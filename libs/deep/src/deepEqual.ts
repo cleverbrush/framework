@@ -2,7 +2,7 @@ const isBothNaN = function (v1, v2) {
     return Number.isNaN(v1) && Number.isNaN(v2);
 };
 
-const deepEqual = function (p1, p2) {
+const deepEqual = function (p1, p2): boolean {
     if (arguments.length !== 2) return false;
     const cache = new Map();
 
@@ -40,8 +40,8 @@ const deepEqual = function (p1, p2) {
 
             cache.set(o1, true);
 
-            let keys1 = Object.keys(o1);
-            let keys2 = Object.keys(o2);
+            const keys1 = Object.keys(o1);
+            const keys2 = Object.keys(o2);
             if (keys1.length != keys2.length) return false;
 
             keys1.sort();
@@ -51,8 +51,8 @@ const deepEqual = function (p1, p2) {
                     return false;
                 }
 
-                let v1 = o1[keys1[i]];
-                let v2 = o2[keys1[i]];
+                const v1 = o1[keys1[i]];
+                const v2 = o2[keys1[i]];
                 if (!compare(v1, v2)) return false;
             }
             return true;
