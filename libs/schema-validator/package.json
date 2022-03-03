@@ -1,21 +1,21 @@
 {
-  "name": "@cleverbrush/schema-validator",
-  "version": "0.0.1",
-  "type": "module",
-  "keywords": [
-    "object schema validator",
-    "schema",
-    "validate object"
-  ],
-  "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-  "license": "GNU GPL",
-  "main": "./dist/index.js",
-  "scripts": {
-    "watch": "tsc --watch",
-    "build": "tsc"
-  },
-  "dependencies": {
-    "@cleverbrush/deep": "0.0.1"
-  },
-  "types": "./dist/index.d.ts"
+    "name": "@cleverbrush/schema-validator",
+    "version": "0.0.1",
+    "type": "module",
+    "keywords": [
+        "object schema validator",
+        "schema",
+        "validate object"
+    ],
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "license": "GNU GPL",
+    "main": "./dist/index.js",
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
+    "dependencies": {
+        "@cleverbrush/deep": "0.0.1"
+    },
+    "types": "./dist/index.d.ts"
 }

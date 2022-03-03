@@ -1,4 +1,4 @@
-import { deepExtend } from "@cleverbrush/deep";
+import { deepExtend } from '@cleverbrush/deep';
 import {
     ISchemasProvider,
     Schema,
@@ -12,36 +12,36 @@ import {
     ArraySchemaDefinition,
     ISchemaValidator,
     DefaultSchemaType,
-    ObjectSchemaDefinition,
-} from "./index";
-import { validateNumber } from "./validators/validateNumber";
-import { validateString } from "./validators/validateString";
-import { validateArray } from "./validators/validateArray";
-import { validateObject } from "./validators/validateObject";
+    ObjectSchemaDefinition
+} from './index';
+import { validateNumber } from './validators/validateNumber';
+import { validateString } from './validators/validateString';
+import { validateArray } from './validators/validateArray';
+import { validateObject } from './validators/validateObject';
 
-const defaultSchemaNames = ["string", "number", "date", "array"];
+const defaultSchemaNames = ['string', 'number', 'date', 'array'];
 
 const defaultSchemas: { [key in DefaultSchemaType]?: Schema<any> } = {
     number: {
-        type: "number",
+        type: 'number',
         isRequired: true,
         isNullable: false,
         ensureNotNaN: true,
-        ensureIsFinite: true,
+        ensureIsFinite: true
     },
     string: {
-        type: "string",
+        type: 'string',
         isNullable: false,
-        isRequired: true,
+        isRequired: true
     },
     array: {
-        type: "array",
+        type: 'array'
     },
     object: {
-        type: "object",
+        type: 'object',
         isNullable: false,
-        isRequired: true,
-    },
+        isRequired: true
+    }
 };
 
 const defaultSchemasValidationStrategies = {
@@ -59,7 +59,7 @@ const defaultSchemasValidationStrategies = {
         obj: any,
         schema: ArraySchemaDefinition<any>,
         validator: ISchemaValidator<any>
-    ): Promise<ValidationResult> => validateArray(obj, schema, validator),
+    ): Promise<ValidationResult> => validateArray(obj, schema, validator)
 };
 
 const isDefaultType = (name: string): boolean =>
@@ -75,9 +75,9 @@ export default class SchemaValidator<T = {}>
         name: keyof K,
         schema: L
     ): SchemaValidator<T & { [key in keyof K]: L }> {
-        if (typeof name !== "string" || !name)
-            throw new Error("Name is required");
-        if (typeof schema !== "object") throw new Error("Object is required");
+        if (typeof name !== 'string' || !name)
+            throw new Error('Name is required');
+        if (typeof schema !== 'object') throw new Error('Object is required');
         if (isDefaultType(name.toString()))
             throw new Error(
                 `You can't add a schema named "${name}" because it's a name of a default schema, please consider another name to be used`
@@ -88,7 +88,7 @@ export default class SchemaValidator<T = {}>
 
         this._schemasMap.set(name.toString(), {
             ...schema,
-            type: "object",
+            type: 'object'
         } as Schema<any>);
         this._schemasCache = null;
 
@@ -101,7 +101,7 @@ export default class SchemaValidator<T = {}>
         for (let key of this._schemasMap.keys()) {
             res[key] = {
                 validate: (value: any): Promise<any> => Promise.resolve(1),
-                schema: this._schemasMap.get(key),
+                schema: this._schemasMap.get(key)
             };
         }
         this._schemasCache = res as { [K in keyof T]: ISchemaActions<T, K> };
@@ -120,13 +120,13 @@ export default class SchemaValidator<T = {}>
         ) => ValidationResult;
         let finalSchema = defaultSchemas[name] as CompositeSchema<{}>;
         if (strategy) {
-            if (typeof mergeSchema === "object") {
+            if (typeof mergeSchema === 'object') {
                 finalSchema = deepExtend(finalSchema, mergeSchema);
             }
-            if (typeof mergeSchema === "number") {
+            if (typeof mergeSchema === 'number') {
                 finalSchema = {
                     ...finalSchema,
-                    equals: mergeSchema,
+                    equals: mergeSchema
                 } as NumberSchemaDefinition<any>;
                 mergeSchema;
             }
@@ -138,7 +138,7 @@ export default class SchemaValidator<T = {}>
 
             return preliminaryResult;
         }
-        throw new Error("not implemented");
+        throw new Error('not implemented');
     }
 
     private async checkValidators(
@@ -150,13 +150,13 @@ export default class SchemaValidator<T = {}>
                 schema.validators.map((v) => Promise.resolve(v(value)))
             );
             const rejections = validatorsResults
-                .filter((f) => f.status === "rejected")
+                .filter((f) => f.status === 'rejected')
                 .map((f: PromiseRejectedResult) => f.reason);
             const errors = validatorsResults
                 .filter(
                     (f) =>
-                        f.status === "fulfilled" &&
-                        typeof f.value !== "boolean" &&
+                        f.status === 'fulfilled' &&
+                        typeof f.value !== 'boolean' &&
                         f.value.valid === false
                 )
                 .map(
@@ -166,16 +166,16 @@ export default class SchemaValidator<T = {}>
 
             if (rejections.length === 0 && errors.length === 0) {
                 return {
-                    valid: true,
+                    valid: true
                 };
             }
             return {
                 valid: false,
-                errors: [...rejections, ...errors],
+                errors: [...rejections, ...errors]
             };
         }
         return {
-            valid: true,
+            valid: true
         };
     }
 
@@ -183,14 +183,14 @@ export default class SchemaValidator<T = {}>
         schema: keyof T | DefaultSchemaType | Schema<any>,
         obj: any
     ): Promise<ValidationResult> {
-        if (!schema) throw new Error("schemaName is required");
-        if (typeof schema === "string") {
+        if (!schema) throw new Error('schemaName is required');
+        if (typeof schema === 'string') {
             if (isDefaultType(schema)) {
                 return await this.validateDefaultType(
                     schema as DefaultSchemaType,
                     obj
                 );
-            } else if (typeof this.schemas[schema as keyof T] !== "undefined") {
+            } else if (typeof this.schemas[schema as keyof T] !== 'undefined') {
                 const objSchema = deepExtend(
                     defaultSchemas.object,
                     this.schemas[schema as keyof T].schema
@@ -199,9 +199,9 @@ export default class SchemaValidator<T = {}>
                 if (!res.valid) return res;
                 return await this.checkValidators(objSchema, obj);
             } else {
-                return await this.validateDefaultType("string", obj, {
-                    type: "string",
-                    equals: schema,
+                return await this.validateDefaultType('string', obj, {
+                    type: 'string',
+                    equals: schema
                 });
             }
         }
@@ -215,17 +215,17 @@ export default class SchemaValidator<T = {}>
             }
             return {
                 valid: false,
-                errors: ["object does not match any schema"],
+                errors: ['object does not match any schema']
             };
         }
 
-        if (typeof schema === "number") {
-            return await this.validateDefaultType("number", obj, schema);
+        if (typeof schema === 'number') {
+            return await this.validateDefaultType('number', obj, schema);
         }
 
-        if (typeof schema === "object") {
-            if (typeof schema.type !== "string")
-                throw new Error("Schema has no type");
+        if (typeof schema === 'object') {
+            if (typeof schema.type !== 'string')
+                throw new Error('Schema has no type');
 
             if (isDefaultType(schema.type)) {
                 return await this.validateDefaultType(
@@ -233,7 +233,7 @@ export default class SchemaValidator<T = {}>
                     obj,
                     schema
                 );
-            } else if (schema.type === "object") {
+            } else if (schema.type === 'object') {
                 const preliminaryResult = await validateObject(
                     obj,
                     schema,

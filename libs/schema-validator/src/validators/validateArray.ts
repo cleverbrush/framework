@@ -1,8 +1,8 @@
 import {
     ValidationResult,
     ArraySchemaDefinition,
-    ISchemaValidator,
-} from "../index";
+    ISchemaValidator
+} from '../index';
 
 export const validateArray = async (
     obj: any,
@@ -10,35 +10,35 @@ export const validateArray = async (
     validator: ISchemaValidator<any>
 ): Promise<ValidationResult> => {
     if (
-        typeof obj === "undefined" &&
-        typeof schema === "object" &&
+        typeof obj === 'undefined' &&
+        typeof schema === 'object' &&
         schema.isRequired === false
     ) {
         return {
-            valid: true,
+            valid: true
         };
     }
     if (!Array.isArray(obj))
         return {
             valid: false,
-            errors: ["expected type array"],
+            errors: ['expected type array']
         };
 
-    if (typeof schema.minLength === "number" && obj.length < schema.minLength) {
+    if (typeof schema.minLength === 'number' && obj.length < schema.minLength) {
         return {
             valid: false,
-            errors: [`expected to be at least ${schema.minLength} chars long`],
+            errors: [`expected to be at least ${schema.minLength} chars long`]
         };
     }
 
-    if (typeof schema.maxLength === "number" && obj.length > schema.maxLength) {
+    if (typeof schema.maxLength === 'number' && obj.length > schema.maxLength) {
         return {
             valid: false,
-            errors: [`expected to be at most ${schema.maxLength} chars long`],
+            errors: [`expected to be at most ${schema.maxLength} chars long`]
         };
     }
 
-    if (typeof schema.ofType !== "undefined") {
+    if (typeof schema.ofType !== 'undefined') {
         const results = await Promise.all(
             obj.map((i) => validator.validate(schema.ofType, i))
         );
@@ -51,16 +51,16 @@ export const validateArray = async (
         if (errors.length) {
             return {
                 valid: false,
-                errors,
+                errors
             };
         }
 
         return {
-            valid: true,
+            valid: true
         };
     }
 
     return {
-        valid: true,
+        valid: true
     };
 };

@@ -1,6 +1,6 @@
 const isBothNaN = function (v1, v2) {
     return Number.isNaN(v1) && Number.isNaN(v2);
-}
+};
 
 const deepEqual = function (p1, p2) {
     if (arguments.length !== 2) return false;
@@ -9,8 +9,8 @@ const deepEqual = function (p1, p2) {
     const compare = function (o1, o2) {
         const arraysAreIdentical = function (a1, a2) {
             if (a1.length !== a2.length) return false;
-            const c1 = a1.map(t => t).sort();
-            const c2 = a2.map(t => t).sort();
+            const c1 = a1.map((t) => t).sort();
+            const c2 = a2.map((t) => t).sort();
 
             for (let i = 0; i < c1.length; i++) {
                 if (!compare(c1[i], c2[i])) return false;
@@ -23,7 +23,10 @@ const deepEqual = function (p1, p2) {
         if (typeof o1 !== typeof o2) return false;
         if (isBothNaN(o1, o2)) return true;
 
-        if ((Array.isArray(o1) && !Array.isArray(o2)) || (!Array.isArray(o1) && Array.isArray(o2))) {
+        if (
+            (Array.isArray(o1) && !Array.isArray(o2)) ||
+            (!Array.isArray(o1) && Array.isArray(o2))
+        ) {
             return false;
         }
         if (Array.isArray(o1) && Array.isArray(o2)) {
@@ -51,10 +54,8 @@ const deepEqual = function (p1, p2) {
                 let v1 = o1[keys1[i]];
                 let v2 = o2[keys1[i]];
                 if (!compare(v1, v2)) return false;
-
             }
             return true;
-
         }
 
         return false;

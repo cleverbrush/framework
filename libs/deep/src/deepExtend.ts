@@ -11,7 +11,13 @@ const deepExtend: (...args: any) => any = function () {
 
         for (let i = 0; i < keys.length; i++) {
             if (o2.hasOwnProperty(keys[i])) {
-                if ((!o1.hasOwnProperty(keys[i])) || !(typeof o1[keys[i]] === 'object' && typeof o2[keys[i]] === 'object')) {
+                if (
+                    !o1.hasOwnProperty(keys[i]) ||
+                    !(
+                        typeof o1[keys[i]] === 'object' &&
+                        typeof o2[keys[i]] === 'object'
+                    )
+                ) {
                     o1[keys[i]] = o2[keys[i]];
                 } else {
                     if (o1[keys[i]] == null) {

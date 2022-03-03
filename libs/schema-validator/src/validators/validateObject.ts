@@ -2,8 +2,8 @@ import {
     ValidationResult,
     ObjectSchemaDefinition,
     ISchemaValidator,
-    Schema,
-} from "../index";
+    Schema
+} from '../index';
 
 export const validateObject = async (
     obj: any,
@@ -11,24 +11,24 @@ export const validateObject = async (
     validator: ISchemaValidator<any>
 ): Promise<ValidationResult> => {
     if (
-        typeof obj === "undefined" &&
-        typeof schema === "object" &&
+        typeof obj === 'undefined' &&
+        typeof schema === 'object' &&
         schema.isRequired === false
     ) {
         return {
-            valid: true,
+            valid: true
         };
     }
-    if (typeof obj !== "object") {
+    if (typeof obj !== 'object') {
         return {
             valid: false,
             errors: [
-                `expected to have type='object', but saw '${typeof obj}' instead`,
-            ],
+                `expected to have type='object', but saw '${typeof obj}' instead`
+            ]
         };
     }
 
-    if (typeof schema.properties === "object" && schema.properties) {
+    if (typeof schema.properties === 'object' && schema.properties) {
         const errors = (
             await Promise.all(
                 Object.entries(schema.properties).map(
@@ -42,7 +42,7 @@ export const validateObject = async (
                             valid: false,
                             errors: (result.errors || []).map(
                                 (e) => `->${name}: ${e}`
-                            ),
+                            )
                         };
                     }
                 )
@@ -54,12 +54,12 @@ export const validateObject = async (
         if (errors.length) {
             return {
                 valid: false,
-                errors,
+                errors
             };
         }
     }
 
     return {
-        valid: true,
+        valid: true
     };
 };

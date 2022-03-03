@@ -1,11 +1,11 @@
-import SchemaValidator from "./schemaValidator";
+import SchemaValidator from './schemaValidator';
 
 export type DefaultSchemaType =
-    | "object"
-    | "function"
-    | "number"
-    | "string"
-    | "array";
+    | 'object'
+    | 'function'
+    | 'number'
+    | 'string'
+    | 'array';
 
 export type PropType<TObj, TProp extends keyof TObj> = TObj[TProp];
 
@@ -32,8 +32,8 @@ export type SchemaDefintion<TObj> = {
     validators?: Array<Validator<TObj>>;
 };
 
-export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, "type"> & {
-    type: "object";
+export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
+    type: 'object';
     extends?: string;
     properties?: Partial<{
         [S in keyof T]: Schema<PropType<T, S>>;
@@ -42,7 +42,7 @@ export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, "type"> & {
 
 export type ObjectSchemaDefinitionParam<T> = Omit<
     ObjectSchemaDefinition<T>,
-    "type"
+    'type'
 >;
 
 export type ParamsValidators<TFunc extends (...args: any) => any> = {
@@ -51,17 +51,17 @@ export type ParamsValidators<TFunc extends (...args: any) => any> = {
 
 export type FunctionSchemaDefinition<T extends (...args: any) => any> = Omit<
     SchemaDefintion<T>,
-    "type"
+    'type'
 > & {
-    type: "function";
+    type: 'function';
     params?: ParamsValidators<T>;
 };
 
 export type NumberSchemaDefinition<TObj> = Omit<
     SchemaDefintion<TObj>,
-    "type"
+    'type'
 > & {
-    type: "number";
+    type: 'number';
     min?: number;
     max?: number;
     equals?: number;
@@ -72,9 +72,9 @@ export type NumberSchemaDefinition<TObj> = Omit<
 
 export type StringSchemaDefinition<TObj> = Omit<
     SchemaDefintion<TObj>,
-    "type"
+    'type'
 > & {
-    type: "string";
+    type: 'string';
     equals?: string;
     minLength?: number;
     maxLength?: number;
@@ -82,9 +82,9 @@ export type StringSchemaDefinition<TObj> = Omit<
 
 export type ArraySchemaDefinition<TObj> = Omit<
     SchemaDefintion<TObj>,
-    "type"
+    'type'
 > & {
-    type: "array";
+    type: 'array';
     ofType?: Schema<any>;
     minLength?: number;
     maxLength?: number;
@@ -95,7 +95,7 @@ export type CompositeSchema<TObj> = TObj extends (...args: any) => any
     : TObj extends number
     ? NumberSchemaDefinition<TObj>
     : TObj extends string
-    ? StringSchemaDefinition<TObj> | "string"
+    ? StringSchemaDefinition<TObj> | 'string'
     :
           | NumberSchemaDefinition<TObj>
           | StringSchemaDefinition<TObj>

@@ -1,18 +1,22 @@
 {
-  "name": "@cleverbrush/deep",
-  "version": "0.0.1",
-  "type": "module",
-  "keywords": [
-    "deep operations on objects",
-    "deep equal",
-    "deep extend"
-  ],
-  "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-  "license": "GNU GPL",
-  "main": "./dist/index.js",
-  "scripts": {
-    "watch": "tsc --watch",
-    "build": "tsc"
-  },
-  "types": "./dist/index.d.ts"
+    "name": "@cleverbrush/deep",
+    "version": "0.0.1",
+    "type": "module",
+    "keywords": [
+        "deep operations on objects",
+        "deep equal",
+        "deep extend"
+    ],
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "license": "GNU GPL",
+    "main": "./dist/index.js",
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/libs"
+    },
+    "types": "./dist/index.d.ts"
 }

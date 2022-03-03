@@ -1,12 +1,12 @@
-import { deepEqual, deepExtend } from "@cleverbrush/deep";
-import { ValidationResult } from "../dist/index.js";
+import { deepEqual, deepExtend } from '@cleverbrush/deep';
+import { ValidationResult } from '../dist/index.js';
 
 import {
     NumberSchemaDefinition,
     ObjectSchemaDefinitionParam,
-    Schema,
-} from "./index";
-import SchemaValidator from "./schemaValidator";
+    Schema
+} from './index';
+import SchemaValidator from './schemaValidator';
 
 type User = {
     id: number;
@@ -23,122 +23,122 @@ type User = {
 
 const getUserSchema = (): ObjectSchemaDefinitionParam<User> => ({
     properties: {
-        id: "number",
+        id: 'number',
         name: {
-            type: "object",
+            type: 'object',
             isNullable: false,
             isRequired: true,
             properties: {
                 first: {
-                    type: "string",
+                    type: 'string',
                     isNullable: false,
                     isRequired: true,
                     minLength: 1,
-                    maxLength: 100,
+                    maxLength: 100
                 },
                 last: {
-                    type: "string",
+                    type: 'string',
                     isNullable: false,
                     isRequired: true,
                     minLength: 1,
-                    maxLength: 100,
-                },
-            },
+                    maxLength: 100
+                }
+            }
         },
         incomePerMonth: {
-            type: "number",
-            min: 0,
-        },
-    },
+            type: 'number',
+            min: 0
+        }
+    }
 });
 
-test("Can add schema", () => {
+test('Can add schema', () => {
     const validator = new SchemaValidator().addSchemaType(
-        "something",
+        'something',
         getUserSchema()
     );
     expect(validator.schemas.something).toBeDefined();
 });
 
-test("Error thrown on adding a schema with duplicate name", () => {
+test('Error thrown on adding a schema with duplicate name', () => {
     expect(() =>
         new SchemaValidator()
-            .addSchemaType("smth", {})
-            .addSchemaType("smth", {})
+            .addSchemaType('smth', {})
+            .addSchemaType('smth', {})
     ).toThrow();
 });
 
-test("Receiving the same schema after add", () => {
+test('Receiving the same schema after add', () => {
     const schema: ObjectSchemaDefinitionParam<{ name: string }> = {
         properties: {
-            name: "string",
-        },
+            name: 'string'
+        }
     };
-    const validator = new SchemaValidator().addSchemaType("something", schema);
+    const validator = new SchemaValidator().addSchemaType('something', schema);
 
     expect(
         deepEqual(
-            { ...schema, type: "object" },
+            { ...schema, type: 'object' },
             validator.schemas.something.schema
         )
     ).toEqual(true);
 });
 
-test("Schemas property is cached when reading", () => {
-    const validator = new SchemaValidator().addSchemaType("something", {});
+test('Schemas property is cached when reading', () => {
+    const validator = new SchemaValidator().addSchemaType('something', {});
     expect(validator.schemas).toEqual(validator.schemas);
 });
 
-test("Schemas property is updated after adding a new schema", () => {
-    let validator = new SchemaValidator().addSchemaType("something", {});
+test('Schemas property is updated after adding a new schema', () => {
+    let validator = new SchemaValidator().addSchemaType('something', {});
     const s = validator.schemas;
-    validator = validator.addSchemaType("another", {});
+    validator = validator.addSchemaType('another', {});
     expect(s).not.toEqual(validator.schemas);
 });
 
 test('Trows when trying to add a schema with name = "number"', () => {
     let validator = new SchemaValidator();
-    expect(() => validator.addSchemaType("number", {})).toThrow();
+    expect(() => validator.addSchemaType('number', {})).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "array"', () => {
     let validator = new SchemaValidator();
-    expect(() => validator.addSchemaType("array", {})).toThrow();
+    expect(() => validator.addSchemaType('array', {})).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "date"', () => {
     let validator = new SchemaValidator();
-    expect(() => validator.addSchemaType("date", {})).toThrow();
+    expect(() => validator.addSchemaType('date', {})).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "string"', () => {
     let validator = new SchemaValidator();
-    expect(() => validator.addSchemaType("string", {})).toThrow();
+    expect(() => validator.addSchemaType('string', {})).toThrow();
 });
 
-test("Throws if schema name is empty", () => {
+test('Throws if schema name is empty', () => {
     let validator = new SchemaValidator();
-    expect(() => validator.addSchemaType("", {})).toThrow();
+    expect(() => validator.addSchemaType('', {})).toThrow();
 });
 
-test("Throws if schema name is not a string", () => {
+test('Throws if schema name is not a string', () => {
     let validator = new SchemaValidator();
     expect(() =>
         validator.addSchemaType(new Date() as any as string, {})
     ).toThrow();
 });
 
-test("Throws if schema is not an object", () => {
+test('Throws if schema is not an object', () => {
     let validator = new SchemaValidator();
     expect(() =>
         validator.addSchemaType(
-            "string",
-            "string" as any as ObjectSchemaDefinitionParam<any>
+            'string',
+            'string' as any as ObjectSchemaDefinitionParam<any>
         )
     ).toThrow();
 });
 
-test("Validate - no schema", async () => {
+test('Validate - no schema', async () => {
     const validator = new SchemaValidator();
     const cth = jest.fn();
     validator
@@ -149,13 +149,13 @@ test("Validate - no schema", async () => {
         });
 });
 
-test("Validate - no schema type", async () => {
+test('Validate - no schema type', async () => {
     const validator = new SchemaValidator();
     const cth = jest.fn();
     validator
         .validate(
             {
-                isRequired: true,
+                isRequired: true
             } as Schema<any>,
             10
         )
@@ -165,116 +165,116 @@ test("Validate - no schema type", async () => {
         });
 });
 
-test("Validate - number by value", async () => {
+test('Validate - number by value', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(10, 0);
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by value - 2", async () => {
+test('Validate - number by value - 2', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(10, 10);
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by value - 3", async () => {
+test('Validate - number by value - 3', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(10, {});
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by value - 4", async () => {
+test('Validate - number by value - 4', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(10, 15);
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by name: object", async () => {
+test('Validate - number by name: object', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("number", {});
-    expect(result).toHaveProperty("valid", false);
+    const result = await validator.validate('number', {});
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by name: string", async () => {
+test('Validate - number by name: string', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("number", "10");
-    expect(result).toHaveProperty("valid", false);
+    const result = await validator.validate('number', '10');
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by name - correct", async () => {
+test('Validate - number by name - correct', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("number", 10);
-    expect(result).toHaveProperty("valid", true);
+    const result = await validator.validate('number', 10);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema", async () => {
+test('Validate - number by schema', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number'
         },
         10
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - not number passed", async () => {
+test('Validate - number by schema - not number passed', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number'
         },
-        "str"
+        'str'
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - min", async () => {
+test('Validate - number by schema - min', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            min: 1000,
+            type: 'number',
+            min: 1000
         },
         10
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - min 2", async () => {
+test('Validate - number by schema - min 2', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            min: 1000,
+            type: 'number',
+            min: 1000
         },
         10000
     );
     expect(result).toEqual({
-        valid: true,
+        valid: true
     });
 });
 
-test("Validate - number by schema - min 3", async () => {
+test('Validate - number by schema - min 3', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            min: 1000,
+            type: 'number',
+            min: 1000
         },
         1000
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - min 4", async () => {
+test('Validate - number by schema - min 4', async () => {
     const validator = new SchemaValidator();
     const mk = jest.fn();
     validator
         .validate(
             {
-                type: "number",
-                min: "string" as any as number,
+                type: 'number',
+                min: 'string' as any as number
             },
             10
         )
@@ -284,50 +284,50 @@ test("Validate - number by schema - min 4", async () => {
         });
 });
 
-test("Validate - number by schema - max", async () => {
+test('Validate - number by schema - max', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            max: 1000,
+            type: 'number',
+            max: 1000
         },
         20000
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - max 2", async () => {
+test('Validate - number by schema - max 2', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            max: 40000,
+            type: 'number',
+            max: 40000
         },
         10000
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - max 3", async () => {
+test('Validate - number by schema - max 3', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            max: 1000,
+            type: 'number',
+            max: 1000
         },
         1000
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - max 4", async () => {
+test('Validate - number by schema - max 4', async () => {
     const validator = new SchemaValidator();
     const mk = jest.fn();
     validator
         .validate(
             {
-                type: "number",
-                max: "string" as any as number,
+                type: 'number',
+                max: 'string' as any as number
             },
             10
         )
@@ -337,551 +337,551 @@ test("Validate - number by schema - max 4", async () => {
         });
 });
 
-test("Validate - number by schema - range", async () => {
+test('Validate - number by schema - range', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number',
             min: 1,
-            max: 100,
+            max: 100
         },
         10
     );
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - range - 2", async () => {
+test('Validate - number by schema - range - 2', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number',
             min: -100,
-            max: 100,
+            max: 100
         },
         -210
     );
 
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - range - 3", async () => {
+test('Validate - number by schema - range - 3', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number',
             min: -100,
-            max: 100,
+            max: 100
         },
         -100
     );
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - range - 4", async () => {
+test('Validate - number by schema - range - 4', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number',
             min: -100,
-            max: 100,
+            max: 100
         },
         100
     );
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - range - 5", async () => {
+test('Validate - number by schema - range - 5', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number',
             min: -100,
-            max: 100,
+            max: 100
         },
         200
     );
 
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - range - 6", async () => {
+test('Validate - number by schema - range - 6', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number',
             min: -100,
-            max: 100,
+            max: 100
         },
         200
     );
 
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - NaN", async () => {
+test('Validate - number by schema - NaN', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number',
             min: -100,
-            max: 100,
+            max: 100
         },
         0 / 0
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - NaN - 2", async () => {
+test('Validate - number by schema - NaN - 2', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            ensureNotNaN: false,
+            type: 'number',
+            ensureNotNaN: false
         },
         0 / 0
     );
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - Infinity", async () => {
+test('Validate - number by schema - Infinity', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
+            type: 'number'
         },
         100 / 0
     );
 
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - Infinity - 2", async () => {
+test('Validate - number by schema - Infinity - 2', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "number",
-            ensureIsFinite: false,
+            type: 'number',
+            ensureIsFinite: false
         },
         100 / 0
     );
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - number by schema - custom validators - 1", async () => {
+test('Validate - number by schema - custom validators - 1', async () => {
     const validator = new SchemaValidator();
     const schema: NumberSchemaDefinition<any> = {
-        type: "number",
+        type: 'number',
         validators: [
             async (value) => {
                 if ((value & 0xb01) === 0)
                     return {
                         valid: false,
-                        errors: ["value should be odd!"],
+                        errors: ['value should be odd!']
                     };
                 return {
-                    valid: true,
+                    valid: true
                 };
-            },
-        ],
+            }
+        ]
     };
     let result = await validator.validate(schema, 101);
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(schema, 100);
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - number by schema - custom validators - 2", async () => {
+test('Validate - number by schema - custom validators - 2', async () => {
     const validator = new SchemaValidator();
     const schema: NumberSchemaDefinition<any> = {
-        type: "number",
+        type: 'number',
         validators: [
             (value) => {
                 if ((value & 0xb01) === 0)
                     return {
                         valid: false,
-                        errors: ["value should be odd!"],
+                        errors: ['value should be odd!']
                     };
                 return {
-                    valid: true,
+                    valid: true
                 };
             },
-            (value) => ({ valid: value > 100 }),
-        ],
+            (value) => ({ valid: value > 100 })
+        ]
     };
     let result = await validator.validate(schema, 101);
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(schema, 99);
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 
     result = await validator.validate(schema, 100);
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - string - 1", async () => {
+test('Validate - string - 1', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("string", "12345");
-    expect(result).toHaveProperty("valid", true);
+    const result = await validator.validate('string', '12345');
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - string - 2", async () => {
+test('Validate - string - 2', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("string", 12345);
-    expect(result).toHaveProperty("valid", false);
+    const result = await validator.validate('string', 12345);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - string - 3", async () => {
+test('Validate - string - 3', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("12345", "12345");
-    expect(result).toHaveProperty("valid", true);
+    const result = await validator.validate('12345', '12345');
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - string - 4", async () => {
+test('Validate - string - 4', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("12345", "123456");
-    expect(result).toHaveProperty("valid", false);
+    const result = await validator.validate('12345', '123456');
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - string - 5", async () => {
+test('Validate - string - 5', async () => {
     const validator = new SchemaValidator();
-    const result = await validator.validate("12345", 123456);
-    expect(result).toHaveProperty("valid", false);
+    const result = await validator.validate('12345', 123456);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - string - schema object - 1", async () => {
+test('Validate - string - schema object - 1', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "string",
-            equals: "123456",
+            type: 'string',
+            equals: '123456'
         },
-        "123456"
+        '123456'
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
 
-test("Validate - string - schema object - 2", async () => {
+test('Validate - string - schema object - 2', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "string",
-            equals: "123456",
+            type: 'string',
+            equals: '123456'
         },
-        "12345"
+        '12345'
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - string - schema object - 3", async () => {
+test('Validate - string - schema object - 3', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate(
         {
-            type: "string",
-            equals: "123456",
+            type: 'string',
+            equals: '123456'
         },
         1234
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - string - length control - 1", async () => {
+test('Validate - string - length control - 1', async () => {
     const validator = new SchemaValidator();
     let result = await validator.validate(
         {
-            type: "string",
+            type: 'string',
             minLength: 2,
-            maxLength: 3,
+            maxLength: 3
         },
-        "U"
+        'U'
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 
     result = await validator.validate(
         {
-            type: "string",
+            type: 'string',
             minLength: 2,
-            maxLength: 3,
+            maxLength: 3
         },
-        "US"
+        'US'
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "string",
+            type: 'string',
             minLength: 2,
-            maxLength: 3,
+            maxLength: 3
         },
-        "USA"
+        'USA'
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "string",
+            type: 'string',
             minLength: 2,
-            maxLength: 3,
+            maxLength: 3
         },
-        "USA"
+        'USA'
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "string",
+            type: 'string',
             minLength: 2,
-            maxLength: 3,
+            maxLength: 3
         },
-        "United States of America"
+        'United States of America'
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - array - 1", async () => {
+test('Validate - array - 1', async () => {
     const validator = new SchemaValidator();
-    let result = await validator.validate("array", []);
-    expect(result).toHaveProperty("valid", true);
+    let result = await validator.validate('array', []);
+    expect(result).toHaveProperty('valid', true);
 
-    result = await validator.validate("array", 123);
-    expect(result).toHaveProperty("valid", false);
+    result = await validator.validate('array', 123);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - array - size control - 1", async () => {
+test('Validate - array - size control - 1', async () => {
     const validator = new SchemaValidator();
     let result = await validator.validate(
         {
-            type: "array",
+            type: 'array',
             minLength: 1,
-            maxLength: 3,
+            maxLength: 3
         },
         []
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 
     result = await validator.validate(
         {
-            type: "array",
+            type: 'array',
             minLength: 1,
-            maxLength: 3,
+            maxLength: 3
         },
         [1]
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "array",
+            type: 'array',
             minLength: 1,
-            maxLength: 3,
+            maxLength: 3
         },
         [1, 2]
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "array",
+            type: 'array',
             minLength: 1,
-            maxLength: 3,
+            maxLength: 3
         },
         [1, 2, 3]
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "array",
+            type: 'array',
             minLength: 1,
-            maxLength: 3,
+            maxLength: 3
         },
         [1, 2, 3, 4]
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - array - ofType - 1", async () => {
+test('Validate - array - ofType - 1', async () => {
     const validator = new SchemaValidator();
     let result = await validator.validate(
         {
-            type: "array",
-            ofType: "number",
+            type: 'array',
+            ofType: 'number'
         },
-        ["1", 2, 3]
+        ['1', 2, 3]
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 
     result = await validator.validate(
         {
-            type: "array",
-            ofType: "number",
+            type: 'array',
+            ofType: 'number'
         },
         [1, 2, 3]
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "array",
+            type: 'array',
             ofType: {
-                type: "number",
-                min: 10,
-            },
+                type: 'number',
+                min: 10
+            }
         },
         [-1, 12, 13]
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - object - 1", async () => {
+test('Validate - object - 1', async () => {
     let validator = new SchemaValidator().addSchemaType(
-        "user",
+        'user',
         getUserSchema()
     );
     const user: User = {
         id: 1,
         name: {
-            first: "Andrew",
-            last: "Zolotukhin",
+            first: 'Andrew',
+            last: 'Zolotukhin'
         },
         bornAt: new Date(1986, 4, 30),
         incomePerMonth: 134234,
-        aliases: [],
+        aliases: []
     };
 
-    let result = await validator.validate("user", user);
+    let result = await validator.validate('user', user);
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
-    result = await validator.validate("user", 10);
+    result = await validator.validate('user', 10);
 
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 
     result = await validator.validate(
         {
-            type: "object",
+            type: 'object',
             properties: {
                 name: {
-                    type: "string",
-                    maxLength: 5,
+                    type: 'string',
+                    maxLength: 5
                 },
                 address: {
-                    type: "object",
+                    type: 'object',
                     properties: {
-                        street: "string",
+                        street: 'string',
                         house: {
-                            type: "number",
-                            isRequired: false,
-                        },
-                    },
-                },
-            },
+                            type: 'number',
+                            isRequired: false
+                        }
+                    }
+                }
+            }
         },
         {
-            name: "Andr",
+            name: 'Andr',
             address: {
-                street: "something",
-            },
+                street: 'something'
+            }
         }
     );
 
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         {
-            type: "object",
+            type: 'object',
             properties: {
-                a: "number",
-                b: "number",
+                a: 'number',
+                b: 'number'
             },
             validators: [
                 (value) => {
                     if (value.a + value.b === 5) {
                         return {
-                            valid: true,
+                            valid: true
                         };
                     }
                     return {
                         valid: false,
-                        error: ["some error"],
+                        error: ['some error']
                     };
-                },
-            ],
+                }
+            ]
         },
         {
             a: 1,
-            b: 3,
+            b: 3
         }
     );
-    expect(result).toHaveProperty("valid", false);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - object - 2", async () => {
+test('Validate - object - 2', async () => {
     let validator = new SchemaValidator().addSchemaType(
-        "user",
+        'user',
         deepExtend(getUserSchema(), {
             validators: [
                 (value): ValidationResult => {
                     if (value.bornAt < new Date(1990, 0, 1)) {
                         return {
-                            valid: true,
+                            valid: true
                         };
                     }
                     return {
                         valid: false,
-                        errors: [`bornAt should be before Jan 1 1990`],
+                        errors: [`bornAt should be before Jan 1 1990`]
                     };
-                },
-            ],
+                }
+            ]
         })
     );
     const user: User = {
         id: 1,
         name: {
-            first: "Andrew",
-            last: "Zolotukhin",
+            first: 'Andrew',
+            last: 'Zolotukhin'
         },
         bornAt: new Date(1996, 4, 30),
         incomePerMonth: 134234,
-        aliases: [],
+        aliases: []
     };
 
-    let result = await validator.validate("user", user);
-    expect(result).toHaveProperty("valid", false);
+    let result = await validator.validate('user', user);
+    expect(result).toHaveProperty('valid', false);
 });
 
-test("Validate - one of - 1", async () => {
+test('Validate - one of - 1', async () => {
     const validator = new SchemaValidator();
 
-    let result = await validator.validate(["number", "object"], "something");
-    expect(result).toHaveProperty("valid", false);
+    let result = await validator.validate(['number', 'object'], 'something');
+    expect(result).toHaveProperty('valid', false);
 
-    result = await validator.validate(["number", "string"], "something");
-    expect(result).toHaveProperty("valid", true);
+    result = await validator.validate(['number', 'string'], 'something');
+    expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
         [
-            "number",
-            "string",
+            'number',
+            'string',
             {
-                type: "object",
+                type: 'object',
                 properties: {
-                    first: "string",
-                    last: "string",
-                },
-            },
+                    first: 'string',
+                    last: 'string'
+                }
+            }
         ],
         {
-            first: "something",
-            last: "another",
+            first: 'something',
+            last: 'another'
         }
     );
-    expect(result).toHaveProperty("valid", true);
+    expect(result).toHaveProperty('valid', true);
 });
