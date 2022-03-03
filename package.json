@@ -13,7 +13,7 @@
     "type": "module",
     "keywords": [],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-    "license": "GNU GPL",
+    "license": "BSD",
     "devDependencies": {
         "@types/jest": "^27.4.0",
         "eslint-config-airbnb": "^19.0.4",

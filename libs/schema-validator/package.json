@@ -8,7 +8,7 @@
         "validate object"
     ],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-    "license": "GNU GPL",
+    "license": "BSD",
     "main": "./dist/index.js",
     "scripts": {
         "watch": "tsc --watch",
