@@ -3,10 +3,11 @@
         "rootDir": "./src",
         "outDir": "./dist",
         "declaration": true,
-        "target": "ES2020",
+        "target": "esnext",
         "module": "CommonJS",
         "esModuleInterop": true,
-        "moduleResolution": "Node"
+        "moduleResolution": "Node",
+        "allowSyntheticDefaultImports": true
     },
     "files": ["./src/index.ts"],
     "watchOptions": {

@@ -1,7 +1,7 @@
 {
     "name": "cleverbrush-utils",
     "private": "true",
-    "version": "0.0.1",
+    "version": "0.0.3",
     "description": "",
     "scripts": {
         "test": "jest",
@@ -10,12 +10,13 @@
     "workspaces": [
         "./libs/*"
     ],
-    "type": "module",
     "keywords": [],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD",
     "devDependencies": {
         "@types/jest": "^27.4.0",
+        "@typescript-eslint/eslint-plugin": "^5.13.0",
+        "@typescript-eslint/parser": "^5.13.0",
         "eslint-config-airbnb": "^19.0.4",
         "jest": "^27.4.7",
         "prettier": "^2.5.1",

@@ -33,7 +33,7 @@ export const validateString = async (
               };
     }
 
-    const str = obj as String;
+    const str = obj as string;
 
     if (typeof schema.equals === 'string' && str !== schema.equals) {
         return {

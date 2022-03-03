@@ -102,7 +102,7 @@ export type CompositeSchema<TObj> = TObj extends (...args: any) => any
           | ArraySchemaDefinition<TObj>
           | ObjectSchemaDefinition<TObj>;
 
-export type SingleSchema<TObj = {}> =
+export type SingleSchema<TObj = Record<string, never>> =
     | number
     | string
     | DefaultSchemaType
@@ -115,13 +115,13 @@ export interface ISchemaActions<K, T extends keyof K> {
     schema: PropType<K, T>;
 }
 
-export interface ISchemasProvider<T = {}> {
+export interface ISchemasProvider<T = Record<string, never>> {
     schemas: {
         [K in keyof T]: ISchemaActions<T, K>;
     };
 }
 
-export interface ISchemaValidator<T = {}> {
+export interface ISchemaValidator<T = Record<string, never>> {
     addSchemaType<K, L extends ObjectSchemaDefinitionParam<M>, M = any>(
         name: keyof K,
         schema: L
@@ -133,4 +133,5 @@ export interface ISchemaValidator<T = {}> {
     ): Promise<ValidationResult>;
 }
 
+export { SchemaValidator };
 export default SchemaValidator;

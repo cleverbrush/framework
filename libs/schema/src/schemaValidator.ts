@@ -65,7 +65,7 @@ const defaultSchemasValidationStrategies = {
 const isDefaultType = (name: string): boolean =>
     defaultSchemaNames.indexOf(name) !== -1;
 
-export default class SchemaValidator<T = {}>
+export default class SchemaValidator<T = Record<string, never>>
     implements ISchemasProvider<T>, ISchemaValidator<T>
 {
     private _schemasMap = new Map<string, Schema<any>>();
@@ -98,9 +98,10 @@ export default class SchemaValidator<T = {}>
     public get schemas(): { [K in keyof T]: ISchemaActions<T, K> } {
         if (this._schemasCache) return this._schemasCache;
         const res = {};
-        for (let key of this._schemasMap.keys()) {
+        for (const key of this._schemasMap.keys()) {
             res[key] = {
-                validate: (value: any): Promise<any> => Promise.resolve(1),
+                validate: (value: any): Promise<any> =>
+                    this.validate(this._schemasMap.get(key), value),
                 schema: this._schemasMap.get(key)
             };
         }
@@ -118,7 +119,9 @@ export default class SchemaValidator<T = {}>
             schema: Schema<any>,
             validator: ISchemaValidator<any>
         ) => ValidationResult;
-        let finalSchema = defaultSchemas[name] as CompositeSchema<{}>;
+        let finalSchema = defaultSchemas[name] as CompositeSchema<
+            Record<string, never>
+        >;
         if (strategy) {
             if (typeof mergeSchema === 'object') {
                 finalSchema = deepExtend(finalSchema, mergeSchema);
@@ -142,7 +145,7 @@ export default class SchemaValidator<T = {}>
     }
 
     private async checkValidators(
-        schema: CompositeSchema<{}>,
+        schema: CompositeSchema<Record<string, never>>,
         value: any
     ): Promise<ValidationResult> {
         if (Array.isArray(schema.validators)) {
@@ -194,7 +197,7 @@ export default class SchemaValidator<T = {}>
                 const objSchema = deepExtend(
                     defaultSchemas.object,
                     this.schemas[schema as keyof T].schema
-                ) as ObjectSchemaDefinition<any>;
+                ) as ObjectSchemaDefinition<Record<string, never>>;
                 const res = await validateObject(obj, objSchema, this);
                 if (!res.valid) return res;
                 return await this.checkValidators(objSchema, obj);
@@ -241,7 +244,10 @@ export default class SchemaValidator<T = {}>
                 );
                 if (!preliminaryResult.valid) return preliminaryResult;
 
-                return await this.checkValidators(schema, obj);
+                return await this.checkValidators(
+                    schema as CompositeSchema<Record<string, never>>,
+                    obj
+                );
             }
         }
 
