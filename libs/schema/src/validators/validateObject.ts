@@ -41,7 +41,7 @@ export const validateObject = async (
                         return {
                             valid: false,
                             errors: (result.errors || []).map(
-                                (e) => `->${name}: ${e}`
+                                (e) => `->${name} ${e}`
                             )
                         };
                     }

@@ -1,4 +1,4 @@
-# Deep operation on objects
+# Deep operations on objects
 
 This is yet another library which provides operations over JavaScript objects, like deep compare and deep merge.
 
