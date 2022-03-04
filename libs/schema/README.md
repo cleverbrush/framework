@@ -23,7 +23,7 @@ Any schema defined by object can contain the following fields:
 -   `type` - schema type (see the list above)
 -   `isRequired` - defines if `undefined` value is considered valid
 -   `isNullable` - defines if `null` value is considered valid
--   `validators` - optional array of custom validation functions (see [Examples](#examples))
+-   `validators` - optional array of custom validation functions (see Examples section at the bottom of this page)
 
 ### Number
 
@@ -274,6 +274,6 @@ There is a possibility to register a schema, give it a name and then reuse it:
 
     // { valid: true }
 
-## Examples {#examples}
+## Examples
 
 For Examples see unit tests in the schemaValidator.tests.ts
