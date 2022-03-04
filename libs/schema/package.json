@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/schema",
-    "version": "0.0.4",
+    "version": "0.0.5",
     "keywords": [
         "object schema validator",
         "schema",
@@ -10,12 +10,16 @@
     "license": "BSD",
     "main": "./dist/index.js",
     "readme": "https://github.com/cleverbrush/libs/tree/master/libs/schema#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/libs"
+    },
     "scripts": {
         "watch": "tsc --watch",
         "build": "tsc"
     },
     "dependencies": {
-        "@cleverbrush/deep": "0.0.4"
+        "@cleverbrush/deep": "0.0.5"
     },
     "types": "./dist/index.d.ts"
 }
