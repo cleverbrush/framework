@@ -97,45 +97,72 @@ test('Schemas property is updated after adding a new schema', () => {
 });
 
 test('Trows when trying to add a schema with name = "number"', () => {
-    let validator = new SchemaValidator();
+    const validator = new SchemaValidator();
     expect(() => validator.addSchemaType('number', {})).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "array"', () => {
-    let validator = new SchemaValidator();
+    const validator = new SchemaValidator();
     expect(() => validator.addSchemaType('array', {})).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "date"', () => {
-    let validator = new SchemaValidator();
+    const validator = new SchemaValidator();
     expect(() => validator.addSchemaType('date', {})).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "string"', () => {
-    let validator = new SchemaValidator();
+    const validator = new SchemaValidator();
     expect(() => validator.addSchemaType('string', {})).toThrow();
 });
 
 test('Throws if schema name is empty', () => {
-    let validator = new SchemaValidator();
+    const validator = new SchemaValidator();
     expect(() => validator.addSchemaType('', {})).toThrow();
 });
 
 test('Throws if schema name is not a string', () => {
-    let validator = new SchemaValidator();
+    const validator = new SchemaValidator();
     expect(() =>
         validator.addSchemaType(new Date() as any as string, {})
     ).toThrow();
 });
 
 test('Throws if schema is not an object', () => {
-    let validator = new SchemaValidator();
+    const validator = new SchemaValidator();
     expect(() =>
         validator.addSchemaType(
             'string',
             'string' as any as ObjectSchemaDefinitionParam<any>
         )
     ).toThrow();
+});
+
+test('Array as schema type', async () => {
+    const validator = new SchemaValidator()
+        .addSchemaType('name', {
+            properties: {
+                name: 'string'
+            }
+        })
+        .addSchemaType('number_or_string', ['number', 'string', 'name']);
+
+    let result = await validator.schemas.number_or_string.validate(123);
+
+    expect(result).toHaveProperty('valid', true);
+
+    result = await validator.schemas.number_or_string.validate('some string');
+
+    expect(result).toHaveProperty('valid', true);
+
+    result = await validator.schemas.number_or_string.validate({});
+
+    expect(result).toHaveProperty('valid', false);
+
+    result = await validator.schemas.number_or_string.validate({
+        name: 'some name'
+    });
+    expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - no schema', async () => {
@@ -741,7 +768,7 @@ test('Validate - array - ofType - 1', async () => {
 });
 
 test('Validate - object - 1', async () => {
-    let validator = new SchemaValidator().addSchemaType(
+    const validator = new SchemaValidator().addSchemaType(
         'user',
         getUserSchema()
     );
@@ -824,7 +851,7 @@ test('Validate - object - 1', async () => {
 });
 
 test('Validate - object - 2', async () => {
-    let validator = new SchemaValidator().addSchemaType(
+    const validator = new SchemaValidator().addSchemaType(
         'user',
         deepExtend(getUserSchema(), {
             validators: [
@@ -853,7 +880,7 @@ test('Validate - object - 2', async () => {
         aliases: []
     };
 
-    let result = await validator.validate('user', user);
+    const result = await validator.validate('user', user);
     expect(result).toHaveProperty('valid', false);
 });
 

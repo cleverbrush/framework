@@ -124,8 +124,8 @@ export interface ISchemasProvider<T = Record<string, never>> {
 export interface ISchemaValidator<T = Record<string, never>> {
     addSchemaType<K, L extends ObjectSchemaDefinitionParam<M>, M = any>(
         name: keyof K,
-        schema: L
-    ): SchemaValidator<T & { [key in keyof K]: L }>;
+        schema: L | Array<Schema<any>>
+    ): SchemaValidator<T & { [key in keyof K]: typeof schema }>;
 
     validate(
         schema: keyof T | DefaultSchemaType | Schema<any>,

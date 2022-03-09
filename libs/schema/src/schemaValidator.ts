@@ -73,11 +73,11 @@ export default class SchemaValidator<T = Record<string, never>>
 
     public addSchemaType<K, L extends ObjectSchemaDefinitionParam<M>, M = any>(
         name: keyof K,
-        schema: L
+        schema: L | Array<Schema<any>>
     ): SchemaValidator<T & { [key in keyof K]: L }> {
         if (typeof name !== 'string' || !name)
             throw new Error('Name is required');
-        if (typeof schema !== 'object') throw new Error('Object is required');
+
         if (isDefaultType(name.toString()))
             throw new Error(
                 `You can't add a schema named "${name}" because it's a name of a default schema, please consider another name to be used`
@@ -86,6 +86,14 @@ export default class SchemaValidator<T = Record<string, never>>
             throw new Error(`Schema "${name}" already exists`);
         }
 
+        if (Array.isArray(schema)) {
+            this._schemasMap.set(name.toString(), schema as Schema<any>);
+            this._schemasCache = null;
+            return this as any as SchemaValidator<T & { [key in keyof K]: L }>;
+        }
+
+        if (typeof schema !== 'object')
+            throw new Error('Array or Object is required');
         this._schemasMap.set(name.toString(), {
             ...schema,
             type: 'object'
