@@ -70,6 +70,24 @@ export default class SchemaValidator<T = Record<string, never>>
 {
     private _schemasMap = new Map<string, Schema<any>>();
     private _schemasCache: { [K in keyof T]: ISchemaActions<T, K> } = null;
+    private _preprocessorsMap = new Map<
+        string,
+        (value: unknown) => unknown | Promise<unknown>
+    >();
+
+    public get preprocessors(): Map<string, (value: unknown) => unknown> {
+        return this._preprocessorsMap;
+    }
+
+    public addPreprocessor(
+        name: string,
+        preprocessor: (value: unknown) => unknown | Promise<unknown>
+    ): SchemaValidator<T> {
+        if (this._preprocessorsMap.has(name))
+            throw new Error(`Preprocessor '${name}' is already registered`);
+        this._preprocessorsMap.set(name, preprocessor);
+        return this;
+    }
 
     public addSchemaType<K, L extends ObjectSchemaDefinitionParam<M>, M = any>(
         name: keyof K,

@@ -39,6 +39,11 @@ export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
     properties?: Partial<{
         [S in keyof T]: Schema<PropType<T, S>>;
     }>;
+    preprocessors?: Partial<{
+        [S in keyof T]:
+            | ((value: unknown) => PropType<T, S> | Promise<PropType<T, S>>)
+            | string;
+    }>;
 };
 
 export type AliasSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
@@ -129,6 +134,15 @@ export interface ISchemasProvider<T = Record<string, never>> {
 }
 
 export interface ISchemaValidator<T = Record<string, never>> {
+    get preprocessors(): Map<
+        string,
+        (value: unknown) => unknown | Promise<unknown>
+    >;
+    addPreprocessor(
+        name: string,
+        preprocessor: (value: unknown) => unknown | Promise<unknown>
+    ): SchemaValidator<T>;
+
     addSchemaType<K, L extends ObjectSchemaDefinitionParam<M>, M = any>(
         name: keyof K,
         schema: L | Array<Schema<any>>

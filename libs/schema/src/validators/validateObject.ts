@@ -28,6 +28,30 @@ export const validateObject = async (
         };
     }
 
+    if (typeof schema.preprocessors === 'object' && schema.preprocessors) {
+        await Promise.all(
+            Object.keys(schema.preprocessors).map(async (key: string) => {
+                if (typeof schema.preprocessors[key] === 'function') {
+                    obj[key] = await Promise.resolve(
+                        (schema.preprocessors[key] as (unknown) => unknown)(
+                            obj[key]
+                        )
+                    );
+                } else {
+                    const preprocessor = validator.preprocessors.get(
+                        schema.preprocessors[key] as string
+                    );
+                    if (typeof preprocessor !== 'function') {
+                        throw new Error(
+                            `preprocessor '${schema.preprocessors[key]}' is unknown`
+                        );
+                    }
+                    obj[key] = await Promise.resolve(preprocessor(obj[key]));
+                }
+            })
+        );
+    }
+
     if (typeof schema.properties === 'object' && schema.properties) {
         const errors = (
             await Promise.all(

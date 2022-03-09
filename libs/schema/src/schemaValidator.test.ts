@@ -1202,3 +1202,100 @@ test('Not required alternative schema alias', async () => {
 
     expect(result).toHaveProperty('valid', false);
 });
+
+test('Preprocessors - 1', async () => {
+    const validator = new SchemaValidator().addSchemaType('Date', {
+        validators: [
+            (value) =>
+                value instanceof Date && !Number.isNaN(value)
+                    ? {
+                          valid: true
+                      }
+                    : {
+                          valid: false,
+                          errors: ['should be a valid Date object']
+                      }
+        ]
+    });
+
+    const schema: Schema<{ bornAt: Date }> = {
+        type: 'object',
+        properties: {
+            bornAt: 'Date'
+        },
+        preprocessors: {
+            bornAt: (value: unknown): Date => {
+                const time = Date.parse(value.toString());
+                if (Number.isNaN(time)) return undefined;
+                return new Date(time);
+            }
+        }
+    };
+
+    const result = await validator.validate(schema, {
+        bornAt: new Date().toJSON()
+    });
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Preprocessors - 2', async () => {
+    const validator = new SchemaValidator().addSchemaType('Date', {
+        validators: [
+            (value) =>
+                value instanceof Date && !Number.isNaN(value)
+                    ? {
+                          valid: true
+                      }
+                    : {
+                          valid: false,
+                          errors: ['should be a valid Date object']
+                      }
+        ]
+    });
+
+    let schema: Schema<{ bornAt: Date; diedAt?: Date }> = {
+        type: 'object',
+        properties: {
+            bornAt: 'Date'
+        },
+        preprocessors: {
+            bornAt: 'StringToDate'
+        }
+    };
+
+    validator.addPreprocessor('StringToDate', (value: unknown): Date => {
+        const time = Date.parse(value.toString());
+        if (Number.isNaN(time)) return undefined;
+        return new Date(time);
+    });
+
+    expect(() =>
+        validator.addPreprocessor('StringToDate', (value: unknown): Date => {
+            const time = Date.parse(value.toString());
+            if (Number.isNaN(time)) return undefined;
+            return new Date(time);
+        })
+    ).toThrow();
+
+    const result = await validator.validate(schema, {
+        bornAt: new Date().toJSON()
+    });
+    expect(result).toHaveProperty('valid', true);
+
+    schema = {
+        type: 'object',
+        properties: {
+            bornAt: 'Date',
+            diedAt: 'Date'
+        },
+        preprocessors: {
+            bornAt: 'StringToDate',
+            diedAt: 'Unregistered'
+        }
+    };
+    expect(async () => {
+        await validator.validate(schema, {
+            bornAt: new Date().toJSON()
+        });
+    }).rejects.toBeInstanceOf(Error);
+});
