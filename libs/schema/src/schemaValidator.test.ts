@@ -912,3 +912,211 @@ test('Validate - one of - 1', async () => {
     );
     expect(result).toHaveProperty('valid', true);
 });
+
+test('Validate schema', async () => {
+    const authorsReportSpecificationSchema = {
+        properties: {
+            type: {
+                type: 'string',
+                equals: 'author'
+            },
+            start: 'Date',
+            end: 'Date',
+            selectionStart: 'Date',
+            selectionEnd: 'Date',
+            granularity: ['day', 'week', 'month'],
+            metrics: {
+                type: 'array',
+                ofType: [
+                    'articlesPublished',
+                    'searchReferrers',
+                    'socialReferrers',
+                    'views',
+                    'visitors',
+                    'newVisitors'
+                ]
+            },
+            filters: {
+                type: 'object',
+                properties: {
+                    author: 'AuthorFilter'
+                    // publication: 'PublicationFilter',
+                    // article: 'ArticleFilter'
+                }
+            }
+        },
+        validators: [
+            (value) =>
+                value.start <= value.end &&
+                value.selectionStart <= value.selectionEnd &&
+                value.selectionStart >= value.start &&
+                value.selectionStart <= value.end &&
+                value.selectionEnd >= value.start &&
+                value.selectionEnd <= value.end
+                    ? {
+                          valid: true
+                      }
+                    : {
+                          valid: false,
+                          errors: [
+                              'selectionStart <=> selectionEnd should be inside the start <=> end interval'
+                          ]
+                      }
+        ]
+    };
+
+    const validator = new SchemaValidator()
+        .addSchemaType('Date', {
+            validators: [
+                (value) =>
+                    value instanceof Date && !Number.isNaN(value)
+                        ? {
+                              valid: true
+                          }
+                        : {
+                              valid: false,
+                              errors: ['should be a valid Date object']
+                          }
+            ]
+        })
+        .addSchemaType('EqualsFilterCondition', {
+            properties: {
+                operation: {
+                    type: 'string',
+                    equals: 'equals'
+                },
+                value: ['object', 'string', 'number']
+            }
+        })
+        .addSchemaType('GreaterThanFilterCondition', {
+            properties: {
+                operation: {
+                    type: 'string',
+                    equals: 'greater_than'
+                },
+                value: 'number'
+            }
+        })
+        .addSchemaType('LessThanFilterCondition', {
+            properties: {
+                operation: {
+                    type: 'string',
+                    equals: 'less_than'
+                },
+                value: 'number'
+            }
+        })
+        .addSchemaType('ContainsFilterCondition', {
+            properties: {
+                operation: {
+                    type: 'string',
+                    equals: 'contains'
+                },
+                value: [
+                    'string',
+                    'number',
+                    {
+                        type: 'array',
+                        ofType: ['string', 'number']
+                    }
+                ]
+            }
+        })
+        .addSchemaType('LikeFilterCondition', {
+            properties: {
+                operation: 'like',
+                value: 'string'
+            }
+        })
+        .addSchemaType('BetweenFilterCondition', {
+            properties: {
+                operation: 'between',
+                from: 'number',
+                to: 'number'
+            },
+            validators: [
+                (value) =>
+                    value.from <= value.to
+                        ? { valid: true }
+                        : { valid: false, error: ['from must be <= to'] }
+            ]
+        })
+        .addSchemaType('StringFilterCondition', [
+            'EqualsFilterCondition',
+            'LikeFilterCondition'
+        ])
+        .addSchemaType('AuthorFilter', {
+            properties: {
+                fullName: 'StringFilterCondition'
+            }
+        })
+        .addSchemaType(
+            'AuthorsReportSpecification',
+            authorsReportSpecificationSchema as ObjectSchemaDefinitionParam<any>
+        );
+
+    /**
+     * @type {import('smg-iq/editorial-analytics.reports').AuthorsReportSpecification}
+     */
+    let reportSpec = {
+        type: 'author',
+        start: new Date(2021, 0, 1),
+        end: new Date(),
+        selectionStart: new Date(2022, 0, 1),
+        selectionEnd: new Date(2022, 2, 1),
+        granularity: 'day',
+        metrics: [
+            'articlesPublished',
+            'searchReferrers',
+            'socialReferrers',
+            'views',
+            'visitors',
+            'newVisitors'
+        ],
+        filters: {
+            author: {
+                fullName: {
+                    operation: 'between',
+                    value: 'some name'
+                }
+            }
+        }
+    };
+
+    let result = await validator.schemas.AuthorsReportSpecification.validate(
+        reportSpec
+    );
+
+    expect(result).toHaveProperty('valid', false);
+
+    reportSpec = {
+        type: 'author',
+        start: new Date(2021, 0, 1),
+        end: new Date(),
+        selectionStart: new Date(2022, 0, 1),
+        selectionEnd: new Date(2022, 2, 1),
+        granularity: 'day',
+        metrics: [
+            'articlesPublished',
+            'searchReferrers',
+            'socialReferrers',
+            'views',
+            'visitors',
+            'newVisitors'
+        ],
+        filters: {
+            author: {
+                fullName: {
+                    operation: 'equals',
+                    value: 'some name'
+                }
+            }
+        }
+    };
+
+    result = await validator.schemas.AuthorsReportSpecification.validate(
+        reportSpec
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});

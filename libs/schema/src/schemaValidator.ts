@@ -202,6 +202,13 @@ export default class SchemaValidator<T = Record<string, never>>
                     obj
                 );
             } else if (typeof this.schemas[schema as keyof T] !== 'undefined') {
+                if (Array.isArray(this.schemas[schema as keyof T].schema)) {
+                    return this.validate(
+                        this.schemas[schema as keyof T]
+                            .schema as any as Schema<any>,
+                        obj
+                    );
+                }
                 const objSchema = deepExtend(
                     defaultSchemas.object,
                     this.schemas[schema as keyof T].schema
