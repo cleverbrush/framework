@@ -259,10 +259,17 @@ export default class SchemaValidator<T = Record<string, never>>
             } else if (schema.type === 'alias') {
                 const alias = this.schemas[schema.schemaName]
                     .schema as Schema<any>;
-                if (Array.isArray(alias))
-                    throw new Error(
-                        'it is impossible to use alternative schema alias as "type" field'
-                    );
+                if (Array.isArray(alias)) {
+                    if (
+                        (!schema.isRequired && typeof obj === 'undefined') ||
+                        (schema.isNullable && obj === null)
+                    ) {
+                        return {
+                            valid: true
+                        };
+                    }
+                    return await this.validate(alias, obj);
+                }
                 if (typeof alias !== 'object')
                     throw new Error(
                         'it is only possible to use a full schema schema definition as alias'

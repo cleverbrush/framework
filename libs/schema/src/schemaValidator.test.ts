@@ -1152,3 +1152,53 @@ test('Validate schema - 2', async () => {
 
     expect(result).toHaveProperty('valid', true);
 });
+
+test('Not required alternative schema alias', async () => {
+    const validator = new SchemaValidator()
+        .addSchemaType('Alternate1', {
+            properties: {
+                a1: 'string'
+            }
+        })
+        .addSchemaType('Alternate2', {
+            properties: {
+                a2: 'string'
+            }
+        })
+        .addSchemaType('Alternate', ['Alternate1', 'Alternate2']);
+
+    let result = await validator.validate(
+        {
+            type: 'alias',
+            isRequired: false,
+            schemaName: 'Alternate'
+        },
+        undefined
+    );
+
+    expect(result).toHaveProperty('valid', true);
+
+    result = await validator.validate(
+        {
+            type: 'alias',
+            isRequired: false,
+            schemaName: 'Alternate'
+        },
+        {
+            a2: 'something'
+        }
+    );
+
+    expect(result).toHaveProperty('valid', true);
+
+    result = await validator.validate(
+        {
+            type: 'alias',
+            isRequired: false,
+            schemaName: 'Alternate'
+        },
+        'invalid'
+    );
+
+    expect(result).toHaveProperty('valid', false);
+});
