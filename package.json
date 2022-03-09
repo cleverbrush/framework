@@ -1,11 +1,15 @@
 {
     "name": "cleverbrush-utils",
     "private": "true",
-    "version": "0.0.5",
+    "version": "0.0.6",
     "description": "",
     "scripts": {
         "test": "jest",
-        "prettier": "npx prettier --write ./libs"
+        "prettier": "npx prettier --write ./libs",
+        "build_deep": "cd libs/deep && npm run build",
+        "build_schema": "cd libs/schema && npm run build",
+        "build": "npm run build_deep && npm run build_schema",
+        "publish": "npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public"
     },
     "workspaces": [
         "./libs/*"
