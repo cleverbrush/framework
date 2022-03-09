@@ -5,7 +5,8 @@ export type DefaultSchemaType =
     | 'function'
     | 'number'
     | 'string'
-    | 'array';
+    | 'array'
+    | 'alias';
 
 export type PropType<TObj, TProp extends keyof TObj> = TObj[TProp];
 
@@ -38,6 +39,11 @@ export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
     properties?: Partial<{
         [S in keyof T]: Schema<PropType<T, S>>;
     }>;
+};
+
+export type AliasSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
+    type: 'alias';
+    schemaName: string;
 };
 
 export type ObjectSchemaDefinitionParam<T> = Omit<
@@ -100,7 +106,8 @@ export type CompositeSchema<TObj> = TObj extends (...args: any) => any
           | NumberSchemaDefinition<TObj>
           | StringSchemaDefinition<TObj>
           | ArraySchemaDefinition<TObj>
-          | ObjectSchemaDefinition<TObj>;
+          | ObjectSchemaDefinition<TObj>
+          | AliasSchemaDefinition<TObj>;
 
 export type SingleSchema<TObj = Record<string, never>> =
     | number

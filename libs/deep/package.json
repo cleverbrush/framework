@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/deep",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "keywords": [
         "deep operations on objects",
         "deep equal",

@@ -156,6 +156,11 @@ export default class SchemaValidator<T = Record<string, never>>
         schema: CompositeSchema<Record<string, never>>,
         value: any
     ): Promise<ValidationResult> {
+        if (!schema.isRequired && typeof value === 'undefined') {
+            return {
+                valid: true
+            };
+        }
         if (Array.isArray(schema.validators)) {
             const validatorsResults = await Promise.allSettled(
                 schema.validators.map((v) => Promise.resolve(v(value)))
@@ -251,6 +256,26 @@ export default class SchemaValidator<T = Record<string, never>>
                     obj,
                     schema
                 );
+            } else if (schema.type === 'alias') {
+                const alias = this.schemas[schema.schemaName]
+                    .schema as Schema<any>;
+                if (Array.isArray(alias))
+                    throw new Error(
+                        'it is impossible to use alternative schema alias as "type" field'
+                    );
+                if (typeof alias !== 'object')
+                    throw new Error(
+                        'it is only possible to use a full schema schema definition as alias'
+                    );
+
+                const schemaToMerge = { ...schema };
+                delete schemaToMerge.type;
+                delete schemaToMerge.schemaName;
+                const finalSchema: Schema<any> = deepExtend(
+                    alias,
+                    schemaToMerge
+                );
+                return await this.validate(finalSchema, obj);
             } else if (schema.type === 'object') {
                 const preliminaryResult = await validateObject(
                     obj,

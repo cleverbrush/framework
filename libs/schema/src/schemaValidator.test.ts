@@ -913,7 +913,7 @@ test('Validate - one of - 1', async () => {
     expect(result).toHaveProperty('valid', true);
 });
 
-test('Validate schema', async () => {
+test('Validate schema - 1', async () => {
     const authorsReportSpecificationSchema = {
         properties: {
             type: {
@@ -1116,6 +1116,38 @@ test('Validate schema', async () => {
 
     result = await validator.schemas.AuthorsReportSpecification.validate(
         reportSpec
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate schema - 2', async () => {
+    const validator = new SchemaValidator().addSchemaType('Date', {
+        validators: [
+            (value) =>
+                value instanceof Date && !Number.isNaN(value)
+                    ? {
+                          valid: true
+                      }
+                    : {
+                          valid: false,
+                          errors: ['should be a valid Date object']
+                      }
+        ]
+    });
+
+    const result = await validator.validate(
+        {
+            type: 'object',
+            properties: {
+                date: {
+                    type: 'alias',
+                    schemaName: 'Date',
+                    isRequired: false
+                }
+            }
+        },
+        {}
     );
 
     expect(result).toHaveProperty('valid', true);
