@@ -24,6 +24,19 @@ export const validateArray = async (
             errors: ['expected type array']
         };
 
+    if (schema.preprocessor) {
+        const preprocessor =
+            typeof schema.preprocessor === 'function'
+                ? schema.preprocessor
+                : validator.preprocessors.get(schema.preprocessor);
+        if (typeof preprocessor !== 'function') {
+            throw new Error(`unknown preprocessor '${schema.preprocessor}'`);
+        }
+        for (let i = 0; i < obj.length; i++) {
+            obj[i] = await Promise.resolve(preprocessor(obj[i]));
+        }
+    }
+
     if (typeof schema.minLength === 'number' && obj.length < schema.minLength) {
         return {
             valid: false,

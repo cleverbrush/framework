@@ -1299,3 +1299,67 @@ test('Preprocessors - 2', async () => {
         });
     }).rejects.toBeInstanceOf(Error);
 });
+
+test('Preprocessors - 3', async () => {
+    const validator = new SchemaValidator().addSchemaType('Date', {
+        validators: [
+            (value) =>
+                value instanceof Date && !Number.isNaN(value)
+                    ? {
+                          valid: true
+                      }
+                    : {
+                          valid: false,
+                          errors: ['should be a valid Date object']
+                      }
+        ]
+    });
+
+    validator.addPreprocessor('StringToDate', (value: unknown): Date => {
+        const time = Date.parse(value.toString());
+        if (Number.isNaN(time)) return undefined;
+        return new Date(time);
+    });
+
+    let obj = [new Date().toJSON()];
+
+    let result = await validator.validate(
+        {
+            preprocessor: 'StringToDate',
+            type: 'array',
+            ofType: 'Date'
+        },
+        obj
+    );
+    expect(result).toHaveProperty('valid', true);
+
+    obj = [new Date().toJSON()];
+    result = await validator.validate(
+        {
+            preprocessor: (value: unknown): Date => {
+                const time = Date.parse(value.toString());
+                if (Number.isNaN(time)) return undefined;
+                return new Date(time);
+            },
+            type: 'array',
+            ofType: 'Date'
+        },
+        obj
+    );
+    expect(result).toHaveProperty('valid', true);
+
+    obj = ['sdfsdf12', new Date().toJSON()];
+    result = await validator.validate(
+        {
+            preprocessor: (value: unknown): Date => {
+                const time = Date.parse(value.toString());
+                if (Number.isNaN(time)) return undefined;
+                return new Date(time);
+            },
+            type: 'array',
+            ofType: 'Date'
+        },
+        obj
+    );
+    expect(result).toHaveProperty('valid', false);
+});

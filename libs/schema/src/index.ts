@@ -96,6 +96,7 @@ export type ArraySchemaDefinition<TObj> = Omit<
     'type'
 > & {
     type: 'array';
+    preprocessor?: ((value: unknown) => unknown | Promise<unknown>) | string;
     ofType?: Schema<any>;
     minLength?: number;
     maxLength?: number;
