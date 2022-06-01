@@ -34,7 +34,7 @@ export const validateObject = async (
                 if (typeof schema.preprocessors[key] === 'function') {
                     obj[key] = await Promise.resolve(
                         (schema.preprocessors[key] as (unknown) => unknown)(
-                            obj[key]
+                            key === '*' ? obj : obj[key]
                         )
                     );
                 } else {
