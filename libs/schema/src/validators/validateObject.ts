@@ -31,10 +31,11 @@ export const validateObject = async (
     if (typeof schema.preprocessors === 'object' && schema.preprocessors) {
         await Promise.all(
             Object.keys(schema.preprocessors).map(async (key: string) => {
+                if (key === '*') return;
                 if (typeof schema.preprocessors[key] === 'function') {
                     obj[key] = await Promise.resolve(
                         (schema.preprocessors[key] as (unknown) => unknown)(
-                            key === '*' ? obj : obj[key]
+                            obj[key]
                         )
                     );
                 } else {
@@ -50,6 +51,24 @@ export const validateObject = async (
                 }
             })
         );
+        if ('*' in schema.preprocessors) {
+            const objectPreprocessor = schema.preprocessors['*'];
+            if (typeof objectPreprocessor === 'function') {
+                await Promise.resolve(
+                    (objectPreprocessor as (unknown) => unknown)(obj)
+                );
+            } else {
+                const preprocessor = validator.preprocessors.get(
+                    objectPreprocessor as string
+                );
+                if (typeof preprocessor !== 'function') {
+                    throw new Error(
+                        `preprocessor '${objectPreprocessor}' is unknown`
+                    );
+                }
+                await Promise.resolve(preprocessor(obj));
+            }
+        }
     }
 
     if (typeof schema.properties === 'object' && schema.properties) {

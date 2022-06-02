@@ -1377,6 +1377,7 @@ test('Preprocessors - 3', async () => {
             marriedAt: 'number'
         },
         preprocessors: {
+            age: (value): number => 40,
             '*': (value: SomeType): void => {
                 if (value.marriedAt > value.age) {
                     value.marriedAt = value.age;
@@ -1390,7 +1391,7 @@ test('Preprocessors - 3', async () => {
         marriedAt: 80
     };
     await validator.validate(schema, obj);
-    expect(obj).toHaveProperty('marriedAt', 50);
+    expect(obj).toHaveProperty('marriedAt', 40);
 });
 
 test('Preprocessors - 4', async () => {
