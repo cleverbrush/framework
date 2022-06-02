@@ -4,6 +4,7 @@ import { ValidationResult } from '../dist/index.js';
 import {
     NumberSchemaDefinition,
     ObjectSchemaDefinitionParam,
+    ObjectSchemaDefinition,
     Schema
 } from './index';
 import SchemaValidator from './schemaValidator';
@@ -829,7 +830,7 @@ test('Validate - object - 1', async () => {
                 b: 'number'
             },
             validators: [
-                (value) => {
+                (value: { a: number; b: number }) => {
                     if (value.a + value.b === 5) {
                         return {
                             valid: true
@@ -1301,6 +1302,98 @@ test('Preprocessors - 2', async () => {
 });
 
 test('Preprocessors - 3', async () => {
+    const validator = new SchemaValidator().addSchemaType('Date', {
+        validators: [
+            (value) =>
+                value instanceof Date && !Number.isNaN(value)
+                    ? {
+                          valid: true
+                      }
+                    : {
+                          valid: false,
+                          errors: ['should be a valid Date object']
+                      }
+        ]
+    });
+
+    validator.addPreprocessor('StringToDate', (value: unknown): Date => {
+        const time = Date.parse(value.toString());
+        if (Number.isNaN(time)) return undefined;
+        return new Date(time);
+    });
+
+    let obj = [new Date().toJSON()];
+
+    let result = await validator.validate(
+        {
+            preprocessor: 'StringToDate',
+            type: 'array',
+            ofType: 'Date'
+        },
+        obj
+    );
+    expect(result).toHaveProperty('valid', true);
+
+    obj = [new Date().toJSON()];
+    result = await validator.validate(
+        {
+            preprocessor: (value: unknown): Date => {
+                const time = Date.parse(value.toString());
+                if (Number.isNaN(time)) return undefined;
+                return new Date(time);
+            },
+            type: 'array',
+            ofType: 'Date'
+        },
+        obj
+    );
+    expect(result).toHaveProperty('valid', true);
+
+    obj = ['sdfsdf12', new Date().toJSON()];
+    result = await validator.validate(
+        {
+            preprocessor: (value: unknown): Date => {
+                const time = Date.parse(value.toString());
+                if (Number.isNaN(time)) return undefined;
+                return new Date(time);
+            },
+            type: 'array',
+            ofType: 'Date'
+        },
+        obj
+    );
+    expect(result).toHaveProperty('valid', false);
+});
+
+test('Preprocessors - 3', async () => {
+    const validator = new SchemaValidator();
+
+    type SomeType = { age: number; marriedAt: number };
+
+    const schema: ObjectSchemaDefinition<SomeType> = {
+        type: 'object',
+        properties: {
+            age: 'number',
+            marriedAt: 'number'
+        },
+        preprocessors: {
+            '*': (value: SomeType): void => {
+                if (value.marriedAt > value.age) {
+                    value.marriedAt = value.age;
+                }
+            }
+        }
+    };
+
+    const obj = {
+        age: 50,
+        marriedAt: 80
+    };
+    await validator.validate(schema, obj);
+    expect(obj).toHaveProperty('marriedAt', 50);
+});
+
+test('Preprocessors - 4', async () => {
     const validator = new SchemaValidator().addSchemaType('Date', {
         validators: [
             (value) =>

@@ -40,9 +40,13 @@ export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
         [S in keyof T]: Schema<PropType<T, S>>;
     }>;
     preprocessors?: Partial<{
-        [S in keyof T]:
-            | ((value: unknown) => PropType<T, S> | Promise<PropType<T, S>>)
-            | string;
+        [S in keyof T | '*']: S extends keyof T
+            ?
+                  | ((
+                        value: unknown
+                    ) => PropType<T, S> | Promise<PropType<T, S>>)
+                  | string
+            : (value: T) => void | Promise<void>;
     }>;
 };
 

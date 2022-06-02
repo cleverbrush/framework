@@ -12,7 +12,8 @@ import {
     ArraySchemaDefinition,
     ISchemaValidator,
     DefaultSchemaType,
-    ObjectSchemaDefinition
+    ObjectSchemaDefinition,
+    SchemaDefintion
 } from './index';
 import { validateNumber } from './validators/validateNumber';
 import { validateString } from './validators/validateString';
@@ -213,8 +214,8 @@ export default class SchemaValidator<T = Record<string, never>>
         };
     }
 
-    public async validate(
-        schema: keyof T | DefaultSchemaType | Schema<any>,
+    public async validate<K>(
+        schema: keyof T | DefaultSchemaType | Schema<K>,
         obj: any
     ): Promise<ValidationResult> {
         if (!schema) throw new Error('schemaName is required');
@@ -293,7 +294,7 @@ export default class SchemaValidator<T = Record<string, never>>
                         'it is only possible to use a full schema schema definition as alias'
                     );
 
-                const schemaToMerge = { ...schema };
+                const schemaToMerge = { ...(schema as any) };
                 delete schemaToMerge.type;
                 delete schemaToMerge.schemaName;
                 const finalSchema: Schema<any> = deepExtend(
