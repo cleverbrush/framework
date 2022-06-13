@@ -2,6 +2,7 @@ import SchemaValidator from './schemaValidator';
 
 export type DefaultSchemaType =
     | 'object'
+    | 'boolean'
     | 'function'
     | 'number'
     | 'string'
@@ -72,6 +73,14 @@ export type FunctionSchemaDefinition<T extends (...args: any) => any> = Omit<
     params?: ParamsValidators<T>;
 };
 
+export type BooleanSchemaDefinition<TObj> = Omit<
+    SchemaDefintion<TObj>,
+    'type'
+> & {
+    type: 'boolean';
+    equals?: boolean;
+};
+
 export type NumberSchemaDefinition<TObj> = Omit<
     SchemaDefintion<TObj>,
     'type'
@@ -113,6 +122,7 @@ export type CompositeSchema<TObj> = TObj extends (...args: any) => any
     : TObj extends string
     ? StringSchemaDefinition<TObj> | 'string'
     :
+          | BooleanSchemaDefinition<TObj>
           | NumberSchemaDefinition<TObj>
           | StringSchemaDefinition<TObj>
           | ArraySchemaDefinition<TObj>

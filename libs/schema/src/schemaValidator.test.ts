@@ -554,6 +554,82 @@ test('Validate - number by schema - custom validators - 2', async () => {
     expect(result).toHaveProperty('valid', false);
 });
 
+test('Validate - boolean - 1', async () => {
+    const validator = new SchemaValidator();
+    const result = await validator.validate(
+        {
+            type: 'boolean'
+        },
+        300
+    );
+
+    expect(result).toHaveProperty('valid', false);
+});
+
+test('Validate - boolean - 2', async () => {
+    const validator = new SchemaValidator();
+    const result = await validator.validate(
+        {
+            type: 'boolean'
+        },
+        true
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - boolean - 3', async () => {
+    const validator = new SchemaValidator();
+    const result = await validator.validate(
+        {
+            type: 'boolean'
+        },
+        false
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - boolean - 4', async () => {
+    const validator = new SchemaValidator();
+    const result = await validator.validate(
+        {
+            type: 'boolean',
+            equals: true
+        },
+        false
+    );
+
+    expect(result).toHaveProperty('valid', false);
+});
+
+test('Validate - boolean - 5', async () => {
+    const validator = new SchemaValidator();
+    const result = await validator.validate(
+        {
+            type: 'boolean',
+            equals: false
+        },
+        false
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - boolean - 6', async () => {
+    const validator = new SchemaValidator();
+    const result = await validator.validate('boolean', false);
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - boolean - 7', async () => {
+    const validator = new SchemaValidator();
+    const result = await validator.validate('boolean', '123');
+
+    expect(result).toHaveProperty('valid', false);
+});
+
 test('Validate - string - 1', async () => {
     const validator = new SchemaValidator();
     const result = await validator.validate('string', '12345');

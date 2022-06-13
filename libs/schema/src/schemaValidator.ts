@@ -13,14 +13,15 @@ import {
     ISchemaValidator,
     DefaultSchemaType,
     ObjectSchemaDefinition,
-    SchemaDefintion
+    BooleanSchemaDefinition
 } from './index';
 import { validateNumber } from './validators/validateNumber';
+import { validateBoolean } from './validators/validateBoolean';
 import { validateString } from './validators/validateString';
 import { validateArray } from './validators/validateArray';
 import { validateObject } from './validators/validateObject';
 
-const defaultSchemaNames = ['string', 'number', 'date', 'array'];
+const defaultSchemaNames = ['string', 'boolean', 'number', 'date', 'array'];
 
 const defaultSchemas: { [key in DefaultSchemaType]?: Schema<any> } = {
     number: {
@@ -29,6 +30,11 @@ const defaultSchemas: { [key in DefaultSchemaType]?: Schema<any> } = {
         isNullable: false,
         ensureNotNaN: true,
         ensureIsFinite: true
+    },
+    boolean: {
+        type: 'boolean',
+        isRequired: true,
+        isNullable: false
     },
     string: {
         type: 'string',
@@ -51,6 +57,11 @@ const defaultSchemasValidationStrategies = {
         schema: NumberSchemaDefinition<any>,
         validator: ISchemaValidator<any>
     ): Promise<ValidationResult> => validateNumber(obj, schema, validator),
+    boolean: (
+        obj: any,
+        schema: BooleanSchemaDefinition<any>,
+        validator: ISchemaValidator<any>
+    ): Promise<ValidationResult> => validateBoolean(obj, schema, validator),
     string: (
         obj: any,
         schema: StringSchemaDefinition<any>,
