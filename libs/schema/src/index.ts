@@ -1,3 +1,4 @@
+import { Merge } from '@cleverbrush/deep';
 import SchemaValidator from './schemaValidator';
 
 export type DefaultSchemaType =
@@ -45,7 +46,7 @@ export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
             ?
                   | ((
                         value: unknown
-                    ) => PropType<T, S> | Promise<PropType<T, S>>)
+                    ) => undefined | PropType<T, S> | Promise<PropType<T, S>>)
                   | string
             : (value: T) => void | Promise<void>;
     }>;
@@ -137,18 +138,25 @@ export type SingleSchema<TObj = Record<string, never>> =
 
 export type Schema<TObj> = SingleSchema<TObj> | Array<SingleSchema<TObj>>;
 
-export interface ISchemaActions<K, T extends keyof K> {
+export type Cons<H, T extends unknown[] = []> = T['length'] extends 0
+    ? [H]
+    : ((h: H, ...t: T) => void) extends (...r: infer R) => void
+    ? R
+    : never;
+
+export interface ISchemaActions<S> {
     validate(value: any): Promise<ValidationResult>;
-    schema: PropType<K, T>;
+    schema: S;
 }
 
-export interface ISchemasProvider<T = Record<string, never>> {
-    schemas: {
-        [K in keyof T]: ISchemaActions<T, K>;
-    };
+export interface ISchemasProvider<T extends unknown[]> {
+    schemas: Merge<T>;
 }
 
-export interface ISchemaValidator<T = Record<string, never>> {
+export interface ISchemaValidator<
+    T extends Record<string, never> = Record<string, never>,
+    SchemaTypesStructures extends unknown[] = []
+> {
     get preprocessors(): Map<
         string,
         (value: unknown) => unknown | Promise<unknown>
@@ -156,18 +164,35 @@ export interface ISchemaValidator<T = Record<string, never>> {
     addPreprocessor(
         name: string,
         preprocessor: (value: unknown) => unknown | Promise<unknown>
-    ): SchemaValidator<T>;
+    ): SchemaValidator<T, SchemaTypesStructures>;
 
-    addSchemaType<K, L extends ObjectSchemaDefinitionParam<M>, M = any>(
+    addSchemaType<
+        K,
+        L extends ObjectSchemaDefinitionParam<M> | Array<Schema<any>>,
+        M = any
+    >(
         name: keyof K,
-        schema: L | Array<Schema<any>>
-    ): SchemaValidator<T & { [key in keyof K]: typeof schema }>;
+        schema: L
+    ): SchemaValidator<
+        T & { [key in keyof K]: typeof schema },
+        Cons<Unfold<keyof K, ISchemaActions<L>>, SchemaTypesStructures>
+    >;
 
     validate(
         schema: keyof T | DefaultSchemaType | Schema<any>,
         obj: any
     ): Promise<ValidationResult>;
 }
+
+export type Unfold<T, K> = T extends string
+    ? T extends `${infer F}.${infer L}`
+        ? {
+              [k in F]: Unfold<L, K>;
+          }
+        : {
+              [k in T]: K;
+          }
+    : never;
 
 export { SchemaValidator };
 export default SchemaValidator;

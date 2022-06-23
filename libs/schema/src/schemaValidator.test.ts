@@ -170,7 +170,7 @@ test('Validate - no schema', async () => {
     const validator = new SchemaValidator();
     const cth = jest.fn();
     validator
-        .validate(null, 10)
+        .validate(null as any, 10)
         .catch(cth)
         .then(() => {
             expect(cth).toBeCalled();
@@ -944,7 +944,7 @@ test('Validate - object - 2', async () => {
                     };
                 }
             ]
-        })
+        }) as any as ObjectSchemaDefinition<any>
     );
     const user: User = {
         id: 1,
@@ -1199,19 +1199,30 @@ test('Validate schema - 1', async () => {
 });
 
 test('Validate schema - 2', async () => {
-    const validator = new SchemaValidator().addSchemaType('Date', {
-        validators: [
-            (value) =>
-                value instanceof Date && !Number.isNaN(value)
-                    ? {
-                          valid: true
-                      }
-                    : {
-                          valid: false,
-                          errors: ['should be a valid Date object']
-                      }
-        ]
-    });
+    const validator = new SchemaValidator()
+        .addSchemaType('Date', {
+            validators: [
+                (value) =>
+                    value instanceof Date && !Number.isNaN(value)
+                        ? {
+                              valid: true
+                          }
+                        : {
+                              valid: false,
+                              errors: ['should be a valid Date object']
+                          }
+            ]
+        })
+        .addSchemaType('Module.Schema1', {
+            properties: {
+                a: 'string'
+            }
+        })
+        .addSchemaType('Module.Schema2', {
+            properties: {
+                b: 'number'
+            }
+        });
 
     const result = await validator.validate(
         {
@@ -1301,8 +1312,10 @@ test('Preprocessors - 1', async () => {
             bornAt: 'Date'
         },
         preprocessors: {
-            bornAt: (value: unknown): Date => {
-                const time = Date.parse(value.toString());
+            bornAt: (value: unknown): Date | undefined => {
+                const time = Date.parse(
+                    (value as Record<string, unknown>).toString()
+                );
                 if (Number.isNaN(time)) return undefined;
                 return new Date(time);
             }
@@ -1340,18 +1353,28 @@ test('Preprocessors - 2', async () => {
         }
     };
 
-    validator.addPreprocessor('StringToDate', (value: unknown): Date => {
-        const time = Date.parse(value.toString());
-        if (Number.isNaN(time)) return undefined;
-        return new Date(time);
-    });
-
-    expect(() =>
-        validator.addPreprocessor('StringToDate', (value: unknown): Date => {
-            const time = Date.parse(value.toString());
+    validator.addPreprocessor(
+        'StringToDate',
+        (value: unknown): Date | undefined => {
+            const time = Date.parse(
+                (value as Record<string, unknown>).toString()
+            );
             if (Number.isNaN(time)) return undefined;
             return new Date(time);
-        })
+        }
+    );
+
+    expect(() =>
+        validator.addPreprocessor(
+            'StringToDate',
+            (value: unknown): Date | undefined => {
+                const time = Date.parse(
+                    (value as Record<string, unknown>).toString()
+                );
+                if (Number.isNaN(time)) return undefined;
+                return new Date(time);
+            }
+        )
     ).toThrow();
 
     const result = await validator.validate(schema, {
@@ -1392,11 +1415,16 @@ test('Preprocessors - 3', async () => {
         ]
     });
 
-    validator.addPreprocessor('StringToDate', (value: unknown): Date => {
-        const time = Date.parse(value.toString());
-        if (Number.isNaN(time)) return undefined;
-        return new Date(time);
-    });
+    validator.addPreprocessor(
+        'StringToDate',
+        (value: unknown): Date | undefined => {
+            const time = Date.parse(
+                (value as Record<string, unknown>).toString()
+            );
+            if (Number.isNaN(time)) return undefined;
+            return new Date(time);
+        }
+    );
 
     let obj = [new Date().toJSON()];
 
@@ -1413,8 +1441,10 @@ test('Preprocessors - 3', async () => {
     obj = [new Date().toJSON()];
     result = await validator.validate(
         {
-            preprocessor: (value: unknown): Date => {
-                const time = Date.parse(value.toString());
+            preprocessor: (value: unknown): Date | undefined => {
+                const time = Date.parse(
+                    (value as Record<string, unknown>).toString()
+                );
                 if (Number.isNaN(time)) return undefined;
                 return new Date(time);
             },
@@ -1428,8 +1458,10 @@ test('Preprocessors - 3', async () => {
     obj = ['sdfsdf12', new Date().toJSON()];
     result = await validator.validate(
         {
-            preprocessor: (value: unknown): Date => {
-                const time = Date.parse(value.toString());
+            preprocessor: (value: unknown): Date | undefined => {
+                const time = Date.parse(
+                    (value as Record<string, unknown>).toString()
+                );
                 if (Number.isNaN(time)) return undefined;
                 return new Date(time);
             },
@@ -1485,11 +1517,16 @@ test('Preprocessors - 4', async () => {
         ]
     });
 
-    validator.addPreprocessor('StringToDate', (value: unknown): Date => {
-        const time = Date.parse(value.toString());
-        if (Number.isNaN(time)) return undefined;
-        return new Date(time);
-    });
+    validator.addPreprocessor(
+        'StringToDate',
+        (value: unknown): Date | undefined => {
+            const time = Date.parse(
+                (value as Record<string, unknown>).toString()
+            );
+            if (Number.isNaN(time)) return undefined;
+            return new Date(time);
+        }
+    );
 
     let obj = [new Date().toJSON()];
 
@@ -1506,8 +1543,10 @@ test('Preprocessors - 4', async () => {
     obj = [new Date().toJSON()];
     result = await validator.validate(
         {
-            preprocessor: (value: unknown): Date => {
-                const time = Date.parse(value.toString());
+            preprocessor: (value: unknown): Date | undefined => {
+                const time = Date.parse(
+                    (value as Record<string, unknown>).toString()
+                );
                 if (Number.isNaN(time)) return undefined;
                 return new Date(time);
             },
@@ -1521,8 +1560,10 @@ test('Preprocessors - 4', async () => {
     obj = ['sdfsdf12', new Date().toJSON()];
     result = await validator.validate(
         {
-            preprocessor: (value: unknown): Date => {
-                const time = Date.parse(value.toString());
+            preprocessor: (value: unknown): Date | undefined => {
+                const time = Date.parse(
+                    (value as Record<string, unknown>).toString()
+                );
                 if (Number.isNaN(time)) return undefined;
                 return new Date(time);
             },
@@ -1532,4 +1573,37 @@ test('Preprocessors - 4', async () => {
         obj
     );
     expect(result).toHaveProperty('valid', false);
+});
+
+test('Submodules - 1', async () => {
+    const validator = new SchemaValidator().addSchemaType(
+        'Module1.Schema1',
+        {}
+    );
+
+    const result = validator.schemas;
+
+    expect(result).toHaveProperty('Module1');
+    expect(result).toHaveProperty('Module1.Schema1');
+});
+
+test('Submodules - 2', async () => {
+    const validator = new SchemaValidator()
+        .addSchemaType('Module1.Schema1', {})
+        .addSchemaType('Module1.Schema2', {
+            properties: {
+                a: 'number'
+            }
+        });
+
+    const result = validator.schemas;
+
+    expect(result).toHaveProperty('Module1');
+    expect(result).toHaveProperty('Module1.Schema1');
+    expect(result).toHaveProperty('Module1.Schema2');
+
+    const result2 = await validator.schemas.Module1.Schema2.validate({
+        a: 234
+    });
+    expect(result2).toHaveProperty('valid', true);
 });

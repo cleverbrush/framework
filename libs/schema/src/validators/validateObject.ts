@@ -8,7 +8,7 @@ import {
 export const validateObject = async (
     obj: any,
     schema: ObjectSchemaDefinition<any>,
-    validator: ISchemaValidator<any>
+    validator: ISchemaValidator<any, unknown[]>
 ): Promise<ValidationResult> => {
     if (
         typeof obj === 'undefined' &&

@@ -1,7 +1,7 @@
 import deepEqual from './deepEqual';
-import deepExtend from './deepExtend';
+import deepExtend, { Merge } from './deepExtend';
 
-export { deepEqual, deepExtend };
+export { deepEqual, deepExtend, Merge };
 
 export default {
     deepEqual,
