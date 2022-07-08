@@ -317,8 +317,12 @@ export default class SchemaValidator<
                     schema
                 );
             } else if (schema.type === 'alias') {
-                const alias = this.schemas[schema.schemaName]
-                    .schema as Schema<any>;
+                const alias = this._schemasMap.get(schema.schemaName);
+                if (typeof alias === 'undefined') {
+                    throw new Error(
+                        `Unknown schema alias - ${schema.schemaName}`
+                    );
+                }
                 if (Array.isArray(alias)) {
                     if (
                         (!schema.isRequired && typeof obj === 'undefined') ||

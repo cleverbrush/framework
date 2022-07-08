@@ -1607,3 +1607,50 @@ test('Submodules - 2', async () => {
     });
     expect(result2).toHaveProperty('valid', true);
 });
+
+test('Submodules - 3', async () => {
+    const validator = new SchemaValidator()
+        .addSchemaType('Module1.Schema1', {
+            properties: {
+                b: 'number'
+            }
+        })
+        .addSchemaType('Module1.Schema2', {
+            properties: {
+                a: {
+                    type: 'alias',
+                    schemaName: 'Module1.Schema1'
+                }
+            }
+        });
+
+    const result2 = await validator.schemas.Module1.Schema2.validate({
+        a: {
+            b: 20
+        }
+    });
+    expect(result2).toHaveProperty('valid', true);
+});
+
+test('Submodules - 4', async () => {
+    const validator = new SchemaValidator()
+        .addSchemaType('Module1.Schema1', {
+            properties: {
+                b: 'number'
+            }
+        })
+        .addSchemaType('Module1.Schema2', {
+            properties: {
+                a: {
+                    type: 'alias',
+                    schemaName: 'Module1.Schema3'
+                }
+            }
+        });
+
+    await validator.schemas.Module1.Schema2.validate({
+        a: {
+            b: 20
+        }
+    }).catch((e) => expect(e).toBeInstanceOf(Error));
+});
