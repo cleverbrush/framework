@@ -274,6 +274,31 @@ There is a possibility to register a schema, give it a name and then reuse it:
 
     // { valid: true }
 
+Also there is a possibility to organize schemas in modules (or even submodules):
+
+    const validator = new SchemaValidator().addSchemaType("Module1.DTOs.Address", {
+        properties: {
+            id: {
+            type: "number",
+            min: 1,
+            },
+            street: "string",
+            zip: "number",
+        }
+    }).addSchemaType("Module1.Models.Person", {
+        properties: {
+            firstName: "string",
+            lastName: "string"
+        },
+    });
+
+    const resultPerson = await validator.schemas.Module1.Models.Person.validate({
+         fistName: 'John',
+         lastName: 'Smith'
+         });
+
+    const resultAddress = await validator.schemas.Module1.DTOs.Address.validate({ });
+
 ## Examples
 
 For Examples see unit tests in the schemaValidator.tests.ts
