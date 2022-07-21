@@ -37,7 +37,7 @@ export type SchemaDefintion<TObj> = {
 
 export type ObjectSchemaDefinition<T> = Omit<SchemaDefintion<T>, 'type'> & {
     type: 'object';
-    extends?: string;
+    noUnknownProperties?: boolean;
     properties?: Partial<{
         [S in keyof T]: Schema<PropType<T, S>>;
     }>;

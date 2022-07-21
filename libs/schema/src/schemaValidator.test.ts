@@ -1654,3 +1654,33 @@ test('Submodules - 4', async () => {
         }
     }).catch((e) => expect(e).toBeInstanceOf(Error));
 });
+
+test('No unknown fields - 1', async () => {
+    const validator = new SchemaValidator().addSchemaType('Schema1', {
+        properties: {
+            b: 'number'
+        },
+        noUnknownProperties: true
+    });
+
+    const result = await validator.schemas.Schema1.validate({
+        b: 20,
+        c: 'something'
+    });
+    expect(result).toHaveProperty('valid', false);
+});
+
+test('No unknown fields - 2', async () => {
+    const validator = new SchemaValidator().addSchemaType('Schema1', {
+        properties: {
+            b: 'number'
+        },
+        noUnknownProperties: false
+    });
+
+    const result = await validator.schemas.Schema1.validate({
+        b: 20,
+        c: 'something'
+    });
+    expect(result).toHaveProperty('valid', true);
+});

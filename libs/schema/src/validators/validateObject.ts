@@ -72,8 +72,8 @@ export const validateObject = async (
     }
 
     if (typeof schema.properties === 'object' && schema.properties) {
-        const errors = (
-            await Promise.all(
+        const errors = [
+            ...(await Promise.all(
                 Object.entries(schema.properties).map(
                     async ([name, schema]: [string, Schema<any>]) => {
                         const result = await validator.validate(
@@ -89,11 +89,20 @@ export const validateObject = async (
                         };
                     }
                 )
-            )
-        )
+            )),
+            ...(schema.noUnknownProperties
+                ? Object.keys(obj)
+                      .filter((k) => !(k in schema.properties))
+                      .map((k) => ({
+                          valid: false,
+                          errors: [`-> ${k} - unknown field`]
+                      }))
+                : [])
+        ]
             .filter((r) => !r.valid)
             .map((r) => r.errors)
             .flat(Infinity) as string[];
+
         if (errors.length) {
             return {
                 valid: false,

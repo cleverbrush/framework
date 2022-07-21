@@ -48,6 +48,7 @@ const defaultSchemas: { [key in DefaultSchemaType]?: Schema<any> } = {
     },
     object: {
         type: 'object',
+        noUnknownProperties: false,
         isNullable: false,
         isRequired: true
     }
