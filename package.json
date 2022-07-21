@@ -9,8 +9,9 @@
         "build_async": "cd libs/async && npm run build",
         "build_deep": "cd libs/deep && npm run build",
         "build_schema": "cd libs/schema && npm run build",
-        "build": "npm run build_async && npm run build_deep && npm run build_schema",
-        "publish": "npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public && npm publish --workspace @cleverbrush/async --access=public"
+        "build_scheduler": "cd libs/scheduler && npm run build",
+        "build": "npm run build_async && npm run build_deep && npm run build_schema && npm run build_scheduler",
+        "publish": "npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public && npm publish --workspace @cleverbrush/async --access=public && npm publish --workspace @cleverbrush/scheduler --access=public"
     },
     "workspaces": [
         "./libs/*"

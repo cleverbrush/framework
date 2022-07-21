@@ -1,0 +1,20 @@
+{
+    "name": "@cleverbrush/scheduler",
+    "version": "0.0.17",
+    "keywords": [
+        "task scheduler"
+    ],
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "license": "BSD",
+    "main": "./dist/index.js",
+    "readme": "https://github.com/cleverbrush/libs/tree/master/libs/scheduler#readme",
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/libs"
+    },
+    "types": "./dist/index.d.ts"
+}

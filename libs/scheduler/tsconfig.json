@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "declaration": true,
+        "target": "esnext",
+        "module": "CommonJS",
+        "esModuleInterop": true,
+        "moduleResolution": "Node",
+        "allowSyntheticDefaultImports": true
+    },
+    "files": ["./src/index.ts"],
+    "watchOptions": {
+        "excludeDirectories": ["./dist"]
+    }
+}
