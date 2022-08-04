@@ -18,7 +18,7 @@
         "watch": "tsc --watch",
         "build": "tsc"
     },
-    "dependencies": {
+    "devDependencies": {
         "@cleverbrush/deep": "0.0.17"
     },
     "types": "./dist/index.d.ts"

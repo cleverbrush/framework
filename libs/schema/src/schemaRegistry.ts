@@ -1,94 +1,59 @@
-import { deepExtend, Merge } from '@cleverbrush/deep';
+import { deepExtend } from '@cleverbrush/deep';
+
+import { ISchemaRegistry as ISchemaRegistry, Unfold } from './index.js';
+import { validateNumber } from './validators/validateNumber.js';
+import { validateBoolean } from './validators/validateBoolean.js';
+import { validateString } from './validators/validateString.js';
+import { validateArray } from './validators/validateArray.js';
+import { validateObject } from './validators/validateObject.js';
+import { validateUnion } from './validators/validateUnion.js';
 import {
-    ISchemasProvider,
-    Schema,
-    ISchemaActions,
-    ObjectSchemaDefinitionParam,
-    ValidationResult,
-    NumberSchemaDefinition,
-    StringSchemaDefinition,
-    CompositeSchema,
-    ValidationResultRaw,
-    ArraySchemaDefinition,
-    ISchemaValidator,
+    ArraySchema,
+    BooleanSchema,
     DefaultSchemaType,
-    ObjectSchemaDefinition,
-    BooleanSchemaDefinition,
-    Cons,
-    Unfold
-} from './index';
-import { validateNumber } from './validators/validateNumber';
-import { validateBoolean } from './validators/validateBoolean';
-import { validateString } from './validators/validateString';
-import { validateArray } from './validators/validateArray';
-import { validateObject } from './validators/validateObject';
+    NumberSchema,
+    ObjectSchema,
+    Schema,
+    SchemaSpecification,
+    StringSchema,
+    ValidationResult,
+    ValidationResultRaw
+} from './schema.js';
 
-const defaultSchemaNames = ['string', 'boolean', 'number', 'date', 'array'];
+import { number } from './builders/NumberSchemaBuilder.js';
+import { union } from './builders/UnionSchemaBuilder.js';
+import { object } from './builders/ObjectSchemaBuilder.js';
+import { string } from './builders/StringSchemaBuilder.js';
+import { boolean } from './builders/BooleanSchemaBuilder.js';
+import { array } from './builders/ArraySchemaBuilder.js';
+import { alias, IAliasSchemaBuilder } from './builders/AliasSchemaBuilder.js';
+import { defaultSchemas } from './defaultSchemas.js';
+import { ISchemaBuilder, SchemaBuilder } from './builders/SchemaBuilder.js';
 
-const defaultSchemas: { [key in DefaultSchemaType]?: Schema<any> } = {
-    number: {
-        type: 'number',
-        isRequired: true,
-        isNullable: false,
-        ensureNotNaN: true,
-        ensureIsFinite: true
-    },
-    boolean: {
-        type: 'boolean',
-        isRequired: true,
-        isNullable: false
-    },
-    string: {
-        type: 'string',
-        isNullable: false,
-        isRequired: true
-    },
-    array: {
-        type: 'array'
-    },
-    object: {
-        type: 'object',
-        noUnknownProperties: false,
-        isNullable: false,
-        isRequired: true
-    }
-};
+const defaultSchemaNames = ['string', 'boolean', 'number', 'array'];
 
 const defaultSchemasValidationStrategies = {
-    number: (
-        obj: any,
-        schema: NumberSchemaDefinition<any>,
-        validator: ISchemaValidator<any, unknown[]>
-    ): Promise<ValidationResult> => validateNumber(obj, schema, validator),
-    boolean: (
-        obj: any,
-        schema: BooleanSchemaDefinition<any>,
-        validator: ISchemaValidator<any, unknown[]>
-    ): Promise<ValidationResult> => validateBoolean(obj, schema, validator),
-    string: (
-        obj: any,
-        schema: StringSchemaDefinition<any>,
-        validator: ISchemaValidator<any, unknown[]>
-    ): Promise<ValidationResult> => validateString(obj, schema, validator),
+    number: (obj: any, schema: NumberSchema): Promise<ValidationResult> =>
+        validateNumber(obj, schema),
+    boolean: (obj: any, schema: BooleanSchema): Promise<ValidationResult> =>
+        validateBoolean(obj, schema),
+    string: (obj: any, schema: StringSchema): Promise<ValidationResult> =>
+        validateString(obj, schema),
     array: (
         obj: any,
-        schema: ArraySchemaDefinition<any>,
-        validator: ISchemaValidator<any, unknown[]>
+        schema: ArraySchema<any>,
+        validator: SchemaRegistry<any>
     ): Promise<ValidationResult> => validateArray(obj, schema, validator)
 };
 
 const isDefaultType = (name: string): boolean =>
     defaultSchemaNames.indexOf(name) !== -1;
 
-export default class SchemaValidator<
-    T extends Record<string, never> = Record<string, never>,
-    SchemaTypesStructures extends unknown[] = []
-> implements
-        ISchemasProvider<SchemaTypesStructures>,
-        ISchemaValidator<T, SchemaTypesStructures>
+export default class SchemaRegistry<T extends Record<string, Schema> = {}>
+    implements ISchemaRegistry<T>
 {
-    private _schemasMap = new Map<string, Schema<any>>();
-    private _schemasCache: Merge<SchemaTypesStructures> = null;
+    private _schemasMap = new Map<string, Schema>();
+    private _schemasCache: Unfold<T> = null;
     private _preprocessorsMap = new Map<
         string,
         (value: unknown) => unknown | Promise<unknown> | undefined
@@ -101,23 +66,41 @@ export default class SchemaValidator<
     public addPreprocessor(
         name: string,
         preprocessor: (value: unknown) => unknown | Promise<unknown>
-    ): SchemaValidator<T, SchemaTypesStructures> {
+    ): SchemaRegistry<T> {
         if (this._preprocessorsMap.has(name))
             throw new Error(`Preprocessor '${name}' is already registered`);
+        if (typeof preprocessor !== 'function') {
+            throw new Error('preprocessor must be a function');
+        }
         this._preprocessorsMap.set(name, preprocessor);
         return this;
     }
 
     public addSchemaType<
-        K,
-        L extends ObjectSchemaDefinitionParam<M> | Array<Schema<any>>,
-        M = any
+        TName extends string,
+        TParam extends
+            | Record<string, any>
+            | ((params: {
+                  boolean: typeof boolean;
+                  array: typeof array;
+                  string: typeof string;
+                  number: typeof number;
+                  union: typeof union;
+                  object: typeof object;
+                  alias: <TSchemaName extends keyof T>(
+                      schemaName: TSchemaName
+                  ) => IAliasSchemaBuilder<TSchemaName, true, false, T>;
+              }) => TSchema),
+        TSchema extends Schema | ISchemaBuilder
     >(
-        name: keyof K,
-        schema: L
-    ): SchemaValidator<
-        T & { [key in keyof K]: L },
-        Cons<Unfold<keyof K, ISchemaActions<L>>, SchemaTypesStructures>
+        name: TName,
+        param: TParam
+    ): SchemaRegistry<
+        T & {
+            [key in TName]: TParam extends (...args: any[]) => any
+                ? ReturnType<TParam>
+                : TParam;
+        }
     > {
         if (typeof name !== 'string' || !name)
             throw new Error('Name is required');
@@ -130,30 +113,38 @@ export default class SchemaValidator<
             throw new Error(`Schema "${name}" already exists`);
         }
 
+        const schema =
+            typeof param === 'function'
+                ? param({
+                      alias,
+                      array,
+                      boolean,
+                      number,
+                      object,
+                      string,
+                      union
+                  })
+                : param;
+
         if (Array.isArray(schema)) {
-            this._schemasMap.set(name.toString(), schema as Schema<any>);
+            this._schemasMap.set(name.toString(), schema as Schema);
             this._schemasCache = null;
-            return this as any as SchemaValidator<
-                T & { [key in keyof K]: L },
-                Cons<Unfold<keyof K, ISchemaActions<L>>, SchemaTypesStructures>
-            >;
+            return this as any;
         }
 
         if (typeof schema !== 'object')
             throw new Error('Array or Object is required');
         this._schemasMap.set(name.toString(), {
-            ...schema,
-            type: 'object'
-        } as Schema<any>);
-        this._schemasCache = null;
+            ...(schema instanceof SchemaBuilder
+                ? schema._schema
+                : (schema as any))
+        } as any as Schema);
 
-        return this as any as SchemaValidator<
-            T & { [key in keyof K]: L },
-            Cons<Unfold<keyof K, ISchemaActions<L>>, SchemaTypesStructures>
-        >;
+        this._schemasCache = null;
+        return this as any;
     }
 
-    public get schemas(): Merge<SchemaTypesStructures> {
+    public get schemas(): Unfold<T> {
         if (this._schemasCache) return this._schemasCache;
         const res = {};
         for (const key of this._schemasMap.keys()) {
@@ -174,32 +165,30 @@ export default class SchemaValidator<
                 curr = curr[parts[i]];
             }
         }
-        this._schemasCache = res as Merge<SchemaTypesStructures>;
+        this._schemasCache = res as Unfold<T>;
         return this._schemasCache;
     }
 
     private async validateDefaultType(
         name: DefaultSchemaType,
         value: any,
-        mergeSchema?: Schema<any>
+        mergeSchema?: Schema
     ): Promise<ValidationResult> {
         const strategy = defaultSchemasValidationStrategies[name] as (
             obj: any,
-            schema: Schema<any>,
-            validator: ISchemaValidator<any, unknown[]>
+            schema: Schema,
+            validator: SchemaRegistry<any>
         ) => ValidationResult;
-        let finalSchema = defaultSchemas[name] as CompositeSchema<
-            Record<string, never>
-        >;
+        let finalSchema = defaultSchemas[name] as SchemaSpecification;
         if (strategy) {
-            if (typeof mergeSchema === 'object') {
-                finalSchema = deepExtend(finalSchema, mergeSchema) as any;
+            if (typeof mergeSchema === 'object' && mergeSchema) {
+                finalSchema = Object.assign({}, finalSchema, mergeSchema);
             }
             if (typeof mergeSchema === 'number') {
                 finalSchema = {
                     ...finalSchema,
                     equals: mergeSchema
-                } as NumberSchemaDefinition<any>;
+                } as NumberSchema;
                 mergeSchema;
             }
 
@@ -218,7 +207,7 @@ export default class SchemaValidator<
     }
 
     private async checkValidators(
-        schema: CompositeSchema<Record<string, never>>,
+        schema: SchemaSpecification,
         value: any
     ): Promise<ValidationResult> {
         if (!schema.isRequired && typeof value === 'undefined') {
@@ -260,8 +249,8 @@ export default class SchemaValidator<
         };
     }
 
-    public async validate<K>(
-        schema: keyof T | DefaultSchemaType | Schema<K>,
+    public async validate(
+        schema: keyof T | Schema,
         obj: any
     ): Promise<ValidationResult> {
         if (!schema) throw new Error('schemaName is required');
@@ -278,8 +267,12 @@ export default class SchemaValidator<
                 const objSchema = deepExtend(
                     defaultSchemas.object,
                     this._schemasMap.get(schema)
-                ) as ObjectSchemaDefinition<Record<string, never>>;
-                const res = await validateObject(obj, objSchema, this as any);
+                ) as ObjectSchema;
+                const res = await validateObject(
+                    obj,
+                    objSchema as any,
+                    this as any
+                );
                 if (!res.valid) return res;
                 return await this.checkValidators(objSchema, obj);
             } else {
@@ -308,32 +301,44 @@ export default class SchemaValidator<
         }
 
         if (typeof schema === 'object') {
-            if (typeof schema.type !== 'string')
+            const spec = schema as SchemaSpecification;
+            if (typeof spec.type !== 'string')
                 throw new Error('Schema has no type');
 
-            if (isDefaultType(schema.type)) {
+            if (isDefaultType(spec.type)) {
                 return await this.validateDefaultType(
-                    schema.type as DefaultSchemaType,
+                    spec.type as DefaultSchemaType,
                     obj,
                     schema
                 );
-            } else if (schema.type === 'alias') {
-                const alias = this._schemasMap.get(schema.schemaName);
+            } else if (spec.type === 'alias') {
+                if (spec.isRequired === false && typeof obj === 'undefined') {
+                    return {
+                        valid: true
+                    };
+                }
+                if (spec.isNullable === true && obj === null) {
+                    return {
+                        valid: true
+                    };
+                }
+
+                const alias = this._schemasMap.get(spec.schemaName);
                 if (typeof alias === 'undefined') {
                     throw new Error(
-                        `Unknown schema alias - ${schema.schemaName}`
+                        `Unknown schema alias - ${spec.schemaName}`
                     );
                 }
                 if (Array.isArray(alias)) {
                     if (
-                        (!schema.isRequired && typeof obj === 'undefined') ||
-                        (schema.isNullable && obj === null)
+                        (!spec.isRequired && typeof obj === 'undefined') ||
+                        (spec.isNullable && obj === null)
                     ) {
                         return {
                             valid: true
                         };
                     }
-                    return await this.validate(alias, obj);
+                    return await this.validate(alias as any, obj);
                 }
                 if (typeof alias !== 'object')
                     throw new Error(
@@ -343,26 +348,25 @@ export default class SchemaValidator<
                 const schemaToMerge = { ...(schema as any) };
                 delete schemaToMerge.type;
                 delete schemaToMerge.schemaName;
-                const finalSchema: Schema<any> = deepExtend(
-                    alias,
-                    schemaToMerge
-                );
+                const finalSchema = deepExtend(alias, schemaToMerge) as Schema;
                 return await this.validate(finalSchema, obj);
-            } else if (schema.type === 'object') {
+            } else if (spec.type === 'union') {
+                return await validateUnion(obj, spec, this as any);
+            } else if (spec.type === 'object') {
                 const preliminaryResult = await validateObject(
                     obj,
-                    schema,
+                    schema as ObjectSchema<any>,
                     this as any
                 );
                 if (!preliminaryResult.valid) return preliminaryResult;
 
                 return await this.checkValidators(
-                    schema as CompositeSchema<Record<string, never>>,
+                    schema as SchemaSpecification,
                     obj
                 );
             }
         }
 
-        throw new Error("Coldn't understand the Schema provided");
+        throw new Error("Couldn't understand the Schema provided");
     }
 }

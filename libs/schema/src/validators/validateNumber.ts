@@ -1,13 +1,8 @@
-import {
-    ValidationResult,
-    NumberSchemaDefinition,
-    ISchemaValidator
-} from '../index';
+import { NumberSchema, ValidationResult } from '../schema.js';
 
 export const validateNumber = async (
     obj: any,
-    schema: NumberSchemaDefinition<any>,
-    validator: ISchemaValidator<any>
+    schema: NumberSchema
 ): Promise<ValidationResult> => {
     if (
         typeof obj === 'undefined' &&

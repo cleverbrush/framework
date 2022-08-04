@@ -1,13 +1,8 @@
-import {
-    ValidationResult,
-    StringSchemaDefinition,
-    ISchemaValidator
-} from '../index';
+import { StringSchema, ValidationResult } from '../schema.js';
 
 export const validateString = async (
     obj: any,
-    schema: StringSchemaDefinition<any>,
-    validator: ISchemaValidator<any>
+    schema: StringSchema
 ): Promise<ValidationResult> => {
     if (
         typeof obj === 'undefined' &&

@@ -1,13 +1,10 @@
-import {
-    ValidationResult,
-    ArraySchemaDefinition,
-    ISchemaValidator
-} from '../index';
+import { ArraySchema, ValidationResult } from '../schema.js';
+import SchemaRegistry from '../schemaRegistry.js';
 
 export const validateArray = async (
     obj: any,
-    schema: ArraySchemaDefinition<any>,
-    validator: ISchemaValidator<any>
+    schema: ArraySchema<any>,
+    validator: SchemaRegistry<any>
 ): Promise<ValidationResult> => {
     if (
         typeof obj === 'undefined' &&

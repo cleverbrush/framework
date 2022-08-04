@@ -1,14 +1,10 @@
-import {
-    ValidationResult,
-    ObjectSchemaDefinition,
-    ISchemaValidator,
-    Schema
-} from '../index';
+import { ObjectSchema, Schema, ValidationResult } from '../schema.js';
+import SchemaRegistry from '../schemaRegistry.js';
 
 export const validateObject = async (
     obj: any,
-    schema: ObjectSchemaDefinition<any>,
-    validator: ISchemaValidator<any, unknown[]>
+    schema: ObjectSchema<any>,
+    validator: SchemaRegistry<any>
 ): Promise<ValidationResult> => {
     if (
         typeof obj === 'undefined' &&
@@ -33,11 +29,14 @@ export const validateObject = async (
             Object.keys(schema.preprocessors).map(async (key: string) => {
                 if (key === '*') return;
                 if (typeof schema.preprocessors[key] === 'function') {
-                    obj[key] = await Promise.resolve(
-                        (schema.preprocessors[key] as (unknown) => unknown)(
-                            obj[key]
-                        )
+                    const res = await Promise.resolve(
+                        (schema.preprocessors[key] as any)(obj[key])
                     );
+                    if (typeof res !== 'undefined') {
+                        obj[key] = res;
+                    } else {
+                        delete obj[key];
+                    }
                 } else {
                     const preprocessor = validator.preprocessors.get(
                         schema.preprocessors[key] as string
@@ -47,16 +46,19 @@ export const validateObject = async (
                             `preprocessor '${schema.preprocessors[key]}' is unknown`
                         );
                     }
-                    obj[key] = await Promise.resolve(preprocessor(obj[key]));
+                    const res = await Promise.resolve(preprocessor(obj[key]));
+                    if (typeof res !== 'undefined') {
+                        obj[key] = res;
+                    } else {
+                        delete obj[key];
+                    }
                 }
             })
         );
         if ('*' in schema.preprocessors) {
             const objectPreprocessor = schema.preprocessors['*'];
             if (typeof objectPreprocessor === 'function') {
-                await Promise.resolve(
-                    (objectPreprocessor as (unknown) => unknown)(obj)
-                );
+                await Promise.resolve((objectPreprocessor as any)(obj));
             } else {
                 const preprocessor = validator.preprocessors.get(
                     objectPreprocessor as string
@@ -75,7 +77,7 @@ export const validateObject = async (
         const errors = [
             ...(await Promise.all(
                 Object.entries(schema.properties).map(
-                    async ([name, schema]: [string, Schema<any>]) => {
+                    async ([name, schema]: [string, Schema]) => {
                         const result = await validator.validate(
                             schema,
                             obj[name]
