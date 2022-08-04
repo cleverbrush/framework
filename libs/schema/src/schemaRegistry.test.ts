@@ -1,13 +1,12 @@
 import { deepEqual, deepExtend } from '@cleverbrush/deep';
-import { ValidationResult } from '../dist/index.js';
 
 import {
-    NumberSchemaDefinition,
-    ObjectSchemaDefinitionParam,
-    ObjectSchemaDefinition,
+    ValidationResult,
+    NumberSchema,
+    ObjectSchema,
     Schema
-} from './index';
-import SchemaValidator from './schemaValidator';
+} from './schema.js';
+import SchemaRegistry from './schemaRegistry.js';
 
 type User = {
     id: number;
@@ -22,60 +21,71 @@ type User = {
     spouse?: User;
 };
 
-const getUserSchema = (): ObjectSchemaDefinitionParam<User> => ({
-    properties: {
-        id: 'number',
-        name: {
-            type: 'object',
-            isNullable: false,
-            isRequired: true,
-            properties: {
-                first: {
-                    type: 'string',
-                    isNullable: false,
-                    isRequired: true,
-                    minLength: 1,
-                    maxLength: 100
-                },
-                last: {
-                    type: 'string',
-                    isNullable: false,
-                    isRequired: true,
-                    minLength: 1,
-                    maxLength: 100
+const getUserSchema = (): Schema<User> =>
+    ({
+        type: 'object',
+        properties: {
+            id: 'number',
+            name: {
+                type: 'object',
+                isNullable: false,
+                isRequired: true,
+                properties: {
+                    first: {
+                        type: 'string',
+                        isNullable: false,
+                        isRequired: true,
+                        minLength: 1,
+                        maxLength: 100
+                    },
+                    last: {
+                        type: 'string',
+                        isNullable: false,
+                        isRequired: true,
+                        minLength: 1,
+                        maxLength: 100
+                    }
                 }
+            },
+            incomePerMonth: {
+                type: 'number',
+                min: 0
             }
-        },
-        incomePerMonth: {
-            type: 'number',
-            min: 0
         }
-    }
-});
+    } as any);
 
 test('Can add schema', () => {
-    const validator = new SchemaValidator().addSchemaType(
-        'something',
-        getUserSchema()
-    );
+    const validator = new SchemaRegistry().addSchemaType('something', {
+        type: 'object',
+        properties: {
+            a: 'string'
+        }
+    });
     expect(validator.schemas.something).toBeDefined();
+});
+
+test('Throws when not array or object is passed to addSchemaType', () => {
+    expect(() => {
+        new SchemaRegistry().addSchemaType('something', 1234 as any);
+    }).toThrow();
 });
 
 test('Error thrown on adding a schema with duplicate name', () => {
     expect(() =>
-        new SchemaValidator()
-            .addSchemaType('smth', {})
-            .addSchemaType('smth', {})
+        new SchemaRegistry()
+            .addSchemaType('smth', {} as any)
+            .addSchemaType('smth', {} as any)
     ).toThrow();
 });
 
 test('Receiving the same schema after add', () => {
-    const schema: ObjectSchemaDefinitionParam<{ name: string }> = {
+    const schema: ObjectSchema<{ name: string }> = {
+        type: 'object',
         properties: {
             name: 'string'
         }
     };
-    const validator = new SchemaValidator().addSchemaType('something', schema);
+    const validator = new SchemaRegistry().addSchemaType('something', schema);
 
     expect(
         deepEqual(
@@ -86,62 +96,69 @@ test('Receiving the same schema after add', () => {
 });
 
 test('Schemas property is cached when reading', () => {
-    const validator = new SchemaValidator().addSchemaType('something', {});
+    const validator = new SchemaRegistry().addSchemaType('something', {});
     expect(validator.schemas).toEqual(validator.schemas);
 });
 
 test('Schemas property is updated after adding a new schema', () => {
-    let validator = new SchemaValidator().addSchemaType('something', {});
+    let validator = new SchemaRegistry().addSchemaType(
+        'something',
+        {} as ObjectSchema<any>
+    );
     const s = validator.schemas;
     validator = validator.addSchemaType('another', {});
     expect(s).not.toEqual(validator.schemas);
 });
 
 test('Trows when trying to add a schema with name = "number"', () => {
-    const validator = new SchemaValidator();
-    expect(() => validator.addSchemaType('number', {})).toThrow();
-});
-
-test('Trows when trying to add a schema with name = "array"', () => {
-    const validator = new SchemaValidator();
-    expect(() => validator.addSchemaType('array', {})).toThrow();
-});
-
-test('Trows when trying to add a schema with name = "date"', () => {
-    const validator = new SchemaValidator();
-    expect(() => validator.addSchemaType('date', {})).toThrow();
-});
-
-test('Trows when trying to add a schema with name = "string"', () => {
-    const validator = new SchemaValidator();
-    expect(() => validator.addSchemaType('string', {})).toThrow();
-});
-
-test('Throws if schema name is empty', () => {
-    const validator = new SchemaValidator();
-    expect(() => validator.addSchemaType('', {})).toThrow();
-});
-
-test('Throws if schema name is not a string', () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     expect(() =>
-        validator.addSchemaType(new Date() as any as string, {})
+        validator.addSchemaType('number', {} as ObjectSchema<any>)
     ).toThrow();
 });
 
-test('Throws if schema is not an object', () => {
-    const validator = new SchemaValidator();
+test('Trows when trying to add a schema with name = "array"', () => {
+    const validator = new SchemaRegistry();
+    expect(() =>
+        validator.addSchemaType('array', {} as ObjectSchema<any>)
+    ).toThrow();
+});
+
+test('Trows when trying to add a schema with name = "string"', () => {
+    const validator = new SchemaRegistry();
+    expect(() =>
+        validator.addSchemaType('string', {} as ObjectSchema<any>)
+    ).toThrow();
+});
+
+test('Throws if schema name is empty', () => {
+    const validator = new SchemaRegistry();
+    expect(() =>
+        validator.addSchemaType('', {} as ObjectSchema<any>)
+    ).toThrow();
+});
+
+test('Throws if schema name is not a string', () => {
+    const validator = new SchemaRegistry();
     expect(() =>
         validator.addSchemaType(
-            'string',
-            'string' as any as ObjectSchemaDefinitionParam<any>
+            new Date() as any as string,
+            {} as ObjectSchema<any>
         )
     ).toThrow();
 });
 
-test('Array as schema type', async () => {
-    const validator = new SchemaValidator()
+test('Throws if schema is not an object', () => {
+    const validator = new SchemaRegistry();
+    expect(() =>
+        validator.addSchemaType('string', 'string' as any as ObjectSchema<any>)
+    ).toThrow();
+});
+
+test('Union - Array as schema type', async () => {
+    const validator = new SchemaRegistry()
         .addSchemaType('name', {
+            type: 'object',
             properties: {
                 name: 'string'
             }
@@ -166,8 +183,64 @@ test('Array as schema type', async () => {
     expect(result).toHaveProperty('valid', true);
 });
 
+test('Union - Schema Object - 1', async () => {
+    const validator = new SchemaRegistry().addSchemaType('address', {
+        type: 'object',
+        properties: {
+            first: {
+                type: 'union',
+                variants: [
+                    { type: 'number', min: 10, max: 20 },
+                    { type: 'string', minLength: 2 }
+                ]
+            }
+        }
+    });
+
+    let result = await validator.schemas.address.validate({
+        first: 15
+    });
+    expect(result).toHaveProperty('valid', true);
+    result = await validator.schemas.address.validate({
+        first: 25
+    });
+    expect(result).toHaveProperty('valid', false);
+    result = await validator.schemas.address.validate({
+        first: 'some string'
+    });
+    expect(result).toHaveProperty('valid', true);
+    result = await validator.schemas.address.validate({
+        first: 's'
+    });
+    expect(result).toHaveProperty('valid', false);
+});
+
+test('Union - Schema Object - 2', async () => {
+    const validator = new SchemaRegistry().addSchemaType('address', {
+        type: 'object',
+        properties: {
+            first: {
+                type: 'union',
+                isRequired: false,
+                isNullable: true,
+                variants: [
+                    { type: 'number', min: 10, max: 20 },
+                    { type: 'string', minLength: 2 }
+                ]
+            }
+        }
+    });
+
+    let result = await validator.schemas.address.validate({});
+    expect(result).toHaveProperty('valid', true);
+    result = await validator.schemas.address.validate({
+        first: null
+    });
+    expect(result).toHaveProperty('valid', true);
+});
+
 test('Validate - no schema', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const cth = jest.fn();
     validator
         .validate(null as any, 10)
@@ -178,7 +251,7 @@ test('Validate - no schema', async () => {
 });
 
 test('Validate - no schema type', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const cth = jest.fn();
     validator
         .validate(
@@ -194,49 +267,61 @@ test('Validate - no schema type', async () => {
 });
 
 test('Validate - number by value', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(10, 0);
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by value - 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(10, 10);
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - number by value - 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(10, {});
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by value - 4', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(10, 15);
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by name: object', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('number', {});
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by name: string', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('number', '10');
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by name - correct', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('number', 10);
     expect(result).toHaveProperty('valid', true);
 });
 
+test('Validate - number by number - correct', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(10, 10);
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - number by number - incorrect', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(10, 20);
+    expect(result).toHaveProperty('valid', false);
+});
+
 test('Validate - number by schema', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number'
@@ -247,7 +332,7 @@ test('Validate - number by schema', async () => {
 });
 
 test('Validate - number by schema - not number passed', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number'
@@ -258,7 +343,7 @@ test('Validate - number by schema - not number passed', async () => {
 });
 
 test('Validate - number by schema - min', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -270,7 +355,7 @@ test('Validate - number by schema - min', async () => {
 });
 
 test('Validate - number by schema - min 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -284,7 +369,7 @@ test('Validate - number by schema - min 2', async () => {
 });
 
 test('Validate - number by schema - min 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -296,7 +381,7 @@ test('Validate - number by schema - min 3', async () => {
 });
 
 test('Validate - number by schema - min 4', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const mk = jest.fn();
     validator
         .validate(
@@ -313,7 +398,7 @@ test('Validate - number by schema - min 4', async () => {
 });
 
 test('Validate - number by schema - max', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -325,7 +410,7 @@ test('Validate - number by schema - max', async () => {
 });
 
 test('Validate - number by schema - max 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -337,7 +422,7 @@ test('Validate - number by schema - max 2', async () => {
 });
 
 test('Validate - number by schema - max 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -349,7 +434,7 @@ test('Validate - number by schema - max 3', async () => {
 });
 
 test('Validate - number by schema - max 4', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const mk = jest.fn();
     validator
         .validate(
@@ -366,7 +451,7 @@ test('Validate - number by schema - max 4', async () => {
 });
 
 test('Validate - number by schema - range', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -380,7 +465,7 @@ test('Validate - number by schema - range', async () => {
 });
 
 test('Validate - number by schema - range - 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -394,7 +479,7 @@ test('Validate - number by schema - range - 2', async () => {
 });
 
 test('Validate - number by schema - range - 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -408,7 +493,7 @@ test('Validate - number by schema - range - 3', async () => {
 });
 
 test('Validate - number by schema - range - 4', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -422,7 +507,7 @@ test('Validate - number by schema - range - 4', async () => {
 });
 
 test('Validate - number by schema - range - 5', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -436,7 +521,7 @@ test('Validate - number by schema - range - 5', async () => {
 });
 
 test('Validate - number by schema - range - 6', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -450,7 +535,7 @@ test('Validate - number by schema - range - 6', async () => {
 });
 
 test('Validate - number by schema - NaN', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -463,7 +548,7 @@ test('Validate - number by schema - NaN', async () => {
 });
 
 test('Validate - number by schema - NaN - 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -476,7 +561,7 @@ test('Validate - number by schema - NaN - 2', async () => {
 });
 
 test('Validate - number by schema - Infinity', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number'
@@ -488,7 +573,7 @@ test('Validate - number by schema - Infinity', async () => {
 });
 
 test('Validate - number by schema - Infinity - 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'number',
@@ -501,8 +586,8 @@ test('Validate - number by schema - Infinity - 2', async () => {
 });
 
 test('Validate - number by schema - custom validators - 1', async () => {
-    const validator = new SchemaValidator();
-    const schema: NumberSchemaDefinition<any> = {
+    const validator = new SchemaRegistry();
+    const schema: NumberSchema = {
         type: 'number',
         validators: [
             async (value) => {
@@ -526,8 +611,8 @@ test('Validate - number by schema - custom validators - 1', async () => {
 });
 
 test('Validate - number by schema - custom validators - 2', async () => {
-    const validator = new SchemaValidator();
-    const schema: NumberSchemaDefinition<any> = {
+    const validator = new SchemaRegistry();
+    const schema: NumberSchema = {
         type: 'number',
         validators: [
             (value) => {
@@ -554,8 +639,30 @@ test('Validate - number by schema - custom validators - 2', async () => {
     expect(result).toHaveProperty('valid', false);
 });
 
+test('Validate - number by schema - custom validators - 3', async () => {
+    const validator = new SchemaRegistry();
+    const schema: NumberSchema = {
+        type: 'number',
+        validators: [
+            async () => {
+                throw new Error('error');
+            },
+            (value) => ({ valid: value > 100 })
+        ]
+    };
+    const result = await validator.validate(schema, 101);
+
+    expect(result).toHaveProperty('valid', false);
+
+    // result = await validator.validate(schema, 99);
+    // expect(result).toHaveProperty('valid', false);
+
+    // result = await validator.validate(schema, 100);
+    // expect(result).toHaveProperty('valid', false);
+});
+
 test('Validate - boolean - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'boolean'
@@ -567,7 +674,7 @@ test('Validate - boolean - 1', async () => {
 });
 
 test('Validate - boolean - 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'boolean'
@@ -579,7 +686,7 @@ test('Validate - boolean - 2', async () => {
 });
 
 test('Validate - boolean - 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'boolean'
@@ -591,7 +698,7 @@ test('Validate - boolean - 3', async () => {
 });
 
 test('Validate - boolean - 4', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'boolean',
@@ -604,7 +711,7 @@ test('Validate - boolean - 4', async () => {
 });
 
 test('Validate - boolean - 5', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'boolean',
@@ -617,51 +724,64 @@ test('Validate - boolean - 5', async () => {
 });
 
 test('Validate - boolean - 6', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('boolean', false);
 
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - boolean - 7', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('boolean', '123');
 
     expect(result).toHaveProperty('valid', false);
 });
 
+test('Validate - boolean - 8', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(
+        {
+            type: 'boolean',
+            isRequired: false
+        },
+        undefined
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
 test('Validate - string - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('string', '12345');
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - string - 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('string', 12345);
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - string - 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('12345', '12345');
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - string - 4', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('12345', '123456');
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - string - 5', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate('12345', 123456);
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - string - schema object - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'string',
@@ -673,7 +793,7 @@ test('Validate - string - schema object - 1', async () => {
 });
 
 test('Validate - string - schema object - 2', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'string',
@@ -685,7 +805,7 @@ test('Validate - string - schema object - 2', async () => {
 });
 
 test('Validate - string - schema object - 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     const result = await validator.validate(
         {
             type: 'string',
@@ -697,7 +817,7 @@ test('Validate - string - schema object - 3', async () => {
 });
 
 test('Validate - string - length control - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     let result = await validator.validate(
         {
             type: 'string',
@@ -750,7 +870,7 @@ test('Validate - string - length control - 1', async () => {
 });
 
 test('Validate - array - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     let result = await validator.validate('array', []);
     expect(result).toHaveProperty('valid', true);
 
@@ -759,7 +879,7 @@ test('Validate - array - 1', async () => {
 });
 
 test('Validate - array - size control - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     let result = await validator.validate(
         {
             type: 'array',
@@ -812,7 +932,7 @@ test('Validate - array - size control - 1', async () => {
 });
 
 test('Validate - array - ofType - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
     let result = await validator.validate(
         {
             type: 'array',
@@ -844,8 +964,35 @@ test('Validate - array - ofType - 1', async () => {
     expect(result).toHaveProperty('valid', false);
 });
 
+test('Validate - array - unknown preprocessor - 1', async () => {
+    expect(async () => {
+        const validator = new SchemaRegistry();
+        await validator.validate(
+            {
+                type: 'array',
+                ofType: 'number',
+                preprocessor: 'DDD'
+            },
+            [1, 2, 3]
+        );
+    }).rejects.toThrow();
+});
+
+test('Validate - array - not required - 1', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(
+        {
+            type: 'array',
+            ofType: 'number',
+            isRequired: false
+        },
+        undefined
+    );
+    expect(result).toHaveProperty('valid', true);
+});
+
 test('Validate - object - 1', async () => {
-    const validator = new SchemaValidator().addSchemaType(
+    const validator = new SchemaRegistry().addSchemaType(
         'user',
         getUserSchema()
     );
@@ -928,7 +1075,7 @@ test('Validate - object - 1', async () => {
 });
 
 test('Validate - object - 2', async () => {
-    const validator = new SchemaValidator().addSchemaType(
+    const validator = new SchemaRegistry().addSchemaType(
         'user',
         deepExtend(getUserSchema(), {
             validators: [
@@ -944,7 +1091,7 @@ test('Validate - object - 2', async () => {
                     };
                 }
             ]
-        }) as any as ObjectSchemaDefinition<any>
+        }) as any as ObjectSchema<any>
     );
     const user: User = {
         id: 1,
@@ -962,7 +1109,7 @@ test('Validate - object - 2', async () => {
 });
 
 test('Validate - one of - 1', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
 
     let result = await validator.validate(['number', 'object'], 'something');
     expect(result).toHaveProperty('valid', false);
@@ -992,6 +1139,7 @@ test('Validate - one of - 1', async () => {
 
 test('Validate schema - 1', async () => {
     const authorsReportSpecificationSchema = {
+        type: 'object',
         properties: {
             type: {
                 type: 'string',
@@ -1042,8 +1190,9 @@ test('Validate schema - 1', async () => {
         ]
     };
 
-    const validator = new SchemaValidator()
+    const validator = new SchemaRegistry()
         .addSchemaType('Date', {
+            type: 'object',
             validators: [
                 (value) =>
                     value instanceof Date && !Number.isNaN(value)
@@ -1057,6 +1206,7 @@ test('Validate schema - 1', async () => {
             ]
         })
         .addSchemaType('EqualsFilterCondition', {
+            type: 'object',
             properties: {
                 operation: {
                     type: 'string',
@@ -1066,6 +1216,7 @@ test('Validate schema - 1', async () => {
             }
         })
         .addSchemaType('GreaterThanFilterCondition', {
+            type: 'object',
             properties: {
                 operation: {
                     type: 'string',
@@ -1075,6 +1226,7 @@ test('Validate schema - 1', async () => {
             }
         })
         .addSchemaType('LessThanFilterCondition', {
+            type: 'object',
             properties: {
                 operation: {
                     type: 'string',
@@ -1084,6 +1236,7 @@ test('Validate schema - 1', async () => {
             }
         })
         .addSchemaType('ContainsFilterCondition', {
+            type: 'object',
             properties: {
                 operation: {
                     type: 'string',
@@ -1100,12 +1253,14 @@ test('Validate schema - 1', async () => {
             }
         })
         .addSchemaType('LikeFilterCondition', {
+            type: 'object',
             properties: {
                 operation: 'like',
                 value: 'string'
             }
         })
         .addSchemaType('BetweenFilterCondition', {
+            type: 'object',
             properties: {
                 operation: 'between',
                 from: 'number',
@@ -1123,13 +1278,14 @@ test('Validate schema - 1', async () => {
             'LikeFilterCondition'
         ])
         .addSchemaType('AuthorFilter', {
+            type: 'object',
             properties: {
                 fullName: 'StringFilterCondition'
             }
         })
         .addSchemaType(
             'AuthorsReportSpecification',
-            authorsReportSpecificationSchema as ObjectSchemaDefinitionParam<any>
+            authorsReportSpecificationSchema as ObjectSchema<any>
         );
 
     /**
@@ -1199,8 +1355,9 @@ test('Validate schema - 1', async () => {
 });
 
 test('Validate schema - 2', async () => {
-    const validator = new SchemaValidator()
+    const validator = new SchemaRegistry()
         .addSchemaType('Date', {
+            type: 'object',
             validators: [
                 (value) =>
                     value instanceof Date && !Number.isNaN(value)
@@ -1214,11 +1371,13 @@ test('Validate schema - 2', async () => {
             ]
         })
         .addSchemaType('Module.Schema1', {
+            type: 'object',
             properties: {
                 a: 'string'
             }
         })
         .addSchemaType('Module.Schema2', {
+            type: 'object',
             properties: {
                 b: 'number'
             }
@@ -1242,7 +1401,7 @@ test('Validate schema - 2', async () => {
 });
 
 test('Not required alternative schema alias', async () => {
-    const validator = new SchemaValidator()
+    const validator = new SchemaRegistry()
         .addSchemaType('Alternate1', {
             properties: {
                 a1: 'string'
@@ -1291,8 +1450,46 @@ test('Not required alternative schema alias', async () => {
     expect(result).toHaveProperty('valid', false);
 });
 
+test('Nullable alias', async () => {
+    const validator = new SchemaRegistry().addSchemaType('Alias1', {
+        properties: {
+            a2: 'string'
+        }
+    });
+
+    let result = await validator.validate(
+        {
+            type: 'alias',
+            isNullable: true,
+            schemaName: 'Alias1'
+        },
+        null
+    );
+
+    expect(result).toHaveProperty('valid', true);
+
+    result = await validator.validate(
+        {
+            type: 'object',
+            properties: {
+                prop: {
+                    type: 'alias',
+                    isNullable: true,
+                    schemaName: 'Alias1'
+                }
+            }
+        },
+        {
+            prop: null
+        }
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
 test('Preprocessors - 1', async () => {
-    const validator = new SchemaValidator().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchemaType('Date', {
+        type: 'object',
         validators: [
             (value) =>
                 value instanceof Date && !Number.isNaN(value)
@@ -1306,13 +1503,16 @@ test('Preprocessors - 1', async () => {
         ]
     });
 
-    const schema: Schema<{ bornAt: Date }> = {
+    const schema: Schema<{ name: string; bornAt: Date }> = {
         type: 'object',
         properties: {
-            bornAt: 'Date'
+            bornAt: {
+                type: 'alias',
+                schemaName: 'Date'
+            }
         },
         preprocessors: {
-            bornAt: (value: unknown): Date | undefined => {
+            bornAt: (value: any): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
                 );
@@ -1320,16 +1520,16 @@ test('Preprocessors - 1', async () => {
                 return new Date(time);
             }
         }
-    };
+    } as any;
 
-    const result = await validator.validate(schema, {
+    const result = await validator.validate(schema as Schema, {
         bornAt: new Date().toJSON()
     });
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Preprocessors - 2', async () => {
-    const validator = new SchemaValidator().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchemaType('Date', {
         validators: [
             (value) =>
                 value instanceof Date && !Number.isNaN(value)
@@ -1351,7 +1551,7 @@ test('Preprocessors - 2', async () => {
         preprocessors: {
             bornAt: 'StringToDate'
         }
-    };
+    } as any;
 
     validator.addPreprocessor(
         'StringToDate',
@@ -1377,7 +1577,7 @@ test('Preprocessors - 2', async () => {
         )
     ).toThrow();
 
-    const result = await validator.validate(schema, {
+    const result = await validator.validate(schema as Schema, {
         bornAt: new Date().toJSON()
     });
     expect(result).toHaveProperty('valid', true);
@@ -1392,18 +1592,18 @@ test('Preprocessors - 2', async () => {
             bornAt: 'StringToDate',
             diedAt: 'Unregistered'
         }
-    };
+    } as any;
     expect(async () => {
-        await validator.validate(schema, {
+        await validator.validate(schema as Schema, {
             bornAt: new Date().toJSON()
         });
     }).rejects.toBeInstanceOf(Error);
 });
 
 test('Preprocessors - 3', async () => {
-    const validator = new SchemaValidator().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchemaType('Date', {
         validators: [
-            (value) =>
+            (value: any) =>
                 value instanceof Date && !Number.isNaN(value)
                     ? {
                           valid: true
@@ -1474,38 +1674,38 @@ test('Preprocessors - 3', async () => {
 });
 
 test('Preprocessors - 3', async () => {
-    const validator = new SchemaValidator();
+    const validator = new SchemaRegistry();
 
     type SomeType = { age: number; marriedAt: number };
 
-    const schema: ObjectSchemaDefinition<SomeType> = {
+    const schema: Schema<SomeType> = {
         type: 'object',
         properties: {
             age: 'number',
             marriedAt: 'number'
         },
         preprocessors: {
-            age: (value): number => 40,
+            age: (): number => 40,
             '*': (value: SomeType): void => {
                 if (value.marriedAt > value.age) {
                     value.marriedAt = value.age;
                 }
             }
         }
-    };
+    } as any;
 
     const obj = {
         age: 50,
         marriedAt: 80
     };
-    await validator.validate(schema, obj);
+    await validator.validate(schema as Schema, obj);
     expect(obj).toHaveProperty('marriedAt', 40);
 });
 
 test('Preprocessors - 4', async () => {
-    const validator = new SchemaValidator().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchemaType('Date', {
         validators: [
-            (value) =>
+            (value: any) =>
                 value instanceof Date && !Number.isNaN(value)
                     ? {
                           valid: true
@@ -1575,11 +1775,96 @@ test('Preprocessors - 4', async () => {
     expect(result).toHaveProperty('valid', false);
 });
 
+test('Preprocessors - 5', async () => {
+    const validator = new SchemaRegistry().addSchemaType('Date', {
+        type: 'object',
+        validators: [
+            (value) =>
+                value instanceof Date && !Number.isNaN(value)
+                    ? {
+                          valid: true
+                      }
+                    : {
+                          valid: false,
+                          errors: ['should be a valid Date object']
+                      }
+        ]
+    });
+
+    const schema: Schema<{ name: string; bornAt: Date }> = {
+        type: 'object',
+        properties: {
+            bornAt: {
+                type: 'alias',
+                schemaName: 'Date',
+                isRequired: false
+            }
+        },
+        preprocessors: {
+            bornAt: () => undefined
+        },
+        validators: [
+            (value) => {
+                expect('bornAt' in value).toEqual(false);
+                return { valid: true };
+            }
+        ]
+    } as any;
+
+    const result = await validator.validate(schema as Schema, {});
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Preprocessors - 6', async () => {
+    const validator = new SchemaRegistry()
+        .addSchemaType('Date', {
+            type: 'object',
+            validators: [
+                (value) =>
+                    value instanceof Date && !Number.isNaN(value)
+                        ? {
+                              valid: true
+                          }
+                        : {
+                              valid: false,
+                              errors: ['should be a valid Date object']
+                          }
+            ]
+        })
+        .addPreprocessor('BornAt', () => undefined);
+
+    const schema: Schema<{ name: string; bornAt: Date }> = {
+        type: 'object',
+        properties: {
+            bornAt: {
+                type: 'alias',
+                schemaName: 'Date',
+                isRequired: false
+            }
+        },
+        preprocessors: {
+            bornAt: 'BornAt'
+        },
+        validators: [
+            (value) => {
+                expect('bornAt' in value).toEqual(false);
+                return { valid: true };
+            }
+        ]
+    } as any;
+
+    const result = await validator.validate(schema as Schema, {});
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Preprocessors - 7', async () => {
+    expect(() => {
+        new SchemaRegistry().addPreprocessor('BornAt', 123 as any);
+    }).toThrow();
+});
+
 test('Submodules - 1', async () => {
-    const validator = new SchemaValidator().addSchemaType(
-        'Module1.Schema1',
-        {}
-    );
+    const validator = new SchemaRegistry().addSchemaType('Module1.Schema1', {});
 
     const result = validator.schemas;
 
@@ -1588,9 +1873,10 @@ test('Submodules - 1', async () => {
 });
 
 test('Submodules - 2', async () => {
-    const validator = new SchemaValidator()
+    const validator = new SchemaRegistry()
         .addSchemaType('Module1.Schema1', {})
         .addSchemaType('Module1.Schema2', {
+            type: 'object',
             properties: {
                 a: 'number'
             }
@@ -1609,13 +1895,15 @@ test('Submodules - 2', async () => {
 });
 
 test('Submodules - 3', async () => {
-    const validator = new SchemaValidator()
+    const validator = new SchemaRegistry()
         .addSchemaType('Module1.Schema1', {
+            type: 'object',
             properties: {
                 b: 'number'
             }
         })
         .addSchemaType('Module1.Schema2', {
+            type: 'object',
             properties: {
                 a: {
                     type: 'alias',
@@ -1633,7 +1921,7 @@ test('Submodules - 3', async () => {
 });
 
 test('Submodules - 4', async () => {
-    const validator = new SchemaValidator()
+    const validator = new SchemaRegistry()
         .addSchemaType('Module1.Schema1', {
             properties: {
                 b: 'number'
@@ -1656,7 +1944,8 @@ test('Submodules - 4', async () => {
 });
 
 test('No unknown fields - 1', async () => {
-    const validator = new SchemaValidator().addSchemaType('Schema1', {
+    const validator = new SchemaRegistry().addSchemaType('Schema1', {
+        type: 'object',
         properties: {
             b: 'number'
         },
@@ -1671,7 +1960,8 @@ test('No unknown fields - 1', async () => {
 });
 
 test('No unknown fields - 2', async () => {
-    const validator = new SchemaValidator().addSchemaType('Schema1', {
+    const validator = new SchemaRegistry().addSchemaType('Schema1', {
+        type: 'object',
         properties: {
             b: 'number'
         },

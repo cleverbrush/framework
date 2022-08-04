@@ -1,13 +1,8 @@
-import {
-    ValidationResult,
-    BooleanSchemaDefinition,
-    ISchemaValidator
-} from '../index';
+import { BooleanSchema, ValidationResult } from '../schema.js';
 
 export const validateBoolean = async (
     obj: any,
-    schema: BooleanSchemaDefinition<any>,
-    validator: ISchemaValidator<any>
+    schema: BooleanSchema
 ): Promise<ValidationResult> => {
     if (
         typeof obj === 'undefined' &&
@@ -23,10 +18,6 @@ export const validateBoolean = async (
             valid: false,
             errors: [`expected type boolean, but saw ${typeof obj}`]
         };
-
-    if (typeof schema === 'boolean') {
-        return { valid: true };
-    }
 
     const bool = obj as boolean;
 
