@@ -45,7 +45,16 @@ export interface ISchemaRegistry<T extends Record<string, any>> {
     schemas: Unfold<T>;
 }
 
-export { SchemaRegistry as SchemaValidator };
-export default SchemaRegistry;
+export { SchemaRegistry };
+export default {
+    SchemaRegistry,
+    alias,
+    array,
+    boolean,
+    number,
+    object,
+    string,
+    union
+};
 
 export { alias, array, boolean, number, object, string, union };

@@ -55,7 +55,7 @@ const getUserSchema = (): Schema<User> =>
     } as any);
 
 test('Can add schema', () => {
-    const validator = new SchemaRegistry().addSchemaType('something', {
+    const validator = new SchemaRegistry().addSchema('something', {
         type: 'object',
         properties: {
             a: 'string'
@@ -66,15 +66,15 @@ test('Can add schema', () => {
 
 test('Throws when not array or object is passed to addSchemaType', () => {
     expect(() => {
-        new SchemaRegistry().addSchemaType('something', 1234 as any);
+        new SchemaRegistry().addSchema('something', 1234 as any);
     }).toThrow();
 });
 
 test('Error thrown on adding a schema with duplicate name', () => {
     expect(() =>
         new SchemaRegistry()
-            .addSchemaType('smth', {} as any)
-            .addSchemaType('smth', {} as any)
+            .addSchema('smth', {} as any)
+            .addSchema('smth', {} as any)
     ).toThrow();
 });
 
@@ -85,7 +85,7 @@ test('Receiving the same schema after add', () => {
             name: 'string'
         }
     };
-    const validator = new SchemaRegistry().addSchemaType('something', schema);
+    const validator = new SchemaRegistry().addSchema('something', schema);
 
     expect(
         deepEqual(
@@ -96,52 +96,50 @@ test('Receiving the same schema after add', () => {
 });
 
 test('Schemas property is cached when reading', () => {
-    const validator = new SchemaRegistry().addSchemaType('something', {});
+    const validator = new SchemaRegistry().addSchema('something', {});
     expect(validator.schemas).toEqual(validator.schemas);
 });
 
 test('Schemas property is updated after adding a new schema', () => {
-    let validator = new SchemaRegistry().addSchemaType(
+    let validator = new SchemaRegistry().addSchema(
         'something',
         {} as ObjectSchema<any>
     );
     const s = validator.schemas;
-    validator = validator.addSchemaType('another', {});
+    validator = validator.addSchema('another', {});
     expect(s).not.toEqual(validator.schemas);
 });
 
 test('Trows when trying to add a schema with name = "number"', () => {
     const validator = new SchemaRegistry();
     expect(() =>
-        validator.addSchemaType('number', {} as ObjectSchema<any>)
+        validator.addSchema('number', {} as ObjectSchema<any>)
     ).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "array"', () => {
     const validator = new SchemaRegistry();
     expect(() =>
-        validator.addSchemaType('array', {} as ObjectSchema<any>)
+        validator.addSchema('array', {} as ObjectSchema<any>)
     ).toThrow();
 });
 
 test('Trows when trying to add a schema with name = "string"', () => {
     const validator = new SchemaRegistry();
     expect(() =>
-        validator.addSchemaType('string', {} as ObjectSchema<any>)
+        validator.addSchema('string', {} as ObjectSchema<any>)
     ).toThrow();
 });
 
 test('Throws if schema name is empty', () => {
     const validator = new SchemaRegistry();
-    expect(() =>
-        validator.addSchemaType('', {} as ObjectSchema<any>)
-    ).toThrow();
+    expect(() => validator.addSchema('', {} as ObjectSchema<any>)).toThrow();
 });
 
 test('Throws if schema name is not a string', () => {
     const validator = new SchemaRegistry();
     expect(() =>
-        validator.addSchemaType(
+        validator.addSchema(
             new Date() as any as string,
             {} as ObjectSchema<any>
         )
@@ -151,19 +149,19 @@ test('Throws if schema name is not a string', () => {
 test('Throws if schema is not an object', () => {
     const validator = new SchemaRegistry();
     expect(() =>
-        validator.addSchemaType('string', 'string' as any as ObjectSchema<any>)
+        validator.addSchema('string', 'string' as any as ObjectSchema<any>)
     ).toThrow();
 });
 
 test('Union - Array as schema type', async () => {
     const validator = new SchemaRegistry()
-        .addSchemaType('name', {
+        .addSchema('name', {
             type: 'object',
             properties: {
                 name: 'string'
             }
         })
-        .addSchemaType('number_or_string', ['number', 'string', 'name']);
+        .addSchema('number_or_string', ['number', 'string', 'name']);
 
     let result = await validator.schemas.number_or_string.validate(123);
 
@@ -184,7 +182,7 @@ test('Union - Array as schema type', async () => {
 });
 
 test('Union - Schema Object - 1', async () => {
-    const validator = new SchemaRegistry().addSchemaType('address', {
+    const validator = new SchemaRegistry().addSchema('address', {
         type: 'object',
         properties: {
             first: {
@@ -216,7 +214,7 @@ test('Union - Schema Object - 1', async () => {
 });
 
 test('Union - Schema Object - 2', async () => {
-    const validator = new SchemaRegistry().addSchemaType('address', {
+    const validator = new SchemaRegistry().addSchema('address', {
         type: 'object',
         properties: {
             first: {
@@ -992,10 +990,7 @@ test('Validate - array - not required - 1', async () => {
 });
 
 test('Validate - object - 1', async () => {
-    const validator = new SchemaRegistry().addSchemaType(
-        'user',
-        getUserSchema()
-    );
+    const validator = new SchemaRegistry().addSchema('user', getUserSchema());
     const user: User = {
         id: 1,
         name: {
@@ -1075,7 +1070,7 @@ test('Validate - object - 1', async () => {
 });
 
 test('Validate - object - 2', async () => {
-    const validator = new SchemaRegistry().addSchemaType(
+    const validator = new SchemaRegistry().addSchema(
         'user',
         deepExtend(getUserSchema(), {
             validators: [
@@ -1191,7 +1186,7 @@ test('Validate schema - 1', async () => {
     };
 
     const validator = new SchemaRegistry()
-        .addSchemaType('Date', {
+        .addSchema('Date', {
             type: 'object',
             validators: [
                 (value) =>
@@ -1205,7 +1200,7 @@ test('Validate schema - 1', async () => {
                           }
             ]
         })
-        .addSchemaType('EqualsFilterCondition', {
+        .addSchema('EqualsFilterCondition', {
             type: 'object',
             properties: {
                 operation: {
@@ -1215,7 +1210,7 @@ test('Validate schema - 1', async () => {
                 value: ['object', 'string', 'number']
             }
         })
-        .addSchemaType('GreaterThanFilterCondition', {
+        .addSchema('GreaterThanFilterCondition', {
             type: 'object',
             properties: {
                 operation: {
@@ -1225,7 +1220,7 @@ test('Validate schema - 1', async () => {
                 value: 'number'
             }
         })
-        .addSchemaType('LessThanFilterCondition', {
+        .addSchema('LessThanFilterCondition', {
             type: 'object',
             properties: {
                 operation: {
@@ -1235,7 +1230,7 @@ test('Validate schema - 1', async () => {
                 value: 'number'
             }
         })
-        .addSchemaType('ContainsFilterCondition', {
+        .addSchema('ContainsFilterCondition', {
             type: 'object',
             properties: {
                 operation: {
@@ -1252,14 +1247,14 @@ test('Validate schema - 1', async () => {
                 ]
             }
         })
-        .addSchemaType('LikeFilterCondition', {
+        .addSchema('LikeFilterCondition', {
             type: 'object',
             properties: {
                 operation: 'like',
                 value: 'string'
             }
         })
-        .addSchemaType('BetweenFilterCondition', {
+        .addSchema('BetweenFilterCondition', {
             type: 'object',
             properties: {
                 operation: 'between',
@@ -1273,17 +1268,17 @@ test('Validate schema - 1', async () => {
                         : { valid: false, error: ['from must be <= to'] }
             ]
         })
-        .addSchemaType('StringFilterCondition', [
+        .addSchema('StringFilterCondition', [
             'EqualsFilterCondition',
             'LikeFilterCondition'
         ])
-        .addSchemaType('AuthorFilter', {
+        .addSchema('AuthorFilter', {
             type: 'object',
             properties: {
                 fullName: 'StringFilterCondition'
             }
         })
-        .addSchemaType(
+        .addSchema(
             'AuthorsReportSpecification',
             authorsReportSpecificationSchema as ObjectSchema<any>
         );
@@ -1356,7 +1351,7 @@ test('Validate schema - 1', async () => {
 
 test('Validate schema - 2', async () => {
     const validator = new SchemaRegistry()
-        .addSchemaType('Date', {
+        .addSchema('Date', {
             type: 'object',
             validators: [
                 (value) =>
@@ -1370,13 +1365,13 @@ test('Validate schema - 2', async () => {
                           }
             ]
         })
-        .addSchemaType('Module.Schema1', {
+        .addSchema('Module.Schema1', {
             type: 'object',
             properties: {
                 a: 'string'
             }
         })
-        .addSchemaType('Module.Schema2', {
+        .addSchema('Module.Schema2', {
             type: 'object',
             properties: {
                 b: 'number'
@@ -1402,17 +1397,17 @@ test('Validate schema - 2', async () => {
 
 test('Not required alternative schema alias', async () => {
     const validator = new SchemaRegistry()
-        .addSchemaType('Alternate1', {
+        .addSchema('Alternate1', {
             properties: {
                 a1: 'string'
             }
         })
-        .addSchemaType('Alternate2', {
+        .addSchema('Alternate2', {
             properties: {
                 a2: 'string'
             }
         })
-        .addSchemaType('Alternate', ['Alternate1', 'Alternate2']);
+        .addSchema('Alternate', ['Alternate1', 'Alternate2']);
 
     let result = await validator.validate(
         {
@@ -1451,7 +1446,7 @@ test('Not required alternative schema alias', async () => {
 });
 
 test('Nullable alias', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Alias1', {
+    const validator = new SchemaRegistry().addSchema('Alias1', {
         properties: {
             a2: 'string'
         }
@@ -1488,7 +1483,7 @@ test('Nullable alias', async () => {
 });
 
 test('Preprocessors - 1', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchema('Date', {
         type: 'object',
         validators: [
             (value) =>
@@ -1529,7 +1524,7 @@ test('Preprocessors - 1', async () => {
 });
 
 test('Preprocessors - 2', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchema('Date', {
         validators: [
             (value) =>
                 value instanceof Date && !Number.isNaN(value)
@@ -1601,7 +1596,7 @@ test('Preprocessors - 2', async () => {
 });
 
 test('Preprocessors - 3', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchema('Date', {
         validators: [
             (value: any) =>
                 value instanceof Date && !Number.isNaN(value)
@@ -1703,7 +1698,7 @@ test('Preprocessors - 3', async () => {
 });
 
 test('Preprocessors - 4', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchema('Date', {
         validators: [
             (value: any) =>
                 value instanceof Date && !Number.isNaN(value)
@@ -1776,7 +1771,7 @@ test('Preprocessors - 4', async () => {
 });
 
 test('Preprocessors - 5', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Date', {
+    const validator = new SchemaRegistry().addSchema('Date', {
         type: 'object',
         validators: [
             (value) =>
@@ -1817,7 +1812,7 @@ test('Preprocessors - 5', async () => {
 
 test('Preprocessors - 6', async () => {
     const validator = new SchemaRegistry()
-        .addSchemaType('Date', {
+        .addSchema('Date', {
             type: 'object',
             validators: [
                 (value) =>
@@ -1864,7 +1859,7 @@ test('Preprocessors - 7', async () => {
 });
 
 test('Submodules - 1', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Module1.Schema1', {});
+    const validator = new SchemaRegistry().addSchema('Module1.Schema1', {});
 
     const result = validator.schemas;
 
@@ -1874,8 +1869,8 @@ test('Submodules - 1', async () => {
 
 test('Submodules - 2', async () => {
     const validator = new SchemaRegistry()
-        .addSchemaType('Module1.Schema1', {})
-        .addSchemaType('Module1.Schema2', {
+        .addSchema('Module1.Schema1', {})
+        .addSchema('Module1.Schema2', {
             type: 'object',
             properties: {
                 a: 'number'
@@ -1896,13 +1891,13 @@ test('Submodules - 2', async () => {
 
 test('Submodules - 3', async () => {
     const validator = new SchemaRegistry()
-        .addSchemaType('Module1.Schema1', {
+        .addSchema('Module1.Schema1', {
             type: 'object',
             properties: {
                 b: 'number'
             }
         })
-        .addSchemaType('Module1.Schema2', {
+        .addSchema('Module1.Schema2', {
             type: 'object',
             properties: {
                 a: {
@@ -1922,12 +1917,12 @@ test('Submodules - 3', async () => {
 
 test('Submodules - 4', async () => {
     const validator = new SchemaRegistry()
-        .addSchemaType('Module1.Schema1', {
+        .addSchema('Module1.Schema1', {
             properties: {
                 b: 'number'
             }
         })
-        .addSchemaType('Module1.Schema2', {
+        .addSchema('Module1.Schema2', {
             properties: {
                 a: {
                     type: 'alias',
@@ -1944,7 +1939,7 @@ test('Submodules - 4', async () => {
 });
 
 test('No unknown fields - 1', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Schema1', {
+    const validator = new SchemaRegistry().addSchema('Schema1', {
         type: 'object',
         properties: {
             b: 'number'
@@ -1960,7 +1955,7 @@ test('No unknown fields - 1', async () => {
 });
 
 test('No unknown fields - 2', async () => {
-    const validator = new SchemaRegistry().addSchemaType('Schema1', {
+    const validator = new SchemaRegistry().addSchema('Schema1', {
         type: 'object',
         properties: {
             b: 'number'
