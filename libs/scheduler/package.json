@@ -16,5 +16,8 @@
         "type": "git",
         "url": "github:cleverbrush/libs"
     },
+    "dependencies": {
+        "@cleverbrush/schema": "0.0.17"
+    },
     "types": "./dist/index.d.ts"
 }
