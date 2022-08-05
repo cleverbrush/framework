@@ -76,7 +76,7 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
         return this;
     }
 
-    public addSchemaType<
+    public addSchema<
         TName extends string,
         TParam extends
             | Record<string, any>
