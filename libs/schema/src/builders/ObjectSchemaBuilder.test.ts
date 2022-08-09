@@ -16,7 +16,7 @@ test('Immutable - 1', () => {
 });
 
 test('Immutable - 2', () => {
-    const schema1 = object().hasProperties({
+    const schema1 = object().addProperties({
         first: number()
     });
     const schema2 = schema1.optional();
@@ -140,7 +140,7 @@ test('nullable - 7', () => {
 
 test('hasProperties - 1', () => {
     const schema1 = object().optional();
-    const schema2 = schema1.hasProperties({
+    const schema2 = schema1.addProperties({
         first: number(),
         second: {
             type: 'number'
@@ -155,13 +155,13 @@ test('hasProperties - 1', () => {
 test('hasProperties - 2', () => {
     const schema1 = object()
         .optional()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: {
                 type: 'number'
             }
         });
-    const schema2 = schema1.hasProperties({
+    const schema2 = schema1.addProperties({
         third: number()
     });
 
@@ -172,7 +172,7 @@ test('hasProperties - 2', () => {
 
 test('removeProperty - 1', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number()
         })
@@ -182,7 +182,7 @@ test('removeProperty - 1', () => {
 });
 
 test('removeProperty - 2', () => {
-    const schema1 = object().hasProperties({
+    const schema1 = object().addProperties({
         first: number(),
         second: number()
     });
@@ -193,7 +193,7 @@ test('removeProperty - 2', () => {
 
 test('removeProperty - 3', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number()
         })
@@ -206,7 +206,7 @@ test('removeProperty - 3', () => {
 });
 
 test('preprocessors - 1', () => {
-    const schema1 = object().hasProperties({
+    const schema1 = object().addProperties({
         first: number(),
         second: number().optional()
     });
@@ -215,7 +215,7 @@ test('preprocessors - 1', () => {
 
 test('preprocessors - 2', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -224,7 +224,7 @@ test('preprocessors - 2', () => {
 });
 
 test('preprocessors - 3', () => {
-    const schema1 = object().hasProperties({
+    const schema1 = object().addProperties({
         first: number(),
         second: number().optional()
     });
@@ -235,7 +235,7 @@ test('preprocessors - 3', () => {
 
 test('preprocessors - 4', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -248,7 +248,7 @@ test('preprocessors - 4', () => {
 
 test('preprocessors - 5', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -263,7 +263,7 @@ test('preprocessors - 5', () => {
 });
 
 test('preprocessors - 6', () => {
-    const schema1 = object().hasProperties({
+    const schema1 = object().addProperties({
         first: number(),
         second: number().optional()
     });
@@ -274,7 +274,7 @@ test('preprocessors - 6', () => {
 
 test('preprocessors - 7', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -287,7 +287,7 @@ test('preprocessors - 7', () => {
 
 test('preprocessors - 8', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -302,7 +302,7 @@ test('preprocessors - 8', () => {
 
 test('canHaveUnknownProperties - 1', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -311,7 +311,7 @@ test('canHaveUnknownProperties - 1', () => {
 });
 
 test('canHaveUnknownProperties - 2', () => {
-    const schema1 = object().hasProperties({
+    const schema1 = object().addProperties({
         first: number(),
         second: number().optional()
     });
@@ -323,7 +323,7 @@ test('canHaveUnknownProperties - 2', () => {
 
 test('canHaveUnknownProperties - 3', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -337,7 +337,7 @@ test('canHaveUnknownProperties - 3', () => {
 
 test('shouldNotHaveUnknownProperties - 1', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })
@@ -346,7 +346,7 @@ test('shouldNotHaveUnknownProperties - 1', () => {
 });
 
 test('canHaveUnknownProperties - 2', () => {
-    const schema1 = object().hasProperties({
+    const schema1 = object().addProperties({
         first: number(),
         second: number().optional()
     });
@@ -358,7 +358,7 @@ test('canHaveUnknownProperties - 2', () => {
 
 test('canHaveUnknownProperties - 3', () => {
     const schema1 = object()
-        .hasProperties({
+        .addProperties({
             first: number(),
             second: number().optional()
         })

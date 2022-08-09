@@ -1,4 +1,4 @@
-import { ValidationResult } from './schema.js';
+import { ValidationResult, InferType, ExpandSchemaBuilder } from './schema.js';
 import SchemaRegistry from './schemaRegistry.js';
 
 import { alias } from './builders/AliasSchemaBuilder.js';
@@ -38,7 +38,7 @@ export type Unfold<
 
 export interface ISchemaActions<S> {
     validate(value: any): Promise<ValidationResult>;
-    schema: S;
+    schema: ExpandSchemaBuilder<S>;
 }
 
 export interface ISchemaRegistry<T extends Record<string, any>> {
@@ -57,4 +57,4 @@ export default {
     union
 };
 
-export { alias, array, boolean, number, object, string, union };
+export { alias, array, boolean, number, object, string, union, InferType };

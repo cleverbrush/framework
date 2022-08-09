@@ -11,9 +11,9 @@ import { boolean } from './builders/BooleanSchemaBuilder.js';
 import { alias } from './builders/AliasSchemaBuilder.js';
 
 const getUserSchema = () =>
-    object().hasProperties({
+    object().addProperties({
         id: number(),
-        name: object().hasProperties({
+        name: object().addProperties({
             first: string().hasMinLength(1).hasMaxLength(100),
             last: string().hasMinLength(1).hasMaxLength(100)
         }),
@@ -26,7 +26,7 @@ test('Can add schema', () => {
     const validator = new SchemaRegistry().addSchema(
         'something',
         ({ object, string }) =>
-            object().hasProperties({
+            object().addProperties({
                 a: string()
             })
     );
@@ -42,7 +42,7 @@ test('Error thrown on adding a schema with duplicate name', () => {
 });
 
 test('Receiving the same schema after add', () => {
-    const schema = object().hasProperties({
+    const schema = object().addProperties({
         name: string()
     });
     const validator = new SchemaRegistry().addSchema('something', schema);
@@ -55,7 +55,7 @@ test('Receiving the same schema after add', () => {
 test('Union - Array as schema type', async () => {
     const validator = new SchemaRegistry()
         .addSchema('name', ({ object, string }) =>
-            object().hasProperties({
+            object().addProperties({
                 name: string()
             })
         )
@@ -85,7 +85,7 @@ test('Union - Schema Object - 1', async () => {
     const validator = new SchemaRegistry().addSchema(
         'address',
         ({ object, union, number, string }) =>
-            object().hasProperties({
+            object().addProperties({
                 first: union(number().hasMinValue(10).hasMaxValue(20)).or(
                     string().hasMinLength(2)
                 )
@@ -114,7 +114,7 @@ test('Union - Schema Object - 2', async () => {
     const validator = new SchemaRegistry().addSchema(
         'address',
         ({ object, number, string, union }) =>
-            object().hasProperties({
+            object().addProperties({
                 first: union(number().hasMinValue(10).hasMaxValue(20))
                     .or(string().hasMinLength(2))
                     .optional()
@@ -506,9 +506,9 @@ test('Validate - object - 1', async () => {
     expect(result).toHaveProperty('valid', false);
 
     result = await validator.validate(
-        object().hasProperties({
+        object().addProperties({
             name: string().hasMaxLength(5),
-            address: object().hasProperties({
+            address: object().addProperties({
                 street: string(),
                 house: number().optional()
             })
@@ -525,7 +525,7 @@ test('Validate - object - 1', async () => {
 
     result = await validator.validate(
         object()
-            .hasProperties({
+            .addProperties({
                 a: number(),
                 b: number()
             })
@@ -567,7 +567,7 @@ test('Validate - one of - 1', async () => {
         union(number())
             .or(string())
             .or(
-                object().hasProperties({
+                object().addProperties({
                     first: string(),
                     last: string()
                 })
@@ -585,13 +585,13 @@ test('Validate schema - 1', async () => {
         .addSchema(
             'EqualsFilterCondition',
             ({ object, number, string, union }) =>
-                object().hasProperties({
+                object().addProperties({
                     operation: string().equalsTo('equals'),
                     value: union(object()).or(string()).or(number())
                 })
         )
         .addSchema('LikeFilterCondition', ({ object, string }) =>
-            object().hasProperties({
+            object().addProperties({
                 operation: string().equalsTo('like'),
                 value: string()
             })
@@ -602,7 +602,7 @@ test('Validate schema - 1', async () => {
             )
         )
         .addSchema('AuthorFilter', ({ alias, object }) =>
-            object().hasProperties({
+            object().addProperties({
                 fullName: alias('StringFilterCondition')
             })
         )
@@ -622,7 +622,7 @@ test('Validate schema - 1', async () => {
             'AuthorsReportSpecification',
             ({ object, string, alias, union }) =>
                 object()
-                    .hasProperties({
+                    .addProperties({
                         type: string().equalsTo('author'),
                         start: alias('Date'),
                         end: alias('Date'),
@@ -639,7 +639,7 @@ test('Validate schema - 1', async () => {
                                 .or(string().equalsTo('visitors'))
                                 .or(string().equalsTo('newVisitors'))
                         ),
-                        filters: object().hasProperties({
+                        filters: object().addProperties({
                             author: alias('AuthorFilter')
                         })
                     })
@@ -740,18 +740,18 @@ test('Validate schema - 2', async () => {
             )
         )
         .addSchema('Module.Schema1', ({ object, string }) =>
-            object().hasProperties({
+            object().addProperties({
                 a: string()
             })
         )
         .addSchema('Module.Schema2', ({ object, number }) =>
-            object().hasProperties({
+            object().addProperties({
                 b: number()
             })
         );
 
     const result = await validator.validate(
-        object().hasProperties({
+        object().addProperties({
             date: alias('Date').optional()
         }),
         {}
@@ -763,12 +763,12 @@ test('Validate schema - 2', async () => {
 test('Not required alternative schema alias', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Alternate1', ({ object, string }) =>
-            object().hasProperties({
+            object().addProperties({
                 a1: string()
             })
         )
         .addSchema('Alternate2', ({ object, string }) =>
-            object().hasProperties({
+            object().addProperties({
                 a2: string()
             })
         )
@@ -822,7 +822,7 @@ test('Preprocessors - 1', async () => {
     );
 
     const schema = object()
-        .hasProperties({
+        .addProperties({
             bornAt: alias('Date')
         })
         .addFieldPreprocessor('bornAt', (value: any): Date | undefined => {
@@ -854,7 +854,7 @@ test('Preprocessors - 2', async () => {
     );
 
     let schema = object()
-        .hasProperties({
+        .addProperties({
             bornAt: alias('Date')
         })
         .addFieldPreprocessor('bornAt', 'StringToDate');
@@ -889,7 +889,7 @@ test('Preprocessors - 2', async () => {
     expect(result).toHaveProperty('valid', true);
 
     schema = object()
-        .hasProperties({
+        .addProperties({
             bornAt: alias('Date'),
             diedAt: alias('Date')
         })
@@ -972,7 +972,7 @@ test('Preprocessors - 3', async () => {
     type SomeType = { age: number; marriedAt: number };
 
     const schema = object()
-        .hasProperties({
+        .addProperties({
             age: number(),
             marriedAt: number()
         })
@@ -1058,7 +1058,7 @@ test('Submodules - 2', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Module1.Schema1', ({ object }) => object())
         .addSchema('Module1.Schema2', ({ object, number }) =>
-            object().hasProperties({
+            object().addProperties({
                 a: number()
             })
         );
@@ -1078,12 +1078,12 @@ test('Submodules - 2', async () => {
 test('Submodules - 3', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Module1.Schema1', ({ object, number }) =>
-            object().hasProperties({
+            object().addProperties({
                 b: number()
             })
         )
         .addSchema('Module1.Schema2', ({ object, alias }) =>
-            object().hasProperties({
+            object().addProperties({
                 a: alias('Module1.Schema1')
             })
         );
@@ -1099,12 +1099,12 @@ test('Submodules - 3', async () => {
 test('Submodules - 4', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Module1.Schema1', ({ object, number }) =>
-            object().hasProperties({
+            object().addProperties({
                 b: number()
             })
         )
         .addSchema('Module1.Schema2', ({ object, alias }) =>
-            object().hasProperties({
+            object().addProperties({
                 a: alias('Module1.Schema3' as any)
             })
         );
@@ -1121,7 +1121,7 @@ test('No unknown fields - 1', async () => {
         'Schema1',
         ({ object, number }) =>
             object()
-                .hasProperties({
+                .addProperties({
                     b: number()
                 })
                 .shouldNotHaveUnknownProperties()
@@ -1139,7 +1139,7 @@ test('No unknown fields - 2', async () => {
         'Schema1',
         ({ object, number }) =>
             object()
-                .hasProperties({
+                .addProperties({
                     b: number()
                 })
                 .canHaveUnknownProperties()

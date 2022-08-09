@@ -5,7 +5,8 @@
         "declaration": true,
         "target": "ES2020",
         "esModuleInterop": true,
-        "moduleResolution": "Node"
+        "moduleResolution": "Node",
+        "checkJs": true
     },
     "watchOptions": {
         "excludeDirectories": ["./dist"]
