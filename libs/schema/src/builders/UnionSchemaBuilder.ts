@@ -1,10 +1,10 @@
-import { Schema, UnionSchema } from '../schema.js';
+import { Schema } from '../schema.js';
 import { SchemaBuilder, ISchemaBuilder } from './SchemaBuilder.js';
 
 export interface IUnionSchemaBuilder<
     TRequired extends boolean = true,
     TNullable extends boolean = false,
-    TVariants extends any[] = never
+    TVariants extends any[] = []
 > extends ISchemaBuilder<TRequired, TNullable> {
     type: 'union';
     variants: TVariants;
@@ -12,7 +12,7 @@ export interface IUnionSchemaBuilder<
     required(): IUnionSchemaBuilder<true, TNullable, TVariants>;
     nullable(): IUnionSchemaBuilder<TRequired, true, TVariants>;
     notNullable(): IUnionSchemaBuilder<TRequired, false, TVariants>;
-    or<T extends Schema>(
+    or<T>(
         schema: T
     ): IUnionSchemaBuilder<TRequired, TNullable, [...TVariants, T]>;
     clearVariants(): IUnionSchemaBuilder<TRequired, TNullable, []>;
@@ -21,7 +21,7 @@ export interface IUnionSchemaBuilder<
 class UnionSchemaBuilder<
         TRequired extends boolean = true,
         TNullable extends boolean = false,
-        TVariants extends any[] = never
+        TVariants extends any[] = []
     >
     extends SchemaBuilder<TRequired, TNullable>
     implements IUnionSchemaBuilder<TRequired, TNullable, TVariants>
@@ -71,7 +71,7 @@ class UnionSchemaBuilder<
         variants?: TVariants;
     }) {
         super(obj);
-        this.variants = [] as any as TVariants;
+        this.variants = [] as TVariants;
         if (Array.isArray(obj.variants)) {
             for (let i = 0; i < obj.variants.length; i++) {
                 this.variants.push(obj.variants[i]);
@@ -119,10 +119,9 @@ class UnionSchemaBuilder<
         });
     }
 
-    or<T extends Schema>(
+    or<T>(
         schema: T
-    ): UnionSchema<[...TVariants, T]> &
-        IUnionSchemaBuilder<TRequired, TNullable, [...TVariants, T]> {
+    ): IUnionSchemaBuilder<TRequired, TNullable, [...TVariants, T]> {
         return UnionSchemaBuilder.create({
             ...(this._schema as any),
             variants: [...this.variants, schema]
@@ -150,4 +149,4 @@ export const union = <
         isRequired: true,
         isNullable: false,
         variants: [schema as any]
-    }) as any as IUnionSchemaBuilder<TRequired, TNullable, [T]>;
+    }) as any;

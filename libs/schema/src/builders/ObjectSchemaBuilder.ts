@@ -6,8 +6,8 @@ export interface IObjectSchemaBuilder<
     TRequired extends boolean = true,
     TNullable extends boolean = false,
     TNoUnknownProperties extends boolean = false,
-    // @ts-ignore
-    TProperties = {}
+    TProperties = {},
+    TMapToType = undefined
 > extends ISchemaBuilder<TRequired, TNullable> {
     readonly type: 'object';
     noUnknownProperties?: TNoUnknownProperties;
@@ -28,33 +28,38 @@ export interface IObjectSchemaBuilder<
         false,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     >;
     required(): IObjectSchemaBuilder<
         true,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     >;
     nullable(): IObjectSchemaBuilder<
         TRequired,
         true,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     >;
     notNullable(): IObjectSchemaBuilder<
         TRequired,
         false,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     >;
-    hasProperties<T extends Record<string, any>>(
+    addProperties<T extends Record<string, any>>(
         val?: T
     ): IObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties & T
+        TProperties & T,
+        TMapToType
     >;
     removeProperty<T extends keyof TProperties>(
         property: T
@@ -62,19 +67,22 @@ export interface IObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        Omit<TProperties, T>
+        Omit<TProperties, T>,
+        TMapToType
     >;
     canHaveUnknownProperties(): IObjectSchemaBuilder<
         TRequired,
         TNullable,
         false,
-        TProperties
+        TProperties,
+        TMapToType
     >;
     shouldNotHaveUnknownProperties(): IObjectSchemaBuilder<
         TRequired,
         TNullable,
         true,
-        TProperties
+        TProperties,
+        TMapToType
     >;
     addFieldPreprocessor<
         T extends keyof TProperties | '*',
@@ -95,7 +103,8 @@ export interface IObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     >;
     removeFieldPreprocessor<T extends keyof TProperties | '*'>(
         property: T
@@ -103,13 +112,29 @@ export interface IObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     >;
     clearFieldPreprocessors(): IObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
+    >;
+    mapToType<T>(): IObjectSchemaBuilder<
+        TRequired,
+        TNullable,
+        TNoUnknownProperties,
+        TProperties,
+        T
+    >;
+    clearMapToType(): IObjectSchemaBuilder<
+        TRequired,
+        TNullable,
+        TNoUnknownProperties,
+        TProperties,
+        undefined
     >;
 }
 
@@ -117,7 +142,8 @@ export class ObjectSchemaBuilder<
         TRequired extends boolean = true,
         TNullable extends boolean = false,
         TNoUnknownProperties extends boolean = false,
-        TProperties = {}
+        TProperties = {},
+        TMapToType = undefined
     >
     extends SchemaBuilder<TRequired, TNullable>
     implements
@@ -125,7 +151,8 @@ export class ObjectSchemaBuilder<
             TRequired,
             TNullable,
             TNoUnknownProperties,
-            TProperties
+            TProperties,
+            TMapToType
         >
 {
     get type(): 'object' {
@@ -251,8 +278,8 @@ export class ObjectSchemaBuilder<
         TCRequired extends boolean = true,
         TCNullable extends boolean = false,
         TCNoUnknownProperties extends boolean = false,
-        // @ts-ignore
-        TCProperties = {}
+        TCProperties = {},
+        TMapToType = undefined
     >(obj?: {
         isRequired: TCRequired;
         isNullable: TCNullable;
@@ -278,13 +305,15 @@ export class ObjectSchemaBuilder<
         TCRequired,
         TCNullable,
         TCNoUnknownProperties,
-        TCProperties
+        TCProperties,
+        TMapToType
     > {
         return new ObjectSchemaBuilder<
             TCRequired,
             TCNullable,
             TCNoUnknownProperties,
-            TCProperties
+            TCProperties,
+            TMapToType
         >(obj as any);
     }
 
@@ -292,7 +321,8 @@ export class ObjectSchemaBuilder<
         TRequired,
         TNullable,
         false,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (this.noUnknownProperties === false) {
             return this as IObjectSchemaBuilder<
@@ -312,15 +342,11 @@ export class ObjectSchemaBuilder<
         TRequired,
         TNullable,
         true,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (this.noUnknownProperties === true) {
-            return this as IObjectSchemaBuilder<
-                TRequired,
-                TNullable,
-                true,
-                TProperties
-            >;
+            return this as any;
         }
         return ObjectSchemaBuilder.create({
             ...(this._schema as any),
@@ -332,15 +358,11 @@ export class ObjectSchemaBuilder<
         false,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (this.isRequired === false) {
-            return this as IObjectSchemaBuilder<
-                false,
-                TNullable,
-                TNoUnknownProperties,
-                TProperties
-            >;
+            return this as any;
         }
         return ObjectSchemaBuilder.create({
             ...(this._schema as any),
@@ -352,15 +374,11 @@ export class ObjectSchemaBuilder<
         true,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (this.isRequired === true) {
-            return this as IObjectSchemaBuilder<
-                true,
-                TNullable,
-                TNoUnknownProperties,
-                TProperties
-            >;
+            return this as any;
         }
         return ObjectSchemaBuilder.create({
             ...(this._schema as any),
@@ -372,7 +390,8 @@ export class ObjectSchemaBuilder<
         TRequired,
         true,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (this.isNullable === true) {
             return this as IObjectSchemaBuilder<
@@ -392,15 +411,11 @@ export class ObjectSchemaBuilder<
         TRequired,
         false,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (this.isNullable === false) {
-            return this as IObjectSchemaBuilder<
-                TRequired,
-                false,
-                TNoUnknownProperties,
-                TProperties
-            >;
+            return this as any;
         }
         return ObjectSchemaBuilder.create({
             ...(this._schema as any),
@@ -408,13 +423,14 @@ export class ObjectSchemaBuilder<
         });
     }
 
-    public hasProperties<T extends Record<string, any>>(
+    public addProperties<T extends Record<string, any>>(
         val?: T
     ): IObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties & T
+        TProperties & T,
+        TMapToType
     > {
         if (typeof val === 'undefined') return this as any;
         return ObjectSchemaBuilder.create({
@@ -432,24 +448,15 @@ export class ObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        Omit<TProperties, T>
+        Omit<TProperties, T>,
+        TMapToType
     > {
         if (typeof this.properties === 'undefined') {
-            return this as any as IObjectSchemaBuilder<
-                TRequired,
-                TNullable,
-                TNoUnknownProperties,
-                Omit<TProperties, T>
-            >;
+            return this as any;
         }
 
         if (!(property in this.properties)) {
-            return this as any as IObjectSchemaBuilder<
-                TRequired,
-                TNullable,
-                TNoUnknownProperties,
-                Omit<TProperties, T>
-            >;
+            return this as any;
         }
 
         const newProperties = {
@@ -498,7 +505,8 @@ export class ObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (typeof this.preprocessors === 'undefined') {
             this.preprocessors = {
@@ -524,7 +532,8 @@ export class ObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (
             typeof this.preprocessors === 'undefined' ||
@@ -551,7 +560,8 @@ export class ObjectSchemaBuilder<
         TRequired,
         TNullable,
         TNoUnknownProperties,
-        TProperties
+        TProperties,
+        TMapToType
     > {
         if (typeof this.preprocessors === 'undefined') {
             return this;
@@ -561,16 +571,37 @@ export class ObjectSchemaBuilder<
             preprocessors: undefined
         });
     }
+
+    public mapToType<T>(): IObjectSchemaBuilder<
+        TRequired,
+        TNullable,
+        TNoUnknownProperties,
+        TProperties,
+        T
+    > {
+        return this as any;
+    }
+
+    public clearMapToType(): IObjectSchemaBuilder<
+        TRequired,
+        TNullable,
+        TNoUnknownProperties,
+        TProperties,
+        undefined
+    > {
+        return this as any;
+    }
 }
 
-// TODO: use with a new TS version (seems to work with TS v4.8-beta)
-// export const object = <T extends Record<string, any>>(
-//     properties?: T
-// ): T extends undefined
-//     ? IObjectSchemaBuilder
-//     : IObjectSchemaBuilder<true, false, T> =>
-//     typeof properties === 'undefined'
-//         ? ObjectSchemaBuilder.create()
-//         : (ObjectSchemaBuilder.create().addProperties(properties) as any);
-
-export const object = (): IObjectSchemaBuilder => ObjectSchemaBuilder.create();
+export const object = <T>(
+    properties?: T
+): IObjectSchemaBuilder<
+    true,
+    false,
+    false,
+    T extends undefined ? {} : T,
+    undefined
+> =>
+    typeof properties === 'undefined'
+        ? ObjectSchemaBuilder.create()
+        : (ObjectSchemaBuilder.create().addProperties(properties) as any);
