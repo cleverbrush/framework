@@ -1,5 +1,3 @@
-import { deepExtend } from '@cleverbrush/deep';
-
 import { ISchemaRegistry as ISchemaRegistry, Unfold } from './index.js';
 import { validateNumber } from './validators/validateNumber.js';
 import { validateBoolean } from './validators/validateBoolean.js';
@@ -280,7 +278,8 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                 if (Array.isArray(this._schemasMap.get(schema))) {
                     return this.validate(this._schemasMap.get(schema), obj);
                 }
-                const objSchema = deepExtend(
+                const objSchema = Object.assign(
+                    {},
                     defaultSchemas.object,
                     this._schemasMap.get(schema)
                 ) as ObjectSchema;
@@ -364,7 +363,11 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                 const schemaToMerge = { ...(schema as any) };
                 delete schemaToMerge.type;
                 delete schemaToMerge.schemaName;
-                const finalSchema = deepExtend(alias, schemaToMerge) as Schema;
+                const finalSchema = Object.assign(
+                    {},
+                    alias,
+                    schemaToMerge
+                ) as Schema;
                 return await this.validate(finalSchema, obj);
             } else if (spec.type === 'union') {
                 return await validateUnion(obj, spec, this as any);
