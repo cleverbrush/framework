@@ -32,8 +32,13 @@ export const defaultSchemas: { [key in DefaultSchemaType]?: Schema } = {
     },
     object: {
         type: 'object',
-        noUnknownProperties: false,
+        noUnknownProperties: true,
         isNullable: false,
         isRequired: true
+    },
+    function: {
+        type: 'function',
+        isRequired: true,
+        isNullable: false
     }
 };

@@ -5,6 +5,7 @@ import { validateString } from './validators/validateString.js';
 import { validateArray } from './validators/validateArray.js';
 import { validateObject } from './validators/validateObject.js';
 import { validateUnion } from './validators/validateUnion.js';
+import { validateFunction } from './validators/validateFunction.js';
 import {
     ArraySchema,
     BooleanSchema,
@@ -18,7 +19,8 @@ import {
     ValidationResult,
     ValidationResultRaw,
     InferType,
-    ExpandSchemaBuilder
+    ExpandSchemaBuilder,
+    FunctionSchema
 } from './schema.js';
 
 import { number } from './builders/NumberSchemaBuilder.js';
@@ -27,11 +29,16 @@ import { object } from './builders/ObjectSchemaBuilder.js';
 import { string } from './builders/StringSchemaBuilder.js';
 import { boolean } from './builders/BooleanSchemaBuilder.js';
 import { array } from './builders/ArraySchemaBuilder.js';
-import { alias, IAliasSchemaBuilder } from './builders/AliasSchemaBuilder.js';
+import {
+    alias,
+    externalAlias,
+    IAliasSchemaBuilder
+} from './builders/AliasSchemaBuilder.js';
+import { func } from './builders/FunctionSchemaBuilder.js';
 import { defaultSchemas } from './defaultSchemas.js';
 import { ISchemaBuilder, SchemaBuilder } from './builders/SchemaBuilder.js';
 
-const defaultSchemaNames = ['string', 'boolean', 'number', 'array'];
+const defaultSchemaNames = ['string', 'boolean', 'number', 'array', 'function'];
 
 const defaultSchemasValidationStrategies = {
     number: (obj: any, schema: NumberSchema): Promise<ValidationResult> =>
@@ -44,7 +51,9 @@ const defaultSchemasValidationStrategies = {
         obj: any,
         schema: ArraySchema<any>,
         validator: SchemaRegistry<any>
-    ): Promise<ValidationResult> => validateArray(obj, schema, validator)
+    ): Promise<ValidationResult> => validateArray(obj, schema, validator),
+    function: (obj: any, schema: FunctionSchema): Promise<ValidationResult> =>
+        validateFunction(obj, schema)
 };
 
 const isDefaultType = (name: string): boolean =>
@@ -77,12 +86,15 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
         return this;
     }
 
-    public addSchema<
+    public addSchemaFrom<
+        TOldName extends keyof T,
         TName extends string,
         TParam extends
             | Record<string, any>
             | ((params: {
+                  schema: ExpandSchemaBuilder<T[TOldName]>;
                   boolean: typeof boolean;
+                  func: typeof func;
                   array: typeof array;
                   string: typeof string;
                   number: typeof number;
@@ -101,6 +113,106 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                       false,
                       {
                           [k in keyof T]: TSchemaName extends k ? T[k] : never;
+                      },
+                      TCompiledType
+                  >;
+              }) => TSchema),
+        TSchema extends Schema | ISchemaBuilder
+    >(
+        oldName: TOldName,
+        name: TName,
+        param: TParam
+    ): SchemaRegistry<
+        T & {
+            [key in TName]: TParam extends (...args: any[]) => any
+                ? ReduceSchemaBuilder<ReturnType<TParam>>
+                : TParam;
+        }
+    > {
+        if (!this._schemasMap.has(oldName.toString())) {
+            throw new Error(`unknown schema name ${oldName.toString()}`);
+        }
+
+        const oldSchema = this._schemasMap.get(oldName.toString());
+
+        const schema =
+            typeof param === 'function'
+                ? param({
+                      schema: oldSchema,
+                      alias,
+                      array,
+                      boolean,
+                      func,
+                      number,
+                      object,
+                      string,
+                      union
+                  })
+                : param;
+
+        if (Array.isArray(schema)) {
+            this._schemasMap.set(name.toString(), schema as Schema);
+            this._schemasCache = null;
+            return this as any;
+        }
+
+        if (typeof schema !== 'object')
+            throw new Error('Array or Object is required');
+        this._schemasMap.set(name.toString(), {
+            ...(schema instanceof SchemaBuilder
+                ? schema._schema
+                : (schema as any))
+        } as any as Schema);
+
+        this._schemasCache = null;
+        return this as any;
+    }
+
+    public addSchema<
+        TName extends string,
+        TParam extends
+            | Record<string, any>
+            | ((params: {
+                  boolean: typeof boolean;
+                  array: typeof array;
+                  string: typeof string;
+                  number: typeof number;
+                  union: typeof union;
+                  object: typeof object;
+                  func: typeof func;
+                  alias: <
+                      TSchemaName extends keyof T,
+                      TCompiledType = InferType<
+                          ExpandSchemaBuilder<T[TSchemaName]>
+                      >
+                  >(
+                      schemaName: TSchemaName
+                  ) => IAliasSchemaBuilder<
+                      TSchemaName,
+                      true,
+                      false,
+                      {
+                          [k in keyof T]: TSchemaName extends k ? T[k] : never;
+                      },
+                      TCompiledType
+                  >;
+                  external: <
+                      TRegistryKeys extends Record<string, any>,
+                      TSchemaName extends keyof TRegistryKeys,
+                      TCompiledType = InferType<
+                          ExpandSchemaBuilder<TRegistryKeys[TSchemaName]>
+                      >
+                  >(
+                      registry: ISchemaRegistry<TRegistryKeys>,
+                      schemaName: TSchemaName
+                  ) => IAliasSchemaBuilder<
+                      TSchemaName,
+                      true,
+                      false,
+                      {
+                          [k in keyof TRegistryKeys]: TSchemaName extends k
+                              ? TRegistryKeys[k]
+                              : never;
                       },
                       TCompiledType
                   >;
@@ -131,12 +243,14 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
             typeof param === 'function'
                 ? param({
                       alias,
+                      external: externalAlias,
                       array,
                       boolean,
                       number,
                       object,
                       string,
-                      union
+                      union,
+                      func
                   })
                 : param;
 
@@ -148,11 +262,10 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
 
         if (typeof schema !== 'object')
             throw new Error('Array or Object is required');
-        this._schemasMap.set(name.toString(), {
-            ...(schema instanceof SchemaBuilder
-                ? schema._schema
-                : (schema as any))
-        } as any as Schema);
+        this._schemasMap.set(
+            name.toString(),
+            schema instanceof SchemaBuilder ? schema.clone() : schema
+        );
 
         this._schemasCache = null;
         return this as any;
@@ -167,8 +280,19 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
             for (let i = 0; i < parts.length; i++) {
                 if (i === parts.length - 1) {
                     curr[parts[i]] = {
-                        validate: (value: any): Promise<any> =>
-                            this.validate(this._schemasMap.get(key), value),
+                        validate: async (value: any): Promise<any> => {
+                            const result = await this.validate(
+                                this._schemasMap.get(key),
+                                value
+                            );
+                            if (!result.valid) {
+                                return result;
+                            }
+                            return {
+                                ...result,
+                                object: value
+                            };
+                        },
                         schema: this._schemasMap.get(key)
                     };
                 } else {
@@ -264,10 +388,14 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
     }
 
     public async validate(
-        schema: keyof T | Schema,
+        schemaToValidate: keyof T | Schema,
         obj: any
     ): Promise<ValidationResult> {
-        if (!schema) throw new Error('schemaName is required');
+        if (!schemaToValidate) throw new Error('schemaName is required');
+        const schema =
+            schemaToValidate instanceof SchemaBuilder
+                ? schemaToValidate._schema
+                : schemaToValidate;
         if (typeof schema === 'string') {
             if (isDefaultType(schema)) {
                 return await this.validateDefaultType(
@@ -338,7 +466,11 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                     };
                 }
 
-                const alias = this._schemasMap.get(spec.schemaName);
+                const registry = (spec.externalRegistry ||
+                    this) as ISchemaRegistry<any>;
+                const alias = (registry as any)._schemasMap.get(
+                    spec.schemaName
+                );
                 if (typeof alias === 'undefined') {
                     throw new Error(
                         `Unknown schema alias - ${spec.schemaName}`
@@ -353,22 +485,29 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                             valid: true
                         };
                     }
-                    return await this.validate(alias as any, obj);
+                    return await (registry as any).validate(alias as any, obj);
                 }
                 if (typeof alias !== 'object')
                     throw new Error(
                         'it is only possible to use a full schema schema definition as alias'
                     );
 
-                const schemaToMerge = { ...(schema as any) };
-                delete schemaToMerge.type;
-                delete schemaToMerge.schemaName;
-                const finalSchema = Object.assign(
-                    {},
-                    alias,
-                    schemaToMerge
-                ) as Schema;
-                return await this.validate(finalSchema, obj);
+                let schemaToValidate = alias;
+
+                if (alias instanceof SchemaBuilder) {
+                    if (typeof schema.isRequired === 'boolean') {
+                        schemaToValidate = (schemaToValidate as any)[
+                            schema.isRequired ? 'required' : 'optional'
+                        ]();
+                    }
+                    if (typeof schema.isNullable === 'boolean') {
+                        schemaToValidate = (schemaToValidate as any)[
+                            schema.isNullable ? 'nullable' : 'notNullable'
+                        ]();
+                    }
+                }
+
+                return await (registry as any).validate(schemaToValidate, obj);
             } else if (spec.type === 'union') {
                 return await validateUnion(obj, spec, this as any);
             } else if (spec.type === 'object') {
@@ -383,6 +522,8 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                     schema as SchemaSpecification,
                     obj
                 );
+            } else if (spec.type === 'function') {
+                return await validateFunction(obj, spec);
             }
         }
 

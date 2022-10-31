@@ -6,6 +6,8 @@ import { IObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 import { INumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { IArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
 import { IBooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
+import { IFunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
+import { ISchemaRegistry } from './index.js';
 
 export type DefaultSchemaType =
     | 'alias'
@@ -14,7 +16,8 @@ export type DefaultSchemaType =
     | 'string'
     | 'array'
     | 'object'
-    | 'union';
+    | 'union'
+    | 'function';
 
 export type KeysWithNoNever<T> = {
     [k in keyof T]: T[k] extends never ? never : k;
@@ -24,8 +27,7 @@ export type OmitNever<T> = {
     [k in KeysWithNoNever<T>]: T[k];
 };
 
-export type MakeOptional<T, K extends keyof T> = Pick<Partial<T>, K> &
-    Omit<T, K>;
+type MakePropOptional<T, K extends keyof T> = Pick<Partial<T>, K> & Omit<T, K>;
 
 export type Union<T1, T2> = {
     [k in keyof Omit<T1, keyof T2>]: T1[k];
@@ -59,7 +61,11 @@ export type DefaultUnionSchema = DefaultCommonSchema & {
 
 export type DefaultObjectSchema = DefaultCommonSchema & {
     type: 'object';
-    noUnknownProperties: false;
+    noUnknownProperties: true;
+};
+
+export type DefaultFunctionSchema = DefaultCommonSchema & {
+    type: 'function';
 };
 
 export type ValidationResultRaw = {
@@ -70,9 +76,18 @@ export type ValidationResultRaw = {
 export type ValidationResult =
     | ValidationResultRaw
     | Promise<ValidationResultRaw>;
+
+export type ValidationResultWithObject<T> = {
+    valid: boolean;
+    errors?: Array<string>;
+    object?: T;
+};
 export type Validator = (value: any) => ValidationResult;
 
-export type CommonSchemaSpecification<TRequired extends boolean = true, TNullable extends boolean = false> = {
+export type CommonSchemaSpecification<
+    TRequired extends boolean = true,
+    TNullable extends boolean = false
+> = {
     isRequired?: TRequired;
     isNullable?: TNullable;
     validators?: Array<Validator>;
@@ -122,9 +137,13 @@ export type ObjectSchema<T extends Record<string, Schema> = never> =
 export type AliasSchema = CommonSchemaSpecification<any, any> & {
     type: 'alias';
     schemaName: string;
+    externalRegistry?: ISchemaRegistry<any>;
 };
 
-export type UnionSchema<T extends any[]> = CommonSchemaSpecification<any, any> & {
+export type UnionSchema<T extends any[]> = CommonSchemaSpecification<
+    any,
+    any
+> & {
     type: 'union';
     variants: T;
 };
@@ -136,6 +155,10 @@ export type StringSchema = CommonSchemaSpecification<any, any> & {
     maxLength?: number;
 };
 
+export type FunctionSchema = CommonSchemaSpecification<any, any> & {
+    type: 'function';
+};
+
 export type SchemaSpecification =
     | ObjectSchema
     | BooleanSchema
@@ -143,15 +166,12 @@ export type SchemaSpecification =
     | ArraySchema<any>
     | AliasSchema
     | UnionSchema<any>
-    | StringSchema;
+    | StringSchema
+    | FunctionSchema;
 
 export type Schema<T = any> = T extends Record<string, any>
     ? any
-    : // ObjectSchema<{
-    //       //   [k in keyof T]?: Schema<T[k]> | Schema;
-    //       [k in keyof T]?: Schema<T[k]> | AliasSchema;
-    //   }>
-    T extends number
+    : T extends number
     ? NumberSchema | number | 'number'
     : T extends string
     ? StringSchema | string | 'string'
@@ -159,9 +179,333 @@ export type Schema<T = any> = T extends Record<string, any>
     ? BooleanSchema | boolean
     : number | DefaultSchemaType | SchemaSpecification | Schema[];
 
-export type ExpandUnionVariants<TVariants extends any[]> = TVariants extends [infer T]
+export type MakeOptional<T> = T extends IAliasSchemaBuilder<
+    infer TSchemaName,
+    infer TRequired,
+    infer TNullable,
+    infer TAliases,
+    infer TAliasesCompiledType
+>
+    ? IAliasSchemaBuilder<
+          TSchemaName,
+          false,
+          TNullable,
+          TAliases,
+          TAliasesCompiledType
+      >
+    : T extends IUnionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TVariants
+      >
+    ? IUnionSchemaBuilder<false, TNullable, TVariants>
+    : T extends IStringSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMinLength,
+          infer TMaxLength,
+          infer TEqualsTo
+      >
+    ? IStringSchemaBuilder<false, TNullable, TMinLength, TMaxLength, TEqualsTo>
+    : T extends IObjectSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TNoUnknownProperties,
+          infer TProperties,
+          infer TMapToType
+      >
+    ? IObjectSchemaBuilder<
+          false,
+          TNullable,
+          TNoUnknownProperties,
+          TProperties,
+          TMapToType
+      >
+    : T extends INumberSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMin,
+          infer TMax,
+          infer TIsInteger,
+          infer TEnsureNotNaN,
+          infer TEnsureIsFinite,
+          infer TEqualsTo
+      >
+    ? INumberSchemaBuilder<
+          false,
+          TNullable,
+          TMin,
+          TMax,
+          TIsInteger,
+          TEnsureNotNaN,
+          TEnsureIsFinite,
+          TEqualsTo
+      >
+    : T extends IArraySchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TOfType,
+          infer TMaxLength,
+          infer TMinLength
+      >
+    ? IArraySchemaBuilder<false, TNullable, TOfType, TMaxLength, TMinLength>
+    : T extends IBooleanSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TEqualsTo
+      >
+    ? IBooleanSchemaBuilder<false, TNullable, TEqualsTo>
+    : T extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
+    ? IFunctionSchemaBuilder<false, TNullable>
+    : T & { isRequired: false };
+
+export type MakeRequired<T> = T extends IAliasSchemaBuilder<
+    infer TSchemaName,
+    infer TRequired,
+    infer TNullable,
+    infer TAliases,
+    infer TAliasesCompiledType
+>
+    ? IAliasSchemaBuilder<
+          TSchemaName,
+          true,
+          TNullable,
+          TAliases,
+          TAliasesCompiledType
+      >
+    : T extends IUnionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TVariants
+      >
+    ? IUnionSchemaBuilder<true, TNullable, TVariants>
+    : T extends IStringSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMinLength,
+          infer TMaxLength,
+          infer TEqualsTo
+      >
+    ? IStringSchemaBuilder<true, TNullable, TMinLength, TMaxLength, TEqualsTo>
+    : T extends IObjectSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TNoUnknownProperties,
+          infer TProperties,
+          infer TMapToType
+      >
+    ? IObjectSchemaBuilder<
+          true,
+          TNullable,
+          TNoUnknownProperties,
+          TProperties,
+          TMapToType
+      >
+    : T extends INumberSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMin,
+          infer TMax,
+          infer TIsInteger,
+          infer TEnsureNotNaN,
+          infer TEnsureIsFinite,
+          infer TEqualsTo
+      >
+    ? INumberSchemaBuilder<
+          true,
+          TNullable,
+          TMin,
+          TMax,
+          TIsInteger,
+          TEnsureNotNaN,
+          TEnsureIsFinite,
+          TEqualsTo
+      >
+    : T extends IArraySchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TOfType,
+          infer TMaxLength,
+          infer TMinLength
+      >
+    ? IArraySchemaBuilder<true, TNullable, TOfType, TMaxLength, TMinLength>
+    : T extends IBooleanSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TEqualsTo
+      >
+    ? IBooleanSchemaBuilder<true, TNullable, TEqualsTo>
+    : T extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
+    ? IFunctionSchemaBuilder<true, TNullable>
+    : T & { isRequired: true };
+
+export type MakeNullable<T> = T extends IAliasSchemaBuilder<
+    infer TSchemaName,
+    infer TRequired,
+    infer TNullable,
+    infer TAliases,
+    infer TAliasesCompiledType
+>
+    ? IAliasSchemaBuilder<
+          TSchemaName,
+          TRequired,
+          true,
+          TAliases,
+          TAliasesCompiledType
+      >
+    : T extends IUnionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TVariants
+      >
+    ? IUnionSchemaBuilder<TRequired, true, TVariants>
+    : T extends IStringSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMinLength,
+          infer TMaxLength,
+          infer TEqualsTo
+      >
+    ? IStringSchemaBuilder<TRequired, true, TMinLength, TMaxLength, TEqualsTo>
+    : T extends IObjectSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TNoUnknownProperties,
+          infer TProperties,
+          infer TMapToType
+      >
+    ? IObjectSchemaBuilder<
+          TRequired,
+          true,
+          TNoUnknownProperties,
+          TProperties,
+          TMapToType
+      >
+    : T extends INumberSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMin,
+          infer TMax,
+          infer TIsInteger,
+          infer TEnsureNotNaN,
+          infer TEnsureIsFinite,
+          infer TEqualsTo
+      >
+    ? INumberSchemaBuilder<
+          TRequired,
+          true,
+          TMin,
+          TMax,
+          TIsInteger,
+          TEnsureNotNaN,
+          TEnsureIsFinite,
+          TEqualsTo
+      >
+    : T extends IArraySchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TOfType,
+          infer TMaxLength,
+          infer TMinLength
+      >
+    ? IArraySchemaBuilder<TRequired, true, TOfType, TMaxLength, TMinLength>
+    : T extends IBooleanSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TEqualsTo
+      >
+    ? IBooleanSchemaBuilder<TRequired, true, TEqualsTo>
+    : T extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
+    ? IFunctionSchemaBuilder<TRequired, true>
+    : T & { isNullable: true };
+
+export type MakeNotNullable<T> = T extends IAliasSchemaBuilder<
+    infer TSchemaName,
+    infer TRequired,
+    infer TNullable,
+    infer TAliases,
+    infer TAliasesCompiledType
+>
+    ? IAliasSchemaBuilder<
+          TSchemaName,
+          TRequired,
+          false,
+          TAliases,
+          TAliasesCompiledType
+      >
+    : T extends IUnionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TVariants
+      >
+    ? IUnionSchemaBuilder<TRequired, false, TVariants>
+    : T extends IStringSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMinLength,
+          infer TMaxLength,
+          infer TEqualsTo
+      >
+    ? IStringSchemaBuilder<TRequired, false, TMinLength, TMaxLength, TEqualsTo>
+    : T extends IObjectSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TNoUnknownProperties,
+          infer TProperties,
+          infer TMapToType
+      >
+    ? IObjectSchemaBuilder<
+          TRequired,
+          false,
+          TNoUnknownProperties,
+          TProperties,
+          TMapToType
+      >
+    : T extends INumberSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMin,
+          infer TMax,
+          infer TIsInteger,
+          infer TEnsureNotNaN,
+          infer TEnsureIsFinite,
+          infer TEqualsTo
+      >
+    ? INumberSchemaBuilder<
+          TRequired,
+          false,
+          TMin,
+          TMax,
+          TIsInteger,
+          TEnsureNotNaN,
+          TEnsureIsFinite,
+          TEqualsTo
+      >
+    : T extends IArraySchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TOfType,
+          infer TMaxLength,
+          infer TMinLength
+      >
+    ? IArraySchemaBuilder<TRequired, false, TOfType, TMaxLength, TMinLength>
+    : T extends IBooleanSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TEqualsTo
+      >
+    ? IBooleanSchemaBuilder<TRequired, false, TEqualsTo>
+    : T extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
+    ? IFunctionSchemaBuilder<TRequired, false>
+    : T & { isNullable: false };
+
+export type ExpandUnionVariants<TVariants extends any[]> = TVariants extends [
+    infer T
+]
     ? [ExpandSchemaBuilder<T>]
-    : TVariants extends [infer T, ...infer Rest] ? [ExpandSchemaBuilder<T>, ExpandUnionVariants<[...Rest]>] : never;
+    : TVariants extends [infer T, ...infer Rest]
+    ? [ExpandSchemaBuilder<T>, ExpandUnionVariants<[...Rest]>]
+    : never;
 
 export type ExpandSchemaBuilder<TSchema> = TSchema extends [
     infer TType,
@@ -176,16 +520,16 @@ export type ExpandSchemaBuilder<TSchema> = TSchema extends [
               infer TMapToType
           ]
             ? IObjectSchemaBuilder<
-                TRequired,
-                TNullable,
-                TNoUnknownProperties,
-                {
-                    [k in keyof TProperties]: ExpandSchemaBuilder<
-                        TProperties[k]
-                    >;
-                },
-                TMapToType
-            >
+                  TRequired,
+                  TNullable,
+                  TNoUnknownProperties,
+                  {
+                      [k in keyof TProperties]: ExpandSchemaBuilder<
+                          TProperties[k]
+                      >;
+                  },
+                  TMapToType
+              >
             : IObjectSchemaBuilder
         : TType extends 'string'
         ? TParams extends [
@@ -194,43 +538,118 @@ export type ExpandSchemaBuilder<TSchema> = TSchema extends [
               infer TMinLength extends number | undefined,
               infer TMaxLength extends number | undefined,
               infer TEqualsTo extends string | undefined
-            ]
+          ]
             ? TEqualsTo extends undefined
-                ? IStringSchemaBuilder<TRequired, TNullable, TMinLength, TMaxLength, undefined>
-                : IStringSchemaBuilder<TRequired, TNullable, TMinLength, TMaxLength, TEqualsTo>
+                ? IStringSchemaBuilder<
+                      TRequired,
+                      TNullable,
+                      TMinLength,
+                      TMaxLength,
+                      undefined
+                  >
+                : IStringSchemaBuilder<
+                      TRequired,
+                      TNullable,
+                      TMinLength,
+                      TMaxLength,
+                      TEqualsTo
+                  >
             : IStringSchemaBuilder
         : TType extends 'number'
         ? TParams extends [
-             infer TRequired extends boolean,
-             infer TNullable extends boolean,
-             infer TMin extends number | undefined,
-             infer TMax extends number | undefined,
-             infer TIsInteger extends boolean | undefined,
-             infer TEnsureNotNaN extends boolean | undefined,
-             infer TEnsureIsFinite extends boolean | undefined,
-             infer TEqualsTo extends number | undefined
-            ]
+              infer TRequired extends boolean,
+              infer TNullable extends boolean,
+              infer TMin extends number | undefined,
+              infer TMax extends number | undefined,
+              infer TIsInteger extends boolean | undefined,
+              infer TEnsureNotNaN extends boolean | undefined,
+              infer TEnsureIsFinite extends boolean | undefined,
+              infer TEqualsTo extends number | undefined
+          ]
             ? TEqualsTo extends undefined
-                ? INumberSchemaBuilder<TRequired, TNullable, TMin, TMax, TIsInteger, TEnsureNotNaN, TEnsureIsFinite, TEqualsTo>
-                : INumberSchemaBuilder<TRequired, TNullable, TMin, TMax, TIsInteger, TEnsureNotNaN, TEnsureIsFinite, undefined>
+                ? INumberSchemaBuilder<
+                      TRequired,
+                      TNullable,
+                      TMin,
+                      TMax,
+                      TIsInteger,
+                      TEnsureNotNaN,
+                      TEnsureIsFinite,
+                      TEqualsTo
+                  >
+                : INumberSchemaBuilder<
+                      TRequired,
+                      TNullable,
+                      TMin,
+                      TMax,
+                      TIsInteger,
+                      TEnsureNotNaN,
+                      TEnsureIsFinite,
+                      undefined
+                  >
             : INumberSchemaBuilder
         : TType extends 'alias'
         ? TParams extends [
-            infer TSchemaName extends string,
-            infer TRequired extends boolean,
-            infer TNullable extends boolean,
-            infer TAliasesCompiledType
-        ]
-        ? IAliasSchemaBuilder<TSchemaName, TRequired, TNullable, any, TAliasesCompiledType> : IAliasSchemaBuilder<any>
+              infer TSchemaName extends string,
+              infer TRequired extends boolean,
+              infer TNullable extends boolean,
+              infer TAliasesCompiledType
+          ]
+            ? IAliasSchemaBuilder<
+                  TSchemaName,
+                  TRequired,
+                  TNullable,
+                  any,
+                  TAliasesCompiledType
+              >
+            : IAliasSchemaBuilder<any>
         : TType extends 'array'
-        ? TParams extends [infer TRequired extends boolean, infer TNullable extends boolean, infer TOfType, infer TMaxLength extends number | undefined, infer TMinLength extends number | undefined]
-            ? IArraySchemaBuilder<TRequired, TNullable, ExpandSchemaBuilder<TOfType>, TMaxLength, TMinLength> : IArraySchemaBuilder
+        ? TParams extends [
+              infer TRequired extends boolean,
+              infer TNullable extends boolean,
+              infer TOfType,
+              infer TMaxLength extends number | undefined,
+              infer TMinLength extends number | undefined
+          ]
+            ? IArraySchemaBuilder<
+                  TRequired,
+                  TNullable,
+                  ExpandSchemaBuilder<TOfType>,
+                  TMaxLength,
+                  TMinLength
+              >
+            : IArraySchemaBuilder
         : TType extends 'union'
-        ? TParams extends [infer TRequired extends boolean, infer TNullable extends boolean, infer TVariants extends any[]]
-            ? IUnionSchemaBuilder<TRequired, TNullable, ExpandUnionVariants<TVariants>> : IUnionSchemaBuilder
+        ? TParams extends [
+              infer TRequired extends boolean,
+              infer TNullable extends boolean,
+              infer TVariants extends any[]
+          ]
+            ? IUnionSchemaBuilder<
+                  TRequired,
+                  TNullable,
+                  ExpandUnionVariants<TVariants>
+              >
+            : IUnionSchemaBuilder
         : TType extends 'boolean'
-        ? TParams extends [infer TRequired extends boolean, infer TNullable extends boolean, infer TEqualsTo extends boolean | undefined]
-            ? IBooleanSchemaBuilder<TRequired, TNullable, TEqualsTo extends undefined ? undefined : boolean> : IBooleanSchemaBuilder
+        ? TParams extends [
+              infer TRequired extends boolean,
+              infer TNullable extends boolean,
+              infer TEqualsTo extends boolean | undefined
+          ]
+            ? IBooleanSchemaBuilder<
+                  TRequired,
+                  TNullable,
+                  TEqualsTo extends undefined ? undefined : boolean
+              >
+            : IBooleanSchemaBuilder
+        : TType extends 'function'
+        ? TParams extends [
+              infer TRequired extends boolean,
+              infer TNullable extends boolean
+          ]
+            ? IFunctionSchemaBuilder<TRequired, TNullable>
+            : IFunctionSchemaBuilder
         : TSchema
     : TSchema;
 
@@ -270,30 +689,66 @@ export type ReduceSchemaBuilder<TBuilder> =
               infer TEnsureIsFinite,
               infer TEqualsTo
           >
-        ? ['number', TRequired, TNullable, TMin, TMax, TIsInteger, TEnsureNotNaN, TEnsureIsFinite, TEqualsTo]
+        ? [
+              'number',
+              TRequired,
+              TNullable,
+              TMin,
+              TMax,
+              TIsInteger,
+              TEnsureNotNaN,
+              TEnsureIsFinite,
+              TEqualsTo
+          ]
         : TBuilder extends IAliasSchemaBuilder<
               infer TSchemaName,
               infer TRequired,
               infer TNullable,
               infer TAliases
           >
-        ? ['alias', TSchemaName, TRequired, TNullable, InferType<ExpandSchemaBuilder<TAliases[TSchemaName]>>]
+        ? [
+              'alias',
+              TSchemaName,
+              TRequired,
+              TNullable,
+              InferType<ExpandSchemaBuilder<TAliases[TSchemaName]>>
+          ]
         : TBuilder extends IArraySchemaBuilder<
-            infer TRequired,
-            infer TNullable,
-            infer TOfType,
-            infer TMaxLength,
-            infer TMinLength
+              infer TRequired,
+              infer TNullable,
+              infer TOfType,
+              infer TMaxLength,
+              infer TMinLength
           >
-        ? ['array', TRequired, TNullable, ReduceSchemaBuilder<TOfType>, TMaxLength, TMinLength]
-        : TBuilder extends IUnionSchemaBuilder<infer TRequired, infer TNullable, infer TVariants>
+        ? [
+              'array',
+              TRequired,
+              TNullable,
+              ReduceSchemaBuilder<TOfType>,
+              TMaxLength,
+              TMinLength
+          ]
+        : TBuilder extends IUnionSchemaBuilder<
+              infer TRequired,
+              infer TNullable,
+              infer TVariants
+          >
         ? ['union', TRequired, TNullable, ReduceSchemaBuilder<TVariants>]
-        : TBuilder extends IBooleanSchemaBuilder<infer TRequired, infer TNullable, infer TEqualsTo>
+        : TBuilder extends IBooleanSchemaBuilder<
+              infer TRequired,
+              infer TNullable,
+              infer TEqualsTo
+          >
         ? ['boolean', TRequired, TNullable, TEqualsTo]
+        : TBuilder extends IFunctionSchemaBuilder<
+              infer TRequired,
+              infer TNullable
+          >
+        ? ['function', TRequired, TNullable]
         : TBuilder extends [infer F]
-        ? [ ReduceSchemaBuilder<F> ]
+        ? [ReduceSchemaBuilder<F>]
         : TBuilder extends [infer F, ...infer Rest]
-        ? [ ReduceSchemaBuilder<F>, ...ReduceSchemaBuilder<Rest> ]
+        ? [ReduceSchemaBuilder<F>, ...ReduceSchemaBuilder<Rest>]
         : TBuilder;
 
 export type InferType<S> = S extends DefaultSchemaType
@@ -307,6 +762,8 @@ export type InferType<S> = S extends DefaultSchemaType
         ? Array<any>
         : S extends 'object'
         ? Record<string, never>
+        : S extends 'function'
+        ? Function
         : never
     : S extends number
     ? S
@@ -320,40 +777,110 @@ export type InferType<S> = S extends DefaultSchemaType
     ? K extends any[]
         ? InferType<K>
         : any
-    : S extends IObjectSchemaBuilder<infer TRequired, infer TNullable, infer TNoUnknownProperties, infer TProperties, infer TMapToType>
-        ? TMapToType extends undefined
-            ? InferType<CommonSchemaSpecification<TRequired, TNullable> & {
-                type: 'object';
-            } &
-            (TNoUnknownProperties extends true ? {noUnknownProperties: true}: { noUnknownProperties: false }) &
-            (TProperties extends Record<string, any> ? {
-                properties: TProperties;
-            } : {})>
+    : S extends IObjectSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TNoUnknownProperties,
+          infer TProperties,
+          infer TMapToType
+      >
+    ? TMapToType extends undefined
+        ? InferType<
+              CommonSchemaSpecification<TRequired, TNullable> & {
+                  type: 'object';
+              } & (TNoUnknownProperties extends true
+                      ? { noUnknownProperties: true }
+                      : { noUnknownProperties: false }) &
+                  (TProperties extends Record<string, any>
+                      ? {
+                            properties: TProperties;
+                        }
+                      : {})
+          >
         : TMapToType
-    : S extends INumberSchemaBuilder<infer TRequired, infer TNullable, infer TMin, infer TMax, infer TIsInteger, infer TEnsureNotNaN, infer TEnsureIsFinite, infer TEqualsTo>
-        ? TRequired extends true
-           ? TEqualsTo extends undefined ? number : TEqualsTo
-           : TEqualsTo extends undefined ? (number | undefined) : (TEqualsTo | undefined)
-    : S extends IBooleanSchemaBuilder<infer TRequired, infer TNullable, infer TEqualsTo>
-        ? TRequired extends true
-            ? TEqualsTo extends undefined ? boolean : TEqualsTo
-            : TEqualsTo extends undefined ? (boolean | undefined): (TEqualsTo | undefined)
-    : S extends IStringSchemaBuilder<infer TRequired, infer TNullable, infer TMinLength, infer TMaxLength, infer TEqualsTo>
-        ? TRequired extends true ?
-            TEqualsTo extends undefined ? string : TEqualsTo
-           : TEqualsTo extends undefined ? (string | undefined) : (TEqualsTo | undefined)
-    : S extends IAliasSchemaBuilder<infer TSchemaName, infer TRequired, infer TNullable, infer TAliases, infer TAliasesCompiledType>
-        ? TRequired extends true ? TAliasesCompiledType : TAliasesCompiledType | undefined
-    : S extends IArraySchemaBuilder<infer TRequired, infer TNullable, infer TOfType, infer TMaxLength, infer TMinLength>
-        ? TRequired extends true
-            ? TOfType extends undefined
-                ? any[] : InferType<TOfType>[]
-            : TOfType extends undefined
-                ? (any[] | undefined) : (InferType<TOfType>[] | undefined)
-    : S extends StringSchema ?
-         S['equals'] extends undefined
+    : S extends INumberSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMin,
+          infer TMax,
+          infer TIsInteger,
+          infer TEnsureNotNaN,
+          infer TEnsureIsFinite,
+          infer TEqualsTo
+      >
+    ? TRequired extends true
+        ? TEqualsTo extends undefined
+            ? number
+            : TEqualsTo
+        : TEqualsTo extends undefined
+        ? number | undefined
+        : TEqualsTo | undefined
+    : S extends IBooleanSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TEqualsTo
+      >
+    ? TRequired extends true
+        ? TEqualsTo extends undefined
+            ? boolean
+            : TEqualsTo
+        : TEqualsTo extends undefined
+        ? boolean | undefined
+        : TEqualsTo | undefined
+    : S extends IStringSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMinLength,
+          infer TMaxLength,
+          infer TEqualsTo
+      >
+    ? TRequired extends true
+        ? TEqualsTo extends undefined
             ? string
-            : S['equals']
+            : TEqualsTo
+        : TEqualsTo extends undefined
+        ? string | undefined
+        : TEqualsTo | undefined
+    : S extends IUnionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TVariants
+      >
+    ? TRequired extends true
+        ? InferType<TVariants>
+        : InferType<TVariants> | undefined
+    : S extends IAliasSchemaBuilder<
+          infer TSchemaName,
+          infer TRequired,
+          infer TNullable,
+          infer TAliases,
+          infer TAliasesCompiledType
+      >
+    ? TRequired extends true
+        ? TAliasesCompiledType
+        : TAliasesCompiledType | undefined
+    : S extends IArraySchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TOfType,
+          infer TMaxLength,
+          infer TMinLength
+      >
+    ? TRequired extends true
+        ? TOfType extends undefined
+            ? any[]
+            : InferType<TOfType>[]
+        : TOfType extends undefined
+        ? any[] | undefined
+        : InferType<TOfType>[] | undefined
+    : S extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
+    ? TRequired extends true
+        ? Function
+        : Function | undefined
+    : S extends StringSchema
+    ? S['equals'] extends undefined
+        ? string
+        : S['equals']
     : S extends NumberSchema
     ? S['equals'] extends undefined
         ? number
@@ -361,14 +888,14 @@ export type InferType<S> = S extends DefaultSchemaType
     : S extends ObjectSchema<infer K>
     ? OptionalPropertiesOf<K> extends never
         ? { [k in keyof K]: InferType<K[k]> }
-        : MakeOptional<
+        : MakePropOptional<
               { [k in keyof K]: InferType<K[k]> },
               OptionalPropertiesOf<K>
           >
     : S extends { type: 'object'; properties: infer K }
     ? OptionalPropertiesOf<K> extends never
         ? { [k in keyof K]: InferType<K[k]> }
-        : MakeOptional<
+        : MakePropOptional<
               { [k in keyof K]: InferType<K[k]> },
               OptionalPropertiesOf<K>
           >
@@ -387,5 +914,9 @@ export type InferType<S> = S extends DefaultSchemaType
     : any;
 
 type OptionalPropertiesOf<T> = {
-    [k in keyof T]: T[k] extends ISchemaBuilder<infer TRequired, any> ? TRequired extends false ? k : never : never
+    [k in keyof T]: T[k] extends ISchemaBuilder<infer TRequired, any>
+        ? TRequired extends false
+            ? k
+            : never
+        : never;
 }[keyof T];

@@ -6,8 +6,6 @@ export interface IUnionSchemaBuilder<
     TNullable extends boolean = false,
     TVariants extends any[] = []
 > extends ISchemaBuilder<TRequired, TNullable> {
-    type: 'union';
-    variants: TVariants;
     optional(): IUnionSchemaBuilder<false, TNullable, TVariants>;
     required(): IUnionSchemaBuilder<true, TNullable, TVariants>;
     nullable(): IUnionSchemaBuilder<TRequired, true, TVariants>;
@@ -26,9 +24,7 @@ class UnionSchemaBuilder<
     extends SchemaBuilder<TRequired, TNullable>
     implements IUnionSchemaBuilder<TRequired, TNullable, TVariants>
 {
-    get type(): 'union' {
-        return 'union';
-    }
+    protected readonly type = 'union';
 
     get _schema(): Schema {
         return Object.assign(
@@ -37,7 +33,7 @@ class UnionSchemaBuilder<
             },
             this.getCommonSchema(),
             {
-                variants: this.variants.map((variant) => {
+                variants: this._variants.map((variant) => {
                     if (variant instanceof SchemaBuilder) {
                         return variant._schema;
                     }
@@ -51,7 +47,7 @@ class UnionSchemaBuilder<
         return UnionSchemaBuilder.create(this._schema as any) as this;
     }
 
-    public variants: TVariants;
+    protected _variants: TVariants;
 
     public static create<
         TRequired extends boolean = true,
@@ -71,10 +67,10 @@ class UnionSchemaBuilder<
         variants?: TVariants;
     }) {
         super(obj);
-        this.variants = [] as TVariants;
+        this._variants = [] as TVariants;
         if (Array.isArray(obj.variants)) {
             for (let i = 0; i < obj.variants.length; i++) {
-                this.variants.push(obj.variants[i]);
+                this._variants.push(obj.variants[i]);
             }
         }
     }
@@ -124,12 +120,12 @@ class UnionSchemaBuilder<
     ): IUnionSchemaBuilder<TRequired, TNullable, [...TVariants, T]> {
         return UnionSchemaBuilder.create({
             ...(this._schema as any),
-            variants: [...this.variants, schema]
+            variants: [...this._variants, schema]
         });
     }
 
     clearVariants(): IUnionSchemaBuilder<TRequired, TNullable, []> {
-        if (this.variants.length === 0)
+        if (this._variants.length === 0)
             return this as any as IUnionSchemaBuilder<TRequired, TNullable, []>;
         return UnionSchemaBuilder.create({
             ...(this._schema as any),
@@ -139,14 +135,25 @@ class UnionSchemaBuilder<
 }
 
 export const union = <
-    T,
+    T extends ISchemaBuilder,
+    K extends T[],
     TRequired extends boolean = true,
     TNullable extends boolean = false
 >(
-    schema: T
-): IUnionSchemaBuilder<TRequired, TNullable, [T]> =>
-    UnionSchemaBuilder.create({
+    ...schemas: K
+): IUnionSchemaBuilder<TRequired, TNullable, K> => {
+    if (schemas.length < 1) {
+        throw new Error('should provide at least one variant');
+    }
+    let res = UnionSchemaBuilder.create({
         isRequired: true,
         isNullable: false,
-        variants: [schema as any]
-    }) as any;
+        variants: [schemas[0] as any]
+    });
+
+    for (let i = 1; i < schemas.length; i++) {
+        res = res.or(schemas[i]);
+    }
+
+    return res as any;
+};

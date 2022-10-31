@@ -125,247 +125,247 @@ test('nullable - 7', () => {
 });
 
 test('equals - 1', () => {
-    const schema = number().equalsTo(10);
-    expect(schema).toHaveProperty('type', 'number');
-    expect(schema).toHaveProperty('equals', 10);
+    const schema = number().equals(10);
+    expect(schema._schema).toHaveProperty('type', 'number');
+    expect(schema._schema).toHaveProperty('equals', 10);
 });
 
 test('equals - 2', () => {
     const schema = number();
-    expect(schema).toHaveProperty('type', 'number');
-    expect(schema).not.toHaveProperty('equals');
+    expect(schema._schema).toHaveProperty('type', 'number');
+    expect(schema._schema).not.toHaveProperty('equals');
 });
 
 test('equals - 4', () => {
-    const schema = number().equalsTo(10).clearEqualsTo();
-    expect(schema).toHaveProperty('type', 'number');
-    expect(schema).not.toHaveProperty('equals');
+    const schema = number().equals(10).clearEquals();
+    expect(schema._schema).toHaveProperty('type', 'number');
+    expect(schema._schema).not.toHaveProperty('equals');
 });
 
 test('equals - 5', () => {
     const schema1 = number();
-    const schema2 = schema1.equalsTo(20);
-    const equals = (schema1 as any).equals === schema2.equals;
+    const schema2 = schema1.equals(20);
+    const equals = schema1._schema.equals === schema2._schema.equals;
     expect(equals).toEqual(false);
-    expect(schema1).not.toHaveProperty('equals');
-    expect(schema2).toHaveProperty('equals', 20);
+    expect(schema1._schema).not.toHaveProperty('equals');
+    expect(schema2._schema).toHaveProperty('equals', 20);
 });
 
 test('equals - 6', () => {
-    const schema1 = number().equalsTo(20);
-    const schema2 = schema1.equalsTo(20);
-    const equals = (schema1 as any).equals === schema2.equals;
+    const schema1 = number().equals(20);
+    const schema2 = schema1.equals(20);
+    const equals = schema1._schema.equals === schema2._schema.equals;
     expect(equals).toEqual(true);
-    expect(schema1).toHaveProperty('equals', 20);
-    expect(schema2).toHaveProperty('equals', 20);
+    expect(schema1._schema).toHaveProperty('equals', 20);
+    expect(schema2._schema).toHaveProperty('equals', 20);
 });
 
 test('equals - 6', () => {
-    const schema1 = number().equalsTo(20);
-    const schema2 = schema1.clearEqualsTo();
-    const equals = (schema1 as any).equals === schema2.equals;
+    const schema1 = number().equals(20);
+    const schema2 = schema1.clearEquals();
+    const equals = schema1._schema.equals === schema2._schema.equals;
     expect(equals).toEqual(false);
-    expect(schema1).toHaveProperty('equals', 20);
-    expect(schema2).not.toHaveProperty('equals');
+    expect(schema1._schema).toHaveProperty('equals', 20);
+    expect(schema2._schema).not.toHaveProperty('equals');
 });
 
 test('equals - 7', () => {
-    const schema1 = number().equalsTo(20).clearEqualsTo();
-    const schema2 = schema1.clearEqualsTo();
+    const schema1 = number().equals(20).clearEquals();
+    const schema2 = schema1.clearEquals();
     const equals = (schema1 as any) === schema2;
     expect(equals).toEqual(true);
 });
 
 test('min - 1', () => {
     const schema = number();
-    expect(schema).not.toHaveProperty('min');
+    expect(schema._schema).not.toHaveProperty('min');
 });
 
 test('min - 2', () => {
-    const schema = number().hasMinValue(20);
-    expect(schema).toHaveProperty('min', 20);
+    const schema = number().min(20);
+    expect(schema._schema).toHaveProperty('min', 20);
 });
 
 test('min - 3', () => {
-    const schema = number().hasMinValue(20).clearMinValue();
-    expect(schema).not.toHaveProperty('min');
+    const schema = number().min(20).clearMin();
+    expect(schema._schema).not.toHaveProperty('min');
 });
 
 test('min - 4', () => {
     const schema1 = number();
-    const schema2 = schema1.hasMinValue(20);
+    const schema2 = schema1.min(20);
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).not.toHaveProperty('min');
-    expect(schema2).toHaveProperty('min', 20);
+    expect(schema1._schema).not.toHaveProperty('min');
+    expect(schema2._schema).toHaveProperty('min', 20);
 });
 
 test('min - 5', () => {
-    const schema1 = number().hasMinValue(20);
-    const schema2 = schema1.hasMinValue(20);
+    const schema1 = number().min(20);
+    const schema2 = schema1.min(20);
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('min', 20);
-    expect(schema2).toHaveProperty('min', 20);
+    expect(schema1._schema).toHaveProperty('min', 20);
+    expect(schema2._schema).toHaveProperty('min', 20);
 });
 
 test('min - 6', () => {
-    const schema1 = number().hasMinValue(20);
-    const schema2 = schema1.clearMinValue();
+    const schema1 = number().min(20);
+    const schema2 = schema1.clearMin();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).toHaveProperty('min', 20);
-    expect(schema2).not.toHaveProperty('min');
+    expect(schema1._schema).toHaveProperty('min', 20);
+    expect(schema2._schema).not.toHaveProperty('min');
 });
 
 test('min - 7', () => {
     const schema1 = number();
-    const schema2 = schema1.clearMinValue();
+    const schema2 = schema1.clearMin();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).not.toHaveProperty('min');
-    expect(schema2).not.toHaveProperty('min');
+    expect(schema1._schema).not.toHaveProperty('min');
+    expect(schema2._schema).not.toHaveProperty('min');
 });
 
 test('min - 8', () => {
-    const schema1 = number().clearMinValue();
-    const schema2 = schema1.clearMinValue();
+    const schema1 = number().clearMin();
+    const schema2 = schema1.clearMin();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).not.toHaveProperty('min');
-    expect(schema2).not.toHaveProperty('min');
+    expect(schema1._schema).not.toHaveProperty('min');
+    expect(schema2._schema).not.toHaveProperty('min');
 });
 
 test('max - 1', () => {
     const schema = number();
-    expect(schema).not.toHaveProperty('max');
+    expect(schema._schema).not.toHaveProperty('max');
 });
 
 test('max - 2', () => {
-    const schema = number().hasMaxValue(30);
-    expect(schema).toHaveProperty('max', 30);
+    const schema = number().max(30);
+    expect(schema._schema).toHaveProperty('max', 30);
 });
 
 test('max - 3', () => {
-    const schema = number().hasMaxValue(30).clearMaxValue();
-    expect(schema).not.toHaveProperty('max');
+    const schema = number().max(30).clearMax();
+    expect(schema._schema).not.toHaveProperty('max');
 });
 
 test('max - 4', () => {
     const schema1 = number();
-    const schema2 = schema1.hasMaxValue(20);
+    const schema2 = schema1.max(20);
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).not.toHaveProperty('max');
-    expect(schema2).toHaveProperty('max', 20);
+    expect(schema1._schema).not.toHaveProperty('max');
+    expect(schema2._schema).toHaveProperty('max', 20);
 });
 
 test('max - 5', () => {
-    const schema1 = number().hasMaxValue(20);
-    const schema2 = schema1.hasMaxValue(20);
+    const schema1 = number().max(20);
+    const schema2 = schema1.max(20);
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('max', 20);
-    expect(schema2).toHaveProperty('max', 20);
+    expect(schema1._schema).toHaveProperty('max', 20);
+    expect(schema2._schema).toHaveProperty('max', 20);
 });
 
 test('max - 6', () => {
-    const schema1 = number().hasMaxValue(20);
-    const schema2 = schema1.clearMaxValue();
+    const schema1 = number().max(20);
+    const schema2 = schema1.clearMax();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).toHaveProperty('max', 20);
-    expect(schema2).not.toHaveProperty('max');
+    expect(schema1._schema).toHaveProperty('max', 20);
+    expect(schema2._schema).not.toHaveProperty('max');
 });
 
 test('max - 7', () => {
     const schema1 = number();
-    const schema2 = schema1.clearMaxValue();
+    const schema2 = schema1.clearMax();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).not.toHaveProperty('max');
-    expect(schema2).not.toHaveProperty('max');
+    expect(schema1._schema).not.toHaveProperty('max');
+    expect(schema2._schema).not.toHaveProperty('max');
 });
 
 test('max - 8', () => {
-    const schema1 = number().clearMaxValue();
-    const schema2 = schema1.clearMaxValue();
+    const schema1 = number().clearMax();
+    const schema2 = schema1.clearMax();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).not.toHaveProperty('max');
-    expect(schema2).not.toHaveProperty('max');
+    expect(schema1._schema).not.toHaveProperty('max');
+    expect(schema2._schema).not.toHaveProperty('max');
 });
 
 test('min,max - 1', () => {
-    const schema = number().hasMinValue(20).hasMaxValue(30);
-    expect(schema).toHaveProperty('min', 20);
-    expect(schema).toHaveProperty('max', 30);
+    const schema = number().min(20).max(30);
+    expect(schema._schema).toHaveProperty('min', 20);
+    expect(schema._schema).toHaveProperty('max', 30);
 });
 
 test('isInteger - 1', () => {
     const schema = number();
-    expect(schema).not.toHaveProperty('isInteger');
+    expect(schema._schema).not.toHaveProperty('isInteger');
 });
 
 test('isInteger - 2', () => {
-    const schema = number().ensureIsInteger();
-    expect(schema).toHaveProperty('isInteger', true);
+    const schema = number().isInteger();
+    expect(schema._schema).toHaveProperty('isInteger', true);
 });
 
 test('isInteger - 3', () => {
-    const schema = number().ensureIsInteger().notEnsureIsInteger();
-    expect(schema).not.toHaveProperty('isInteger');
+    const schema = number().isInteger().canBeNotInteger();
+    expect(schema._schema).not.toHaveProperty('isInteger');
 });
 
 test('isInteger - 4', () => {
     const schema1 = number();
-    const schema2 = schema1.ensureIsInteger();
+    const schema2 = schema1.isInteger();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).not.toHaveProperty('isInteger');
-    expect(schema2).toHaveProperty('isInteger', true);
+    expect(schema1._schema).not.toHaveProperty('isInteger');
+    expect(schema2._schema).toHaveProperty('isInteger', true);
 });
 
 test('isInteger - 5', () => {
-    const schema1 = number().ensureIsInteger();
-    const schema2 = schema1.ensureIsInteger();
+    const schema1 = number().isInteger();
+    const schema2 = schema1.isInteger();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('isInteger', true);
-    expect(schema2).toHaveProperty('isInteger', true);
+    expect(schema1._schema).toHaveProperty('isInteger', true);
+    expect(schema2._schema).toHaveProperty('isInteger', true);
 });
 
 test('isInteger - 6', () => {
     const schema1 = number();
-    const schema2 = schema1.notEnsureIsInteger();
+    const schema2 = schema1.canBeNotInteger();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).not.toHaveProperty('isInteger');
-    expect(schema2).not.toHaveProperty('isInteger');
+    expect(schema1._schema).not.toHaveProperty('isInteger');
+    expect(schema2._schema).not.toHaveProperty('isInteger');
 });
 
 test('isInteger - 7', () => {
-    const schema1 = number().notEnsureIsInteger();
-    const schema2 = schema1.notEnsureIsInteger();
+    const schema1 = number().canBeNotInteger();
+    const schema2 = schema1.canBeNotInteger();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).not.toHaveProperty('isInteger');
-    expect(schema2).not.toHaveProperty('isInteger');
+    expect(schema1._schema).not.toHaveProperty('isInteger');
+    expect(schema2._schema).not.toHaveProperty('isInteger');
 });
 
 test('NaN - 1', () => {
     const schema = number();
-    expect(schema).toHaveProperty('ensureNotNaN', true);
+    expect(schema._schema).toHaveProperty('ensureNotNaN', true);
 });
 
 test('NaN - 2', () => {
     const schema = number().notNaN();
-    expect(schema).toHaveProperty('ensureNotNaN', true);
+    expect(schema._schema).toHaveProperty('ensureNotNaN', true);
 });
 
 test('NaN - 3', () => {
     const schema = number().canBeNaN();
-    expect(schema).toHaveProperty('ensureNotNaN', false);
+    expect(schema._schema).toHaveProperty('ensureNotNaN', false);
 });
 
 test('NaN - 4', () => {
@@ -373,8 +373,8 @@ test('NaN - 4', () => {
     const schema2 = schema1.notNaN();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('ensureNotNaN', true);
-    expect(schema2).toHaveProperty('ensureNotNaN', true);
+    expect(schema1._schema).toHaveProperty('ensureNotNaN', true);
+    expect(schema2._schema).toHaveProperty('ensureNotNaN', true);
 });
 
 test('NaN - 5', () => {
@@ -382,8 +382,8 @@ test('NaN - 5', () => {
     const schema2 = schema1.notNaN();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('ensureNotNaN', true);
-    expect(schema2).toHaveProperty('ensureNotNaN', true);
+    expect(schema1._schema).toHaveProperty('ensureNotNaN', true);
+    expect(schema2._schema).toHaveProperty('ensureNotNaN', true);
 });
 
 test('NaN - 6', () => {
@@ -391,8 +391,8 @@ test('NaN - 6', () => {
     const schema2 = schema1.canBeNaN();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).toHaveProperty('ensureNotNaN', true);
-    expect(schema2).toHaveProperty('ensureNotNaN', false);
+    expect(schema1._schema).toHaveProperty('ensureNotNaN', true);
+    expect(schema2._schema).toHaveProperty('ensureNotNaN', false);
 });
 
 test('NaN - 7', () => {
@@ -400,8 +400,8 @@ test('NaN - 7', () => {
     const schema2 = schema1.canBeNaN();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('ensureNotNaN', false);
-    expect(schema2).toHaveProperty('ensureNotNaN', false);
+    expect(schema1._schema).toHaveProperty('ensureNotNaN', false);
+    expect(schema2._schema).toHaveProperty('ensureNotNaN', false);
 });
 
 test('NaN - 8', () => {
@@ -409,23 +409,23 @@ test('NaN - 8', () => {
     const schema2 = schema1.notNaN();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).toHaveProperty('ensureNotNaN', false);
-    expect(schema2).toHaveProperty('ensureNotNaN', true);
+    expect(schema1._schema).toHaveProperty('ensureNotNaN', false);
+    expect(schema2._schema).toHaveProperty('ensureNotNaN', true);
 });
 
 test('Finite - 1', () => {
     const schema = number();
-    expect(schema).toHaveProperty('ensureIsFinite', true);
+    expect(schema._schema).toHaveProperty('ensureIsFinite', true);
 });
 
 test('Finite - 2', () => {
     const schema = number().isFinite();
-    expect(schema).toHaveProperty('ensureIsFinite', true);
+    expect(schema._schema).toHaveProperty('ensureIsFinite', true);
 });
 
 test('Finite - 3', () => {
     const schema = number().canBeInfinite();
-    expect(schema).toHaveProperty('ensureIsFinite', false);
+    expect(schema._schema).toHaveProperty('ensureIsFinite', false);
 });
 
 test('Finite - 4', () => {
@@ -433,8 +433,8 @@ test('Finite - 4', () => {
     const schema2 = schema1.isFinite();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('ensureIsFinite', true);
-    expect(schema2).toHaveProperty('ensureIsFinite', true);
+    expect(schema1._schema).toHaveProperty('ensureIsFinite', true);
+    expect(schema2._schema).toHaveProperty('ensureIsFinite', true);
 });
 
 test('Finite - 5', () => {
@@ -442,8 +442,8 @@ test('Finite - 5', () => {
     const schema2 = schema1.isFinite();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('ensureIsFinite', true);
-    expect(schema2).toHaveProperty('ensureIsFinite', true);
+    expect(schema1._schema).toHaveProperty('ensureIsFinite', true);
+    expect(schema2._schema).toHaveProperty('ensureIsFinite', true);
 });
 
 test('Finite - 6', () => {
@@ -451,8 +451,8 @@ test('Finite - 6', () => {
     const schema2 = schema1.canBeInfinite();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).toHaveProperty('ensureIsFinite', true);
-    expect(schema2).toHaveProperty('ensureIsFinite', false);
+    expect(schema1._schema).toHaveProperty('ensureIsFinite', true);
+    expect(schema2._schema).toHaveProperty('ensureIsFinite', false);
 });
 
 test('Finite - 7', () => {
@@ -460,8 +460,8 @@ test('Finite - 7', () => {
     const schema2 = schema1.canBeInfinite();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema1).toHaveProperty('ensureIsFinite', false);
-    expect(schema2).toHaveProperty('ensureIsFinite', false);
+    expect(schema1._schema).toHaveProperty('ensureIsFinite', false);
+    expect(schema2._schema).toHaveProperty('ensureIsFinite', false);
 });
 
 test('Finite - 8', () => {
@@ -469,17 +469,17 @@ test('Finite - 8', () => {
     const schema2 = schema1.isFinite();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema1).toHaveProperty('ensureIsFinite', false);
-    expect(schema2).toHaveProperty('ensureIsFinite', true);
+    expect(schema1._schema).toHaveProperty('ensureIsFinite', false);
+    expect(schema2._schema).toHaveProperty('ensureIsFinite', true);
 });
 
 test('Clone', () => {
     const schema1 = number()
         .canBeInfinite()
-        .hasMinValue(20)
-        .hasMaxValue(30)
+        .min(20)
+        .max(30)
         .addValidator(() => ({ valid: true }))
-        .notEnsureIsInteger()
+        .canBeNotInteger()
         .canBeInfinite()
         .canBeNaN();
     const schema2 = schema1.clone();

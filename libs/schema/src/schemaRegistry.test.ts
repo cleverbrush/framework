@@ -748,6 +748,69 @@ test('Validate - boolean - 8', async () => {
     expect(result).toHaveProperty('valid', true);
 });
 
+test('Validate - function - 1', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(
+        {
+            type: 'function'
+        },
+        300
+    );
+
+    expect(result).toHaveProperty('valid', false);
+});
+
+test('Validate - function - 2', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(
+        {
+            type: 'function'
+        },
+        () => 10
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - function - 3', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(
+        {
+            type: 'function'
+        },
+        (a) => a * a
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - function - 4', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate('function', () => 20);
+
+    expect(result).toHaveProperty('valid', true);
+});
+
+test('Validate - function - 5', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate('function', '123');
+
+    expect(result).toHaveProperty('valid', false);
+});
+
+test('Validate - function - 6', async () => {
+    const validator = new SchemaRegistry();
+    const result = await validator.validate(
+        {
+            type: 'function',
+            isRequired: false
+        },
+        undefined
+    );
+
+    expect(result).toHaveProperty('valid', true);
+});
+
 test('Validate - string - 1', async () => {
     const validator = new SchemaRegistry();
     const result = await validator.validate('string', '12345');
@@ -991,15 +1054,13 @@ test('Validate - array - not required - 1', async () => {
 
 test('Validate - object - 1', async () => {
     const validator = new SchemaRegistry().addSchema('user', getUserSchema());
-    const user: User = {
+    const user = {
         id: 1,
         name: {
             first: 'Andrew',
             last: 'Zolotukhin'
         },
-        bornAt: new Date(1986, 4, 30),
-        incomePerMonth: 134234,
-        aliases: []
+        incomePerMonth: 134234
     };
 
     let result = await validator.validate('user', user);

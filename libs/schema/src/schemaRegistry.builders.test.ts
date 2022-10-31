@@ -1,23 +1,22 @@
-import { deepEqual } from '@cleverbrush/deep';
 import { InferType, Schema } from './schema.js';
 import { object } from './builders/ObjectSchemaBuilder.js';
 import { number } from './builders/NumberSchemaBuilder.js';
 import { string } from './builders/StringSchemaBuilder.js';
 import { array } from './builders/ArraySchemaBuilder.js';
-
-import SchemaRegistry from './schemaRegistry.js';
 import { union } from './builders/UnionSchemaBuilder.js';
 import { boolean } from './builders/BooleanSchemaBuilder.js';
 import { alias } from './builders/AliasSchemaBuilder.js';
 
+import SchemaRegistry from './schemaRegistry.js';
+
 const getUserSchema = () =>
-    object().addProperties({
+    object({
         id: number(),
-        name: object().addProperties({
-            first: string().hasMinLength(1).hasMaxLength(100),
-            last: string().hasMinLength(1).hasMaxLength(100)
+        name: object().addProps({
+            first: string().minLength(1).maxLength(100),
+            last: string().minLength(1).maxLength(100)
         }),
-        incomePerMonth: number().hasMinValue(0),
+        incomePerMonth: number().min(0),
         bornAt: object(),
         aliases: array()
     });
@@ -26,7 +25,7 @@ test('Can add schema', () => {
     const validator = new SchemaRegistry().addSchema(
         'something',
         ({ object, string }) =>
-            object().addProperties({
+            object().addProps({
                 a: string()
             })
     );
@@ -41,21 +40,10 @@ test('Error thrown on adding a schema with duplicate name', () => {
     ).toThrow();
 });
 
-test('Receiving the same schema after add', () => {
-    const schema = object().addProperties({
-        name: string()
-    });
-    const validator = new SchemaRegistry().addSchema('something', schema);
-
-    expect(
-        deepEqual({ ...schema._schema }, validator.schemas.something.schema)
-    ).toEqual(true);
-});
-
 test('Union - Array as schema type', async () => {
     const validator = new SchemaRegistry()
         .addSchema('name', ({ object, string }) =>
-            object().addProperties({
+            object().addProps({
                 name: string()
             })
         )
@@ -85,10 +73,8 @@ test('Union - Schema Object - 1', async () => {
     const validator = new SchemaRegistry().addSchema(
         'address',
         ({ object, union, number, string }) =>
-            object().addProperties({
-                first: union(number().hasMinValue(10).hasMaxValue(20)).or(
-                    string().hasMinLength(2)
-                )
+            object().addProps({
+                first: union(number().min(10).max(20)).or(string().minLength(2))
             })
     );
 
@@ -114,9 +100,9 @@ test('Union - Schema Object - 2', async () => {
     const validator = new SchemaRegistry().addSchema(
         'address',
         ({ object, number, string, union }) =>
-            object().addProperties({
-                first: union(number().hasMinValue(10).hasMaxValue(20))
-                    .or(string().hasMinLength(2))
+            object({
+                first: union(number().min(10).max(20))
+                    .or(string().minLength(2))
                     .optional()
                     .nullable()
             })
@@ -143,13 +129,13 @@ test('Validate - number by schema - not number passed', async () => {
 
 test('Validate - number by schema - min', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(number().hasMinValue(1000), 10);
+    const result = await validator.validate(number().min(1000), 10);
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by schema - min 2', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(number().hasMinValue(1000), 10000);
+    const result = await validator.validate(number().min(1000), 10000);
     expect(result).toEqual({
         valid: true
     });
@@ -157,7 +143,7 @@ test('Validate - number by schema - min 2', async () => {
 
 test('Validate - number by schema - min 3', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(number().hasMinValue(1000), 1000);
+    const result = await validator.validate(number().min(1000), 1000);
     expect(result).toHaveProperty('valid', true);
 });
 
@@ -165,7 +151,7 @@ test('Validate - number by schema - min 4', async () => {
     const validator = new SchemaRegistry();
     const mk = jest.fn();
     validator
-        .validate(number().hasMinValue('wdd' as any), 10)
+        .validate(number().min('wdd' as any), 10)
         .catch(mk)
         .then(() => {
             expect(mk).toBeCalled();
@@ -174,19 +160,19 @@ test('Validate - number by schema - min 4', async () => {
 
 test('Validate - number by schema - max', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(number().hasMaxValue(1000), 20000);
+    const result = await validator.validate(number().max(1000), 20000);
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by schema - max 2', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(number().hasMaxValue(40000), 10000);
+    const result = await validator.validate(number().max(40000), 10000);
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - number by schema - max 3', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(number().hasMaxValue(1000), 1000);
+    const result = await validator.validate(number().max(1000), 1000);
     expect(result).toHaveProperty('valid', true);
 });
 
@@ -194,7 +180,7 @@ test('Validate - number by schema - max 4', async () => {
     const validator = new SchemaRegistry();
     const mk = jest.fn();
     validator
-        .validate(number().hasMaxValue('string' as any), 10)
+        .validate(number().max('string' as any), 10)
         .catch(mk)
         .then(() => {
             expect(mk).toBeCalled();
@@ -203,70 +189,49 @@ test('Validate - number by schema - max 4', async () => {
 
 test('Validate - number by schema - range', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        number().hasMinValue(1).hasMaxValue(100),
-        10
-    );
+    const result = await validator.validate(number().min(1).max(100), 10);
 
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - number by schema - range - 2', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        number().hasMinValue(-1).hasMaxValue(100),
-        -210
-    );
+    const result = await validator.validate(number().min(-1).max(100), -210);
 
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by schema - range - 3', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        number().hasMinValue(-100).hasMaxValue(100),
-        -100
-    );
+    const result = await validator.validate(number().min(-100).max(100), -100);
 
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - number by schema - range - 4', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        number().hasMinValue(-100).hasMaxValue(100),
-        100
-    );
+    const result = await validator.validate(number().min(-100).max(100), 100);
 
     expect(result).toHaveProperty('valid', true);
 });
 
 test('Validate - number by schema - range - 5', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        number().hasMinValue(-100).hasMaxValue(100),
-        200
-    );
+    const result = await validator.validate(number().min(-100).max(100), 200);
 
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by schema - range - 6', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        number().hasMinValue(-100).hasMaxValue(100),
-        200
-    );
+    const result = await validator.validate(number().min(-100).max(100), 200);
 
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - number by schema - NaN', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        number().hasMinValue(-100).hasMaxValue(100),
-        0 / 0
-    );
+    const result = await validator.validate(number().min(-100).max(100), 0 / 0);
     expect(result).toHaveProperty('valid', false);
 });
 
@@ -359,14 +324,14 @@ test('Validate - boolean - 3', async () => {
 
 test('Validate - boolean - 4', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(boolean().equalsTo(true), false);
+    const result = await validator.validate(boolean().equals(true), false);
 
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - boolean - 5', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(boolean().equalsTo(false), false);
+    const result = await validator.validate(boolean().equals(false), false);
 
     expect(result).toHaveProperty('valid', true);
 });
@@ -374,7 +339,7 @@ test('Validate - boolean - 5', async () => {
 test('Validate - string - schema object - 1', async () => {
     const validator = new SchemaRegistry();
     const result = await validator.validate(
-        string().equalsTo('123456'),
+        string().equals('123456'),
         '123456'
     );
     expect(result).toHaveProperty('valid', true);
@@ -382,47 +347,41 @@ test('Validate - string - schema object - 1', async () => {
 
 test('Validate - string - schema object - 2', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(
-        string().equalsTo('123456'),
-        '12345'
-    );
+    const result = await validator.validate(string().equals('123456'), '12345');
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - string - schema object - 3', async () => {
     const validator = new SchemaRegistry();
-    const result = await validator.validate(string().equalsTo('123456'), 1234);
+    const result = await validator.validate(string().equals('123456'), 1234);
     expect(result).toHaveProperty('valid', false);
 });
 
 test('Validate - string - length control - 1', async () => {
     const validator = new SchemaRegistry();
     let result = await validator.validate(
-        string().hasMinLength(2).hasMaxLength(3),
+        string().minLength(2).maxLength(3),
         'U'
     );
     expect(result).toHaveProperty('valid', false);
 
-    result = await validator.validate(
-        string().hasMinLength(2).hasMaxLength(3),
-        'US'
-    );
+    result = await validator.validate(string().minLength(2).maxLength(3), 'US');
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        string().hasMinLength(2).hasMaxLength(3),
+        string().minLength(2).maxLength(3),
         'USA'
     );
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        string().hasMinLength(2).hasMaxLength(3),
+        string().minLength(2).maxLength(3),
         'USA'
     );
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        string().hasMinLength(2).hasMaxLength(3),
+        string().minLength(2).maxLength(3),
         'United States of America'
     );
     expect(result).toHaveProperty('valid', false);
@@ -431,30 +390,28 @@ test('Validate - string - length control - 1', async () => {
 test('Validate - array - size control - 1', async () => {
     const validator = new SchemaRegistry();
     let result = await validator.validate(
-        array().hasMinLength(1).hasMaxLength(3),
+        array().minLength(1).maxLength(3),
         []
     );
     expect(result).toHaveProperty('valid', false);
 
-    result = await validator.validate(array().hasMinLength(1).hasMaxLength(3), [
-        1
-    ]);
+    result = await validator.validate(array().minLength(1).maxLength(3), [1]);
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        array().hasMinLength(1).hasMaxLength(3),
+        array().minLength(1).maxLength(3),
         [1, 2]
     );
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        array().hasMinLength(1).hasMaxLength(3),
+        array().minLength(1).maxLength(3),
         [1, 2, 3]
     );
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        array().hasMinLength(1).hasMaxLength(3),
+        array().minLength(1).maxLength(3),
         [1, 2, 3, 4]
     );
     expect(result).toHaveProperty('valid', false);
@@ -462,21 +419,18 @@ test('Validate - array - size control - 1', async () => {
 
 test('Validate - array - ofType - 1', async () => {
     const validator = new SchemaRegistry();
-    let result = await validator.validate(array().hasElementOfType(number()), [
+    let result = await validator.validate(array().ofType(number()), [
         '1',
         2,
         3
     ]);
     expect(result).toHaveProperty('valid', false);
 
-    result = await validator.validate(
-        array().hasElementOfType(number()),
-        [1, 2, 3]
-    );
+    result = await validator.validate(array().ofType(number()), [1, 2, 3]);
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        array().hasElementOfType(number().hasMinValue(10)),
+        array().ofType(number().min(10)),
         [-1, 12, 13]
     );
     expect(result).toHaveProperty('valid', false);
@@ -506,9 +460,9 @@ test('Validate - object - 1', async () => {
     expect(result).toHaveProperty('valid', false);
 
     result = await validator.validate(
-        object().addProperties({
-            name: string().hasMaxLength(5),
-            address: object().addProperties({
+        object({
+            name: string().maxLength(5),
+            address: object({
                 street: string(),
                 house: number().optional()
             })
@@ -524,22 +478,20 @@ test('Validate - object - 1', async () => {
     expect(result).toHaveProperty('valid', true);
 
     result = await validator.validate(
-        object()
-            .addProperties({
-                a: number(),
-                b: number()
-            })
-            .addValidator((value: { a: number; b: number }) => {
-                if (value.a + value.b === 5) {
-                    return {
-                        valid: true
-                    };
-                }
+        object({
+            a: number(),
+            b: number()
+        }).addValidator((value: { a: number; b: number }) => {
+            if (value.a + value.b === 5) {
                 return {
-                    valid: false,
-                    error: ['some error']
+                    valid: true
                 };
-            }),
+            }
+            return {
+                valid: false,
+                error: ['some error']
+            };
+        }),
         {
             a: 1,
             b: 3
@@ -567,7 +519,7 @@ test('Validate - one of - 1', async () => {
         union(number())
             .or(string())
             .or(
-                object().addProperties({
+                object({
                     first: string(),
                     last: string()
                 })
@@ -585,14 +537,14 @@ test('Validate schema - 1', async () => {
         .addSchema(
             'EqualsFilterCondition',
             ({ object, number, string, union }) =>
-                object().addProperties({
-                    operation: string().equalsTo('equals'),
+                object({
+                    operation: string().equals('equals'),
                     value: union(object()).or(string()).or(number())
                 })
         )
         .addSchema('LikeFilterCondition', ({ object, string }) =>
-            object().addProperties({
-                operation: string().equalsTo('like'),
+            object({
+                operation: string().equals('like'),
                 value: string()
             })
         )
@@ -602,7 +554,7 @@ test('Validate schema - 1', async () => {
             )
         )
         .addSchema('AuthorFilter', ({ alias, object }) =>
-            object().addProperties({
+            object({
                 fullName: alias('StringFilterCondition')
             })
         )
@@ -621,45 +573,43 @@ test('Validate schema - 1', async () => {
         .addSchema(
             'AuthorsReportSpecification',
             ({ object, string, alias, union }) =>
-                object()
-                    .addProperties({
-                        type: string().equalsTo('author'),
-                        start: alias('Date'),
-                        end: alias('Date'),
-                        selectionStart: alias('Date'),
-                        selectionEnd: alias('Date'),
-                        granularity: union(string().equalsTo('day'))
-                            .or(string().equalsTo('week'))
-                            .or(string().equalsTo('month')),
-                        metrics: array().hasElementOfType(
-                            union(string().equalsTo('articlesPublished'))
-                                .or(string().equalsTo('searchReferrers'))
-                                .or(string().equalsTo('socialReferrers'))
-                                .or(string().equalsTo('views'))
-                                .or(string().equalsTo('visitors'))
-                                .or(string().equalsTo('newVisitors'))
-                        ),
-                        filters: object().addProperties({
-                            author: alias('AuthorFilter')
-                        })
+                object({
+                    type: string().equals('author'),
+                    start: alias('Date'),
+                    end: alias('Date'),
+                    selectionStart: alias('Date'),
+                    selectionEnd: alias('Date'),
+                    granularity: union(string().equals('day'))
+                        .or(string().equals('week'))
+                        .or(string().equals('month')),
+                    metrics: array().ofType(
+                        union(string().equals('articlesPublished'))
+                            .or(string().equals('searchReferrers'))
+                            .or(string().equals('socialReferrers'))
+                            .or(string().equals('views'))
+                            .or(string().equals('visitors'))
+                            .or(string().equals('newVisitors'))
+                    ),
+                    filters: object({
+                        author: alias('AuthorFilter')
                     })
-                    .addValidator((value) =>
-                        value.start <= value.end &&
-                        value.selectionStart <= value.selectionEnd &&
-                        value.selectionStart >= value.start &&
-                        value.selectionStart <= value.end &&
-                        value.selectionEnd >= value.start &&
-                        value.selectionEnd <= value.end
-                            ? {
-                                  valid: true
-                              }
-                            : {
-                                  valid: false,
-                                  errors: [
-                                      'selectionStart <=> selectionEnd should be inside the start <=> end interval'
-                                  ]
-                              }
-                    )
+                }).addValidator((value) =>
+                    value.start <= value.end &&
+                    value.selectionStart <= value.selectionEnd &&
+                    value.selectionStart >= value.start &&
+                    value.selectionStart <= value.end &&
+                    value.selectionEnd >= value.start &&
+                    value.selectionEnd <= value.end
+                        ? {
+                              valid: true
+                          }
+                        : {
+                              valid: false,
+                              errors: [
+                                  'selectionStart <=> selectionEnd should be inside the start <=> end interval'
+                              ]
+                          }
+                )
         );
 
     let reportSpec = {
@@ -740,18 +690,18 @@ test('Validate schema - 2', async () => {
             )
         )
         .addSchema('Module.Schema1', ({ object, string }) =>
-            object().addProperties({
+            object({
                 a: string()
             })
         )
         .addSchema('Module.Schema2', ({ object, number }) =>
-            object().addProperties({
+            object({
                 b: number()
             })
         );
 
     const result = await validator.validate(
-        object().addProperties({
+        object({
             date: alias('Date').optional()
         }),
         {}
@@ -763,12 +713,12 @@ test('Validate schema - 2', async () => {
 test('Not required alternative schema alias', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Alternate1', ({ object, string }) =>
-            object().addProperties({
+            object({
                 a1: string()
             })
         )
         .addSchema('Alternate2', ({ object, string }) =>
-            object().addProperties({
+            object({
                 a2: string()
             })
         )
@@ -821,17 +771,13 @@ test('Preprocessors - 1', async () => {
         )
     );
 
-    const schema = object()
-        .addProperties({
-            bornAt: alias('Date')
-        })
-        .addFieldPreprocessor('bornAt', (value: any): Date | undefined => {
-            const time = Date.parse(
-                (value as Record<string, unknown>).toString()
-            );
-            if (Number.isNaN(time)) return undefined;
-            return new Date(time);
-        });
+    const schema = object({
+        bornAt: alias('Date')
+    }).setPropPreprocessor('bornAt', (value: any): Date | undefined => {
+        const time = Date.parse((value as Record<string, unknown>).toString());
+        if (Number.isNaN(time)) return undefined;
+        return new Date(time);
+    });
     const result = await validator.validate(schema as Schema, {
         bornAt: new Date().toJSON()
     });
@@ -853,11 +799,9 @@ test('Preprocessors - 2', async () => {
         )
     );
 
-    let schema = object()
-        .addProperties({
-            bornAt: alias('Date')
-        })
-        .addFieldPreprocessor('bornAt', 'StringToDate');
+    let schema = object({
+        bornAt: alias('Date')
+    }).setPropPreprocessor('bornAt', 'StringToDate');
 
     validator.addPreprocessor(
         'StringToDate',
@@ -888,13 +832,12 @@ test('Preprocessors - 2', async () => {
     });
     expect(result).toHaveProperty('valid', true);
 
-    schema = object()
-        .addProperties({
-            bornAt: alias('Date'),
-            diedAt: alias('Date')
-        })
-        .addFieldPreprocessor('bornAt', 'StringToDate')
-        .addFieldPreprocessor('diedAt', 'Unregistered') as any;
+    schema = object({
+        bornAt: alias('Date'),
+        diedAt: alias('Date')
+    })
+        .setPropPreprocessor('bornAt', 'StringToDate')
+        .setPropPreprocessor('diedAt', 'Unregistered') as any;
 
     expect(async () => {
         await validator.validate(schema as Schema, {
@@ -930,7 +873,7 @@ test('Preprocessors - 3', async () => {
     let obj = [new Date().toJSON()];
 
     let result = await validator.validate(
-        array().hasElementOfType(alias('Date')).addPreprocessor('StringToDate'),
+        array().ofType(alias('Date')).addPreprocessor('StringToDate'),
         obj
     );
     expect(result).toHaveProperty('valid', true);
@@ -938,7 +881,7 @@ test('Preprocessors - 3', async () => {
     obj = [new Date().toJSON()];
     result = await validator.validate(
         array()
-            .hasElementOfType(alias('Date'))
+            .ofType(alias('Date'))
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -953,7 +896,7 @@ test('Preprocessors - 3', async () => {
     obj = ['sdfsdf12', new Date().toJSON()];
     result = await validator.validate(
         array()
-            .hasElementOfType(alias('Date'))
+            .ofType(alias('Date'))
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -971,13 +914,12 @@ test('Preprocessors - 3', async () => {
 
     type SomeType = { age: number; marriedAt: number };
 
-    const schema = object()
-        .addProperties({
-            age: number(),
-            marriedAt: number()
-        })
-        .addFieldPreprocessor('age', (): number => 40)
-        .addFieldPreprocessor('*', (value: SomeType): void => {
+    const schema = object({
+        age: number(),
+        marriedAt: number()
+    })
+        .setPropPreprocessor('age', (): number => 40)
+        .setPropPreprocessor('*', (value: SomeType): void => {
             if (value.marriedAt > value.age) {
                 value.marriedAt = value.age;
             }
@@ -1019,7 +961,7 @@ test('Preprocessors - 4', async () => {
     let obj = [new Date().toJSON()];
 
     let result = await validator.validate(
-        array().hasElementOfType(alias('Date')).addPreprocessor('StringToDate'),
+        array().ofType(alias('Date')).addPreprocessor('StringToDate'),
         obj
     );
     expect(result).toHaveProperty('valid', true);
@@ -1027,7 +969,7 @@ test('Preprocessors - 4', async () => {
     obj = [new Date().toJSON()];
     result = await validator.validate(
         array()
-            .hasElementOfType(alias('Date'))
+            .ofType(alias('Date'))
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -1042,7 +984,7 @@ test('Preprocessors - 4', async () => {
     obj = ['sdfsdf12', new Date().toJSON()];
     result = await validator.validate(
         array()
-            .hasElementOfType(alias('Date'))
+            .ofType(alias('Date'))
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -1058,7 +1000,7 @@ test('Submodules - 2', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Module1.Schema1', ({ object }) => object())
         .addSchema('Module1.Schema2', ({ object, number }) =>
-            object().addProperties({
+            object({
                 a: number()
             })
         );
@@ -1078,12 +1020,12 @@ test('Submodules - 2', async () => {
 test('Submodules - 3', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Module1.Schema1', ({ object, number }) =>
-            object().addProperties({
+            object({
                 b: number()
             })
         )
         .addSchema('Module1.Schema2', ({ object, alias }) =>
-            object().addProperties({
+            object({
                 a: alias('Module1.Schema1')
             })
         );
@@ -1099,12 +1041,12 @@ test('Submodules - 3', async () => {
 test('Submodules - 4', async () => {
     const validator = new SchemaRegistry()
         .addSchema('Module1.Schema1', ({ object, number }) =>
-            object().addProperties({
+            object({
                 b: number()
             })
         )
         .addSchema('Module1.Schema2', ({ object, alias }) =>
-            object().addProperties({
+            object({
                 a: alias('Module1.Schema3' as any)
             })
         );
@@ -1120,11 +1062,9 @@ test('No unknown fields - 1', async () => {
     const validator = new SchemaRegistry().addSchema(
         'Schema1',
         ({ object, number }) =>
-            object()
-                .addProperties({
-                    b: number()
-                })
-                .shouldNotHaveUnknownProperties()
+            object({
+                b: number()
+            }).noUnknownProps()
     );
 
     const result = await validator.schemas.Schema1.validate({
@@ -1138,11 +1078,9 @@ test('No unknown fields - 2', async () => {
     const validator = new SchemaRegistry().addSchema(
         'Schema1',
         ({ object, number }) =>
-            object()
-                .addProperties({
-                    b: number()
-                })
-                .canHaveUnknownProperties()
+            object({
+                b: number()
+            }).canHaveUnknownProps()
     );
 
     const result = await validator.schemas.Schema1.validate({
@@ -1150,4 +1088,351 @@ test('No unknown fields - 2', async () => {
         c: 'something'
     });
     expect(result).toHaveProperty('valid', true);
+});
+
+test('addSchemaFrom - 1', async () => {
+    const registry = new SchemaRegistry()
+        .addSchema('Person', ({ string, object }) =>
+            object({
+                first: string(),
+                last: string()
+            })
+        )
+        .addSchemaFrom('Person', 'PersonWithEmail', ({ schema, string }) =>
+            schema.addProps({
+                email: string()
+            })
+        );
+    expect(
+        registry.schemas.Person === registry.schemas.PersonWithEmail
+    ).toEqual(false);
+});
+
+test('Object returned - 1', async () => {
+    const registry = new SchemaRegistry().addSchema(
+        'Person',
+        ({ object, string }) =>
+            object({
+                first: string(),
+                last: string()
+            })
+    );
+    const p = {
+        first: 'John',
+        last: 'Smith'
+    };
+    const { valid, object } = await registry.schemas.Person.validate(p);
+
+    expect(valid).toEqual(true);
+    expect(object === p).toEqual(true);
+});
+
+test('makeAllPropsOptional - 1', async () => {
+    const registry = new SchemaRegistry().addSchema(
+        'Schema1',
+        ({ object, number }) =>
+            object({
+                id: number(),
+                first: number(),
+                second: number()
+            })
+                .makeAllPropsOptional()
+                .makePropRequired('id')
+    );
+
+    const { valid } = await registry.schemas.Schema1.validate({
+        id: 123
+    });
+
+    const { valid: valid2 } = await registry.schemas.Schema1.validate({});
+
+    expect(valid).toEqual(true);
+    expect(valid2).toEqual(false);
+});
+
+test('no unknown props allowed by default', async () => {
+    const registry = new SchemaRegistry().addSchema(
+        'User',
+        ({ object, string }) =>
+            object({
+                firstName: string(),
+                lastName: string()
+            })
+    );
+
+    const { valid } = await registry.schemas.User.validate({
+        firstName: 'John',
+        lastName: 'Smith',
+        age: 20
+    });
+
+    expect(valid).toEqual(false);
+
+    const registry2 = registry.addSchemaFrom('User', 'UserOpen', ({ schema }) =>
+        schema.canHaveUnknownProps()
+    );
+
+    const { valid: valid2 } = await registry2.schemas.UserOpen.validate({
+        firstName: 'John',
+        lastName: 'Smith',
+        age: 20
+    });
+
+    expect(valid2).toEqual(true);
+});
+
+test('Func - 1', async () => {
+    const validator = new SchemaRegistry().addSchema('something', ({ func }) =>
+        func()
+    );
+    expect(validator.schemas.something).toBeDefined();
+    expect(await validator.schemas.something.validate(123)).toHaveProperty(
+        'valid',
+        false
+    );
+    expect(await validator.schemas.something.validate(() => 10)).toHaveProperty(
+        'valid',
+        true
+    );
+});
+
+test('Func - 2', async () => {
+    const validator = new SchemaRegistry().addSchema(
+        'something',
+        ({ func, string, object }) =>
+            object({
+                name: string(),
+                f: func()
+            })
+    );
+    expect(
+        await validator.schemas.something.validate({
+            name: '123',
+            f: 324
+        })
+    ).toHaveProperty('valid', false);
+    expect(
+        await validator.schemas.something.validate({
+            name: '1234',
+            f: () => 10
+        })
+    ).toHaveProperty('valid', true);
+});
+
+test('Func - 3', async () => {
+    const validator = new SchemaRegistry().addSchema(
+        'something',
+        ({ func, string, object }) =>
+            object({
+                name: string(),
+                f: func().optional()
+            })
+    );
+
+    expect(
+        await validator.schemas.something.validate({
+            name: '123',
+            f: 324
+        })
+    ).toHaveProperty('valid', false);
+    expect(
+        await validator.schemas.something.validate({
+            name: '1234'
+        })
+    ).toHaveProperty('valid', true);
+});
+
+test('Func - 3', async () => {
+    const validator = new SchemaRegistry().addSchema(
+        'something',
+        ({ func, string, object, union }) =>
+            object({
+                name: string(),
+                f: union(func(), object().canHaveUnknownProps()).optional()
+            })
+    );
+
+    expect(
+        await validator.schemas.something.validate({
+            name: '123',
+            f: 324
+        })
+    ).toHaveProperty('valid', false);
+    expect(
+        await validator.schemas.something.validate({
+            name: '1234'
+        })
+    ).toHaveProperty('valid', true);
+    expect(
+        await validator.schemas.something.validate({
+            name: '1234',
+            f: { a: 34 }
+        })
+    ).toHaveProperty('valid', true);
+    expect(
+        await validator.schemas.something.validate({
+            name: '1234',
+            f: () => 20
+        })
+    ).toHaveProperty('valid', true);
+    expect(
+        await validator.schemas.something.validate({
+            name: '1234',
+            f: '2345'
+        })
+    ).toHaveProperty('valid', false);
+});
+
+test('External Schema - 1', async () => {
+    const validator1 = new SchemaRegistry().addSchema(
+        'person',
+        ({ object, number }) =>
+            object({
+                age: number().min(0),
+                marriedAt: number().min(18)
+            })
+    );
+
+    const validator2 = new SchemaRegistry().addSchema(
+        'company',
+        ({ object, string }) =>
+            object({
+                name: string(),
+                director: validator1.schemas.person.schema.optional()
+            })
+    );
+
+    const result = await validator2.schemas.company.validate({
+        name: 'Some',
+        director: {
+            age: 40,
+            marriedAt: 22
+        }
+    });
+
+    expect(result).toHaveProperty('valid', true);
+
+    const result2 = await validator2.schemas.company.validate({
+        name: 'Some',
+        director: {
+            age: -10,
+            marriedAt: 22
+        }
+    });
+
+    expect(result2).toHaveProperty('valid', false);
+});
+
+test('External Schema - 2', async () => {
+    const validator1 = new SchemaRegistry()
+        .addSchema('address', ({ object, string }) =>
+            object({
+                city: string(),
+                street: string().addValidator((v) => ({ valid: v.length > 0 }))
+            }).addValidator((val) => ({ valid: val.city.length > 0 }))
+        )
+        .addSchema('person', ({ object, number, alias }) =>
+            object({
+                age: number().min(0),
+                marriedAt: number()
+                    .min(18)
+                    .addValidator((v) => ({ valid: v > 10 })),
+                address: alias('address')
+            }).addValidator((val) => ({ valid: val.marriedAt < val.age }))
+        );
+
+    const validator2 = new SchemaRegistry().addSchema(
+        'company',
+        ({ object, string, external }) =>
+            object({
+                name: string().addValidator(() => ({ valid: true })),
+                director: external(validator1, 'person')
+            }).addValidator((v) => ({ valid: true }))
+    );
+
+    const result = await validator2.schemas.company.validate({
+        name: 'Some',
+        director: {
+            age: 40,
+            marriedAt: 22,
+            address: {
+                city: 'City upon a Hill',
+                street: '123 Blossom street'
+            }
+        }
+    });
+
+    expect(result).toHaveProperty('valid', true);
+
+    const result2 = await validator2.schemas.company.validate({
+        name: 'Some',
+        director: {
+            age: -10,
+            marriedAt: 22,
+            address: {
+                city: 'City upon a Hill',
+                street: '123 Blossom street'
+            }
+        }
+    });
+
+    expect(result2).toHaveProperty('valid', false);
+});
+
+test('Empty Validators Bug', async () => {
+    const isValidEmail = (s) => {
+        if (typeof s !== 'string') return false;
+        const regex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,8}$/;
+        return regex.test(s);
+    };
+    const validator = new SchemaRegistry().addSchema(
+        'Report',
+        ({ object, array, string }) =>
+            object({
+                recepients: array()
+                    .ofType(
+                        string().addValidator((val) => {
+                            if (isValidEmail(val)) {
+                                return { valid: true };
+                            }
+                            return {
+                                valid: false,
+                                errors: [`${val} is not a valid email`]
+                            };
+                        })
+                    )
+                    .addValidator((val) => {
+                        if (!Array.isArray(val)) {
+                            return {
+                                valid: false,
+                                errors: ['not an array']
+                            };
+                        }
+                        const map = {};
+                        const lowerCased = val.map((v) => v.toLowerCase());
+                        for (let i = 0; i < lowerCased.length; i++) {
+                            if (lowerCased[i] in map) {
+                                return {
+                                    valid: false,
+                                    errors: ['no duplicates allowed']
+                                };
+                            }
+                            map[lowerCased[i]] = true;
+                        }
+                        return { valid: true };
+                    })
+            })
+    );
+
+    const result1 = await validator.schemas.Report.validate({
+        recepients: ['user1@domain1.com', 'user2@domain1.com']
+    });
+
+    expect(result1).toHaveProperty('valid', true);
+
+    const result2 = await validator.schemas.Report.validate({
+        recepients: ['user1@domain1.com', 'user1@domain1.com']
+    });
+
+    expect(result2).toHaveProperty('valid', false);
 });

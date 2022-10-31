@@ -1,4 +1,8 @@
-import { ValidationResult, InferType, ExpandSchemaBuilder } from './schema.js';
+import {
+    InferType,
+    ExpandSchemaBuilder,
+    ValidationResultWithObject
+} from './schema.js';
 import SchemaRegistry from './schemaRegistry.js';
 
 import { alias } from './builders/AliasSchemaBuilder.js';
@@ -8,6 +12,7 @@ import { number } from './builders/NumberSchemaBuilder.js';
 import { object } from './builders/ObjectSchemaBuilder.js';
 import { string } from './builders/StringSchemaBuilder.js';
 import { union } from './builders/UnionSchemaBuilder.js';
+import { func } from './builders/FunctionSchemaBuilder.js';
 
 export type GetNodes<
     T extends Record<string, any>,
@@ -37,7 +42,9 @@ export type Unfold<
 };
 
 export interface ISchemaActions<S> {
-    validate(value: any): Promise<ValidationResult>;
+    validate(
+        value: any
+    ): Promise<ValidationResultWithObject<InferType<ExpandSchemaBuilder<S>>>>;
     schema: ExpandSchemaBuilder<S>;
 }
 
@@ -54,7 +61,18 @@ export default {
     number,
     object,
     string,
-    union
+    union,
+    func
 };
 
-export { alias, array, boolean, number, object, string, union, InferType };
+export {
+    alias,
+    array,
+    boolean,
+    number,
+    object,
+    string,
+    union,
+    func,
+    InferType
+};

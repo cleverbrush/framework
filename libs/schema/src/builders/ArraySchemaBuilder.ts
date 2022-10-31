@@ -9,10 +9,6 @@ export interface IArraySchemaBuilder<
     TMaxLength extends number | undefined = undefined,
     TMinLength extends number | undefined = undefined
 > extends ISchemaBuilder<TRequired, TNullable> {
-    readonly type: 'array';
-    ofType?: TOfType;
-    maxLength?: TMaxLength;
-    minLength?: TMinLength;
     optional(): IArraySchemaBuilder<
         false,
         TNullable,
@@ -27,7 +23,7 @@ export interface IArraySchemaBuilder<
         TMaxLength,
         TMinLength
     >;
-    hasElementOfType<T extends Schema>(
+    ofType<T extends Schema>(
         schema: T
     ): IArraySchemaBuilder<TRequired, TNullable, T, TMaxLength, TMinLength>;
     nullable(): IArraySchemaBuilder<
@@ -44,7 +40,7 @@ export interface IArraySchemaBuilder<
         TMaxLength,
         TMinLength
     >;
-    clearElementType(): IArraySchemaBuilder<
+    clearOfType(): IArraySchemaBuilder<
         TRequired,
         TNullable,
         undefined,
@@ -52,7 +48,7 @@ export interface IArraySchemaBuilder<
         TMinLength
     >;
 
-    hasMaxLength<T extends number>(
+    maxLength<T extends number>(
         length: T
     ): IArraySchemaBuilder<TRequired, TNullable, TOfType, T, TMinLength>;
     clearMaxLength(): IArraySchemaBuilder<
@@ -62,7 +58,7 @@ export interface IArraySchemaBuilder<
         undefined,
         TMinLength
     >;
-    hasMinLength<T extends number>(
+    minLength<T extends number>(
         length: T
     ): IArraySchemaBuilder<TRequired, TNullable, TOfType, TMaxLength, T>;
 
@@ -102,19 +98,16 @@ class ArraySchemaBuilder<
                 type: this.type
             },
             this.getCommonSchema(),
-            typeof this.ofType !== 'undefined'
+            typeof this._ofType !== 'undefined'
                 ? {
-                      ofType:
-                          this.ofType instanceof SchemaBuilder
-                              ? this.ofType._schema
-                              : JSON.parse(JSON.stringify(this.ofType))
+                      ofType: this._ofType as any
                   }
                 : {},
-            typeof this.minLength !== 'undefined'
-                ? { minLength: this.minLength }
+            typeof this._minLength !== 'undefined'
+                ? { minLength: this._minLength }
                 : {},
-            typeof this.maxLength !== 'undefined'
-                ? { maxLength: this.maxLength }
+            typeof this._maxLength !== 'undefined'
+                ? { maxLength: this._maxLength }
                 : {}
         );
     }
@@ -159,16 +152,16 @@ class ArraySchemaBuilder<
         super(obj);
         if (typeof obj === 'object' && obj) {
             if (typeof obj.ofType !== 'undefined') {
-                this.ofType =
+                this._ofType =
                     obj.ofType instanceof SchemaBuilder
                         ? obj.ofType.clone()
                         : { ...(obj.ofType as any) };
             }
             if (typeof obj.maxLength !== 'undefined') {
-                this.maxLength = obj.maxLength;
+                this._maxLength = obj.maxLength;
             }
             if (typeof obj.minLength !== 'undefined') {
-                this.minLength = obj.minLength;
+                this._minLength = obj.minLength;
             }
         } else {
             const defaultSchema = defaultSchemas['array'] as any;
@@ -177,13 +170,11 @@ class ArraySchemaBuilder<
         }
     }
 
-    get type(): 'array' {
-        return 'array';
-    }
+    protected readonly type = 'array';
 
-    ofType?: TOfType;
-    maxLength?: TMaxLength;
-    minLength?: TMinLength;
+    protected _ofType?: TOfType;
+    protected _maxLength?: TMaxLength;
+    protected _minLength?: TMinLength;
 
     optional(): IArraySchemaBuilder<
         false,
@@ -275,7 +266,7 @@ class ArraySchemaBuilder<
         });
     }
 
-    hasElementOfType<T extends Schema>(
+    ofType<T extends Schema>(
         schema: T
     ): IArraySchemaBuilder<TRequired, TNullable, T, TMaxLength, TMinLength> {
         return ArraySchemaBuilder.create({
@@ -284,14 +275,14 @@ class ArraySchemaBuilder<
         });
     }
 
-    clearElementType(): IArraySchemaBuilder<
+    clearOfType(): IArraySchemaBuilder<
         TRequired,
         TNullable,
         undefined,
         TMaxLength,
         TMinLength
     > {
-        if (typeof this.ofType === 'undefined') {
+        if (typeof this._ofType === 'undefined') {
             return this as IArraySchemaBuilder<
                 TRequired,
                 TNullable,
@@ -306,10 +297,10 @@ class ArraySchemaBuilder<
         });
     }
 
-    hasMaxLength<T extends number>(
+    maxLength<T extends number>(
         length: T
     ): IArraySchemaBuilder<TRequired, TNullable, TOfType, T, TMinLength> {
-        if ((this.maxLength as any) === length) {
+        if ((this._maxLength as any) === length) {
             return this as any as IArraySchemaBuilder<
                 TRequired,
                 TNullable,
@@ -331,7 +322,7 @@ class ArraySchemaBuilder<
         undefined,
         TMinLength
     > {
-        if (typeof this.maxLength === 'undefined') {
+        if (typeof this._maxLength === 'undefined') {
             return this as IArraySchemaBuilder<
                 TRequired,
                 TNullable,
@@ -346,10 +337,10 @@ class ArraySchemaBuilder<
         });
     }
 
-    hasMinLength<T extends number>(
+    minLength<T extends number>(
         length: T
     ): IArraySchemaBuilder<TRequired, TNullable, TOfType, TMaxLength, T> {
-        if ((this.minLength as any) === length) {
+        if ((this._minLength as any) === length) {
             return this as any as IArraySchemaBuilder<
                 TRequired,
                 TNullable,
@@ -371,7 +362,7 @@ class ArraySchemaBuilder<
         TMaxLength,
         TMinLength
     > {
-        if (typeof this.minLength === 'undefined') {
+        if (typeof this._minLength === 'undefined') {
             return this as IArraySchemaBuilder<
                 TRequired,
                 TNullable,
