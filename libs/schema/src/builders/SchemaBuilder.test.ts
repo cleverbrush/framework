@@ -66,7 +66,7 @@ test('Preprocessor - 5', () => {
 test('Preprocessor - 6', () => {
     const schema1 = number()
         .addPreprocessor(() => new Date())
-        .hasMinValue(30);
+        .min(30);
     const schema2 = schema1.clearPreprocessor();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);

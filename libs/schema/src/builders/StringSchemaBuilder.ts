@@ -9,10 +9,6 @@ export interface IStringSchemaBuilder<
     TMaxLength extends number | undefined = undefined,
     TEqualsTo extends string | undefined = undefined
 > extends ISchemaBuilder<TRequired, TNullable> {
-    type: 'string';
-    minLength?: TMinLength;
-    maxLength?: TMaxLength;
-    equals?: TEqualsTo;
     optional(): IStringSchemaBuilder<
         false,
         TNullable,
@@ -41,7 +37,7 @@ export interface IStringSchemaBuilder<
         TMaxLength,
         TEqualsTo
     >;
-    hasMinLength<K extends number>(
+    minLength<K extends number>(
         val: K
     ): IStringSchemaBuilder<TRequired, TNullable, K, TMaxLength, TEqualsTo>;
     clearMinLength(): IStringSchemaBuilder<
@@ -51,7 +47,7 @@ export interface IStringSchemaBuilder<
         TMaxLength,
         TEqualsTo
     >;
-    hasMaxLength<K extends number>(
+    maxLength<K extends number>(
         val: K
     ): IStringSchemaBuilder<TRequired, TNullable, TMinLength, K, TEqualsTo>;
     clearMaxLength(): IStringSchemaBuilder<
@@ -61,10 +57,10 @@ export interface IStringSchemaBuilder<
         undefined,
         TEqualsTo
     >;
-    equalsTo<T extends string>(
+    equals<T extends string>(
         val: T
     ): IStringSchemaBuilder<TRequired, TNullable, TMinLength, TMaxLength, T>;
-    clearEqualsTo(): IStringSchemaBuilder<
+    clearEquals(): IStringSchemaBuilder<
         TRequired,
         TNullable,
         TMinLength,
@@ -90,13 +86,11 @@ class StringSchemaBuilder<
             TEqualsTo
         >
 {
-    public minLength?: TMinLength;
-    public maxLength?: TMaxLength;
-    public equals?: TEqualsTo;
+    protected _minLength?: TMinLength;
+    protected _maxLength?: TMaxLength;
+    protected _equals?: TEqualsTo;
 
-    public get type(): 'string' {
-        return 'string';
-    }
+    protected readonly type = 'string';
 
     public clone(): this {
         return StringSchemaBuilder.create(this._schema as any) as this;
@@ -108,13 +102,13 @@ class StringSchemaBuilder<
                 type: this.type
             },
             this.getCommonSchema(),
-            typeof this.minLength !== 'undefined'
-                ? { minLength: this.minLength }
+            typeof this._minLength !== 'undefined'
+                ? { minLength: this._minLength }
                 : {},
-            typeof this.maxLength !== 'undefined'
-                ? { maxLength: this.maxLength }
+            typeof this._maxLength !== 'undefined'
+                ? { maxLength: this._maxLength }
                 : {},
-            typeof this.equals !== 'undefined' ? { equals: this.equals } : {}
+            typeof this._equals !== 'undefined' ? { equals: this._equals } : {}
         );
     }
 
@@ -207,10 +201,10 @@ class StringSchemaBuilder<
         });
     }
 
-    public hasMinLength<K extends number>(
+    public minLength<K extends number>(
         val: K
     ): IStringSchemaBuilder<TRequired, TNullable, K, TMaxLength, TEqualsTo> {
-        if ((this.minLength as any) === val) {
+        if ((this._minLength as any) === val) {
             return this as any as IStringSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -232,7 +226,7 @@ class StringSchemaBuilder<
         TMaxLength,
         TEqualsTo
     > {
-        if (typeof this.minLength === 'undefined') {
+        if (typeof this._minLength === 'undefined') {
             return this as any as IStringSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -247,10 +241,10 @@ class StringSchemaBuilder<
         });
     }
 
-    public hasMaxLength<K extends number>(
+    public maxLength<K extends number>(
         val: K
     ): IStringSchemaBuilder<TRequired, TNullable, TMinLength, K, TEqualsTo> {
-        if ((this.maxLength as any) === val) {
+        if ((this._maxLength as any) === val) {
             return this as any as IStringSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -272,7 +266,7 @@ class StringSchemaBuilder<
         undefined,
         TEqualsTo
     > {
-        if (typeof this.maxLength === 'undefined') {
+        if (typeof this._maxLength === 'undefined') {
             return this as IStringSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -287,10 +281,10 @@ class StringSchemaBuilder<
         });
     }
 
-    public equalsTo<T extends string>(
+    public equals<T extends string>(
         val: T
     ): IStringSchemaBuilder<TRequired, TNullable, TMinLength, TMaxLength, T> {
-        if ((this.equals as any) === val) {
+        if ((this._equals as any) === val) {
             return this as any as IStringSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -306,14 +300,14 @@ class StringSchemaBuilder<
         });
     }
 
-    public clearEqualsTo(): IStringSchemaBuilder<
+    public clearEquals(): IStringSchemaBuilder<
         TRequired,
         TNullable,
         TMinLength,
         TMaxLength,
         undefined
     > {
-        if (typeof this.equals === 'undefined') {
+        if (typeof this._equals === 'undefined') {
             return this as IStringSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -368,13 +362,13 @@ class StringSchemaBuilder<
         super(obj);
         if (typeof obj === 'object' && obj) {
             if (typeof obj.minLength !== 'undefined') {
-                this.minLength = obj.minLength;
+                this._minLength = obj.minLength;
             }
             if (typeof obj.maxLength !== 'undefined') {
-                this.maxLength = obj.maxLength;
+                this._maxLength = obj.maxLength;
             }
             if (typeof obj.equals !== 'undefined') {
-                this.equals = obj.equals;
+                this._equals = obj.equals;
             }
         } else {
             const defaultSchema = defaultSchemas['string'] as any;
@@ -384,4 +378,15 @@ class StringSchemaBuilder<
     }
 }
 
-export const string = () => StringSchemaBuilder.create();
+export const string = <T extends string | undefined = undefined>(
+    equals?: T
+): IStringSchemaBuilder<
+    true,
+    false,
+    undefined,
+    undefined,
+    T extends undefined ? undefined : T
+> => {
+    const res = StringSchemaBuilder.create();
+    return typeof equals === 'string' ? res.equals(equals) : res;
+};

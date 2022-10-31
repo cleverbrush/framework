@@ -127,7 +127,7 @@ test('ofType - 1', () => {
     const s: Schema = {
         type: 'number'
     };
-    const schema = array().hasElementOfType(s);
+    const schema = array().ofType(s)._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).toHaveProperty('ofType', s);
 });
@@ -136,48 +136,48 @@ test('ofType - 2', () => {
     const s: Schema = {
         type: 'array'
     };
-    const schema = array().hasElementOfType(s).clearElementType();
+    const schema = array().ofType(s).clearOfType()._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).not.toHaveProperty('ofType');
 });
 
 test('ofType - 3', () => {
     const schema1 = array();
-    const schema2 = schema1.hasElementOfType(number());
+    const schema2 = schema1.ofType(number());
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
 });
 
 test('ofType - 4', () => {
-    const schema1 = array().hasElementOfType(number());
-    const schema2 = schema1.hasElementOfType(number());
+    const schema1 = array().ofType(number());
+    const schema2 = schema1.ofType(number());
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
 });
 
 test('ofType - 5', () => {
-    const schema1 = array().hasElementOfType(number());
+    const schema1 = array().ofType(number());
     const schema2 = schema1.clone();
-    const equal = schema1.ofType === schema2.ofType;
+    const equal = schema1._schema.ofType === schema2._schema.ofType;
     expect(equal).toEqual(false);
 });
 
 test('ofType - 6', () => {
-    const schema1 = array().hasElementOfType(number());
-    const schema2 = schema1.clearElementType();
+    const schema1 = array().ofType(number());
+    const schema2 = schema1.clearOfType();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
 });
 
 test('ofType - 7', () => {
-    const schema1 = array().hasElementOfType(number()).clearElementType();
-    const schema2 = schema1.clearElementType();
+    const schema1 = array().ofType(number()).clearOfType();
+    const schema2 = schema1.clearOfType();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
 });
 
 test('maxLength - 1', () => {
-    const schema = array();
+    const schema = array()._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).not.toHaveProperty('maxLength');
 });
@@ -186,7 +186,7 @@ test('maxLength - 2', () => {
     const s: Schema = {
         type: 'array'
     };
-    const schema = array().hasElementOfType(s).hasMaxLength(10);
+    const schema = array().ofType(s).maxLength(10)._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).toHaveProperty('maxLength', 10);
 });
@@ -195,30 +195,27 @@ test('maxLength - 3', () => {
     const s: Schema = {
         type: 'array'
     };
-    const schema = array()
-        .hasElementOfType(s)
-        .hasMaxLength(10)
-        .clearMaxLength();
+    const schema = array().ofType(s).maxLength(10).clearMaxLength()._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).not.toHaveProperty('maxLength');
 });
 
 test('maxLength - 4', () => {
-    const schema1 = array().hasMaxLength(10).clearMaxLength();
+    const schema1 = array().maxLength(10).clearMaxLength();
     const schema2 = schema1.clearMaxLength();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
 });
 
 test('maxLength - 5', () => {
-    const schema1 = array().hasMaxLength(20);
+    const schema1 = array().maxLength(20);
     const schema2 = schema1.clearMaxLength();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
 });
 
 test('minLength - 1', () => {
-    const schema = array();
+    const schema = array()._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).not.toHaveProperty('minLength');
 });
@@ -227,7 +224,7 @@ test('minLength - 2', () => {
     const s: Schema = {
         type: 'array'
     };
-    const schema = array().hasElementOfType(s).hasMinLength(10);
+    const schema = array().ofType(s).minLength(10)._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).toHaveProperty('minLength', 10);
 });
@@ -236,30 +233,27 @@ test('minLength - 3', () => {
     const s: Schema = {
         type: 'array'
     };
-    const schema = array()
-        .hasElementOfType(s)
-        .hasMinLength(10)
-        .clearMinLength();
+    const schema = array().ofType(s).minLength(10).clearMinLength()._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).not.toHaveProperty('minLength');
 });
 
 test('minLength - 4', () => {
-    const schema1 = array().hasMinLength(10).clearMinLength();
+    const schema1 = array().minLength(10).clearMinLength();
     const schema2 = schema1.clearMinLength();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
 });
 
 test('minLength - 5', () => {
-    const schema1 = array().hasMinLength(20);
+    const schema1 = array().minLength(20);
     const schema2 = schema1.clearMinLength();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
 });
 
 test('minLength - 6', () => {
-    const schema1 = array().hasMinLength(20).clearMinLength();
+    const schema1 = array().minLength(20).clearMinLength();
     const schema2 = schema1.clearMinLength();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
@@ -269,10 +263,7 @@ test('min/max lengths - 1', () => {
     const s: Schema = {
         type: 'array'
     };
-    const schema = array()
-        .hasElementOfType(s)
-        .hasMinLength(10)
-        .hasMaxLength(100);
+    const schema = array().ofType(s).minLength(10).maxLength(100)._schema;
     expect(schema).toHaveProperty('type', 'array');
     expect(schema).toHaveProperty('minLength', 10);
     expect(schema).toHaveProperty('maxLength', 100);

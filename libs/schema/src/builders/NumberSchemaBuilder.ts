@@ -12,15 +12,7 @@ export interface INumberSchemaBuilder<
     TEnsureIsFinite extends boolean = true,
     TEqualsTo extends number | undefined = undefined
 > extends ISchemaBuilder<TRequired, TNullable> {
-    readonly type: 'number';
-    min?: TMin;
-    max?: TMax;
-    isInteger?: TIsInteger;
-    ensureNotNaN: TEnsureNotNaN;
-    ensureIsFinite: TEnsureIsFinite;
-    equals?: TEqualsTo;
-
-    hasMinValue<K extends number>(
+    min<K extends number>(
         val: K
     ): INumberSchemaBuilder<
         TRequired,
@@ -32,7 +24,7 @@ export interface INumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     >;
-    clearMinValue(): INumberSchemaBuilder<
+    clearMin(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         undefined,
@@ -42,7 +34,7 @@ export interface INumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     >;
-    hasMaxValue<K extends number>(
+    max<K extends number>(
         val: K
     ): INumberSchemaBuilder<
         TRequired,
@@ -54,7 +46,7 @@ export interface INumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     >;
-    clearMaxValue(): INumberSchemaBuilder<
+    clearMax(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -104,7 +96,7 @@ export interface INumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     >;
-    equalsTo<T extends number>(
+    equals<T extends number>(
         val: T
     ): INumberSchemaBuilder<
         TRequired,
@@ -116,7 +108,7 @@ export interface INumberSchemaBuilder<
         TEnsureIsFinite,
         T
     >;
-    clearEqualsTo(): INumberSchemaBuilder<
+    clearEquals(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -126,7 +118,7 @@ export interface INumberSchemaBuilder<
         TEnsureIsFinite,
         undefined
     >;
-    ensureIsInteger(): INumberSchemaBuilder<
+    isInteger(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -136,7 +128,7 @@ export interface INumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     >;
-    notEnsureIsInteger(): INumberSchemaBuilder<
+    canBeNotInteger(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -220,16 +212,16 @@ export class NumberSchemaBuilder<
         return Object.assign(
             {
                 type: this.type,
-                ensureNotNaN: this.ensureNotNaN,
-                ensureIsFinite: this.ensureIsFinite
+                ensureNotNaN: this._ensureNotNaN,
+                ensureIsFinite: this._ensureIsFinite
             },
             this.getCommonSchema(),
-            typeof this.min !== 'undefined' ? { min: this.min } : {},
-            typeof this.max !== 'undefined' ? { max: this.max } : {},
-            typeof this.isInteger !== 'undefined'
-                ? { isInteger: this.isInteger }
+            typeof this._min !== 'undefined' ? { min: this._min } : {},
+            typeof this._max !== 'undefined' ? { max: this._max } : {},
+            typeof this._isInteger !== 'undefined'
+                ? { isInteger: this._isInteger }
                 : {},
-            typeof this.equals !== 'undefined' ? { equals: this.equals } : {}
+            typeof this._equals !== 'undefined' ? { equals: this._equals } : {}
         );
     }
 
@@ -285,45 +277,42 @@ export class NumberSchemaBuilder<
         super(obj);
         if (typeof obj === 'object' && obj) {
             if (typeof obj.min !== 'undefined') {
-                this.min = obj.min;
+                this._min = obj.min;
             }
             if (typeof obj.max !== 'undefined') {
-                this.max = obj.max;
+                this._max = obj.max;
             }
             if (typeof obj.isInteger !== 'undefined') {
-                this.isInteger = obj.isInteger;
+                this._isInteger = obj.isInteger;
             }
             if (typeof obj.ensureNotNaN !== 'undefined') {
-                this.ensureNotNaN = obj.ensureNotNaN;
+                this._ensureNotNaN = obj.ensureNotNaN;
             }
             if (typeof obj.ensureIsFinite !== 'undefined') {
-                this.ensureIsFinite = obj.ensureIsFinite;
+                this._ensureIsFinite = obj.ensureIsFinite;
             }
             if (typeof obj.equals !== 'undefined') {
-                this.equals = obj.equals;
+                this._equals = obj.equals;
             }
         } else {
             const defaultSchema = defaultSchemas['number'] as any;
             this.isRequired = defaultSchema.isRequired;
             this.isNullable = defaultSchema.isNullable;
-            this.ensureNotNaN = defaultSchema.ensureNotNaN;
-            this.ensureIsFinite = defaultSchema.ensureIsFinite;
+            this._ensureNotNaN = defaultSchema.ensureNotNaN;
+            this._ensureIsFinite = defaultSchema.ensureIsFinite;
         }
     }
 
-    public get type(): 'number' {
-        this.equals;
-        return 'number' as const;
-    }
+    protected readonly type = 'number';
 
-    min?: TMin;
-    max?: TMax;
-    isInteger?: TIsInteger;
-    ensureNotNaN: TEnsureNotNaN = true as TEnsureNotNaN;
-    ensureIsFinite: TEnsureIsFinite = true as TEnsureIsFinite;
-    equals?: TEqualsTo;
+    _min?: TMin;
+    _max?: TMax;
+    _isInteger?: TIsInteger;
+    _ensureNotNaN: TEnsureNotNaN = true as TEnsureNotNaN;
+    _ensureIsFinite: TEnsureIsFinite = true as TEnsureIsFinite;
+    _equals?: TEqualsTo;
 
-    hasMinValue<K extends number>(
+    min<K extends number>(
         val: K
     ): INumberSchemaBuilder<
         TRequired,
@@ -335,7 +324,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if ((this.min as any) === val) {
+        if ((this._min as any) === val) {
             return this as any as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -353,7 +342,7 @@ export class NumberSchemaBuilder<
         });
     }
 
-    clearMinValue(): INumberSchemaBuilder<
+    clearMin(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         undefined,
@@ -363,7 +352,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if (typeof this.min === 'undefined') {
+        if (typeof this._min === 'undefined') {
             return this as any as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -381,7 +370,7 @@ export class NumberSchemaBuilder<
         });
     }
 
-    hasMaxValue<K extends number>(
+    max<K extends number>(
         val: K
     ): INumberSchemaBuilder<
         TRequired,
@@ -393,7 +382,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if ((this.max as any) === val) {
+        if ((this._max as any) === val) {
             return this as any as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -411,7 +400,7 @@ export class NumberSchemaBuilder<
         });
     }
 
-    clearMaxValue(): INumberSchemaBuilder<
+    clearMax(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -421,7 +410,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if (typeof this.max === 'undefined') {
+        if (typeof this._max === 'undefined') {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -569,7 +558,7 @@ export class NumberSchemaBuilder<
         >;
     }
 
-    equalsTo<T extends number>(
+    equals<T extends number>(
         val: T
     ): INumberSchemaBuilder<
         TRequired,
@@ -581,7 +570,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         T
     > {
-        if ((this.equals as any) === val) {
+        if ((this._equals as any) === val) {
             return this as any as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -600,7 +589,7 @@ export class NumberSchemaBuilder<
         });
     }
 
-    clearEqualsTo(): INumberSchemaBuilder<
+    clearEquals(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -610,7 +599,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         undefined
     > {
-        if (typeof this.equals === 'undefined') {
+        if (typeof this._equals === 'undefined') {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -628,7 +617,7 @@ export class NumberSchemaBuilder<
         });
     }
 
-    ensureIsInteger(): INumberSchemaBuilder<
+    isInteger(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -638,7 +627,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if (this.isInteger === true) {
+        if (this._isInteger === true) {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -656,7 +645,7 @@ export class NumberSchemaBuilder<
         });
     }
 
-    notEnsureIsInteger(): INumberSchemaBuilder<
+    canBeNotInteger(): INumberSchemaBuilder<
         TRequired,
         TNullable,
         TMin,
@@ -666,7 +655,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if (typeof this.isInteger === 'undefined') {
+        if (typeof this._isInteger === 'undefined') {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -694,7 +683,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if (this.ensureNotNaN === true) {
+        if (this._ensureNotNaN === true) {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -722,7 +711,7 @@ export class NumberSchemaBuilder<
         TEnsureIsFinite,
         TEqualsTo
     > {
-        if (this.ensureNotNaN === false) {
+        if (this._ensureNotNaN === false) {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -750,7 +739,7 @@ export class NumberSchemaBuilder<
         true,
         TEqualsTo
     > {
-        if (this.ensureIsFinite === true) {
+        if (this._ensureIsFinite === true) {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -778,7 +767,7 @@ export class NumberSchemaBuilder<
         false,
         TEqualsTo
     > {
-        if (this.ensureIsFinite === false) {
+        if (this._ensureIsFinite === false) {
             return this as INumberSchemaBuilder<
                 TRequired,
                 TNullable,

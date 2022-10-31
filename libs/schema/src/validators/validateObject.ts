@@ -92,14 +92,14 @@ export const validateObject = async (
                     }
                 )
             )),
-            ...(schema.noUnknownProperties
-                ? Object.keys(obj)
+            ...(schema.noUnknownProperties === false
+                ? []
+                : Object.keys(obj)
                       .filter((k) => !(k in schema.properties))
                       .map((k) => ({
                           valid: false,
                           errors: [`-> ${k} - unknown field`]
-                      }))
-                : [])
+                      })))
         ]
             .filter((r) => !r.valid)
             .map((r) => r.errors)

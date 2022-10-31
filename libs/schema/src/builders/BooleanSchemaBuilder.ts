@@ -7,10 +7,7 @@ export interface IBooleanSchemaBuilder<
     TNullable extends boolean = false,
     TEqualsTo extends boolean | undefined = undefined
 > extends ISchemaBuilder<TRequired, TNullable> {
-    readonly type: 'boolean';
-    equals?: TEqualsTo;
-
-    equalsTo<T extends boolean>(
+    equals<T extends boolean>(
         val: T
     ): IBooleanSchemaBuilder<TRequired, TNullable, T>;
     clearEqualsTo(): IBooleanSchemaBuilder<TRequired, TNullable, undefined>;
@@ -28,9 +25,7 @@ export class BooleanSchemaBuilder<
     extends SchemaBuilder<TRequired, TNullable>
     implements IBooleanSchemaBuilder<TRequired, TNullable, TEqualsTo>
 {
-    get type(): 'boolean' {
-        return 'boolean';
-    }
+    protected readonly type = 'boolean';
 
     public get _schema(): Schema {
         return Object.assign(
@@ -38,12 +33,12 @@ export class BooleanSchemaBuilder<
                 type: this.type
             },
             this.getCommonSchema(),
-            typeof this.equals !== 'undefined' ? { equals: this.equals } : {}
+            typeof this._equals !== 'undefined' ? { equals: this._equals } : {}
         );
     }
 
     public clone(): this {
-        return BooleanSchemaBuilder.create(this as any) as this;
+        return BooleanSchemaBuilder.create(this._schema as any) as this;
     }
 
     public static create<
@@ -74,7 +69,7 @@ export class BooleanSchemaBuilder<
         super(obj);
         if (typeof obj === 'object' && obj) {
             if (typeof obj.equals !== 'undefined') {
-                this.equals = obj.equals;
+                this._equals = obj.equals;
             }
         } else {
             const defaultSchema = defaultSchemas['boolean'] as any;
@@ -83,12 +78,12 @@ export class BooleanSchemaBuilder<
         }
     }
 
-    public equals?: TEqualsTo;
+    protected _equals?: TEqualsTo;
 
-    equalsTo<T extends boolean>(
+    equals<T extends boolean>(
         val: T
     ): IBooleanSchemaBuilder<TRequired, TNullable, T> {
-        if ((this.equals as any) === val) {
+        if ((this._equals as any) === val) {
             return this as any as IBooleanSchemaBuilder<
                 TRequired,
                 TNullable,
@@ -102,7 +97,7 @@ export class BooleanSchemaBuilder<
     }
 
     clearEqualsTo(): IBooleanSchemaBuilder<TRequired, TNullable, undefined> {
-        if (typeof this.equals === 'undefined') {
+        if (typeof this._equals === 'undefined') {
             return this as IBooleanSchemaBuilder<
                 TRequired,
                 TNullable,

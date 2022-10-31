@@ -3,7 +3,7 @@ import { string } from './StringSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 
 test('Clean', () => {
-    const schema = union(string());
+    const schema = union(string())._schema;
     expect(schema).toHaveProperty('type', 'union');
     expect(schema).toHaveProperty('variants');
     expect(schema).toHaveProperty('variants.length', 1);
@@ -125,11 +125,11 @@ test('or - 1', () => {
     const schema2 = schema1.or(number());
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema2).toHaveProperty('type', 'union');
-    expect(schema2).toHaveProperty('variants');
-    expect(schema2).toHaveProperty('variants.length', 2);
-    expect(schema2).toHaveProperty('isRequired', true);
-    expect(schema2).toHaveProperty('isNullable', false);
+    expect(schema2._schema).toHaveProperty('type', 'union');
+    expect(schema2._schema).toHaveProperty('variants');
+    expect(schema2._schema).toHaveProperty('variants.length', 2);
+    expect(schema2._schema).toHaveProperty('isRequired', true);
+    expect(schema2._schema).toHaveProperty('isNullable', false);
 });
 
 test('or - 2', () => {
@@ -137,11 +137,11 @@ test('or - 2', () => {
     const schema2 = schema1.clearVariants();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(false);
-    expect(schema2).toHaveProperty('type', 'union');
-    expect(schema2).toHaveProperty('variants');
-    expect(schema2).toHaveProperty('variants.length', 0);
-    expect(schema2).toHaveProperty('isRequired', true);
-    expect(schema2).toHaveProperty('isNullable', false);
+    expect(schema2._schema).toHaveProperty('type', 'union');
+    expect(schema2._schema).toHaveProperty('variants');
+    expect(schema2._schema).toHaveProperty('variants.length', 0);
+    expect(schema2._schema).toHaveProperty('isRequired', true);
+    expect(schema2._schema).toHaveProperty('isNullable', false);
 });
 
 test('or - 3', () => {
@@ -149,9 +149,14 @@ test('or - 3', () => {
     const schema2 = schema1.clearVariants();
     const equal = (schema1 as any) === schema2;
     expect(equal).toEqual(true);
-    expect(schema2).toHaveProperty('type', 'union');
-    expect(schema2).toHaveProperty('variants');
-    expect(schema2).toHaveProperty('variants.length', 0);
-    expect(schema2).toHaveProperty('isRequired', true);
-    expect(schema2).toHaveProperty('isNullable', false);
+    expect(schema2._schema).toHaveProperty('type', 'union');
+    expect(schema2._schema).toHaveProperty('variants');
+    expect(schema2._schema).toHaveProperty('variants.length', 0);
+    expect(schema2._schema).toHaveProperty('isRequired', true);
+    expect(schema2._schema).toHaveProperty('isNullable', false);
+});
+
+test('or - 4', () => {
+    const schema1 = union(string('123'), string('321'));
+    expect(schema1._schema.variants.length).toEqual(2);
 });
