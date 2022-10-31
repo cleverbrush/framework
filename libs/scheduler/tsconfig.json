@@ -7,9 +7,10 @@
         "module": "CommonJS",
         "esModuleInterop": true,
         "moduleResolution": "Node",
-        "allowSyntheticDefaultImports": true
+        "allowSyntheticDefaultImports": true,
+        "sourceMap": true
     },
-    "files": ["./src/index.ts"],
+    "files": ["src/index.ts"],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }
