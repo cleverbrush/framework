@@ -18,7 +18,6 @@ import {
     StringSchema,
     ValidationResult,
     ValidationResultRaw,
-    InferType,
     ExpandSchemaBuilder,
     FunctionSchema
 } from './schema.js';
@@ -29,11 +28,6 @@ import { object } from './builders/ObjectSchemaBuilder.js';
 import { string } from './builders/StringSchemaBuilder.js';
 import { boolean } from './builders/BooleanSchemaBuilder.js';
 import { array } from './builders/ArraySchemaBuilder.js';
-import {
-    alias,
-    externalAlias,
-    IAliasSchemaBuilder
-} from './builders/AliasSchemaBuilder.js';
 import { func } from './builders/FunctionSchemaBuilder.js';
 import { defaultSchemas } from './defaultSchemas.js';
 import { ISchemaBuilder, SchemaBuilder } from './builders/SchemaBuilder.js';
@@ -86,13 +80,41 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
         return this;
     }
 
+    private _aliasBuilder = <TSchemaName extends keyof T>(
+        schemaName: TSchemaName
+    ): ExpandSchemaBuilder<T[TSchemaName]> => {
+        if (typeof schemaName !== 'string' || !schemaName)
+            throw new Error('schemaName must be non-empty string');
+        const aliasSchema = this._schemasMap.get(schemaName.toString());
+        if (!aliasSchema)
+            throw new Error(`Schema name ${schemaName} is not defined.`);
+        return aliasSchema;
+    };
+
+    private _externalAlias = <
+        TExternalSchemaName extends keyof TExternalAliases,
+        TExternalAliases extends Record<string, any>,
+        TExternalSchemaRegistry extends ISchemaRegistry<TExternalAliases>
+    >(
+        registry: TExternalSchemaRegistry,
+        schemaName: TExternalSchemaName
+    ): ExpandSchemaBuilder<TExternalAliases[TExternalSchemaName]> => {
+        if (typeof schemaName !== 'string' || !schemaName)
+            throw new Error('schemaName must be non-empty string');
+        // TODO: accessing private property here...
+        const externalSchema = (registry as any)._schemasMap.get(schemaName);
+        if (!externalSchema)
+            throw new Error(`Schema name ${schemaName} is not defined.`);
+        return externalSchema;
+    };
+
     public addSchemaFrom<
         TOldName extends keyof T,
         TName extends string,
         TParam extends
             | Record<string, any>
             | ((params: {
-                  schema: ExpandSchemaBuilder<T[TOldName]>;
+                  base: ExpandSchemaBuilder<T[TOldName]>;
                   boolean: typeof boolean;
                   func: typeof func;
                   array: typeof array;
@@ -100,35 +122,22 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                   number: typeof number;
                   union: typeof union;
                   object: typeof object;
-                  alias: <
-                      TSchemaName extends keyof T,
-                      TCompiledType = InferType<
-                          ExpandSchemaBuilder<T[TSchemaName]>
-                      >
-                  >(
+                  alias: <TSchemaName extends keyof T>(
                       schemaName: TSchemaName
-                  ) => IAliasSchemaBuilder<
-                      TSchemaName,
-                      true,
-                      false,
-                      {
-                          [k in keyof T]: TSchemaName extends k ? T[k] : never;
-                      },
-                      TCompiledType
-                  >;
+                  ) => ExpandSchemaBuilder<T[TSchemaName]>;
               }) => TSchema),
         TSchema extends Schema | ISchemaBuilder
     >(
         oldName: TOldName,
         name: TName,
         param: TParam
-    ): SchemaRegistry<
-        T & {
-            [key in TName]: TParam extends (...args: any[]) => any
-                ? ReduceSchemaBuilder<ReturnType<TParam>>
-                : TParam;
-        }
-    > {
+    ): SchemaRegistry<{
+        [key in keyof T | TName]: key extends keyof T
+            ? T[key]
+            : TParam extends (...args: any[]) => any
+            ? ReduceSchemaBuilder<ReturnType<TParam>>
+            : TParam;
+    }> {
         if (!this._schemasMap.has(oldName.toString())) {
             throw new Error(`unknown schema name ${oldName.toString()}`);
         }
@@ -138,8 +147,8 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
         const schema =
             typeof param === 'function'
                 ? param({
-                      schema: oldSchema,
-                      alias,
+                      base: oldSchema,
+                      alias: this._aliasBuilder,
                       array,
                       boolean,
                       func,
@@ -180,54 +189,28 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                   union: typeof union;
                   object: typeof object;
                   func: typeof func;
-                  alias: <
-                      TSchemaName extends keyof T,
-                      TCompiledType = InferType<
-                          ExpandSchemaBuilder<T[TSchemaName]>
-                      >
-                  >(
+                  alias: <TSchemaName extends keyof T>(
                       schemaName: TSchemaName
-                  ) => IAliasSchemaBuilder<
-                      TSchemaName,
-                      true,
-                      false,
-                      {
-                          [k in keyof T]: TSchemaName extends k ? T[k] : never;
-                      },
-                      TCompiledType
-                  >;
+                  ) => ExpandSchemaBuilder<T[TSchemaName]>;
                   external: <
-                      TRegistryKeys extends Record<string, any>,
-                      TSchemaName extends keyof TRegistryKeys,
-                      TCompiledType = InferType<
-                          ExpandSchemaBuilder<TRegistryKeys[TSchemaName]>
-                      >
+                      TRegistryKeys,
+                      TSchemaName extends keyof TRegistryKeys
                   >(
-                      registry: ISchemaRegistry<TRegistryKeys>,
+                      registry: SchemaRegistry<TRegistryKeys>,
                       schemaName: TSchemaName
-                  ) => IAliasSchemaBuilder<
-                      TSchemaName,
-                      true,
-                      false,
-                      {
-                          [k in keyof TRegistryKeys]: TSchemaName extends k
-                              ? TRegistryKeys[k]
-                              : never;
-                      },
-                      TCompiledType
-                  >;
+                  ) => ExpandSchemaBuilder<TRegistryKeys[TSchemaName]>;
               }) => TSchema),
         TSchema extends Schema | ISchemaBuilder
     >(
         name: TName,
         param: TParam
-    ): SchemaRegistry<
-        T & {
-            [key in TName]: TParam extends (...args: any[]) => any
-                ? ReduceSchemaBuilder<ReturnType<TParam>>
-                : TParam;
-        }
-    > {
+    ): SchemaRegistry<{
+        [key in keyof T | TName]: key extends keyof T
+            ? T[key]
+            : TParam extends (...args: any[]) => any
+            ? ReduceSchemaBuilder<ReturnType<TParam>>
+            : TParam;
+    }> {
         if (typeof name !== 'string' || !name)
             throw new Error('Name is required');
 
@@ -242,8 +225,8 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
         const schema =
             typeof param === 'function'
                 ? param({
-                      alias,
-                      external: externalAlias,
+                      alias: this._aliasBuilder,
+                      external: this._externalAlias,
                       array,
                       boolean,
                       number,
@@ -454,60 +437,6 @@ export default class SchemaRegistry<T extends Record<string, Schema> = {}>
                     obj,
                     schema
                 );
-            } else if (spec.type === 'alias') {
-                if (spec.isRequired === false && typeof obj === 'undefined') {
-                    return {
-                        valid: true
-                    };
-                }
-                if (spec.isNullable === true && obj === null) {
-                    return {
-                        valid: true
-                    };
-                }
-
-                const registry = (spec.externalRegistry ||
-                    this) as ISchemaRegistry<any>;
-                const alias = (registry as any)._schemasMap.get(
-                    spec.schemaName
-                );
-                if (typeof alias === 'undefined') {
-                    throw new Error(
-                        `Unknown schema alias - ${spec.schemaName}`
-                    );
-                }
-                if (Array.isArray(alias)) {
-                    if (
-                        (!spec.isRequired && typeof obj === 'undefined') ||
-                        (spec.isNullable && obj === null)
-                    ) {
-                        return {
-                            valid: true
-                        };
-                    }
-                    return await (registry as any).validate(alias as any, obj);
-                }
-                if (typeof alias !== 'object')
-                    throw new Error(
-                        'it is only possible to use a full schema schema definition as alias'
-                    );
-
-                let schemaToValidate = alias;
-
-                if (alias instanceof SchemaBuilder) {
-                    if (typeof schema.isRequired === 'boolean') {
-                        schemaToValidate = (schemaToValidate as any)[
-                            schema.isRequired ? 'required' : 'optional'
-                        ]();
-                    }
-                    if (typeof schema.isNullable === 'boolean') {
-                        schemaToValidate = (schemaToValidate as any)[
-                            schema.isNullable ? 'nullable' : 'notNullable'
-                        ]();
-                    }
-                }
-
-                return await (registry as any).validate(schemaToValidate, obj);
             } else if (spec.type === 'union') {
                 return await validateUnion(obj, spec, this as any);
             } else if (spec.type === 'object') {

@@ -33,12 +33,7 @@ class UnionSchemaBuilder<
             },
             this.getCommonSchema(),
             {
-                variants: this._variants.map((variant) => {
-                    if (variant instanceof SchemaBuilder) {
-                        return variant._schema;
-                    }
-                    return JSON.parse(JSON.stringify(variant));
-                })
+                variants: this._variants
             }
         );
     }

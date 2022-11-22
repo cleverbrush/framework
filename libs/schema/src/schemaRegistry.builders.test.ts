@@ -5,7 +5,6 @@ import { string } from './builders/StringSchemaBuilder.js';
 import { array } from './builders/ArraySchemaBuilder.js';
 import { union } from './builders/UnionSchemaBuilder.js';
 import { boolean } from './builders/BooleanSchemaBuilder.js';
-import { alias } from './builders/AliasSchemaBuilder.js';
 
 import SchemaRegistry from './schemaRegistry.js';
 
@@ -702,58 +701,12 @@ test('Validate schema - 2', async () => {
 
     const result = await validator.validate(
         object({
-            date: alias('Date').optional()
+            date: validator.schemas.Date.schema.optional()
         }),
         {}
     );
 
     expect(result).toHaveProperty('valid', true);
-});
-
-test('Not required alternative schema alias', async () => {
-    const validator = new SchemaRegistry()
-        .addSchema('Alternate1', ({ object, string }) =>
-            object({
-                a1: string()
-            })
-        )
-        .addSchema('Alternate2', ({ object, string }) =>
-            object({
-                a2: string()
-            })
-        )
-        .addSchema('Alternate', ({ union, alias }) =>
-            union(alias('Alternate1')).or(alias('Alternate2'))
-        );
-
-    const s = alias('Alternate').optional();
-    let result = await validator.validate(s, undefined);
-
-    expect(result).toHaveProperty('valid', true);
-
-    result = await validator.validate(
-        {
-            type: 'alias',
-            isRequired: false,
-            schemaName: 'Alternate'
-        },
-        {
-            a2: 'something'
-        }
-    );
-
-    expect(result).toHaveProperty('valid', true);
-
-    result = await validator.validate(
-        {
-            type: 'alias',
-            isRequired: false,
-            schemaName: 'Alternate'
-        },
-        'invalid'
-    );
-
-    expect(result).toHaveProperty('valid', false);
 });
 
 test('Preprocessors - 1', async () => {
@@ -772,7 +725,7 @@ test('Preprocessors - 1', async () => {
     );
 
     const schema = object({
-        bornAt: alias('Date')
+        bornAt: validator.schemas.Date.schema
     }).setPropPreprocessor('bornAt', (value: any): Date | undefined => {
         const time = Date.parse((value as Record<string, unknown>).toString());
         if (Number.isNaN(time)) return undefined;
@@ -800,7 +753,7 @@ test('Preprocessors - 2', async () => {
     );
 
     let schema = object({
-        bornAt: alias('Date')
+        bornAt: validator.schemas.Date.schema
     }).setPropPreprocessor('bornAt', 'StringToDate');
 
     validator.addPreprocessor(
@@ -833,8 +786,8 @@ test('Preprocessors - 2', async () => {
     expect(result).toHaveProperty('valid', true);
 
     schema = object({
-        bornAt: alias('Date'),
-        diedAt: alias('Date')
+        bornAt: validator.schemas.Date.schema,
+        diedAt: validator.schemas.Date.schema
     })
         .setPropPreprocessor('bornAt', 'StringToDate')
         .setPropPreprocessor('diedAt', 'Unregistered') as any;
@@ -873,7 +826,9 @@ test('Preprocessors - 3', async () => {
     let obj = [new Date().toJSON()];
 
     let result = await validator.validate(
-        array().ofType(alias('Date')).addPreprocessor('StringToDate'),
+        array()
+            .ofType(validator.schemas.Date.schema)
+            .addPreprocessor('StringToDate'),
         obj
     );
     expect(result).toHaveProperty('valid', true);
@@ -881,7 +836,7 @@ test('Preprocessors - 3', async () => {
     obj = [new Date().toJSON()];
     result = await validator.validate(
         array()
-            .ofType(alias('Date'))
+            .ofType(validator.schemas.Date.schema)
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -896,7 +851,7 @@ test('Preprocessors - 3', async () => {
     obj = ['sdfsdf12', new Date().toJSON()];
     result = await validator.validate(
         array()
-            .ofType(alias('Date'))
+            .ofType(validator.schemas.Date.schema)
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -961,7 +916,9 @@ test('Preprocessors - 4', async () => {
     let obj = [new Date().toJSON()];
 
     let result = await validator.validate(
-        array().ofType(alias('Date')).addPreprocessor('StringToDate'),
+        array()
+            .ofType(validator.schemas.Date.schema)
+            .addPreprocessor('StringToDate'),
         obj
     );
     expect(result).toHaveProperty('valid', true);
@@ -969,7 +926,7 @@ test('Preprocessors - 4', async () => {
     obj = [new Date().toJSON()];
     result = await validator.validate(
         array()
-            .ofType(alias('Date'))
+            .ofType(validator.schemas.Date.schema)
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -984,7 +941,7 @@ test('Preprocessors - 4', async () => {
     obj = ['sdfsdf12', new Date().toJSON()];
     result = await validator.validate(
         array()
-            .ofType(alias('Date'))
+            .ofType(validator.schemas.Date.schema)
             .addPreprocessor((value: unknown): Date | undefined => {
                 const time = Date.parse(
                     (value as Record<string, unknown>).toString()
@@ -1039,23 +996,21 @@ test('Submodules - 3', async () => {
 });
 
 test('Submodules - 4', async () => {
-    const validator = new SchemaRegistry()
-        .addSchema('Module1.Schema1', ({ object, number }) =>
-            object({
-                b: number()
-            })
-        )
-        .addSchema('Module1.Schema2', ({ object, alias }) =>
-            object({
-                a: alias('Module1.Schema3' as any)
-            })
-        );
-
-    await validator.schemas.Module1.Schema2.validate({
-        a: {
-            b: 20
-        }
-    }).catch((e) => expect(e).toBeInstanceOf(Error));
+    try {
+        new SchemaRegistry()
+            .addSchema('Module1.Schema1', ({ object, number }) =>
+                object({
+                    b: number()
+                })
+            )
+            .addSchema('Module1.Schema2', ({ object, alias }) =>
+                object({
+                    a: alias('Module1.Schema3' as any)
+                })
+            );
+    } catch (e) {
+        expect(e).toBeInstanceOf(Error);
+    }
 });
 
 test('No unknown fields - 1', async () => {
@@ -1098,8 +1053,8 @@ test('addSchemaFrom - 1', async () => {
                 last: string()
             })
         )
-        .addSchemaFrom('Person', 'PersonWithEmail', ({ schema, string }) =>
-            schema.addProps({
+        .addSchemaFrom('Person', 'PersonWithEmail', ({ base, string }) =>
+            base.addProps({
                 email: string()
             })
         );
@@ -1168,8 +1123,8 @@ test('no unknown props allowed by default', async () => {
 
     expect(valid).toEqual(false);
 
-    const registry2 = registry.addSchemaFrom('User', 'UserOpen', ({ schema }) =>
-        schema.canHaveUnknownProps()
+    const registry2 = registry.addSchemaFrom('User', 'UserOpen', ({ base }) =>
+        base.canHaveUnknownProps()
     );
 
     const { valid: valid2 } = await registry2.schemas.UserOpen.validate({
@@ -1347,7 +1302,7 @@ test('External Schema - 2', async () => {
             object({
                 name: string().addValidator(() => ({ valid: true })),
                 director: external(validator1, 'person')
-            }).addValidator((v) => ({ valid: true }))
+            }).addValidator(() => ({ valid: true }))
     );
 
     const result = await validator2.schemas.company.validate({

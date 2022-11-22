@@ -5,7 +5,6 @@ import {
 } from './schema.js';
 import SchemaRegistry from './schemaRegistry.js';
 
-import { alias } from './builders/AliasSchemaBuilder.js';
 import { array } from './builders/ArraySchemaBuilder.js';
 import { boolean } from './builders/BooleanSchemaBuilder.js';
 import { number } from './builders/NumberSchemaBuilder.js';
@@ -55,7 +54,6 @@ export interface ISchemaRegistry<T extends Record<string, any>> {
 export { SchemaRegistry };
 export default {
     SchemaRegistry,
-    alias,
     array,
     boolean,
     number,
@@ -65,14 +63,4 @@ export default {
     func
 };
 
-export {
-    alias,
-    array,
-    boolean,
-    number,
-    object,
-    string,
-    union,
-    func,
-    InferType
-};
+export { array, boolean, number, object, string, union, func, InferType };

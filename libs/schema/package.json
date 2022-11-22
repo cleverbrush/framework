@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/schema",
-    "version": "0.0.17",
+    "version": "1.0.0-beta.4",
     "keywords": [
         "object schema validator",
         "schema",
@@ -8,6 +8,10 @@
     ],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD",
+    "files": [
+        "*",
+        "dist/*"
+    ],
     "main": "./dist/index.js",
     "readme": "https://github.com/cleverbrush/libs/tree/master/libs/schema#readme",
     "repository": {
@@ -19,7 +23,7 @@
         "build": "tsc"
     },
     "devDependencies": {
-        "@cleverbrush/deep": "0.0.17"
+        "@cleverbrush/deep": "1.0.0-beta.4"
     },
     "types": "./dist/index.d.ts"
 }

@@ -1,5 +1,4 @@
 import { ISchemaBuilder } from './builders/SchemaBuilder.js';
-import { IAliasSchemaBuilder } from './builders/AliasSchemaBuilder.js';
 import { IUnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
 import { IStringSchemaBuilder } from './builders/StringSchemaBuilder.js';
 import { IObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
@@ -179,25 +178,11 @@ export type Schema<T = any> = T extends Record<string, any>
     ? BooleanSchema | boolean
     : number | DefaultSchemaType | SchemaSpecification | Schema[];
 
-export type MakeOptional<T> = T extends IAliasSchemaBuilder<
-    infer TSchemaName,
+export type MakeOptional<T> = T extends IUnionSchemaBuilder<
     infer TRequired,
     infer TNullable,
-    infer TAliases,
-    infer TAliasesCompiledType
+    infer TVariants
 >
-    ? IAliasSchemaBuilder<
-          TSchemaName,
-          false,
-          TNullable,
-          TAliases,
-          TAliasesCompiledType
-      >
-    : T extends IUnionSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TVariants
-      >
     ? IUnionSchemaBuilder<false, TNullable, TVariants>
     : T extends IStringSchemaBuilder<
           infer TRequired,
@@ -259,25 +244,11 @@ export type MakeOptional<T> = T extends IAliasSchemaBuilder<
     ? IFunctionSchemaBuilder<false, TNullable>
     : T & { isRequired: false };
 
-export type MakeRequired<T> = T extends IAliasSchemaBuilder<
-    infer TSchemaName,
+export type MakeRequired<T> = T extends IUnionSchemaBuilder<
     infer TRequired,
     infer TNullable,
-    infer TAliases,
-    infer TAliasesCompiledType
+    infer TVariants
 >
-    ? IAliasSchemaBuilder<
-          TSchemaName,
-          true,
-          TNullable,
-          TAliases,
-          TAliasesCompiledType
-      >
-    : T extends IUnionSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TVariants
-      >
     ? IUnionSchemaBuilder<true, TNullable, TVariants>
     : T extends IStringSchemaBuilder<
           infer TRequired,
@@ -339,25 +310,11 @@ export type MakeRequired<T> = T extends IAliasSchemaBuilder<
     ? IFunctionSchemaBuilder<true, TNullable>
     : T & { isRequired: true };
 
-export type MakeNullable<T> = T extends IAliasSchemaBuilder<
-    infer TSchemaName,
+export type MakeNullable<T> = T extends IUnionSchemaBuilder<
     infer TRequired,
     infer TNullable,
-    infer TAliases,
-    infer TAliasesCompiledType
+    infer TVariants
 >
-    ? IAliasSchemaBuilder<
-          TSchemaName,
-          TRequired,
-          true,
-          TAliases,
-          TAliasesCompiledType
-      >
-    : T extends IUnionSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TVariants
-      >
     ? IUnionSchemaBuilder<TRequired, true, TVariants>
     : T extends IStringSchemaBuilder<
           infer TRequired,
@@ -419,25 +376,11 @@ export type MakeNullable<T> = T extends IAliasSchemaBuilder<
     ? IFunctionSchemaBuilder<TRequired, true>
     : T & { isNullable: true };
 
-export type MakeNotNullable<T> = T extends IAliasSchemaBuilder<
-    infer TSchemaName,
+export type MakeNotNullable<T> = T extends IUnionSchemaBuilder<
     infer TRequired,
     infer TNullable,
-    infer TAliases,
-    infer TAliasesCompiledType
+    infer TVariants
 >
-    ? IAliasSchemaBuilder<
-          TSchemaName,
-          TRequired,
-          false,
-          TAliases,
-          TAliasesCompiledType
-      >
-    : T extends IUnionSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TVariants
-      >
     ? IUnionSchemaBuilder<TRequired, false, TVariants>
     : T extends IStringSchemaBuilder<
           infer TRequired,
@@ -504,7 +447,7 @@ export type ExpandUnionVariants<TVariants extends any[]> = TVariants extends [
 ]
     ? [ExpandSchemaBuilder<T>]
     : TVariants extends [infer T, ...infer Rest]
-    ? [ExpandSchemaBuilder<T>, ExpandUnionVariants<[...Rest]>]
+    ? [ExpandSchemaBuilder<T>, ...ExpandUnionVariants<[...Rest]>]
     : never;
 
 export type ExpandSchemaBuilder<TSchema> = TSchema extends [
@@ -588,21 +531,6 @@ export type ExpandSchemaBuilder<TSchema> = TSchema extends [
                       undefined
                   >
             : INumberSchemaBuilder
-        : TType extends 'alias'
-        ? TParams extends [
-              infer TSchemaName extends string,
-              infer TRequired extends boolean,
-              infer TNullable extends boolean,
-              infer TAliasesCompiledType
-          ]
-            ? IAliasSchemaBuilder<
-                  TSchemaName,
-                  TRequired,
-                  TNullable,
-                  any,
-                  TAliasesCompiledType
-              >
-            : IAliasSchemaBuilder<any>
         : TType extends 'array'
         ? TParams extends [
               infer TRequired extends boolean,
@@ -699,19 +627,6 @@ export type ReduceSchemaBuilder<TBuilder> =
               TEnsureNotNaN,
               TEnsureIsFinite,
               TEqualsTo
-          ]
-        : TBuilder extends IAliasSchemaBuilder<
-              infer TSchemaName,
-              infer TRequired,
-              infer TNullable,
-              infer TAliases
-          >
-        ? [
-              'alias',
-              TSchemaName,
-              TRequired,
-              TNullable,
-              InferType<ExpandSchemaBuilder<TAliases[TSchemaName]>>
           ]
         : TBuilder extends IArraySchemaBuilder<
               infer TRequired,
@@ -849,16 +764,6 @@ export type InferType<S> = S extends DefaultSchemaType
     ? TRequired extends true
         ? InferType<TVariants>
         : InferType<TVariants> | undefined
-    : S extends IAliasSchemaBuilder<
-          infer TSchemaName,
-          infer TRequired,
-          infer TNullable,
-          infer TAliases,
-          infer TAliasesCompiledType
-      >
-    ? TRequired extends true
-        ? TAliasesCompiledType
-        : TAliasesCompiledType | undefined
     : S extends IArraySchemaBuilder<
           infer TRequired,
           infer TNullable,
