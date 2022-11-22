@@ -7,6 +7,7 @@ export interface IJobRepository {
     getJobs(): Promise<Job[]>;
     getJobById(jobId: string): Promise<Job>;
     createJob(item: AddJobRequest): Promise<Job>;
+    removeJob(jobId: string): Promise<void>;
 
     saveJob(job: Job): Promise<Job>;
 
@@ -34,6 +35,12 @@ export class InMemoryJobRepository implements IJobRepository {
 
     async getJobs(): Promise<Job[]> {
         return this._jobs;
+    }
+
+    async removeJob(jobId: string) {
+        const job = this.getJobById(jobId);
+        if (!job) throw new Error(`job with id ${jobId} doesn't exist`);
+        this._jobs = this._jobs.filter((j) => j.id !== jobId);
     }
 
     async createJob(item: AddJobRequest): Promise<Job> {

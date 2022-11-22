@@ -62,8 +62,8 @@ const registry = new SchemaRegistry()
     .addSchemaFrom(
         'Templates.Schedule',
         'Models.TaskScheduleMinute',
-        ({ string, schema }) =>
-            schema
+        ({ string, base }) =>
+            base
                 .removeProp('hour')
                 .removeProp('minute')
                 .addProps({
@@ -74,8 +74,8 @@ const registry = new SchemaRegistry()
     .addSchemaFrom(
         'Templates.Schedule',
         'Models.TaskScheduleDay',
-        ({ string, schema }) =>
-            schema.addProps({
+        ({ string, base }) =>
+            base.addProps({
                 /** Repeat every day */
                 every: string('day')
             })
@@ -83,8 +83,8 @@ const registry = new SchemaRegistry()
     .addSchemaFrom(
         'Templates.Schedule',
         'Models.TaskScheduleWeek',
-        ({ schema, number, string, array }) =>
-            schema.addProps({
+        ({ base, number, string, array }) =>
+            base.addProps({
                 /** Repeat every week */
                 every: string('week'),
                 /** Day of week: array of no more than 7 numbers numbers (from 1 to 7 where 1 is Monday). */
@@ -112,8 +112,8 @@ const registry = new SchemaRegistry()
     .addSchemaFrom(
         'Templates.Schedule',
         'Models.TaskScheduleMonth',
-        ({ schema, string, number, union }) =>
-            schema.addProps({
+        ({ base, string, number, union }) =>
+            base.addProps({
                 /** Repeat every month */
                 every: string('month'),
                 /** Day - 'last' or number from 1 to 28 */
@@ -123,8 +123,8 @@ const registry = new SchemaRegistry()
     .addSchemaFrom(
         'Templates.Schedule',
         'Models.TaskScheduleYear',
-        ({ schema, string, number, union }) =>
-            schema.addProps({
+        ({ base, string, number, union }) =>
+            base.addProps({
                 /** Repeat every year */
                 every: string('year'),
                 /** Day - 'last' or number from 1 to 28 */
@@ -158,8 +158,10 @@ export const schemaRegistry = registry
                 timeout: number().min(0).optional(),
                 /** Arbitrary props for job (can be a callback returning props or Promise<props>) */
                 props: union(object().canHaveUnknownProps(), func()).optional(),
-                /** Job will be considered as disabled when more than that count of runs fails consequently */
-                maxConsequentFails: number().min(0).optional()
+                /** Job will be considered as disabled when more than that count of runs fails consequently
+                 * unlimited if negative
+                 */
+                maxConsequentFails: number().optional()
             })
     );
 

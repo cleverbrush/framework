@@ -1,11 +1,15 @@
 {
     "name": "@cleverbrush/scheduler",
-    "version": "0.0.17",
+    "version": "1.0.0-beta.4",
     "keywords": [
         "task scheduler"
     ],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD",
+    "files": [
+        "*",
+        "dist/*"
+    ],
     "main": "./dist/index.js",
     "readme": "https://github.com/cleverbrush/libs/tree/master/libs/scheduler#readme",
     "scripts": {
@@ -17,7 +21,7 @@
         "url": "github:cleverbrush/libs"
     },
     "dependencies": {
-        "@cleverbrush/schema": "0.0.17"
+        "@cleverbrush/schema": "1.0.0-beta.4"
     },
     "types": "./dist/index.d.ts"
 }

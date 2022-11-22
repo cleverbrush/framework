@@ -26,8 +26,10 @@ export { ScheduleCalculator, Schedule as TaskSchedule, Schemas };
 type WorkerResult = {
     status: JobInstanceStatus;
     exitCode: number;
+    error?: Error;
 };
 
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB
 const CHECK_INTERVAL = 1000 * 10; // every 10 seconds
 // const SCHEDULE_JOB_SPAN = 1000 * 60 * 60; // 1 hour
 const SCHEDULE_JOB_SPAN = 1000 * 60; // 1 hour
@@ -46,13 +48,22 @@ type JobEndItem = JobStartItem & {
     endDate: Date;
 };
 
+type JobErrorItem = JobStartItem & {
+    endDate: Date;
+    error?: Error;
+};
+
 type Events = {
     'job:start': (job: JobStartItem) => any;
     'job:end': (job: JobEndItem) => any;
+    'job:error': (job: JobErrorItem) => any;
+    'job:timeout': (job: JobErrorItem) => any;
 };
 
 interface IJobScheduler {
     on<T extends keyof Events>(name: T, callback: Events[T]): this;
+    addJob(job: CreateJobRequest): Promise<void>;
+    removeJob(id: string): Promise<void>;
 }
 
 export class JobScheduler extends EventEmitter implements IJobScheduler {
@@ -110,6 +121,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         const promise = new Promise<WorkerResult>((resolve) => {
             let timedOut = false;
             let isFinished = false;
+            let error;
 
             const timeoutTimer = setTimeout(() => {
                 if (isFinished) return;
@@ -121,7 +133,9 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
                 });
             }, timeout);
 
-            worker.on('error', (e) => e);
+            worker.on('error', (e) => {
+                error = e;
+            });
 
             worker.on('exit', (exitCode) => {
                 if (isFinished) return;
@@ -130,7 +144,8 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
                 isFinished = true;
                 resolve({
                     status: exitCode === 0 ? 'succeeded' : 'errored',
-                    exitCode
+                    exitCode,
+                    error
                 });
             });
         });
@@ -184,16 +199,38 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
                 job.timeout
             );
 
-            const stdOutPass = new PassThrough();
-            stdout.pipe(stdOutPass);
-            const stdErrPass = new PassThrough();
-            stderr.pipe(stdErrPass);
+            const stdOutPass = stdout.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
+            const stdErrPass = stderr.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
 
-            const stdOutForJobStart = stdout.pipe(new PassThrough());
-            const stdErrForJobStart = stderr.pipe(new PassThrough());
+            const stdOutForJobStart = stdout.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
+            const stdErrForJobStart = stderr.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
 
-            const stdOutForJobEnd = stdout.pipe(new PassThrough());
-            const stdErrForJobEnd = stderr.pipe(new PassThrough());
+            const stdOutForJobEnd = stdout.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
+            const stdErrForJobEnd = stderr.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
 
             this.emit('job:start', {
                 instanceId: instance.id,
@@ -209,17 +246,43 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             const result = await promise;
             status = result.status;
             exitCode = result.exitCode;
+            const { error } = result;
 
             const endDate = new Date();
 
-            this.emit('job:end', {
-                instanceId: instance.id,
-                jobId: job.id,
-                stderr: stdErrForJobEnd,
-                stdout: stdOutForJobEnd,
-                startDate,
-                endDate
-            } as JobStartItem);
+            switch (status) {
+                case 'errored':
+                    this.emit('job:error', {
+                        instanceId: instance.id,
+                        jobId: job.id,
+                        stderr: stdErrForJobEnd,
+                        stdout: stdOutForJobEnd,
+                        startDate,
+                        endDate,
+                        error
+                    } as JobErrorItem);
+                    break;
+                case 'timedout':
+                    this.emit('job:timeout', {
+                        instanceId: instance.id,
+                        jobId: job.id,
+                        stderr: stdErrForJobEnd,
+                        stdout: stdOutForJobEnd,
+                        startDate,
+                        endDate,
+                        error
+                    } as JobErrorItem);
+                    break;
+                default:
+                    this.emit('job:end', {
+                        instanceId: instance.id,
+                        jobId: job.id,
+                        stderr: stdErrForJobEnd,
+                        stdout: stdOutForJobEnd,
+                        startDate,
+                        endDate
+                    } as JobStartItem);
+            }
 
             instance = await this._jobsRepository.saveInstance({
                 ...instance,
@@ -241,7 +304,10 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             const schedule = await this.getJobSchedule(job);
 
             if (status !== 'succeeded') {
-                if (job.consequentFailsCount + 1 >= job.maxConsequentFails) {
+                if (
+                    job.consequentFailsCount + 1 >= job.maxConsequentFails &&
+                    job.maxConsequentFails > 0
+                ) {
                     job.status = 'disabled';
                 } else {
                     job.consequentFailsCount += 1;
@@ -286,7 +352,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
             timer = setTimeout(async () => {
                 const actualJob = await this._jobsRepository.getJobById(job.id);
-                if (actualJob.status !== 'active') {
+                if (!actualJob || actualJob.status !== 'active') {
                     instance.status = 'canceled';
                     await this._jobsRepository.saveInstance(instance);
                     return;
@@ -319,6 +385,8 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
                 while (schedule.hasNext(SCHEDULE_JOB_SPAN)) {
                     const { date: nextRun, index } = schedule.next();
+                    if (nextRun < new Date()) continue;
+
                     const alreadyScheduled = scheduledInstances.find(
                         (i) => i.index === index
                     );
@@ -357,6 +425,18 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
         this.status = 'stopped';
         // TODO: add logic
+    }
+
+    public async jobExists(jobId: string): Promise<boolean> {
+        return (await this._jobsRepository.getJobById(jobId)) !== null;
+    }
+
+    public async removeJob(jobId: string): Promise<void> {
+        if (typeof jobId !== 'string' || !jobId) {
+            throw new Error('id is required');
+        }
+
+        await this._jobsRepository.removeJob(jobId);
     }
 
     public async addJob(job: CreateJobRequest) {
