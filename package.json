@@ -1,7 +1,7 @@
 {
     "name": "cleverbrush-utils",
     "private": "true",
-    "version": "0.0.17",
+    "version": "1.0.0-beta.4",
     "description": "",
     "scripts": {
         "clean": "npm run clean_async && npm run clean_deep && npm run clean_schema && npm run clean_scheduler",
@@ -9,13 +9,18 @@
         "clean_deep": "rm -rf libs/deep/dist",
         "clean_schema": "rm -rf libs/schema/dist",
         "clean_scheduler": "rm -rf libs/scheduler/dist",
-        "build": "npm run build_async && npm run build_deep && npm run build_schema && npm run build_scheduler",
+        "build": "npm run clean && npm run build_async && npm run build_deep && npm run build_schema && npm run build_scheduler",
         "build_async": "cd libs/async && npm run build",
         "build_deep": "cd libs/deep && npm run build",
         "build_schema": "cd libs/schema && npm run build",
         "build_scheduler": "cd libs/scheduler && npm run build",
+        "build_async:beta": "cd libs/async && npm run build && cd ../..",
+        "build_deep:beta": "cd libs/deep && npm run build && cd ../..",
+        "build_schema:beta": "cd libs/schema && npm run build && cd ../..",
+        "build_scheduler:beta": "cd libs/scheduler && npm run build && cd ../..",
         "prettier": "npx prettier --write ./libs",
         "publish": "npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public && npm publish --workspace @cleverbrush/async --access=public && npm publish --workspace @cleverbrush/scheduler --access=public",
+        "publish:beta": "npm run clean && npm run build_deep:beta && npm publish --tag beta --workspace @cleverbrush/deep --access=public && npm run build_async:beta && npm publish --tag beta --workspace @cleverbrush/async --access=public && npm run build_schema:beta && npm publish --tag beta --workspace @cleverbrush/schema --access=public && npm run build_scheduler:beta &&  npm publish --tag beta --workspace @cleverbrush/scheduler --access=public",
         "run_scheduler": "node ./libs/scheduler/dist/index.js",
         "test": "jest"
     },
