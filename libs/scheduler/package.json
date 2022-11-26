@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/scheduler",
-    "version": "1.0.0-beta.4",
+    "version": "1.0.0-beta.5",
     "keywords": [
         "task scheduler"
     ],
@@ -21,7 +21,7 @@
         "url": "github:cleverbrush/libs"
     },
     "dependencies": {
-        "@cleverbrush/schema": "1.0.0-beta.4"
+        "@cleverbrush/schema": "1.0.0-beta.5"
     },
     "types": "./dist/index.d.ts"
 }

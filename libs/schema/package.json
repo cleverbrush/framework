@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/schema",
-    "version": "1.0.0-beta.4",
+    "version": "1.0.0-beta.5",
     "keywords": [
         "object schema validator",
         "schema",
@@ -23,7 +23,7 @@
         "build": "tsc"
     },
     "devDependencies": {
-        "@cleverbrush/deep": "1.0.0-beta.4"
+        "@cleverbrush/deep": "1.0.0-beta.5"
     },
     "types": "./dist/index.d.ts"
 }

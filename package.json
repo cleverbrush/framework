@@ -1,7 +1,7 @@
 {
     "name": "cleverbrush-utils",
     "private": "true",
-    "version": "1.0.0-beta.4",
+    "version": "1.0.0-beta.5",
     "description": "",
     "scripts": {
         "clean": "npm run clean_async && npm run clean_deep && npm run clean_schema && npm run clean_scheduler",
