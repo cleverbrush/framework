@@ -2,6 +2,7 @@ import { deepEqual } from '@cleverbrush/deep';
 
 import { Schema } from '../schema.js';
 import { func } from './FunctionSchemaBuilder.js';
+import { InferType } from '../schema.js';
 
 test('Clean', () => {
     const schema = func();
@@ -131,4 +132,14 @@ test('Clone', () => {
     expect(equal).toEqual(false);
     const equal2 = deepEqual(schema1._schema, schema2._schema);
     expect(equal2).toEqual(true);
+});
+
+test('Map to type', () => {
+    const schema1 = func();
+    const schema2 = schema1.mapToType<(name: string) => number>();
+
+    // test of type inference
+    const callback: InferType<typeof schema2> = (name: string): number => 10;
+
+    expect(schema1 === schema2).toEqual(true);
 });

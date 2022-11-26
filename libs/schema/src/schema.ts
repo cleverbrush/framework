@@ -306,8 +306,12 @@ export type MakeRequired<T> = T extends IUnionSchemaBuilder<
           infer TEqualsTo
       >
     ? IBooleanSchemaBuilder<true, TNullable, TEqualsTo>
-    : T extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
-    ? IFunctionSchemaBuilder<true, TNullable>
+    : T extends IFunctionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMapToType
+      >
+    ? IFunctionSchemaBuilder<true, TNullable, TMapToType>
     : T & { isRequired: true };
 
 export type MakeNullable<T> = T extends IUnionSchemaBuilder<
@@ -372,8 +376,12 @@ export type MakeNullable<T> = T extends IUnionSchemaBuilder<
           infer TEqualsTo
       >
     ? IBooleanSchemaBuilder<TRequired, true, TEqualsTo>
-    : T extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
-    ? IFunctionSchemaBuilder<TRequired, true>
+    : T extends IFunctionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMapToType
+      >
+    ? IFunctionSchemaBuilder<TRequired, true, TMapToType>
     : T & { isNullable: true };
 
 export type MakeNotNullable<T> = T extends IUnionSchemaBuilder<
@@ -438,8 +446,12 @@ export type MakeNotNullable<T> = T extends IUnionSchemaBuilder<
           infer TEqualsTo
       >
     ? IBooleanSchemaBuilder<TRequired, false, TEqualsTo>
-    : T extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
-    ? IFunctionSchemaBuilder<TRequired, false>
+    : T extends IFunctionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMapToType
+      >
+    ? IFunctionSchemaBuilder<TRequired, false, TMapToType>
     : T & { isNullable: false };
 
 export type ExpandUnionVariants<TVariants extends any[]> = TVariants extends [
@@ -574,9 +586,10 @@ export type ExpandSchemaBuilder<TSchema> = TSchema extends [
         : TType extends 'function'
         ? TParams extends [
               infer TRequired extends boolean,
-              infer TNullable extends boolean
+              infer TNullable extends boolean,
+              infer TMapToType
           ]
-            ? IFunctionSchemaBuilder<TRequired, TNullable>
+            ? IFunctionSchemaBuilder<TRequired, TNullable, TMapToType>
             : IFunctionSchemaBuilder
         : TSchema
     : TSchema;
@@ -657,9 +670,10 @@ export type ReduceSchemaBuilder<TBuilder> =
         ? ['boolean', TRequired, TNullable, TEqualsTo]
         : TBuilder extends IFunctionSchemaBuilder<
               infer TRequired,
-              infer TNullable
+              infer TNullable,
+              infer TMapToType
           >
-        ? ['function', TRequired, TNullable]
+        ? ['function', TRequired, TNullable, TMapToType]
         : TBuilder extends [infer F]
         ? [ReduceSchemaBuilder<F>]
         : TBuilder extends [infer F, ...infer Rest]
@@ -778,10 +792,18 @@ export type InferType<S> = S extends DefaultSchemaType
         : TOfType extends undefined
         ? any[] | undefined
         : InferType<TOfType>[] | undefined
-    : S extends IFunctionSchemaBuilder<infer TRequired, infer TNullable>
-    ? TRequired extends true
-        ? Function
-        : Function | undefined
+    : S extends IFunctionSchemaBuilder<
+          infer TRequired,
+          infer TNullable,
+          infer TMapToType
+      >
+    ? TMapToType extends undefined
+        ? TRequired extends true
+            ? Function
+            : Function | undefined
+        : TRequired extends true
+        ? TMapToType
+        : TMapToType | undefined
     : S extends StringSchema
     ? S['equals'] extends undefined
         ? string

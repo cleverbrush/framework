@@ -4,17 +4,20 @@ import { defaultSchemas } from '../defaultSchemas.js';
 
 export interface IFunctionSchemaBuilder<
     TRequired extends boolean = true,
-    TNullable extends boolean = false
+    TNullable extends boolean = false,
+    TMapToType = undefined
 > extends ISchemaBuilder<TRequired, TNullable> {
-    optional(): IFunctionSchemaBuilder<false, TNullable>;
-    required(): IFunctionSchemaBuilder<true, TNullable>;
-    nullable(): IFunctionSchemaBuilder<TRequired, true>;
-    notNullable(): IFunctionSchemaBuilder<TRequired, false>;
+    optional(): IFunctionSchemaBuilder<false, TNullable, TMapToType>;
+    required(): IFunctionSchemaBuilder<true, TNullable, TMapToType>;
+    nullable(): IFunctionSchemaBuilder<TRequired, true, TMapToType>;
+    notNullable(): IFunctionSchemaBuilder<TRequired, false, TMapToType>;
+    mapToType<T>(): IFunctionSchemaBuilder<TRequired, TNullable, T>;
 }
 
 export class FunctionSchemaBuilder<
         TRequired extends boolean = true,
-        TNullable extends boolean = false
+        TNullable extends boolean = false,
+        TMapToType = undefined
     >
     extends SchemaBuilder<TRequired, TNullable>
     implements IFunctionSchemaBuilder<TRequired, TNullable>
@@ -34,9 +37,14 @@ export class FunctionSchemaBuilder<
         return FunctionSchemaBuilder.create(this._schema as any) as this;
     }
 
+    public mapToType<T>(): IFunctionSchemaBuilder<TRequired, TNullable, T> {
+        return this as any;
+    }
+
     public static create<
         TRequired extends boolean = true,
-        TNullable extends boolean = false
+        TNullable extends boolean = false,
+        TMapToType = undefined
     >(obj?: {
         isRequired: TRequired;
         isNullable: TNullable;
@@ -44,7 +52,7 @@ export class FunctionSchemaBuilder<
         preprocessor?:
             | ((value: unknown) => unknown | Promise<unknown>)
             | string;
-    }): IFunctionSchemaBuilder<TRequired, TNullable> {
+    }): IFunctionSchemaBuilder<TRequired, TNullable, TMapToType> {
         return new FunctionSchemaBuilder(obj as any);
     }
 
@@ -64,9 +72,9 @@ export class FunctionSchemaBuilder<
         }
     }
 
-    optional(): IFunctionSchemaBuilder<false, TNullable> {
+    optional(): IFunctionSchemaBuilder<false, TNullable, TMapToType> {
         if (this.isRequired === false) {
-            return this as IFunctionSchemaBuilder<false, TNullable>;
+            return this as any;
         }
         return FunctionSchemaBuilder.create({
             ...(this._schema as any),
@@ -74,9 +82,9 @@ export class FunctionSchemaBuilder<
         });
     }
 
-    required(): IFunctionSchemaBuilder<true, TNullable> {
+    required(): IFunctionSchemaBuilder<true, TNullable, TMapToType> {
         if (this.isRequired === true) {
-            return this as IFunctionSchemaBuilder<true, TNullable>;
+            return this as any;
         }
         return FunctionSchemaBuilder.create({
             ...(this._schema as any),
@@ -84,9 +92,9 @@ export class FunctionSchemaBuilder<
         });
     }
 
-    nullable(): IFunctionSchemaBuilder<TRequired, true> {
+    nullable(): IFunctionSchemaBuilder<TRequired, true, TMapToType> {
         if (this.isNullable === true) {
-            return this as IFunctionSchemaBuilder<TRequired, true>;
+            return this as any;
         }
         return FunctionSchemaBuilder.create({
             ...(this._schema as any),
@@ -94,9 +102,9 @@ export class FunctionSchemaBuilder<
         });
     }
 
-    notNullable(): IFunctionSchemaBuilder<TRequired, false> {
+    notNullable(): IFunctionSchemaBuilder<TRequired, false, TMapToType> {
         if (this.isNullable === false) {
-            return this as IFunctionSchemaBuilder<TRequired, false>;
+            return this as any;
         }
         return FunctionSchemaBuilder.create({
             ...(this._schema as any),
