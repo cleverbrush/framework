@@ -35,6 +35,7 @@ const CHECK_INTERVAL = 1000 * 10; // every 10 seconds
 const SCHEDULE_JOB_SPAN = 1000 * 60; // 1 hour
 const DEFAULT_JOB_TIMEOUT = 1000 * 20; // 20 seconds
 const DEFAULT_MAX_CONSEQUENT_FAILS = 3;
+const DEFAULT_MAX_RETRIES = 2;
 
 type JobStartItem = {
     jobId: string;
@@ -53,11 +54,16 @@ type JobErrorItem = JobStartItem & {
     error?: Error;
 };
 
+type JobMessageItem = Omit<JobStartItem, 'stdout' | 'stderr'> & {
+    value: any;
+};
+
 type Events = {
     'job:start': (job: JobStartItem) => any;
     'job:end': (job: JobEndItem) => any;
     'job:error': (job: JobErrorItem) => any;
     'job:timeout': (job: JobErrorItem) => any;
+    'job:message': (msg: JobMessageItem) => any;
 };
 
 interface IJobScheduler {
@@ -102,7 +108,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         }
 
         if (typeof job.successfullTimesRunned === 'number') {
-            schedule.startingFromIndex = job.successfullTimesRunned + 1;
+            schedule.skipFirst = job.successfullTimesRunned - 1;
         }
 
         const res = new ScheduleCalculator(schedule);
@@ -152,8 +158,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
         return {
             promise,
-            stderr: worker.stderr,
-            stdout: worker.stdout
+            worker
         };
     }
 
@@ -193,44 +198,53 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
                 status: 'running'
             });
 
-            const { promise, stderr, stdout } = this.runWorkerWithTimeout(
+            const { promise, worker } = this.runWorkerWithTimeout(
                 fileName,
                 finalProps,
                 job.timeout
             );
 
-            const stdOutPass = stdout.pipe(
+            const stdOutPass = worker.stdout.pipe(
                 new PassThrough({
                     highWaterMark: MAX_BUFFER_SIZE
                 })
             );
-            const stdErrPass = stderr.pipe(
-                new PassThrough({
-                    highWaterMark: MAX_BUFFER_SIZE
-                })
-            );
-
-            const stdOutForJobStart = stdout.pipe(
-                new PassThrough({
-                    highWaterMark: MAX_BUFFER_SIZE
-                })
-            );
-            const stdErrForJobStart = stderr.pipe(
+            const stdErrPass = worker.stderr.pipe(
                 new PassThrough({
                     highWaterMark: MAX_BUFFER_SIZE
                 })
             );
 
-            const stdOutForJobEnd = stdout.pipe(
+            const stdOutForJobStart = worker.stdout.pipe(
                 new PassThrough({
                     highWaterMark: MAX_BUFFER_SIZE
                 })
             );
-            const stdErrForJobEnd = stderr.pipe(
+            const stdErrForJobStart = worker.stderr.pipe(
                 new PassThrough({
                     highWaterMark: MAX_BUFFER_SIZE
                 })
             );
+
+            const stdOutForJobEnd = worker.stdout.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
+            const stdErrForJobEnd = worker.stderr.pipe(
+                new PassThrough({
+                    highWaterMark: MAX_BUFFER_SIZE
+                })
+            );
+
+            worker.on('message', (value) => {
+                this.emit('job:message', {
+                    instanceId: instance.id,
+                    jobId: job.id,
+                    startDate,
+                    value
+                });
+            });
 
             this.emit('job:start', {
                 instanceId: instance.id,
@@ -323,8 +337,11 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
             await this._jobsRepository.saveJob(job);
 
-            if (shouldRetry) {
-                await this.startJobInstance(instance);
+            if (shouldRetry && instance.retryIndex < instance.maxRetries) {
+                await this.startJobInstance({
+                    ...instance,
+                    retryIndex: instance.retryIndex + 1
+                });
             }
         }
     }
@@ -347,7 +364,9 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
                 scheduledTo: date,
                 status: 'scheduled',
                 timeout: job.timeout,
-                index
+                index,
+                retryIndex: 0,
+                maxRetries: job.maxRetries
             });
 
             timer = setTimeout(async () => {
@@ -467,7 +486,11 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             maxConsequentFails:
                 typeof job.maxConsequentFails === 'number'
                     ? job.maxConsequentFails
-                    : DEFAULT_MAX_CONSEQUENT_FAILS
+                    : DEFAULT_MAX_CONSEQUENT_FAILS,
+            maxRetries:
+                typeof job.maxRetries === 'number'
+                    ? job.maxRetries
+                    : DEFAULT_MAX_RETRIES
         });
     }
 

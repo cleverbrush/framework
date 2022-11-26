@@ -86,7 +86,7 @@ test('day - 4', () => {
         interval: 2,
         startsOn: new Date(Date.UTC(2022, 9, 12, 21, 0, 0, 0)),
         endsOn: new Date(Date.UTC(2022, 11, 12, 0, 0, 0, 0)),
-        startingFromIndex: 3,
+        skipFirst: 2,
         maxOccurences: 10
     });
 
@@ -102,8 +102,10 @@ test('day - 4', () => {
     ];
 
     for (let i = 0; i < results.length; i++) {
-        expect(calculator.hasNext()).toEqual(true);
-        expect(calculator.next().date.getTime()).toEqual(results[i].getTime());
+        const hasNext = calculator.hasNext();
+        expect(hasNext).toEqual(true);
+        const next = calculator.next();
+        expect(next.date.getTime()).toEqual(results[i].getTime());
     }
 
     expect(calculator.hasNext()).toEqual(false);

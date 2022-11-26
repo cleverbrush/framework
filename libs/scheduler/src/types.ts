@@ -40,8 +40,8 @@ const registry = new SchemaRegistry()
             endsOn: alias('Common.Date').optional(),
             /** Max number of repeats (min 1) */
             maxOccurences: number().min(1).optional(),
-            /** Skip this number of repeats - 1. Min value is 1.  */
-            startingFromIndex: number().min(1).optional()
+            /** Skip this number of repeats. Min value is 1.  */
+            skipFirst: number().min(1).optional()
         })
             .setPropPreprocessor('endsOn', 'StringToDate')
             .addValidator((val) => {
@@ -161,7 +161,11 @@ export const schemaRegistry = registry
                 /** Job will be considered as disabled when more than that count of runs fails consequently
                  * unlimited if negative
                  */
-                maxConsequentFails: number().optional()
+                maxConsequentFails: number().optional(),
+                /**
+                 * Job will be retried right away this times. Job will be retried on next schedule run if this number is exceeded.
+                 */
+                maxRetries: number().optional().min(1)
             })
     );
 
@@ -188,6 +192,7 @@ export type Job = {
     successfullTimesRunned?: number;
     consequentFailsCount: number;
     maxConsequentFails: number;
+    maxRetries: number;
 };
 
 export type JobInstance = {
@@ -202,6 +207,8 @@ export type JobInstance = {
     stdOut?: string;
     stdErr?: string;
     exitCode?: number;
+    retryIndex: number;
+    maxRetries: number;
 };
 
 export type JobSchedulerProps = {

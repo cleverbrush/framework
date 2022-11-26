@@ -86,9 +86,12 @@ export class ScheduleCalculator {
             this.#hasNext = true;
         }
 
-        let leftToSkip = this.#schedule.startingFromIndex || 1;
+        let leftToSkip =
+            typeof this.#schedule.skipFirst === 'number'
+                ? this.#schedule.skipFirst
+                : 0;
 
-        while (leftToSkip-- > 1 && this.#hasNext) {
+        while (leftToSkip-- > 0 && this.#hasNext) {
             this.next();
         }
     }
