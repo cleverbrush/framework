@@ -1,789 +1,337 @@
-import { ISchemaBuilder, SchemaBuilder } from './SchemaBuilder.js';
-import { defaultSchemas } from '../defaultSchemas.js';
-import { Schema, Validator } from '../schema.js';
+import {
+    Preprocessor,
+    SchemaBuilder,
+    ValidationResult,
+    ValidationContext,
+    Validator
+} from './SchemaBuilder.js';
 
-export interface INumberSchemaBuilder<
-    TRequired extends boolean = true,
-    TNullable extends boolean = false,
-    TMin extends number | undefined = undefined,
-    TMax extends number | undefined = undefined,
-    TIsInteger extends boolean | undefined = undefined,
-    TEnsureNotNaN extends boolean = true,
-    TEnsureIsFinite extends boolean = true,
-    TEqualsTo extends number | undefined = undefined
-> extends ISchemaBuilder<TRequired, TNullable> {
-    min<K extends number>(
-        val: K
-    ): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        K,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    clearMin(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        undefined,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    max<K extends number>(
-        val: K
-    ): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        K,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    clearMax(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        undefined,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    optional(): INumberSchemaBuilder<
-        false,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    required(): INumberSchemaBuilder<
-        true,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    nullable(): INumberSchemaBuilder<
-        TRequired,
-        true,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    notNullable(): INumberSchemaBuilder<
-        TRequired,
-        false,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    equals<T extends number>(
-        val: T
-    ): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        T
-    >;
-    clearEquals(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        undefined
-    >;
-    isInteger(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        true,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    canBeNotInteger(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        undefined,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    notNaN(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        true,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-    canBeNaN(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        false,
-        TEnsureIsFinite,
-        TEqualsTo
-    >;
-
-    isFinite(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        true,
-        TEqualsTo
-    >;
-    canBeInfinite(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        false,
-        TEqualsTo
-    >;
-}
+type NumberSchemaBuilderCreateProps<
+    T = number,
+    R extends boolean = true
+> = Partial<ReturnType<NumberSchemaBuilder<T, R>['introspect']>>;
 
 export class NumberSchemaBuilder<
-        TRequired extends boolean = true,
-        TNullable extends boolean = false,
-        TMin extends number | undefined = undefined,
-        TMax extends number | undefined = undefined,
-        TIsInteger extends boolean | undefined = undefined,
-        TEnsureNotNaN extends boolean = true,
-        TEnsureIsFinite extends boolean = true,
-        TEqualsTo extends number | undefined = undefined
-    >
-    extends SchemaBuilder<TRequired, TNullable>
-    implements
-        INumberSchemaBuilder<
-            TRequired,
-            TNullable,
-            TMin,
-            TMax,
-            TIsInteger,
-            TEnsureNotNaN,
-            TEnsureIsFinite,
-            TEqualsTo
-        >
-{
-    public clone(): this {
-        return NumberSchemaBuilder.create(this._schema as any) as this;
-    }
+    TResult = number,
+    TRequired extends boolean = true
+> extends SchemaBuilder<TResult, TRequired> {
+    #min?: number;
+    #max?: number;
+    #equalsTo?: number;
+    #ensureNotNaN = true;
+    #ensureIsFinite = true;
+    #isInteger = true;
 
-    public get _schema(): Schema {
-        return Object.assign(
-            {
-                type: this.type,
-                ensureNotNaN: this._ensureNotNaN,
-                ensureIsFinite: this._ensureIsFinite
-            },
-            this.getCommonSchema(),
-            typeof this._min !== 'undefined' ? { min: this._min } : {},
-            typeof this._max !== 'undefined' ? { max: this._max } : {},
-            typeof this._isInteger !== 'undefined'
-                ? { isInteger: this._isInteger }
-                : {},
-            typeof this._equals !== 'undefined' ? { equals: this._equals } : {}
-        );
-    }
-
-    public static create<
-        TRequired extends boolean = true,
-        TNullable extends boolean = false,
-        TMin extends number | undefined = undefined,
-        TMax extends number | undefined = undefined,
-        TIsInteger extends boolean | undefined = undefined,
-        TEnsureNotNaN extends boolean = true,
-        TEnsureIsFinite extends boolean = true,
-        TEqualsTo extends number | undefined = undefined
-    >(obj?: {
-        isRequired: TRequired;
-        isNullable: TNullable;
-        min: TMin;
-        max: TMax;
-        isInteger: TIsInteger;
-        ensureNotNaN: TEnsureNotNaN;
-        ensureIsFinite: TEnsureIsFinite;
-        equals: TEqualsTo;
-        validators?: Validator[];
-        preprocessor?:
-            | ((value: unknown) => unknown | Promise<unknown>)
-            | string;
-    }): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        return new NumberSchemaBuilder(obj as any);
-    }
-
-    private constructor(obj: {
-        isRequired: TRequired;
-        isNullable: TNullable;
-        min: TMin;
-        max: TMax;
-        isInteger: TIsInteger;
-        ensureNotNaN: TEnsureNotNaN;
-        ensureIsFinite: TEnsureIsFinite;
-        equals: TEqualsTo;
-        validators?: Validator[];
-        preprocessor?:
-            | ((value: unknown) => unknown | Promise<unknown>)
-            | string;
-    }) {
-        super(obj);
-        if (typeof obj === 'object' && obj) {
-            if (typeof obj.min !== 'undefined') {
-                this._min = obj.min;
-            }
-            if (typeof obj.max !== 'undefined') {
-                this._max = obj.max;
-            }
-            if (typeof obj.isInteger !== 'undefined') {
-                this._isInteger = obj.isInteger;
-            }
-            if (typeof obj.ensureNotNaN !== 'undefined') {
-                this._ensureNotNaN = obj.ensureNotNaN;
-            }
-            if (typeof obj.ensureIsFinite !== 'undefined') {
-                this._ensureIsFinite = obj.ensureIsFinite;
-            }
-            if (typeof obj.equals !== 'undefined') {
-                this._equals = obj.equals;
-            }
-        } else {
-            const defaultSchema = defaultSchemas['number'] as any;
-            this.isRequired = defaultSchema.isRequired;
-            this.isNullable = defaultSchema.isNullable;
-            this._ensureNotNaN = defaultSchema.ensureNotNaN;
-            this._ensureIsFinite = defaultSchema.ensureIsFinite;
-        }
-    }
-
-    protected readonly type = 'number';
-
-    _min?: TMin;
-    _max?: TMax;
-    _isInteger?: TIsInteger;
-    _ensureNotNaN: TEnsureNotNaN = true as TEnsureNotNaN;
-    _ensureIsFinite: TEnsureIsFinite = true as TEnsureIsFinite;
-    _equals?: TEqualsTo;
-
-    min<K extends number>(
-        val: K
-    ): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        K,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if ((this._min as any) === val) {
-            return this as any as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                K,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            min: val
+    public static create(props: NumberSchemaBuilderCreateProps) {
+        return new NumberSchemaBuilder({
+            type: 'number',
+            ...props
         });
     }
 
-    clearMin(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        undefined,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (typeof this._min === 'undefined') {
-            return this as any as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                undefined,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
+    private constructor(props: NumberSchemaBuilderCreateProps) {
+        super(props as any);
+
+        if (typeof props.min === 'number') {
+            this.#min = props.min;
         }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            min: undefined
-        });
+
+        if (typeof props.max === 'number') {
+            this.#max = props.max;
+        }
+
+        if (typeof props.ensureNotNaN === 'boolean') {
+            this.#ensureNotNaN = props.ensureNotNaN;
+        }
+
+        if (typeof props.ensureIsFinite === 'boolean') {
+            this.#ensureIsFinite = props.ensureIsFinite;
+        }
+
+        if (typeof props.isInteger === 'boolean') {
+            this.#isInteger = props.isInteger;
+        }
+
+        if (
+            typeof props.equalsTo === 'number' ||
+            typeof props.equalsTo === 'undefined'
+        ) {
+            this.#equalsTo = props.equalsTo;
+        }
     }
 
-    max<K extends number>(
-        val: K
-    ): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        K,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if ((this._max as any) === val) {
-            return this as any as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                K,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            max: val
-        });
+    public introspect() {
+        return {
+            ...super.introspect(),
+            min: this.#min,
+            max: this.#max,
+            ensureNotNaN: this.#ensureNotNaN,
+            ensureIsFinite: this.#ensureIsFinite,
+            equalsTo: this.#equalsTo,
+            isInteger: this.#isInteger,
+            preprocessors: this.preprocessors as Preprocessor<TResult>[],
+            validators: this.validators as Validator<TResult>[]
+        };
     }
 
-    clearMax(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        undefined,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (typeof this._max === 'undefined') {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                undefined,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            max: undefined
-        });
+    public hasType<T>(notUsed?: T): NumberSchemaBuilder<T, true> {
+        return this.createFromProps({
+            ...this.introspect()
+        } as any) as any;
     }
 
-    optional(): INumberSchemaBuilder<
-        false,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (this.isRequired === false) {
-            return this as INumberSchemaBuilder<
-                false,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            isRequired: false
-        }) as INumberSchemaBuilder<
-            false,
-            TNullable,
-            TMin,
-            TMax,
-            TIsInteger,
-            TEnsureNotNaN,
-            TEnsureIsFinite,
-            TEqualsTo
-        >;
+    public clearHasType(): NumberSchemaBuilder<number, TRequired> {
+        return this.createFromProps({
+            ...this.introspect()
+        } as any) as any;
     }
 
-    required(): INumberSchemaBuilder<
-        true,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (this.isRequired === true) {
-            return this as INumberSchemaBuilder<
-                true,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
+    public async validate(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        const superResult = await super.preValidate(object, context);
+
+        const {
+            valid,
+            object: objToValidate,
+            context: prevalidationContext
+        } = superResult;
+
+        const { path } = prevalidationContext;
+
+        if (!valid) {
+            return superResult;
         }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            isRequired: true
-        });
+
+        if (
+            (typeof objToValidate === 'undefined' || objToValidate === null) &&
+            this.isRequired === false
+        ) {
+            return {
+                valid: true,
+                object: objToValidate
+            };
+        }
+        if (typeof objToValidate !== 'number')
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: `expected type number, but saw ${typeof objToValidate}`,
+                        path: path as string
+                    }
+                ]
+            };
+
+        if (
+            typeof this.#equalsTo !== 'undefined' &&
+            objToValidate !== this.#equalsTo
+        ) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: `is expected to be equal to ${this.#equalsTo}`,
+                        path: path as string
+                    }
+                ]
+            };
+        }
+
+        if (this.#ensureNotNaN && Number.isNaN(objToValidate)) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'is not expected to be NaN',
+                        path: path as string
+                    }
+                ]
+            };
+        }
+
+        if (
+            this.#ensureIsFinite &&
+            !Number.isFinite(objToValidate) &&
+            this.#ensureNotNaN &&
+            !Number.isNaN(objToValidate)
+        ) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'is expected to be a finite number',
+                        path: path as string
+                    }
+                ]
+            };
+        }
+
+        if (
+            this.#isInteger &&
+            !Number.isNaN(objToValidate) &&
+            Number.isFinite(objToValidate) &&
+            !Number.isInteger(objToValidate)
+        ) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: `is expected to be integer`,
+                        path: path as string
+                    }
+                ]
+            };
+        }
+
+        if (typeof this.#min !== 'undefined') {
+            if (objToValidate < this.#min)
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message: `expected to be at least ${this.#min}`,
+                            path: path as string
+                        }
+                    ]
+                };
+        }
+
+        if (typeof this.#max !== 'undefined') {
+            if (objToValidate > this.#max)
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message: `expected to be no more than ${this.#max}`,
+                            path: path as string
+                        }
+                    ]
+                };
+        }
+
+        return {
+            valid: true,
+            object: objToValidate as TResult
+        };
     }
 
-    nullable(): INumberSchemaBuilder<
-        TRequired,
-        true,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (this.isNullable === true) {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                true,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            isNullable: true
-        });
+    public setType<T>(notUsed?: T): NumberSchemaBuilder<T, true> {
+        return this.createFromProps({
+            ...this.introspect()
+        }) as any;
     }
 
-    notNullable(): INumberSchemaBuilder<
-        TRequired,
-        false,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (this.isNullable === false) {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                false,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            isNullable: false
-        }) as INumberSchemaBuilder<
-            TRequired,
-            false,
-            TMin,
-            TMax,
-            TIsInteger,
-            TEnsureNotNaN,
-            TEnsureIsFinite,
-            TEqualsTo
-        >;
+    protected createFromProps<T, TReq extends boolean>(
+        props: NumberSchemaBuilderCreateProps<T, TReq>
+    ): this {
+        return NumberSchemaBuilder.create(props as any) as any;
     }
 
-    equals<T extends number>(
-        val: T
-    ): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        T
-    > {
-        if ((this._equals as any) === val) {
-            return this as any as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                T
-            >;
-        }
-
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            equals: val as T
-        });
+    public equals<T extends number, R = NumberSchemaBuilder<T, TRequired>>(
+        value: T
+    ): R {
+        if (typeof value !== 'number') throw new Error('number expected');
+        return this.createFromProps({
+            ...this.introspect(),
+            equalsTo: value
+        }) as any;
     }
 
-    clearEquals(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        undefined
-    > {
-        if (typeof this._equals === 'undefined') {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                undefined
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            equals: undefined
-        });
+    public clearEquals(): NumberSchemaBuilder<number, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
+            equalsTo: undefined
+        }) as any;
     }
 
-    isInteger(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        true,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (this._isInteger === true) {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                true,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
+    public isFloat(): NumberSchemaBuilder<TResult, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
+            isInteger: false
+        }) as any;
+    }
+
+    public isInteger(): NumberSchemaBuilder<TResult, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
             isInteger: true
-        });
+        }) as any;
     }
 
-    canBeNotInteger(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        undefined,
-        TEnsureNotNaN,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (typeof this._isInteger === 'undefined') {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                undefined,
-                TEnsureNotNaN,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
-            isInteger: undefined
-        });
+    public required(): NumberSchemaBuilder<TResult, true> {
+        return super.required();
     }
 
-    notNaN(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        true,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (this._ensureNotNaN === true) {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                true,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
+    public optional(): NumberSchemaBuilder<TResult, false> {
+        return super.optional();
+    }
+
+    public notNaN(): NumberSchemaBuilder<TResult, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
             ensureNotNaN: true
         });
     }
 
-    canBeNaN(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        false,
-        TEnsureIsFinite,
-        TEqualsTo
-    > {
-        if (this._ensureNotNaN === false) {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                false,
-                TEnsureIsFinite,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
+    public canBeNaN(): NumberSchemaBuilder<TResult, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
             ensureNotNaN: false
         });
     }
 
-    isFinite(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        true,
-        TEqualsTo
-    > {
-        if (this._ensureIsFinite === true) {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                true,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
+    public isFinite(): NumberSchemaBuilder<TResult, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
             ensureIsFinite: true
         });
     }
 
-    canBeInfinite(): INumberSchemaBuilder<
-        TRequired,
-        TNullable,
-        TMin,
-        TMax,
-        TIsInteger,
-        TEnsureNotNaN,
-        false,
-        TEqualsTo
-    > {
-        if (this._ensureIsFinite === false) {
-            return this as INumberSchemaBuilder<
-                TRequired,
-                TNullable,
-                TMin,
-                TMax,
-                TIsInteger,
-                TEnsureNotNaN,
-                false,
-                TEqualsTo
-            >;
-        }
-        return NumberSchemaBuilder.create({
-            ...(this._schema as any),
+    public canBeInfinite(): NumberSchemaBuilder<TResult, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
             ensureIsFinite: false
         });
     }
+
+    public min(minValue: number): NumberSchemaBuilder<TResult, TRequired> {
+        if (typeof minValue !== 'number')
+            throw new Error('minValue must be a number');
+        return this.createFromProps({
+            ...this.introspect(),
+            min: minValue
+        }) as any;
+    }
+
+    public clearMin(): NumberSchemaBuilder<TResult, TRequired> {
+        const schema = this.introspect();
+        delete schema.min;
+        return this.createFromProps({
+            ...schema
+        }) as any;
+    }
+
+    public max(maxValue: number): NumberSchemaBuilder<TResult, TRequired> {
+        if (typeof maxValue !== 'number')
+            throw new Error('maxValue must be a number');
+        return this.createFromProps({
+            ...this.introspect(),
+            max: maxValue
+        }) as any;
+    }
+
+    public clearMax(): NumberSchemaBuilder<TResult, TRequired> {
+        const schema = this.introspect();
+        delete schema.max;
+        return this.createFromProps({
+            ...schema
+        }) as any;
+    }
 }
 
-export const number = () => NumberSchemaBuilder.create();
+export const number = () =>
+    NumberSchemaBuilder.create({
+        isRequired: true
+    });

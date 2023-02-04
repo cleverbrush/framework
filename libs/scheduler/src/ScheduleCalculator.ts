@@ -323,6 +323,7 @@ export class ScheduleCalculator {
 
         if (typeof span !== 'number') return this.#hasNext;
 
+        if (!this.#next) return false;
         return this.#next.getTime() - new Date().getTime() <= span;
     }
 

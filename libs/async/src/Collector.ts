@@ -25,17 +25,17 @@ export default class Collector<
     ): this {
         return super.on(event, listener);
     }
-    #collectionResults = null;
+    #collectionResults: Record<keyof T, unknown>;
 
     #leftToCollect = 0;
 
-    #timeoutTimer = null;
+    #timeoutTimer;
 
     #isTimedOut = false;
 
-    #promiseResolve = null;
+    #promiseResolve: (...args: any[]) => any;
 
-    #promiseReject = null;
+    #promiseReject: (...args: any[]) => any;
 
     constructor(keys: K[], timeout = -1) {
         super();
@@ -43,7 +43,7 @@ export default class Collector<
             throw new Error('keys must be of time Array<String>');
 
         this.#leftToCollect = Object.keys(keys).length;
-        this.#collectionResults = {};
+        this.#collectionResults = {} as any;
 
         if (typeof timeout === 'number' && timeout > 0) {
             this.#timeoutTimer = setTimeout(() => {
@@ -68,7 +68,7 @@ export default class Collector<
     }
 
     collect<L extends K>(key: L, value: T[L]): this {
-        if (this.#isTimedOut) return;
+        if (this.#isTimedOut) return this;
         // if value is Promise - await it and collect its result
         Promise.resolve(value)
             .then((result) => {

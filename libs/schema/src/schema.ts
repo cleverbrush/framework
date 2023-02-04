@@ -680,165 +680,165 @@ export type ReduceSchemaBuilder<TBuilder> =
         ? [ReduceSchemaBuilder<F>, ...ReduceSchemaBuilder<Rest>]
         : TBuilder;
 
-export type InferType<S> = S extends DefaultSchemaType
-    ? S extends 'string'
-        ? string
-        : S extends 'boolean'
-        ? boolean
-        : S extends 'number'
-        ? number
-        : S extends 'array'
-        ? Array<any>
-        : S extends 'object'
-        ? Record<string, never>
-        : S extends 'function'
-        ? Function
-        : never
-    : S extends number
-    ? S
-    : S extends BooleanSchema
-    ? S['equals'] extends undefined
-        ? boolean
-        : S['equals']
-    : S extends UnionSchema<infer K>
-    ? InferType<K>
-    : S extends { type: 'union'; variants: infer K }
-    ? K extends any[]
-        ? InferType<K>
-        : any
-    : S extends IObjectSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TNoUnknownProperties,
-          infer TProperties,
-          infer TMapToType
-      >
-    ? TMapToType extends undefined
-        ? InferType<
-              CommonSchemaSpecification<TRequired, TNullable> & {
-                  type: 'object';
-              } & (TNoUnknownProperties extends true
-                      ? { noUnknownProperties: true }
-                      : { noUnknownProperties: false }) &
-                  (TProperties extends Record<string, any>
-                      ? {
-                            properties: TProperties;
-                        }
-                      : {})
-          >
-        : TMapToType
-    : S extends INumberSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TMin,
-          infer TMax,
-          infer TIsInteger,
-          infer TEnsureNotNaN,
-          infer TEnsureIsFinite,
-          infer TEqualsTo
-      >
-    ? TRequired extends true
-        ? TEqualsTo extends undefined
-            ? number
-            : TEqualsTo
-        : TEqualsTo extends undefined
-        ? number | undefined
-        : TEqualsTo | undefined
-    : S extends IBooleanSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TEqualsTo
-      >
-    ? TRequired extends true
-        ? TEqualsTo extends undefined
-            ? boolean
-            : TEqualsTo
-        : TEqualsTo extends undefined
-        ? boolean | undefined
-        : TEqualsTo | undefined
-    : S extends IStringSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TMinLength,
-          infer TMaxLength,
-          infer TEqualsTo
-      >
-    ? TRequired extends true
-        ? TEqualsTo extends undefined
-            ? string
-            : TEqualsTo
-        : TEqualsTo extends undefined
-        ? string | undefined
-        : TEqualsTo | undefined
-    : S extends IUnionSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TVariants
-      >
-    ? TRequired extends true
-        ? InferType<TVariants>
-        : InferType<TVariants> | undefined
-    : S extends IArraySchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TOfType,
-          infer TMaxLength,
-          infer TMinLength
-      >
-    ? TRequired extends true
-        ? TOfType extends undefined
-            ? any[]
-            : InferType<TOfType>[]
-        : TOfType extends undefined
-        ? any[] | undefined
-        : InferType<TOfType>[] | undefined
-    : S extends IFunctionSchemaBuilder<
-          infer TRequired,
-          infer TNullable,
-          infer TMapToType
-      >
-    ? TMapToType extends undefined
-        ? TRequired extends true
-            ? Function
-            : Function | undefined
-        : TRequired extends true
-        ? TMapToType
-        : TMapToType | undefined
-    : S extends StringSchema
-    ? S['equals'] extends undefined
-        ? string
-        : S['equals']
-    : S extends NumberSchema
-    ? S['equals'] extends undefined
-        ? number
-        : S['equals']
-    : S extends ObjectSchema<infer K>
-    ? OptionalPropertiesOf<K> extends never
-        ? { [k in keyof K]: InferType<K[k]> }
-        : MakePropOptional<
-              { [k in keyof K]: InferType<K[k]> },
-              OptionalPropertiesOf<K>
-          >
-    : S extends { type: 'object'; properties: infer K }
-    ? OptionalPropertiesOf<K> extends never
-        ? { [k in keyof K]: InferType<K[k]> }
-        : MakePropOptional<
-              { [k in keyof K]: InferType<K[k]> },
-              OptionalPropertiesOf<K>
-          >
-    : S extends [infer F]
-    ? InferType<F>
-    : S extends [infer F, ...infer Rest]
-    ? InferType<F> | InferType<Rest>
-    : S extends ArraySchema<infer L>
-    ? InferType<L> extends never
-        ? Array<any>
-        : InferType<L>[]
-    : S extends { type: 'array'; ofType: infer L }
-    ? InferType<L>[]
-    : S extends { type: 'array' }
-    ? Array<any>
-    : any;
+// export type InferType<S> = S extends DefaultSchemaType
+//     ? S extends 'string'
+//         ? string
+//         : S extends 'boolean'
+//         ? boolean
+//         : S extends 'number'
+//         ? number
+//         : S extends 'array'
+//         ? Array<any>
+//         : S extends 'object'
+//         ? Record<string, never>
+//         : S extends 'function'
+//         ? Function
+//         : never
+//     : S extends number
+//     ? S
+//     : S extends BooleanSchema
+//     ? S['equals'] extends undefined
+//         ? boolean
+//         : S['equals']
+//     : S extends UnionSchema<infer K>
+//     ? InferType<K>
+//     : S extends { type: 'union'; variants: infer K }
+//     ? K extends any[]
+//         ? InferType<K>
+//         : any
+//     : S extends IObjectSchemaBuilder<
+//           infer TRequired,
+//           infer TNullable,
+//           infer TNoUnknownProperties,
+//           infer TProperties,
+//           infer TMapToType
+//       >
+//     ? TMapToType extends undefined
+//         ? InferType<
+//               CommonSchemaSpecification<TRequired, TNullable> & {
+//                   type: 'object';
+//               } & (TNoUnknownProperties extends true
+//                       ? { noUnknownProperties: true }
+//                       : { noUnknownProperties: false }) &
+//                   (TProperties extends Record<string, any>
+//                       ? {
+//                             properties: TProperties;
+//                         }
+//                       : {})
+//           >
+//         : TMapToType
+//     : S extends INumberSchemaBuilder<
+//           infer TRequired,
+//           infer TNullable,
+//           infer TMin,
+//           infer TMax,
+//           infer TIsInteger,
+//           infer TEnsureNotNaN,
+//           infer TEnsureIsFinite,
+//           infer TEqualsTo
+//       >
+//     ? TRequired extends true
+//         ? TEqualsTo extends undefined
+//             ? number
+//             : TEqualsTo
+//         : TEqualsTo extends undefined
+//         ? number | undefined
+//         : TEqualsTo | undefined
+//     : S extends IBooleanSchemaBuilder<
+//           infer TRequired,
+//           infer TNullable,
+//           infer TEqualsTo
+//       >
+//     ? TRequired extends true
+//         ? TEqualsTo extends undefined
+//             ? boolean
+//             : TEqualsTo
+//         : TEqualsTo extends undefined
+//         ? boolean | undefined
+//         : TEqualsTo | undefined
+//     : S extends IStringSchemaBuilder<
+//           infer TRequired,
+//           infer TNullable,
+//           infer TMinLength,
+//           infer TMaxLength,
+//           infer TEqualsTo
+//       >
+//     ? TRequired extends true
+//         ? TEqualsTo extends undefined
+//             ? string
+//             : TEqualsTo
+//         : TEqualsTo extends undefined
+//         ? string | undefined
+//         : TEqualsTo | undefined
+//     : S extends IUnionSchemaBuilder<
+//           infer TRequired,
+//           infer TNullable,
+//           infer TVariants
+//       >
+//     ? TRequired extends true
+//         ? InferType<TVariants>
+//         : InferType<TVariants> | undefined
+//     : S extends IArraySchemaBuilder<
+//           infer TRequired,
+//           infer TNullable,
+//           infer TOfType,
+//           infer TMaxLength,
+//           infer TMinLength
+//       >
+//     ? TRequired extends true
+//         ? TOfType extends undefined
+//             ? any[]
+//             : InferType<TOfType>[]
+//         : TOfType extends undefined
+//         ? any[] | undefined
+//         : InferType<TOfType>[] | undefined
+//     : S extends IFunctionSchemaBuilder<
+//           infer TRequired,
+//           infer TNullable,
+//           infer TMapToType
+//       >
+//     ? TMapToType extends undefined
+//         ? TRequired extends true
+//             ? Function
+//             : Function | undefined
+//         : TRequired extends true
+//         ? TMapToType
+//         : TMapToType | undefined
+//     : S extends StringSchema
+//     ? S['equals'] extends undefined
+//         ? string
+//         : S['equals']
+//     : S extends NumberSchema
+//     ? S['equals'] extends undefined
+//         ? number
+//         : S['equals']
+//     : S extends ObjectSchema<infer K>
+//     ? OptionalPropertiesOf<K> extends never
+//         ? { [k in keyof K]: InferType<K[k]> }
+//         : MakePropOptional<
+//               { [k in keyof K]: InferType<K[k]> },
+//               OptionalPropertiesOf<K>
+//           >
+//     : S extends { type: 'object'; properties: infer K }
+//     ? OptionalPropertiesOf<K> extends never
+//         ? { [k in keyof K]: InferType<K[k]> }
+//         : MakePropOptional<
+//               { [k in keyof K]: InferType<K[k]> },
+//               OptionalPropertiesOf<K>
+//           >
+//     : S extends [infer F]
+//     ? InferType<F>
+//     : S extends [infer F, ...infer Rest]
+//     ? InferType<F> | InferType<Rest>
+//     : S extends ArraySchema<infer L>
+//     ? InferType<L> extends never
+//         ? Array<any>
+//         : InferType<L>[]
+//     : S extends { type: 'array'; ofType: infer L }
+//     ? InferType<L>[]
+//     : S extends { type: 'array' }
+//     ? Array<any>
+//     : any;
 
 type OptionalPropertiesOf<T> = {
     [k in keyof T]: T[k] extends ISchemaBuilder<infer TRequired, any>
