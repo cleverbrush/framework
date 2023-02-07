@@ -100,21 +100,33 @@ export const transaction = <T extends {}>(
     };
 
     if (Array.isArray(initial)) {
-	const result = initial.map(el => typeof el === 'object' && el && !shouldNotWrapWithTransaction(el) ? transaction(el).object : el);
-	const commitArray = () => result.map(el =>
-	   el && typeof el[TRANSACTION_SYMBOL] === 'object' ? el[TRANSACTION_SYMBOL].commit() : el);
-	result[TRANSACTION_SYMBOL] = {
-		initial,
-		object: result,
-		commit: commitArray as any,
-		rollback: () => initial
-	};
-	return {
-	   object: result as any,
-	   commit: commitArray as any,
-	   rollback: () => initial,
-	   isDirty
-	};
+        const result = initial.map((el) =>
+            typeof el === 'object' && el && !shouldNotWrapWithTransaction(el)
+                ? transaction(el).object
+                : el
+        );
+        const commitArray = () =>
+            result.map((el) =>
+                el && typeof el[TRANSACTION_SYMBOL] === 'object'
+                    ? el[TRANSACTION_SYMBOL].commit()
+                    : el
+            );
+        Object.defineProperty(result, TRANSACTION_SYMBOL, {
+            writable: false,
+            configurable: false,
+            value: {
+                initial,
+                object: result,
+                commit: commitArray as any,
+                rollback: () => initial
+            }
+        });
+        return {
+            object: result as any,
+            commit: commitArray as any,
+            rollback: () => initial,
+            isDirty
+        };
     }
 
     const proxy = new Proxy<T>(initial, {
@@ -157,7 +169,7 @@ export const transaction = <T extends {}>(
             if (typeof prop === 'symbol') {
                 if (prop === TRANSACTION_SYMBOL) {
                     return {
-			initial,
+                        initial,
                         object: proxy,
                         commit,
                         rollback

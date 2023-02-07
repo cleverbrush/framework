@@ -384,10 +384,14 @@ test('array - 1', () => {
 
 test('array - 2', () => {
     const initial = {
-       first: 'value',
-       second: [100, 'str', {
-	nested1: 11
-       }]
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11
+            }
+        ]
     };
 
     const { object, commit } = transaction(initial);
@@ -396,29 +400,105 @@ test('array - 2', () => {
     object.second.push(200);
 
     expect(object).toEqual({
-	    first: 'value',
-	    second: [100, 'str', {
-		    nested1: 11,
-		    nested2: 12
-	    },
-	    200]
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11,
+                nested2: 12
+            },
+            200
+        ]
     });
     expect(initial).toEqual({
-       first: 'value',
-       second: [100, 'str', {
-	nested1: 11
-       }]
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11
+            }
+        ]
     });
 
     const result = commit();
 
     expect(result).toEqual({
-	    first: 'value',
-	    second: [100, 'str', {
-		    nested1: 11,
-		    nested2: 12
-	    },
-	    200]
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11,
+                nested2: 12
+            },
+            200
+        ]
+    });
+});
+
+test('array - 3', () => {
+    const initial = {
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11
+            }
+        ]
+    };
+
+    const { object, rollback } = transaction(initial);
+
+    (object as any).second[2].nested2 = 12;
+    object.second.push(200);
+
+    expect(object).toEqual({
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11,
+                nested2: 12
+            },
+            200
+        ]
+    });
+    expect(initial).toEqual({
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11
+            }
+        ]
     });
 
+    const result = rollback();
+
+    expect(initial).toEqual({
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11
+            }
+        ]
+    });
+
+    expect(result).toEqual({
+        first: 'value',
+        second: [
+            100,
+            'str',
+            {
+                nested1: 11
+            }
+        ]
+    });
 });
