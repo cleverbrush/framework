@@ -378,6 +378,47 @@ test('array - 1', () => {
 
     commit();
 
-    expect(object.length).toEqual(3);
+    expect(object.length).toEqual(4);
     expect(initial.length).toEqual(3);
+});
+
+test('array - 2', () => {
+    const initial = {
+       first: 'value',
+       second: [100, 'str', {
+	nested1: 11
+       }]
+    };
+
+    const { object, commit } = transaction(initial);
+
+    (object as any).second[2].nested2 = 12;
+    object.second.push(200);
+
+    expect(object).toEqual({
+	    first: 'value',
+	    second: [100, 'str', {
+		    nested1: 11,
+		    nested2: 12
+	    },
+	    200]
+    });
+    expect(initial).toEqual({
+       first: 'value',
+       second: [100, 'str', {
+	nested1: 11
+       }]
+    });
+
+    const result = commit();
+
+    expect(result).toEqual({
+	    first: 'value',
+	    second: [100, 'str', {
+		    nested1: 11,
+		    nested2: 12
+	    },
+	    200]
+    });
+
 });
