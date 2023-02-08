@@ -504,21 +504,167 @@ test('array - 3', () => {
 });
 
 test('cyclic - 1', () => {
-   const initial = {
-   } as any;
+    const initial = {} as any;
 
-   const child = {
-	parent: initial
-   };
+    const child = {
+        parent: initial
+    };
 
-   initial.child = child;
+    initial.child = child;
 
-   const { object, commit } = transaction(initial);
+    const { object, commit } = transaction(initial);
 
-   object.nn = 100;
+    object.nn = 100;
 
-   const result = commit();
+    const result = commit();
 
-   expect(result).toHaveProperty('nn');
-   expect(result).toHaveProperty('child.parent.child');
+    expect(result).toHaveProperty('nn');
+    expect(result).toHaveProperty('child.parent.child');
+});
+
+test('isDirty - 1', () => {
+    const initial = {
+        val1: 1,
+        val2: '2'
+    };
+
+    const { object, isDirty, commit, rollback } = transaction(initial);
+
+    expect(isDirty()).toEqual(false);
+
+    object.val2 = 'new val';
+
+    expect(isDirty()).toEqual(true);
+
+    object.val2 = '2';
+
+    expect(isDirty()).toEqual(false);
+
+    object.val2 = 'new val 2';
+
+    expect(isDirty()).toEqual(true);
+
+    commit();
+
+    expect(isDirty()).toEqual(false);
+
+    object.val2 = 'new val 3';
+
+    expect(isDirty()).toEqual(true);
+
+    rollback();
+
+    expect(isDirty()).toEqual(false);
+});
+
+test('isDirty - 2', () => {
+    const nested = {
+        val2: '2'
+    };
+    const initial = {
+        val1: 1,
+        nested
+    };
+
+    const { object, isDirty, commit, rollback } = transaction(initial);
+
+    expect(isDirty()).toEqual(false);
+
+    object.nested.val2 = 'new val';
+
+    expect(isDirty()).toEqual(true);
+
+    object.nested.val2 = '2';
+
+    expect(isDirty()).toEqual(false);
+
+    object.nested.val2 = 'new val 2';
+
+    expect(isDirty()).toEqual(true);
+
+    commit();
+
+    expect(isDirty()).toEqual(false);
+
+    object.nested.val2 = 'new val 3';
+
+    expect(isDirty()).toEqual(true);
+
+    rollback();
+
+    expect(isDirty()).toEqual(false);
+});
+
+test('isDirty - 3', () => {
+    const nested = {
+        val2: '2'
+    };
+    const initial = {
+        val1: 1,
+        nested
+    };
+
+    const { object, isDirty, commit, rollback } = transaction(initial);
+
+    expect(isDirty()).toEqual(false);
+
+    object.nested = { val2: 'new val' };
+
+    expect(isDirty()).toEqual(true);
+
+    object.nested = nested;
+
+    expect(isDirty()).toEqual(false);
+
+    object.nested = { val2: 'new val 2' };
+
+    expect(isDirty()).toEqual(true);
+
+    commit();
+
+    expect(isDirty()).toEqual(false);
+
+    object.nested = { val2: 'new val 3' };
+
+    expect(isDirty()).toEqual(true);
+
+    rollback();
+
+    expect(isDirty()).toEqual(false);
+});
+
+test('isDirty - 4', () => {
+    const arr = [{ name: 'Ivanov' }, { name: 'Petrov' }, { name: 'Sidorov' }];
+    const initial = {
+        val1: 1,
+        arr
+    };
+
+    const { object, isDirty, commit, rollback } = transaction(initial);
+
+    expect(isDirty()).toEqual(false);
+
+    object.arr[1].name = 'Kuznetsov';
+
+    expect(isDirty()).toEqual(true);
+
+    object.arr[1].name = 'Petrov';
+
+    expect(isDirty()).toEqual(false);
+
+    object.arr[1].name = 'Kuznetsov';
+
+    expect(isDirty()).toEqual(true);
+
+    commit();
+
+    expect(isDirty()).toEqual(false);
+
+    object.arr[1].name = 'Kuznetsov';
+
+    expect(isDirty()).toEqual(true);
+
+    rollback();
+
+    expect(isDirty()).toEqual(false);
 });
