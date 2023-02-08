@@ -502,3 +502,23 @@ test('array - 3', () => {
         ]
     });
 });
+
+test('cyclic - 1', () => {
+   const initial = {
+   } as any;
+
+   const child = {
+	parent: initial
+   };
+
+   initial.child = child;
+
+   const { object, commit } = transaction(initial);
+
+   object.nn = 100;
+
+   const result = commit();
+
+   expect(result).toHaveProperty('nn');
+   expect(result).toHaveProperty('child.parent.child');
+});
