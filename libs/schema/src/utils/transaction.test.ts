@@ -660,7 +660,7 @@ test('isDirty - 4', () => {
 
     expect(isDirty()).toEqual(false);
 
-    object.arr[1].name = 'Kuznetsov';
+    object.arr[1].name = 'Petrov';
 
     expect(isDirty()).toEqual(true);
 

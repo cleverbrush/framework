@@ -59,7 +59,12 @@ export const transaction = <T extends {}>(
         options as Required<TransactionOptions>;
 
     const isDirty = () =>
-        Object.keys(newProperties).find(key => newProperties[key] && newProperties[key][TRANSACTION_SYMBOL] ? newProperties[key][TRANSACTION_SYMBOL].isDirty() : true) || deletedProperties.size > 0 as any;
+        !!Object.keys(newProperties).find((key) => {
+            if (newProperties[key] && newProperties[key][TRANSACTION_SYMBOL]) {
+                return newProperties[key][TRANSACTION_SYMBOL].isDirty();
+            }
+            return true;
+        }) || ((deletedProperties.size > 0) as any);
 
     const commit = () => {
         Object.keys(newProperties).forEach((key) => {
@@ -111,6 +116,15 @@ export const transaction = <T extends {}>(
                     ? el[TRANSACTION_SYMBOL].commit()
                     : el
             );
+
+        const isDirtyArray = () => {
+            return !!result.find((val, index) => {
+                if (val && typeof val[TRANSACTION_SYMBOL] === 'object') {
+                    return val[TRANSACTION_SYMBOL].isDirty();
+                }
+                return result[index] !== initial[index];
+            });
+        };
         Object.defineProperty(result, TRANSACTION_SYMBOL, {
             writable: false,
             configurable: false,
@@ -118,23 +132,24 @@ export const transaction = <T extends {}>(
                 initial,
                 object: result,
                 commit: commitArray as any,
-                rollback: () => initial
+                rollback: () => initial,
+                isDirty: isDirtyArray
             }
         });
         return {
             object: result as any,
             commit: commitArray as any,
             rollback: () => initial,
-            isDirty
+            isDirty: isDirtyArray
         };
     }
 
     const proxy = new Proxy<T>(initial, {
         set: (target, property, value) => {
-	    if(target && target[property] === value) {
-	      delete newProperties[property];
-	      return true;
-	    }
+            if (target && target[property] === value) {
+                delete newProperties[property];
+                return true;
+            }
             newProperties[property] = value;
             deletedProperties.delete(property as any);
             return true;
@@ -177,7 +192,7 @@ export const transaction = <T extends {}>(
                         object: proxy,
                         commit,
                         rollback,
-			isDirty
+                        isDirty
                     };
                 }
                 return target[prop];
