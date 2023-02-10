@@ -59,7 +59,7 @@ export const transaction = <T extends {}>(
         options as Required<TransactionOptions>;
 
     const isDirty = () =>
-        Object.keys(newProperties).length > 0 || deletedProperties.size > 0;
+        Object.keys(newProperties).find(key => newProperties[key] && newProperties[key][TRANSACTION_SYMBOL] ? newProperties[key][TRANSACTION_SYMBOL].isDirty() : true) || deletedProperties.size > 0 as any;
 
     const commit = () => {
         Object.keys(newProperties).forEach((key) => {
@@ -131,6 +131,10 @@ export const transaction = <T extends {}>(
 
     const proxy = new Proxy<T>(initial, {
         set: (target, property, value) => {
+	    if(target && target[property] === value) {
+	      delete newProperties[property];
+	      return true;
+	    }
             newProperties[property] = value;
             deletedProperties.delete(property as any);
             return true;
@@ -172,7 +176,8 @@ export const transaction = <T extends {}>(
                         initial,
                         object: proxy,
                         commit,
-                        rollback
+                        rollback,
+			isDirty
                     };
                 }
                 return target[prop];
