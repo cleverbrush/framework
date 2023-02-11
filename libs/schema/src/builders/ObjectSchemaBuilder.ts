@@ -162,13 +162,17 @@ export class ObjectSchemaBuilder<
         const {
             valid,
             object: objToValidate,
-            context: prevalidationContext
+            context: prevalidationContext,
+            validationTransaction
         } = prevalidatedResult;
 
         const { path, doNotStopOnFirstError } = prevalidationContext;
         let errors = prevalidatedResult.errors || [];
 
         if (!valid && !doNotStopOnFirstError) {
+            if (validationTransaction) {
+                validationTransaction.rollback();
+            }
             return prevalidatedResult as any;
         }
 
@@ -178,7 +182,9 @@ export class ObjectSchemaBuilder<
         ) {
             return {
                 valid: true,
-                object: objToValidate as any
+                object: validationTransaction
+                    ? validationTransaction.commit().validatedObject
+                    : (objToValidate as any)
             };
         }
 
@@ -189,6 +195,9 @@ export class ObjectSchemaBuilder<
             });
 
             if (!doNotStopOnFirstError) {
+                if (validationTransaction) {
+                    validationTransaction.rollback();
+                }
                 return {
                     valid: false,
                     errors: [errors[0]]
@@ -201,6 +210,9 @@ export class ObjectSchemaBuilder<
 
         if (propKeys.length === 0) {
             if (objKeys.length === 0) {
+                if (validationTransaction) {
+                    validationTransaction.commit();
+                }
                 return {
                     valid: true,
                     object: {} as any
@@ -249,6 +261,9 @@ export class ObjectSchemaBuilder<
                         path: path as string
                     });
                     if (!doNotStopOnFirstError) {
+                        if (validationTransaction) {
+                            validationTransaction.rollback();
+                        }
                         return {
                             valid: false,
                             errors: [errors[0]]
@@ -259,12 +274,18 @@ export class ObjectSchemaBuilder<
         });
 
         if (notValidResults.length === 0 && errors.length === 0) {
+            if (validationTransaction) {
+                validationTransaction.commit();
+            }
             return {
                 valid: true,
                 object: objToReturn as any
             };
         }
 
+        if (validationTransaction) {
+            validationTransaction.rollback();
+        }
         return {
             valid: false,
             errors: doNotStopOnFirstError

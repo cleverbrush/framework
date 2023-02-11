@@ -22,13 +22,7 @@ const defaultTransactionOptions: TransactionOptions = {
         !!defaultNonTransactionalTypes.find((t) => child instanceof t)
 };
 
-/**
- * Starts transaction over the `initial` object.
- */
-export const transaction = <T extends {}>(
-    initial: T,
-    options?: TransactionOptions
-): {
+export type Transaction<T> = {
     /**
      * Transaction object you can modify (equals to `initial` right after the call).
      * All changes to `object` will not be reflected to `initial` until `commit`
@@ -49,7 +43,15 @@ export const transaction = <T extends {}>(
      * Returns `true` if there are any changes to `object` which makes is different from `initial`
      */
     isDirty: () => boolean;
-} => {
+};
+
+/**
+ * Starts transaction over the `initial` object.
+ */
+export const transaction = <T extends {}>(
+    initial: T,
+    options?: TransactionOptions
+): Transaction<T> => {
     let newProperties = {};
     let deletedProperties = new Map<keyof T, true>();
 

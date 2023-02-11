@@ -1925,3 +1925,32 @@ test('big schema - 1', async () => {
         }
     }
 });
+
+test('Conditional Preprocessors', async () => {
+    const schema = object({
+        num: number()
+    }).addPreprocessor((obj) =>
+        obj && obj.num % 2 === 0 ? { num: obj.num + 1 } : { num: 0 }
+    );
+
+    {
+        const obj = {
+            num: 11
+        };
+
+        const { valid, object: res1 } = await schema.validate(obj);
+        expect(valid).toEqual(true);
+        expect(res1?.num).toEqual(0);
+        expect(obj.num).toEqual(11);
+    }
+
+    {
+        const obj = {
+            num: 10
+        };
+        const { valid, object: res } = await schema.validate(obj);
+        expect(valid).toEqual(true);
+        expect(res?.num).toEqual(11);
+        expect(obj.num).toEqual(10);
+    }
+});

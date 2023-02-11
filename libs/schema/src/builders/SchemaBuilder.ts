@@ -1,4 +1,4 @@
-// import { transaction } from '../utils/transaction.js';
+import { Transaction, transaction } from '../utils/transaction.js';
 
 export type InferType<T> = T extends SchemaBuilder<
     infer TResult,
@@ -36,6 +36,7 @@ export type ValidationResult<T> = {
 
 export type PreValidationResult<T> = ValidationResult<T> & {
     context: ValidationContext;
+    validationTransaction?: Transaction<any>;
 };
 
 type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
@@ -197,7 +198,12 @@ export abstract class SchemaBuilder<
             doNotStopOnFirstError
         };
 
-        let preprocessedObject = object;
+        const preprocessingTransaction = transaction({
+            validatedObject: object
+        });
+
+        let preprocessedObject =
+            preprocessingTransaction.object.validatedObject;
 
         let errors: ValidationError[] = [];
 
@@ -216,6 +222,7 @@ export abstract class SchemaBuilder<
                         path: `${path}($preprocessors[${currentPrepropIndex}])`
                     });
                     if (!doNotStopOnFirstError) {
+                        preprocessingTransaction.rollback();
                         return {
                             valid: false,
                             errors: [errors[0]].filter((e) => e),
@@ -255,6 +262,7 @@ export abstract class SchemaBuilder<
                                   ])
                         ];
                         if (!doNotStopOnFirstError) {
+                            preprocessingTransaction.rollback();
                             return {
                                 valid: false,
                                 errors: [errors[0]].filter((e) => e),
@@ -270,6 +278,7 @@ export abstract class SchemaBuilder<
                         path: `${path}($validators[${currentValidatorIndex}])`
                     });
                     if (!doNotStopOnFirstError) {
+                        preprocessingTransaction.rollback();
                         return {
                             valid: false,
                             errors: [errors[0]].filter((e) => e),
@@ -292,6 +301,7 @@ export abstract class SchemaBuilder<
                 path
             });
             if (!doNotStopOnFirstError) {
+                preprocessingTransaction.rollback();
                 return {
                     valid: false,
                     errors: [errors[0]],
@@ -306,14 +316,16 @@ export abstract class SchemaBuilder<
                 errors: errors
                     .filter((e) => e)
                     .filter((e, i) => (doNotStopOnFirstError ? true : i === 0)),
-                context: resultingContext
+                context: resultingContext,
+                validationTransaction: preprocessingTransaction
             };
         }
 
         return {
             valid: true,
             context: resultingContext,
-            object: preprocessedObject
+            object: preprocessedObject,
+            validationTransaction: preprocessingTransaction
         };
     }
 
