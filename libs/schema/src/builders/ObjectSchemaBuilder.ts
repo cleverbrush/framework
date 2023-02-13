@@ -1,4 +1,3 @@
-import { number } from './NumberSchemaBuilder.js';
 import {
     InferType,
     SchemaBuilder,
@@ -37,6 +36,9 @@ type MergeTwo<L, R> = Id<
         SpreadProperties<L, R, OptionalPropertyNames<R> & keyof L>
 >;
 
+/**
+ * Used to build arbitrary object schemas
+ */
 export class ObjectSchemaBuilder<
     TProperties extends Record<string, SchemaBuilder<any, any>> = {},
     TRequired extends boolean = true,
@@ -79,7 +81,16 @@ export class ObjectSchemaBuilder<
     public introspect() {
         return {
             ...super.introspect(),
+            /**
+             * Properties defined in schema
+             */
             properties: { ...this.#properties },
+            /**
+             * If set to `true`, schema validation will not
+             * return errors if object contains fields which
+             * are not defined in the schema `properties`.
+             * Set to `false` by default
+             */
             acceptUnknownProps: this.#acceptUnknownProps
         };
     }
@@ -102,6 +113,10 @@ export class ObjectSchemaBuilder<
         return super.optional();
     }
 
+    /**
+     * Performs validion of object schema over the `object`.
+     * @param context Optional `ValidationContext` settings.
+     */
     public async validate(
         object: InferType<
             SchemaBuilder<
@@ -296,6 +311,10 @@ export class ObjectSchemaBuilder<
         };
     }
 
+    /**
+     * Fields not defined in `properties` will not be validated
+     * and will be passed through the validation.
+     */
     public acceptUnknownProps(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
@@ -308,6 +327,10 @@ export class ObjectSchemaBuilder<
         } as ObjectSchemaBuilderProps<TProperties, TRequired>) as any;
     }
 
+    /**
+     * Fields not defined in `properties` will be considered
+     * as schema violation.
+     */
     public notAcceptUnknownProps(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
@@ -339,6 +362,11 @@ export class ObjectSchemaBuilder<
         } as ObjectSchemaBuilderProps) as any;
     }
 
+    /**
+     * Add property to the schema `properties`
+     * @param propName name of the new property
+     * @param schema schema builder of the new property
+     */
     public addProp<TType extends SchemaBuilder<any, any>, TName extends string>(
         propName: TName,
         schema: TType
@@ -380,6 +408,10 @@ export class ObjectSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @deprecated this is for internal use, do not use if you are
+     * not sure you need it.
+     */
     public optimize(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
@@ -408,6 +440,11 @@ export class ObjectSchemaBuilder<
         return this as any;
     }
 
+    /**
+     * Adds new properties to the object schema. The same as `.addProp()` but
+     * allows to add multiple properties with one call.
+     * @param props a key/schema object map.
+     */
     public addProps<TProps extends Record<string, SchemaBuilder<any, any>>>(
         props: TProps
     ): ObjectSchemaBuilder<
@@ -437,6 +474,9 @@ export class ObjectSchemaBuilder<
         }
     >;
 
+    /**
+     * Adds all properties from the `schema` object schema to the current schema.
+     */
     public addProps<K extends ObjectSchemaBuilder<any, any, any, any>>(
         schema: K
     ): K extends ObjectSchemaBuilder<
@@ -487,6 +527,12 @@ export class ObjectSchemaBuilder<
         } as ObjectSchemaBuilderProps) as any;
     }
 
+    /**
+     * Omits properties listed in `properties` from the schema.
+     * Consider `Omit<Type, 'prop1'|'prop2'...>` as a good analogue
+     * from the TS world.
+     * @param properties - array of property names (strings) to remove from the schema.
+     */
     public omit<K extends keyof TProperties>(
         properties: K[]
     ): ObjectSchemaBuilder<
@@ -495,6 +541,10 @@ export class ObjectSchemaBuilder<
         TExplicitType,
         Omit<TResult, K>
     >;
+    /**
+     * Removes `propName` from the list of properties.
+     * @param propName property name to remove.
+     */
     public omit<TProperty extends keyof TProperties>(
         propName: TProperty
     ): ObjectSchemaBuilder<
@@ -503,6 +553,12 @@ export class ObjectSchemaBuilder<
         TExplicitType,
         Omit<TResult, TProperty>
     >;
+    /**
+     * Removes all properties of `schema` from the current schema.
+     * `Omit<TSchema, keyof TAnotherSchema>` as a good illustration
+     * from the TS world.
+     * @param schema schema builder to take properties from.
+     */
     public omit<T>(
         schema: T
     ): T extends ObjectSchemaBuilder<
@@ -594,6 +650,12 @@ export class ObjectSchemaBuilder<
         throw new Error('this parameter type is not supported');
     }
 
+    /**
+     * Adds all properties from `schema` to the current schema.
+     * `TSchema & TAnotherSchema` is a good example of the similar operation
+     * in TS type system.
+     * @param schema an object schema to take properties from
+     */
     public intersect<T extends ObjectSchemaBuilder<any, any, any, any, any>>(
         schema: T
     ): T extends ObjectSchemaBuilder<
@@ -635,6 +697,11 @@ export class ObjectSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * Marks all properties in the current schema as optional.
+     * It is the same as call `.optional('propname')` where `propname` is the name
+     * of every property in the schema.
+     */
     public partial(): ObjectSchemaBuilder<
         {
             [k in keyof TProperties]: ReturnType<TProperties[k]['optional']>;
@@ -643,6 +710,10 @@ export class ObjectSchemaBuilder<
         TExplicitType,
         Partial<TResult>
     >;
+    /**
+     * Marks all properties from `properties` as optional in the schema.
+     * @param properties list of property names (string) to make optional
+     */
     public partial<K extends keyof TProperties>(
         properties: K[]
     ): ObjectSchemaBuilder<
@@ -657,6 +728,10 @@ export class ObjectSchemaBuilder<
             [k in keyof TResult as K extends k ? k : never]?: TResult[k];
         }
     >;
+    /**
+     * Marks property `propName` as optional in the schema.
+     * @param propName the name of the property (string).
+     */
     public partial<TProperty extends keyof TProperties>(
         propName: TProperty
     ): ObjectSchemaBuilder<
@@ -724,6 +799,11 @@ export class ObjectSchemaBuilder<
         throw new Error('expecting string or string[] parameter');
     }
 
+    /**
+     * Returns a new schema containing only properties listed in
+     * `properties` array.
+     * @param properties array of property names (strings)
+     */
     public pick<K extends keyof TProperties>(
         properties: K[]
     ): ObjectSchemaBuilder<
@@ -734,6 +814,12 @@ export class ObjectSchemaBuilder<
             [k in keyof TResult as K extends k ? k : never]: TResult[k];
         }
     >;
+    /**
+     * Returns new schema based on the current schema. This new schema
+     * will consists only from properties which names are taken from the
+     * `schema` object schema.
+     * @param schema schema to take property names list from
+     */
     public pick<K extends ObjectSchemaBuilder<any, any, any, any, any>>(
         schema: K
     ): K extends ObjectSchemaBuilder<infer TProps, infer T1, infer T2, infer T3>
@@ -754,6 +840,11 @@ export class ObjectSchemaBuilder<
               }
           >
         : never;
+    /**
+     * Returns a new schema consisting of only one property
+     * (taken from the `property` property name).
+     * @param property the name of the property (string).
+     */
     public pick<K extends keyof TProperties>(
         property: K
     ): ObjectSchemaBuilder<
@@ -822,6 +913,15 @@ export class ObjectSchemaBuilder<
         throw new Error('not implemented');
     }
 
+    /**
+     * Modify schema for `propName` and return a new schema.
+     * Could be useful if you want to leave all schema intact, but
+     * change a type of one property.
+     * @param propName name of the property (string)
+     * @param callback callback function returning a new schema fo the `propName`. As a first parameter
+     * you will receive an old schema for `propName`.
+     * @returns
+     */
     public modifyPropSchema<
         K extends keyof TProperties,
         R extends SchemaBuilder<any, any>
@@ -876,6 +976,10 @@ export class ObjectSchemaBuilder<
         return this.createFromProps(props) as any;
     }
 
+    /**
+     * An alias for `.partial(prop: string)`
+     * @param prop name of the property
+     */
     public makePropOptional<
         K extends keyof TProperties,
         R = ReturnType<TProperties[K]['optional']>
@@ -903,6 +1007,10 @@ export class ObjectSchemaBuilder<
         ) as any;
     }
 
+    /**
+     * Marks `prop` as required property.
+     * @param prop name of the property
+     */
     public makePropRequired<
         K extends keyof TProperties,
         R = ReturnType<TProperties[K]['required']>
@@ -930,6 +1038,10 @@ export class ObjectSchemaBuilder<
         ) as any;
     }
 
+    /**
+     * `Partial<T>` would be a good example of the
+     * same operation in the TS world.
+     */
     public makeAllPropsOptional(): ObjectSchemaBuilder<
         {
             [k in keyof TProperties]: ReturnType<TProperties[k]['optional']>;
@@ -947,6 +1059,10 @@ export class ObjectSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * `Required<T>` would be a good example of the
+     * same operation in the TS world.
+     */
     public makeAllPropsRequired(): ObjectSchemaBuilder<
         {
             [k in keyof TProperties]: ReturnType<TProperties[k]['required']>;
@@ -973,8 +1089,15 @@ export class ObjectSchemaBuilder<
     }
 }
 
+/**
+ * Defines a schema for empty object `{}`
+ */
 export function object(): ObjectSchemaBuilder<{}, true, undefined, {}>;
 
+/**
+ * Defines an object schema, properties definitions are takens from `props`.
+ * @param props key/schema object map for schema's properties.
+ */
 export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     props: TProps
 ): ObjectSchemaBuilder<

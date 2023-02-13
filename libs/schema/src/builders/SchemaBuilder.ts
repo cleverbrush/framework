@@ -78,8 +78,19 @@ export abstract class SchemaBuilder<
     #validators: Validator<TResult>[] = [];
     #type = 'base';
 
+    /**
+     * Set type of schema explicitly. `notUsed` param is needed only for cas when JS is used. E.g. when you
+     * can't call method like `schema.hasType<Date>()`, so instead you can call `schema.hasType(new Date())`
+     * with the same result.
+     */
     public abstract hasType<T>(notUsed?: T);
+
+    /**
+     * Clears type set by call to `.hasType<T>()`, default schema type inference will be used
+     * for schema retuned by this call.
+     */
     public abstract clearHasType();
+
     protected abstract createFromProps(props): this;
 
     protected get type() {
@@ -100,31 +111,6 @@ export abstract class SchemaBuilder<
         return this.#validators;
     }
 
-    public introspect() {
-        return {
-            type: this.type,
-            isRequired: this.#isRequired,
-            preprocessors: [
-                ...this.preprocessors
-            ] as readonly Preprocessor<TResult>[],
-            validators: [...this.validators] as readonly Validator<TResult>[]
-        };
-    }
-
-    public optional() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isRequired: false
-        }) as any;
-    }
-
-    public required() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isRequired: true
-        }) as any;
-    }
-
     protected get isRequired(): TRequired {
         return this.#isRequired as TRequired;
     }
@@ -134,48 +120,6 @@ export abstract class SchemaBuilder<
             throw new Error('should be a boolean value');
         this.#isRequired = value as any;
     }
-
-    public addPreprocessor(preprocessor: Preprocessor<TResult>): this {
-        if (typeof preprocessor !== 'function') {
-            throw new Error('preprocessor must be a function');
-        }
-        return this.createFromProps({
-            ...this.introspect(),
-            preprocessors: [...this.preprocessors, preprocessor]
-        });
-    }
-
-    public clearPreprocessors(): this {
-        return this.createFromProps({
-            ...this.introspect(),
-            preprocessors: []
-        });
-    }
-
-    public addValidator(validator: Validator<TResult>): this {
-        if (typeof validator !== 'function') {
-            throw new Error('validator must be a function');
-        }
-        return this.createFromProps({
-            ...this.introspect(),
-            validators: [...this.validators, validator]
-        });
-    }
-
-    public clearValidators(): this {
-        return this.createFromProps({
-            ...this.introspect(),
-            validators: []
-        });
-    }
-
-    public abstract validate(
-        /**
-         * Object to validate
-         */
-        object: any,
-        context?: ValidationContext
-    ): Promise<ValidationResult<any>>;
 
     protected async preValidate(
         /**
@@ -328,6 +272,113 @@ export abstract class SchemaBuilder<
             validationTransaction: preprocessingTransaction
         };
     }
+
+    /**
+     * Generates a serializable object describing the defined schema
+     */
+    public introspect() {
+        return {
+            /**
+             * String `id` of schema type, e.g. `string', `number` or `object`.
+             */
+            type: this.type,
+            /**
+             * If set to `false`, schema will be optional (`null` or `undefined` values
+             * will be considered as valid).
+             */
+            isRequired: this.#isRequired,
+            /**
+             * Array of preprocessor functions
+             */
+            preprocessors: [
+                ...this.preprocessors
+            ] as readonly Preprocessor<TResult>[],
+            /**
+             * Array of validator functions
+             */
+            validators: [...this.validators] as readonly Validator<TResult>[]
+        };
+    }
+
+    /**
+     * Makes schema optional (consider `null` and `undefined` as valid objects for this schema)
+     */
+    public optional() {
+        return this.createFromProps({
+            ...this.introspect(),
+            isRequired: false
+        }) as any;
+    }
+
+    /**
+     * Makes schema required (consider `null` and `undefined` as invalid objects for this schema)
+     */
+    public required() {
+        return this.createFromProps({
+            ...this.introspect(),
+            isRequired: true
+        }) as any;
+    }
+
+    /**
+     * Adds a `preprocessor` to a preprocessors list
+     */
+    public addPreprocessor(preprocessor: Preprocessor<TResult>): this {
+        if (typeof preprocessor !== 'function') {
+            throw new Error('preprocessor must be a function');
+        }
+        return this.createFromProps({
+            ...this.introspect(),
+            preprocessors: [...this.preprocessors, preprocessor]
+        });
+    }
+
+    /**
+     * Remove all preprocessors for this schema.
+     */
+    public clearPreprocessors(): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            preprocessors: []
+        });
+    }
+
+    /**
+     * Adds a `validator` to validators list.
+     */
+    public addValidator(validator: Validator<TResult>): this {
+        if (typeof validator !== 'function') {
+            throw new Error('validator must be a function');
+        }
+        return this.createFromProps({
+            ...this.introspect(),
+            validators: [...this.validators, validator]
+        });
+    }
+
+    /**
+     * Remove all validators for this schema.
+     */
+    public clearValidators(): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            validators: []
+        });
+    }
+
+    /**
+     * Perform schema validation on `object`.
+     */
+    public abstract validate(
+        /**
+         * Object to validate
+         */
+        object: any,
+        /**
+         * Optional `ValidationContext` settings
+         */
+        context?: ValidationContext
+    ): Promise<ValidationResult<any>>;
 
     protected constructor(props: SchemaBuilderProps<TResult>) {
         const { type, preprocessors, validators, isRequired } = props;

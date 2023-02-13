@@ -63,13 +63,38 @@ export class NumberSchemaBuilder<
     public introspect() {
         return {
             ...super.introspect(),
+            /**
+             * Min valid value (if defined).
+             */
             min: this.#min,
+            /**
+             * Max valid value (if defined).
+             */
             max: this.#max,
+            /**
+             * Make sure that object is not `NaN`. `true` by default.
+             */
             ensureNotNaN: this.#ensureNotNaN,
+            /**
+             * Make sure that object is not different kinds of `infinity`. `true` by default.
+             */
             ensureIsFinite: this.#ensureIsFinite,
+            /**
+             * If set, restrict object to be equal to a certain value.
+             */
             equalsTo: this.#equalsTo,
+            /**
+             * Allow only integer values (floating point values will be rejected
+             * as invalid)
+             */
             isInteger: this.#isInteger,
+            /**
+             * Array of preprocessor functions
+             */
             preprocessors: this.preprocessors as Preprocessor<TResult>[],
+            /**
+             * Array of validator functions
+             */
             validators: this.validators as Validator<TResult>[]
         };
     }
@@ -86,6 +111,10 @@ export class NumberSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * Performs validion of number schema over `object`.
+     * @param context Optional `ValidationContext` settings.
+     */
     public async validate(
         object: TResult,
         context?: ValidationContext
@@ -217,18 +246,15 @@ export class NumberSchemaBuilder<
         };
     }
 
-    public setType<T>(notUsed?: T): NumberSchemaBuilder<T, true> {
-        return this.createFromProps({
-            ...this.introspect()
-        }) as any;
-    }
-
     protected createFromProps<T, TReq extends boolean>(
         props: NumberSchemaBuilderCreateProps<T, TReq>
     ): this {
         return NumberSchemaBuilder.create(props as any) as any;
     }
 
+    /**
+     * Restricts object to be equal to `value`.
+     */
     public equals<T extends number, R = NumberSchemaBuilder<T, TRequired>>(
         value: T
     ): R {
@@ -239,6 +265,9 @@ export class NumberSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * Removes a `value` defeined by `equals()` call.
+     */
     public clearEquals(): NumberSchemaBuilder<number, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -246,6 +275,9 @@ export class NumberSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * Floating point number will be considered as valid after this call.
+     */
     public isFloat(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -253,6 +285,9 @@ export class NumberSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * Only integer values will be considered as valid after this call.
+     */
     public isInteger(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -268,6 +303,9 @@ export class NumberSchemaBuilder<
         return super.optional();
     }
 
+    /**
+     * Do not accept NaN value
+     */
     public notNaN(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -275,6 +313,9 @@ export class NumberSchemaBuilder<
         });
     }
 
+    /**
+     * Consider NaN value as valid
+     */
     public canBeNaN(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -282,6 +323,9 @@ export class NumberSchemaBuilder<
         });
     }
 
+    /**
+     * Do not accept `Infinity`.
+     */
     public isFinite(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -289,6 +333,9 @@ export class NumberSchemaBuilder<
         });
     }
 
+    /**
+     * Consider `Infinity` as valid value.
+     */
     public canBeInfinite(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -296,6 +343,9 @@ export class NumberSchemaBuilder<
         });
     }
 
+    /**
+     * Set minimal valid value for schema.
+     */
     public min(minValue: number): NumberSchemaBuilder<TResult, TRequired> {
         if (typeof minValue !== 'number')
             throw new Error('minValue must be a number');
@@ -305,6 +355,9 @@ export class NumberSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * Clear minimal valid value for schema.
+     */
     public clearMin(): NumberSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
         delete schema.min;
@@ -313,6 +366,9 @@ export class NumberSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * Set maximal valid value for schema.
+     */
     public max(maxValue: number): NumberSchemaBuilder<TResult, TRequired> {
         if (typeof maxValue !== 'number')
             throw new Error('maxValue must be a number');
@@ -322,6 +378,9 @@ export class NumberSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * Clear maximal valid value for schema.
+     */
     public clearMax(): NumberSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
         delete schema.max;
@@ -331,6 +390,9 @@ export class NumberSchemaBuilder<
     }
 }
 
+/**
+ * Creates a number schema.
+ */
 export const number = () =>
     NumberSchemaBuilder.create({
         isRequired: true
