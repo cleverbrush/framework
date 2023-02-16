@@ -10,6 +10,7 @@ export {
     ValidationError,
     ValidationResult
 } from './builders/SchemaBuilder.js';
+export { any, AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
 export { number, NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 export { object, ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 export { union, UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';

@@ -62,7 +62,7 @@ export class UnionSchemaBuilder<
 
     public static create(props: UnionSchemaBuilderCreateProps<any>) {
         return new UnionSchemaBuilder({
-            type: 'number',
+            type: 'union',
             ...props
         });
     }
