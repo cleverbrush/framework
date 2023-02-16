@@ -255,14 +255,12 @@ export class NumberSchemaBuilder<
     /**
      * Restricts object to be equal to `value`.
      */
-    public equals<T extends number, R = NumberSchemaBuilder<T, TRequired>>(
-        value: T
-    ): R {
+    public equals<T extends number>(value: T) {
         if (typeof value !== 'number') throw new Error('number expected');
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: value
-        }) as any;
+        }) as any as NumberSchemaBuilder<T, TRequired>;
     }
 
     /**

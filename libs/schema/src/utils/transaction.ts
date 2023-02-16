@@ -1,6 +1,6 @@
 const TRANSACTION_SYMBOL = Symbol('transaction');
 
-const defaultNonTransactionalTypes = [Error, RegExp];
+const defaultNonTransactionalTypes = [Error, RegExp, Date];
 
 export type TransactionOptions = {
     /**
@@ -244,3 +244,11 @@ export const transaction = <T extends {}>(
         isDirty
     };
 };
+
+/**
+ * Checks if `obj` is instance of transaction
+ * @param obj object to check if it's a transaction
+ * @returns
+ */
+export const isTransaction = (obj) =>
+    obj && typeof obj === 'object' && Object.hasOwn(obj, TRANSACTION_SYMBOL);

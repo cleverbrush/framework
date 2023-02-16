@@ -1989,3 +1989,12 @@ test('Conditional Preprocessors', async () => {
         expect(obj.num).toEqual(10);
     }
 });
+
+test('Number equals as property', async () => {
+    const schema = object({
+        first: number().equals(10)
+    });
+
+    const typeTest: InferType<typeof schema> = {} as any;
+    expectType<{ first: 10 }>(typeTest);
+});
