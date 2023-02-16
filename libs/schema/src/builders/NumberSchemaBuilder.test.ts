@@ -1,6 +1,6 @@
 import { expectType } from 'tsd';
 import { InferType } from './SchemaBuilder.js';
-import { number, NumberSchemaBuilder } from './NumberSchemaBuilder.js';
+import { number } from './NumberSchemaBuilder.js';
 
 test('Clean', async () => {
     const builder = number();
@@ -476,13 +476,13 @@ test('preprocessors - 1', async () => {
     }
 });
 
-test('setType - 1', () => {
+test('hasType - 1', () => {
     const builder = number().hasType<string>();
     const typeCheck1: InferType<typeof builder> = '123';
     expectType<string>(typeCheck1);
 });
 
-test('setType - 2', () => {
+test('hasType - 2', () => {
     const builder = number().hasType(new Date());
     const typeCheck1: InferType<typeof builder> = new Date();
     expectType<Date>(typeCheck1);

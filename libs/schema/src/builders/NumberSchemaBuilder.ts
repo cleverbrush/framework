@@ -233,7 +233,9 @@ export class NumberSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `expected to be no more than ${this.#max}`,
+                            message: `expected to be no more than or equal to ${
+                                this.#max
+                            }`,
                             path: path as string
                         }
                     ]
