@@ -11,6 +11,9 @@ type NumberSchemaBuilderCreateProps<
     R extends boolean = true
 > = Partial<ReturnType<NumberSchemaBuilder<T, R>['introspect']>>;
 
+/**
+ * Number schema builder class. Allows to create Number schemas.
+ */
 export class NumberSchemaBuilder<
     TResult = number,
     TRequired extends boolean = true
