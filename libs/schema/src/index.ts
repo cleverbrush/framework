@@ -1,4 +1,5 @@
 import { any, AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
+import { array, ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
 import { date, DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 import { object, ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 import { number, NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
@@ -14,6 +15,7 @@ export {
     ValidationResult
 } from './builders/SchemaBuilder.js';
 export { any, AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
+export { array, ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
 export { date, DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 export { number, NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 export { object, ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
@@ -22,6 +24,7 @@ export { union, UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
 
 export default {
     any,
+    array,
     date,
     number,
     object,
@@ -29,6 +32,7 @@ export default {
     union,
     builders: {
         AnySchemaBuilder,
+        ArraySchemaBuilder,
         DateSchemaBuilder,
         ObjectSchemaBuilder,
         NumberSchemaBuilder,

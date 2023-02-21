@@ -79,8 +79,7 @@ export class AnySchemaBuilder<
 }
 
 /**
- * Creates a union schema.
- * @param schema required and will be considered as a first option for the union shchema.
+ * Creates a `any` schema.
  */
 export const any = () =>
     AnySchemaBuilder.create({
