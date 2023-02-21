@@ -5,6 +5,10 @@ import {
     BooleanSchemaBuilder
 } from './builders/BooleanSchemaBuilder.js';
 import { date, DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
+import {
+    func,
+    FunctionSchemaBuilder
+} from './builders/FunctionSchemaBuilder.js';
 import { object, ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 import { number, NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { string, StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
@@ -25,6 +29,10 @@ export {
     BooleanSchemaBuilder
 } from './builders/BooleanSchemaBuilder.js';
 export { date, DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
+export {
+    func,
+    FunctionSchemaBuilder
+} from './builders/FunctionSchemaBuilder.js';
 export { number, NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 export { object, ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 export { string, StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
@@ -35,6 +43,7 @@ export default {
     array,
     boolean,
     date,
+    func,
     number,
     object,
     string,
@@ -44,6 +53,7 @@ export default {
         ArraySchemaBuilder,
         BooleanSchemaBuilder,
         DateSchemaBuilder,
+        FunctionSchemaBuilder,
         ObjectSchemaBuilder,
         NumberSchemaBuilder,
         SchemaBuilder,

@@ -261,10 +261,23 @@ export class StringSchemaBuilder<
     }
 }
 
+export function string<T extends string>(
+    equals: T
+): StringSchemaBuilder<T, true>;
+
+export function string(): StringSchemaBuilder<string, true>;
+
 /**
  * Creates a string schema.
  */
-export const string = () =>
-    StringSchemaBuilder.create({
+export function string(equals?: string) {
+    if (typeof equals === 'string') {
+        return StringSchemaBuilder.create({
+            isRequired: true,
+            equalsTo: equals
+        });
+    }
+    return StringSchemaBuilder.create({
         isRequired: true
     });
+}
