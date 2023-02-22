@@ -445,32 +445,46 @@ export class ObjectSchemaBuilder<
      * allows to add multiple properties with one call.
      * @param props a key/schema object map.
      */
-    public addProps<TProps extends Record<string, SchemaBuilder<any, any>>>(
+    public addProps<
+        TProps extends Record<string, SchemaBuilder<any, any>>,
+        TOptProps = Pick<
+            TProps,
+            keyof {
+                [k in keyof TProps as TProps[k] extends SchemaBuilder<
+                    any,
+                    infer TReq
+                >
+                    ? TReq extends false
+                        ? k
+                        : never
+                    : never]: TProps[k];
+            }
+        >,
+        TReqProps = Pick<
+            TProps,
+            keyof {
+                [k in keyof TProps as TProps[k] extends SchemaBuilder<
+                    any,
+                    infer TReq
+                >
+                    ? TReq extends true
+                        ? k
+                        : never
+                    : never]: TProps[k];
+            }
+        >
+    >(
         props: TProps
     ): ObjectSchemaBuilder<
         TProperties & {
             [k in keyof TProps]: TProps[k];
         },
-        TRequired,
-        TExplicitType,
+        true,
+        undefined,
         TResult & {
-            [k in keyof TProps as TProps[k] extends SchemaBuilder<
-                infer TRes,
-                infer TReq
-            >
-                ? TReq extends false
-                    ? k
-                    : never
-                : never]?: InferType<TProps[k]>;
+            [k in keyof TOptProps]?: InferType<TOptProps[k]>;
         } & {
-            [k in keyof TProps as TProps[k] extends SchemaBuilder<
-                infer TRes,
-                infer TReq
-            >
-                ? TReq extends false
-                    ? never
-                    : k
-                : never]: InferType<TProps[k]>;
+            [k in keyof TReqProps]: InferType<TReqProps[k]>;
         }
     >;
 
@@ -1111,7 +1125,7 @@ export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     }
 >;
 
-export function object<TProps extends Record<string, SchemaBuilder>>(
+export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     props?: TProps
 ): ObjectSchemaBuilder<
     {
