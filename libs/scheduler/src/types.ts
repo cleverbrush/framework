@@ -1,183 +1,128 @@
-import { InferType, SchemaRegistry } from '@cleverbrush/schema';
+import {
+    InferType,
+    date,
+    object,
+    func,
+    number,
+    string,
+    array,
+    union
+} from '@cleverbrush/schema';
 
 import { IJobRepository } from './jobRepository.js';
 
-const registry = new SchemaRegistry()
-    .addPreprocessor('StringToDate', (value) => {
-        if (typeof value === 'undefined') return value;
-        if (typeof value === 'string') {
-            const time = Date.parse(value);
-            if (Number.isNaN(time)) return value;
-            return new Date(time);
-        }
-        return value;
-    })
-    .addSchema('Common.Date', ({ object }) =>
-        object()
-            .mapToType<Date>()
-            .addValidator((value) =>
-                value instanceof Date && !Number.isNaN(value)
-                    ? {
-                          valid: true
-                      }
-                    : {
-                          valid: false,
-                          errors: ['should be a valid Date object']
-                      }
-            )
-    )
-    .addSchema('Templates.Schedule', ({ object, number, alias }) =>
-        object({
-            /** Number of days between repeats */
-            interval: number().min(1).max(356),
-            /** Hour (0-23) */
-            hour: number().min(0).max(23).optional(),
-            /** Minute (0-59) */
-            minute: number().min(0).max(59).optional(),
-            /** Do not start earlier than this date */
-            startsOn: alias('Common.Date').optional(),
-            /** Do not repeat after this date */
-            endsOn: alias('Common.Date').optional(),
-            /** Max number of repeats (min 1) */
-            maxOccurences: number().min(1).optional(),
-            /** Skip this number of repeats. Min value is 1.  */
-            skipFirst: number().min(1).optional()
-        })
-            .setPropPreprocessor('endsOn', 'StringToDate')
-            .addValidator((val) => {
-                if (
-                    'endsOn' in val &&
-                    'maxOccurences' in val &&
-                    // TODO: remove this clause when object validator is fixed in a new version
-                    typeof val.endsOf !== 'undefined'
-                ) {
+const ScheduleSchemaBase = object({
+    /** Number of days between repeats */
+    interval: number().min(1).max(356),
+    /** Hour (0-23) */
+    hour: number().min(0).max(23).optional(),
+    /** Minute (0-59) */
+    minute: number().min(0).max(59).optional(),
+    /** Do not start earlier than this date */
+    startsOn: date().acceptJsonString().optional(),
+    /** Do not repeat after this date */
+    endsOn: date().acceptJsonString().optional(),
+    /** Max number of repeats (min 1) */
+    maxOccurences: number().min(1).optional(),
+    /** Skip this number of repeats. Min value is 1.  */
+    skipFirst: number().min(1).optional()
+}).addValidator((val) => {
+    if (
+        'endsOn' in val &&
+        'maxOccurences' in val &&
+        typeof val.endsOn !== 'undefined'
+    ) {
+        return {
+            valid: false,
+            errors: [{ message: 'either endsOn or maxOccurences is required' }]
+        };
+    }
+    return { valid: true };
+});
+
+const ScheduleMinuteSchema = ScheduleSchemaBase.omit('hour')
+    .omit('minute')
+    .addProps({
+        /** Repeat every minute */
+        every: string('minute')
+    });
+
+const ScheduleDaySchema = ScheduleSchemaBase.addProps({
+    /** Repeat every day */
+    every: string('day')
+});
+
+const ScheduleWeekSchema = ScheduleSchemaBase.addProps({
+    /** Repeat every week */
+    every: string('week'),
+    /** Days of week for schedule */
+    dayOfWeek: array()
+        .setItemSchema(number().min(1).max(7))
+        .minLength(1)
+        .maxLength(7)
+        .addValidator((val) => {
+            const map = {};
+            for (let i = 0; i < val.length; i++) {
+                if (map[val[i]]) {
                     return {
                         valid: false,
-                        errors: ['either endsOn or maxOccurences is required']
+                        errors: [{ message: 'no duplicates allowed' }]
                     };
                 }
-                return { valid: true };
-            })
-    )
-    .addSchemaFrom(
-        'Templates.Schedule',
-        'Models.TaskScheduleMinute',
-        ({ string, base }) =>
-            base
-                .removeProp('hour')
-                .removeProp('minute')
-                .addProps({
-                    /** Repeat every minute */
-                    every: string('minute')
-                })
-    )
-    .addSchemaFrom(
-        'Templates.Schedule',
-        'Models.TaskScheduleDay',
-        ({ string, base }) =>
-            base.addProps({
-                /** Repeat every day */
-                every: string('day')
-            })
-    )
-    .addSchemaFrom(
-        'Templates.Schedule',
-        'Models.TaskScheduleWeek',
-        ({ base, number, string, array }) =>
-            base.addProps({
-                /** Repeat every week */
-                every: string('week'),
-                /** Day of week: array of no more than 7 numbers numbers (from 1 to 7 where 1 is Monday). */
-                dayOfWeek: array()
-                    .ofType(number().min(1).max(7))
-                    .minLength(1)
-                    .maxLength(7)
-                    .addValidator((val) => {
-                        const map = {};
-                        for (let i = 0; i < val.length; i++) {
-                            if (map[val[i]]) {
-                                return {
-                                    valid: false,
-                                    errors: ['no duplicates allowed']
-                                };
-                            }
-                            map[val[i]] = true;
-                        }
-                        return {
-                            valid: true
-                        };
-                    })
-            })
-    )
-    .addSchemaFrom(
-        'Templates.Schedule',
-        'Models.TaskScheduleMonth',
-        ({ base, string, number, union }) =>
-            base.addProps({
-                /** Repeat every month */
-                every: string('month'),
-                /** Day - 'last' or number from 1 to 28 */
-                day: union(string('last'), number().min(1).max(28))
-            })
-    )
-    .addSchemaFrom(
-        'Templates.Schedule',
-        'Models.TaskScheduleYear',
-        ({ base, string, number, union }) =>
-            base.addProps({
-                /** Repeat every year */
-                every: string('year'),
-                /** Day - 'last' or number from 1 to 28 */
-                day: union(string('last')).or(number().min(1).max(28)),
-                /** Month - number from 1 to 12 */
-                month: number().min(1).max(12)
-            })
-    );
+                map[val[i]] = true;
+            }
+            return {
+                valid: true
+            };
+        })
+});
 
-export const schemaRegistry = registry
-    .addSchema('Models.Schedule', ({ alias, union }) =>
-        union(
-            alias('Models.TaskScheduleMinute'),
-            alias('Models.TaskScheduleDay'),
-            alias('Models.TaskScheduleWeek'),
-            alias('Models.TaskScheduleMonth'),
-            alias('Models.TaskScheduleYear')
-        )
-    )
-    .addSchema(
-        'Models.CreateJobRequest',
-        ({ object, number, string, alias, union, func }) =>
-            object({
-                /** Id of job, must be uniq */
-                id: string(),
-                /** Path to js file (relative to root folder) */
-                path: string().minLength(1),
-                /** Job's schedule */
-                schedule: alias('Models.Schedule'),
-                /** Timeout for job (in milliseconds) */
-                timeout: number().min(0).optional(),
-                /** Arbitrary props for job (can be a callback returning props or Promise<props>) */
-                props: union(object().canHaveUnknownProps(), func()).optional(),
-                /** Job will be considered as disabled when more than that count of runs fails consequently
-                 * unlimited if negative
-                 */
-                maxConsequentFails: number().optional(),
-                /**
-                 * Job will be retried right away this times. Job will be retried on next schedule run if this number is exceeded.
-                 */
-                maxRetries: number().optional().min(1)
-            })
-    );
+const ScheduleMonthSchema = ScheduleSchemaBase.addProps({
+    /** Repeat every month */
+    every: string('month'),
+    /** Day - 'last' or number from 1 to 28 */
+    day: union(string('last')).or(number().min(1).max(28))
+});
 
-export type Schedule = InferType<
-    typeof schemaRegistry.schemas.Models.Schedule.schema
->;
+const ScheduleYearSchema = ScheduleSchemaBase.addProps({
+    /** Repeat every year */
+    every: string('year'),
+    /** Day - 'last' or number from 1 to 28 */
+    day: union(string('last')).or(number().min(1).max(28)),
+    /** Month - number from 1 to 12 */
+    month: number().min(1).max(12)
+});
 
-export type CreateJobRequest = InferType<
-    typeof schemaRegistry.schemas.Models.CreateJobRequest.schema
->;
+const ScheduleSchema = union(ScheduleMinuteSchema)
+    .or(ScheduleDaySchema)
+    .or(ScheduleWeekSchema)
+    .or(ScheduleMonthSchema)
+    .or(ScheduleYearSchema);
 
-export const Schemas = schemaRegistry;
+const CreateJobRequestSchema = object({
+    /** Id of job, must be uniq */
+    id: string(),
+    /** Path to js file (relative to root folder) */
+    path: string().minLength(1),
+    /** Job's schedule */
+    schedule: ScheduleSchema,
+    /** Timeout for job (in milliseconds) */
+    timeout: number().min(0).optional(),
+    /** Arbitrary props for job (can be a callback returning props or Promise<props>) */
+    props: union(object().acceptUnknownProps()).or(func()).optional(),
+    /** Job will be considered as disabled when more than that count of runs fails consequently
+     * unlimited if negative
+     */
+    maxConsequentFails: number().optional(),
+    /**
+     * Job will be retried right away this times. Job will be retried on next schedule run if this number is exceeded.
+     */
+    maxRetries: number().optional().min(1)
+});
+
+export type Schedule = InferType<typeof ScheduleSchema>;
+
+export type CreateJobRequest = InferType<typeof CreateJobRequestSchema>;
 
 export type Job = {
     id: string;
@@ -226,3 +171,14 @@ export type JobInstanceStatus =
     | 'scheduled'
     | 'timedout'
     | 'canceled';
+
+export const Schemas = {
+    ScheduleSchemaBase,
+    ScheduleSchema,
+    CreateJobRequestSchema,
+    ScheduleMinuteSchema,
+    ScheduleDaySchema,
+    ScheduleWeekSchema,
+    ScheduleMonthSchema,
+    ScheduleYearSchema
+};

@@ -6,7 +6,6 @@ import { join as pathJoin } from 'path';
 import { Worker } from 'worker_threads';
 
 import {
-    schemaRegistry,
     JobSchedulerProps,
     CreateJobRequest,
     SchedulerStatus,
@@ -459,8 +458,9 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
     }
 
     public async addJob(job: CreateJobRequest) {
-        const validationResult =
-            await schemaRegistry.schemas.Models.CreateJobRequest.validate(job);
+        const validationResult = await Schemas.CreateJobRequestSchema.validate(
+            job
+        );
         if (!validationResult.valid) {
             throw new Error(
                 `Invalid CreateJobRequest: ${validationResult.errors?.join(

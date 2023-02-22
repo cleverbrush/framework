@@ -104,7 +104,7 @@ export class ScheduleCalculator {
             case 'minute':
                 candidate =
                     this.#repeatCount === 0
-                        ? this.#schedule.startsOn
+                        ? (this.#schedule.startsOn as Date)
                         : new Date(
                               Date.UTC(
                                   this.#currentDate.getUTCFullYear(),
@@ -175,7 +175,10 @@ export class ScheduleCalculator {
                                         0
                                     )
                                 );
-                                if (dateWithTime > this.#schedule.startsOn) {
+                                if (
+                                    dateWithTime >
+                                    (this.#schedule.startsOn as Date)
+                                ) {
                                     candidate = dateWithTime;
                                     found = true;
                                     break;
@@ -244,7 +247,7 @@ export class ScheduleCalculator {
                         );
                         iteration++;
                     } while (
-                        dateTime < this.#schedule.startsOn ||
+                        dateTime < (this.#schedule.startsOn as Date) ||
                         dateTime <= this.#currentDate
                     );
                     candidate = dateTime;
@@ -294,7 +297,7 @@ export class ScheduleCalculator {
                         );
                         iteration++;
                     } while (
-                        dateTime < this.#schedule.startsOn ||
+                        dateTime < (this.#schedule.startsOn as Date) ||
                         dateTime <= this.#currentDate
                     );
                     candidate = dateTime;
