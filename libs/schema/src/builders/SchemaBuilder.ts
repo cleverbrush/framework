@@ -34,9 +34,9 @@ export type ValidationResult<T> = {
     errors?: ValidationError[];
 };
 
-export type PreValidationResult<T> = ValidationResult<T> & {
+export type PreValidationResult<T, TTransactionType> = ValidationResult<T> & {
     context: ValidationContext;
-    validationTransaction?: Transaction<any>;
+    validationTransaction?: Transaction<TTransactionType>;
 };
 
 type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
@@ -127,7 +127,7 @@ export abstract class SchemaBuilder<
          */
         object: any,
         context?: ValidationContext
-    ): Promise<PreValidationResult<any>> {
+    ): Promise<PreValidationResult<any, { validatedObject: any }>> {
         const { doNotStopOnFirstError } = context || {
             doNotStopOnFirstError: false
         };
@@ -142,7 +142,7 @@ export abstract class SchemaBuilder<
             doNotStopOnFirstError
         };
 
-        const preprocessingTransaction = transaction({
+        let preprocessingTransaction = transaction({
             validatedObject: object
         });
 
@@ -155,9 +155,13 @@ export abstract class SchemaBuilder<
             let currentPrepropIndex = 0;
             for (const preprocessor of this.preprocessors) {
                 try {
-                    preprocessedObject = await Promise.resolve(
-                        preprocessor(preprocessedObject)
-                    );
+                    preprocessingTransaction = transaction({
+                        validatedObject: await Promise.resolve(
+                            preprocessor(preprocessedObject)
+                        )
+                    });
+                    preprocessedObject =
+                        preprocessingTransaction.object.validatedObject;
                 } catch (err) {
                     errors.push({
                         message: `Preprocessor #${currentPrepropIndex}${

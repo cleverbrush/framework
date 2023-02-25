@@ -111,14 +111,23 @@ export class UnionSchemaBuilder<
 
         const {
             valid,
-            object: objToValidate,
-            context: prevalidationContext
+            validationTransaction,
+            context: prevalidationContext,
+            errors
         } = superResult;
+
+        const rollback = validationTransaction?.rollback;
+
+        let objToValidate =
+            validationTransaction?.object.validatedObject || superResult.object;
 
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return superResult;
+            return {
+                valid,
+                errors
+            };
         }
 
         if (
@@ -135,17 +144,18 @@ export class UnionSchemaBuilder<
         let resultingErrors = [];
 
         for (let i = 0; i < this.#options.length; i++) {
-            const { valid, errors } = await this.#options[i].validate(
-                objToValidate,
-                {
-                    ...prevalidationContext,
-                    path: `${path}[option ${i}]`
-                }
-            );
+            const {
+                valid,
+                errors,
+                object: validatedOption
+            } = await this.#options[i].validate(objToValidate, {
+                ...prevalidationContext,
+                path: `${path}[option ${i}]`
+            });
             if (valid) {
                 return {
                     valid: true,
-                    object: objToValidate as TResult
+                    object: validatedOption as TResult
                 };
             } else {
                 if (
@@ -155,6 +165,10 @@ export class UnionSchemaBuilder<
                 ) {
                     resultingErrors = errors as any;
                     minErrorsCount = errors.length;
+                }
+
+                if (rollback) {
+                    objToValidate = rollback().validatedObject;
                 }
             }
         }

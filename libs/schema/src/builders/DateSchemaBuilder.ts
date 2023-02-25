@@ -153,14 +153,17 @@ export class DateSchemaBuilder<
     ): Promise<ValidationResult<TResult>> {
         const superResult = await super.preValidate(object, context);
 
-        const { valid, context: prevalidationContext } = superResult;
+        const { valid, context: prevalidationContext, errors } = superResult;
 
         let { object: objToValidate } = superResult;
 
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return superResult;
+            return {
+                valid,
+                errors
+            };
         }
 
         if (

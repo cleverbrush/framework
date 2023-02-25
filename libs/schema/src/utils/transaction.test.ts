@@ -56,12 +56,12 @@ test('Can read modified property - 2', () => {
     });
 });
 
-test('Commit updates initial object', () => {
-    const obj = {
+test("Commit doesn' update initial object", () => {
+    const initialObj = {
         first: '1',
         second: 2
     };
-    const { object, commit, isDirty } = transaction(obj);
+    const { object, commit, isDirty } = transaction(initialObj);
 
     expect(isDirty()).toEqual(false);
 
@@ -70,24 +70,23 @@ test('Commit updates initial object', () => {
     expect(isDirty()).toEqual(true);
 
     expect('third' in object).toEqual(true);
-    expect('third' in obj).toEqual(false);
+    expect('third' in initialObj).toEqual(false);
     expect(object).toEqual({
         first: '1',
         second: 2,
         third: 123
     });
-    expect(obj).toEqual({
+    expect(initialObj).toEqual({
         first: '1',
         second: 2
     });
 
     const commitResult = commit();
     expect('third' in commitResult).toEqual(true);
-    expect('third' in obj).toEqual(true);
-    expect(obj).toEqual({
+    expect('third' in initialObj).toEqual(false);
+    expect(initialObj).toEqual({
         first: '1',
-        second: 2,
-        third: 123
+        second: 2
     });
     expect(commitResult).toEqual({
         first: '1',
@@ -118,10 +117,20 @@ test('commit - 1', () => {
     expect(initial.nested.n1).toEqual(1);
     expect(initial.nested.n2).toEqual('str');
 
-    commit();
+    const commitResult = commit();
 
-    expect(initial.nested.n1).toEqual(20);
-    expect(initial.nested.n2).toEqual('new val');
+    expect(commitResult === initial).toEqual(false);
+
+    expect(initial.nested.n1).toEqual(1);
+    expect(initial.nested.n2).toEqual('str');
+    expect(commitResult).toEqual({
+        field1: 1,
+        field2: 'str',
+        nested: {
+            n1: 20,
+            n2: 'new val'
+        }
+    });
 });
 
 test('delete property', () => {
@@ -208,7 +217,8 @@ test('nested object', () => {
     expect(initial).toEqual({
         field3: 2,
         nested: {
-            field1: 'modified'
+            field1: 'some str',
+            field2: 1
         }
     });
 });
@@ -660,7 +670,7 @@ test('isDirty - 4', () => {
 
     expect(isDirty()).toEqual(false);
 
-    object.arr[1].name = 'Petrov';
+    object.arr[1].name = 'Petrov2';
 
     expect(isDirty()).toEqual(true);
 

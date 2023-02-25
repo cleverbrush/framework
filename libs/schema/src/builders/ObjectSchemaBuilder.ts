@@ -178,7 +178,8 @@ export class ObjectSchemaBuilder<
             valid,
             object: objToValidate,
             context: prevalidationContext,
-            validationTransaction
+            validationTransaction,
+            errors: preValidationErrors
         } = prevalidatedResult;
 
         const { path, doNotStopOnFirstError } = prevalidationContext;
@@ -188,7 +189,10 @@ export class ObjectSchemaBuilder<
             if (validationTransaction) {
                 validationTransaction.rollback();
             }
-            return prevalidatedResult as any;
+            return {
+                valid,
+                errors: preValidationErrors
+            };
         }
 
         if (
@@ -226,7 +230,7 @@ export class ObjectSchemaBuilder<
         if (propKeys.length === 0) {
             if (objKeys.length === 0) {
                 if (validationTransaction) {
-                    validationTransaction.commit();
+                    validationTransaction.commit().validatedObject;
                 }
                 return {
                     valid: true,
@@ -252,6 +256,12 @@ export class ObjectSchemaBuilder<
             (res) => !res.result.valid
         );
 
+        validationResults
+            .filter((res) => res.result.valid)
+            .forEach(({ key, result }) => {
+                objToValidate[key] = result.object;
+            });
+
         errors = [
             ...errors,
             ...notValidResults.reduce(
@@ -260,41 +270,36 @@ export class ObjectSchemaBuilder<
             )
         ];
 
-        const objToReturn = validationResults.reduce((acc, curr) => {
-            // @ts-ignore
-            acc[curr.key] = curr.result.object;
-            return acc;
-        }, {});
-
-        objKeys.forEach((key) => {
-            if (!(key in this.#properties)) {
-                if (this.#acceptUnknownProps) {
-                    objToReturn[key] = objToValidate[key];
-                } else {
-                    errors.push({
-                        message: `unknown property '${key}'`,
-                        path: path as string
-                    });
-                    if (!doNotStopOnFirstError) {
-                        if (validationTransaction) {
-                            validationTransaction.rollback();
-                        }
-                        return {
-                            valid: false,
-                            errors: [errors[0]]
-                        };
+        for (let i = 0; i < objKeys.length; i++) {
+            const key = objKeys[i];
+            if (!(key in this.#properties) && !this.#acceptUnknownProps) {
+                errors.push({
+                    message: `unknown property '${key}'`,
+                    path: path as string
+                });
+                if (!doNotStopOnFirstError) {
+                    if (validationTransaction) {
+                        validationTransaction.rollback();
                     }
+                    return {
+                        valid: false,
+                        errors: [errors[0]]
+                    };
                 }
             }
-        });
+        }
 
         if (notValidResults.length === 0 && errors.length === 0) {
             if (validationTransaction) {
-                validationTransaction.commit();
+                const commited = validationTransaction.commit();
+                return {
+                    valid: true,
+                    object: commited.validatedObject
+                };
             }
             return {
                 valid: true,
-                object: objToReturn as any
+                object: objToValidate
             };
         }
 

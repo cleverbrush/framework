@@ -51,10 +51,13 @@ export class AnySchemaBuilder<
     ): Promise<ValidationResult<TResult>> {
         const superResult = await super.preValidate(object, context);
 
-        const { valid, object: objToValidate } = superResult;
+        const { valid, object: objToValidate, errors } = superResult;
 
         if (!valid) {
-            return superResult;
+            return {
+                valid,
+                errors
+            };
         }
 
         return {

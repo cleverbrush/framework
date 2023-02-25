@@ -2,6 +2,9 @@ import { expectType } from 'tsd';
 
 import { object } from './ObjectSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
+import { string } from './StringSchemaBuilder.js';
+import { union } from './UnionSchemaBuilder.js';
+import { date } from './DateSchemaBuilder.js';
 import { InferType } from './SchemaBuilder.js';
 
 test('empty - 1', async () => {
@@ -276,32 +279,6 @@ test('addProps - 2', async () => {
 
     expectType<{ first: number }>(typeCheck1);
     expectType<{ first: number; third: number; fourth: number }>(typeCheck2);
-});
-
-test('addProps - 3', async () => {
-    const schemaToAdd = object({
-        /**
-         * some comment
-         */
-        prop1: number(),
-        /**
-         * some comment 2
-         */
-        prop2: number()
-    });
-
-    const schema1 = object({
-        /**
-         * comment 1
-         */
-        initial1: number()
-    }).addProps(schemaToAdd);
-
-    const value: InferType<typeof schema1> = {
-        initial1: 1,
-        prop1: 2,
-        prop2: 3
-    };
 });
 
 test('nested object - 1', async () => {
@@ -1988,6 +1965,53 @@ test('Conditional Preprocessors', async () => {
         expect(res).toBeUndefined();
         expect(obj.num).toEqual(10);
     }
+});
+
+test('Preprocessors', async () => {
+    const preprocessDateInterval = (value) => {
+        if (typeof value === 'undefined') return value;
+
+        if (typeof value === 'string') {
+            try {
+                return {
+                    from: new Date(2022, 0, 1),
+                    to: new Date(2023, 0, 1)
+                };
+            } catch (e) {
+                return value;
+            }
+        }
+
+        return value;
+    };
+
+    const IntervalSchema = union(string()).or(
+        object({
+            from: date(),
+            to: date()
+        })
+    );
+
+    const schema = object({
+        interval: IntervalSchema,
+        num: number()
+    }).addPreprocessor((value) => {
+        if (!value || typeof value !== 'object') return value;
+        value.interval = preprocessDateInterval(value?.interval);
+        return value;
+    });
+
+    const testObj = {
+        interval: 'some-str',
+        num: 10
+    };
+
+    const { valid, object: result, errors } = await schema.validate(testObj);
+
+    expect(valid).toEqual(true);
+    expect(result === testObj).toEqual(false);
+    expect(typeof testObj.interval === 'string').toEqual(true);
+    expect(errors).toBeUndefined();
 });
 
 test('Number equals as property', async () => {

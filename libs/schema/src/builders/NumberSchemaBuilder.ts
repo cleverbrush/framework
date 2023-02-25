@@ -126,14 +126,22 @@ export class NumberSchemaBuilder<
 
         const {
             valid,
-            object: objToValidate,
-            context: prevalidationContext
+            context: prevalidationContext,
+            validationTransaction,
+            errors
         } = superResult;
+
+        const objToValidate =
+            validationTransaction?.object.validatedObject || superResult.object;
+        const commit = validationTransaction?.commit;
 
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return superResult;
+            return {
+                valid,
+                errors
+            };
         }
 
         if (
@@ -247,7 +255,10 @@ export class NumberSchemaBuilder<
 
         return {
             valid: true,
-            object: objToValidate as TResult
+            object:
+                typeof commit === 'function'
+                    ? commit().validatedObject
+                    : (objToValidate as TResult)
         };
     }
 

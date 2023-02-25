@@ -69,24 +69,29 @@ export const transaction = <T extends {}>(
         }) || ((deletedProperties.size > 0) as any);
 
     const commit = () => {
+        const result = {} as Record<keyof T, any>;
+        Object.keys(initial).forEach((key) => {
+            result[key] = initial[key];
+        });
+
         Object.keys(newProperties).forEach((key) => {
             const value = newProperties[key];
             if (value[TRANSACTION_SYMBOL]) {
                 const { commit: childCommit } = value[TRANSACTION_SYMBOL];
-                initial[key] = childCommit();
+                result[key] = childCommit();
             } else {
-                initial[key] = newProperties[key];
+                result[key] = newProperties[key];
             }
         });
 
         for (const key of deletedProperties.keys()) {
-            delete initial[key];
+            delete result[key];
         }
 
         newProperties = {};
         deletedProperties = new Map<keyof T, true>();
 
-        return initial;
+        return result;
     };
 
     const rollback = () => {
@@ -209,6 +214,7 @@ export const transaction = <T extends {}>(
             }
 
             if (
+                !isTransaction(target[prop]) &&
                 typeof target[prop] === 'object' &&
                 target[prop] &&
                 !shouldNotWrapWithTransaction(target[prop])

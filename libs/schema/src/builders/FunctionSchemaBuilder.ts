@@ -55,12 +55,13 @@ export class FunctionSchemaBuilder<
         const {
             valid,
             object: objToValidate,
-            context: prevalidationContext
+            context: prevalidationContext,
+            errors
         } = superResult;
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return superResult;
+            return { valid, errors };
         }
 
         if (
