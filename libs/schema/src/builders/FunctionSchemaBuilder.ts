@@ -29,6 +29,7 @@ export class FunctionSchemaBuilder<
         super(props as any);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): FunctionSchemaBuilder<true, T> {
         return this.createFromProps({
             ...this.introspect()
@@ -54,8 +55,8 @@ export class FunctionSchemaBuilder<
 
         const {
             valid,
-            object: objToValidate,
             context: prevalidationContext,
+            transaction: preValidationTransaction,
             errors
         } = superResult;
         const { path } = prevalidationContext;
@@ -63,6 +64,10 @@ export class FunctionSchemaBuilder<
         if (!valid) {
             return { valid, errors };
         }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         if (
             (typeof objToValidate === 'undefined' || objToValidate === null) &&

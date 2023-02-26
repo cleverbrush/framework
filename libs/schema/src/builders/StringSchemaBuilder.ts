@@ -74,6 +74,7 @@ export class StringSchemaBuilder<
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): StringSchemaBuilder<T, true> {
         return this.createFromProps({
             ...this.introspect()
@@ -98,8 +99,8 @@ export class StringSchemaBuilder<
 
         const {
             valid,
-            object: objToValidate,
             context: prevalidationContext,
+            transaction: preValidationTransaction,
             errors
         } = superResult;
 
@@ -111,6 +112,10 @@ export class StringSchemaBuilder<
                 errors
             };
         }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         if (
             (typeof objToValidate === 'undefined' || objToValidate === null) &&

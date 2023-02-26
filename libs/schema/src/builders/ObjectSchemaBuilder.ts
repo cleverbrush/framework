@@ -176,9 +176,8 @@ export class ObjectSchemaBuilder<
         const prevalidatedResult = await super.preValidate(object, context);
         const {
             valid,
-            object: objToValidate,
             context: prevalidationContext,
-            validationTransaction,
+            transaction: validationTransaction,
             errors: preValidationErrors
         } = prevalidatedResult;
 
@@ -194,6 +193,10 @@ export class ObjectSchemaBuilder<
                 errors: preValidationErrors
             };
         }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = validationTransaction!;
 
         if (
             !this.isRequired &&
@@ -349,6 +352,7 @@ export class ObjectSchemaBuilder<
     }
 
     public hasType<T>(
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         notUsed?: T
     ): ObjectSchemaBuilder<TProperties, TRequired, T, TResult> {
         return this.createFromProps({
@@ -382,7 +386,11 @@ export class ObjectSchemaBuilder<
         TRequired,
         TExplicitType,
         TResult &
-            (TType extends SchemaBuilder<infer K, infer TR>
+            (TType extends SchemaBuilder<
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                infer K,
+                infer TR
+            >
                 ? TR extends false
                     ? {
                           [k in TName]?: InferType<TType>;
@@ -500,7 +508,9 @@ export class ObjectSchemaBuilder<
         schema: K
     ): K extends ObjectSchemaBuilder<
         infer TProp,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TReq,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TExpType,
         infer TRes
     >
@@ -578,12 +588,11 @@ export class ObjectSchemaBuilder<
      * from the TS world.
      * @param schema schema builder to take properties from.
      */
-    public omit<T>(
-        schema: T
-    ): T extends ObjectSchemaBuilder<
+    public omit<T>(schema: T): T extends ObjectSchemaBuilder<
         infer TProps,
         infer TRequired,
         infer TExplicitType,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TExternalResult
     >
         ? ObjectSchemaBuilder<
@@ -679,6 +688,7 @@ export class ObjectSchemaBuilder<
         schema: T
     ): T extends ObjectSchemaBuilder<
         infer TProps,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TReq,
         infer TExplType,
         infer TRes,
@@ -841,7 +851,15 @@ export class ObjectSchemaBuilder<
      */
     public pick<K extends ObjectSchemaBuilder<any, any, any, any, any>>(
         schema: K
-    ): K extends ObjectSchemaBuilder<infer TProps, infer T1, infer T2, infer T3>
+    ): K extends ObjectSchemaBuilder<
+        infer TProps,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        infer T1,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        infer T2,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        infer T3
+    >
         ? ObjectSchemaBuilder<
               {
                   [k in keyof TProps as k extends keyof TProperties
@@ -953,7 +971,11 @@ export class ObjectSchemaBuilder<
         },
         TRequired,
         TExplicitType,
-        R extends SchemaBuilder<infer S, infer TReq>
+        R extends SchemaBuilder<
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            infer S,
+            infer TReq
+        >
             ? Omit<TResult, K> &
                   (TReq extends false
                       ? {
@@ -1010,7 +1032,11 @@ export class ObjectSchemaBuilder<
         },
         TRequired,
         TExplicitType,
-        R extends SchemaBuilder<infer S, infer TReq>
+        R extends SchemaBuilder<
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            infer S,
+            infer TReq
+        >
             ? Omit<TResult, K> &
                   (TReq extends false
                       ? {
@@ -1041,7 +1067,11 @@ export class ObjectSchemaBuilder<
         },
         TRequired,
         TExplicitType,
-        R extends SchemaBuilder<infer S, infer TReq>
+        R extends SchemaBuilder<
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            infer S,
+            infer TReq
+        >
             ? Omit<TResult, K> &
                   (TReq extends false
                       ? {
@@ -1140,6 +1170,7 @@ export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     undefined,
     {
         [k in keyof TProps as TProps[k] extends SchemaBuilder<
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             infer TRes,
             infer TReq
         >
@@ -1149,6 +1180,7 @@ export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
             : never]?: InferType<TProps[k]>;
     } & {
         [k in keyof TProps as TProps[k] extends SchemaBuilder<
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
             infer TRes,
             infer TReq
         >

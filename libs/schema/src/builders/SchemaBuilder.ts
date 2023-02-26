@@ -34,9 +34,12 @@ export type ValidationResult<T> = {
     errors?: ValidationError[];
 };
 
-export type PreValidationResult<T, TTransactionType> = ValidationResult<T> & {
+export type PreValidationResult<T, TTransactionType> = Omit<
+    ValidationResult<T>,
+    'object'
+> & {
     context: ValidationContext;
-    validationTransaction?: Transaction<TTransactionType>;
+    transaction?: Transaction<TTransactionType>;
 };
 
 type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
@@ -265,15 +268,14 @@ export abstract class SchemaBuilder<
                     .filter((e) => e)
                     .filter((e, i) => (doNotStopOnFirstError ? true : i === 0)),
                 context: resultingContext,
-                validationTransaction: preprocessingTransaction
+                transaction: preprocessingTransaction
             };
         }
 
         return {
             valid: true,
             context: resultingContext,
-            object: preprocessedObject,
-            validationTransaction: preprocessingTransaction
+            transaction: preprocessingTransaction
         };
     }
 

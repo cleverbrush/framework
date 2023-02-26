@@ -28,6 +28,7 @@ export class AnySchemaBuilder<
         super(props as any);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): AnySchemaBuilder<true, T> {
         return this.createFromProps({
             ...this.introspect()
@@ -51,7 +52,11 @@ export class AnySchemaBuilder<
     ): Promise<ValidationResult<TResult>> {
         const superResult = await super.preValidate(object, context);
 
-        const { valid, object: objToValidate, errors } = superResult;
+        const {
+            valid,
+            transaction: preValidationTransaction,
+            errors
+        } = superResult;
 
         if (!valid) {
             return {
@@ -59,6 +64,10 @@ export class AnySchemaBuilder<
                 errors
             };
         }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         return {
             valid: true,

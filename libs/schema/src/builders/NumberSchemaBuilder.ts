@@ -102,6 +102,7 @@ export class NumberSchemaBuilder<
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): NumberSchemaBuilder<T, true> {
         return this.createFromProps({
             ...this.introspect()
@@ -127,13 +128,9 @@ export class NumberSchemaBuilder<
         const {
             valid,
             context: prevalidationContext,
-            validationTransaction,
+            transaction: preValidationTransaction,
             errors
         } = superResult;
-
-        const objToValidate =
-            validationTransaction?.object.validatedObject || superResult.object;
-        const commit = validationTransaction?.commit;
 
         const { path } = prevalidationContext;
 
@@ -143,6 +140,10 @@ export class NumberSchemaBuilder<
                 errors
             };
         }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         if (
             (typeof objToValidate === 'undefined' || objToValidate === null) &&
@@ -255,10 +256,7 @@ export class NumberSchemaBuilder<
 
         return {
             valid: true,
-            object:
-                typeof commit === 'function'
-                    ? commit().validatedObject
-                    : (objToValidate as TResult)
+            object: preValidationTransaction!.commit().validatedObject
         };
     }
 

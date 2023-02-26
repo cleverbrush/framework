@@ -21,6 +21,7 @@ type TakeBeforeIndex<
     TIndex extends number
 > = TArr extends [
     ...infer TRest extends SchemaBuilder<any, any>[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     infer TLast extends SchemaBuilder<any, any>
 ]
     ? TRest['length'] extends TIndex
@@ -87,6 +88,7 @@ export class UnionSchemaBuilder<
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
         return this.createFromProps({
             ...this.introspect()
@@ -111,15 +113,10 @@ export class UnionSchemaBuilder<
 
         const {
             valid,
-            validationTransaction,
+            transaction: preValidationTransaction,
             context: prevalidationContext,
             errors
         } = superResult;
-
-        const rollback = validationTransaction?.rollback;
-
-        let objToValidate =
-            validationTransaction?.object.validatedObject || superResult.object;
 
         const { path } = prevalidationContext;
 
@@ -129,6 +126,10 @@ export class UnionSchemaBuilder<
                 errors
             };
         }
+
+        let {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         if (
             !this.isRequired &&
@@ -167,9 +168,8 @@ export class UnionSchemaBuilder<
                     minErrorsCount = errors.length;
                 }
 
-                if (rollback) {
-                    objToValidate = rollback().validatedObject;
-                }
+                objToValidate =
+                    preValidationTransaction!.rollback().validatedObject;
             }
         }
 
@@ -240,6 +240,7 @@ export class UnionSchemaBuilder<
      * Removes first option.
      */
     public removeFirstOption(): TOptions extends [
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TFirst,
         ...infer TRest extends SchemaBuilder<any, any>[]
     ]

@@ -1,3 +1,4 @@
+import { transaction } from '../utils/transaction.js';
 import {
     Preprocessor,
     SchemaBuilder,
@@ -131,6 +132,7 @@ export class DateSchemaBuilder<
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): DateSchemaBuilder<T, true> {
         return this.createFromProps({
             ...this.introspect()
@@ -155,8 +157,6 @@ export class DateSchemaBuilder<
 
         const { valid, context: prevalidationContext, errors } = superResult;
 
-        let { object: objToValidate } = superResult;
-
         const { path } = prevalidationContext;
 
         if (!valid) {
@@ -165,6 +165,12 @@ export class DateSchemaBuilder<
                 errors
             };
         }
+
+        let { transaction: preValidationTransaction } = superResult;
+
+        let {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         if (
             (typeof objToValidate === 'undefined' || objToValidate === null) &&
@@ -177,11 +183,17 @@ export class DateSchemaBuilder<
         }
 
         if (this.#parseFromJson) {
-            objToValidate = parseFromJsonPreprocessor(objToValidate);
+            preValidationTransaction = transaction({
+                validatedObject: parseFromJsonPreprocessor(objToValidate)
+            });
+            objToValidate = preValidationTransaction.object.validatedObject;
         }
 
         if (this.#parseFromEpoch) {
-            objToValidate = parseFromEpochPreprocessor(objToValidate);
+            preValidationTransaction = transaction({
+                validatedObject: parseFromEpochPreprocessor(objToValidate)
+            });
+            objToValidate = preValidationTransaction.object.validatedObject;
         }
 
         if (!(objToValidate instanceof Date))
@@ -264,7 +276,8 @@ export class DateSchemaBuilder<
 
         return {
             valid: true,
-            object: objToValidate as TResult
+            object: preValidationTransaction!.commit()
+                .validatedObject as TResult
         };
     }
 

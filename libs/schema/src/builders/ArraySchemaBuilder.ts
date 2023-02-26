@@ -54,6 +54,7 @@ export class ArraySchemaBuilder<
         }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): ArraySchemaBuilder<TItemSchema, true, T> {
         return this.createFromProps({
             ...this.introspect()
@@ -83,9 +84,9 @@ export class ArraySchemaBuilder<
 
         const {
             valid,
-            object: objToValidate,
             context: prevalidationContext,
-            errors
+            errors,
+            transaction: preValidationTransaction
         } = superResult;
         const { path } = prevalidationContext;
 
@@ -95,6 +96,10 @@ export class ArraySchemaBuilder<
                 errors
             };
         }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         if (
             (typeof objToValidate === 'undefined' || objToValidate === null) &&

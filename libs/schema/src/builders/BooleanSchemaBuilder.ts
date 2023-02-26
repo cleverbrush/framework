@@ -47,6 +47,7 @@ export class BooleanSchemaBuilder<
         };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): BooleanSchemaBuilder<TResult, true, T> {
         return this.createFromProps({
             ...this.introspect()
@@ -72,8 +73,8 @@ export class BooleanSchemaBuilder<
 
         const {
             valid,
-            object: objToValidate,
             context: prevalidationContext,
+            transaction: preValidationTransaction,
             errors
         } = superResult;
 
@@ -82,6 +83,10 @@ export class BooleanSchemaBuilder<
         if (!valid) {
             return { valid, errors };
         }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
 
         if (
             (typeof objToValidate === 'undefined' || objToValidate === null) &&
