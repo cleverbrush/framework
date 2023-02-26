@@ -185,9 +185,6 @@ export class ObjectSchemaBuilder<
         let errors = prevalidatedResult.errors || [];
 
         if (!valid && !doNotStopOnFirstError) {
-            if (validationTransaction) {
-                validationTransaction.rollback();
-            }
             return {
                 valid,
                 errors: preValidationErrors
@@ -204,9 +201,7 @@ export class ObjectSchemaBuilder<
         ) {
             return {
                 valid: true,
-                object: validationTransaction
-                    ? validationTransaction.commit().validatedObject
-                    : (objToValidate as any)
+                object: validationTransaction!.commit().validatedObject
             };
         }
 
@@ -232,6 +227,12 @@ export class ObjectSchemaBuilder<
 
         if (propKeys.length === 0) {
             if (objKeys.length === 0) {
+                if (doNotStopOnFirstError && errors.length > 0) {
+                    return {
+                        valid: false,
+                        errors
+                    };
+                }
                 if (validationTransaction) {
                     validationTransaction.commit().validatedObject;
                 }
@@ -246,7 +247,7 @@ export class ObjectSchemaBuilder<
             propKeys.map(async (key) => ({
                 key,
                 result: await this.#properties[key].validate(
-                    objToValidate ? objToValidate[key] : (objToValidate as any),
+                    objToValidate[key],
                     {
                         ...context,
                         path: `${path}.${key}`
@@ -293,22 +294,15 @@ export class ObjectSchemaBuilder<
         }
 
         if (notValidResults.length === 0 && errors.length === 0) {
-            if (validationTransaction) {
-                const commited = validationTransaction.commit();
-                return {
-                    valid: true,
-                    object: commited.validatedObject
-                };
-            }
+            const commited = validationTransaction!.commit();
             return {
                 valid: true,
-                object: objToValidate
+                object: commited.validatedObject
             };
         }
 
-        if (validationTransaction) {
-            validationTransaction.rollback();
-        }
+        validationTransaction!.rollback();
+
         return {
             valid: false,
             errors: doNotStopOnFirstError
@@ -450,7 +444,9 @@ export class ObjectSchemaBuilder<
               >
             : TResult
     > {
-        return this as any;
+        return this.createFromProps({
+            ...this.introspect()
+        } as any) as any;
     }
 
     /**
@@ -608,7 +604,7 @@ export class ObjectSchemaBuilder<
             const propName =
                 propNameOrArrayOrPropsOrBuilder as keyof TProperties;
 
-            if (!(propName in this.#properties)) {
+            if (!propName || !(propName in this.#properties)) {
                 throw new Error(
                     `property ${propName.toString()} does not exists in the schema`
                 );
@@ -695,10 +691,10 @@ export class ObjectSchemaBuilder<
         any
     >
         ? ObjectSchemaBuilder<
-              TProperties & TProps,
+              Omit<TProperties, keyof TProps> & TProps,
               TRequired,
               TExplType,
-              TResult & TRes
+              Omit<TResult, keyof TRes> & TRes
           >
         : never {
         if (!(schema instanceof ObjectSchemaBuilder)) {
