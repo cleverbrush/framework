@@ -890,6 +890,7 @@ export class ObjectSchemaBuilder<
         undefined,
         K extends keyof TResult ? Pick<TResult, K> : TResult
     >;
+
     public pick(properties): any {
         if (typeof properties === 'string') {
             const property = properties as string;
@@ -947,7 +948,8 @@ export class ObjectSchemaBuilder<
             }
             return this.pick(props as any as keyof TProperties);
         }
-        throw new Error('not implemented');
+
+        throw new Error('string, array or ObjectSchemaBuilder is expected');
     }
 
     /**
@@ -1129,12 +1131,6 @@ export class ObjectSchemaBuilder<
                 return acc;
             }, {})
         } as any) as any;
-    }
-
-    public modifySchema<R extends SchemaBuilder>(
-        callback: (builder: this) => R
-    ): R {
-        throw new Error('not implemented');
     }
 }
 
