@@ -220,6 +220,7 @@ test('Required checks', async () => {
         expect(errors).not.toBeDefined();
     }
 });
+
 test('Has type checks', async () => {
     const schema1 = any();
     const schema2 = schema1.hasType<Date>();
@@ -300,6 +301,16 @@ test('Has type checks', async () => {
         expect(result).toEqual(obj);
         expect(errors).not.toBeDefined();
     }
+});
+
+test('Clear Has type - 1', () => {
+    const schema1 = any().hasType<Date>();
+    const schema2 = schema1.clearHasType();
+
+    const typeCheck: InferType<typeof schema2> = 23;
+
+    expectType<any>(typeCheck);
+    expect(schema1 !== (schema2 as any)).toEqual(true);
 });
 
 test('Preprocessors', async () => {

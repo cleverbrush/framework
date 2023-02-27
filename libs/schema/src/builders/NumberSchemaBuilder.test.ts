@@ -488,6 +488,16 @@ test('hasType - 2', () => {
     expectType<Date>(typeCheck1);
 });
 
+test('Clear Has type - 1', () => {
+    const schema1 = number().hasType<Date>();
+    const schema2 = schema1.clearHasType();
+
+    const typeCheck: InferType<typeof schema2> = 123;
+
+    expectType<number>(typeCheck);
+    expect(schema1 !== (schema2 as any)).toEqual(true);
+});
+
 test('isInteger - 1', async () => {
     const builder = number();
     const schema = builder.introspect();

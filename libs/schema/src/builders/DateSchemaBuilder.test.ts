@@ -515,6 +515,34 @@ test('Parse from JSON - 2', async () => {
     }
 });
 
+test('Parse from JSON - 3', async () => {
+    const builder = date().acceptJsonString();
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(null as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(undefined as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+});
+
 test('Parse from UNIX Epoch - 1', async () => {
     const builder1 = date();
     const builder2 = date().acceptEpoch();

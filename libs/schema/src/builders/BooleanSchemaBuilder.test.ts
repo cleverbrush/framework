@@ -165,3 +165,13 @@ test('hasType - 2', () => {
     const typeCheck1: InferType<typeof builder> = new Date();
     expectType<Date>(typeCheck1);
 });
+
+test('Clear Has type - 1', () => {
+    const schema1 = boolean().hasType<Date>();
+    const schema2 = schema1.clearHasType();
+
+    const typeCheck: InferType<typeof schema2> = true;
+
+    expectType<boolean>(typeCheck);
+    expect(schema1 !== (schema2 as any)).toEqual(true);
+});

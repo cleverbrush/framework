@@ -2396,3 +2396,27 @@ test('addProp - 1', async () => {
         schema1.addProp('second', 'sss' as any);
     }).toThrowError();
 });
+
+test('Custom path', async () => {
+    const schema = object({
+        first: string()
+    });
+
+    const { valid, errors } = await schema.validate(
+        {
+            unk: 123
+        } as any,
+        {
+            path: '$.sub',
+            doNotStopOnFirstError: true
+        }
+    );
+
+    expect(valid).toEqual(false);
+    expect(
+        Array.isArray(errors) &&
+            errors.length === 2 &&
+            errors[0].path === '$.sub.first' &&
+            errors[1].path === '$.sub'
+    ).toEqual(true);
+});

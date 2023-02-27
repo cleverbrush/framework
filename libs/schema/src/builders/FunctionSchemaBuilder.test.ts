@@ -250,3 +250,13 @@ test('Has type checks', async () => {
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
     }
 });
+
+test('Clear Has type - 1', () => {
+    const schema1 = func().hasType<Date>();
+    const schema2 = schema1.clearHasType();
+
+    const typeCheck: InferType<typeof schema2> = () => null;
+
+    expectType<(...args: any[]) => any>(typeCheck);
+    expect(schema1 !== (schema2 as any)).toEqual(true);
+});
