@@ -50,6 +50,52 @@ type TakeExceptIndex<
 /**
  * Union schema builder class. Allows to create schemas
  * containing alternatives. E.g. string | number | Date.
+ * Use it when you want to define a schema for a value
+ * that can be of different types. The type of the value
+ * will be determined by the first schema that succeeds
+ * validation. Any schema type can be supplied as variant.
+ * Which means that you are not limited to primitive types and
+ * can construct complex types as well, e.g. object | array.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link union | union()} function instead.
+ *
+ * @example
+ * ```ts
+ * const schema = union(string('foo')).or(string('bar'));
+ * const result = await schema.validate('foo');
+ * // result.valid === true
+ * // result.object === 'foo'
+ * ```
+ *
+ * @example
+ * ```ts
+ * const schema = union(string('foo')).or(string('bar'));
+ * const result = await schema.validate('baz');
+ * // result.valid === false
+ * ```
+ *
+ * @example
+ * ```ts
+ * const schema = union(string('yes')).or(string('no')).or(number(0)).or(number(1));
+ * // equals to 'yes' | 'no' | 0 | 1 in TS
+ * const result = await schema.validate('yes');
+ * // result.valid === true
+ * // result.object === 'yes'
+ *
+ * const result2 = await schema.validate(0);
+ * // result2.valid === true
+ * // result2.object === 0
+ *
+ * const result3 = await schema.validate('baz');
+ * // result3.valid === false
+ *
+ * const result4 = await schema.validate(2);
+ * // result4.valid === false
+ * ```
+ *
+ * @see {@link union}
  */
 export class UnionSchemaBuilder<
     TOptions extends readonly SchemaBuilder<any, any>[],
@@ -88,6 +134,9 @@ export class UnionSchemaBuilder<
         };
     }
 
+    /**
+     * @hidden
+     */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
         return this.createFromProps({
@@ -95,6 +144,9 @@ export class UnionSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public clearHasType(): UnionSchemaBuilder<TOptions, TRequired, undefined> {
         return this.createFromProps({
             ...this.introspect()
@@ -186,16 +238,23 @@ export class UnionSchemaBuilder<
         return UnionSchemaBuilder.create(props as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public required(): UnionSchemaBuilder<TOptions, true, TExplicitType> {
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): UnionSchemaBuilder<TOptions, false, TExplicitType> {
         return super.optional();
     }
 
     /**
      * Adds a new schema option described by `schema`.
+     * schema must be an instance of `SchemaBuilder` class ancestor.
      * @param schema schema to be added as an option.
      */
     public or<T extends SchemaBuilder<any, any>>(
@@ -213,7 +272,8 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * Removes option by its `index`.
+     * Removes option by its `index`. If `index` is out of bounds,
+     * an error is thrown.
      * @param index index of the option, starting from `0`.
      */
     public removeOption<T extends number>(
@@ -237,7 +297,7 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * Removes first option.
+     * Removes first option from the union schema.
      */
     public removeFirstOption(): TOptions extends [
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -251,6 +311,7 @@ export class UnionSchemaBuilder<
 
     /**
      * Removes all options and replaces them by single `schema` option.
+     * Equivalent to `union(schema)` function, but could be useful in some cases.
      * @param schema schema to be added as a single option to the new schema.
      */
     public reset<T extends SchemaBuilder<any, any>>(

@@ -13,6 +13,40 @@ type NumberSchemaBuilderCreateProps<
 
 /**
  * Number schema builder class. Allows to create Number schemas.
+ * Can be required or optional, can be restricted to be equal to a certain value,
+ * can be restricted to be in a certain range, can be restricted to be integer.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link number | number()} function instead.
+ *
+ * @example ```ts
+ * const schema = number().equals(42);
+ * const result = await schema.validate(42);
+ * // result.valid === true
+ * // result.object === 42
+ * ```
+ * @example ```ts
+ * const schema = number();
+ * const result = await schema.validate('42');
+ * // result.valid === false
+ * // result.errors[0].message === 'is expected to be a number'
+ * ```
+ * @example ```ts
+ * const schema = number().min(0).max(100);
+ * const result = await schema.validate(42);
+ * // result.valid === true
+ * // result.object === 42
+ * ```
+ *
+ * @example ```ts
+ * const schema = number().min(0).max(100);
+ * const result = await schema.validate(142.5);
+ * // result.valid === false
+ * // result.errors[0].message === 'is expected to be less than or equal to 100'
+ * ```
+ *
+ * @see {@link number}
  */
 export class NumberSchemaBuilder<
     TResult = number,
@@ -102,6 +136,9 @@ export class NumberSchemaBuilder<
         };
     }
 
+    /**
+     * @hidden
+     */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): NumberSchemaBuilder<T, true> {
         return this.createFromProps({
@@ -109,6 +146,9 @@ export class NumberSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public clearHasType(): NumberSchemaBuilder<number, TRequired> {
         return this.createFromProps({
             ...this.introspect()
@@ -267,7 +307,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Restricts object to be equal to `value`.
+     * Restricts number to be equal to `value`.
      */
     public equals<T extends number>(value: T) {
         if (typeof value !== 'number') throw new Error('number expected');
@@ -278,7 +318,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Removes a `value` defeined by `equals()` call.
+     * Clear `equals()` call.
      */
     public clearEquals(): NumberSchemaBuilder<number, TRequired> {
         return this.createFromProps({
@@ -288,7 +328,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Floating point number will be considered as valid after this call.
+     * Float values will be considered as valid after this call.
      */
     public isFloat(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
@@ -307,10 +347,16 @@ export class NumberSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * @hidden
+     */
     public required(): NumberSchemaBuilder<TResult, true> {
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): NumberSchemaBuilder<TResult, false> {
         return super.optional();
     }
@@ -346,7 +392,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Consider `Infinity` as valid value.
+     * Consider `Infinity` as valid.
      */
     public canBeInfinite(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
@@ -356,7 +402,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Set minimal valid value for schema.
+     * Restrict number to be at least `minValue`.
      */
     public min(minValue: number): NumberSchemaBuilder<TResult, TRequired> {
         if (typeof minValue !== 'number')
@@ -368,7 +414,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Clear minimal valid value for schema.
+     * Clear `min()` call.
      */
     public clearMin(): NumberSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
@@ -379,7 +425,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Set maximal valid value for schema.
+     * Restrict number to be no more than `maxValue`.
      */
     public max(maxValue: number): NumberSchemaBuilder<TResult, TRequired> {
         if (typeof maxValue !== 'number')
@@ -391,7 +437,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Clear maximal valid value for schema.
+     * Clear `max()` call.
      */
     public clearMax(): NumberSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
@@ -403,9 +449,29 @@ export class NumberSchemaBuilder<
 }
 
 /**
+ * Creates a number schema restricted to `equals` value.
+ * @param equals string value
+ */
+export function number<T extends number>(
+    equals: T
+): NumberSchemaBuilder<T, true>;
+
+/**
  * Creates a number schema.
  */
-export const number = () =>
-    NumberSchemaBuilder.create({
+export function number(): NumberSchemaBuilder<number, true>;
+
+/**
+ * Creates a number schema.
+ */
+export function number(equals?: number) {
+    if (typeof equals === 'number') {
+        return NumberSchemaBuilder.create({
+            isRequired: true,
+            equalsTo: equals
+        });
+    }
+    return NumberSchemaBuilder.create({
         isRequired: true
     });
+}

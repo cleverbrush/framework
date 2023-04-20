@@ -9,7 +9,34 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 >;
 
 /**
- * Boolean schema builder class.
+ * Similar to `boolean` type in TypeScript.
+ * Allows to define a schema for a boolean value. It can be required or optional.
+ * It can be restricted to be equal to a certain value.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link boolean | boolean()} function instead.
+ *
+ * @example ```ts
+ * const schema = boolean().equals(true);
+ * const result = await schema.validate(true);
+ * // result.valid === true
+ * // result.object === true
+ * ```
+ * @example ```ts
+ * const schema = boolean().equals(false);
+ * const result = await schema.validate(true);
+ * // result.valid === false
+ * // result.errors[0].message === 'is expected to be equal to 'false''
+ * ```
+ * @example ```ts
+ * const schema = boolean().equals(true).optional();
+ * const result = await schema.validate(undefined);
+ * // result.valid === true
+ * // result.object === undefined
+ * ```
+ *
+ * @see {@link boolean}
  */
 export class BooleanSchemaBuilder<
     TResult = boolean,

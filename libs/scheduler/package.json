@@ -23,5 +23,11 @@
     "dependencies": {
         "@cleverbrush/schema": "1.0.0-beta.5"
     },
-    "types": "./dist/index.d.ts"
+    "types": "./dist/index.d.ts",
+    "typedoc": {
+        "entryPoint": "./src/index.ts",
+        "readmeFile": "./README.md",
+        "displayName": "Job Scheduler",
+        "tsconfig": "./tsconfig.json"
+    }
 }

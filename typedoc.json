@@ -1,0 +1,13 @@
+{ 
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPointStrategy": "packages",
+    "entryPoints": [
+        "libs/async",
+        "libs/deep",
+        "libs/scheduler",
+        "libs/schema"
+    ],
+    "name": "Libraries",
+    "excludePrivate": true,
+    "plugin": ["typedoc-plugin-versions"]
+}

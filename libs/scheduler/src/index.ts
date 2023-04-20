@@ -71,6 +71,9 @@ interface IJobScheduler {
     removeJob(id: string): Promise<void>;
 }
 
+/**
+ * Job scheduler class that handles all the scheduling and running of jobs.
+ */
 export class JobScheduler extends EventEmitter implements IJobScheduler {
     protected _rootFolder: string;
     protected _status: SchedulerStatus = 'stopped';
@@ -82,6 +85,9 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
     protected _jobProps: Map<string, any> = new Map<string, any>();
 
+    /**
+     * Status of the scheduler.
+     */
     public get status() {
         return this._status;
     }
@@ -93,6 +99,11 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
     private scheduleCalculatorCache = new Map<string, ScheduleCalculator>();
 
+    /**
+     * Get the schedule calculator for a job by its id.
+     * @param {Job} job
+     * @returns {Promise<ScheduleCalculator>}
+     */
     protected async getJobSchedule(job: Job) {
         if (this.scheduleCalculatorCache.has(job.id)) {
             return this.scheduleCalculatorCache.get(job.id);
@@ -170,6 +181,10 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         });
     }
 
+    /**
+     * Start a job instance. This will run the job and update the status of the instance.
+     * @param {JobInstance} instance - The job instance to start.
+     */
     protected async startJobInstance(instance: JobInstance): Promise<void> {
         const startDate = new Date();
         instance = await this._jobsRepository.saveInstance({
@@ -419,6 +434,9 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         }
     }
 
+    /**
+     * Starts the scheduler (all jobs will be scheduled and executed when it's time).
+     */
     public async start() {
         if (this._status === 'started') {
             throw new Error('Scheduler is already started');
@@ -434,6 +452,9 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         // TODO: add logic
     }
 
+    /**
+     * Stops the scheduler (all jobs will be stopped and no new jobs will be scheduled).
+     */
     public stop() {
         if (this._status === 'stopped') {
             throw new Error('Scheduler is already stopped');
@@ -445,10 +466,20 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         // TODO: add logic
     }
 
+    /**
+     * Checks if job exists by id
+     * @param {string} jobId - id of the job
+     * @returns {Promise<boolean>} - true if job exists, false otherwise
+     */
     public async jobExists(jobId: string): Promise<boolean> {
         return (await this._jobsRepository.getJobById(jobId)) !== null;
     }
 
+    /**
+     * Removes job by its id
+     * @param jobId {string} - id of the job
+     * @returns {Promise<void>}
+     */
     public async removeJob(jobId: string): Promise<void> {
         if (typeof jobId !== 'string' || !jobId) {
             throw new Error('id is required');
@@ -457,6 +488,10 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         await this._jobsRepository.removeJob(jobId);
     }
 
+    /**
+     * Adds job to the scheduler
+     * @param job {CreateJobRequest} - job to add
+     */
     public async addJob(job: CreateJobRequest) {
         const validationResult = await Schemas.CreateJobRequestSchema.validate(
             job
@@ -494,6 +529,10 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         });
     }
 
+    /**
+     *
+     * @param props {JobSchedulerProps} - scheduler properties
+     */
     constructor(props: JobSchedulerProps) {
         super();
         if (typeof props.rootFolder !== 'string') {

@@ -9,7 +9,30 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 >;
 
 /**
- * Function schema builder class.
+ * Schema builder for functions. Allows to define a schema for a function.
+ * It can be: required or optional.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link func | func()} function instead.
+ *
+ * @example
+ * ```ts
+ * const schema = func();
+ * const result = await schema.validate(() => {});
+ * // result.valid === true
+ * // result.object === () => {}
+ * ```
+ *
+ * @example
+ * ```ts
+ * const schema = func().optional();
+ * const result = await schema.validate(undefined);
+ * // result.valid === true
+ * // result.object === undefined
+ * ```
+ *
+ * @see {@link func}
  */
 export class FunctionSchemaBuilder<
     TRequired extends boolean = true,
@@ -29,6 +52,9 @@ export class FunctionSchemaBuilder<
         super(props as any);
     }
 
+    /**
+     * @hidden
+     */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): FunctionSchemaBuilder<true, T> {
         return this.createFromProps({
@@ -36,6 +62,9 @@ export class FunctionSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public clearHasType(): FunctionSchemaBuilder<TRequired, undefined> {
         return this.createFromProps({
             ...this.introspect()
@@ -103,10 +132,16 @@ export class FunctionSchemaBuilder<
         return FunctionSchemaBuilder.create(props as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public required(): FunctionSchemaBuilder<true, TExplicitType> {
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): FunctionSchemaBuilder<false, TExplicitType> {
         return super.optional();
     }
@@ -114,6 +149,7 @@ export class FunctionSchemaBuilder<
 
 /**
  * Creates a `function` schema.
+ * @retuns {@link FunctionSchemaBuilder}
  */
 export const func = () =>
     FunctionSchemaBuilder.create({

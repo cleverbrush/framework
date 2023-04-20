@@ -12,7 +12,57 @@ type StringSchemaBuilderCreateProps<
 > = Partial<ReturnType<StringSchemaBuilder<T, R>['introspect']>>;
 
 /**
- * String schema builder class. Allows to create String schemas.
+ * Allows to define a schema for a string. It can be: required or optional,
+ * restricted to be equal to a certain value, restricted to have a certain
+ * length.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link string | string()} function instead.
+ *
+ * @example ```ts
+ * const schema = string().equals('hello');
+ * const result = await schema.validate('hello');
+ * // result.valid === true
+ * // result.object === 'hello'
+ * ```
+ *
+ * @example ```ts
+ * const schema = string().equals('hello');
+ * const result = await schema.validate('world');
+ * // result.valid === false
+ * // result.errors[0].message === "is expected to be equal to 'hello'"
+ * ```
+ *
+ * @example ```ts
+ * const schema = string().minLength(5);
+ * const result = await schema.validate('hello');
+ * // result.valid === true
+ * // result.object === 'hello'
+ * ```
+ *
+ * @example ```ts
+ * const schema = string().minLength(5);
+ * const result = await schema.validate('hi');
+ * // result.valid === false
+ * // result.errors[0].message === 'is expected to have a length of at least 5'
+ * ```
+ *
+ * @example ```ts
+ * const schema = string().minLength(2).maxLength(5);
+ * const result = await schema.validate('yes');
+ * // result.valid === true
+ * // result.object === 'yes'
+ * ```
+ *
+ * @example ```ts
+ * const schema = string('no');
+ * const result = await schema.validate('yes');
+ * // result.valid === false
+ * // result.errors[0].message === "is expected to be equal to 'no'"
+ * ```
+ *
+ * @see {@link string}
  */
 export class StringSchemaBuilder<
     TResult = string,
@@ -74,6 +124,9 @@ export class StringSchemaBuilder<
         };
     }
 
+    /**
+     * @hidden
+     */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): StringSchemaBuilder<T, true> {
         return this.createFromProps({
@@ -81,6 +134,9 @@ export class StringSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public clearHasType(): StringSchemaBuilder<string, TRequired> {
         return this.createFromProps({
             ...this.introspect()
@@ -206,7 +262,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * Removes a `value` defeined by `equals()` call.
+     * Cancels `equals()` call.
      */
     public clearEquals(): StringSchemaBuilder<string, TRequired> {
         return this.createFromProps({
@@ -215,16 +271,23 @@ export class StringSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * @hidden
+     */
     public required(): StringSchemaBuilder<TResult, true> {
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): StringSchemaBuilder<TResult, false> {
         return super.optional();
     }
 
     /**
      * Set minimal length of the valid value for schema.
+     * @param {number} length
      */
     public minLength(length: number): StringSchemaBuilder<TResult, TRequired> {
         if (typeof length !== 'number')
@@ -236,7 +299,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * Clear minimal length of the valid value for schema.
+     * Cancel `minLength()` call.
      */
     public clearMinLength(): StringSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
@@ -248,6 +311,7 @@ export class StringSchemaBuilder<
 
     /**
      * Set maximal length of the valid value for schema.
+     * @length {number} length
      */
     public maxLength(length: number): StringSchemaBuilder<TResult, TRequired> {
         if (typeof length !== 'number')
@@ -259,7 +323,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * Clear maximal length of the valid value for schema.
+     * cancel `maxLength()` call.
      */
     public clearMaxLength(): StringSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
@@ -270,6 +334,10 @@ export class StringSchemaBuilder<
     }
 }
 
+/**
+ * Creates a string schema restricted to be equal to `equals`.
+ * @param equals number value
+ */
 export function string<T extends string>(
     equals: T
 ): StringSchemaBuilder<T, true>;

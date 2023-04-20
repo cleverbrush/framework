@@ -9,9 +9,9 @@ import { InferType } from './SchemaBuilder.js';
 
 test('Types - 1', async () => {
     const schema1 = array();
-    const schema2 = schema1.setItemSchema(number());
-    const schema3 = schema2.setItemSchema(string());
-    const schema4 = schema3.clearItemSchema();
+    const schema2 = schema1.of(number());
+    const schema3 = schema2.of(string());
+    const schema4 = schema3.clearOf();
     const schema5 = schema4.hasType<Date>();
     const schema6 = schema5.clearHasType();
 
@@ -55,9 +55,9 @@ test('Types - 1', async () => {
     }
 
     const optionalSchema1 = schema1.optional();
-    const optionalSchema2 = optionalSchema1.setItemSchema(number());
-    const optionalSchema3 = optionalSchema2.setItemSchema(string());
-    const optionalSchema4 = optionalSchema3.clearItemSchema();
+    const optionalSchema2 = optionalSchema1.of(number());
+    const optionalSchema3 = optionalSchema2.of(string());
+    const optionalSchema4 = optionalSchema3.clearOf();
 
     const requiredSchema = optionalSchema4.required();
 
@@ -73,7 +73,7 @@ test('Types - 1', async () => {
     expectType<Array<string> | undefined>(optionalVal3);
     expectType<Array<any> | undefined>(optionalVal4);
 
-    const arrayOfUnionSchema = array().setItemSchema(
+    const arrayOfUnionSchema = array().of(
         union(number().equals(1)).or(string().equals('2'))
     );
 
@@ -369,9 +369,9 @@ test('Max Length - 2', async () => {
     }
 });
 
-test('setItemSchema - 1', async () => {
+test('of - 1', async () => {
     const schema1 = array();
-    const schema2 = schema1.setItemSchema(
+    const schema2 = schema1.of(
         union(number()).or(
             object({
                 num: number(),
@@ -426,8 +426,8 @@ test('setItemSchema - 1', async () => {
     }
 });
 
-test('setItemSchema - 2', async () => {
-    const schema = array().setItemSchema(
+test('of - 2', async () => {
+    const schema = array().of(
         union(number()).or(
             object({
                 num: number(),
@@ -483,4 +483,18 @@ test('setItemSchema - 2', async () => {
         expect(result).toEqual([2, 1, { num: 234, str: '244' }]);
         expect(errors).toBeUndefined();
     }
+});
+
+test('One call to set elementSchema - 1', () => {
+    const schema = array(number());
+
+    const typeCheck: InferType<typeof schema> = [1, 2, 3, 4];
+    expectType<number[]>(typeCheck);
+});
+
+test('One call to set elementSchema - 2', () => {
+    const schema = array(union(number(0)).or(number(1)).or(number(2)));
+
+    const typeCheck: InferType<typeof schema> = [1, 2, 0];
+    expectType<(0 | 1 | 2)[]>(typeCheck);
 });

@@ -72,6 +72,13 @@ export type ValidationContext = {
     doNotStopOnFirstError?: boolean;
 };
 
+/**
+ * Base class for all schema builders. Provides basic functionality for schema building.
+ *
+ * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
+ * @typeparam TResult Type of the object that will be returned by `validate()` method.
+ * @typeparam TRequired If `true`, object will be required. If `false`, object will be optional.
+ */
 export abstract class SchemaBuilder<
     TResult = any,
     TRequired extends boolean = true
@@ -94,6 +101,12 @@ export abstract class SchemaBuilder<
      */
     public abstract clearHasType();
 
+    /**
+     * Protected method used to create an new instance of the Builder
+     * defined by the `props` object. Should be used to instanticate new
+     * builders to keep builder's immutability.
+     * @param props arbitrary props object
+     */
     protected abstract createFromProps(props): this;
 
     protected get type() {
@@ -106,10 +119,18 @@ export abstract class SchemaBuilder<
         this.#type = value;
     }
 
+    /**
+     * A list of preprocessors associated with
+     * the Builder
+     */
     protected get preprocessors() {
         return this.#preprocessors;
     }
 
+    /**
+     * A list of validators associated with
+     * the Builder
+     */
     protected get validators() {
         return this.#validators;
     }

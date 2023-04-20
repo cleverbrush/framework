@@ -4,10 +4,26 @@ const isBothNaN = function (v1, v2) {
     return Number.isNaN(v1) && Number.isNaN(v2);
 };
 
+/**
+ * Compares two objects and returns true if they
+ * have the same structure and values. Can work
+ * with arrays and objects, nested objects,
+ * recursive objects, dates, etc.
+ * @param p1 first object
+ * @param p2 second object
+ * @param options additional options
+ * @returns {boolean} `true` if the objects are equal, `false` otherwise
+ */
 const deepEqual = function (
     p1,
     p2,
-    options?: { disregardArrayOrder?: boolean }
+    options?: {
+        /**
+         * if true, the order of the elements in the array will be disregarded
+         * e.g. [1, 2] and [2, 1] will be considered equal
+         */
+        disregardArrayOrder?: boolean;
+    }
 ): boolean {
     const cache = new Map();
 

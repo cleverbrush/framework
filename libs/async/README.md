@@ -8,10 +8,6 @@ This package contains the set of simple utilities to work with Async abstraction
 
 ## Usage
 
-    const asyncUtils = require('@cleverbrush/async');
-
-or for ES Module
-
     import { Collector } from '@cleverbrush/async';
 
 ## Classes

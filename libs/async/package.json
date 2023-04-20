@@ -20,5 +20,11 @@
         "type": "git",
         "url": "github:cleverbrush/libs"
     },
-    "types": "./dist/index.d.ts"
+    "types": "./dist/index.d.ts",
+    "typedoc": {
+        "entryPoint": "./src/index.ts",
+        "readmeFile": "./README.md",
+        "displayName": "Async utilities",
+        "tsconfig": "./tsconfig.json"
+    }
 }

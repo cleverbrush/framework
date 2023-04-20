@@ -25,5 +25,11 @@
     "devDependencies": {
         "@cleverbrush/deep": "1.0.0-beta.6"
     },
-    "types": "./dist/index.d.ts"
+    "types": "./dist/index.d.ts",
+    "typedoc": {
+        "entryPoint": "./src/index.ts",
+        "readmeFile": "./README.md",
+        "displayName": "Schema Definition And Validation",
+        "tsconfig": "./tsconfig.json"
+    }
 }

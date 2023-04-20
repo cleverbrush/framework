@@ -32,7 +32,44 @@ const parseFromEpochPreprocessor = (value) => {
 };
 
 /**
- * Date schema builder class. Allows to create Date schemas.
+ * Allows to create Date schema. It can be required or optional.
+ * It can be restricted to be: equal to a certain value, in future, in past, in a certain range.
+ * Supports parsing from JSON string and UNIX epoch (using preprocessors).
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link date | date()} function instead.
+ *
+ * @example ```ts
+ * const date = new Date(2020, 0, 2);
+ * const schema = date().min(new Date(2020, 0, 1));
+ * const result = await schema.validate(date);
+ * // result.valid === true
+ * // result.object === date
+ * ```
+ *
+ * @example ```ts
+ * const schema = date();
+ * const result = await schema.validate('2020-01-01');
+ * // result.valid === false
+ * // result.errors[0].message === 'is expected to be a date'
+ * ```
+ *
+ * @example ```ts
+ * const schema = date().parseFromJson();
+ * const result = await schema.validate('2020-01-01T00:00:00.000Z');
+ * // result.valid === true
+ * // result.object is equal to corresponding Date object
+ * ```
+ *
+ * @example ```ts
+ * const schema = date().parseFromEpoch();
+ * const result = await schema.validate(1577836800000);
+ * // result.valid === true
+ * // result.object is equal to corresponding Date object
+ * ```
+ *
+ * @see {@link date}
  */
 export class DateSchemaBuilder<
     TResult = Date,
@@ -132,6 +169,9 @@ export class DateSchemaBuilder<
         };
     }
 
+    /**
+     * @hidden
+     */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): DateSchemaBuilder<T, true> {
         return this.createFromProps({
@@ -139,6 +179,9 @@ export class DateSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public clearHasType(): DateSchemaBuilder<Date, TRequired> {
         return this.createFromProps({
             ...this.introspect()
@@ -281,6 +324,9 @@ export class DateSchemaBuilder<
         };
     }
 
+    /**
+     * @hidden
+     */
     protected createFromProps<T, TReq extends boolean>(
         props: DateSchemaBuilderCreateProps<T, TReq>
     ): this {
@@ -288,7 +334,7 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * Restricts object to be equal to `value`.
+     * Restricts Date to be equal to `value`.
      */
     public equals<T extends Date>(value: T) {
         if (!(value instanceof Date)) throw new Error('Date expected');
@@ -299,7 +345,7 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * Removes a `value` defeined by `equals()` call.
+     * Clears `equals()` call.
      */
     public clearEquals(): DateSchemaBuilder<Date, TRequired> {
         return this.createFromProps({
@@ -308,16 +354,22 @@ export class DateSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * @hidden
+     */
     public required(): DateSchemaBuilder<TResult, true> {
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): DateSchemaBuilder<TResult, false> {
         return super.optional();
     }
 
     /**
-     * Accept only dates in future.
+     * Accept only dates in the future.
      */
     public isInFuture(): DateSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
@@ -369,7 +421,7 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * Clear minimal valid value for schema.
+     * Clear `min()` call.
      */
     public clearMin(): DateSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
@@ -392,7 +444,7 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * Clear maximal valid value for schema.
+     * Clear `max()` call.
      */
     public clearMax(): DateSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
@@ -402,6 +454,10 @@ export class DateSchemaBuilder<
         }) as any;
     }
 
+    /**
+     * Accepts JSON string as a valid Date.
+     * String must be in ISO format and will be parsed using `JSON.parse()`.
+     */
     public acceptJsonString(): DateSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -409,6 +465,9 @@ export class DateSchemaBuilder<
         });
     }
 
+    /**
+     * Cancel `acceptJsonString()` call.
+     */
     public doNotAcceptJsonString(): DateSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -416,6 +475,10 @@ export class DateSchemaBuilder<
         });
     }
 
+    /**
+     * Accepts epoch number as a valid Date.
+     * Epoch number will be parsed using `new Date(epoch)`.
+     */
     public acceptEpoch(): DateSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
@@ -423,6 +486,9 @@ export class DateSchemaBuilder<
         });
     }
 
+    /**
+     * Cancel `acceptEpoch()` call.
+     */
     public doNotAcceptEpoch(): DateSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),

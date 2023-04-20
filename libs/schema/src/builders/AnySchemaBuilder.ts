@@ -10,13 +10,29 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<
 
 /**
  * Any schema builder class. Similar to the `any` type
- * in TypeScript.
+ * in TypeScript. Allows to define a schema for `any` value.
+ * Use it when you don't know the type of the value.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use `any()` function instead.
+ *
+ * @example
+ * ```ts
+ * const schema = any();
+ * const result = await schema.validate(123);
+ * // result.valid === true
+ * // result.object === 123
+ * ```
  */
 export class AnySchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
     TResult = TExplicitType extends undefined ? any : TExplicitType
 > extends SchemaBuilder<TResult, TRequired> {
+    /**
+     * @hidden
+     */
     public static create(props: AnySchemaBuilderCreateProps<any>) {
         return new AnySchemaBuilder({
             type: 'any',
@@ -28,6 +44,9 @@ export class AnySchemaBuilder<
         super(props as any);
     }
 
+    /**
+     * @hidden
+     */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): AnySchemaBuilder<true, T> {
         return this.createFromProps({
@@ -35,6 +54,9 @@ export class AnySchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public clearHasType(): AnySchemaBuilder<TRequired, undefined> {
         return this.createFromProps({
             ...this.introspect()
@@ -42,7 +64,7 @@ export class AnySchemaBuilder<
     }
 
     /**
-     * Performs validion of the schema over `object`. Basically runs
+     * Performs validation of the schema over `object`. Basically runs
      * validators, preprocessors and checks for required (if schema is not optional).
      * @param context Optional `ValidationContext` settings.
      */
@@ -81,10 +103,16 @@ export class AnySchemaBuilder<
         return AnySchemaBuilder.create(props as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public required(): AnySchemaBuilder<true, TExplicitType> {
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): AnySchemaBuilder<false, TExplicitType> {
         return super.optional();
     }
@@ -92,6 +120,28 @@ export class AnySchemaBuilder<
 
 /**
  * Creates a `any` schema.
+ * @example
+ * ```
+ *  const anyObject = any();
+ *
+ * // null - invalid
+ * // undefined - invalid
+ * // string - valid
+ * // {} - valid
+ * // Date -valid
+ * // { someProp: 123 } - valid
+ * // etc
+ * ```
+ * @example
+ * ```
+ *  const anyObject = any().optional();
+ *  // null - valid
+ *  // undefined - valid
+ *  // string - valid
+ *  // {} - valid
+ *  // Date -valid
+ *  // { someProp: 123 } - valid
+ * ```
  */
 export const any = () =>
     AnySchemaBuilder.create({

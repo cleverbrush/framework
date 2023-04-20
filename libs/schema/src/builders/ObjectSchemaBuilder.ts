@@ -37,7 +37,89 @@ type MergeTwo<L, R> = Id<
 >;
 
 /**
- * Used to build arbitrary object schemas
+ * Object schema builder class. Similar to the `object` type
+ * in JS. Allows to define a schema for `object` value.
+ * Should be used to validate objects with specific properties.
+ * Properties should be defined as their own schema builders.
+ * You can use any `SchemaBuilder` e.g. `string()`, `number()`,
+ * `boolean()`, `array()`, `object()`, etc. to define properties.
+ * Which means that you can define nested objects and arrays of
+ * any complexity.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link object | object()} function instead.
+ *
+ * @example
+ * ```ts
+ * const schema = object({
+ *    name: string(),
+ *    age: number()
+ * });
+ *
+ * const result = await schema.validate({
+ *   name: 'John',
+ *   age: 30
+ * });
+ *
+ * // result.valid === true
+ * // result.object === { name: 'John', age: 30 }
+ * ```
+ *
+ * @example
+ * ```ts
+ * const schema = object({
+ *   name: string(),
+ *   age: number().optional()
+ * });
+ *
+ * const result = await schema.validate({
+ *  name: 'John'
+ * });
+ * // result.valid === true
+ * // result.object === { name: 'John' }
+ * ```
+ *
+ * @example
+ * ```ts
+ * const schema = object({
+ *  name: string(),
+ *  age: number();
+ * });
+ * const result = await schema.validate({
+ *  name: 'John'
+ * });
+ *
+ * // result.valid === false
+ * // result.errors[0].message === "is expected to have property 'age'"
+ * ```
+ *
+ * @example
+ * ```ts
+ * const schema = object({
+ * name: string(),
+ * address: object({
+ *     city: string(),
+ *     country: string()
+ *   })
+ * });
+ * const result = await schema.validate({
+ * name: 'John',
+ * address: {
+ *    city: 'New York',
+ *    country: 'USA'
+ *  }
+ * });
+ * // result.valid === true
+ * // result.object === {
+ * //   name: 'John',
+ * //   address: {
+ * //     city: 'New York',
+ * //     country: 'USA'
+ * //   }
+ * // }
+ * ```
+ * @see {@link object}
  */
 export class ObjectSchemaBuilder<
     TProperties extends Record<string, SchemaBuilder<any, any>> = {},
@@ -95,6 +177,9 @@ export class ObjectSchemaBuilder<
         };
     }
 
+    /**
+     * @hidden
+     */
     public required(): ObjectSchemaBuilder<
         TProperties,
         true,
@@ -104,6 +189,9 @@ export class ObjectSchemaBuilder<
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): ObjectSchemaBuilder<
         TProperties,
         false,
@@ -331,7 +419,7 @@ export class ObjectSchemaBuilder<
 
     /**
      * Fields not defined in `properties` will be considered
-     * as schema violation.
+     * as schema violation. This is the default behavior.
      */
     public notAcceptUnknownProps(): ObjectSchemaBuilder<
         TProperties,
@@ -345,6 +433,9 @@ export class ObjectSchemaBuilder<
         } as ObjectSchemaBuilderProps) as any;
     }
 
+    /**
+     * @hidden
+     */
     public hasType<T>(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         notUsed?: T
@@ -354,6 +445,9 @@ export class ObjectSchemaBuilder<
         } as ObjectSchemaBuilderProps) as any;
     }
 
+    /**
+     * @hidden
+     */
     public clearHasType(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
@@ -366,7 +460,8 @@ export class ObjectSchemaBuilder<
     }
 
     /**
-     * Add property to the schema `properties`
+     * Adds a new property to the object schema. The new property
+     * will be validated according to the provided schema.
      * @param propName name of the new property
      * @param schema schema builder of the new property
      */
@@ -416,6 +511,7 @@ export class ObjectSchemaBuilder<
     }
 
     /**
+     * @hidden
      * @deprecated this is for internal use, do not use if you are
      * not sure you need it.
      */
@@ -451,7 +547,8 @@ export class ObjectSchemaBuilder<
 
     /**
      * Adds new properties to the object schema. The same as `.addProp()` but
-     * allows to add multiple properties with one call.
+     * allows to add multiple properties with one call. The new properties
+     * will be validated according to the provided schemas.
      * @param props a key/schema object map.
      */
     public addProps<
@@ -499,6 +596,7 @@ export class ObjectSchemaBuilder<
 
     /**
      * Adds all properties from the `schema` object schema to the current schema.
+     * @param schema an instance of `ObjectSchemaBuilder`
      */
     public addProps<K extends ObjectSchemaBuilder<any, any, any, any>>(
         schema: K
@@ -554,7 +652,7 @@ export class ObjectSchemaBuilder<
 
     /**
      * Omits properties listed in `properties` from the schema.
-     * Consider `Omit<Type, 'prop1'|'prop2'...>` as a good analogue
+     * Consider `Omit<Type, 'prop1'|'prop2'...>` as a good illustration
      * from the TS world.
      * @param properties - array of property names (strings) to remove from the schema.
      */
@@ -568,7 +666,8 @@ export class ObjectSchemaBuilder<
     >;
     /**
      * Removes `propName` from the list of properties.
-     * @param propName property name to remove.
+     * @param propName property name to remove. Schema should contain
+     * this property. An error will be thrown otherwise.
      */
     public omit<TProperty extends keyof TProperties>(
         propName: TProperty
@@ -598,6 +697,7 @@ export class ObjectSchemaBuilder<
               Omit<TResult, keyof TProps>
           >
         : never;
+
     public omit(propNameOrArrayOrPropsOrBuilder): any {
         if (typeof propNameOrArrayOrPropsOrBuilder === 'string') {
             // remove one field
@@ -676,8 +776,8 @@ export class ObjectSchemaBuilder<
 
     /**
      * Adds all properties from `schema` to the current schema.
-     * `TSchema & TAnotherSchema` is a good example of the similar operation
-     * in TS type system.
+     * `TSchema & TAnotherSchema` is a good example of the similar concept
+     * in the TS type system.
      * @param schema an object schema to take properties from
      */
     public intersect<T extends ObjectSchemaBuilder<any, any, any, any, any>>(
@@ -771,6 +871,7 @@ export class ObjectSchemaBuilder<
                 : never]?: TResult[k];
         }
     >;
+
     public partial(propNameOrArray?): any {
         if (
             typeof propNameOrArray === 'undefined' ||
@@ -873,9 +974,11 @@ export class ObjectSchemaBuilder<
               }
           >
         : never;
+
     /**
      * Returns a new schema consisting of only one property
-     * (taken from the `property` property name).
+     * (taken from the `property` property name). If the property
+     * does not exists in the current schema, an error will be thrown.
      * @param property the name of the property (string).
      */
     public pick<K extends keyof TProperties>(
@@ -1052,6 +1155,8 @@ export class ObjectSchemaBuilder<
 
     /**
      * Marks `prop` as required property.
+     * If `prop` does not exists in the current schema,
+     * an error will be thrown.
      * @param prop name of the property
      */
     public makePropRequired<
