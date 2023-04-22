@@ -3,9 +3,11 @@
         "rootDir": ".",
         "outDir": "./dist",
         "declaration": true,
-        "target": "ES2020",
+        "target": "ES2022",
         "esModuleInterop": true,
-        "moduleResolution": "Node"
+        "moduleResolution": "Node",
+        "checkJs": true,
+        "strictNullChecks": true
     },
     "watchOptions": {
         "excludeDirectories": ["./dist"]

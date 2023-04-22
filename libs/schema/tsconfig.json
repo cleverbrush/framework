@@ -3,11 +3,13 @@
         "rootDir": "./src",
         "outDir": "./dist",
         "declaration": true,
-        "target": "esnext",
-        "module": "CommonJS",
+        "target": "ES2022",
+        "module": "ES2022",
         "esModuleInterop": true,
         "allowSyntheticDefaultImports": true,
-        "moduleResolution": "Node"
+        "moduleResolution": "Node",
+        "strictNullChecks": true,
+        "noImplicitThis": true
     },
     "files": ["./src/index.ts"],
     "watchOptions": {

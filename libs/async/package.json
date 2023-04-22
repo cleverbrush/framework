@@ -1,20 +1,37 @@
 {
-    "name": "@cleverbrush/async",
-    "version": "0.0.17",
-    "keywords": [
-        "async utils"
-    ],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-    "license": "BSD",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "description": "Various async utilities for Cleverbrush framework",
+    "files": [
+        "dist/**/*"
+    ],
+    "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Async_utilities.html",
+    "keywords": [
+        "async utils",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
     "main": "./dist/index.js",
-    "readme": "https://github.com/cleverbrush/libs/tree/master/libs/async#readme",
+    "name": "@cleverbrush/async",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/async#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
     "scripts": {
         "watch": "tsc --watch",
         "build": "tsc"
     },
-    "repository": {
-        "type": "git",
-        "url": "github:cleverbrush/libs"
+    "typedoc": {
+        "entryPoint": "./src/index.ts",
+        "readmeFile": "./README.md",
+        "displayName": "Async utilities",
+        "tsconfig": "./tsconfig.json"
     },
-    "types": "./dist/index.d.ts"
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "1.0.0"
 }

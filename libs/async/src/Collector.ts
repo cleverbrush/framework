@@ -12,6 +12,30 @@ export interface ICollector<T> {
     ): this;
 }
 
+/**
+ * Allows to collect results of async operations and wait for all of them to finish
+ * supports timeout and promise interface to wait for all results.
+ * Also implementes EventEmitter interface.
+ * @example
+ * ```typescript
+ * const collector = new Collector(['a', 'b', 'c']);
+ * collector.collect('a', Promise.resolve(1));
+ * collector.collect('b', Promise.resolve(2));
+ * collector.collect('c', Promise.resolve(3));
+ * collector.on('end', (result) => {
+ *    console.log(result); // { a: 1, b: 2, c: 3 }
+ * });
+ * ```
+ * or using promise interface
+ * ```typescript
+ * const collector = new Collector(['a', 'b', 'c']);
+ * collector.collect('a', Promise.resolve(1));
+ * collector.collect('b', Promise.resolve(2));
+ * collector.collect('c', Promise.resolve(3));
+ * collector.toPromise().then((result) => {
+ *   console.log(result); // { a: 1, b: 2, c: 3 }
+ * });
+ */
 export default class Collector<
         T extends Record<string, unknown>,
         K extends keyof T = keyof T
@@ -25,25 +49,30 @@ export default class Collector<
     ): this {
         return super.on(event, listener);
     }
-    #collectionResults = null;
+    #collectionResults: Record<keyof T, unknown>;
 
     #leftToCollect = 0;
 
-    #timeoutTimer = null;
+    #timeoutTimer;
 
     #isTimedOut = false;
 
-    #promiseResolve = null;
+    #promiseResolve: (...args: any[]) => any;
 
-    #promiseReject = null;
+    #promiseReject: (...args: any[]) => any;
 
+    /**
+     *
+     * @param keys - array of keys to collect
+     * @param timeout - optional timeout in ms. If timeout is reached, collector will emit 'timeout' event and reject promise
+     */
     constructor(keys: K[], timeout = -1) {
         super();
         if (!Array.isArray(keys))
             throw new Error('keys must be of time Array<String>');
 
         this.#leftToCollect = Object.keys(keys).length;
-        this.#collectionResults = {};
+        this.#collectionResults = {} as any;
 
         if (typeof timeout === 'number' && timeout > 0) {
             this.#timeoutTimer = setTimeout(() => {
@@ -67,8 +96,14 @@ export default class Collector<
             this.#promiseResolve({ ...this.#collectionResults });
     }
 
+    /**
+     * Collects `value` for given `key`
+     * @param key - key to collect
+     * @param value - value to collect for given key. If value is Promise - it will be awaited and result will be collected
+     * @returns `this` to allow chaining
+     */
     collect<L extends K>(key: L, value: T[L]): this {
-        if (this.#isTimedOut) return;
+        if (this.#isTimedOut) return this;
         // if value is Promise - await it and collect its result
         Promise.resolve(value)
             .then((result) => {
@@ -102,6 +137,9 @@ export default class Collector<
         return this;
     }
 
+    /**
+     * Returns promise that will be resolved when all items are collected or rejected if timeout is reached.
+     */
     toPromise(): Promise<T> {
         return new Promise((res, rej) => {
             this.#promiseResolve = res;

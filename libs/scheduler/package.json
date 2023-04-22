@@ -1,0 +1,42 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "1.0.0"
+    },
+    "description": "Job Scheduler for NodeJS",
+    "files": [
+        "dist/**/*"
+    ],
+    "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Job_Scheduler.html",
+    "keywords": [
+        "task scheduler",
+        "task runner",
+        "scheduler",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "name": "@cleverbrush/scheduler",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/scheduler#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
+    "type": "module",
+    "typedoc": {
+        "entryPoint": "./src/index.ts",
+        "readmeFile": "./README.md",
+        "displayName": "Job Scheduler",
+        "tsconfig": "./tsconfig.json"
+    },
+    "types": "./dist/index.d.ts",
+    "version": "1.0.0"
+}

@@ -1,0 +1,14 @@
+{ 
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPointStrategy": "packages",
+    "entryPoints": [
+        "libs/async",
+        "libs/deep",
+        "libs/scheduler",
+        "libs/schema"
+    ],
+    "name": "Libraries",
+    "excludePrivate": true,
+    "gtmWorkspaceId": "GTM-WRLXDMG",
+    "plugin": [ "typedoc-google-tag-manager-plugin", "typedoc-plugin-versions"]
+}

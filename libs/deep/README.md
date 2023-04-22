@@ -8,10 +8,6 @@ This is yet another library which provides operations over JavaScript objects, l
 
 ## Usage
 
-    const deep = require('@cleverbrush/deep');
-
-or for ES Module
-
     import deep from '@cleverbrush/deep';
     // or import functions individually
     import { deepEqual, deepExtend } from '@cleverbrush/deep';
