@@ -5,7 +5,7 @@
         "task scheduler"
     ],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-    "license": "BSD",
+    "license": "BSD 3-Clause",
     "files": [
         "*",
         "dist/*"
