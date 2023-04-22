@@ -11,14 +11,14 @@
         "dist/*"
     ],
     "main": "./dist/index.js",
-    "readme": "https://github.com/cleverbrush/libs/tree/master/libs/scheduler#readme",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/scheduler#readme",
     "scripts": {
         "watch": "tsc --watch",
         "build": "tsc"
     },
     "repository": {
         "type": "git",
-        "url": "github:cleverbrush/libs"
+        "url": "github:cleverbrush/framework"
     },
     "dependencies": {
         "@cleverbrush/schema": "1.0.0"

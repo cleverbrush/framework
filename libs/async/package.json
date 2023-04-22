@@ -2,23 +2,24 @@
     "name": "@cleverbrush/async",
     "version": "1.0.0",
     "keywords": [
-        "async utils"
+        "async utils",
+        "cleverbrush"
     ],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-    "license": "BSD",
+    "license": "BSD 3-Clause",
     "files": [
         "*",
         "dist/*"
     ],
     "main": "./dist/index.js",
-    "readme": "https://github.com/cleverbrush/libs/tree/master/libs/async#readme",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/async#readme",
     "scripts": {
         "watch": "tsc --watch",
         "build": "tsc"
     },
     "repository": {
         "type": "git",
-        "url": "github:cleverbrush/libs"
+        "url": "github:cleverbrush/framework"
     },
     "types": "./dist/index.d.ts",
     "typedoc": {

@@ -4,11 +4,15 @@ This package contains the set of simple utilities to work with Async abstraction
 
 ## Installation
 
+```bash
     npm install @cleverbrush/async
+```
 
 ## Usage
 
-    import { Collector } from '@cleverbrush/async';
+```typescript
+import { Collector } from '@cleverbrush/async';
+```
 
 ## Classes
 
