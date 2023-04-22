@@ -9,5 +9,6 @@
     ],
     "name": "Libraries",
     "excludePrivate": true,
-    "plugin": ["typedoc-plugin-versions"]
+    "gtmWorkspaceId": "GTM-WRLXDMG",
+    "plugin": [ "typedoc-google-tag-manager-plugin", "typedoc-plugin-versions"]
 }
