@@ -4,9 +4,11 @@
         "url": "https://github.com/cleverbrush/framework/issues",
         "email": "andrew_zol@cleverbrush.com"
     },
+    "description": "Various async utilities for Cleverbrush framework",
     "files": [
         "dist/**/*"
     ],
+    "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Async_utilities.html",
     "keywords": [
         "async utils",
         "cleverbrush"
