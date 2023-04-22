@@ -5,7 +5,7 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "files": [
-        "dist/*"
+        "dist/**/*"
     ],
     "keywords": [
         "async utils",
@@ -29,6 +29,7 @@
         "displayName": "Async utilities",
         "tsconfig": "./tsconfig.json"
     },
+    "type": "module",
     "types": "./dist/index.d.ts",
     "version": "1.0.0"
 }

@@ -1,32 +1,37 @@
 {
-    "name": "@cleverbrush/deep",
-    "version": "1.0.0",
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "files": [
+        "dist/**/*"
+    ],
     "keywords": [
         "deep operations on objects",
         "deep equal",
-        "deep extend"
+        "deep extend",
+        "cleverbrush"
     ],
-    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD 3-Clause",
-    "files": [
-        "*",
-        "dist/*"
-    ],
     "main": "./dist/index.js",
+    "name": "@cleverbrush/deep",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/deep#readme",
-    "scripts": {
-        "watch": "tsc --watch",
-        "build": "tsc"
-    },
     "repository": {
         "type": "git",
         "url": "github:cleverbrush/framework"
     },
-    "types": "./dist/index.d.ts",
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
     "typedoc": {
         "entryPoint": "./src/index.ts",
         "readmeFile": "./README.md",
         "displayName": "Deep operations on objects",
         "tsconfig": "./tsconfig.json"
-    }
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "1.0.0"
 }

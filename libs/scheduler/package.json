@@ -1,33 +1,40 @@
 {
-    "name": "@cleverbrush/scheduler",
-    "version": "1.0.0",
-    "keywords": [
-        "task scheduler"
-    ],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-    "license": "BSD 3-Clause",
-    "files": [
-        "*",
-        "dist/*"
-    ],
-    "main": "./dist/index.js",
-    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/scheduler#readme",
-    "scripts": {
-        "watch": "tsc --watch",
-        "build": "tsc"
-    },
-    "repository": {
-        "type": "git",
-        "url": "github:cleverbrush/framework"
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
         "@cleverbrush/schema": "1.0.0"
     },
-    "types": "./dist/index.d.ts",
+    "files": [
+        "dist/**/*"
+    ],
+    "keywords": [
+        "task scheduler",
+        "task runner",
+        "scheduler",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "name": "@cleverbrush/scheduler",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/scheduler#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
+    "type": "module",
     "typedoc": {
         "entryPoint": "./src/index.ts",
         "readmeFile": "./README.md",
         "displayName": "Job Scheduler",
         "tsconfig": "./tsconfig.json"
-    }
+    },
+    "types": "./dist/index.d.ts",
+    "version": "1.0.0"
 }

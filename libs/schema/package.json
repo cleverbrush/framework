@@ -1,18 +1,21 @@
 {
-    "name": "@cleverbrush/schema",
-    "version": "1.0.0",
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "files": [
+        "dist/**/*"
+    ],
     "keywords": [
         "object schema validator",
         "schema",
-        "validate object"
+        "validate object",
+        "cleverbrush"
     ],
-    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD 3-Clause",
-    "files": [
-        "*",
-        "dist/*"
-    ],
     "main": "./dist/index.js",
+    "name": "@cleverbrush/schema",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/schema#readme",
     "repository": {
         "type": "git",
@@ -22,14 +25,16 @@
         "watch": "tsc --watch",
         "build": "tsc"
     },
-    "devDependencies": {
-        "@cleverbrush/deep": "1.0.0"
-    },
+    "type": "module",
     "types": "./dist/index.d.ts",
     "typedoc": {
         "entryPoint": "./src/index.ts",
         "readmeFile": "./README.md",
         "displayName": "Schema Definition And Validation",
         "tsconfig": "./tsconfig.json"
+    },
+    "version": "1.0.0",
+    "devDependencies": {
+        "@cleverbrush/deep": "1.0.0"
     }
 }
