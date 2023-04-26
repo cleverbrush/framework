@@ -235,31 +235,7 @@ export class ObjectSchemaBuilder<
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
-        object: InferType<
-            SchemaBuilder<
-                undefined extends TExplicitType
-                    ? MergeTwo<
-                          Omit<
-                              {
-                                  [k in keyof TFinalResult]?: k extends OptionalPropertyNames<TFinalResult>
-                                      ? TFinalResult[k]
-                                      : never;
-                              },
-                              RequiredPropertyNames<TFinalResult>
-                          >,
-                          Omit<
-                              {
-                                  [k in keyof TFinalResult]: k extends OptionalPropertyNames<TFinalResult>
-                                      ? never
-                                      : TFinalResult[k];
-                              },
-                              OptionalPropertyNames<TFinalResult>
-                          >
-                      >
-                    : TFinalResult,
-                TRequired
-            >
-        >,
+        object: TFinalResult,
         context?: ValidationContext
     ): Promise<ValidationResult<TFinalResult>> {
         const prevalidatedResult = await super.preValidate(object, context);
