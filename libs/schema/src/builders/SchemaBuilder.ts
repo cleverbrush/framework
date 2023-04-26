@@ -1,5 +1,14 @@
 import { Transaction, transaction } from '../utils/transaction.js';
 
+export type InferTypeNoOptimize<T> = T extends SchemaBuilder<
+    infer TResult,
+    infer TRequired
+>
+    ? TRequired extends true
+        ? TResult
+        : MakeOptional<TResult>
+    : T;
+
 export type InferType<T> = T extends SchemaBuilder<
     infer TResult,
     infer TRequired
@@ -18,7 +27,6 @@ export type InferType<T> = T extends SchemaBuilder<
     : T;
 
 export type ValidationError = { path: string; message: string };
-export type MakeRequired<T> = NonNullable<T>;
 export type MakeOptional<T> = { prop?: T }['prop'];
 
 export type ValidationResult<T> = {

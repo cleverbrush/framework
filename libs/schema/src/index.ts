@@ -12,7 +12,6 @@ export { SchemaBuilder } from './builders/SchemaBuilder.js';
 export {
     InferType,
     MakeOptional,
-    MakeRequired,
     ValidationError,
     ValidationResult
 } from './builders/SchemaBuilder.js';

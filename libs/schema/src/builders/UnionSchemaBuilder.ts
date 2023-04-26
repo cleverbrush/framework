@@ -2,7 +2,7 @@ import {
     SchemaBuilder,
     ValidationResult,
     ValidationContext,
-    InferType
+    InferTypeNoOptimize
 } from './SchemaBuilder.js';
 
 type UnionSchemaBuilderCreateProps<
@@ -10,11 +10,15 @@ type UnionSchemaBuilderCreateProps<
     R extends boolean = true
 > = Partial<ReturnType<UnionSchemaBuilder<T, R>['introspect']>>;
 
-type SchemaArrayToUnion<TArr extends readonly any[]> = TArr['length'] extends 1
-    ? InferType<TArr[0]>
-    : TArr extends readonly [infer TFirst, ...infer TRest]
-    ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]>
-    : never;
+type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =
+    TArr['length'] extends 1
+        ? InferTypeNoOptimize<TArr[0]>
+        : TArr extends readonly [
+              infer TFirst extends SchemaBuilder<any, any>,
+              ...infer TRest extends SchemaBuilder<any, any>[]
+          ]
+        ? InferTypeNoOptimize<TFirst> | SchemaArrayToUnion<[...TRest]>
+        : never;
 
 type TakeBeforeIndex<
     TArr extends readonly SchemaBuilder<any, any>[],
