@@ -15,26 +15,7 @@ type ObjectSchemaBuilderCreateProps<
     TRequired extends boolean = true
 > = Partial<ObjectSchemaBuilderProps<T, TRequired>>;
 
-type RequiredPropertyNames<T> = {
-    [K in keyof T]-?: undefined extends T[K] ? never : K;
-}[keyof T];
-
-type OptionalPropertyNames<T> = {
-    [K in keyof T]-?: undefined extends T[K] ? K : never;
-}[keyof T];
-
-type SpreadProperties<L, R, K extends keyof L & keyof R> = {
-    [P in K]: L[P] | Exclude<R[P], undefined>;
-};
-
 type Id<T> = T extends infer U ? { [K in keyof U]: U[K] } : never;
-
-type MergeTwo<L, R> = Id<
-    Pick<L, Exclude<keyof L, keyof R>> &
-        Pick<R, Exclude<keyof R, OptionalPropertyNames<R>>> &
-        Pick<R, Exclude<OptionalPropertyNames<R>, keyof L>> &
-        SpreadProperties<L, R, OptionalPropertyNames<R> & keyof L>
->;
 
 export type RespectPropsOptionality<
     T extends Record<string, SchemaBuilder<any, any>>
@@ -162,11 +143,13 @@ type ModifyPropSchema<
 export class ObjectSchemaBuilder<
     TProperties extends Record<string, SchemaBuilder<any, any>> = {},
     TRequired extends boolean = true,
-    TExplicitType = undefined,
-    TFinalResult = undefined extends TExplicitType
+    TExplicitType = undefined
+> extends SchemaBuilder<
+    undefined extends TExplicitType
         ? RespectPropsOptionality<TProperties>
-        : TExplicitType
-> extends SchemaBuilder<TFinalResult, TRequired> {
+        : TExplicitType,
+    TRequired
+> {
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
 
@@ -235,9 +218,17 @@ export class ObjectSchemaBuilder<
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
-        object: TFinalResult,
+        object: undefined extends TExplicitType
+            ? RespectPropsOptionality<TProperties>
+            : TExplicitType,
         context?: ValidationContext
-    ): Promise<ValidationResult<TFinalResult>> {
+    ): Promise<
+        ValidationResult<
+            undefined extends TExplicitType
+                ? RespectPropsOptionality<TProperties>
+                : TExplicitType
+        >
+    > {
         const prevalidatedResult = await super.preValidate(object, context);
         const {
             valid,
@@ -423,11 +414,7 @@ export class ObjectSchemaBuilder<
     /**
      * @hidden
      */
-    public clearHasType(): ObjectSchemaBuilder<
-        TProperties,
-        TRequired,
-        undefined
-    > {
+    public clearHasType(): ObjectSchemaBuilder<TProperties, TRequired> {
         return this.createFromProps({
             ...this.introspect()
         } as ObjectSchemaBuilderProps) as any;
@@ -484,11 +471,10 @@ export class ObjectSchemaBuilder<
      * comments were lost. Hopefully it will be fixed in the future by Typescript team or somebody will
      * find a workaround/fix and create a pull request.
      */
-    public optimize(): ObjectSchemaBuilder<
-        TProperties,
-        TRequired,
-        TExplicitType,
-        undefined extends TExplicitType ? Id<TFinalResult> : TExplicitType
+    public optimize(): SchemaBuilder<
+        undefined extends TExplicitType
+            ? Id<RespectPropsOptionality<TProperties>>
+            : TExplicitType
     > {
         return this.createFromProps({
             ...this.introspect()
@@ -509,15 +495,14 @@ export class ObjectSchemaBuilder<
      * Adds all properties from the `schema` object schema to the current schema.
      * @param schema an instance of `ObjectSchemaBuilder`
      */
-    public addProps<K extends ObjectSchemaBuilder<any, any, any, any>>(
+    public addProps<K extends ObjectSchemaBuilder<any, any, any>>(
         schema: K
     ): K extends ObjectSchemaBuilder<
         infer TProp,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TReq,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TExpType,
-        infer TRes
+        infer TExpType
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProp> & TProp,
@@ -585,12 +570,12 @@ export class ObjectSchemaBuilder<
      * from the TS world.
      * @param schema schema builder to take properties from.
      */
-    public omit<T>(schema: T): T extends ObjectSchemaBuilder<
+    public omit<T>(
+        schema: T
+    ): T extends ObjectSchemaBuilder<
         infer TProps,
         infer TRequired,
-        infer TExplicitType,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TExternalResult
+        infer TExplicitType
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps>,
@@ -681,14 +666,13 @@ export class ObjectSchemaBuilder<
      * in the TS type system.
      * @param schema an object schema to take properties from
      */
-    public intersect<T extends ObjectSchemaBuilder<any, any, any, any>>(
+    public intersect<T extends ObjectSchemaBuilder<any, any, any>>(
         schema: T
     ): T extends ObjectSchemaBuilder<
         infer TProps,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TReq,
-        infer TExplType,
-        infer TRes
+        infer TExplType
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps> & TProps,
@@ -822,16 +806,14 @@ export class ObjectSchemaBuilder<
      * `schema` object schema.
      * @param schema schema to take property names list from
      */
-    public pick<K extends ObjectSchemaBuilder<any, any, any, any>>(
+    public pick<K extends ObjectSchemaBuilder<any, any, any>>(
         schema: K
     ): K extends ObjectSchemaBuilder<
         infer TProps,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer T1,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T2,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T3
+        infer T2
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof Omit<TProperties, keyof TProps>>,
@@ -1036,7 +1018,7 @@ export class ObjectSchemaBuilder<
 /**
  * Defines a schema for empty object `{}`
  */
-export function object(): ObjectSchemaBuilder<{}, true, undefined, {}>;
+export function object(): ObjectSchemaBuilder<{}, true>;
 
 /**
  * Defines an object schema, properties definitions are takens from `props`.
@@ -1044,21 +1026,11 @@ export function object(): ObjectSchemaBuilder<{}, true, undefined, {}>;
  */
 export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     props: TProps
-): ObjectSchemaBuilder<
-    TProps,
-    true,
-    undefined,
-    RespectPropsOptionality<TProps>
->;
+): ObjectSchemaBuilder<TProps, true>;
 
 export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     props?: TProps
-): ObjectSchemaBuilder<
-    TProps,
-    true,
-    undefined,
-    RespectPropsOptionality<TProps>
-> {
+): ObjectSchemaBuilder<TProps, true> {
     return ObjectSchemaBuilder.create({
         isRequired: true,
         properties: props
