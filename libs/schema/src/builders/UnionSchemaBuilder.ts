@@ -2,7 +2,7 @@ import {
     SchemaBuilder,
     ValidationResult,
     ValidationContext,
-    InferTypeNoOptimize
+    InferType
 } from './SchemaBuilder.js';
 
 type UnionSchemaBuilderCreateProps<
@@ -12,12 +12,12 @@ type UnionSchemaBuilderCreateProps<
 
 type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =
     TArr['length'] extends 1
-        ? InferTypeNoOptimize<TArr[0]>
+        ? InferType<TArr[0]>
         : TArr extends readonly [
               infer TFirst extends SchemaBuilder<any, any>,
               ...infer TRest extends SchemaBuilder<any, any>[]
           ]
-        ? InferTypeNoOptimize<TFirst> | SchemaArrayToUnion<[...TRest]>
+        ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]>
         : never;
 
 type TakeBeforeIndex<
@@ -104,11 +104,13 @@ type TakeExceptIndex<
 export class UnionSchemaBuilder<
     TOptions extends readonly SchemaBuilder<any, any>[],
     TRequired extends boolean = true,
-    TExplicitType = undefined,
-    TResult = TExplicitType extends undefined
+    TExplicitType = undefined
+> extends SchemaBuilder<
+    TExplicitType extends undefined
         ? SchemaArrayToUnion<TOptions>
-        : TExplicitType
-> extends SchemaBuilder<TResult, TRequired> {
+        : TExplicitType,
+    TRequired
+> {
     #options: TOptions;
 
     public static create(props: UnionSchemaBuilderCreateProps<any>) {
@@ -162,9 +164,17 @@ export class UnionSchemaBuilder<
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
-        object: TResult,
+        object: TExplicitType extends undefined
+            ? SchemaArrayToUnion<TOptions>
+            : TExplicitType,
         context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
+    ): Promise<
+        ValidationResult<
+            TExplicitType extends undefined
+                ? SchemaArrayToUnion<TOptions>
+                : TExplicitType
+        >
+    > {
         const superResult = await super.preValidate(object, context);
 
         const {
@@ -212,7 +222,7 @@ export class UnionSchemaBuilder<
             if (valid) {
                 return {
                     valid: true,
-                    object: validatedOption as TResult
+                    object: validatedOption as any
                 };
             } else {
                 if (
