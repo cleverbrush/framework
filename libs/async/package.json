@@ -6,7 +6,7 @@
     },
     "description": "Various async utilities for Cleverbrush framework",
     "files": [
-        "dist/**/*"
+        "dist"
     ],
     "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Async_utilities.html",
     "keywords": [

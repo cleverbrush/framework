@@ -6,7 +6,7 @@
     },
     "description": "Library for deep operations on objects like deep equal, deep extend, etc.",
     "files": [
-        "dist/**/*"
+        "dist"
     ],
     "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Deep_operations_on_objects.html",
     "keywords": [

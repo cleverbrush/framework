@@ -6,7 +6,7 @@
     },
     "description": "Schema Definition And Validation library, that allows to define and validate objects of any complexity",
     "files": [
-        "dist/**/*"
+        "dist"
     ],
     "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Schema_Definition_And_Validation.html",
     "keywords": [

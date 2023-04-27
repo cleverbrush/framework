@@ -9,7 +9,7 @@
     },
     "description": "Job Scheduler for NodeJS",
     "files": [
-        "dist/**/*"
+        "dist"
     ],
     "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Job_Scheduler.html",
     "keywords": [
