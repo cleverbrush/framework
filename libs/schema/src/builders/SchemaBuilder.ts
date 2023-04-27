@@ -18,7 +18,6 @@ export type InferType<T> = T extends SchemaBuilder<
     : T;
 
 export type ValidationError = { path: string; message: string };
-export type MakeRequired<T> = NonNullable<T>;
 export type MakeOptional<T> = { prop?: T }['prop'];
 
 export type ValidationResult<T> = {

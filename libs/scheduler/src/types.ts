@@ -12,7 +12,8 @@ import {
 import { IJobRepository } from './jobRepository.js';
 
 const ScheduleSchemaBase = object({
-    /** Number of days between repeats */
+    /** Number of intervals (days, months, minutes or weeks)
+     * between repeats. Interval type depends of `every` value */
     interval: number().min(1).max(356),
     /** Hour (0-23) */
     hour: number().min(0).max(23).optional(),

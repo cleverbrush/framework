@@ -15,26 +15,45 @@ type ObjectSchemaBuilderCreateProps<
     TRequired extends boolean = true
 > = Partial<ObjectSchemaBuilderProps<T, TRequired>>;
 
-type RequiredPropertyNames<T> = {
-    [K in keyof T]-?: undefined extends T[K] ? never : K;
-}[keyof T];
-
-type OptionalPropertyNames<T> = {
-    [K in keyof T]-?: undefined extends T[K] ? K : never;
-}[keyof T];
-
-type SpreadProperties<L, R, K extends keyof L & keyof R> = {
-    [P in K]: L[P] | Exclude<R[P], undefined>;
-};
-
 type Id<T> = T extends infer U ? { [K in keyof U]: U[K] } : never;
 
-type MergeTwo<L, R> = Id<
-    Pick<L, Exclude<keyof L, keyof R>> &
-        Pick<R, Exclude<keyof R, OptionalPropertyNames<R>>> &
-        Pick<R, Exclude<OptionalPropertyNames<R>, keyof L>> &
-        SpreadProperties<L, R, OptionalPropertyNames<R> & keyof L>
->;
+export type RespectPropsOptionality<
+    T extends Record<string, SchemaBuilder<any, any>>
+> = {
+    [K in RequiredProps<T>]: InferType<T[K]>;
+} & {
+    [K in NotRequiredProps<T>]?: InferType<T[K]>;
+};
+
+type MakeChildrenRequired<T extends Record<string, SchemaBuilder<any, any>>> = {
+    [K in keyof T]: ReturnType<T[K]['required']>;
+};
+
+type MakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any>>> = {
+    [K in keyof T]: ReturnType<T[K]['optional']>;
+};
+
+type MakeChildOptional<
+    T extends Record<any, SchemaBuilder<any, any>>,
+    TProp extends keyof T
+> = {
+    [K in keyof T]: K extends TProp ? ReturnType<T[K]['optional']> : T[K];
+};
+
+type MakeChildRequired<
+    T extends Record<any, SchemaBuilder<any, any>>,
+    TProp extends keyof T
+> = {
+    [K in keyof T]: K extends TProp ? ReturnType<T[K]['required']> : T[K];
+};
+
+type ModifyPropSchema<
+    T extends Record<any, SchemaBuilder<any, any>>,
+    TProp extends keyof T,
+    TSchema extends SchemaBuilder<any, any>
+> = {
+    [K in keyof T]: K extends TProp ? TSchema : T[K];
+};
 
 /**
  * Object schema builder class. Similar to the `object` type
@@ -124,10 +143,13 @@ type MergeTwo<L, R> = Id<
 export class ObjectSchemaBuilder<
     TProperties extends Record<string, SchemaBuilder<any, any>> = {},
     TRequired extends boolean = true,
-    TExplicitType = undefined,
-    TResult = {},
-    TFinalResult = undefined extends TExplicitType ? TResult : TExplicitType
-> extends SchemaBuilder<TFinalResult, TRequired> {
+    TExplicitType = undefined
+> extends SchemaBuilder<
+    undefined extends TExplicitType
+        ? RespectPropsOptionality<TProperties>
+        : TExplicitType,
+    TRequired
+> {
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
 
@@ -180,24 +202,14 @@ export class ObjectSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): ObjectSchemaBuilder<
-        TProperties,
-        true,
-        TExplicitType,
-        TResult
-    > {
+    public required(): ObjectSchemaBuilder<TProperties, true, TExplicitType> {
         return super.required();
     }
 
     /**
      * @hidden
      */
-    public optional(): ObjectSchemaBuilder<
-        TProperties,
-        false,
-        TExplicitType,
-        TResult
-    > {
+    public optional(): ObjectSchemaBuilder<TProperties, false, TExplicitType> {
         return super.optional();
     }
 
@@ -206,59 +218,15 @@ export class ObjectSchemaBuilder<
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
-        object: InferType<
-            SchemaBuilder<
-                undefined extends TExplicitType
-                    ? MergeTwo<
-                          Omit<
-                              {
-                                  [k in keyof TResult]?: k extends OptionalPropertyNames<TResult>
-                                      ? TResult[k]
-                                      : never;
-                              },
-                              RequiredPropertyNames<TResult>
-                          >,
-                          Omit<
-                              {
-                                  [k in keyof TResult]: k extends OptionalPropertyNames<TResult>
-                                      ? never
-                                      : TResult[k];
-                              },
-                              OptionalPropertyNames<TResult>
-                          >
-                      >
-                    : TResult,
-                TRequired
-            >
-        >,
+        object: undefined extends TExplicitType
+            ? RespectPropsOptionality<TProperties>
+            : TExplicitType,
         context?: ValidationContext
     ): Promise<
         ValidationResult<
-            InferType<
-                SchemaBuilder<
-                    undefined extends TExplicitType
-                        ? MergeTwo<
-                              Omit<
-                                  {
-                                      [k in keyof TResult]?: k extends OptionalPropertyNames<TResult>
-                                          ? TResult[k]
-                                          : never;
-                                  },
-                                  RequiredPropertyNames<TResult>
-                              >,
-                              Omit<
-                                  {
-                                      [k in keyof TResult]: k extends OptionalPropertyNames<TResult>
-                                          ? never
-                                          : TResult[k];
-                                  },
-                                  OptionalPropertyNames<TResult>
-                              >
-                          >
-                        : TResult,
-                    TRequired
-                >
-            >
+            undefined extends TExplicitType
+                ? RespectPropsOptionality<TProperties>
+                : TExplicitType
         >
     > {
         const prevalidatedResult = await super.preValidate(object, context);
@@ -408,8 +376,7 @@ export class ObjectSchemaBuilder<
     public acceptUnknownProps(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
-        TExplicitType,
-        TResult
+        TExplicitType
     > {
         return this.createFromProps({
             ...this.introspect(),
@@ -424,8 +391,7 @@ export class ObjectSchemaBuilder<
     public notAcceptUnknownProps(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
-        TExplicitType,
-        TResult
+        TExplicitType
     > {
         return this.createFromProps({
             ...this.introspect(),
@@ -439,7 +405,7 @@ export class ObjectSchemaBuilder<
     public hasType<T>(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         notUsed?: T
-    ): ObjectSchemaBuilder<TProperties, TRequired, T, TResult> {
+    ): ObjectSchemaBuilder<TProperties, TRequired, T> {
         return this.createFromProps({
             ...this.introspect()
         } as ObjectSchemaBuilderProps) as any;
@@ -448,12 +414,7 @@ export class ObjectSchemaBuilder<
     /**
      * @hidden
      */
-    public clearHasType(): ObjectSchemaBuilder<
-        TProperties,
-        TRequired,
-        undefined,
-        TResult
-    > {
+    public clearHasType(): ObjectSchemaBuilder<TProperties, TRequired> {
         return this.createFromProps({
             ...this.introspect()
         } as ObjectSchemaBuilderProps) as any;
@@ -473,21 +434,7 @@ export class ObjectSchemaBuilder<
             [k in TName]: TType;
         },
         TRequired,
-        TExplicitType,
-        TResult &
-            (TType extends SchemaBuilder<
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                infer K,
-                infer TR
-            >
-                ? TR extends false
-                    ? {
-                          [k in TName]?: InferType<TType>;
-                      }
-                    : {
-                          [k in TName]: InferType<TType>;
-                      }
-                : never)
+        TExplicitType
     > {
         if (typeof propName !== 'string' || !propName) {
             throw new Error('propName must be a non empty string');
@@ -514,31 +461,20 @@ export class ObjectSchemaBuilder<
      * @hidden
      * @deprecated this is for internal use, do not use if you are
      * not sure you need it.
+     *
+     * TODO: This is used to avoid `&` in resulting types. For example,
+     * when you have a schema like `object({prop1: string()})` and then use `addProp({prop2: string()})` method,
+     * the resulting type without `optimize` will be something like `{prop1: string} & {prop2: string}`. Which
+     * is not we would like to have. Instead we want to have `{prop1: string, prop2: string}`. This is what
+     * `optimize` method does. However it is not always possible to do this optimization without losing
+     * JSDoc comments, which is sucks. For example, I had to disable optimization for UnionSchemas, because
+     * comments were lost. Hopefully it will be fixed in the future by Typescript team or somebody will
+     * find a workaround/fix and create a pull request.
      */
-    public optimize(): ObjectSchemaBuilder<
-        TProperties,
-        TRequired,
-        TExplicitType,
+    public optimize(): SchemaBuilder<
         undefined extends TExplicitType
-            ? MergeTwo<
-                  Omit<
-                      {
-                          [k in keyof TResult]?: k extends OptionalPropertyNames<TResult>
-                              ? TResult[k]
-                              : never;
-                      },
-                      RequiredPropertyNames<TResult>
-                  >,
-                  Omit<
-                      {
-                          [k in keyof TResult]: k extends OptionalPropertyNames<TResult>
-                              ? never
-                              : TResult[k];
-                      },
-                      OptionalPropertyNames<TResult>
-                  >
-              >
-            : TResult
+            ? Id<RespectPropsOptionality<TProperties>>
+            : TExplicitType
     > {
         return this.createFromProps({
             ...this.introspect()
@@ -551,70 +487,27 @@ export class ObjectSchemaBuilder<
      * will be validated according to the provided schemas.
      * @param props a key/schema object map.
      */
-    public addProps<
-        TProps extends Record<string, SchemaBuilder<any, any>>,
-        TOptProps = Pick<
-            TProps,
-            keyof {
-                [k in keyof TProps as TProps[k] extends SchemaBuilder<
-                    any,
-                    infer TReq
-                >
-                    ? TReq extends false
-                        ? k
-                        : never
-                    : never]: TProps[k];
-            }
-        >,
-        TReqProps = Pick<
-            TProps,
-            keyof {
-                [k in keyof TProps as TProps[k] extends SchemaBuilder<
-                    any,
-                    infer TReq
-                >
-                    ? TReq extends true
-                        ? k
-                        : never
-                    : never]: TProps[k];
-            }
-        >
-    >(
+    public addProps<TProps extends Record<string, SchemaBuilder<any, any>>>(
         props: TProps
-    ): ObjectSchemaBuilder<
-        TProperties & {
-            [k in keyof TProps]: TProps[k];
-        },
-        true,
-        undefined,
-        TResult & {
-            [k in keyof TOptProps]?: InferType<TOptProps[k]>;
-        } & {
-            [k in keyof TReqProps]: InferType<TReqProps[k]>;
-        }
-    >;
+    ): ObjectSchemaBuilder<TProperties & TProps, true, undefined>;
 
     /**
      * Adds all properties from the `schema` object schema to the current schema.
      * @param schema an instance of `ObjectSchemaBuilder`
      */
-    public addProps<K extends ObjectSchemaBuilder<any, any, any, any>>(
+    public addProps<K extends ObjectSchemaBuilder<any, any, any>>(
         schema: K
     ): K extends ObjectSchemaBuilder<
         infer TProp,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TReq,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TExpType,
-        infer TRes
+        infer TExpType
     >
         ? ObjectSchemaBuilder<
-              Omit<TProperties, keyof TProp> & {
-                  [k in keyof TProp]: TProp[k];
-              },
+              Omit<TProperties, keyof TProp> & TProp,
               TRequired,
-              TExplicitType,
-              Omit<TResult, keyof TRes> & Omit<TRes, keyof TResult>
+              TExplicitType
           >
         : never;
 
@@ -658,12 +551,7 @@ export class ObjectSchemaBuilder<
      */
     public omit<K extends keyof TProperties>(
         properties: K[]
-    ): ObjectSchemaBuilder<
-        Omit<TProperties, K>,
-        TRequired,
-        TExplicitType,
-        Omit<TResult, K>
-    >;
+    ): ObjectSchemaBuilder<Omit<TProperties, K>, TRequired, TExplicitType>;
     /**
      * Removes `propName` from the list of properties.
      * @param propName property name to remove. Schema should contain
@@ -674,8 +562,7 @@ export class ObjectSchemaBuilder<
     ): ObjectSchemaBuilder<
         Omit<TProperties, TProperty>,
         TRequired,
-        TExplicitType,
-        Omit<TResult, TProperty>
+        TExplicitType
     >;
     /**
      * Removes all properties of `schema` from the current schema.
@@ -683,18 +570,17 @@ export class ObjectSchemaBuilder<
      * from the TS world.
      * @param schema schema builder to take properties from.
      */
-    public omit<T>(schema: T): T extends ObjectSchemaBuilder<
+    public omit<T>(
+        schema: T
+    ): T extends ObjectSchemaBuilder<
         infer TProps,
         infer TRequired,
-        infer TExplicitType,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TExternalResult
+        infer TExplicitType
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps>,
               TRequired,
-              TExplicitType,
-              Omit<TResult, keyof TProps>
+              TExplicitType
           >
         : never;
 
@@ -780,21 +666,18 @@ export class ObjectSchemaBuilder<
      * in the TS type system.
      * @param schema an object schema to take properties from
      */
-    public intersect<T extends ObjectSchemaBuilder<any, any, any, any, any>>(
+    public intersect<T extends ObjectSchemaBuilder<any, any, any>>(
         schema: T
     ): T extends ObjectSchemaBuilder<
         infer TProps,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer TReq,
-        infer TExplType,
-        infer TRes,
-        any
+        infer TExplType
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps> & TProps,
               TRequired,
-              TExplType,
-              Omit<TResult, keyof TRes> & TRes
+              TExplType
           >
         : never {
         if (!(schema instanceof ObjectSchemaBuilder)) {
@@ -828,12 +711,9 @@ export class ObjectSchemaBuilder<
      * of every property in the schema.
      */
     public partial(): ObjectSchemaBuilder<
-        {
-            [k in keyof TProperties]: ReturnType<TProperties[k]['optional']>;
-        },
+        MakeChildrenOptional<TProperties>,
         TRequired,
-        TExplicitType,
-        Partial<TResult>
+        TExplicitType
     >;
     /**
      * Marks all properties from `properties` as optional in the schema.
@@ -842,16 +722,9 @@ export class ObjectSchemaBuilder<
     public partial<K extends keyof TProperties>(
         properties: K[]
     ): ObjectSchemaBuilder<
-        Omit<TProperties, K> & {
-            [k in keyof TProperties as K extends k ? k : never]: ReturnType<
-                TProperties[k]['optional']
-            >;
-        },
+        Omit<TProperties, K> & Pick<MakeChildrenOptional<TProperties>, K>,
         TRequired,
-        TExplicitType,
-        Omit<TResult, K> & {
-            [k in keyof TResult as K extends k ? k : never]?: TResult[k];
-        }
+        TExplicitType
     >;
     /**
      * Marks property `propName` as optional in the schema.
@@ -860,16 +733,10 @@ export class ObjectSchemaBuilder<
     public partial<TProperty extends keyof TProperties>(
         propName: TProperty
     ): ObjectSchemaBuilder<
-        Omit<TProperties, TProperty> & {
-            [k in TProperty]: ReturnType<TProperties[k]['optional']>;
-        },
+        Omit<TProperties, TProperty> &
+            Pick<MakeChildrenOptional<TProperties>, TProperty>,
         TRequired,
-        TExplicitType,
-        Omit<TResult, TProperty> & {
-            [k in keyof TResult as TProperty extends k
-                ? k
-                : never]?: TResult[k];
-        }
+        TExplicitType
     >;
 
     public partial(propNameOrArray?): any {
@@ -932,46 +799,26 @@ export class ObjectSchemaBuilder<
      */
     public pick<K extends keyof TProperties>(
         properties: K[]
-    ): ObjectSchemaBuilder<
-        Pick<TProperties, K>,
-        TRequired,
-        undefined,
-        {
-            [k in keyof TResult as K extends k ? k : never]: TResult[k];
-        }
-    >;
+    ): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, undefined>;
     /**
      * Returns new schema based on the current schema. This new schema
      * will consists only from properties which names are taken from the
      * `schema` object schema.
      * @param schema schema to take property names list from
      */
-    public pick<K extends ObjectSchemaBuilder<any, any, any, any, any>>(
+    public pick<K extends ObjectSchemaBuilder<any, any, any>>(
         schema: K
     ): K extends ObjectSchemaBuilder<
         infer TProps,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         infer T1,
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T2,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T3
+        infer T2
     >
         ? ObjectSchemaBuilder<
-              {
-                  [k in keyof TProps as k extends keyof TProperties
-                      ? k
-                      : never]: k extends keyof TProperties
-                      ? TProperties[k]
-                      : never;
-              },
+              Omit<TProperties, keyof Omit<TProperties, keyof TProps>>,
               TRequired,
-              undefined,
-              {
-                  [k in keyof TProps as k extends keyof TProperties
-                      ? k
-                      : never]: k extends keyof TResult ? TResult[k] : never;
-              }
+              undefined
           >
         : never;
 
@@ -983,12 +830,7 @@ export class ObjectSchemaBuilder<
      */
     public pick<K extends keyof TProperties>(
         property: K
-    ): ObjectSchemaBuilder<
-        Pick<TProperties, K>,
-        TRequired,
-        undefined,
-        K extends keyof TResult ? Pick<TResult, K> : TResult
-    >;
+    ): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, undefined>;
 
     public pick(properties): any {
         if (typeof properties === 'string') {
@@ -1067,25 +909,9 @@ export class ObjectSchemaBuilder<
         propName: K,
         callback: (builder: TProperties[K]) => R
     ): ObjectSchemaBuilder<
-        Omit<TProperties, K> & {
-            [k in K]: R;
-        },
+        ModifyPropSchema<TProperties, K, R>,
         TRequired,
-        TExplicitType,
-        R extends SchemaBuilder<
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            infer S,
-            infer TReq
-        >
-            ? Omit<TResult, K> &
-                  (TReq extends false
-                      ? {
-                            [k in K]?: InferType<R>;
-                        }
-                      : {
-                            [k in K]: InferType<R>;
-                        })
-            : never
+        TExplicitType
     > {
         if (typeof propName !== 'string' || !propName) {
             throw new Error('propName must be a non empty string');
@@ -1122,31 +948,12 @@ export class ObjectSchemaBuilder<
      * An alias for `.partial(prop: string)`
      * @param prop name of the property
      */
-    public makePropOptional<
-        K extends keyof TProperties,
-        R = ReturnType<TProperties[K]['optional']>
-    >(
+    public makePropOptional<K extends keyof TProperties>(
         prop: K
     ): ObjectSchemaBuilder<
-        Omit<TProperties, K> & {
-            [k in K]: R;
-        },
+        MakeChildOptional<TProperties, K>,
         TRequired,
-        TExplicitType,
-        R extends SchemaBuilder<
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            infer S,
-            infer TReq
-        >
-            ? Omit<TResult, K> &
-                  (TReq extends false
-                      ? {
-                            [k in K]?: InferType<R>;
-                        }
-                      : {
-                            [k in K]: InferType<R>;
-                        })
-            : never
+        TExplicitType
     > {
         return this.modifyPropSchema(prop, (builder) =>
             builder.optional()
@@ -1159,31 +966,12 @@ export class ObjectSchemaBuilder<
      * an error will be thrown.
      * @param prop name of the property
      */
-    public makePropRequired<
-        K extends keyof TProperties,
-        R = ReturnType<TProperties[K]['required']>
-    >(
+    public makePropRequired<K extends keyof TProperties>(
         prop: K
     ): ObjectSchemaBuilder<
-        Omit<TProperties, K> & {
-            [k in K]: R;
-        },
+        MakeChildRequired<TProperties, K>,
         TRequired,
-        TExplicitType,
-        R extends SchemaBuilder<
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            infer S,
-            infer TReq
-        >
-            ? Omit<TResult, K> &
-                  (TReq extends false
-                      ? {
-                            [k in K]?: InferType<R>;
-                        }
-                      : {
-                            [k in K]: InferType<R>;
-                        })
-            : never
+        TExplicitType
     > {
         return this.modifyPropSchema(prop, (builder) =>
             builder.required()
@@ -1195,12 +983,9 @@ export class ObjectSchemaBuilder<
      * same operation in the TS world.
      */
     public makeAllPropsOptional(): ObjectSchemaBuilder<
-        {
-            [k in keyof TProperties]: ReturnType<TProperties[k]['optional']>;
-        },
+        MakeChildrenOptional<TProperties>,
         TRequired,
-        TExplicitType,
-        Partial<TResult>
+        TExplicitType
     > {
         return this.createFromProps({
             ...this.introspect(),
@@ -1216,14 +1001,9 @@ export class ObjectSchemaBuilder<
      * same operation in the TS world.
      */
     public makeAllPropsRequired(): ObjectSchemaBuilder<
-        {
-            [k in keyof TProperties]: ReturnType<TProperties[k]['required']>;
-        },
+        MakeChildrenRequired<TProperties>,
         TRequired,
-        TExplicitType,
-        {
-            [k in keyof TResult]: NonNullable<TResult[k]>;
-        }
+        TExplicitType
     > {
         return this.createFromProps({
             ...this.introspect(),
@@ -1238,7 +1018,7 @@ export class ObjectSchemaBuilder<
 /**
  * Defines a schema for empty object `{}`
  */
-export function object(): ObjectSchemaBuilder<{}, true, undefined, {}>;
+export function object(): ObjectSchemaBuilder<{}, true>;
 
 /**
  * Defines an object schema, properties definitions are takens from `props`.
@@ -1246,49 +1026,38 @@ export function object(): ObjectSchemaBuilder<{}, true, undefined, {}>;
  */
 export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     props: TProps
-): ObjectSchemaBuilder<
-    {
-        [k in keyof TProps]: TProps[k];
-    },
-    true,
-    undefined,
-    {
-        [k in keyof TProps]: InferType<TProps[k]>;
-    }
->;
+): ObjectSchemaBuilder<TProps, true>;
 
 export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
     props?: TProps
-): ObjectSchemaBuilder<
-    {
-        [k in keyof TProps]: TProps[k];
-    },
-    true,
-    undefined,
-    {
-        [k in keyof TProps as TProps[k] extends SchemaBuilder<
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            infer TRes,
-            infer TReq
-        >
-            ? TReq extends false
-                ? k
-                : never
-            : never]?: InferType<TProps[k]>;
-    } & {
-        [k in keyof TProps as TProps[k] extends SchemaBuilder<
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            infer TRes,
-            infer TReq
-        >
-            ? TReq extends false
-                ? never
-                : k
-            : never]: InferType<TProps[k]>;
-    }
-> {
+): ObjectSchemaBuilder<TProps, true> {
     return ObjectSchemaBuilder.create({
         isRequired: true,
         properties: props
     }) as any;
 }
+
+type RequiredProps<T extends Record<string, SchemaBuilder<any, any>>> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        infer TRes,
+        infer TReq
+    >
+        ? TReq extends true
+            ? k
+            : never
+        : never]: T[k];
+};
+
+type NotRequiredProps<T extends Record<string, SchemaBuilder<any, any>>> =
+    keyof {
+        [k in keyof T as T[k] extends SchemaBuilder<
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            infer TRes,
+            infer TReq
+        >
+            ? TReq extends true
+                ? never
+                : k
+            : never]: T[k];
+    };
