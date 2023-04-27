@@ -5,7 +5,7 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/schema": "1.0.0"
+        "@cleverbrush/schema": "1.1.0"
     },
     "description": "Job Scheduler for NodeJS",
     "files": [
@@ -38,5 +38,5 @@
         "tsconfig": "./tsconfig.json"
     },
     "types": "./dist/index.d.ts",
-    "version": "1.0.0"
+    "version": "1.1.0"
 }

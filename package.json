@@ -1,7 +1,7 @@
 {
     "name": "cleverbrush-framework",
     "private": "true",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "Cleverbrush Framework - a set of libraries used by Cleverbrush, a web-based publishing application",
     "scripts": {
         "build": "npm run clean && npm run build_async && npm run build_deep && npm run build_schema && npm run build_scheduler",

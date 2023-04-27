@@ -35,8 +35,8 @@
         "displayName": "Schema Definition And Validation",
         "tsconfig": "./tsconfig.json"
     },
-    "version": "1.0.0",
+    "version": "1.1.0",
     "devDependencies": {
-        "@cleverbrush/deep": "1.0.0"
+        "@cleverbrush/deep": "1.1.0"
     }
 }
