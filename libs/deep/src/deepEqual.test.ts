@@ -1,4 +1,4 @@
-import deepEqual from './deepEqual.js';
+import { deepEqual } from './deepEqual.js';
 
 test('deepEqual - 1', () => {
     expect(deepEqual('a', 'a')).toEqual(true);

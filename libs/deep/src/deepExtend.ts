@@ -27,44 +27,44 @@ export type Merge<T extends unknown[]> = T['length'] extends 3
     ? Merge<[Merge<[...K]>, MergeTwo<PL, L>]>
     : never;
 
-const deepExtend: <T extends unknown[]>(...args: T) => Merge<T> = function () {
-    if (arguments.length === 0) return false;
-    if (arguments.length === 1) return arguments[0];
-    if (typeof arguments[0] !== 'object') return false;
+export const deepExtend = ((...rest) => {
+    if (rest.length === 0) throw new Error('no arguments');
+    if (typeof rest[0] !== 'object' || rest[0] === null)
+        throw new Error('not a non-null object');
+    if (rest.length === 1) return rest[0];
 
     const result = {};
 
     const extendObject = function (o1, o2) {
-        if (o2 == null) return;
         const keys = Object.keys(o2);
 
         for (let i = 0; i < keys.length; i++) {
-            if (o2.hasOwnProperty(keys[i])) {
-                if (
-                    !o1.hasOwnProperty(keys[i]) ||
-                    !(
-                        typeof o1[keys[i]] === 'object' &&
-                        typeof o2[keys[i]] === 'object'
-                    )
-                ) {
+            if (
+                !Reflect.has(o1, keys[i]) ||
+                !(
+                    typeof o1[keys[i]] === 'object' &&
+                    o1[keys[i]] !== null &&
+                    typeof o2[keys[i]] === 'object'
+                )
+            ) {
+                o1[keys[i]] = o2[keys[i]];
+            } else {
+                if (o1[keys[i]] == null || o2[keys[i]] == null) {
                     o1[keys[i]] = o2[keys[i]];
                 } else {
-                    if (o1[keys[i]] == null) {
-                        o1[keys[i]] = o2[keys[i]];
-                    } else {
-                        extendObject(o1[keys[i]], o2[keys[i]]);
-                    }
+                    extendObject(o1[keys[i]], o2[keys[i]]);
                 }
             }
         }
     };
 
-    for (let i = 0; i < arguments.length; i++) {
-        if (typeof arguments[i] === 'object' && arguments[i]) {
-            extendObject(result, arguments[i]);
+    for (let i = 0; i < rest.length; i++) {
+        if (typeof rest[i] === 'object' && rest[i] !== null && rest[i]) {
+            extendObject(result, rest[i]);
+        } else {
+            throw new Error('not a non-null object');
         }
     }
 
     return result;
-};
-export default deepExtend;
+}) as <T extends unknown[]>(...args: T) => Merge<T>;

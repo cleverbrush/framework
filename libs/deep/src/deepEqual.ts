@@ -1,8 +1,6 @@
 import { HashObject } from './hashObject.js';
 
-const isBothNaN = function (v1, v2) {
-    return Number.isNaN(v1) && Number.isNaN(v2);
-};
+const isBothNaN = (v1, v2) => Number.isNaN(v1) && Number.isNaN(v2);
 
 /**
  * Compares two objects and returns true if they
@@ -14,7 +12,7 @@ const isBothNaN = function (v1, v2) {
  * @param options additional options
  * @returns {boolean} `true` if the objects are equal, `false` otherwise
  */
-const deepEqual = function (
+export const deepEqual = function (
     p1,
     p2,
     options?: {
@@ -110,5 +108,3 @@ const deepEqual = function (
 
     return compare(p1, p2);
 };
-
-export default deepEqual;
