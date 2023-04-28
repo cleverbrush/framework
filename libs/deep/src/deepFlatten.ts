@@ -1,5 +1,17 @@
 /**
  * Flattens an object to a single level, with the nested keys separated by a `delimiter`.
+ * @example
+ * ```ts
+ * deepFlatten({ a: { b: 1, c: 2 } });
+ * // => { 'a.b': 1, 'a.c': 2 }
+ *
+ * deepFlatten({ a: { b: 1, c: 2 } }, '/');
+ * // => { 'a/b': 1, 'a/c': 2 }
+ *
+ * deepFlatten({ a: { b: 1, c: { d: 'some val' } }, d: 3 });
+ * // => { 'a.b': 1, 'a.c.d': 'some val', d: 3 }
+ *
+ * ```
  * @param {string} [delimiter]
  */
 export function deepFlatten(
