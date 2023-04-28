@@ -1,4 +1,11 @@
-export const deepFlatten = (obj) => {
+/**
+ * Flattens an object to a single level, with the nested keys separated by a `delimiter`.
+ * @param {string} [delimiter]
+ */
+export function deepFlatten(
+    obj: Record<string, any>,
+    delimiter = '.'
+): Record<string, any> {
     const shouldFlatten = (obj) =>
         typeof obj === 'object' &&
         obj !== null &&
@@ -19,10 +26,13 @@ export const deepFlatten = (obj) => {
 
         Object.keys(obj).forEach((key) => {
             if (!shouldFlatten(obj[key])) {
-                result[prefix ? `${prefix}.${key}` : key] = obj[key];
+                result[prefix ? `${prefix}${delimiter}${key}` : key] = obj[key];
                 return;
             }
-            deepFlattenHelper(obj[key], prefix ? `${prefix}.${key}` : key);
+            deepFlattenHelper(
+                obj[key],
+                prefix ? `${prefix}${delimiter}${key}` : key
+            );
         });
 
         stack.pop();
@@ -31,4 +41,4 @@ export const deepFlatten = (obj) => {
     deepFlattenHelper(obj);
 
     return result;
-};
+}

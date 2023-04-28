@@ -83,15 +83,27 @@ test('deepFlatten - 7', () => {
 });
 
 test('deepFlatten - 8', () => {
-    expect(() => deepFlatten(10)).toThrowError('cannot flatten this object');
+    expect(() => deepFlatten(null as any)).toThrowError(
+        'cannot flatten this object'
+    );
 });
 
 test('deepFlatten - 9', () => {
-    expect(() => deepFlatten(10)).toThrowError('cannot flatten this object');
+    expect(() => deepFlatten(10 as any)).toThrowError(
+        'cannot flatten this object'
+    );
 });
 
 test('deepFlatten - 10', () => {
     const repeatedObj = { a: 1 };
     const obj = { b: repeatedObj, c: repeatedObj };
     expect(deepFlatten(obj)).toEqual({ 'b.a': 1, 'c.a': 1 });
+});
+
+test('deepFlatten - 11', () => {
+    expect(deepFlatten({ a: 1, b: { c: 20, d: 'some string' } }, '/')).toEqual({
+        a: 1,
+        'b/c': 20,
+        'b/d': 'some string'
+    });
 });
