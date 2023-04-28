@@ -8,7 +8,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Schema_Definition_And_Validation.html",
+    "homepage": "https://docs.cleverbrush.com/v1.1.1/modules/Schema_Definition_And_Validation.html",
     "keywords": [
         "object schema validator",
         "schema",
@@ -35,8 +35,8 @@
         "displayName": "Schema Definition And Validation",
         "tsconfig": "./tsconfig.json"
     },
-    "version": "1.1.0",
+    "version": "1.1.1",
     "devDependencies": {
-        "@cleverbrush/deep": "1.1.0"
+        "@cleverbrush/deep": "1.1.1"
     }
 }
