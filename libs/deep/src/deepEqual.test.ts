@@ -67,3 +67,37 @@ test('deepEqual - 12', () => {
         )
     ).toEqual(true);
 });
+
+test('deepEqual - null args', () => {
+    expect(deepEqual(null, null)).toEqual(true);
+});
+
+test('deepEqual - null props', () => {
+    expect(deepEqual({ prop1: null }, { prop1: null })).toEqual(true);
+});
+
+test('deepEqual - null props 2', () => {
+    expect(
+        deepEqual(
+            { prop1: null },
+            {
+                prop1: {
+                    someVal: 10
+                }
+            }
+        )
+    ).toEqual(false);
+});
+
+test('deepEqual - undefined props', () => {
+    expect(
+        deepEqual(
+            { prop1: undefined },
+            {
+                prop1: {
+                    someVal: 10
+                }
+            }
+        )
+    ).toEqual(false);
+});

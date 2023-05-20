@@ -70,7 +70,7 @@ export const deepEqual = function (
             return arraysAreIdentical(o1, o2);
         }
 
-        if (typeof o1 === 'object') {
+        if (typeof o1 === 'object' && o1 !== null) {
             if (cache.get(o1) === true) {
                 return false;
             }
