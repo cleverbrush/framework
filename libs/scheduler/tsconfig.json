@@ -8,7 +8,8 @@
         "esModuleInterop": true,
         "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
-        "sourceMap": true
+        "sourceMap": false,
+        "declarationMap": false
     },
     "files": ["src/index.ts"],
     "watchOptions": {

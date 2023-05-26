@@ -9,7 +9,9 @@
         "allowSyntheticDefaultImports": true,
         "moduleResolution": "Node",
         "strictNullChecks": true,
-        "noImplicitThis": true
+        "noImplicitThis": true,
+        "sourceMap": false,
+        "declarationMap": false
     },
     "files": ["./src/index.ts"],
     "watchOptions": {
