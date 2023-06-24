@@ -14,7 +14,8 @@ type StringSchemaBuilderCreateProps<
 /**
  * Allows to define a schema for a string. It can be: required or optional,
  * restricted to be equal to a certain value, restricted to have a certain
- * length.
+ * length, restricted to start with a certain value, restricted to end with
+ * a certain value, restricted to match a certain regular expression.
  *
  * **NOTE** this class is exported only to give opportunity to extend it
  * by inheriting. It is not recommended to create an instance of this class
@@ -71,6 +72,9 @@ export class StringSchemaBuilder<
     #minLength?: number;
     #maxLength?: number;
     #equalsTo?: string;
+    #startsWith?: string;
+    #endsWith?: string;
+    #matches?: RegExp;
 
     public static create(props: StringSchemaBuilderCreateProps) {
         return new StringSchemaBuilder({
@@ -96,6 +100,21 @@ export class StringSchemaBuilder<
         ) {
             this.#equalsTo = props.equalsTo;
         }
+
+        if (
+            typeof props.startsWith === 'string' &&
+            props.startsWith.length > 0
+        ) {
+            this.#startsWith = props.startsWith;
+        }
+
+        if (typeof props.endsWith === 'string' && props.endsWith.length > 0) {
+            this.#endsWith = props.endsWith;
+        }
+
+        if (props.matches instanceof RegExp) {
+            this.#matches = props.matches;
+        }
     }
 
     public introspect() {
@@ -113,6 +132,18 @@ export class StringSchemaBuilder<
              * If set, restrict object to be equal to a certain value.
              */
             equalsTo: this.#equalsTo,
+            /**
+             * If set, restrict string to start with a certain value.
+             */
+            startsWith: this.#startsWith,
+            /**
+             * If set, restrict string to end with a certain value.
+             */
+            endsWith: this.#endsWith,
+            /**
+             * If set, restrict string to match a certain regular expression.
+             */
+            matches: this.#matches,
             /**
              * Array of preprocessor functions
              */
@@ -208,6 +239,40 @@ export class StringSchemaBuilder<
             };
         }
 
+        if (
+            typeof this.#startsWith === 'string' &&
+            this.#startsWith.length > 0 &&
+            !objToValidate.startsWith(this.#startsWith)
+        ) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: `is expected to start with '${
+                            this.#startsWith
+                        }'`,
+                        path: path as string
+                    }
+                ]
+            };
+        }
+
+        if (
+            typeof this.#endsWith === 'string' &&
+            this.#endsWith.length > 0 &&
+            !objToValidate.endsWith(this.#endsWith)
+        ) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: `is expected to end with '${this.#endsWith}'`,
+                        path: path as string
+                    }
+                ]
+            };
+        }
+
         if (typeof this.#minLength !== 'undefined') {
             if (objToValidate.length < this.#minLength)
                 return {
@@ -236,6 +301,20 @@ export class StringSchemaBuilder<
                         }
                     ]
                 };
+        }
+
+        if (this.#matches instanceof RegExp) {
+            if (!this.#matches.test(objToValidate)) {
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message: `does not match to ${this.#matches}`,
+                            path: path as string
+                        }
+                    ]
+                };
+            }
         }
 
         return {
@@ -331,6 +410,74 @@ export class StringSchemaBuilder<
         return this.createFromProps({
             ...schema
         }) as any;
+    }
+
+    /**
+     * Restricts string to start with `val`.
+     */
+    public startsWith(val: string): StringSchemaBuilder<TResult, TRequired> {
+        if (typeof val !== 'string' || !val)
+            throw new Error('non empty string expected');
+        return this.createFromProps({
+            ...this.introspect(),
+            startsWith: val
+        });
+    }
+
+    /**
+     * Cancels `startsWith()` call.
+     */
+    public clearStartsWith(): StringSchemaBuilder<TResult, TRequired> {
+        const schema = this.introspect();
+        delete schema.startsWith;
+        return this.createFromProps({
+            ...schema
+        });
+    }
+
+    /**
+     * Restricts string to end with `val`.
+     */
+    public endsWith(val: string): StringSchemaBuilder<TResult, TRequired> {
+        if (typeof val !== 'string' || !val)
+            throw new Error('non empty string expected');
+        return this.createFromProps({
+            ...this.introspect(),
+            endsWith: val
+        });
+    }
+
+    /**
+     * Cancels `endsWith()` call.
+     */
+    public clearEndsWith(): StringSchemaBuilder<TResult, TRequired> {
+        const schema = this.introspect();
+        delete schema.endsWith;
+        return this.createFromProps({
+            ...schema
+        });
+    }
+
+    /**
+     * Restricts string to match `regexp`.
+     */
+    public matches(regexp: RegExp): StringSchemaBuilder<TResult, TRequired> {
+        if (!(regexp instanceof RegExp)) throw new Error('regexp expected');
+        return this.createFromProps({
+            ...this.introspect(),
+            matches: regexp
+        });
+    }
+
+    /**
+     * Cancels `matches()` call.
+     */
+    public clearMatches(): StringSchemaBuilder<TResult, TRequired> {
+        const schema = this.introspect();
+        delete schema.matches;
+        return this.createFromProps({
+            ...schema
+        });
     }
 }
 

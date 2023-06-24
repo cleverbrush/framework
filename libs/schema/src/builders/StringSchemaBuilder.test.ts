@@ -365,3 +365,147 @@ test('hasType - 1', () => {
     expectType<Date>(typeSchema2);
     expectType<string>(typeSchema3);
 });
+
+test('startsWith - 1', async () => {
+    {
+        const schema1 = string();
+        const schema2 = schema1.startsWith('abc');
+        expect((schema1 as any) === schema2).toEqual(false);
+    }
+
+    {
+        const schema1 = string();
+        const schema2 = schema1.clearStartsWith();
+        expect((schema1 as any) === schema2).toEqual(false);
+    }
+
+    {
+        expect(() => string().startsWith(123 as any)).toThrowError();
+    }
+
+    {
+        const schema = string().startsWith('abc');
+        const { valid, errors, object } = await schema.validate('abc');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abc');
+    }
+
+    {
+        const schema = string().startsWith('abc');
+        const { valid, errors, object } = await schema.validate('abcdefg');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abcdefg');
+    }
+
+    {
+        const schema = string().startsWith('abc');
+        const { valid, errors, object } = await schema.validate('invalid');
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(object).toBeUndefined();
+    }
+
+    {
+        const schema = string().startsWith('abc').clearStartsWith();
+        const { valid, errors, object } = await schema.validate('valid');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('valid');
+    }
+});
+
+test('endsWith - 1', async () => {
+    {
+        const schema1 = string();
+        const schema2 = schema1.endsWith('abc');
+        expect((schema1 as any) === schema2).toEqual(false);
+    }
+
+    {
+        const schema1 = string();
+        const schema2 = schema1.clearEndsWith();
+        expect((schema1 as any) === schema2).toEqual(false);
+    }
+
+    {
+        expect(() => string().endsWith(123 as any)).toThrowError();
+    }
+
+    {
+        const schema = string().endsWith('abc');
+        const { valid, errors, object } = await schema.validate('abc');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abc');
+    }
+
+    {
+        const schema = string().endsWith('abc');
+        const { valid, errors, object } = await schema.validate('defgabc');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('defgabc');
+    }
+
+    {
+        const schema = string().endsWith('abc');
+        const { valid, errors, object } = await schema.validate('invalid');
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(object).toBeUndefined();
+    }
+
+    {
+        const schema = string().endsWith('abc').clearEndsWith();
+        const { valid, errors, object } = await schema.validate('valid');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('valid');
+    }
+});
+
+test('matches - 1', async () => {
+    {
+        const schema1 = string();
+        const schema2 = schema1.matches(/abc/);
+        expect((schema1 as any) === schema2).toEqual(false);
+    }
+
+    {
+        const schema1 = string();
+        const schema2 = schema1.clearMatches();
+        expect((schema1 as any) === schema2).toEqual(false);
+    }
+
+    {
+        expect(() => string().matches(123 as any)).toThrowError();
+    }
+
+    {
+        const schema = string().matches(/^abc\d+/);
+        const { valid, errors, object } = await schema.validate('abc123');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abc123');
+    }
+
+    {
+        const schema = string().matches(/^abc\d+/);
+        const { valid, errors, object } = await schema.validate('abcdefg');
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(object).toBeUndefined();
+    }
+
+    {
+        const schema = string()
+            .matches(/^abc\d+/)
+            .clearMatches();
+        const { valid, errors, object } = await schema.validate('abcdefg');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abcdefg');
+    }
+});
