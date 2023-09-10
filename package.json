@@ -40,9 +40,9 @@
         "prettier": "^3.0.0",
         "tsd": "^0.28.1",
         "ts-jest": "^29.1.1",
-        "typedoc": "^0.24.8",
+        "typedoc": "^0.23.26",
         "typedoc-google-tag-manager-plugin": "^1.0.4",
         "typedoc-plugin-versions": "^0.2.3",
-        "typescript": "^5.1.6"
+        "typescript": "^5.0.4"
     }
 }
