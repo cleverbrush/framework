@@ -30,8 +30,7 @@ type WorkerResult = {
 
 const MAX_BUFFER_SIZE = 10 * 1024 * 1024; // 10MB
 const CHECK_INTERVAL = 1000 * 10; // every 10 seconds
-// const SCHEDULE_JOB_SPAN = 1000 * 60 * 60; // 1 hour
-const SCHEDULE_JOB_SPAN = 1000 * 60; // 1 hour
+const SCHEDULE_JOB_SPAN = 1000 * 60; // 1 minute
 const DEFAULT_JOB_TIMEOUT = 1000 * 20; // 20 seconds
 const DEFAULT_MAX_CONSEQUENT_FAILS = 3;
 const DEFAULT_MAX_RETRIES = 2;
@@ -385,11 +384,13 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
 
             timer = setTimeout(async () => {
                 const actualJob = await this._jobsRepository.getJobById(job.id);
+
                 if (!actualJob || actualJob.status !== 'active') {
                     instance.status = 'canceled';
                     await this._jobsRepository.saveInstance(instance);
                     return;
                 }
+
                 await this.startJobInstance(instance);
             }, interval);
 
@@ -419,6 +420,18 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
                 while (schedule.hasNext(SCHEDULE_JOB_SPAN)) {
                     const { date: nextRun, index } = schedule.next();
                     if (nextRun < new Date()) continue;
+
+                    if (jobs[i].noConcurrentRuns) {
+                        const runingInstances =
+                            await this._jobsRepository.getInstancesWithStatus(
+                                jobs[i].id,
+                                'running'
+                            );
+
+                        if (runingInstances.length > 0) {
+                            return;
+                        }
+                    }
 
                     const alreadyScheduled = scheduledInstances.find(
                         (i) => i.index === index
@@ -493,9 +506,8 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
      * @param job {CreateJobRequest} - job to add
      */
     public async addJob(job: CreateJobRequest) {
-        const validationResult = await Schemas.CreateJobRequestSchema.validate(
-            job
-        );
+        const validationResult =
+            await Schemas.CreateJobRequestSchema.validate(job);
         if (!validationResult.valid) {
             throw new Error(
                 `Invalid CreateJobRequest: ${validationResult.errors?.join(
@@ -525,7 +537,8 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             maxRetries:
                 typeof job.maxRetries === 'number'
                     ? job.maxRetries
-                    : DEFAULT_MAX_RETRIES
+                    : DEFAULT_MAX_RETRIES,
+            noConcurrentRuns: job.noConcurrentRuns || false
         });
     }
 
@@ -547,11 +560,6 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         }
 
         this._rootFolder = props.rootFolder;
-
-        setInterval(() => {
-            this._jobsRepository.dumpJobs();
-            this._jobsRepository.dumpInstances();
-        }, 10 * 1000);
     }
 
     public on<T extends keyof Events>(name: T, callback: Events[T]): this {

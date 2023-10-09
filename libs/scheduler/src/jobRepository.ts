@@ -22,10 +22,6 @@ export interface IJobRepository {
     ): Promise<JobInstance>;
 
     saveInstance(instance: JobInstance): Promise<JobInstance>;
-
-    // TODO: remove
-    dumpJobs(): void;
-    dumpInstances(): void;
 }
 
 export class InMemoryJobRepository implements IJobRepository {
@@ -130,13 +126,5 @@ export class InMemoryJobRepository implements IJobRepository {
 
         this._jobInstances.push(result);
         return result;
-    }
-
-    dumpJobs(): void {
-        // console.table(this._jobs);
-    }
-
-    dumpInstances(): void {
-        // console.table(this._jobInstances);
     }
 }

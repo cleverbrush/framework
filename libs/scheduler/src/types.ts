@@ -1,11 +1,12 @@
 import {
     InferType,
+    array,
+    boolean,
     date,
-    object,
     func,
     number,
+    object,
     string,
-    array,
     union
 } from '@cleverbrush/schema';
 
@@ -118,7 +119,11 @@ const CreateJobRequestSchema = object({
     /**
      * Job will be retried right away this times. Job will be retried on next schedule run if this number is exceeded.
      */
-    maxRetries: number().optional().min(1)
+    maxRetries: number().optional().min(1),
+    /**
+     * If true, job will not be runned if previous run is not finished yet.
+     */
+    noConcurrentRuns: boolean().optional()
 });
 
 /**
@@ -184,6 +189,10 @@ export type Job = {
      * next schedule run if this number is exceeded.
      */
     maxRetries: number;
+    /**
+     * If true, job will not be runned if previous run is not finished yet.
+     */
+    noConcurrentRuns?: boolean;
 };
 
 export type JobInstance = {
