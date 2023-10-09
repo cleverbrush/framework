@@ -1,0 +1,10 @@
+{ 
+    "$schema": "https://typedoc.org/schema.json",
+    "entryPoints": [
+        "src/index.ts",
+    ],
+    "name": "@cleverbrush/async",
+    "excludePrivate": true,
+    "gtmWorkspaceId": "GTM-WRLXDMG",
+    "plugin": [ "typedoc-google-tag-manager-plugin" ]
+}

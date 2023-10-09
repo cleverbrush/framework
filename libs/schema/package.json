@@ -29,12 +29,6 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "typedoc": {
-        "entryPoint": "./src/index.ts",
-        "readmeFile": "./README.md",
-        "displayName": "Schema Definition And Validation",
-        "tsconfig": "./tsconfig.json"
-    },
     "version": "1.1.5",
     "devDependencies": {
         "@cleverbrush/deep": "1.1.5"

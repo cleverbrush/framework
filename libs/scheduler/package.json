@@ -31,12 +31,6 @@
         "build": "tsc"
     },
     "type": "module",
-    "typedoc": {
-        "entryPoint": "./src/index.ts",
-        "readmeFile": "./README.md",
-        "displayName": "Job Scheduler",
-        "tsconfig": "./tsconfig.json"
-    },
     "types": "./dist/index.d.ts",
     "version": "1.1.5"
 }

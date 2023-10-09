@@ -27,12 +27,6 @@
         "watch": "tsc --watch",
         "build": "tsc"
     },
-    "typedoc": {
-        "entryPoint": "./src/index.ts",
-        "readmeFile": "./README.md",
-        "displayName": "Deep operations on objects",
-        "tsconfig": "./tsconfig.json"
-    },
     "type": "module",
     "types": "./dist/index.d.ts",
     "version": "1.1.5"
