@@ -52,7 +52,7 @@ const user = {
 };
 ```
 
-See [Documentation](https://docs.cleverbrush.com/v1.0/modules/Schema_Definition_And_Validation.html) or `docs` folder for more information.
+See [Documentation](https://docs.cleverbrush.com/modules/_cleverbrush_schema.html) or `docs` folder for more information.
 
 ## Schema Types
 

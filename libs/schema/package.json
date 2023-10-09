@@ -8,7 +8,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/v1.1.1/modules/Schema_Definition_And_Validation.html",
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_schema.html",
     "keywords": [
         "object schema validator",
         "schema",

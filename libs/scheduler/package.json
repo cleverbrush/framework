@@ -11,7 +11,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/v1.1.1/modules/Job_Scheduler.html",
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_scheduler.html",
     "keywords": [
         "task scheduler",
         "task runner",
