@@ -8,7 +8,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/v1.0.0/modules/Async_utilities.html",
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_async.html",
     "keywords": [
         "async utils",
         "cleverbrush"
