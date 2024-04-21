@@ -25,7 +25,10 @@
         "watch": "tsc --watch",
         "build": "tsc"
     },
+    "devDependencies": {
+        "@types/node": "^20.11.30"
+    },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "1.1.5"
+    "version": "1.1.6"
 }
