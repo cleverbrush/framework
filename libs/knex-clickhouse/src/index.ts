@@ -1,5 +1,5 @@
 import Knex from 'knex';
-import ClickhouseDriver from '@clickhouse/client';
+import ClickhouseDriver, { type ClickHouseSettings } from '@clickhouse/client';
 
 import { makeEscape } from './makeEscape.js';
 
@@ -233,7 +233,9 @@ export class ClickhouseKnexClient extends Knex.Client {
                 password: this.config.connection.password,
                 // @ts-ignore
                 database: this.config.connection.database,
-                compression: { request: true, response: true }
+                compression: { request: true, response: true },
+                // @ts-ignore
+                clickhouse_settings: this.config.clickHouseSettings
             });
 
             // @ts-ignore
@@ -255,3 +257,62 @@ Object.assign(ClickhouseKnexClient.prototype, {
     driverName: 'clikhouse',
     canCancelQuery: true
 });
+
+const registerKnexClickhouseExtensions = (knex) => {
+    Knex.QueryBuilder.extend('insertToClickhouse', function (rows) {
+        const getTuple = (r, p = ['(', ')']) =>
+            p[0] +
+            r
+                .map((c) => {
+                    if (c === null) {
+                        return 'NULL';
+                    }
+                    if (typeof c === 'string') {
+                        return knex.raw('?', [c]).toQuery();
+                    }
+
+                    if (Array.isArray(c)) {
+                        return getTuple(c, ['[', ']']);
+                    }
+
+                    if (typeof c === 'object') {
+                        const keys = Object.keys(c);
+                        return `[${keys
+                            .map(
+                                (k) =>
+                                    `(${knex.raw('?', [k]).toQuery()}, ${knex
+                                        .raw('?', [c[k]])
+                                        .toQuery()})`
+                            )
+                            .join(', ')}]`;
+                    }
+
+                    return c;
+                })
+                .join(', ') +
+            p[1];
+        const values = rows.map((r) => getTuple(r));
+        // @ts-ignore
+        return knex.raw(`INSERT INTO ${this._single.table} VALUES ${values}`);
+    });
+};
+
+/**
+ *
+ * @returns {import('knex').Knex<any, unknown[]>}
+ */
+export const getClickhouseConnection = (
+    config: Knex.Knex.Config<any> = {},
+    clickHouseSettings?: ClickHouseSettings
+) => {
+    const connection = Knex({
+        ...config,
+        client: ClickhouseKnexClient,
+        // @ts-ignore
+        clickHouseSettings
+    });
+
+    registerKnexClickhouseExtensions(connection);
+
+    return connection;
+};
