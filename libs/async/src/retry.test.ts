@@ -56,3 +56,33 @@ test('retry - 3', async () => {
     expect(end - start).toBeGreaterThan(10 + 20 + 40 + 80 + 160);
     expect(numCalled).toBe(6);
 });
+
+test('retry - 4 - should retry', async () => {
+    let numCalled = 0;
+    const fn = () =>
+        new Promise(() => {
+            numCalled++;
+            if (numCalled < 3) {
+                throw new Error('error');
+            }
+            throw new Error('error2');
+        });
+
+    await expect(
+        retry(fn, { maxRetries: 5, shouldRetry: (e) => e.message === 'error' })
+    ).rejects.toThrow('error2');
+});
+
+test('retry - 5 - should not retry', async () => {
+    let numCalled = 0;
+    const fn = () =>
+        new Promise(() => {
+            numCalled++;
+            throw new Error('error');
+        });
+
+    await expect(
+        retry(fn, { maxRetries: 5, shouldRetry: (e) => e.message === 'error2' })
+    ).rejects.toThrow('error');
+    expect(numCalled).toBe(1);
+});
