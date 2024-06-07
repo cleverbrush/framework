@@ -5,6 +5,8 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
+        "@cleverbrush/async": "^1.1.7",
+        "@cleverbrush/deep": "^1.1.7",
         "@clickhouse/client": "^1.0.1"
     },
     "peerDependencies": {

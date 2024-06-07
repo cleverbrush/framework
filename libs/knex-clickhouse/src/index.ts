@@ -1,6 +1,8 @@
 import Knex from 'knex';
 import ClickhouseDriver, { type ClickHouseSettings } from '@clickhouse/client';
 
+import { retry } from '@cleverbrush/async';
+import { deepExtend } from '@cleverbrush/deep';
 import { makeEscape } from './makeEscape.js';
 
 const parseDate = (value) => new Date(Date.parse(value));
@@ -24,13 +26,42 @@ function arrayString(arr, esc) {
     return `[${result}]`;
 }
 
+type AdditionalClientOptions = {
+    /**
+     * Options for retrying the query,
+     * by default it will retry 10 times with a delay factor of 2 and a minimum delay of
+     * 100ms and delay randomization of 10%.
+     * and will retry only if the error code is 'ECONNRESET',
+     * you can override this behavior by passing your own options.
+     * If this option is set to `null` then the query will not be retried.
+     */
+    retry?: Parameters<typeof retry>[1];
+};
+
 export class ClickhouseKnexClient extends Knex.Client {
     _driver() {
         return ClickhouseDriver;
     }
 
-    constructor(config = {}) {
+    #retryOptions: Parameters<typeof retry>[1];
+
+    constructor(config: Knex.Knex.Config<any> & AdditionalClientOptions = {}) {
+        const { retry: retryOptions } = config;
+
         super(config);
+
+        this.#retryOptions = retryOptions
+            ? deepExtend(
+                  {
+                      maxRetries: 10,
+                      delayFactor: 2,
+                      minDelay: 100,
+                      delayRandomizationPercent: 0.1,
+                      shouldRetry: (error) => error.code === 'ECONNRESET'
+                  },
+                  retryOptions
+              )
+            : null;
     }
 
     #typeParsers = {
@@ -142,7 +173,13 @@ export class ClickhouseKnexClient extends Knex.Client {
             case 'first':
             case 'pluck':
                 {
-                    const p = await connection.query(queryParams);
+                    const p = (await (this.#retryOptions
+                        ? retry(
+                              () => connection.query(queryParams),
+                              this.#retryOptions
+                          )
+                        : connection.query(queryParams))) as any;
+
                     response = await p.json();
 
                     const { data, meta, ...rest } = response;
@@ -151,7 +188,12 @@ export class ClickhouseKnexClient extends Knex.Client {
                 }
                 break;
             default:
-                response = await connection.exec(queryParams);
+                response = await (this.#retryOptions
+                    ? retry(
+                          () => connection.exec(queryParams),
+                          this.#retryOptions
+                      )
+                    : connection.exec(queryParams));
         }
 
         return obj;
@@ -302,7 +344,7 @@ const registerKnexClickhouseExtensions = (knex) => {
  * @returns {import('knex').Knex<any, unknown[]>}
  */
 export const getClickhouseConnection = (
-    config: Knex.Knex.Config<any> = {},
+    config: Knex.Knex.Config<any> & AdditionalClientOptions = {},
     clickHouseSettings?: ClickHouseSettings
 ) => {
     const connection = Knex({
