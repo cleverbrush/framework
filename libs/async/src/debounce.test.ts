@@ -46,3 +46,19 @@ test('debounce - 3', async () => {
     await new Promise((resolve) => setTimeout(resolve, 200));
     expect(numCalled).toBe(2);
 });
+
+test('debounce - immediate', async () => {
+    let numCalled = 0;
+    const fn = () => {
+        numCalled++;
+    };
+
+    const debouncedFn = debounce(fn, 100, { immediate: true });
+
+    debouncedFn();
+    expect(numCalled).toBe(1);
+    debouncedFn();
+    debouncedFn();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(numCalled).toBe(2);
+});
