@@ -4,17 +4,13 @@
     "version": "1.1.10",
     "description": "Cleverbrush Framework - a set of libraries used by Cleverbrush, a web-based publishing application",
     "scripts": {
-        "build": "npm run clean && npm run build_async && npm run build_deep && npm run build_knex-clickhouse && npm run build_schema && npm run build_scheduler",
+        "build": "npm run clean && npm run build_async && npm run build_deep && npm run build_knex-clickhouse && npm run build_schema && npm run build_scheduler && npm run build_mapper",
         "build_async": "cd libs/async && npm run build",
         "build_deep": "cd libs/deep && npm run build",
         "build_knex-clickhouse": "cd libs/knex-clickhouse && npm run build",
-        "build_schema": "cd libs/schema && npm run build",
+        "build_mapper": "cd libs/mapper && npm run build",
         "build_scheduler": "cd libs/scheduler && npm run build",
-        "build_async:beta": "cd libs/async && npm run build && cd ../..",
-        "build_deep:beta": "cd libs/deep && npm run build && cd ../..",
-        "build_knex-clickhouse:beta": "cd libs/knex-clickhouse && npm run build && cd ../..",
-        "build_schema:beta": "cd libs/schema && npm run build && cd ../..",
-        "build_scheduler:beta": "cd libs/scheduler && npm run build && cd ../..",
+        "build_schema": "cd libs/schema && npm run build",
         "clean": "npm run clean_async && npm run clean_deep && npm run clean_knex-clickhouse && npm run clean_schema && npm run clean_scheduler",
         "clean_async": "rm -rf libs/async/dist",
         "clean_deep": "rm -rf libs/deep/dist",
@@ -23,8 +19,8 @@
         "clean_scheduler": "rm -rf libs/scheduler/dist",
         "docs": "typedoc",
         "prettier": "npx prettier --write ./libs",
-        "publish": "npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public && npm publish --workspace @cleverbrush/knex-clickhouse --access=public && npm publish --workspace @cleverbrush/async --access=public && npm publish --workspace @cleverbrush/scheduler --access=public",
-        "publish:beta": "npm run clean && npm run build_deep:beta && npm publish --tag beta --workspace @cleverbrush/deep --access=public && npm publish --tag beta --workspace @cleverbrush/knex-clickhouse --access=public && npm run build_async:beta && npm publish --tag beta --workspace @cleverbrush/async --access=public && npm run build_schema:beta && npm publish --tag beta --workspace @cleverbrush/schema --access=public && npm run build_scheduler:beta &&  npm publish --tag beta --workspace @cleverbrush/scheduler --access=public",
+        "publish": "npm run clean && npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public && npm publish --workspace @cleverbrush/knex-clickhouse --access=public && npm publish --workspace @cleverbrush/async --access=public && npm publish --workspace @cleverbrush/scheduler --access=public && npm publish --workspace @cleverbrush/mapper --access=public",
+        "publish:beta": "npm run clean && npm run build && npm publish --tag beta --workspace @cleverbrush/deep --access=public && npm publish --tag beta --workspace @cleverbrush/knex-clickhouse --access=public && npm publish --tag beta --workspace @cleverbrush/async --access=public && npm publish --tag beta --workspace @cleverbrush/schema --access=public && npm publish --tag beta --workspace @cleverbrush/scheduler --access=public && npm publish --tag beta --workspace @cleverbrush/mapper --access=public",
         "run_scheduler": "node ./libs/scheduler/dist/index.js",
         "test": "jest"
     },
@@ -36,13 +32,12 @@
     "license": "BSD 3-Clause",
     "devDependencies": {
         "@types/jest": "^29.5.12",
-        "@typescript-eslint/eslint-plugin": "^8.1.0",
-        "@typescript-eslint/parser": "^8.1.0",
         "eslint-config-airbnb": "^19.0.4",
         "jest": "^29.7.0",
         "prettier": "^3.3.3",
         "tsd": "^0.31.1",
         "ts-jest": "^29.2.4",
-        "typescript": "^5.5.4"
+        "typescript": "^5.5.4",
+        "typescript-eslint": "^8.1.0"
     }
 }

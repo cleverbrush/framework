@@ -1,0 +1,36 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "description": "Library for deep operations on objects like deep equal, deep extend, etc.",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_mapper.html",
+    "keywords": [
+        "deep operations on objects",
+        "deep equal",
+        "deep extend",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "name": "@cleverbrush/mapper",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/mapper#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "1.1.10",
+    "dependencies": {
+        "@cleverbrush/schema": "1.1.10"
+    }
+}
