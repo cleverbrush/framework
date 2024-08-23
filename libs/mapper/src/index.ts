@@ -27,10 +27,17 @@ export type PropertyMappingStrategy<
     ) => TReturnType;
 };
 
-export class SchemaToSchemaMapper<
+export class Mapper<
     TFromSchema extends ObjectSchemaBuilder<any, any, any>,
     TToSchema extends ObjectSchemaBuilder<any, any, any>
 > {
+    private readonly _fromSchema: TFromSchema;
+    private readonly _toSchema: TToSchema;
+
+    public constructor(fromSchema: TFromSchema, toSchema: TToSchema) {
+        this._fromSchema = fromSchema;
+        this._toSchema = toSchema;
+    }
     public forProp<TPropertyType>(
         selector: SchemaPropertySelector<TToSchema, TPropertyType>
     ): PropertyMappingStrategy<TFromSchema, TPropertyType, this> {
@@ -38,20 +45,6 @@ export class SchemaToSchemaMapper<
     }
 
     public end(): SchemaToSchemaMapperResult<TFromSchema, TToSchema> {
-        throw new Error();
-    }
-}
-
-export class Mapper<TFromSchema extends ObjectSchemaBuilder<any, any, any>> {
-    private readonly _fromSchema: TFromSchema;
-
-    public constructor(fromSchema: TFromSchema) {
-        this._fromSchema = fromSchema;
-    }
-
-    public to<TToSchema extends ObjectSchemaBuilder<any, any, any>>(
-        schema: TToSchema
-    ): SchemaToSchemaMapper<TFromSchema, TToSchema> {
         throw new Error();
     }
 }
@@ -73,10 +66,9 @@ const DtoSchema = object({
     alwaysTen: number().equals(10)
 });
 
-const mapper = new Mapper(UserSchema);
+const mapper = new Mapper(UserSchema, DtoSchema);
 
 const mapUserToUserDto = mapper
-    .to(DtoSchema)
     .forProp((t) => t.name)
     .mapFromProp((t) => t.name)
     .forProp((t) => t.cityName)
