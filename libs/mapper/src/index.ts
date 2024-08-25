@@ -27,6 +27,20 @@ export type PropertyMappingStrategy<
     ) => TReturnType;
 };
 
+/**
+ * A class to map properties from one schema to another
+ * by defualt it will map all properties with the same name
+ * and type (schema). If you want to map a property to a different
+ * property you can use the forProp method to specify the target.
+ * When you are done you can call the `getMapper` method to get the
+ * function that will do the mapping.
+ *
+ * If there are properties that you don't want to map you can use the
+ * ignore method.
+ * Also if at the time of calling `getMapper` function there are properties
+ * in the target schema that are not mapped (and not ignored)
+ * and MapperConfigurationError will be thrown.
+ */
 export class Mapper<
     TFromSchema extends ObjectSchemaBuilder<any, any, any>,
     TToSchema extends ObjectSchemaBuilder<any, any, any>
@@ -34,17 +48,23 @@ export class Mapper<
     private readonly _fromSchema: TFromSchema;
     private readonly _toSchema: TToSchema;
 
+    /**
+     * Creates a new instance of the Mapper class given the two schemas.
+     * @param fromSchema - `object` schema to map from
+     * @param toSchema  - `object` schema to map to
+     */
     public constructor(fromSchema: TFromSchema, toSchema: TToSchema) {
         this._fromSchema = fromSchema;
         this._toSchema = toSchema;
     }
+
     public forProp<TPropertyType>(
         selector: SchemaPropertySelector<TToSchema, TPropertyType>
     ): PropertyMappingStrategy<TFromSchema, TPropertyType, this> {
         throw new Error();
     }
 
-    public end(): SchemaToSchemaMapperResult<TFromSchema, TToSchema> {
+    public getMapper(): SchemaToSchemaMapperResult<TFromSchema, TToSchema> {
         throw new Error();
     }
 }
@@ -82,7 +102,7 @@ const mapUserToUserDto = mapper
     .mapFrom((t) => t.address.city + ' ' + t.address.houseNr)
     .forProp((t) => t.alwaysTen)
     .mapFrom(() => 10)
-    .end();
+    .getMapper();
 
 const user: InferType<typeof UserSchema> = {
     address: {
