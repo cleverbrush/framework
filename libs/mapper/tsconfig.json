@@ -11,7 +11,7 @@
         "sourceMap": false,
         "declarationMap": false
     },
-    "files": ["./src/index.ts"],
+    "files": ["src/index.ts"],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }
