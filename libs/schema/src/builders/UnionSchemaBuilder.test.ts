@@ -1,4 +1,3 @@
-import { expectType } from 'tsd';
 import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
 import { InferType } from './SchemaBuilder.js';
@@ -10,10 +9,10 @@ test('Simple Union - 1', async () => {
     {
         const { valid, object: result } = await schema.validate(10);
         const obj: InferType<typeof schema> = 10;
-        expectType<10>(obj);
+        expectTypeOf(obj).toEqualTypeOf<10>();
         expect(result).toBeDefined();
         if (result) {
-            expectType<10>(result);
+            expectTypeOf(result).toEqualTypeOf<10>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(10);
@@ -29,8 +28,8 @@ test('Simple Union - 1', async () => {
 test('Simple Union - 2', async () => {
     const schema1 = union(number().equals(10));
     const schema = schema1.or(number().equals(20));
-    const obj: InferType<typeof schema> = 10;
-    expectType<10 | 20>(obj);
+    let obj: InferType<typeof schema> = null as any;
+    expectTypeOf(obj).toEqualTypeOf<10 | 20>();
 
     expect((schema as any) !== schema1).toEqual(true);
 
@@ -38,7 +37,7 @@ test('Simple Union - 2', async () => {
         const { valid, object: result } = await schema.validate(10);
         expect(result).toBeDefined();
         if (result) {
-            expectType<10 | 20>(result);
+            expectTypeOf(result).toEqualTypeOf<10 | 20>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(10);
@@ -48,7 +47,7 @@ test('Simple Union - 2', async () => {
         const { valid, object: result } = await schema.validate(20);
         expect(result).toBeDefined();
         if (result) {
-            expectType<10 | 20>(result);
+            expectTypeOf(result).toEqualTypeOf<10 | 20>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(20);
@@ -71,8 +70,8 @@ test('Simple Union - 3', async () => {
             })
         );
 
-    const obj: InferType<typeof schema> = 10;
-    expectType<10 | 20 | { first: 1; second: 3 | 2 }>(obj);
+    const obj: InferType<typeof schema> = null as any;
+    expectTypeOf(obj).toEqualTypeOf<10 | 20 | { first: 1; second: 3 | 2 }>();
     {
         const { valid, object: result } = await schema.validate({
             first: 1,
@@ -80,7 +79,9 @@ test('Simple Union - 3', async () => {
         });
         expect(result).toBeDefined();
         if (result) {
-            expectType<10 | 20 | { first: 1; second: 3 | 2 }>(result);
+            expectTypeOf(result).toEqualTypeOf<
+                10 | 20 | { first: 1; second: 3 | 2 }
+            >();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual({
@@ -96,7 +97,9 @@ test('Simple Union - 3', async () => {
         });
         expect(result).toBeDefined();
         if (result) {
-            expectType<10 | 20 | { first: 1; second: 3 | 2 }>(result);
+            expectTypeOf(result).toEqualTypeOf<
+                10 | 20 | { first: 1; second: 3 | 2 }
+            >();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual({
@@ -175,7 +178,7 @@ test('validator not interfering - 1', async () => {
     );
 
     const obj: InferType<typeof schema> = { first: 44 };
-    expectType<{ first: number }>(obj);
+    expectTypeOf(obj).toEqualTypeOf<{ first: number }>();
 
     {
         const { valid, object: result } = await schema.validate({
@@ -183,7 +186,7 @@ test('validator not interfering - 1', async () => {
         });
         expect(result).toBeDefined();
         if (result) {
-            expectType<{ first: number }>(result);
+            expectTypeOf(result).toEqualTypeOf<{ first: number }>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual({
@@ -201,11 +204,11 @@ test('Required - 1', async () => {
 
     {
         const { valid, object: result } = await schema2.validate(10);
-        const obj: InferType<typeof schema2> = 10;
-        expectType<10>(obj);
+        const obj: InferType<typeof schema2> = null as any;
+        expectTypeOf(obj).toEqualTypeOf<10>();
         expect(result).toBeDefined();
         if (result) {
-            expectType<10>(result);
+            expectTypeOf(result).toEqualTypeOf<10>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(10);
@@ -227,10 +230,10 @@ test('Optional - 1', async () => {
     {
         const { valid, object: result } = await schema2.validate(10);
         const obj: InferType<typeof schema2> = 10;
-        expectType<10>(obj);
+        expectTypeOf(obj).toEqualTypeOf<10>();
         expect(result).toBeDefined();
         if (result) {
-            expectType<10>(result);
+            expectTypeOf(result).toEqualTypeOf<10>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(10);
@@ -252,10 +255,10 @@ test('Has Type - 1', async () => {
     {
         const { valid, object: result } = await schema2.validate(10 as any);
         const obj: InferType<typeof schema2> = new Date();
-        expectType<Date>(obj);
+        expectTypeOf(obj).toEqualTypeOf<Date>();
         expect(result).toBeDefined();
         if (result) {
-            expectType<Date>(result);
+            expectTypeOf(result).toEqualTypeOf<Date>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(10);
@@ -271,10 +274,10 @@ test('Clear Has Type - 1', async () => {
     {
         const { valid, object: result } = await schema2.validate(10 as any);
         const obj: InferType<typeof schema2> = 10;
-        expectType<10>(obj);
+        expectTypeOf(obj).toEqualTypeOf<10>();
         expect(result).toBeDefined();
         if (result) {
-            expectType<10>(result);
+            expectTypeOf(result).toEqualTypeOf<10>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(10);
@@ -290,7 +293,7 @@ test('Remove Option - 1', async () => {
     const schema1 = union(number().equals(10)).or(number().equals(20));
     const schema2 = schema1.removeOption(1);
     const obj: InferType<typeof schema2> = 10;
-    expectType<10>(obj);
+    expectTypeOf(obj).toEqualTypeOf<10>();
 
     expect((schema2 as any) !== schema1).toEqual(true);
 
@@ -298,7 +301,7 @@ test('Remove Option - 1', async () => {
         const { valid, object: result } = await schema2.validate(10);
         expect(result).toBeDefined();
         if (result) {
-            expectType<10>(result);
+            expectTypeOf(result).toEqualTypeOf<10>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(10);
@@ -308,7 +311,7 @@ test('Remove Option - 1', async () => {
         const { valid, object: result } = await schema2.validate(20 as any);
         expect(result).not.toBeDefined();
         if (result) {
-            expectType<10>(result);
+            expectTypeOf(result).toEqualTypeOf<10>();
         }
         expect(valid).toEqual(false);
         expect(result).toBeUndefined();
@@ -319,7 +322,7 @@ test('Remove First Option - 1', async () => {
     const schema1 = union(number().equals(10)).or(number().equals(20));
     const schema2 = schema1.removeFirstOption();
     const obj: InferType<typeof schema2> = 20;
-    expectType<20>(obj);
+    expectTypeOf(obj).toEqualTypeOf<20>();
 
     expect((schema2 as any) !== schema1).toEqual(true);
 
@@ -327,7 +330,7 @@ test('Remove First Option - 1', async () => {
         const { valid, object: result } = await schema2.validate(20);
         expect(result).toBeDefined();
         if (result) {
-            expectType<20>(result);
+            expectTypeOf(result).toEqualTypeOf<20>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(20);
@@ -337,7 +340,7 @@ test('Remove First Option - 1', async () => {
         const { valid, object: result } = await schema2.validate(10 as any);
         expect(result).not.toBeDefined();
         if (result) {
-            expectType<20>(result);
+            expectTypeOf(result).toEqualTypeOf<20>();
         }
         expect(valid).toEqual(false);
         expect(result).toBeUndefined();
@@ -355,7 +358,7 @@ test('Reset - 1', async () => {
     const schema1 = union(number().equals(10)).or(number().equals(20));
     const schema2 = schema1.reset(number().equals(40));
     const obj: InferType<typeof schema2> = 40;
-    expectType<40>(obj);
+    expectTypeOf(obj).toEqualTypeOf<40>();
 
     expect((schema2 as any) !== schema1).toEqual(true);
 
@@ -363,7 +366,7 @@ test('Reset - 1', async () => {
         const { valid, object: result } = await schema2.validate(40);
         expect(result).toBeDefined();
         if (result) {
-            expectType<40>(result);
+            expectTypeOf(result).toEqualTypeOf<40>();
         }
         expect(valid).toEqual(true);
         expect(result).toEqual(40);
@@ -373,7 +376,7 @@ test('Reset - 1', async () => {
         const { valid, object: result } = await schema2.validate(10 as any);
         expect(result).not.toBeDefined();
         if (result) {
-            expectType<40>(result);
+            expectTypeOf(result).toEqualTypeOf<40>();
         }
         expect(valid).toEqual(false);
         expect(result).toBeUndefined();

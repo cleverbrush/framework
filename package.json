@@ -22,7 +22,7 @@
         "publish": "npm run clean && npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public && npm publish --workspace @cleverbrush/knex-clickhouse --access=public && npm publish --workspace @cleverbrush/async --access=public && npm publish --workspace @cleverbrush/scheduler --access=public && npm publish --workspace @cleverbrush/mapper --access=public",
         "publish:beta": "npm run clean && npm run build && npm publish --tag beta --workspace @cleverbrush/deep --access=public && npm publish --tag beta --workspace @cleverbrush/knex-clickhouse --access=public && npm publish --tag beta --workspace @cleverbrush/async --access=public && npm publish --tag beta --workspace @cleverbrush/schema --access=public && npm publish --tag beta --workspace @cleverbrush/scheduler --access=public && npm publish --tag beta --workspace @cleverbrush/mapper --access=public",
         "run_scheduler": "node ./libs/scheduler/dist/index.js",
-        "test": "jest"
+        "test": "vitest --run"
     },
     "workspaces": [
         "./libs/*"
@@ -31,13 +31,11 @@
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD 3-Clause",
     "devDependencies": {
-        "@types/jest": "^29.5.12",
+        "@vitest/coverage-v8": "^2.0.5",
         "eslint-config-airbnb": "^19.0.4",
-        "jest": "^29.7.0",
         "prettier": "^3.3.3",
-        "tsd": "^0.31.1",
-        "ts-jest": "^29.2.4",
         "typescript": "^5.5.4",
-        "typescript-eslint": "^8.1.0"
+        "typescript-eslint": "^8.1.0",
+        "vitest": "^2.0.5"
     }
 }

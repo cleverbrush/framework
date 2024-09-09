@@ -1,4 +1,3 @@
-import { expectType } from 'tsd';
 import { InferType } from './SchemaBuilder.js';
 import { boolean } from './BooleanSchemaBuilder.js';
 
@@ -10,7 +9,7 @@ test('Clean', async () => {
     expect(schema.type).toEqual('boolean');
 
     const typeCheck: InferType<typeof builder> = 123 as any;
-    expectType<boolean>(typeCheck);
+    expectTypeOf(typeCheck).toBeBoolean();
 
     {
         const { valid, errors, object } = await builder.validate(true);
@@ -47,10 +46,10 @@ test('Optional', () => {
     expect(schema).toHaveProperty('isRequired', false);
 
     const typeCheck1: InferType<typeof builder> = true;
-    expectType<boolean>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeBoolean();
 
     let typeCheck2: InferType<typeof builderOptional>;
-    expectType<boolean | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<boolean | undefined>();
 });
 
 test('Required', () => {
@@ -66,10 +65,10 @@ test('Required', () => {
     expect(schema).toHaveProperty('isRequired', true);
 
     const typeCheck1: InferType<typeof builder> = true;
-    expectType<boolean>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeBoolean();
 
     const typeCheck2: InferType<typeof builderOptional> = undefined;
-    expectType<boolean | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<boolean | undefined>();
 });
 
 test('Optional - 2', async () => {
@@ -108,7 +107,7 @@ test('equals - 1', async () => {
     expect(newSchema.equalsTo).toEqual(true);
 
     const typeCheck1: InferType<typeof newBuilder> = true;
-    expectType<true>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<true>();
 
     {
         const { valid, object, errors } = await newBuilder.validate(true);
@@ -145,7 +144,7 @@ test('equals - 2', async () => {
     expect(schema.equalsTo).toBeUndefined();
 
     const typeCheck1: InferType<typeof builder> = 123 as any;
-    expectType<boolean>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeBoolean();
 });
 
 test('equals - 3', () => {
@@ -157,13 +156,13 @@ test('equals - 3', () => {
 test('hasType - 1', () => {
     const builder = boolean().hasType<string>();
     const typeCheck1: InferType<typeof builder> = '123';
-    expectType<string>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeString();
 });
 
 test('hasType - 2', () => {
     const builder = boolean().hasType(new Date());
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 });
 
 test('Clear Has type - 1', () => {
@@ -172,6 +171,6 @@ test('Clear Has type - 1', () => {
 
     const typeCheck: InferType<typeof schema2> = true;
 
-    expectType<boolean>(typeCheck);
+    expectTypeOf(typeCheck).toBeBoolean();
     expect(schema1 !== (schema2 as any)).toEqual(true);
 });

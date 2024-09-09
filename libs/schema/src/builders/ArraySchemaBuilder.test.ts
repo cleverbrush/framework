@@ -1,5 +1,3 @@
-import { expectType } from 'tsd';
-
 import { array } from './ArraySchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
@@ -22,35 +20,35 @@ test('Types - 1', async () => {
     const val5: InferType<typeof schema5> = new Date();
     const val6: InferType<typeof schema6> = [];
 
-    expectType<Array<any>>(val1);
-    expectType<Array<number>>(val2);
-    expectType<Array<string>>(val3);
-    expectType<Array<any>>(val4);
-    expectType<Date>(val5);
-    expectType<Array<any>>(val6);
+    expectTypeOf(val1).toMatchTypeOf<Array<any>>();
+    expectTypeOf(val2).toMatchTypeOf<Array<number>>();
+    expectTypeOf(val3).toMatchTypeOf<Array<string>>();
+    expectTypeOf(val4).toMatchTypeOf<Array<any>>();
+    expectTypeOf(val5).toMatchTypeOf<Date>();
+    expectTypeOf(val6).toMatchTypeOf<Array<any>>();
 
     {
         const { object: res } = await schema1.validate([]);
         if (res) {
-            expectType<any[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<any>>();
         }
     }
     {
         const { object: res } = await schema2.validate([]);
         if (res) {
-            expectType<number[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<number>>();
         }
     }
     {
         const { object: res } = await schema3.validate([]);
         if (res) {
-            expectType<string[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<string>>();
         }
     }
     {
         const { object: res } = await schema4.validate([]);
         if (res) {
-            expectType<any[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<any>>();
         }
     }
 
@@ -68,10 +66,10 @@ test('Types - 1', async () => {
     const optionalVal3: InferType<typeof optionalSchema3> = [];
     const optionalVal4: InferType<typeof optionalSchema4> = [];
 
-    expectType<Array<any> | undefined>(optionalVal1);
-    expectType<Array<number> | undefined>(optionalVal2);
-    expectType<Array<string> | undefined>(optionalVal3);
-    expectType<Array<any> | undefined>(optionalVal4);
+    expectTypeOf(optionalVal1).toMatchTypeOf<Array<any> | undefined>();
+    expectTypeOf(optionalVal2).toMatchTypeOf<Array<number> | undefined>();
+    expectTypeOf(optionalVal3).toMatchTypeOf<Array<string> | undefined>();
+    expectTypeOf(optionalVal4).toMatchTypeOf<Array<any> | undefined>();
 
     const arrayOfUnionSchema = array().of(
         union(number().equals(1)).or(string().equals('2'))
@@ -79,11 +77,11 @@ test('Types - 1', async () => {
 
     const arrayOfUnionVal: InferType<typeof arrayOfUnionSchema> = [];
 
-    expectType<Array<1 | '2'>>(arrayOfUnionVal);
+    expectTypeOf(arrayOfUnionVal).toMatchTypeOf<(1 | '2')[]>();
     {
         const { object: res } = await arrayOfUnionSchema.validate([]);
         if (res) {
-            expectType<(1 | '2')[]>(res);
+            expectTypeOf(res).toMatchTypeOf<(1 | '2')[]>();
         }
     }
 });
@@ -489,12 +487,12 @@ test('One call to set elementSchema - 1', () => {
     const schema = array(number());
 
     const typeCheck: InferType<typeof schema> = [1, 2, 3, 4];
-    expectType<number[]>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<number[]>();
 });
 
 test('One call to set elementSchema - 2', () => {
     const schema = array(union(number(0)).or(number(1)).or(number(2)));
 
     const typeCheck: InferType<typeof schema> = [1, 2, 0];
-    expectType<(0 | 1 | 2)[]>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<(0 | 1 | 2)[]>();
 });

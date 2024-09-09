@@ -1,4 +1,3 @@
-import { expectType } from 'tsd';
 import { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 
@@ -361,9 +360,9 @@ test('hasType - 1', () => {
     const typeSchema2: InferType<typeof schema2> = null as any;
     const typeSchema3: InferType<typeof schema3> = null as any;
 
-    expectType<string>(typeSchema1);
-    expectType<Date>(typeSchema2);
-    expectType<string>(typeSchema3);
+    expectTypeOf(typeSchema1).toBeString();
+    expectTypeOf(typeSchema2).toEqualTypeOf<Date>();
+    expectTypeOf(typeSchema3).toBeString();
 });
 
 test('startsWith - 1', async () => {

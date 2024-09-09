@@ -7,7 +7,8 @@
         "esModuleInterop": true,
         "moduleResolution": "Node",
         "checkJs": true,
-        "strictNullChecks": true
+        "strictNullChecks": true,
+        "types": ["vitest/globals"]
     },
     "watchOptions": {
         "excludeDirectories": ["./dist"]

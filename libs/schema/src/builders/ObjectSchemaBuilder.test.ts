@@ -1,5 +1,3 @@
-import { expectType } from 'tsd';
-
 import { object } from './ObjectSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
@@ -18,10 +16,10 @@ test('empty - 1', async () => {
     expect(obj === testObj).toEqual(false);
 
     const typeTest: InferType<typeof schema> = {};
-    expectType<{}>(typeTest);
+    expectTypeOf(typeTest).toEqualTypeOf<{}>();
 
     if (typeof obj !== 'undefined') {
-        expectType<{}>(obj);
+        expectTypeOf(obj).toEqualTypeOf<{}>();
     }
 });
 
@@ -107,14 +105,20 @@ test('one prop - 2', async () => {
     expect(errors?.findIndex((e) => e.path === '$.first')).not.toEqual(-1);
 
     const typeTest: InferType<typeof schema> = { first: 1 };
-    expectType<{ first: number; second?: number }>(typeTest);
+    expectTypeOf(typeTest).toEqualTypeOf<{ first: number; second?: number }>();
 
     if (typeof result !== 'undefined') {
-        expectType<{ first: number; second?: number }>(result);
+        expectTypeOf(result).toEqualTypeOf<{
+            first: number;
+            second?: number;
+        }>();
 
         const typeTest: InferType<typeof schema> = {} as any;
 
-        expectType<{ first: number; second?: number }>(typeTest);
+        expectTypeOf(typeTest).toEqualTypeOf<{
+            first: number;
+            second?: number;
+        }>();
     }
 });
 
@@ -180,10 +184,10 @@ test('one prop - 5', async () => {
     expect(errors).not.toBeDefined();
 
     const typeTest: InferType<typeof schema> = { first: 1 };
-    expectType<{ first?: number }>(typeTest);
+    expectTypeOf(typeTest).toEqualTypeOf<{ first?: number }>();
 
     if (typeof result !== 'undefined') {
-        expectType<{ first?: number }>(result);
+        expectTypeOf(result).toEqualTypeOf<{ first?: number }>();
     }
 });
 
@@ -200,13 +204,13 @@ test('two props - 1', async () => {
     });
 
     const val: InferType<typeof schema> = { first: 1, second: 20 };
-    expectType<{ first: number; second: number }>(val);
+    expectTypeOf(val).toEqualTypeOf<{ first: number; second: number }>();
 
     const { valid, object: result } = await schema.validate(val);
 
     expect(valid).toEqual(true);
     if (typeof result !== 'undefined') {
-        expectType<{ first: number; second: number }>(result);
+        expectTypeOf(result).toEqualTypeOf<{ first: number; second: number }>();
     }
 });
 
@@ -228,13 +232,16 @@ test('two props - 2', async () => {
     expect(introspected.properties).toHaveProperty('second');
 
     const val: InferType<typeof schema> = { first: 1 };
-    expectType<{ first: number; second?: number }>(val);
+    expectTypeOf(val).toEqualTypeOf<{ first: number; second?: number }>();
 
     const { valid, object: result } = await schema.validate(val);
 
     expect(valid).toEqual(true);
     if (typeof result !== 'undefined') {
-        expectType<{ first: number; second?: number }>(result);
+        expectTypeOf(result).toEqualTypeOf<{
+            first: number;
+            second?: number;
+        }>();
     }
 });
 
@@ -284,8 +291,12 @@ test('addProps - 1', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first: number }>(typeCheck1);
-    expectType<{ first: number; third?: number; fourth: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{ first: number }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{
+        first: number;
+        third?: number;
+        fourth: number;
+    }>();
 });
 
 test('addProps - 2', async () => {
@@ -305,8 +316,12 @@ test('addProps - 2', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first: number }>(typeCheck1);
-    expectType<{ first: number; third: number; fourth: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{ first: number }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{
+        first: number;
+        third: number;
+        fourth: number;
+    }>();
 });
 
 test('addProps - 3', async () => {
@@ -335,6 +350,34 @@ test('addProps - 3', async () => {
     }).toThrowError();
 });
 
+test('addProps - nested Optional', async () => {
+    const schema = object({
+        first: number(),
+        toOmit: string()
+    })
+        .addProps({
+            second: object({
+                third: number().optional()
+            })
+                .optional()
+                .addProp('fourth', number())
+                .addProps({
+                    fifth: string()
+                })
+        })
+        .omit('toOmit');
+    const objToValidate: InferType<typeof schema> = null as any;
+
+    expectTypeOf(objToValidate).toEqualTypeOf<{
+        first: number;
+        second?: {
+            third?: number;
+            fourth: number;
+            fifth: string;
+        };
+    }>();
+});
+
 test('nested object - 1', async () => {
     const schema = object({
         nested: object({
@@ -355,10 +398,10 @@ test('nested object - 1', async () => {
     } = await schema.validate(objToValidate);
 
     const typeCheck: InferType<typeof schema> = {} as any;
-    expectType<{ nested: { num: number } }>(typeCheck);
+    expectTypeOf(typeCheck).toEqualTypeOf<{ nested: { num: number } }>();
 
     if (typeof resultObj !== 'undefined') {
-        expectType<{ nested: { num: number } }>(resultObj);
+        expectTypeOf(resultObj).toEqualTypeOf<{ nested: { num: number } }>();
     }
 
     expect(valid).toEqual(true);
@@ -388,10 +431,10 @@ test('nested object - 2', async () => {
     } = await schema.validate(objToValidate);
 
     const typeCheck: InferType<typeof schema> = {} as any;
-    expectType<{ nested: { num: number } }>(typeCheck);
+    expectTypeOf(typeCheck).toEqualTypeOf<{ nested: { num: number } }>();
 
     if (typeof resultObj !== 'undefined') {
-        expectType<{ nested: { num: number } }>(resultObj);
+        expectTypeOf(resultObj).toEqualTypeOf<{ nested: { num: number } }>();
     }
 
     expect(valid).toEqual(false);
@@ -630,14 +673,14 @@ test('omit - 1', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number }>();
 
     const { valid, object: obj } = await schema2.validate({ first: 10 });
 
     expect(valid).toEqual(true);
     if (obj) {
-        expectType<{ first: number }>(obj);
+        expectTypeOf(obj).toEqualTypeOf<{ first: number }>();
     }
 });
 
@@ -673,16 +716,20 @@ test('omit - 2', async () => {
     const typeTest2: InferType<typeof schema2> = {} as any;
     const typeTest3: InferType<typeof schema3> = {} as any;
 
-    expectType<{ first: number; second: number; third: number }>(typeTest1);
-    expectType<{ second: number; third: number }>(typeTest2);
-    expectType<{ first: number }>(typeTest3);
+    expectTypeOf(typeTest1).toEqualTypeOf<{
+        first: number;
+        second: number;
+        third: number;
+    }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ second: number; third: number }>();
+    expectTypeOf(typeTest3).toEqualTypeOf<{ first: number }>();
 
     const { valid, object: obj } = await schema3.validate({ first: 20 });
 
     expect(valid).toEqual(true);
     expect(obj).toHaveProperty('first', 20);
     if (obj) {
-        expectType<{ first: number }>(obj);
+        expectTypeOf(obj).toEqualTypeOf<{ first: number }>();
     }
 });
 
@@ -718,16 +765,20 @@ test('omit - 3', async () => {
     const typeTest2: InferType<typeof schema2> = {} as any;
     const typeTest3: InferType<typeof schema3> = {} as any;
 
-    expectType<{ first: number; second: number; third: number }>(typeTest1);
-    expectType<{ second: number; third: number }>(typeTest2);
-    expectType<{ first: number }>(typeTest3);
+    expectTypeOf(typeTest1).toEqualTypeOf<{
+        first: number;
+        second: number;
+        third: number;
+    }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ second: number; third: number }>();
+    expectTypeOf(typeTest3).toEqualTypeOf<{ first: number }>();
 
     const { valid, object: obj } = await schema3.validate({ first: 20 });
 
     expect(valid).toEqual(true);
     expect(obj).toHaveProperty('first', 20);
     if (obj) {
-        expectType<{ first: number }>(obj);
+        expectTypeOf(obj).toEqualTypeOf<{ first: number }>();
     }
 });
 
@@ -780,8 +831,8 @@ test('Preprocessors - 1', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number; second: number }>();
 
     const { object: obj, valid } = await schema2.validate({
         first: 10,
@@ -812,8 +863,8 @@ test('Preprocessors - 2', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number; second: number }>();
 
     const {
         object: obj,
@@ -853,8 +904,8 @@ test('Preprocessors - 3', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number; second: number }>();
 
     const {
         object: obj,
@@ -899,8 +950,8 @@ test('Validators - 1', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number; second: number }>();
 
     const { object: obj, valid } = await schema2.validate({
         first: 10,
@@ -940,8 +991,8 @@ test('Validators - 2', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number; second: number }>();
 
     const {
         object: obj,
@@ -981,8 +1032,8 @@ test('Validators - 3', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number; second: number }>();
 
     const {
         object: obj,
@@ -1022,8 +1073,8 @@ test('Validators - 4', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first: number; second: number }>();
 
     const {
         object: obj,
@@ -1216,8 +1267,8 @@ test('modifyPropSchema - 1', async () => {
     const typeTest1: InferType<typeof schema1> = { second: 1, first: 3 };
     const typeTest2: InferType<typeof schema2> = { second: 2, first: 3 };
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first?: number; second: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ first?: number; second: number }>();
 
     const spec1 = schema1.introspect();
     const spec2 = schema2.introspect();
@@ -1305,8 +1356,11 @@ test('Partial - 1', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number }>(typeTest1);
-    expectType<{ first?: number; second?: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{
+        first?: number;
+        second?: number;
+    }>();
 
     {
         const testObj = {
@@ -1321,7 +1375,10 @@ test('Partial - 1', async () => {
         expect(errors).toBeUndefined();
 
         if (object) {
-            expectType<{ first?: number; second?: number }>(object);
+            expectTypeOf(object).toEqualTypeOf<{
+                first?: number;
+                second?: number;
+            }>();
         }
     }
 
@@ -1335,7 +1392,10 @@ test('Partial - 1', async () => {
         expect(errors).toBeUndefined();
 
         if (object) {
-            expectType<{ first?: number; second?: number }>(object);
+            expectTypeOf(object).toEqualTypeOf<{
+                first?: number;
+                second?: number;
+            }>();
         }
     }
 });
@@ -1364,8 +1424,16 @@ test('Partial - 2', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number; third: number }>(typeTest1);
-    expectType<{ first: number; second?: number; third?: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{
+        first: number;
+        second: number;
+        third: number;
+    }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{
+        first: number;
+        second?: number;
+        third?: number;
+    }>();
 
     {
         const testObj = {
@@ -1379,9 +1447,11 @@ test('Partial - 2', async () => {
         expect(errors).toBeUndefined();
 
         if (object) {
-            expectType<{ first: number; second?: number; third?: number }>(
-                object
-            );
+            expectTypeOf(object).toEqualTypeOf<{
+                first: number;
+                second?: number;
+                third?: number;
+            }>();
         }
     }
 });
@@ -1410,8 +1480,16 @@ test('Partial - 3', async () => {
     const typeTest1: InferType<typeof schema1> = {} as any;
     const typeTest2: InferType<typeof schema2> = {} as any;
 
-    expectType<{ first: number; second: number; third: number }>(typeTest1);
-    expectType<{ first: number; second?: number; third: number }>(typeTest2);
+    expectTypeOf(typeTest1).toEqualTypeOf<{
+        first: number;
+        second: number;
+        third: number;
+    }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{
+        first: number;
+        second?: number;
+        third: number;
+    }>();
 
     {
         const testObj = {
@@ -1426,9 +1504,11 @@ test('Partial - 3', async () => {
         expect(errors).toBeUndefined();
 
         if (object) {
-            expectType<{ first: number; second?: number; third: number }>(
-                object
-            );
+            expectTypeOf(object).toEqualTypeOf<{
+                first: number;
+                second?: number;
+                third: number;
+            }>();
         }
     }
 });
@@ -1484,7 +1564,7 @@ test('makePropOptional - 1', async () => {
         first: 2
     };
 
-    expectType<{ first?: number; second: number }>(typeCheck);
+    expectTypeOf(typeCheck).toEqualTypeOf<{ first?: number; second: number }>();
 });
 
 test('makePropRequired - 1', async () => {
@@ -1506,8 +1586,11 @@ test('makePropRequired - 1', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first?: number; second: number }>(typeCheck1);
-    expectType<{ first: number; second: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{
+        first?: number;
+        second: number;
+    }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{ first: number; second: number }>();
 });
 
 test('makeAllPropsOptional - 1', async () => {
@@ -1534,8 +1617,11 @@ test('makeAllPropsOptional - 1', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first: number; second: number }>(typeCheck1);
-    expectType<{ first?: number; second?: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{
+        first?: number;
+        second?: number;
+    }>();
 });
 
 test('makeAllPropsRequired - 1', async () => {
@@ -1562,8 +1648,11 @@ test('makeAllPropsRequired - 1', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first: number; second?: number }>(typeCheck1);
-    expectType<{ first: number; second: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{
+        first: number;
+        second?: number;
+    }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{ first: number; second: number }>();
 });
 
 test('hasType - 1', async () => {
@@ -1578,8 +1667,8 @@ test('hasType - 1', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first: number; second: number }>(typeCheck1);
-    expectType<string>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeCheck2).toBeString();
 });
 
 test('clearHasType - 1', async () => {
@@ -1594,8 +1683,8 @@ test('clearHasType - 1', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<string>(typeCheck1);
-    expectType<{ first: number; second: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toBeString();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{ first: number; second: number }>();
 });
 
 test('pick - 1', async () => {
@@ -1616,8 +1705,8 @@ test('pick - 1', async () => {
     const typeCheck1: InferType<typeof schema1> = { first: 1, second: 2 };
     const typeCheck2: InferType<typeof schema2> = { first: 4 };
 
-    expectType<{ first: number; second: number }>(typeCheck1);
-    expectType<{ first: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{ first: number }>();
 });
 
 test('pick - 2', async () => {
@@ -1633,8 +1722,12 @@ test('pick - 2', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first: number; second: number; third: number }>(typeCheck1);
-    expectType<{ first: number; third: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{
+        first: number;
+        second: number;
+        third: number;
+    }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{ first: number; third: number }>();
 });
 
 test('pick - 3', async () => {
@@ -1660,8 +1753,12 @@ test('pick - 3', async () => {
     const typeCheck1: InferType<typeof schema1> = null as any;
     const typeCheck2: InferType<typeof schema2> = null as any;
 
-    expectType<{ first: number; second: number; third: number }>(typeCheck1);
-    expectType<{ first: number; third: number }>(typeCheck2);
+    expectTypeOf(typeCheck1).toEqualTypeOf<{
+        first: number;
+        second: number;
+        third: number;
+    }>();
+    expectTypeOf(typeCheck2).toEqualTypeOf<{ first: number; third: number }>();
 });
 
 test('pick - 4', async () => {
@@ -1970,7 +2067,7 @@ test('big schema - 1', async () => {
         expect(object).toEqual(val);
 
         if (typeof object !== 'undefined') {
-            expectType<{
+            expectTypeOf(object).toEqualTypeOf<{
                 something1: number;
                 something2: number;
                 something3: number;
@@ -2083,7 +2180,7 @@ test('big schema - 1', async () => {
                 externalSecond: number;
                 newlyAddedProp: number;
                 externalThird?: number;
-            }>(object);
+            }>();
         }
     }
 });
@@ -2205,7 +2302,7 @@ test('Number equals as property', async () => {
     });
 
     const typeTest: InferType<typeof schema> = {} as any;
-    expectType<{ first: 10 }>(typeTest);
+    expectTypeOf(typeTest).toEqualTypeOf<{ first: 10 }>();
 });
 
 test('Optional Property', async () => {
@@ -2366,7 +2463,11 @@ test('intersect - 1', async () => {
         schema3.introspect().properties.third.introspect().type === 'number'
     ).toEqual(true);
 
-    expectType<{ first: string; second: number; third: number }>(typeCheck);
+    expectTypeOf(typeCheck).toEqualTypeOf<{
+        first: string;
+        second: number;
+        third: number;
+    }>();
 });
 
 test('optimize', () => {

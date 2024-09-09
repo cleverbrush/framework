@@ -23,20 +23,22 @@ test('Collector - 2', async () => {
 });
 
 test('Collector - 3', async () => {
-    expect(async () => {
-        const c = new Collector<{ a: number; b: string }>(['a', 'b']);
-        const promise = c.toPromise();
+    const c = new Collector<{ a: number; b: string }>(['a', 'b']);
+    const promise = c.toPromise();
 
-        c.collect('a', 10);
+    c.collect('a', 10);
 
-        const result = await promise;
-        expect(result).toHaveProperty('a', 10);
-        expect(result).toHaveProperty('b', 'abc');
-    }).rejects.toThrow();
+    const thenFunct = vi.fn();
+    promise.then(thenFunct);
+
+    // wait for 200ms
+    await new Promise((resolve) => setTimeout(resolve, 200));
+
+    expect(thenFunct).not.toHaveBeenCalled();
 });
 
 test('Collector - 4', async () => {
-    const timeoutHandler = jest.fn();
+    const timeoutHandler = vi.fn();
     type Obj = { a: number; b: string };
 
     const c = new Collector<Obj>(['a', 'b'], 500);

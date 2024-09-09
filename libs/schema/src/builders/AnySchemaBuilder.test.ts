@@ -1,4 +1,3 @@
-import { expectType } from 'tsd';
 import { any } from './AnySchemaBuilder.js';
 import { InferType } from './SchemaBuilder.js';
 
@@ -6,7 +5,7 @@ test('Any checks', async () => {
     const schema = any();
 
     const typeCheck: InferType<typeof schema> = null;
-    expectType<any>(typeCheck);
+    expectTypeOf(typeCheck).toBeAny();
 
     {
         const obj = null;
@@ -64,7 +63,7 @@ test('Optional checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<any>(typeCheck);
+    expectTypeOf(typeCheck).toBeAny();
 
     {
         const obj = null;
@@ -146,7 +145,7 @@ test('Required checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;
@@ -228,7 +227,7 @@ test('Has type checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;
@@ -309,7 +308,7 @@ test('Clear Has type - 1', () => {
 
     const typeCheck: InferType<typeof schema2> = 23;
 
-    expectType<any>(typeCheck);
+    expectTypeOf(typeCheck).toBeAny();
     expect(schema1 !== (schema2 as any)).toEqual(true);
 });
 
@@ -338,7 +337,7 @@ test('Preprocessors', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;

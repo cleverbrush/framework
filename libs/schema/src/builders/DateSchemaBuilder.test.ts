@@ -1,4 +1,3 @@
-import { expectType } from 'tsd';
 import { InferType } from './SchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
 
@@ -10,7 +9,7 @@ test('Clean', async () => {
     expect(schema.type).toEqual('date');
 
     const typeCheck: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const now = new Date();
@@ -41,10 +40,10 @@ test('Optional', () => {
     expect(schema).toHaveProperty('isRequired', false);
 
     const typeCheck1: InferType<typeof builder> = 0 as any;
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 
     let typeCheck2: InferType<typeof builderOptional>;
-    expectType<Date | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<Date | undefined>();
 });
 
 test('Required', () => {
@@ -60,10 +59,10 @@ test('Required', () => {
     expect(schema).toHaveProperty('isRequired', true);
 
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 
     const typeCheck2: InferType<typeof builderOptional> = new Date();
-    expectType<Date | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<Date | undefined>();
 });
 
 test('Optional - 2', async () => {
@@ -113,7 +112,7 @@ test('equals - 1', async () => {
     expect(newSchema.equalsTo).toEqual(dd);
 
     const typeCheck1: InferType<typeof newBuilder> = dd;
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 
     {
         const { valid, object, errors } = await newBuilder.validate(dd);
@@ -137,7 +136,7 @@ test('equals - 2', async () => {
     expect(schema.equalsTo).toBeUndefined();
 
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 });
 
 test('equals - 3', () => {
@@ -424,19 +423,19 @@ test('preprocessor - 1', async () => {
 test('hasType - 1', () => {
     const builder = date().hasType<string>();
     const typeCheck1: InferType<typeof builder> = '123';
-    expectType<string>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<string>();
 });
 
 test('hasType - 2', () => {
     const builder = date().hasType(123);
     const typeCheck1: InferType<typeof builder> = 2233;
-    expectType<number>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<number>();
 });
 
 test('hasType - 3', () => {
     const builder = date().hasType(123).clearHasType();
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 });
 
 test('Parse from JSON - 1', async () => {

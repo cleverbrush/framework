@@ -219,13 +219,27 @@ export class ObjectSchemaBuilder<
      */
     public async validate(
         object: undefined extends TExplicitType
-            ? RespectPropsOptionality<TProperties>
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionality<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
             : TExplicitType,
         context?: ValidationContext
     ): Promise<
         ValidationResult<
             undefined extends TExplicitType
-                ? RespectPropsOptionality<TProperties>
+                ? InferType<
+                      SchemaBuilder<
+                          undefined extends TExplicitType
+                              ? Id<RespectPropsOptionality<TProperties>>
+                              : TExplicitType,
+                          TRequired
+                      >
+                  >
                 : TExplicitType
         >
     > {
@@ -364,8 +378,8 @@ export class ObjectSchemaBuilder<
             errors: doNotStopOnFirstError
                 ? errors
                 : errors[0]
-                ? [errors[0]]
-                : []
+                  ? [errors[0]]
+                  : []
         };
     }
 
@@ -489,7 +503,7 @@ export class ObjectSchemaBuilder<
      */
     public addProps<TProps extends Record<string, SchemaBuilder<any, any>>>(
         props: TProps
-    ): ObjectSchemaBuilder<TProperties & TProps, true, undefined>;
+    ): ObjectSchemaBuilder<TProperties & TProps, TRequired, undefined>;
 
     /**
      * Adds all properties from the `schema` object schema to the current schema.
