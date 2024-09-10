@@ -10,6 +10,8 @@ export default defineConfig({
             include: ['libs/**/*/src/**/*.{js,mjs,cjs,ts,mts,cts}'],
             exclude: [
                 '**/node_modules/**',
+                '**/dist/**',
+                '**/*/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
                 'libs/**/*/src/index.ts',
                 'libs/**/*/src/types.ts'
             ]

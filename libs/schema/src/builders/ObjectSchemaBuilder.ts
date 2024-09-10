@@ -5,6 +5,143 @@ import {
     ValidationResult
 } from './SchemaBuilder.js';
 
+/**
+ * A symbol to mark property descriptors in the schema.
+ * Normally, you should not use it directly unless you want
+ * to develop some advanced features or extend the library.
+ * In normal conditions it's used internally by the library.
+ */
+export const SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR = Symbol();
+
+/**
+ * Describes a property in a schema. And gives you
+ * a possibility to access property value and set it.
+ * suppose you have a schema like this:
+ * ```ts
+ * const schema = object({
+ *  name: string(),
+ *  address: object({
+ *   city: string(),
+ *   country: string()
+ *  }),
+ *  id: number()
+ * });
+ * ```
+ * then you can get a property descriptor for the `address.city` property
+ * like this:
+ * ```ts
+ * const addressCityDescriptor = schema.getPropertiesFor(schema).address.city;
+ * ```
+ *
+ * And then you can use it to get and set the value of this property having the object:
+ * ```ts
+ * const obj = {
+ * name: 'Leo',
+ * address: {
+ *  city: 'Kozelsk',
+ *  country: 'Russia'
+ *  },
+ *  id: 123
+ * };
+ *
+ * const success = addressCityDescriptor.setValue(obj, 'Venyov');
+ * // this returns you a boolean value indicating if the value was set successfully
+ * ```
+ */
+export type PropertyDescriptor<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TPropertyType
+> = {
+    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+        /**
+         * Sets a new value to the property. If the process was successful,
+         * the method returns `true`, otherwise `false`.
+         * It can return `false` if the property could not be set to the object
+         * which can happen if the `setValue` method is called with an object
+         * which does not comply with the schema.
+         * for example, if you have a schema and property descriptopr like this:
+         * ```ts
+         * const schema = object({
+         *  name: string(),
+         *  address: object({
+         *   city: string(),
+         *   country: string()
+         *  }),
+         *  id: number()
+         * });
+         *
+         * const addressCityDescriptor = schema.getPropertiesFor(schema).address.city;
+         * ```
+         * And then you try to set a new value to the `address.city` property on the object
+         * which does not have `address` property:
+         * ```ts
+         * const obj = {
+         * name: 'Leo'
+         * };
+         *
+         * const success = addressCityDescriptor.setValue(obj, 'Venyov');
+         * // success === false
+         * ```
+         *
+         * @param obj Object to set the value to
+         * @param value a new value to set to the property
+         * @returns
+         */
+        setValue: (obj: InferType<TSchema>, value: TPropertyType) => boolean;
+        /**
+         * Gets the value of the property from the object.
+         * @param obj object to get the value from
+         * @returns an object containing a `value` and `success` properties. `value` is the value of the property
+         * if it was found in the object, `success` is a boolean value indicating if the property was found in the object.
+         */
+        getValue: (obj: InferType<TSchema>) => {
+            value?: TPropertyType;
+            success: boolean;
+        };
+    };
+};
+
+/**
+ * A tree of property descriptors for the schema.
+ * Has a possibility to filter properties by the type (`TAssignableTo` type parameter).
+ */
+export type PropertyDescriptorTree<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any> = TSchema,
+    TAssignableTo = any
+> =
+    TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
+        ? {
+              [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
+                  any,
+                  any,
+                  any
+              >
+                  ? PropertyDescriptorTree<TProperties[K], TRootSchema> &
+                        PropertyDescriptor<
+                            TRootSchema,
+                            InferType<TProperties[K]>
+                        >
+                  : InferType<TProperties[K]> extends TAssignableTo
+                    ? PropertyDescriptor<TRootSchema, InferType<TProperties[K]>>
+                    : never;
+          }
+        : never;
+
+/**
+ * A callback function to select properties from the schema.
+ * Normally it's provided by the user to select property descriptors
+ * from the schema for the further usage. e.g. to select source and destination
+ * properties for object mappings
+ */
+export type SchemaPropertySelector<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TPropertyType,
+    TAssignableTo = any
+> = (
+    l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>
+) => PropertyDescriptor<TSchema, TPropertyType>;
+
 type ObjectSchemaBuilderProps<
     T extends Record<string, SchemaBuilder> = {},
     TRequired extends boolean = true
@@ -1029,27 +1166,167 @@ export class ObjectSchemaBuilder<
     }
 }
 
-/**
- * Defines a schema for empty object `{}`
- */
-export function object(): ObjectSchemaBuilder<{}, true>;
+export interface Object {
+    /**
+     * Defines a schema for empty object `{}`
+     */
+    (): ObjectSchemaBuilder<{}, true>;
+    /**
+     * Defines an object schema, properties definitions are takens from `props`.
+     * @param props key/schema object map for schema's properties.
+     */
+    <TProps extends Record<string, SchemaBuilder<any, any>>>(
+        props: TProps
+    ): ObjectSchemaBuilder<TProps, true>;
+    /**
+     * Defines an object schema, properties definitions are takens from `props`.
+     * @param props key/schema object map for schema's properties.
+     */
+    <TProps extends Record<string, SchemaBuilder<any, any>>>(
+        props?: TProps
+    ): ObjectSchemaBuilder<TProps, true>;
+    /**
+     * Returns a tree of property descriptors for the given `schema`.
+     * The structure of the tree is the same as the structure of the `schema`.
+     * Which gives you an opportunity to access property descriptors for each
+     * property in the schema in a useful and type-safe way.
+     * @param schema
+     */
+    getPropertiesFor<
+        TProperties extends Record<string, SchemaBuilder<any, any>> = {},
+        TRequired extends boolean = true,
+        TExplicitType = undefined,
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+    >(
+        schema: TSchema
+    ): PropertyDescriptorTree<TSchema, TSchema>;
+}
 
-/**
- * Defines an object schema, properties definitions are takens from `props`.
- * @param props key/schema object map for schema's properties.
- */
-export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
-    props: TProps
-): ObjectSchemaBuilder<TProps, true>;
-
-export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
-    props?: TProps
-): ObjectSchemaBuilder<TProps, true> {
+const object = ((props) => {
     return ObjectSchemaBuilder.create({
         isRequired: true,
         properties: props
     }) as any;
-}
+}) as Object;
+
+const propertyDescriptorTreeMap = new WeakMap<
+    ObjectSchemaBuilder<any, any, any>,
+    PropertyDescriptorTree<any, any>
+>();
+
+const createPropertyDescriptorFor = (
+    selector: (any) => any,
+    propertyName: string
+) => ({
+    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+        setValue: (obj, newValue) => {
+            const selectorResult = selector(obj);
+            if (!selectorResult) return false;
+
+            selectorResult[propertyName] = newValue;
+            return true;
+        },
+        getValue: (obj) => {
+            const selectorResult = selector(obj);
+            if (!selectorResult)
+                return {
+                    success: false
+                };
+
+            if (Object.hasOwn(selectorResult, propertyName)) {
+                return {
+                    success: true,
+                    value: selectorResult[propertyName]
+                };
+            }
+
+            return {
+                success: false
+            };
+        }
+    }
+});
+
+(object as any).getPropertiesFor = <
+    TProperties extends Record<string, SchemaBuilder<any, any>> = {},
+    TRequired extends boolean = true,
+    TExplicitType = undefined,
+    TSchema extends ObjectSchemaBuilder<any, any, any> = ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TExplicitType
+    >
+>(
+    schema: ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // this is to make possibility to traverse the tree and select properties
+    selector?: (any) => any,
+    // parent object to have a possibility to get link to itself
+    parentSelector?: any,
+    currentName?: string
+): PropertyDescriptorTree<TSchema, TSchema> => {
+    if (!(schema instanceof ObjectSchemaBuilder)) {
+        throw new Error(
+            'schema must be an instance of the ObjectSchemaBuilder class'
+        );
+    }
+    const introspected = schema.introspect();
+    if (!introspected.properties) {
+        return {} as any;
+    }
+
+    const propsNames = Object.keys(introspected.properties);
+
+    if (propsNames.length === 0) {
+        return {} as any;
+    }
+
+    if (propertyDescriptorTreeMap.has(schema)) {
+        return propertyDescriptorTreeMap.get(schema) as any;
+    }
+
+    const result =
+        typeof selector !== 'function' || !parentSelector || !currentName
+            ? {}
+            : createPropertyDescriptorFor(
+                  (obj) => parentSelector(obj),
+                  currentName
+              );
+
+    if (typeof selector !== 'function') {
+        selector = (o) => o;
+    }
+
+    for (const propName of propsNames) {
+        const propSchema = introspected.properties[propName];
+        if (propSchema instanceof ObjectSchemaBuilder) {
+            result[propName] = (object.getPropertiesFor as any)(
+                propSchema,
+                (tree) => {
+                    const selectorResult = selector(tree);
+                    if (selectorResult) {
+                        return selectorResult[propName];
+                    }
+                    return null;
+                },
+                selector,
+                propName
+            );
+        } else {
+            result[propName] = createPropertyDescriptorFor(selector, propName);
+        }
+
+        propertyDescriptorTreeMap.set(schema, result);
+    }
+
+    return result as any;
+};
+
+export { object };
 
 type RequiredProps<T extends Record<string, SchemaBuilder<any, any>>> = keyof {
     [k in keyof T as T[k] extends SchemaBuilder<

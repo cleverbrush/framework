@@ -1,10 +1,7 @@
 import {
     InferType,
     ObjectSchemaBuilder,
-    SchemaPropertySelector,
-    object,
-    string,
-    number
+    SchemaPropertySelector
 } from '@cleverbrush/schema';
 
 export type SchemaToSchemaMapperResult<TFromSchema, TToSchema> = (
