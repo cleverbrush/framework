@@ -299,6 +299,38 @@ test('Property Descriptor is valid - 4', async () => {
     );
 });
 
+test('Property Descriptor is valid - 5', async () => {
+    const schema = object({
+        firstName: string(),
+        lastName: string(),
+        address: object({
+            street: string(),
+            city: string(),
+            zip: number(),
+            // nested object
+            phone: object({
+                home: string(),
+                work: string()
+            })
+        })
+    });
+
+    const person: InferType<typeof schema> = {
+        firstName: 'Leo',
+        lastName: 'Tolstoy'
+    } as any;
+
+    const tree = object.getPropertiesFor(schema);
+
+    const res = tree.address.zip[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].setValue(
+        person,
+        12345
+    );
+
+    expect(res).toEqual(false);
+    expect(person.address).toBeUndefined();
+});
+
 test('Wrong descriptor', async () => {
     const schema = object({
         firstName: string(),
@@ -361,4 +393,46 @@ test('Wrong descriptor', async () => {
 
         expect(success).toEqual(true);
     }
+});
+
+test('No new properties creation by default', async () => {
+    const schema = object({
+        nested: object({
+            nested: object({
+                value: number()
+            })
+        })
+    });
+
+    const person = {} as any;
+
+    const tree = object.getPropertiesFor(schema);
+
+    const res = tree.nested.nested.value[
+        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+    ].setValue(person, 123);
+
+    expect(res).toEqual(false);
+    expect(person).toEqual({});
+});
+
+test('New properties creation', async () => {
+    const schema = object({
+        nested: object({
+            nested: object({
+                value: number()
+            })
+        })
+    });
+
+    const person = {} as any;
+
+    const tree = object.getPropertiesFor(schema);
+
+    const res = tree.nested.nested.value[
+        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+    ].setValue(person, 123, { createMissingStructure: true });
+
+    expect(res).toEqual(true);
+    expect(person).toEqual({ nested: { nested: { value: 123 } } });
 });

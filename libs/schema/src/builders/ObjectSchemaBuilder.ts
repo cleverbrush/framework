@@ -48,6 +48,38 @@ export const SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR = Symbol();
  * // this returns you a boolean value indicating if the value was set successfully
  * ```
  */
+
+type PropertySetterOptions = {
+    /**
+     * If set to `true`, the method will create missing structure
+     * in the object to set the value. For example, if you have a schema
+     * and property descriptor like this:
+     * ```ts
+     * const schema = object({
+     * address: object({
+     * city: string(),
+     * country: string()
+     * }),
+     * });
+     * const addressCityDescriptor = schema.getPropertiesFor(schema).address.city;
+     * ```
+     * And then you try to set a new value to the `address.city` property on the object
+     * which does not have `address` property:
+     * ```ts
+     * const obj = {
+     * name: 'Leo'
+     * };
+     * const success = addressCityDescriptor.setValue(obj, 'Venyov', { createMissingStructure: true });
+     * // success === true
+     * // obj === {
+     * // name: 'Leo',
+     * // address: {
+     * // city: 'Venyov'
+     * // }
+     */
+    createMissingStructure?: boolean;
+};
+
 export type PropertyDescriptor<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
     TPropertyType
@@ -85,9 +117,14 @@ export type PropertyDescriptor<
          *
          * @param obj Object to set the value to
          * @param value a new value to set to the property
+         * @param options additional optional parameters to control the process
          * @returns
          */
-        setValue: (obj: InferType<TSchema>, value: TPropertyType) => boolean;
+        setValue: (
+            obj: InferType<TSchema>,
+            value: TPropertyType,
+            options?: PropertySetterOptions
+        ) => boolean;
         /**
          * Gets the value of the property from the object.
          * @param obj object to get the value from
@@ -1219,19 +1256,22 @@ const propertyDescriptorTreeMap = new WeakMap<
 >();
 
 const createPropertyDescriptorFor = (
-    selector: (any) => any,
+    selector: (any, boolean) => any,
     propertyName: string
 ) => ({
     [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
-        setValue: (obj, newValue) => {
-            const selectorResult = selector(obj);
+        setValue: (obj, newValue, options?: PropertySetterOptions) => {
+            const selectorResult = selector(
+                obj,
+                !!options?.createMissingStructure
+            );
             if (!selectorResult) return false;
 
             selectorResult[propertyName] = newValue;
             return true;
         },
         getValue: (obj) => {
-            const selectorResult = selector(obj);
+            const selectorResult = selector(obj, false);
             if (!selectorResult)
                 return {
                     success: false
@@ -1264,7 +1304,7 @@ const createPropertyDescriptorFor = (
     schema: ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     // this is to make possibility to traverse the tree and select properties
-    selector?: (any) => any,
+    selector?: (arg1: any, any) => any,
     // parent object to have a possibility to get link to itself
     parentSelector?: any,
     currentName?: string
@@ -1293,7 +1333,8 @@ const createPropertyDescriptorFor = (
         typeof selector !== 'function' || !parentSelector || !currentName
             ? {}
             : createPropertyDescriptorFor(
-                  (obj) => parentSelector(obj),
+                  (obj, createMissingStructure) =>
+                      parentSelector(obj, createMissingStructure),
                   currentName
               );
 
@@ -1306,9 +1347,18 @@ const createPropertyDescriptorFor = (
         if (propSchema instanceof ObjectSchemaBuilder) {
             result[propName] = (object.getPropertiesFor as any)(
                 propSchema,
-                (tree) => {
-                    const selectorResult = selector(tree);
+                (tree, createMissingStructure) => {
+                    const selectorResult = selector(
+                        tree,
+                        createMissingStructure
+                    );
                     if (selectorResult) {
+                        if (
+                            createMissingStructure &&
+                            !selectorResult[propName]
+                        ) {
+                            selectorResult[propName] = {};
+                        }
                         return selectorResult[propName];
                     }
                     return null;
