@@ -1,8 +1,9 @@
 import {
     Preprocessor,
     SchemaBuilder,
-    ValidationResult,
     ValidationContext,
+    ValidationErrorMessageProvider,
+    ValidationResult,
     Validator
 } from './SchemaBuilder.js';
 
@@ -53,8 +54,23 @@ export class NumberSchemaBuilder<
     TRequired extends boolean = true
 > extends SchemaBuilder<TResult, TRequired> {
     #min?: number;
+    #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<any> = () =>
+        `expected to be at least ${this.#min}`;
+    #minErrorMessageProvider: ValidationErrorMessageProvider<any> =
+        this.#defaultMinErrorMessageProvider;
+
     #max?: number;
+    #defaultMaxErrorMessageProvider: ValidationErrorMessageProvider<any> = () =>
+        `expected to be no more than or equal to ${this.#max}`;
+    #maxErrorMessageProvider: ValidationErrorMessageProvider<any> =
+        this.#defaultMaxErrorMessageProvider;
+
     #equalsTo?: number;
+    #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<any> =
+        () => `expected to be equal to ${this.#equalsTo}`;
+    #equalsToErrorMessageProvider: ValidationErrorMessageProvider<any> =
+        this.#defaultEqualsToErrorMessageProvider;
+
     #ensureNotNaN = true;
     #ensureIsFinite = true;
     #isInteger = true;
@@ -73,9 +89,21 @@ export class NumberSchemaBuilder<
             this.#min = props.min;
         }
 
+        this.#minErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.minValidationErrorMessageProvider as any,
+                this.#defaultMinErrorMessageProvider
+            );
+
         if (typeof props.max === 'number') {
             this.#max = props.max;
         }
+
+        this.#maxErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.maxValidationErrorMessageProvider as any,
+                this.#defaultMaxErrorMessageProvider
+            );
 
         if (typeof props.ensureNotNaN === 'boolean') {
             this.#ensureNotNaN = props.ensureNotNaN;
@@ -95,6 +123,12 @@ export class NumberSchemaBuilder<
         ) {
             this.#equalsTo = props.equalsTo;
         }
+
+        this.#equalsToErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.equalsToValidationErrorMessageProvider as any,
+                this.#defaultEqualsToErrorMessageProvider
+            );
     }
 
     public introspect() {
@@ -105,9 +139,21 @@ export class NumberSchemaBuilder<
              */
             min: this.#min,
             /**
+             * Min valid value error message provider.
+             * If not provided, default error message will be used.
+             */
+            minValidationErrorMessageProvider: this.#minErrorMessageProvider,
+
+            /**
              * Max valid value (if defined).
              */
             max: this.#max,
+            /**
+             * Max valid value error message provider.
+             * If not provided, default error message will be used.
+             */
+            maxValidationErrorMessageProvider: this.#maxErrorMessageProvider,
+
             /**
              * Make sure that object is not `NaN`. `true` by default.
              */
@@ -119,7 +165,15 @@ export class NumberSchemaBuilder<
             /**
              * If set, restrict object to be equal to a certain value.
              */
+
             equalsTo: this.#equalsTo,
+            /**
+             * EqualsTo error message provider.
+             * If not provided, default error message will be used.
+             */
+            equalsToValidationErrorMessageProvider:
+                this.#equalsToErrorMessageProvider,
+
             /**
              * Allow only integer values (floating point values will be rejected
              * as invalid)
@@ -213,7 +267,9 @@ export class NumberSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `is expected to be equal to ${this.#equalsTo}`,
+                        message: await this.getValidationErrorMessage(
+                            this.#equalsToErrorMessageProvider
+                        ),
                         path: path as string
                     }
                 ]
@@ -272,7 +328,9 @@ export class NumberSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `expected to be at least ${this.#min}`,
+                            message: await this.getValidationErrorMessage(
+                                this.#minErrorMessageProvider
+                            ),
                             path: path as string
                         }
                     ]
@@ -285,9 +343,9 @@ export class NumberSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `expected to be no more than or equal to ${
-                                this.#max
-                            }`,
+                            message: await this.getValidationErrorMessage(
+                                this.#maxErrorMessageProvider
+                            ),
                             path: path as string
                         }
                     ]
@@ -404,12 +462,21 @@ export class NumberSchemaBuilder<
     /**
      * Restrict number to be at least `minValue`.
      */
-    public min(minValue: number): NumberSchemaBuilder<TResult, TRequired> {
+    public min(
+        minValue: number,
+        errorMessage?: ValidationErrorMessageProvider<this>
+    ): NumberSchemaBuilder<TResult, TRequired> {
         if (typeof minValue !== 'number')
             throw new Error('minValue must be a number');
+        const validationMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                errorMessage,
+                this.#defaultMinErrorMessageProvider
+            );
         return this.createFromProps({
             ...this.introspect(),
-            min: minValue
+            min: minValue,
+            minValidationErrorMessageProvider: validationMessageProvider
         }) as any;
     }
 

@@ -1,24 +1,34 @@
 import { Transaction, transaction } from '../utils/transaction.js';
 
-export type InferType<T> = T extends SchemaBuilder<
-    infer TResult,
-    infer TRequired
->
-    ? T extends {
-          optimize: (
-              ...args: any[]
-          ) => SchemaBuilder<infer TOptimizedType, infer TOptimizedRequired>;
-      }
-        ? TOptimizedRequired extends true
-            ? TOptimizedType
-            : MakeOptional<TOptimizedType>
-        : TRequired extends true
-        ? TResult
-        : MakeOptional<TResult>
-    : T;
+export type InferType<T> =
+    T extends SchemaBuilder<infer TResult, infer TRequired>
+        ? T extends {
+              optimize: (
+                  ...args: any[]
+              ) => SchemaBuilder<
+                  infer TOptimizedType,
+                  infer TOptimizedRequired
+              >;
+          }
+            ? TOptimizedRequired extends true
+                ? TOptimizedType
+                : MakeOptional<TOptimizedType>
+            : TRequired extends true
+              ? TResult
+              : MakeOptional<TResult>
+        : T;
 
 export type ValidationError = { path: string; message: string };
 export type MakeOptional<T> = { prop?: T }['prop'];
+
+export type ValidationErrorMessageProvider<
+    TSchema extends SchemaBuilder<any, any>
+> =
+    | string
+    | ((
+          seenValue?: InferType<TSchema>,
+          schema?: TSchema
+      ) => string | Promise<string>);
 
 export type ValidationResult<T> = {
     /**
@@ -405,6 +415,36 @@ export abstract class SchemaBuilder<
          */
         context?: ValidationContext
     ): Promise<ValidationResult<any>>;
+
+    protected async getValidationErrorMessage(
+        provider: ValidationErrorMessageProvider<this>
+    ): Promise<string> {
+        if (typeof provider === 'string') {
+            return provider;
+        }
+
+        if (typeof provider === 'function') {
+            return provider(this as any);
+        }
+
+        throw new Error(
+            'Invalid error message provider must be a string or a function returning a string or a promise of a string'
+        );
+    }
+
+    protected assureValidationErrorMessageProvider(
+        provider: ValidationErrorMessageProvider<any> | undefined,
+        defaultValue: ValidationErrorMessageProvider<any>
+    ): ValidationErrorMessageProvider<this> {
+        if (typeof provider === 'string') {
+            return provider;
+        }
+        if (typeof provider === 'function') {
+            return provider;
+        }
+
+        return defaultValue;
+    }
 
     protected constructor(props: SchemaBuilderProps<TResult>) {
         const { type, preprocessors, validators, isRequired } = props;
