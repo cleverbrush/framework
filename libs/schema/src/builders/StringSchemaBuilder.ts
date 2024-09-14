@@ -74,7 +74,7 @@ export class StringSchemaBuilder<
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
     > = function (this: StringSchemaBuilder) {
-        return `is expected to have a length of at least ${this.#minLength}`;
+        return `is expected to have a length of at least ${this.#minLength} characters`;
     };
     #minLengthErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -94,7 +94,7 @@ export class StringSchemaBuilder<
     #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
     > = function (this: StringSchemaBuilder, seenValue?: TResult) {
-        return `is expected to be equal to ${this.#equalsTo} but saw ${seenValue}`;
+        return `is expected to be equal to "${this.#equalsTo}" but saw "${seenValue}"`;
     };
     #equalsToErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -104,7 +104,7 @@ export class StringSchemaBuilder<
     #defaultStartsWithErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
     > = function (this: StringSchemaBuilder) {
-        return `is expected to start with ${this.#startsWith}`;
+        return `is expected to start with "${this.#startsWith}"`;
     };
     #startsWithErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -114,7 +114,7 @@ export class StringSchemaBuilder<
     #defaultEndsWithErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
     > = function (this: StringSchemaBuilder) {
-        return `is expected to end with ${this.#endsWith}`;
+        return `is expected to end with "${this.#endsWith}"`;
     };
     #endsWithErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -124,7 +124,7 @@ export class StringSchemaBuilder<
     #defaultMatchesErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
     > = function (this: StringSchemaBuilder) {
-        return `is expected to match ${this.#matches}`;
+        return `is expected to match the pattern ${this.#matches}`;
     };
     #matchesErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
