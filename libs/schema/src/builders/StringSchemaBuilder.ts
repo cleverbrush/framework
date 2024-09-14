@@ -1,8 +1,9 @@
 import {
     Preprocessor,
     SchemaBuilder,
-    ValidationResult,
     ValidationContext,
+    ValidationErrorMessageProvider,
+    ValidationResult,
     Validator
 } from './SchemaBuilder.js';
 
@@ -70,11 +71,64 @@ export class StringSchemaBuilder<
     TRequired extends boolean = true
 > extends SchemaBuilder<TResult, TRequired> {
     #minLength?: number;
+    #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = function (this: StringSchemaBuilder) {
+        return `is expected to have a length of at least ${this.#minLength}`;
+    };
+    #minLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = this.#defaultMinLengthErrorMessageProvider;
+
     #maxLength?: number;
+    #defaultMaxLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = function (this: StringSchemaBuilder) {
+        return `is expected to have a length of no more than ${this.#maxLength} characters`;
+    };
+    #maxLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = this.#defaultMaxLengthErrorMessageProvider;
+
     #equalsTo?: string;
+    #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = function (this: StringSchemaBuilder, seenValue?: TResult) {
+        return `is expected to be equal to ${this.#equalsTo} but saw ${seenValue}`;
+    };
+    #equalsToErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEqualsToErrorMessageProvider;
+
     #startsWith?: string;
+    #defaultStartsWithErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = function (this: StringSchemaBuilder) {
+        return `is expected to start with ${this.#startsWith}`;
+    };
+    #startsWithErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = this.#defaultStartsWithErrorMessageProvider;
+
     #endsWith?: string;
+    #defaultEndsWithErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = function (this: StringSchemaBuilder) {
+        return `is expected to end with ${this.#endsWith}`;
+    };
+    #endsWithErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEndsWithErrorMessageProvider;
+
     #matches?: RegExp;
+    #defaultMatchesErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = function (this: StringSchemaBuilder) {
+        return `is expected to match ${this.#matches}`;
+    };
+    #matchesErrorMessageProvider: ValidationErrorMessageProvider<
+        StringSchemaBuilder<TResult, TRequired>
+    > = this.#defaultMatchesErrorMessageProvider;
 
     public static create(props: StringSchemaBuilderCreateProps) {
         return new StringSchemaBuilder({
@@ -90,9 +144,21 @@ export class StringSchemaBuilder<
             this.#minLength = props.minLength;
         }
 
+        this.#minLengthErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.minLengthValidationErrorMessageProvider,
+                this.#defaultMinLengthErrorMessageProvider
+            );
+
         if (typeof props.maxLength === 'number') {
             this.#maxLength = props.maxLength;
         }
+
+        this.#maxLengthErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.maxLengthValidationErrorMessageProvider,
+                this.#defaultMaxLengthErrorMessageProvider
+            );
 
         if (
             typeof props.equalsTo === 'string' ||
@@ -101,6 +167,12 @@ export class StringSchemaBuilder<
             this.#equalsTo = props.equalsTo;
         }
 
+        this.#equalsToErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.equalsToValidationErrorMessageProvider,
+                this.#defaultEqualsToErrorMessageProvider
+            );
+
         if (
             typeof props.startsWith === 'string' &&
             props.startsWith.length > 0
@@ -108,13 +180,31 @@ export class StringSchemaBuilder<
             this.#startsWith = props.startsWith;
         }
 
+        this.#startsWithErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.startsWithValidationErrorMessageProvider,
+                this.#defaultStartsWithErrorMessageProvider
+            );
+
         if (typeof props.endsWith === 'string' && props.endsWith.length > 0) {
             this.#endsWith = props.endsWith;
         }
 
+        this.#endsWithErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.endsWithValidationErrorMessageProvider,
+                this.#defaultEndsWithErrorMessageProvider
+            );
+
         if (props.matches instanceof RegExp) {
             this.#matches = props.matches;
         }
+
+        this.#matchesErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.matchesValidationErrorMessageProvider,
+                this.#defaultMatchesErrorMessageProvider
+            );
     }
 
     public introspect() {
@@ -124,30 +214,79 @@ export class StringSchemaBuilder<
              * Min length of the string (if defined).
              */
             minLength: this.#minLength,
+
+            /**
+             * Min length validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            minLengthValidationErrorMessageProvider:
+                this.#minLengthErrorMessageProvider,
+
             /**
              * Max length of the string (if defined).
              */
             maxLength: this.#maxLength,
+
+            /**
+             * Max length validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            maxLengthValidationErrorMessageProvider:
+                this.#maxLengthErrorMessageProvider,
+
             /**
              * If set, restrict object to be equal to a certain value.
              */
             equalsTo: this.#equalsTo,
+
+            /**
+             * Equals validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            equalsToValidationErrorMessageProvider:
+                this.#equalsToErrorMessageProvider,
+
             /**
              * If set, restrict string to start with a certain value.
              */
             startsWith: this.#startsWith,
+
+            /**
+             * Starts with validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            startsWithValidationErrorMessageProvider:
+                this.#startsWithErrorMessageProvider,
+
             /**
              * If set, restrict string to end with a certain value.
              */
             endsWith: this.#endsWith,
+
+            /**
+             * Ends with validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            endsWithValidationErrorMessageProvider:
+                this.#endsWithErrorMessageProvider,
+
             /**
              * If set, restrict string to match a certain regular expression.
              */
             matches: this.#matches,
+
+            /**
+             * Matches validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            matchesValidationErrorMessageProvider:
+                this.#matchesErrorMessageProvider,
+
             /**
              * Array of preprocessor functions
              */
             preprocessors: this.preprocessors as Preprocessor<TResult>[],
+
             /**
              * Array of validator functions
              */
@@ -232,7 +371,10 @@ export class StringSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `is expected to be equal to ${this.#equalsTo}`,
+                        message: await this.getValidationErrorMessage(
+                            this.#equalsToErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -248,9 +390,10 @@ export class StringSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `is expected to start with '${
-                            this.#startsWith
-                        }'`,
+                        message: await this.getValidationErrorMessage(
+                            this.#startsWithErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -266,7 +409,10 @@ export class StringSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `is expected to end with '${this.#endsWith}'`,
+                        message: await this.getValidationErrorMessage(
+                            this.#endsWithErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -279,9 +425,10 @@ export class StringSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `expected to has at least ${
-                                this.#minLength
-                            } characters length`,
+                            message: await this.getValidationErrorMessage(
+                                this.#minLengthErrorMessageProvider,
+                                objToValidate as TResult
+                            ),
                             path: path as string
                         }
                     ]
@@ -294,9 +441,10 @@ export class StringSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `must not exceed ${
-                                this.#maxLength
-                            } characters`,
+                            message: await this.getValidationErrorMessage(
+                                this.#maxLengthErrorMessageProvider,
+                                objToValidate as TResult
+                            ),
                             path: path as string
                         }
                     ]
@@ -309,7 +457,10 @@ export class StringSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `does not match to ${this.#matches}`,
+                            message: await this.getValidationErrorMessage(
+                                this.#matchesErrorMessageProvider,
+                                objToValidate as TResult
+                            ),
                             path: path as string
                         }
                     ]
@@ -332,11 +483,20 @@ export class StringSchemaBuilder<
     /**
      * Restricts object to be equal to `value`.
      */
-    public equals<T extends string>(value: T) {
+    public equals<T extends string>(
+        value: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            StringSchemaBuilder<TResult, TRequired>
+        >
+    ) {
         if (typeof value !== 'string') throw new Error('string expected');
         return this.createFromProps({
             ...this.introspect(),
-            equalsTo: value
+            equalsTo: value,
+            equalsToValidationErrorMessageProvider: errorMessage
         }) as any as StringSchemaBuilder<T, TRequired>;
     }
 
@@ -368,12 +528,21 @@ export class StringSchemaBuilder<
      * Set minimal length of the valid value for schema.
      * @param {number} length
      */
-    public minLength(length: number): StringSchemaBuilder<TResult, TRequired> {
+    public minLength(
+        length: number,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            StringSchemaBuilder<TResult, TRequired>
+        >
+    ): StringSchemaBuilder<TResult, TRequired> {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
         return this.createFromProps({
             ...this.introspect(),
-            minLength: length
+            minLength: length,
+            minLengthValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 
@@ -392,12 +561,21 @@ export class StringSchemaBuilder<
      * Set maximal length of the valid value for schema.
      * @length {number} length
      */
-    public maxLength(length: number): StringSchemaBuilder<TResult, TRequired> {
+    public maxLength(
+        length: number,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            StringSchemaBuilder<TResult, TRequired>
+        >
+    ): StringSchemaBuilder<TResult, TRequired> {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
         return this.createFromProps({
             ...this.introspect(),
-            maxLength: length
+            maxLength: length,
+            maxLengthValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 
@@ -416,7 +594,13 @@ export class StringSchemaBuilder<
      * Restricts string to start with `val`.
      */
     public startsWith<T extends string>(
-        val: T
+        val: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            StringSchemaBuilder<TResult, TRequired>
+        >
     ): StringSchemaBuilder<
         TResult extends string ? `${T}${TResult}` : TResult,
         TRequired
@@ -425,7 +609,8 @@ export class StringSchemaBuilder<
             throw new Error('non empty string expected');
         return this.createFromProps({
             ...this.introspect(),
-            startsWith: val
+            startsWith: val,
+            startsWithValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 
@@ -444,7 +629,13 @@ export class StringSchemaBuilder<
      * Restricts string to end with `val`.
      */
     public endsWith<T extends string>(
-        val: T
+        val: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            StringSchemaBuilder<TResult, TRequired>
+        >
     ): StringSchemaBuilder<
         TResult extends string ? `${TResult}${T}` : TResult,
         TRequired
@@ -453,7 +644,8 @@ export class StringSchemaBuilder<
             throw new Error('non empty string expected');
         return this.createFromProps({
             ...this.introspect(),
-            endsWith: val
+            endsWith: val,
+            endsWithValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 
@@ -471,11 +663,20 @@ export class StringSchemaBuilder<
     /**
      * Restricts string to match `regexp`.
      */
-    public matches(regexp: RegExp): StringSchemaBuilder<TResult, TRequired> {
+    public matches(
+        regexp: RegExp,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            StringSchemaBuilder<TResult, TRequired>
+        >
+    ): StringSchemaBuilder<TResult, TRequired> {
         if (!(regexp instanceof RegExp)) throw new Error('regexp expected');
         return this.createFromProps({
             ...this.introspect(),
-            matches: regexp
+            matches: regexp,
+            matchesValidationErrorMessageProvider: errorMessage
         });
     }
 
