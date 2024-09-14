@@ -54,26 +54,64 @@ export class NumberSchemaBuilder<
     TRequired extends boolean = true
 > extends SchemaBuilder<TResult, TRequired> {
     #min?: number;
-    #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<any> = () =>
-        `expected to be at least ${this.#min}`;
-    #minErrorMessageProvider: ValidationErrorMessageProvider<any> =
-        this.#defaultMinErrorMessageProvider;
+    #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = function (this: NumberSchemaBuilder) {
+        return `expected to be at least ${this.#min}`;
+    } as any;
+    #minErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = this.#defaultMinErrorMessageProvider;
 
     #max?: number;
-    #defaultMaxErrorMessageProvider: ValidationErrorMessageProvider<any> = () =>
-        `expected to be no more than or equal to ${this.#max}`;
-    #maxErrorMessageProvider: ValidationErrorMessageProvider<any> =
-        this.#defaultMaxErrorMessageProvider;
+    #defaultMaxErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = function (this: NumberSchemaBuilder) {
+        return `expected to be no more than or equal to ${this.#max}`;
+    };
+    #maxErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = this.#defaultMaxErrorMessageProvider;
 
     #equalsTo?: number;
-    #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<any> =
-        () => `expected to be equal to ${this.#equalsTo}`;
-    #equalsToErrorMessageProvider: ValidationErrorMessageProvider<any> =
-        this.#defaultEqualsToErrorMessageProvider;
+    #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = function (this: NumberSchemaBuilder) {
+        return `expected to be equal to ${this.#equalsTo}`;
+    };
+    #equalsToErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEqualsToErrorMessageProvider;
 
     #ensureNotNaN = true;
+    #defaultEnsureNotNaNErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = function (this: NumberSchemaBuilder) {
+        return 'is not expected to be NaN';
+    };
+    #ensureNotNaNErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEnsureNotNaNErrorMessageProvider;
+
     #ensureIsFinite = true;
+    #defaultEnsureIsFiniteErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = function (this: NumberSchemaBuilder) {
+        return 'is expected to be a finite number';
+    };
+    #ensureIsFiniteErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEnsureIsFiniteErrorMessageProvider;
+
     #isInteger = true;
+    #defaultEnsureIsIntegerErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = function (this: NumberSchemaBuilder) {
+        return 'is expected to be an integer';
+    };
+    #ensureIsIntegerErrorMessageProvider: ValidationErrorMessageProvider<
+        NumberSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEnsureIsIntegerErrorMessageProvider;
 
     public static create(props: NumberSchemaBuilderCreateProps) {
         return new NumberSchemaBuilder({
@@ -109,13 +147,31 @@ export class NumberSchemaBuilder<
             this.#ensureNotNaN = props.ensureNotNaN;
         }
 
+        this.#ensureNotNaNErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.ensureNotNaNErrorMessageProvider as any,
+                this.#defaultEnsureNotNaNErrorMessageProvider
+            );
+
         if (typeof props.ensureIsFinite === 'boolean') {
             this.#ensureIsFinite = props.ensureIsFinite;
         }
 
+        this.#ensureIsFiniteErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.ensureIsFiniteErrorMessageProvider as any,
+                this.#defaultEnsureIsFiniteErrorMessageProvider
+            );
+
         if (typeof props.isInteger === 'boolean') {
             this.#isInteger = props.isInteger;
         }
+
+        this.#ensureIsIntegerErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.ensureIsIntegerErrorMessageProvider as any,
+                this.#defaultEnsureIsIntegerErrorMessageProvider
+            );
 
         if (
             typeof props.equalsTo === 'number' ||
@@ -159,9 +215,22 @@ export class NumberSchemaBuilder<
              */
             ensureNotNaN: this.#ensureNotNaN,
             /**
+             * EnsureNotNaN error message provider.
+             * If not provided, default error message will be used.
+             */
+            ensureNotNaNErrorMessageProvider:
+                this.#ensureNotNaNErrorMessageProvider,
+
+            /**
              * Make sure that object is not different kinds of `infinity`. `true` by default.
              */
             ensureIsFinite: this.#ensureIsFinite,
+            /**
+             * EnsureIsFinite error message provider.
+             */
+            ensureIsFiniteErrorMessageProvider:
+                this.#ensureIsFiniteErrorMessageProvider,
+
             /**
              * If set, restrict object to be equal to a certain value.
              */
@@ -179,6 +248,12 @@ export class NumberSchemaBuilder<
              * as invalid)
              */
             isInteger: this.#isInteger,
+            /**
+             * EnsureIsInteger error message provider.
+             */
+            ensureIsIntegerErrorMessageProvider:
+                this.#ensureIsIntegerErrorMessageProvider,
+
             /**
              * Array of preprocessor functions
              */
@@ -268,7 +343,8 @@ export class NumberSchemaBuilder<
                 errors: [
                     {
                         message: await this.getValidationErrorMessage(
-                            this.#equalsToErrorMessageProvider
+                            this.#equalsToErrorMessageProvider,
+                            objToValidate as TResult
                         ),
                         path: path as string
                     }
@@ -281,7 +357,10 @@ export class NumberSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: 'is not expected to be NaN',
+                        message: await this.getValidationErrorMessage(
+                            this.#ensureNotNaNErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -298,7 +377,10 @@ export class NumberSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: 'is expected to be a finite number',
+                        message: await this.getValidationErrorMessage(
+                            this.#ensureIsFiniteErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -315,7 +397,10 @@ export class NumberSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `is expected to be integer`,
+                        message: await this.getValidationErrorMessage(
+                            this.#ensureIsIntegerErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -329,7 +414,8 @@ export class NumberSchemaBuilder<
                     errors: [
                         {
                             message: await this.getValidationErrorMessage(
-                                this.#minErrorMessageProvider
+                                this.#minErrorMessageProvider,
+                                objToValidate as TResult
                             ),
                             path: path as string
                         }
@@ -344,7 +430,8 @@ export class NumberSchemaBuilder<
                     errors: [
                         {
                             message: await this.getValidationErrorMessage(
-                                this.#maxErrorMessageProvider
+                                this.#maxErrorMessageProvider,
+                                objToValidate as TResult
                             ),
                             path: path as string
                         }
@@ -367,11 +454,20 @@ export class NumberSchemaBuilder<
     /**
      * Restricts number to be equal to `value`.
      */
-    public equals<T extends number>(value: T) {
+    public equals<T extends number>(
+        value: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            NumberSchemaBuilder<TResult, TRequired>
+        >
+    ) {
         if (typeof value !== 'number') throw new Error('number expected');
         return this.createFromProps({
             ...this.introspect(),
-            equalsTo: value
+            equalsTo: value,
+            equalsToValidationErrorMessageProvider: errorMessage
         }) as any as NumberSchemaBuilder<T, TRequired>;
     }
 
@@ -386,22 +482,45 @@ export class NumberSchemaBuilder<
     }
 
     /**
+     * @deprecated Use {@link clearIsInteger} instead.
      * Float values will be considered as valid after this call.
      */
     public isFloat(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            isInteger: false
+            isInteger: false,
+            ensureIsIntegerErrorMessageProvider:
+                this.#defaultEnsureIsIntegerErrorMessageProvider
+        }) as any;
+    }
+
+    /**
+     * Clear `isInteger()` call.
+     */
+    public clearIsInteger(): NumberSchemaBuilder<TResult, TRequired> {
+        return this.createFromProps({
+            ...this.introspect(),
+            isInteger: false,
+            ensureIsIntegerErrorMessageProvider:
+                this.#defaultEnsureIsIntegerErrorMessageProvider
         }) as any;
     }
 
     /**
      * Only integer values will be considered as valid after this call.
      */
-    public isInteger(): NumberSchemaBuilder<TResult, TRequired> {
+    public isInteger(
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            NumberSchemaBuilder<TResult, TRequired>
+        >
+    ): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            isInteger: true
+            isInteger: true,
+            ensureIsIntegerErrorMessageProvider: errorMessage
         }) as any;
     }
 
@@ -422,10 +541,18 @@ export class NumberSchemaBuilder<
     /**
      * Do not accept NaN value
      */
-    public notNaN(): NumberSchemaBuilder<TResult, TRequired> {
+    public notNaN(
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            NumberSchemaBuilder<TResult, TRequired>
+        >
+    ): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            ensureNotNaN: true
+            ensureNotNaN: true,
+            ensureNotNaNErrorMessageProvider: errorMessage
         });
     }
 
@@ -435,17 +562,27 @@ export class NumberSchemaBuilder<
     public canBeNaN(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            ensureNotNaN: false
+            ensureNotNaN: false,
+            ensureNotNaNErrorMessageProvider:
+                this.#defaultEnsureNotNaNErrorMessageProvider
         });
     }
 
     /**
      * Do not accept `Infinity`.
      */
-    public isFinite(): NumberSchemaBuilder<TResult, TRequired> {
+    public isFinite(
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            NumberSchemaBuilder<TResult, TRequired>
+        >
+    ): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            ensureIsFinite: true
+            ensureIsFinite: true,
+            ensureIsFiniteErrorMessageProvider: errorMessage
         });
     }
 
@@ -455,7 +592,9 @@ export class NumberSchemaBuilder<
     public canBeInfinite(): NumberSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            ensureIsFinite: false
+            ensureIsFinite: false,
+            ensureIsFiniteErrorMessageProvider:
+                this.#defaultEnsureIsFiniteErrorMessageProvider
         });
     }
 
@@ -464,19 +603,19 @@ export class NumberSchemaBuilder<
      */
     public min(
         minValue: number,
-        errorMessage?: ValidationErrorMessageProvider<this>
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            NumberSchemaBuilder<TResult, TRequired>
+        >
     ): NumberSchemaBuilder<TResult, TRequired> {
         if (typeof minValue !== 'number')
             throw new Error('minValue must be a number');
-        const validationMessageProvider =
-            this.assureValidationErrorMessageProvider(
-                errorMessage,
-                this.#defaultMinErrorMessageProvider
-            );
         return this.createFromProps({
             ...this.introspect(),
             min: minValue,
-            minValidationErrorMessageProvider: validationMessageProvider
+            minValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 
@@ -494,12 +633,21 @@ export class NumberSchemaBuilder<
     /**
      * Restrict number to be no more than `maxValue`.
      */
-    public max(maxValue: number): NumberSchemaBuilder<TResult, TRequired> {
+    public max(
+        maxValue: number,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            NumberSchemaBuilder<TResult, TRequired>
+        >
+    ): NumberSchemaBuilder<TResult, TRequired> {
         if (typeof maxValue !== 'number')
             throw new Error('maxValue must be a number');
         return this.createFromProps({
             ...this.introspect(),
-            max: maxValue
+            max: maxValue,
+            maxValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 

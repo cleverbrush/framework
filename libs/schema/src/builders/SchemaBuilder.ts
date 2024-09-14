@@ -21,13 +21,19 @@ export type InferType<T> =
 export type ValidationError = { path: string; message: string };
 export type MakeOptional<T> = { prop?: T }['prop'];
 
+/**
+ * Type of the function that provides a validation error message for
+ * the given `seenValue` and `schema`. Can be a string or a function
+ * returning a string or a promise of a string.
+ * Should be used to provide a custom validation error message.
+ */
 export type ValidationErrorMessageProvider<
-    TSchema extends SchemaBuilder<any, any>
+    TSchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
 > =
     | string
     | ((
-          seenValue?: InferType<TSchema>,
-          schema?: TSchema
+          seenValue: InferType<TSchema>,
+          schema: TSchema
       ) => string | Promise<string>);
 
 export type ValidationResult<T> = {
@@ -417,14 +423,15 @@ export abstract class SchemaBuilder<
     ): Promise<ValidationResult<any>>;
 
     protected async getValidationErrorMessage(
-        provider: ValidationErrorMessageProvider<this>
+        provider: ValidationErrorMessageProvider,
+        seenValue: TResult
     ): Promise<string> {
         if (typeof provider === 'string') {
             return provider;
         }
 
         if (typeof provider === 'function') {
-            return provider(this as any);
+            return provider(seenValue, this);
         }
 
         throw new Error(
@@ -433,14 +440,18 @@ export abstract class SchemaBuilder<
     }
 
     protected assureValidationErrorMessageProvider(
-        provider: ValidationErrorMessageProvider<any> | undefined,
-        defaultValue: ValidationErrorMessageProvider<any>
-    ): ValidationErrorMessageProvider<this> {
+        provider: ValidationErrorMessageProvider | undefined,
+        defaultValue: ValidationErrorMessageProvider
+    ): ValidationErrorMessageProvider<any> {
         if (typeof provider === 'string') {
             return provider;
         }
         if (typeof provider === 'function') {
-            return provider;
+            return provider.bind(this);
+        }
+
+        if (typeof defaultValue === 'function') {
+            return defaultValue.bind(this);
         }
 
         return defaultValue;
