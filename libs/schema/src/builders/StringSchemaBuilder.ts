@@ -415,47 +415,57 @@ export class StringSchemaBuilder<
     /**
      * Restricts string to start with `val`.
      */
-    public startsWith(val: string): StringSchemaBuilder<TResult, TRequired> {
+    public startsWith<T extends string>(
+        val: T
+    ): StringSchemaBuilder<
+        TResult extends string ? `${T}${TResult}` : TResult,
+        TRequired
+    > {
         if (typeof val !== 'string' || !val)
             throw new Error('non empty string expected');
         return this.createFromProps({
             ...this.introspect(),
             startsWith: val
-        });
+        }) as any;
     }
 
     /**
      * Cancels `startsWith()` call.
      */
-    public clearStartsWith(): StringSchemaBuilder<TResult, TRequired> {
+    public clearStartsWith(): StringSchemaBuilder<string, TRequired> {
         const schema = this.introspect();
         delete schema.startsWith;
         return this.createFromProps({
             ...schema
-        });
+        }) as any;
     }
 
     /**
      * Restricts string to end with `val`.
      */
-    public endsWith(val: string): StringSchemaBuilder<TResult, TRequired> {
+    public endsWith<T extends string>(
+        val: T
+    ): StringSchemaBuilder<
+        TResult extends string ? `${TResult}${T}` : TResult,
+        TRequired
+    > {
         if (typeof val !== 'string' || !val)
             throw new Error('non empty string expected');
         return this.createFromProps({
             ...this.introspect(),
             endsWith: val
-        });
+        }) as any;
     }
 
     /**
      * Cancels `endsWith()` call.
      */
-    public clearEndsWith(): StringSchemaBuilder<TResult, TRequired> {
+    public clearEndsWith(): StringSchemaBuilder<string, TRequired> {
         const schema = this.introspect();
         delete schema.endsWith;
         return this.createFromProps({
             ...schema
-        });
+        }) as any;
     }
 
     /**

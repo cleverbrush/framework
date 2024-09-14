@@ -388,6 +388,21 @@ test('startsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('abc');
+        if (typeof object !== 'undefined') {
+            expectTypeOf(object).toMatchTypeOf<`abc${string}`>();
+        }
+
+        const schema2 = schema.clearStartsWith();
+        const {
+            valid: valid2,
+            errors: errors2,
+            object: object2
+        } = await schema2.validate('abc');
+        expect(valid2).toEqual(true);
+        expect(errors2).toBeUndefined();
+        if (typeof object2 !== 'undefined') {
+            expectTypeOf(object2).toBeString();
+        }
     }
 
     {
@@ -400,7 +415,9 @@ test('startsWith - 1', async () => {
 
     {
         const schema = string().startsWith('abc');
-        const { valid, errors, object } = await schema.validate('invalid');
+        const { valid, errors, object } = await schema.validate(
+            'invalid' as any
+        );
         expect(valid).toEqual(false);
         expect(errors).toBeDefined();
         expect(object).toBeUndefined();
@@ -412,6 +429,17 @@ test('startsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('valid');
+    }
+});
+
+test('startsWith - regular string', async () => {
+    const value = 'abc';
+    const schema1 = string().startsWith(value);
+    const { valid, object } = await schema1.validate('abcdef' as any);
+
+    expect(valid).toEqual(true);
+    if (typeof object !== 'undefined') {
+        expectTypeOf(object).toMatchTypeOf<string>();
     }
 });
 
@@ -446,11 +474,28 @@ test('endsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('defgabc');
+        if (typeof object !== 'undefined') {
+            expectTypeOf(object).toMatchTypeOf<`${string}abc`>();
+        }
+
+        const schema2 = schema.clearEndsWith();
+        const {
+            valid: valid2,
+            errors: errors2,
+            object: object2
+        } = await schema2.validate('cba');
+        expect(valid2).toEqual(true);
+        expect(errors2).toBeUndefined();
+        if (typeof object2 !== 'undefined') {
+            expectTypeOf(object2).toBeString();
+        }
     }
 
+    const schema = string().endsWith('abc');
     {
-        const schema = string().endsWith('abc');
-        const { valid, errors, object } = await schema.validate('invalid');
+        const { valid, errors, object } = await schema.validate(
+            'invalid' as any
+        );
         expect(valid).toEqual(false);
         expect(errors).toBeDefined();
         expect(object).toBeUndefined();
@@ -462,6 +507,17 @@ test('endsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('valid');
+    }
+});
+
+test('endsWith - regular string', async () => {
+    const value = '456';
+    const schema1 = string().endsWith(value);
+    const { valid, object } = await schema1.validate('123456' as any);
+
+    expect(valid).toEqual(true);
+    if (typeof object !== 'undefined') {
+        expectTypeOf(object).toMatchTypeOf<string>();
     }
 });
 
@@ -506,5 +562,30 @@ test('matches - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('abcdefg');
+    }
+});
+
+test('endsWith - regular string', async () => {
+    const value = 'def';
+    const schema1 = string().endsWith(value + 'g');
+    const { valid, object } = await schema1.validate('abcdefg' as any);
+
+    expect(valid).toEqual(true);
+    if (typeof object !== 'undefined') {
+        expectTypeOf(object).toMatchTypeOf<string>();
+    }
+});
+
+test('startsWith and endsWith', async () => {
+    const schema = string().startsWith('abc').endsWith('def');
+
+    {
+        const { valid, errors, object } = await schema.validate('abcdef');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abcdef');
+
+        const val: InferType<typeof schema> = 'abc123def';
+        expectTypeOf(val).toMatchTypeOf<`abc${string}def`>();
     }
 });
