@@ -7,7 +7,7 @@
     "dependencies": {
         "@cleverbrush/async": "^1.1.10",
         "@cleverbrush/deep": "^1.1.10",
-        "@clickhouse/client": "^1.0.1"
+        "@clickhouse/client": "^1.6.0"
     },
     "peerDependencies": {
         "knex": ">=3.1.0"
