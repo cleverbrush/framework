@@ -2,8 +2,9 @@ import { transaction } from '../utils/transaction.js';
 import {
     Preprocessor,
     SchemaBuilder,
-    ValidationResult,
     ValidationContext,
+    ValidationErrorMessageProvider,
+    ValidationResult,
     Validator
 } from './SchemaBuilder.js';
 
@@ -76,10 +77,55 @@ export class DateSchemaBuilder<
     TRequired extends boolean = true
 > extends SchemaBuilder<TResult, TRequired> {
     #min?: Date;
+    #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = function (this: DateSchemaBuilder) {
+        return `is expected to be after ${this.#min} (${this.#min?.getTime()})`;
+    };
+    #minErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = this.#defaultMinErrorMessageProvider;
+
     #max?: Date;
+    #defaultMaxErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = function (this: DateSchemaBuilder) {
+        return `is expected to be before ${this.#max} (${this.#max?.getTime()})`;
+    };
+    #maxErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = this.#defaultMaxErrorMessageProvider;
+
     #equalsTo?: Date;
+    #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = function (this: DateSchemaBuilder) {
+        return `is expected to be equal ${this.#equalsTo} (${this.#equalsTo?.getTime()})`;
+    };
+    #equalsToErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEqualsToErrorMessageProvider;
+
     #ensureIsInFuture = false;
+    #defaultEnsureIsInFutureErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = function (this: DateSchemaBuilder) {
+        return 'is expected to be in future';
+    };
+    #ensureIsInFutureErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEnsureIsInFutureErrorMessageProvider;
+
     #ensureIsInPast = false;
+    #defaultEnsureIsInPastErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = function (this: DateSchemaBuilder) {
+        return 'is expected to be in past';
+    };
+    #ensureIsInPastErrorMessageProvider: ValidationErrorMessageProvider<
+        DateSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEnsureIsInPastErrorMessageProvider;
+
     #parseFromJson = false;
     #parseFromEpoch = false;
 
@@ -97,17 +143,41 @@ export class DateSchemaBuilder<
             this.#min = props.min;
         }
 
+        this.#minErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.minValidationErrorMessageProvider,
+                this.#defaultMinErrorMessageProvider
+            );
+
         if (props.max instanceof Date) {
             this.#max = props.max;
         }
+
+        this.#maxErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.maxValidationErrorMessageProvider,
+                this.#defaultMaxErrorMessageProvider
+            );
 
         if (typeof props.ensureIsInFuture === 'boolean') {
             this.#ensureIsInFuture = props.ensureIsInFuture;
         }
 
+        this.#ensureIsInFutureErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.ensureIsInFutureValidationErrorMessageProvider,
+                this.#defaultEnsureIsInFutureErrorMessageProvider
+            );
+
         if (typeof props.ensureIsInPast === 'boolean') {
             this.#ensureIsInPast = props.ensureIsInPast;
         }
+
+        this.#ensureIsInPastErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.ensureIsInPastValidationErrorMessageProvider,
+                this.#defaultEnsureIsInPastErrorMessageProvider
+            );
 
         if (typeof props.parseFromJson === 'boolean') {
             this.#parseFromJson = props.parseFromJson;
@@ -123,6 +193,12 @@ export class DateSchemaBuilder<
         ) {
             this.#equalsTo = props.equalsTo;
         }
+
+        this.#equalsToErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.equalsToValidationErrorMessageProvider,
+                this.#defaultEqualsToErrorMessageProvider
+            );
     }
 
     public introspect() {
@@ -132,22 +208,60 @@ export class DateSchemaBuilder<
              * Min valid value (if defined).
              */
             min: this.#min,
+
+            /**
+             * Min value validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            minValidationErrorMessageProvider: this.#minErrorMessageProvider,
+
             /**
              * Max valid value (if defined).
              */
             max: this.#max,
+
+            /**
+             * Max value validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            maxValidationErrorMessageProvider: this.#maxErrorMessageProvider,
+
             /**
              * Make sure that date is in future. `false` by default.
              */
             ensureIsInFuture: this.#ensureIsInFuture,
+
+            /**
+             * Ensure in future validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            ensureIsInFutureValidationErrorMessageProvider:
+                this.#ensureIsInFutureErrorMessageProvider,
+
             /**
              * Make sure that date is in past. `false` by default.
              */
             ensureIsInPast: this.#ensureIsInPast,
+
+            /**
+             * Ensure in past validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            ensureIsInPastValidationErrorMessageProvider:
+                this.#ensureIsInPastErrorMessageProvider,
+
             /**
              * If set, restrict date to be equal to a certain value.
              */
             equalsTo: this.#equalsTo,
+
+            /**
+             * Equals to validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            equalsToValidationErrorMessageProvider:
+                this.#equalsToErrorMessageProvider,
+
             /**
              * If set, schema will try to parse date from the UNIX epoch (number).
              * `false` by default.
@@ -258,7 +372,10 @@ export class DateSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `is expected to be equal to ${this.#equalsTo}`,
+                        message: await this.getValidationErrorMessage(
+                            this.#equalsToErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -270,7 +387,10 @@ export class DateSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: 'is expected to be in future',
+                        message: await this.getValidationErrorMessage(
+                            this.#ensureIsInFutureErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -282,7 +402,10 @@ export class DateSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: 'is expected to be in past',
+                        message: await this.getValidationErrorMessage(
+                            this.#ensureIsInPastErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -295,7 +418,10 @@ export class DateSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `expected to be at least ${this.#min}`,
+                            message: await this.getValidationErrorMessage(
+                                this.#minErrorMessageProvider,
+                                objToValidate as TResult
+                            ),
                             path: path as string
                         }
                     ]
@@ -308,9 +434,10 @@ export class DateSchemaBuilder<
                     valid: false,
                     errors: [
                         {
-                            message: `expected to be no more than or equal to ${
-                                this.#max
-                            }`,
+                            message: await this.getValidationErrorMessage(
+                                this.#maxErrorMessageProvider,
+                                objToValidate as TResult
+                            ),
                             path: path as string
                         }
                     ]
@@ -336,11 +463,20 @@ export class DateSchemaBuilder<
     /**
      * Restricts Date to be equal to `value`.
      */
-    public equals<T extends Date>(value: T) {
+    public equals<T extends Date>(
+        value: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            DateSchemaBuilder<TResult, TRequired>
+        >
+    ): DateSchemaBuilder<T, TRequired> {
         if (!(value instanceof Date)) throw new Error('Date expected');
         return this.createFromProps({
             ...this.introspect(),
-            equalsTo: value
+            equalsTo: value,
+            equalsToValidationErrorMessageProvider: errorMessage
         }) as any as DateSchemaBuilder<T, TRequired>;
     }
 
@@ -371,10 +507,18 @@ export class DateSchemaBuilder<
     /**
      * Accept only dates in the future.
      */
-    public isInFuture(): DateSchemaBuilder<TResult, TRequired> {
+    public isInFuture(
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            DateSchemaBuilder<TResult, TRequired>
+        >
+    ): DateSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            ensureIsInFuture: true
+            ensureIsInFuture: true,
+            ensureIsInFutureValidationErrorMessageProvider: errorMessage
         });
     }
 
@@ -391,10 +535,18 @@ export class DateSchemaBuilder<
     /**
      * Accept only dates in the past.
      */
-    public isInPast(): DateSchemaBuilder<TResult, TRequired> {
+    public isInPast(
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            DateSchemaBuilder<TResult, TRequired>
+        >
+    ): DateSchemaBuilder<TResult, TRequired> {
         return this.createFromProps({
             ...this.introspect(),
-            ensureIsInPast: true
+            ensureIsInPast: true,
+            ensureIsInPastValidationErrorMessageProvider: errorMessage
         });
     }
 
@@ -411,12 +563,21 @@ export class DateSchemaBuilder<
     /**
      * Set minimal valid Date value for schema.
      */
-    public min(minValue: Date): DateSchemaBuilder<TResult, TRequired> {
+    public min(
+        minValue: Date,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            DateSchemaBuilder<TResult, TRequired>
+        >
+    ): DateSchemaBuilder<TResult, TRequired> {
         if (!(minValue instanceof Date))
             throw new Error('minValue must be a Date');
         return this.createFromProps({
             ...this.introspect(),
-            min: minValue
+            min: minValue,
+            minValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 
@@ -434,12 +595,21 @@ export class DateSchemaBuilder<
     /**
      * Set maximal valid Date value for schema.
      */
-    public max(maxValue: Date): DateSchemaBuilder<TResult, TRequired> {
+    public max(
+        maxValue: Date,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            DateSchemaBuilder<TResult, TRequired>
+        >
+    ): DateSchemaBuilder<TResult, TRequired> {
         if (!(maxValue instanceof Date))
             throw new Error('maxValue must be a Date');
         return this.createFromProps({
             ...this.introspect(),
-            max: maxValue
+            max: maxValue,
+            maxValidationErrorMessageProvider: errorMessage
         }) as any;
     }
 
