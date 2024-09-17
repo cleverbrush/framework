@@ -1,7 +1,8 @@
 import {
     SchemaBuilder,
-    ValidationResult,
-    ValidationContext
+    ValidationContext,
+    ValidationErrorMessageProvider,
+    ValidationResult
 } from './SchemaBuilder.js';
 
 type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
@@ -45,6 +46,14 @@ export class BooleanSchemaBuilder<
     TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType
 > extends SchemaBuilder<TFinalResult, TRequired> {
     #equalsTo?: boolean;
+    #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
+        BooleanSchemaBuilder<TResult, TRequired>
+    > = function (this: BooleanSchemaBuilder) {
+        return `is expected to be equal ${this.#equalsTo}`;
+    };
+    #equalsToErrorMessageProvider: ValidationErrorMessageProvider<
+        BooleanSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEqualsToErrorMessageProvider;
 
     public static create(props: BooleanSchemaBuilderCreateProps<any>) {
         return new BooleanSchemaBuilder({
@@ -62,6 +71,12 @@ export class BooleanSchemaBuilder<
         ) {
             this.#equalsTo = props.equalsTo;
         }
+
+        this.#equalsToErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.equalsToValidationErrorMessageProvider,
+                this.#defaultEqualsToErrorMessageProvider
+            );
     }
 
     public introspect() {
@@ -70,7 +85,13 @@ export class BooleanSchemaBuilder<
             /**
              * If set, restrict object to be equal to a certain value.
              */
-            equalsTo: this.#equalsTo
+            equalsTo: this.#equalsTo,
+            /**
+             * Equals to validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            equalsToValidationErrorMessageProvider:
+                this.#equalsToErrorMessageProvider
         };
     }
 
@@ -145,9 +166,10 @@ export class BooleanSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `is expected to be equal to '${
-                            this.#equalsTo
-                        }'`,
+                        message: await this.getValidationErrorMessage(
+                            this.#equalsToErrorMessageProvider,
+                            objToValidate as TFinalResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -177,11 +199,20 @@ export class BooleanSchemaBuilder<
     /**
      * Restricts object to be equal to `value`.
      */
-    public equals<T extends boolean>(value: T) {
+    public equals<T extends boolean>(
+        value: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            BooleanSchemaBuilder<TResult, TRequired>
+        >
+    ) {
         if (typeof value !== 'boolean') throw new Error('boolean expected');
         return this.createFromProps({
             ...this.introspect(),
-            equalsTo: value
+            equalsTo: value,
+            equalsToValidationErrorMessageProvider: errorMessage
         } as any) as any as BooleanSchemaBuilder<T, TRequired, TExplicitType>;
     }
 

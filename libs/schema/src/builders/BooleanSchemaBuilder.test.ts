@@ -174,3 +174,55 @@ test('Clear Has type - 1', () => {
     expectTypeOf(typeCheck).toBeBoolean();
     expect(schema1 !== (schema2 as any)).toEqual(true);
 });
+
+test('euqalsTo with custom error message - 1', async () => {
+    const schema = boolean().equals(true, 'Custom error message');
+    {
+        const { valid, errors } = await schema.validate(true);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+    {
+        const { valid, errors } = await schema.validate(false as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema2 = schema.clearEquals().equals(true);
+
+    {
+        const { valid, errors } = await schema2.validate(true);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(false as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('is expected to be equal true');
+    }
+
+    const schema3 = schema2
+        .clearEquals()
+        .equals(true, () => 'Custom error message');
+
+    {
+        const { valid, errors } = await schema3.validate(false as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearEquals()
+        .equals(true, () => Promise.resolve('Custom error message'));
+
+    {
+        const { valid, errors } = await schema4.validate(false as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+});
