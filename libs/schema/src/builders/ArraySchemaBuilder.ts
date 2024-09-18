@@ -1,7 +1,8 @@
 import {
     SchemaBuilder,
-    ValidationResult,
     ValidationContext,
+    ValidationErrorMessageProvider,
+    ValidationResult,
     InferType
 } from './SchemaBuilder.js';
 
@@ -36,12 +37,30 @@ export class ArraySchemaBuilder<
         ? TElementSchema extends undefined
             ? Array<any>
             : TElementSchema extends SchemaBuilder<infer T1, infer T2>
-            ? Array<InferType<SchemaBuilder<T1, T2>>>
-            : never
+              ? Array<InferType<SchemaBuilder<T1, T2>>>
+              : never
         : TExplicitType
 > extends SchemaBuilder<TResult, TRequired> {
     #minLength?: number;
+    #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+    > = function (this: ArraySchemaBuilder<any, any, any>) {
+        return `is expected to have no less than ${this.#minLength} elements`;
+    };
+    #minLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+    > = this.#defaultMinLengthErrorMessageProvider;
+
     #maxLength?: number;
+    #defaultMaxLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+    > = function (this: ArraySchemaBuilder<any, any, any>) {
+        return `is expected to have no more than ${this.#maxLength} elements`;
+    };
+    #maxLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+    > = this.#defaultMaxLengthErrorMessageProvider;
+
     #elementSchema?: TElementSchema;
 
     /**
@@ -63,9 +82,21 @@ export class ArraySchemaBuilder<
             this.#minLength = props.minLength;
         }
 
+        this.#minLengthErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.minLengthValidationErrorMessageProvider,
+                this.#defaultMinLengthErrorMessageProvider
+            );
+
         if (typeof props.maxLength === 'number') {
             this.#maxLength = props.maxLength;
         }
+
+        this.#maxLengthErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.maxLengthValidationErrorMessageProvider,
+                this.#defaultMaxLengthErrorMessageProvider
+            );
 
         if (props.elementSchema instanceof SchemaBuilder) {
             this.#elementSchema = props.elementSchema;
@@ -152,9 +183,10 @@ export class ArraySchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `cannot contain more than ${
-                            this.#maxLength
-                        } elements`,
+                        message: await this.getValidationErrorMessage(
+                            this.#maxLengthErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -169,9 +201,10 @@ export class ArraySchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `cannot contain less than ${
-                            this.#minLength
-                        } elements`,
+                        message: await this.getValidationErrorMessage(
+                            this.#minLengthErrorMessageProvider,
+                            objToValidate as TResult
+                        ),
                         path: path as string
                     }
                 ]
@@ -290,10 +323,25 @@ export class ArraySchemaBuilder<
              * Min length of a valid array
              */
             minLength: this.#minLength,
+
+            /**
+             * Min length validation error message provider.
+             * If not provided, default error message provider is used.
+             */
+            minLengthValidationErrorMessageProvider:
+                this.#minLengthErrorMessageProvider,
+
             /**
              * Max length of a valid array
              */
-            maxLength: this.#maxLength
+            maxLength: this.#maxLength,
+
+            /**
+             * Max length validation error message provider.
+             * If not provided, default error message provider is used.
+             */
+            maxLengthValidationErrorMessageProvider:
+                this.#maxLengthErrorMessageProvider
         };
     }
 
@@ -322,13 +370,20 @@ export class ArraySchemaBuilder<
      * Set minimal length of the valid array value for schema.
      */
     public minLength<T extends number>(
-        length: T
+        length: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+        >
     ): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType> {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
         return ArraySchemaBuilder.create({
             ...this.introspect(),
-            minLength: length
+            minLength: length,
+            minLengthValidationErrorMessageProvider: errorMessage
         } as any) as any;
     }
 
@@ -351,13 +406,20 @@ export class ArraySchemaBuilder<
      * Set max length of the valid array value for schema.
      */
     public maxLength<T extends number>(
-        length: T
+        length: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+        >
     ): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType> {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
         return ArraySchemaBuilder.create({
             ...this.introspect(),
-            maxLength: length
+            maxLength: length,
+            maxLengthValidationErrorMessageProvider: errorMessage
         } as any) as any;
     }
 

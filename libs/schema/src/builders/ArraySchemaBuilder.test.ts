@@ -496,3 +496,129 @@ test('One call to set elementSchema - 2', () => {
     const typeCheck: InferType<typeof schema> = [1, 2, 0];
     expectTypeOf(typeCheck).toMatchTypeOf<(0 | 1 | 2)[]>();
 });
+
+test('Min Length With Custom Validation Error Message', async () => {
+    const schema = array().of(number()).minLength(3);
+
+    {
+        const { object: result, errors, valid } = await schema.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual(
+            'is expected to have no less than 3 elements'
+        );
+    }
+
+    const schema2 = schema
+        .clearMinLength()
+        .minLength(3, 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema2.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema3 = schema2
+        .clearMinLength()
+        .minLength(3, () => 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema3.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearMinLength()
+        .minLength(3, () => Promise.resolve('Custom error message'));
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema4.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+});
+
+test('Max Length With Custom Validation Error Message', async () => {
+    const schema = array().of(number()).maxLength(1);
+
+    {
+        const { object: result, errors, valid } = await schema.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual(
+            'is expected to have no more than 1 elements'
+        );
+    }
+
+    const schema2 = schema
+        .clearMaxLength()
+        .maxLength(1, 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema2.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema3 = schema2
+        .clearMaxLength()
+        .maxLength(1, () => 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema3.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearMaxLength()
+        .maxLength(1, () => Promise.resolve('Custom error message'));
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema4.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+});
