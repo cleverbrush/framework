@@ -436,3 +436,22 @@ test('New properties creation', async () => {
     expect(res).toEqual(true);
     expect(person).toEqual({ nested: { nested: { value: 123 } } });
 });
+
+test('The same subschema in different parents gives different property descriptors', async () => {
+    const nestedSchema = object({
+        value: number()
+    });
+
+    const parentSchema1 = object({
+        nested: nestedSchema
+    });
+
+    const parentSchema2 = object({
+        nested: nestedSchema
+    });
+
+    const nestedProp1 = object.getPropertiesFor(parentSchema1).nested;
+    const nestedProp2 = object.getPropertiesFor(parentSchema2).nested;
+
+    expect(nestedProp1 === nestedProp2).toEqual(false);
+});

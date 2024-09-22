@@ -19,6 +19,23 @@ export type InferType<T> =
         : T;
 
 export type ValidationError = { path: string; message: string };
+
+/**
+ * Used to represent a validation error for nested
+ * objects/properties. Contains a list of errors and
+ * the value that caused them.
+ */
+export type NestedValidationError<T = any> = {
+    /**
+     * Value that caused the error
+     */
+    seenValue?: T;
+    /**
+     * A list of errors, empty if object satisfies a schema
+     */
+    errors: string[];
+};
+
 export type MakeOptional<T> = { prop?: T }['prop'];
 
 /**

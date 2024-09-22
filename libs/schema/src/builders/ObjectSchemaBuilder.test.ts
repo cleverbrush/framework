@@ -2521,3 +2521,35 @@ test('Custom path', async () => {
             errors[1].path === '$.sub'
     ).toEqual(true);
 });
+
+test('getErrorsFor', async () => {
+    const schema = object({
+        first: string(),
+        last: string(),
+        age: number()
+    });
+
+    const obj = { first: 'Leo', last: 'Tolstoi', age: 'old' };
+
+    const { getErrorsFor } = await schema.validate(obj as any);
+
+    const ageErrors = getErrorsFor((t) => t.age);
+    const firstErrors = getErrorsFor((t) => t.first);
+    const lastErrors = getErrorsFor((t) => t.last);
+
+    expect(ageErrors).toBeDefined();
+    expect(firstErrors).toBeDefined();
+    expect(lastErrors).toBeDefined();
+
+    expect(Array.isArray(ageErrors) && ageErrors.length === 1).toEqual(true);
+    expect(Array.isArray(firstErrors) && firstErrors.length === 0).toEqual(
+        true
+    );
+    expect(Array.isArray(lastErrors) && lastErrors.length === 0).toEqual(true);
+
+    expect(ageErrors.seenValue).toEqual('old');
+    expect(firstErrors.seenValue).toBeUndefined();
+    expect(lastErrors.seenValue).toBeUndefined();
+
+    expect(ageErrors.errors[0]).toEqual('must be a number');
+});

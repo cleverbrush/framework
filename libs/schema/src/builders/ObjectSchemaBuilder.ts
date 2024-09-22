@@ -1,5 +1,6 @@
 import {
     InferType,
+    NestedValidationError,
     SchemaBuilder,
     ValidationContext,
     ValidationResult
@@ -229,6 +230,21 @@ type ModifyPropSchema<
     [K in keyof T]: K extends TProp ? TSchema : T[K];
 };
 
+export type ObjectSchemaValidationResult<
+    T,
+    TSchema extends ObjectSchemaBuilder<any, any, any>
+> = ValidationResult<T> & {
+    /**
+     * Returns a nested validation error for the property selected by the `selector` function.
+     * @param selector a callback function to select property from the schema.
+     */
+    getErrorsFor<TPropertyType>(
+        selector: (
+            properties: PropertyDescriptorTree<TSchema, TSchema>
+        ) => PropertyDescriptor<TSchema, TPropertyType>
+    ): NestedValidationError<TPropertyType>;
+};
+
 /**
  * Object schema builder class. Similar to the `object` type
  * in JS. Allows to define a schema for `object` value.
@@ -404,7 +420,7 @@ export class ObjectSchemaBuilder<
             : TExplicitType,
         context?: ValidationContext
     ): Promise<
-        ValidationResult<
+        ObjectSchemaValidationResult<
             undefined extends TExplicitType
                 ? InferType<
                       SchemaBuilder<
@@ -414,7 +430,8 @@ export class ObjectSchemaBuilder<
                           TRequired
                       >
                   >
-                : TExplicitType
+                : TExplicitType,
+            this
         >
     > {
         const prevalidatedResult = await super.preValidate(object, context);
@@ -431,7 +448,12 @@ export class ObjectSchemaBuilder<
         if (!valid && !doNotStopOnFirstError) {
             return {
                 valid,
-                errors: preValidationErrors
+                errors: preValidationErrors,
+                getErrorsFor: () => {
+                    throw new Error(
+                        'getErrorsFor method is not available in this context'
+                    );
+                }
             };
         }
 
@@ -445,7 +467,12 @@ export class ObjectSchemaBuilder<
         ) {
             return {
                 valid: true,
-                object: validationTransaction!.commit().validatedObject
+                object: validationTransaction!.commit().validatedObject,
+                getErrorsFor: () => {
+                    throw new Error(
+                        'getErrorsFor method is not available in this context'
+                    );
+                }
             };
         }
 
@@ -461,7 +488,12 @@ export class ObjectSchemaBuilder<
                 }
                 return {
                     valid: false,
-                    errors: [errors[0]]
+                    errors: [errors[0]],
+                    getErrorsFor: () => {
+                        throw new Error(
+                            'getErrorsFor method is not available in this context'
+                        );
+                    }
                 };
             }
         }
@@ -474,7 +506,12 @@ export class ObjectSchemaBuilder<
                 if (doNotStopOnFirstError && errors.length > 0) {
                     return {
                         valid: false,
-                        errors
+                        errors,
+                        getErrorsFor: () => {
+                            throw new Error(
+                                'getErrorsFor method is not available in this context'
+                            );
+                        }
                     };
                 }
                 if (validationTransaction) {
@@ -482,7 +519,12 @@ export class ObjectSchemaBuilder<
                 }
                 return {
                     valid: true,
-                    object: {} as any
+                    object: {} as any,
+                    getErrorsFor: () => {
+                        throw new Error(
+                            'getErrorsFor method is not available in this context'
+                        );
+                    }
                 };
             }
         }
@@ -531,7 +573,12 @@ export class ObjectSchemaBuilder<
                     }
                     return {
                         valid: false,
-                        errors: [errors[0]]
+                        errors: [errors[0]],
+                        getErrorsFor: () => {
+                            throw new Error(
+                                'getErrorsFor method is not available in this context'
+                            );
+                        }
                     };
                 }
             }
@@ -541,7 +588,10 @@ export class ObjectSchemaBuilder<
             const commited = validationTransaction!.commit();
             return {
                 valid: true,
-                object: commited.validatedObject
+                object: commited.validatedObject,
+                getErrorsFor: (selector) => {
+                    throw new Error('selector is required');
+                }
             };
         }
 
@@ -553,7 +603,10 @@ export class ObjectSchemaBuilder<
                 ? errors
                 : errors[0]
                   ? [errors[0]]
-                  : []
+                  : [],
+            getErrorsFor: (selector) => {
+                throw new Error('selector is required');
+            }
         };
     }
 
@@ -1250,10 +1303,12 @@ const object = ((props) => {
     }) as any;
 }) as Object;
 
-const propertyDescriptorTreeMap = new WeakMap<
+type PropertyDescriptorMap = Map<
     ObjectSchemaBuilder<any, any, any>,
-    PropertyDescriptorTree<any, any>
->();
+    PropertyDescriptorMap | PropertyDescriptorTree<any, any>
+>;
+
+const propertyDescriptorTreeMap: PropertyDescriptorMap = new WeakMap() as any;
 
 const createPropertyDescriptorFor = (
     selector: (any, boolean) => any,
