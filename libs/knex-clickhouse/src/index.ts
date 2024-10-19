@@ -1,9 +1,14 @@
 import Knex from 'knex';
-import ClickhouseDriver, { type ClickHouseSettings } from '@clickhouse/client';
+import ClickhouseDriver, {
+    ClickHouseClient,
+    type ClickHouseSettings
+} from '@clickhouse/client';
 
 import { retry } from '@cleverbrush/async';
 import { deepExtend } from '@cleverbrush/deep';
 import { makeEscape } from './makeEscape.js';
+
+export { type ClickHouseClient };
 
 const parseDate = (value) => new Date(Date.parse(value));
 
@@ -127,11 +132,10 @@ export class ClickhouseKnexClient extends Knex.Client {
 
     /**
      *
-     * @param {import('@clickhouse/client').ClickHouseClient} connection
      * @param {import('@clickhouse/client').QueryParams} obj
      * @returns
      */
-    async _query(connection, obj) {
+    async _query(connection: ClickHouseClient, obj) {
         if (!obj || typeof obj === 'string') {
             obj = { sql: obj };
         } else if (!obj.sql) {
@@ -168,6 +172,13 @@ export class ClickhouseKnexClient extends Knex.Client {
             format: 'JSONCompact'
         };
         obj.finalQuery = query;
+
+        const { preQueryCallback } = this.config as any;
+
+        if (typeof preQueryCallback === 'function') {
+            await Promise.resolve(preQueryCallback(connection));
+        }
+
         switch (method) {
             case 'select':
             case 'first':
@@ -175,10 +186,10 @@ export class ClickhouseKnexClient extends Knex.Client {
                 {
                     const p = (await (this.#retryOptions
                         ? retry(
-                              () => connection.query(queryParams),
+                              () => connection.query(queryParams as any),
                               this.#retryOptions
                           )
-                        : connection.query(queryParams))) as any;
+                        : connection.query(queryParams as any))) as any;
 
                     response = await p.json();
 
@@ -190,10 +201,10 @@ export class ClickhouseKnexClient extends Knex.Client {
             default:
                 response = await (this.#retryOptions
                     ? retry(
-                          () => connection.exec(queryParams),
+                          () => connection.exec(queryParams as any),
                           this.#retryOptions
                       )
-                    : connection.exec(queryParams));
+                    : connection.exec(queryParams as any));
         }
 
         return obj;
@@ -345,13 +356,26 @@ const registerKnexClickhouseExtensions = (knex) => {
  */
 export const getClickhouseConnection = (
     config: Knex.Knex.Config<any> & AdditionalClientOptions = {},
-    clickHouseSettings?: ClickHouseSettings
+    clickHouseSettings?: ClickHouseSettings,
+    /**
+     * If defined, this function will be called before each query
+     * and awaited if it returns a promise.
+     *
+     * Could be useful in some cases. For example you want first to check
+     * if the server is not in idle state (for example Clickhouse Cloud have idling options)
+     * and if it is, you want to wake it up before sending the query.
+     *
+     * if the function throws an error this error will not be caught and will propagate to the caller.
+     * Therefore the query will not be executed.
+     */
+    preQueryCallback?: (connection: ClickHouseClient) => Promise<void>
 ) => {
     const connection = Knex({
         ...config,
         client: ClickhouseKnexClient,
         // @ts-ignore
-        clickHouseSettings
+        clickHouseSettings,
+        preQueryCallback
     });
 
     registerKnexClickhouseExtensions(connection);
