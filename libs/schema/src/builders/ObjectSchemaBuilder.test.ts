@@ -458,6 +458,7 @@ test('no unknown fields - 1', async () => {
     const {
         valid,
         errors,
+        getErrorsFor,
         object: objResult
     } = await schema.validate(objToCheck);
 
@@ -471,6 +472,11 @@ test('no unknown fields - 1', async () => {
         expect(errors[0].path).toEqual('$');
     }
     expect(objResult).toBeUndefined();
+
+    const rootErrors = getErrorsFor((t) => t);
+
+    expect(Array.isArray(rootErrors.errors)).toEqual(true);
+    expect(rootErrors.errors.length).toEqual(1);
 });
 
 test('no unknown fields - 2', async () => {
@@ -2522,7 +2528,7 @@ test('Custom path', async () => {
     ).toEqual(true);
 });
 
-test('getErrorsFor', async () => {
+test('getErrorsFor - 1', async () => {
     const schema = object({
         first: string(),
         last: string(),
@@ -2541,15 +2547,85 @@ test('getErrorsFor', async () => {
     expect(firstErrors).toBeDefined();
     expect(lastErrors).toBeDefined();
 
-    expect(Array.isArray(ageErrors) && ageErrors.length === 1).toEqual(true);
-    expect(Array.isArray(firstErrors) && firstErrors.length === 0).toEqual(
-        true
-    );
-    expect(Array.isArray(lastErrors) && lastErrors.length === 0).toEqual(true);
+    expect(
+        Array.isArray(firstErrors.errors) && firstErrors.errors.length === 0
+    ).toEqual(true);
+    expect(
+        Array.isArray(lastErrors.errors) && lastErrors.errors.length === 0
+    ).toEqual(true);
+    expect(
+        Array.isArray(ageErrors.errors) && ageErrors.errors.length === 1
+    ).toEqual(true);
 
     expect(ageErrors.seenValue).toEqual('old');
-    expect(firstErrors.seenValue).toBeUndefined();
-    expect(lastErrors.seenValue).toBeUndefined();
+    expect(firstErrors.seenValue).toEqual('Leo');
+    expect(lastErrors.seenValue).toEqual('Tolstoi');
 
-    expect(ageErrors.errors[0]).toEqual('must be a number');
+    expect(ageErrors.errors[0]).toEqual('expected type number, but saw string');
+});
+
+test('getErrorsFor - self', async () => {
+    const schema = object({
+        first: string(),
+        last: string(),
+        age: number()
+    });
+
+    const { valid, getErrorsFor } = await schema.validate(123 as any);
+
+    expect(valid).toEqual(false);
+    const rootErrors = getErrorsFor((t) => t);
+    expect(rootErrors).toBeDefined();
+    expect(
+        Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1
+    ).toEqual(true);
+    expect(rootErrors.errors[0]).toEqual('must be an object');
+});
+
+test('getErrorsFor - nested', async () => {
+    const schema = object({
+        first: string(),
+        last: string(),
+        age: number(),
+        nested: object({
+            nested1: string(),
+            /**
+             * some comment here
+             */
+            nested2: string(),
+            nested3: number()
+        })
+    });
+
+    const obj = {
+        first: 'Leo',
+        last: 'Tolstoi',
+        age: 20,
+        nested: {
+            nested1: 'Leo',
+            nested2: 'Tolstoi',
+            nested3: 'old'
+        }
+    };
+
+    const { getErrorsFor } = await schema.validate(obj as any);
+    const rootErrors = getErrorsFor((t) => t);
+    expect(rootErrors).toBeDefined();
+    expect(rootErrors.errors).toBeDefined();
+    expect(rootErrors.errors.length).toEqual(0);
+
+    const nestedErrors = getErrorsFor((t) => t.nested);
+    expect(nestedErrors.errors).toBeDefined();
+    expect(nestedErrors.errors.length).toEqual(0);
+
+    const nested3Errors = getErrorsFor((t) => t.nested.nested3);
+    expect(nested3Errors.errors).toBeDefined();
+    expect(nested3Errors.errors.length).toEqual(1);
+    expect(nested3Errors.errors[0]).toEqual(
+        'expected type number, but saw string'
+    );
+
+    // const nested4Errors = getErrorsFor((t) => t.nested).descriptor[
+    //     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+    // ];
 });

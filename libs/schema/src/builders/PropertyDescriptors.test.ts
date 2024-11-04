@@ -1,10 +1,10 @@
-import {
-    object,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-} from './ObjectSchemaBuilder.js';
+import { object } from './ObjectSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
+import {
+    InferType,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+} from './SchemaBuilder.js';
 
 test('Throws with not ObjectSchemaBuilder instance', async () => {
     expect(() => (object as any).getPropertiesFor()).toThrowError();
@@ -454,4 +454,38 @@ test('The same subschema in different parents gives different property descripto
     const nestedProp2 = object.getPropertiesFor(parentSchema2).nested;
 
     expect(nestedProp1 === nestedProp2).toEqual(false);
+
+    const nestedProp1ValueProp =
+        object.getPropertiesFor(parentSchema1).nested.value;
+    const nestedProp2ValueProp =
+        object.getPropertiesFor(parentSchema2).nested.value;
+
+    expect(nestedProp1ValueProp === nestedProp2ValueProp).toEqual(false);
+});
+
+test('Schema modification changes property descriptor', async () => {
+    const schema = object({
+        level1: string(),
+        nested: object({
+            level2: number()
+        })
+    });
+
+    const initialDescriptorForLevel1 = object.getPropertiesFor(schema).level1;
+    const initialDescriptorForLevel2 =
+        object.getPropertiesFor(schema).nested.level2;
+
+    const modifiedSchema = schema.makeAllPropsOptional();
+
+    const modifiedDescriptorForLevel1 =
+        object.getPropertiesFor(modifiedSchema).level1;
+    const modifiedDescriptorForLevel2 =
+        object.getPropertiesFor(modifiedSchema).nested.level2;
+
+    expect(
+        (initialDescriptorForLevel1 as any) === modifiedDescriptorForLevel1
+    ).toEqual(false);
+    expect(
+        (initialDescriptorForLevel2 as any) === modifiedDescriptorForLevel2
+    ).toEqual(false);
 });

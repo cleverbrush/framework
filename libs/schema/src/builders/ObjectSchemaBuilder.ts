@@ -1,170 +1,19 @@
 import {
     InferType,
     NestedValidationError,
+    PreValidationResult,
+    PropertyDescriptor,
+    PropertyDescriptorTree,
+    PropertySetterOptions,
     SchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     ValidationContext,
     ValidationResult
 } from './SchemaBuilder.js';
 
-/**
- * A symbol to mark property descriptors in the schema.
- * Normally, you should not use it directly unless you want
- * to develop some advanced features or extend the library.
- * In normal conditions it's used internally by the library.
- */
-export const SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR = Symbol();
+import { PropertyValidationError } from './PropertyValidationError.js';
 
-/**
- * Describes a property in a schema. And gives you
- * a possibility to access property value and set it.
- * suppose you have a schema like this:
- * ```ts
- * const schema = object({
- *  name: string(),
- *  address: object({
- *   city: string(),
- *   country: string()
- *  }),
- *  id: number()
- * });
- * ```
- * then you can get a property descriptor for the `address.city` property
- * like this:
- * ```ts
- * const addressCityDescriptor = schema.getPropertiesFor(schema).address.city;
- * ```
- *
- * And then you can use it to get and set the value of this property having the object:
- * ```ts
- * const obj = {
- * name: 'Leo',
- * address: {
- *  city: 'Kozelsk',
- *  country: 'Russia'
- *  },
- *  id: 123
- * };
- *
- * const success = addressCityDescriptor.setValue(obj, 'Venyov');
- * // this returns you a boolean value indicating if the value was set successfully
- * ```
- */
-
-type PropertySetterOptions = {
-    /**
-     * If set to `true`, the method will create missing structure
-     * in the object to set the value. For example, if you have a schema
-     * and property descriptor like this:
-     * ```ts
-     * const schema = object({
-     * address: object({
-     * city: string(),
-     * country: string()
-     * }),
-     * });
-     * const addressCityDescriptor = schema.getPropertiesFor(schema).address.city;
-     * ```
-     * And then you try to set a new value to the `address.city` property on the object
-     * which does not have `address` property:
-     * ```ts
-     * const obj = {
-     * name: 'Leo'
-     * };
-     * const success = addressCityDescriptor.setValue(obj, 'Venyov', { createMissingStructure: true });
-     * // success === true
-     * // obj === {
-     * // name: 'Leo',
-     * // address: {
-     * // city: 'Venyov'
-     * // }
-     */
-    createMissingStructure?: boolean;
-};
-
-export type PropertyDescriptor<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertyType
-> = {
-    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
-        /**
-         * Sets a new value to the property. If the process was successful,
-         * the method returns `true`, otherwise `false`.
-         * It can return `false` if the property could not be set to the object
-         * which can happen if the `setValue` method is called with an object
-         * which does not comply with the schema.
-         * for example, if you have a schema and property descriptopr like this:
-         * ```ts
-         * const schema = object({
-         *  name: string(),
-         *  address: object({
-         *   city: string(),
-         *   country: string()
-         *  }),
-         *  id: number()
-         * });
-         *
-         * const addressCityDescriptor = schema.getPropertiesFor(schema).address.city;
-         * ```
-         * And then you try to set a new value to the `address.city` property on the object
-         * which does not have `address` property:
-         * ```ts
-         * const obj = {
-         * name: 'Leo'
-         * };
-         *
-         * const success = addressCityDescriptor.setValue(obj, 'Venyov');
-         * // success === false
-         * ```
-         *
-         * @param obj Object to set the value to
-         * @param value a new value to set to the property
-         * @param options additional optional parameters to control the process
-         * @returns
-         */
-        setValue: (
-            obj: InferType<TSchema>,
-            value: TPropertyType,
-            options?: PropertySetterOptions
-        ) => boolean;
-        /**
-         * Gets the value of the property from the object.
-         * @param obj object to get the value from
-         * @returns an object containing a `value` and `success` properties. `value` is the value of the property
-         * if it was found in the object, `success` is a boolean value indicating if the property was found in the object.
-         */
-        getValue: (obj: InferType<TSchema>) => {
-            value?: TPropertyType;
-            success: boolean;
-        };
-    };
-};
-
-/**
- * A tree of property descriptors for the schema.
- * Has a possibility to filter properties by the type (`TAssignableTo` type parameter).
- */
-export type PropertyDescriptorTree<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TRootSchema extends ObjectSchemaBuilder<any, any, any> = TSchema,
-    TAssignableTo = any
-> =
-    TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
-        ? {
-              [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
-                  any,
-                  any,
-                  any
-              >
-                  ? PropertyDescriptorTree<TProperties[K], TRootSchema> &
-                        PropertyDescriptor<
-                            TRootSchema,
-                            InferType<TProperties[K]>
-                        >
-                  : InferType<TProperties[K]> extends TAssignableTo
-                    ? PropertyDescriptor<TRootSchema, InferType<TProperties[K]>>
-                    : never;
-          }
-        : never;
+const MUST_BE_AN_OBJECT_ERROR_MESSSAGE = 'must be an object';
 
 /**
  * A callback function to select properties from the schema.
@@ -232,17 +81,20 @@ type ModifyPropSchema<
 
 export type ObjectSchemaValidationResult<
     T,
-    TSchema extends ObjectSchemaBuilder<any, any, any>
+    TRootSchema extends ObjectSchemaBuilder<any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any> = TRootSchema
 > = ValidationResult<T> & {
     /**
      * Returns a nested validation error for the property selected by the `selector` function.
      * @param selector a callback function to select property from the schema.
      */
     getErrorsFor<TPropertyType>(
-        selector: (
-            properties: PropertyDescriptorTree<TSchema, TSchema>
+        selector?: (
+            properties: PropertyDescriptorTree<TSchema, TRootSchema>
         ) => PropertyDescriptor<TSchema, TPropertyType>
-    ): NestedValidationError<TPropertyType>;
+    ): TSchema extends ObjectSchemaBuilder<any, any, any>
+        ? PropertyValidationError<TSchema, TRootSchema>
+        : NestedValidationError<TPropertyType>;
 };
 
 /**
@@ -343,6 +195,8 @@ export class ObjectSchemaBuilder<
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
 
+    #propertyDescriptorTreeMap: PropertyDescriptorMap = new WeakMap() as any;
+
     public static create<
         P extends Record<string, SchemaBuilder>,
         R extends boolean
@@ -403,6 +257,55 @@ export class ObjectSchemaBuilder<
         return super.optional();
     }
 
+    protected async preValidate(
+        /**
+         * Object to validate
+         */
+        object: any,
+        context?: ValidationContext<this>
+    ): Promise<
+        PreValidationResult<
+            InferType<
+                SchemaBuilder<
+                    undefined extends TExplicitType
+                        ? Id<RespectPropsOptionality<TProperties>>
+                        : TExplicitType,
+                    TRequired
+                >
+            >,
+            { validatedObject: any }
+        >
+    > {
+        const result = await super.preValidate(object, context);
+        if (
+            !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                result?.context?.rootPropertyDescriptor as any
+            )
+        ) {
+            (result.context.rootPropertyDescriptor as any) =
+                ObjectSchemaBuilder.getPropertiesFor(this);
+        }
+
+        if (
+            !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                result.context.currentPropertyDescriptor as any
+            )
+        ) {
+            result.context.currentPropertyDescriptor =
+                result.context.rootPropertyDescriptor;
+        }
+
+        if (
+            !result.context.rootValidationObject &&
+            result.transaction?.object?.validatedObject
+        ) {
+            result.context.rootValidationObject =
+                result.transaction.object.validatedObject;
+        }
+
+        return result;
+    }
+
     /**
      * Performs validion of object schema over the `object`.
      * @param context Optional `ValidationContext` settings.
@@ -418,7 +321,7 @@ export class ObjectSchemaBuilder<
                   >
               >
             : TExplicitType,
-        context?: ValidationContext
+        context?: ValidationContext<this>
     ): Promise<
         ObjectSchemaValidationResult<
             undefined extends TExplicitType
@@ -434,7 +337,7 @@ export class ObjectSchemaBuilder<
             this
         >
     > {
-        const prevalidatedResult = await super.preValidate(object, context);
+        const prevalidatedResult = await this.preValidate(object, context);
         const {
             valid,
             context: prevalidationContext,
@@ -442,18 +345,94 @@ export class ObjectSchemaBuilder<
             errors: preValidationErrors
         } = prevalidatedResult;
 
-        const { path, doNotStopOnFirstError } = prevalidationContext;
+        const propertyDescriptorToErrorMap = new WeakMap<
+            PropertyDescriptor<any, any>,
+            PropertyValidationError<any, any>
+        >() as any;
+
+        const { path, doNotStopOnFirstError, rootValidationObject } =
+            prevalidationContext;
+
+        const rootPropertyDescriptor: PropertyDescriptor<
+            this,
+            InferType<this>
+        > = prevalidationContext.rootPropertyDescriptor as any;
+
+        const currentPropertyDescriptor: PropertyDescriptor<
+            this,
+            InferType<this>
+        > = prevalidationContext.currentPropertyDescriptor as any;
+
+        const addErrorFor = (
+            propertyDescriptor: PropertyDescriptor<any, any>,
+            message: string
+        ) => {
+            if (
+                !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    propertyDescriptor
+                )
+            ) {
+                throw new Error('invalid property descriptor');
+            }
+
+            let validationError: PropertyValidationError<this, any> =
+                propertyDescriptorToErrorMap.has(propertyDescriptor)
+                    ? propertyDescriptorToErrorMap.get(propertyDescriptor)
+                    : (null as any);
+
+            if (!validationError) {
+                validationError = new PropertyValidationError(
+                    propertyDescriptor,
+                    rootValidationObject
+                );
+
+                propertyDescriptorToErrorMap.set(
+                    propertyDescriptor,
+                    validationError
+                );
+            }
+
+            validationError.addError(message);
+        };
+
+        const getErrorsFor = <TPropertyType>(
+            selector?: (
+                properties: PropertyDescriptorTree<this>
+            ) => PropertyDescriptor<this, TPropertyType>
+        ): any /* PropertyValidationError<this, any> */ => {
+            const descriptor: PropertyDescriptor<this, any> =
+                typeof selector === 'function'
+                    ? selector(currentPropertyDescriptor as any)
+                    : currentPropertyDescriptor;
+
+            if (
+                !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    descriptor as any
+                )
+            ) {
+                throw new Error('invalid property descriptor');
+            }
+
+            if (!propertyDescriptorToErrorMap.has(descriptor)) {
+                propertyDescriptorToErrorMap.set(
+                    descriptor,
+                    new PropertyValidationError(
+                        descriptor,
+                        rootValidationObject
+                    )
+                );
+            }
+
+            return propertyDescriptorToErrorMap.get(descriptor);
+        };
+
         let errors = prevalidatedResult.errors || [];
 
         if (!valid && !doNotStopOnFirstError) {
             return {
                 valid,
                 errors: preValidationErrors,
-                getErrorsFor: () => {
-                    throw new Error(
-                        'getErrorsFor method is not available in this context'
-                    );
-                }
+                getErrorsFor
             };
         }
 
@@ -468,19 +447,19 @@ export class ObjectSchemaBuilder<
             return {
                 valid: true,
                 object: validationTransaction!.commit().validatedObject,
-                getErrorsFor: () => {
-                    throw new Error(
-                        'getErrorsFor method is not available in this context'
-                    );
-                }
+                getErrorsFor
             };
         }
 
         if (typeof objToValidate !== 'object') {
             errors.push({
-                message: 'must be an object',
+                message: MUST_BE_AN_OBJECT_ERROR_MESSSAGE,
                 path: path as string
             });
+            addErrorFor(
+                currentPropertyDescriptor,
+                MUST_BE_AN_OBJECT_ERROR_MESSSAGE
+            );
 
             if (!doNotStopOnFirstError) {
                 if (validationTransaction) {
@@ -489,11 +468,7 @@ export class ObjectSchemaBuilder<
                 return {
                     valid: false,
                     errors: [errors[0]],
-                    getErrorsFor: () => {
-                        throw new Error(
-                            'getErrorsFor method is not available in this context'
-                        );
-                    }
+                    getErrorsFor
                 };
             }
         }
@@ -507,11 +482,7 @@ export class ObjectSchemaBuilder<
                     return {
                         valid: false,
                         errors,
-                        getErrorsFor: () => {
-                            throw new Error(
-                                'getErrorsFor method is not available in this context'
-                            );
-                        }
+                        getErrorsFor
                     };
                 }
                 if (validationTransaction) {
@@ -520,11 +491,7 @@ export class ObjectSchemaBuilder<
                 return {
                     valid: true,
                     object: {} as any,
-                    getErrorsFor: () => {
-                        throw new Error(
-                            'getErrorsFor method is not available in this context'
-                        );
-                    }
+                    getErrorsFor
                 };
             }
         }
@@ -536,7 +503,10 @@ export class ObjectSchemaBuilder<
                     objToValidate[key],
                     {
                         ...context,
-                        path: `${path}.${key}`
+                        path: `${path}.${key}`,
+                        rootPropertyDescriptor: rootPropertyDescriptor as any,
+                        currentPropertyDescriptor:
+                            currentPropertyDescriptor[key]
                     }
                 )
             }))
@@ -563,10 +533,12 @@ export class ObjectSchemaBuilder<
         for (let i = 0; i < objKeys.length; i++) {
             const key = objKeys[i];
             if (!(key in this.#properties) && !this.#acceptUnknownProps) {
+                const message = `unknown property '${key}'`;
                 errors.push({
-                    message: `unknown property '${key}'`,
+                    message,
                     path: path as string
                 });
+                addErrorFor(currentPropertyDescriptor, message);
                 if (!doNotStopOnFirstError) {
                     if (validationTransaction) {
                         validationTransaction.rollback();
@@ -574,11 +546,7 @@ export class ObjectSchemaBuilder<
                     return {
                         valid: false,
                         errors: [errors[0]],
-                        getErrorsFor: () => {
-                            throw new Error(
-                                'getErrorsFor method is not available in this context'
-                            );
-                        }
+                        getErrorsFor
                     };
                 }
             }
@@ -589,11 +557,32 @@ export class ObjectSchemaBuilder<
             return {
                 valid: true,
                 object: commited.validatedObject,
-                getErrorsFor: (selector) => {
-                    throw new Error('selector is required');
-                }
+                getErrorsFor
             };
         }
+
+        notValidResults.forEach(({ key, result }) => {
+            const descriptor = currentPropertyDescriptor[key];
+            if (
+                typeof (result as any).getErrorsFor === 'function' &&
+                ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
+            ) {
+                // const seenValue =
+                //     currentPropertyDescriptor[key][
+                //         SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                //     ].getValue(rootValidationObject);
+                // console.log(seenValue);
+                // console.log(
+                //     'errors',
+                //     (result as any).getErrorsFor(currentPropertyDescriptor[key])
+                //         .errors
+                // );
+            } else if (Array.isArray(result.errors)) {
+                result.errors.forEach((error) => {
+                    addErrorFor(descriptor, error.message);
+                });
+            }
+        });
 
         validationTransaction!.rollback();
 
@@ -604,9 +593,7 @@ export class ObjectSchemaBuilder<
                 : errors[0]
                   ? [errors[0]]
                   : [],
-            getErrorsFor: (selector) => {
-                throw new Error('selector is required');
-            }
+            getErrorsFor
         };
     }
 
@@ -1254,6 +1241,121 @@ export class ObjectSchemaBuilder<
             }, {})
         } as any) as any;
     }
+
+    static #getPropertiesFor<
+        TProperties extends Record<string, SchemaBuilder<any, any>> = {},
+        TRequired extends boolean = true,
+        TExplicitType = undefined,
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+    >(
+        schema: TSchema,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        // this is to make possibility to traverse the tree and select properties
+        selector?: (arg1: any, any) => any,
+        // parent object to have a possibility to get link to itself
+        parentSelector?: any,
+        currentName?: string
+    ): PropertyDescriptorTree<TSchema> {
+        const introspected = schema.introspect();
+        if (!introspected.properties) {
+            return {} as any;
+        }
+
+        const propsNames = Object.keys(introspected.properties);
+
+        if (propsNames.length === 0) {
+            return {} as any;
+        }
+
+        if (typeof selector !== 'function') {
+            selector = (o) => o;
+        }
+        const result =
+            // typeof selector !== 'function' || !parentSelector || !currentName
+            //     ? {}
+            //     :
+            createPropertyDescriptorFor(
+                (obj, createMissingStructure) =>
+                    (parentSelector || selector)(obj, createMissingStructure),
+                currentName
+            );
+
+        for (const propName of propsNames) {
+            const propSchema = introspected.properties[propName];
+            if (propSchema instanceof ObjectSchemaBuilder) {
+                result[propName] = (
+                    ObjectSchemaBuilder.#getPropertiesFor as any
+                )(
+                    propSchema,
+                    (tree, createMissingStructure) => {
+                        const selectorResult = selector(
+                            tree,
+                            createMissingStructure
+                        );
+                        if (selectorResult) {
+                            if (
+                                createMissingStructure &&
+                                !selectorResult[propName]
+                            ) {
+                                selectorResult[propName] = {};
+                            }
+                            return selectorResult[propName];
+                        }
+                        return null;
+                    },
+                    selector,
+                    propName
+                );
+            } else {
+                result[propName] = createPropertyDescriptorFor(
+                    selector,
+                    propName
+                );
+            }
+        }
+
+        return result as any;
+    }
+
+    public static getPropertiesFor<
+        TProperties extends Record<string, SchemaBuilder<any, any>> = {},
+        TRequired extends boolean = true,
+        TExplicitType = undefined,
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+    >(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema> {
+        if (!(schema instanceof ObjectSchemaBuilder)) {
+            throw new Error(
+                'schema must be an instance of the ObjectSchemaBuilder class'
+            );
+        }
+
+        if (schema.#propertyDescriptorTreeMap.has(schema)) {
+            return schema.#propertyDescriptorTreeMap.get(schema) as any;
+        }
+
+        const result = ObjectSchemaBuilder.#getPropertiesFor(schema);
+        schema.#propertyDescriptorTreeMap.set(schema, result);
+
+        return result;
+    }
+
+    public static isValidPropertyDescriptor(
+        descriptor: PropertyDescriptor<any, any>
+    ) {
+        return (
+            typeof descriptor === 'object' &&
+            descriptor !== null &&
+            typeof descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] === 'object'
+        );
+    }
 }
 
 export interface Object {
@@ -1294,6 +1396,14 @@ export interface Object {
     >(
         schema: TSchema
     ): PropertyDescriptorTree<TSchema, TSchema>;
+
+    /**
+     * Verifies if the given `descriptor` is a valid property descriptor.
+     * @param descriptor a property descriptor to check
+     */
+    isValidPropertyDescriptor(
+        descriptor: PropertyDescriptor<any, any>
+    ): boolean;
 }
 
 const object = ((props) => {
@@ -1308,11 +1418,9 @@ type PropertyDescriptorMap = Map<
     PropertyDescriptorMap | PropertyDescriptorTree<any, any>
 >;
 
-const propertyDescriptorTreeMap: PropertyDescriptorMap = new WeakMap() as any;
-
 const createPropertyDescriptorFor = (
     selector: (any, boolean) => any,
-    propertyName: string
+    propertyName?: string
 ) => ({
     [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
         setValue: (obj, newValue, options?: PropertySetterOptions) => {
@@ -1322,7 +1430,10 @@ const createPropertyDescriptorFor = (
             );
             if (!selectorResult) return false;
 
-            selectorResult[propertyName] = newValue;
+            if (typeof propertyName === 'string') {
+                selectorResult[propertyName] = newValue;
+            }
+
             return true;
         },
         getValue: (obj) => {
@@ -1331,6 +1442,13 @@ const createPropertyDescriptorFor = (
                 return {
                     success: false
                 };
+
+            if (typeof propertyName !== 'string') {
+                return {
+                    success: true,
+                    value: selectorResult
+                };
+            }
 
             if (Object.hasOwn(selectorResult, propertyName)) {
                 return {
@@ -1356,80 +1474,12 @@ const createPropertyDescriptorFor = (
         TExplicitType
     >
 >(
-    schema: ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    // this is to make possibility to traverse the tree and select properties
-    selector?: (arg1: any, any) => any,
-    // parent object to have a possibility to get link to itself
-    parentSelector?: any,
-    currentName?: string
-): PropertyDescriptorTree<TSchema, TSchema> => {
-    if (!(schema instanceof ObjectSchemaBuilder)) {
-        throw new Error(
-            'schema must be an instance of the ObjectSchemaBuilder class'
-        );
-    }
-    const introspected = schema.introspect();
-    if (!introspected.properties) {
-        return {} as any;
-    }
+    schema: ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+): PropertyDescriptorTree<TSchema, TSchema> =>
+    ObjectSchemaBuilder.getPropertiesFor(schema) as any;
 
-    const propsNames = Object.keys(introspected.properties);
-
-    if (propsNames.length === 0) {
-        return {} as any;
-    }
-
-    if (propertyDescriptorTreeMap.has(schema)) {
-        return propertyDescriptorTreeMap.get(schema) as any;
-    }
-
-    const result =
-        typeof selector !== 'function' || !parentSelector || !currentName
-            ? {}
-            : createPropertyDescriptorFor(
-                  (obj, createMissingStructure) =>
-                      parentSelector(obj, createMissingStructure),
-                  currentName
-              );
-
-    if (typeof selector !== 'function') {
-        selector = (o) => o;
-    }
-
-    for (const propName of propsNames) {
-        const propSchema = introspected.properties[propName];
-        if (propSchema instanceof ObjectSchemaBuilder) {
-            result[propName] = (object.getPropertiesFor as any)(
-                propSchema,
-                (tree, createMissingStructure) => {
-                    const selectorResult = selector(
-                        tree,
-                        createMissingStructure
-                    );
-                    if (selectorResult) {
-                        if (
-                            createMissingStructure &&
-                            !selectorResult[propName]
-                        ) {
-                            selectorResult[propName] = {};
-                        }
-                        return selectorResult[propName];
-                    }
-                    return null;
-                },
-                selector,
-                propName
-            );
-        } else {
-            result[propName] = createPropertyDescriptorFor(selector, propName);
-        }
-
-        propertyDescriptorTreeMap.set(schema, result);
-    }
-
-    return result as any;
-};
+(object as any).isValidPropertyDescriptor =
+    ObjectSchemaBuilder.isValidPropertyDescriptor;
 
 export { object };
 

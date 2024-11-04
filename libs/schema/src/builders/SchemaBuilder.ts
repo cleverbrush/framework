@@ -1,3 +1,4 @@
+import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 import { Transaction, transaction } from '../utils/transaction.js';
 
 export type InferType<T> =
@@ -27,13 +28,13 @@ export type ValidationError = { path: string; message: string };
  */
 export type NestedValidationError<T = any> = {
     /**
-     * Value that caused the error
+     * Value that property had and which caused error or errors
      */
     seenValue?: T;
     /**
      * A list of errors, empty if object satisfies a schema
      */
-    errors: string[];
+    errors: ReadonlyArray<string>;
 };
 
 export type MakeOptional<T> = { prop?: T }['prop'];
@@ -72,6 +73,7 @@ export type PreValidationResult<T, TTransactionType> = Omit<
 > & {
     context: ValidationContext;
     transaction?: Transaction<TTransactionType>;
+    rootPropertyDescriptor?: PropertyDescriptor<any, InferType<any>>;
 };
 
 type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
@@ -90,7 +92,9 @@ export type SchemaBuilderProps<T> = {
     validators: Validator<T>[];
 };
 
-export type ValidationContext = {
+export type ValidationContext<
+    TSchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
+> = {
     /**
      * Path of the field. **Optional**, used to display correct error path in the {@link ValidationError}
      */
@@ -102,7 +106,205 @@ export type ValidationContext = {
      * You might need it to display validation errors.
      */
     doNotStopOnFirstError?: boolean;
+
+    /**
+     * Optional. If you define a `rootPropertyDescriptor` while validating an object,
+     * it will report all validation errors with the path starting from the root property.
+     * Normally it's used internally by the library for validation of nested objects and
+     * should not be used directly (but who knows, maybe you will find a use case for it).
+     */
+    rootPropertyDescriptor?: TSchema extends ObjectSchemaBuilder<any, any, any>
+        ? PropertyDescriptor<TSchema, InferType<TSchema>>
+        : never;
+
+    /**
+     * Optional. This is a property descriptor for the current object being validated.
+     * This descriptor is descendant of the `rootPropertyDescriptor` and is used to provide
+     * a path to the current object being validated in the root object.
+     * Normally it's used internally by the library for validation of nested objects and
+     * should not be used directly (but who knows, maybe you will find a use case for it).
+     */
+    currentPropertyDescriptor?: TSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any
+    >
+        ? PropertyDescriptor<TSchema, InferType<TSchema>>
+        : never;
+
+    /**
+     * Optional. Used along with `rootPropertyDescriptor` and `currentPropertyDescriptor` to provide
+     * a root validation object, this object will be used to retrieve the value of properties
+     * using the `rootPropertyDescriptor` because the `rootPropertyDescriptor` is a property descriptor
+     * for the root object, and it needs the root object along with the whole structure to get the
+     * value of the property.
+     *
+     * Normally it's used internally by the library for validation of nested objects and
+     * should not be used directly (but who knows, maybe you will find a use case for it).
+     */
+    rootValidationObject?: InferType<TSchema>;
 };
+
+/**
+ * A symbol to mark property descriptors in the schema.
+ * Normally, you should not use it directly unless you want
+ * to develop some advanced features or extend the library.
+ * In normal conditions it's used internally by the library.
+ */
+export const SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR = Symbol();
+
+/**
+ * Describes a property in a schema. And gives you
+ * a possibility to access property value and set it.
+ * suppose you have a schema like this:
+ * ```ts
+ * const schema = object({
+ *  name: string(),
+ *  address: object({
+ *   city: string(),
+ *   country: string()
+ *  }),
+ *  id: number()
+ * });
+ * ```
+ * then you can get a property descriptor for the `address.city` property
+ * like this:
+ * ```ts
+ * const addressCityDescriptor = object.getPropertiesFor(schema).address.city;
+ * ```
+ *
+ * And then you can use it to get and set the value of this property having the object:
+ * ```ts
+ * const obj = {
+ * name: 'Leo',
+ * address: {
+ *  city: 'Kozelsk',
+ *  country: 'Russia'
+ *  },
+ *  id: 123
+ * };
+ *
+ * const success = addressCityDescriptor.setValue(obj, 'Venyov');
+ * // this returns you a boolean value indicating if the value was set successfully
+ * ```
+ */
+
+export type PropertySetterOptions = {
+    /**
+     * If set to `true`, the method will create missing structure
+     * in the object to set the value. For example, if you have a schema
+     * and property descriptor like this:
+     * ```ts
+     * const schema = object({
+     * address: object({
+     * city: string(),
+     * country: string()
+     * }),
+     * });
+     * const addressCityDescriptor = object.getPropertiesFor(schema).address.city;
+     * ```
+     * And then you try to set a new value to the `address.city` property on the object
+     * which does not have `address` property:
+     * ```ts
+     * const obj = {
+     * name: 'Leo'
+     * };
+     * const success = addressCityDescriptor.setValue(obj, 'Venyov', { createMissingStructure: true });
+     * // success === true
+     * // obj === {
+     * // name: 'Leo',
+     * // address: {
+     * // city: 'Venyov'
+     * //  }
+     * // }
+     */
+    createMissingStructure?: boolean;
+};
+
+export type PropertyDescriptor<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TPropertyType
+> = {
+    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+        /**
+         * Sets a new value to the property. If the process was successful,
+         * the method returns `true`, otherwise `false`.
+         * It can return `false` if the property could not be set to the object
+         * which can happen if the `setValue` method is called with an object
+         * which does not comply with the schema.
+         * for example, if you have a schema and property descriptopr like this:
+         * ```ts
+         * const schema = object({
+         *  name: string(),
+         *  address: object({
+         *   city: string(),
+         *   country: string()
+         *  }),
+         *  id: number()
+         * });
+         *
+         * const addressCityDescriptor = object.getPropertiesFor(schema).address.city;
+         * ```
+         * And then you try to set a new value to the `address.city` property on the object
+         * which does not have `address` property:
+         * ```ts
+         * const obj = {
+         * name: 'Leo'
+         * };
+         *
+         * const success = addressCityDescriptor.setValue(obj, 'Venyov');
+         * // success === false
+         * ```
+         *
+         * @param obj Object to set the value to
+         * @param value a new value to set to the property
+         * @param options additional optional parameters to control the process
+         * @returns
+         */
+        setValue: (
+            obj: InferType<TSchema>,
+            value: TPropertyType,
+            options?: PropertySetterOptions
+        ) => boolean;
+        /**
+         * Gets the value of the property from the object.
+         * @param obj object to get the value from
+         * @returns an object containing a `value` and `success` properties. `value` is the value of the property
+         * if it was found in the object, `success` is a boolean value indicating if the property was found in the object.
+         */
+        getValue: (obj: InferType<TSchema>) => {
+            value?: TPropertyType;
+            success: boolean;
+        };
+    };
+};
+
+/**
+ * A tree of property descriptors for the schema.
+ * Has a possibility to filter properties by the type (`TAssignableTo` type parameter).
+ */
+export type PropertyDescriptorTree<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any> = TSchema,
+    TAssignableTo = any
+> =
+    TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
+        ? {
+              [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
+                  any,
+                  any,
+                  any
+              >
+                  ? PropertyDescriptorTree<TProperties[K], TRootSchema> &
+                        PropertyDescriptor<
+                            TRootSchema,
+                            InferType<TProperties[K]>
+                        >
+                  : InferType<TProperties[K]> extends TAssignableTo
+                    ? PropertyDescriptor<TRootSchema, InferType<TProperties[K]>>
+                    : never;
+          } & PropertyDescriptor<TRootSchema, InferType<TSchema>>
+        : never;
 
 /**
  * Base class for all schema builders. Provides basic functionality for schema building.
