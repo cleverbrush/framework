@@ -44,8 +44,8 @@ export class PropertyValidationError<
         return [];
     }
 
-    public get descriptor(): PropertyDescriptorTree<TSchema, TRootSchema> {
-        return this.#descriptor;
+    public get descriptor() {
+        return this.#descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
     }
 
     constructor(

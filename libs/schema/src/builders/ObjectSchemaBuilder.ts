@@ -23,11 +23,11 @@ const MUST_BE_AN_OBJECT_ERROR_MESSSAGE = 'must be an object';
  */
 export type SchemaPropertySelector<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertyType,
+    TPropertySchema extends SchemaBuilder<any, any>,
     TAssignableTo = any
 > = (
     l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>
-) => PropertyDescriptor<TSchema, TPropertyType>;
+) => PropertyDescriptor<TSchema, TPropertySchema>;
 
 type ObjectSchemaBuilderProps<
     T extends Record<string, SchemaBuilder> = {},
@@ -88,13 +88,13 @@ export type ObjectSchemaValidationResult<
      * Returns a nested validation error for the property selected by the `selector` function.
      * @param selector a callback function to select property from the schema.
      */
-    getErrorsFor<TPropertyType>(
+    getErrorsFor<TPropertySchema>(
         selector?: (
             properties: PropertyDescriptorTree<TSchema, TRootSchema>
-        ) => PropertyDescriptor<TSchema, TPropertyType>
-    ): TSchema extends ObjectSchemaBuilder<any, any, any>
-        ? PropertyValidationError<TSchema, TRootSchema>
-        : NestedValidationError<TPropertyType>;
+        ) => PropertyDescriptor<TRootSchema, TPropertySchema>
+    ): TPropertySchema extends ObjectSchemaBuilder<any, any, any>
+        ? PropertyValidationError<TPropertySchema, TRootSchema>
+        : NestedValidationError<InferType<TPropertySchema>>;
 };
 
 /**
@@ -353,15 +353,11 @@ export class ObjectSchemaBuilder<
         const { path, doNotStopOnFirstError, rootValidationObject } =
             prevalidationContext;
 
-        const rootPropertyDescriptor: PropertyDescriptor<
-            this,
-            InferType<this>
-        > = prevalidationContext.rootPropertyDescriptor as any;
+        const rootPropertyDescriptor: PropertyDescriptor<this, this> =
+            prevalidationContext.rootPropertyDescriptor as any;
 
-        const currentPropertyDescriptor: PropertyDescriptor<
-            this,
-            InferType<this>
-        > = prevalidationContext.currentPropertyDescriptor as any;
+        const currentPropertyDescriptor: PropertyDescriptor<this, this> =
+            prevalidationContext.currentPropertyDescriptor as any;
 
         const addErrorFor = (
             propertyDescriptor: PropertyDescriptor<any, any>,
@@ -395,11 +391,11 @@ export class ObjectSchemaBuilder<
             validationError.addError(message);
         };
 
-        const getErrorsFor = <TPropertyType>(
+        const getErrorsFor = (<TPropertySchema extends SchemaBuilder<any, any>>(
             selector?: (
                 properties: PropertyDescriptorTree<this>
-            ) => PropertyDescriptor<this, TPropertyType>
-        ): any /* PropertyValidationError<this, any> */ => {
+            ) => PropertyDescriptor<this, TPropertySchema>
+        ): PropertyValidationError<this, any> => {
             const descriptor: PropertyDescriptor<this, any> =
                 typeof selector === 'function'
                     ? selector(currentPropertyDescriptor as any)
@@ -424,7 +420,7 @@ export class ObjectSchemaBuilder<
             }
 
             return propertyDescriptorToErrorMap.get(descriptor);
-        };
+        }) as any;
 
         let errors = prevalidatedResult.errors || [];
 
@@ -1281,7 +1277,8 @@ export class ObjectSchemaBuilder<
             createPropertyDescriptorFor(
                 (obj, createMissingStructure) =>
                     (parentSelector || selector)(obj, createMissingStructure),
-                currentName
+                currentName,
+                schema
             );
 
         for (const propName of propsNames) {
@@ -1420,7 +1417,8 @@ type PropertyDescriptorMap = Map<
 
 const createPropertyDescriptorFor = (
     selector: (any, boolean) => any,
-    propertyName?: string
+    propertyName?: string,
+    schema?: SchemaBuilder<any, any>
 ) => ({
     [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
         setValue: (obj, newValue, options?: PropertySetterOptions) => {
@@ -1460,7 +1458,9 @@ const createPropertyDescriptorFor = (
             return {
                 success: false
             };
-        }
+        },
+
+        getSchema: () => schema
     }
 });
 

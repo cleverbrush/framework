@@ -73,7 +73,7 @@ export type PreValidationResult<T, TTransactionType> = Omit<
 > & {
     context: ValidationContext;
     transaction?: Transaction<TTransactionType>;
-    rootPropertyDescriptor?: PropertyDescriptor<any, InferType<any>>;
+    rootPropertyDescriptor?: PropertyDescriptor<any, any>;
 };
 
 type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
@@ -114,7 +114,7 @@ export type ValidationContext<
      * should not be used directly (but who knows, maybe you will find a use case for it).
      */
     rootPropertyDescriptor?: TSchema extends ObjectSchemaBuilder<any, any, any>
-        ? PropertyDescriptor<TSchema, InferType<TSchema>>
+        ? PropertyDescriptor<TSchema, TSchema>
         : never;
 
     /**
@@ -129,7 +129,7 @@ export type ValidationContext<
         any,
         any
     >
-        ? PropertyDescriptor<TSchema, InferType<TSchema>>
+        ? PropertyDescriptor<TSchema, TSchema>
         : never;
 
     /**
@@ -223,7 +223,7 @@ export type PropertySetterOptions = {
 
 export type PropertyDescriptor<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertyType
+    TPropertySchema
 > = {
     [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
         /**
@@ -263,7 +263,7 @@ export type PropertyDescriptor<
          */
         setValue: (
             obj: InferType<TSchema>,
-            value: TPropertyType,
+            value: InferType<TPropertySchema>,
             options?: PropertySetterOptions
         ) => boolean;
         /**
@@ -273,9 +273,15 @@ export type PropertyDescriptor<
          * if it was found in the object, `success` is a boolean value indicating if the property was found in the object.
          */
         getValue: (obj: InferType<TSchema>) => {
-            value?: TPropertyType;
+            value?: InferType<TPropertySchema>;
             success: boolean;
         };
+
+        /**
+         * Gets the schema for the property described by the property descriptor.
+         * @returns a schema for the property
+         */
+        getSchema: () => TPropertySchema;
     };
 };
 
@@ -287,24 +293,20 @@ export type PropertyDescriptorTree<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
     TRootSchema extends ObjectSchemaBuilder<any, any, any> = TSchema,
     TAssignableTo = any
-> =
-    TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
+> = PropertyDescriptor<TRootSchema, TSchema> &
+    (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
         ? {
               [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
                   any,
                   any,
                   any
               >
-                  ? PropertyDescriptorTree<TProperties[K], TRootSchema> &
-                        PropertyDescriptor<
-                            TRootSchema,
-                            InferType<TProperties[K]>
-                        >
+                  ? PropertyDescriptorTree<TProperties[K], TRootSchema>
                   : InferType<TProperties[K]> extends TAssignableTo
-                    ? PropertyDescriptor<TRootSchema, InferType<TProperties[K]>>
+                    ? PropertyDescriptor<TRootSchema, TProperties[K]>
                     : never;
-          } & PropertyDescriptor<TRootSchema, InferType<TSchema>>
-        : never;
+          }
+        : never);
 
 /**
  * Base class for all schema builders. Provides basic functionality for schema building.
