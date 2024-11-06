@@ -1,6 +1,7 @@
 import {
     InferType,
     NestedValidationError,
+    PropertyDescriptorInner,
     PropertyDescriptorTree,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from './SchemaBuilder.js';
@@ -17,10 +18,17 @@ export class PropertyValidationError<
         any,
         any,
         any
-    > = ObjectSchemaBuilder<any, any, any>
-> implements NestedValidationError<InferType<TSchema>>
+    > = ObjectSchemaBuilder<any, any, any>,
+    TParentPropertyDescriptor = any
+> implements
+        NestedValidationError<TSchema, TRootSchema, TParentPropertyDescriptor>
 {
-    #descriptor: PropertyDescriptorTree<TSchema, TRootSchema>;
+    #descriptor: PropertyDescriptorTree<
+        TSchema,
+        TRootSchema,
+        any,
+        TParentPropertyDescriptor
+    >;
     #rootObjectValue: InferType<TRootSchema> | undefined;
     #errors: string[] = [];
 
@@ -40,16 +48,25 @@ export class PropertyValidationError<
         return this.#errors.length === 0;
     }
 
-    public getChildErrors(): NestedValidationError[] {
+    public getChildErrors(): NestedValidationError<any, any, any>[] {
         return [];
     }
 
-    public get descriptor() {
-        return this.#descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+    public get descriptor(): PropertyDescriptorInner<
+        TRootSchema,
+        TSchema,
+        TParentPropertyDescriptor
+    > {
+        return this.#descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] as any;
     }
 
     constructor(
-        descriptor: PropertyDescriptorTree<TSchema, TRootSchema>,
+        descriptor: PropertyDescriptorTree<
+            TSchema,
+            TRootSchema,
+            any,
+            TParentPropertyDescriptor
+        >,
         rootObjectValue: InferType<TRootSchema> | undefined,
         errors?: string[]
     ) {

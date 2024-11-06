@@ -3,7 +3,10 @@ import { number } from './NumberSchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
+import {
+    InferType,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+} from './SchemaBuilder.js';
 
 test('empty - 1', async () => {
     const schema = object();
@@ -2593,7 +2596,10 @@ test('getErrorsFor - nested', async () => {
              * some comment here
              */
             nested2: string(),
-            nested3: number()
+            nested3: number(),
+            nested4: object({
+                nested5: string()
+            }).optional()
         })
     });
 
@@ -2625,7 +2631,26 @@ test('getErrorsFor - nested', async () => {
         'expected type number, but saw string'
     );
 
-    // const nested4Errors = getErrorsFor((t) => t.nested).descriptor[
-    //     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-    // ];
+    // const nested4Errors = getErrorsFor((t) => t.nested.nested4.nested5)
+    //     .descriptor.parent.parent.parent.getSchema()
+    //     .introspect().properties;
+
+    // const nested5Errors = getErrorsFor((t) => t.nested.nested4).descriptor;
+
+    // const S = object({
+    //     a: string(),
+    //     nested: object({
+    //         nested2: object({
+    //             nested3: number(),
+    //             nested4: number(),
+    //             nested5: number(),
+    //             nested6: number()
+    //         })
+    //     })
+    // });
+
+    // const pr =
+    //     object.getPropertiesFor(S).nested.nested2.nested3[
+    //         SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+    //     ].parent.parent.parent.getSchema().introspect().properties
 });

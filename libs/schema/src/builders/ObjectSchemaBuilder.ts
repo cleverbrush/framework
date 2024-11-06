@@ -24,10 +24,11 @@ const MUST_BE_AN_OBJECT_ERROR_MESSSAGE = 'must be an object';
 export type SchemaPropertySelector<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
     TPropertySchema extends SchemaBuilder<any, any>,
-    TAssignableTo = any
+    TAssignableTo = any,
+    TParentPropertyDescriptor = undefined
 > = (
     l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>
-) => PropertyDescriptor<TSchema, TPropertySchema>;
+) => PropertyDescriptor<TSchema, TPropertySchema, TParentPropertyDescriptor>;
 
 type ObjectSchemaBuilderProps<
     T extends Record<string, SchemaBuilder> = {},
@@ -88,13 +89,25 @@ export type ObjectSchemaValidationResult<
      * Returns a nested validation error for the property selected by the `selector` function.
      * @param selector a callback function to select property from the schema.
      */
-    getErrorsFor<TPropertySchema>(
+    getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(
         selector?: (
             properties: PropertyDescriptorTree<TSchema, TRootSchema>
-        ) => PropertyDescriptor<TRootSchema, TPropertySchema>
+        ) => PropertyDescriptor<
+            TRootSchema,
+            TPropertySchema,
+            TParentPropertyDescriptor
+        >
     ): TPropertySchema extends ObjectSchemaBuilder<any, any, any>
-        ? PropertyValidationError<TPropertySchema, TRootSchema>
-        : NestedValidationError<InferType<TPropertySchema>>;
+        ? PropertyValidationError<
+              TPropertySchema,
+              TRootSchema,
+              TParentPropertyDescriptor
+          >
+        : NestedValidationError<
+              TPropertySchema,
+              TRootSchema,
+              TParentPropertyDescriptor
+          >;
 };
 
 /**
@@ -346,21 +359,27 @@ export class ObjectSchemaBuilder<
         } = prevalidatedResult;
 
         const propertyDescriptorToErrorMap = new WeakMap<
-            PropertyDescriptor<any, any>,
+            PropertyDescriptor<any, any, any>,
             PropertyValidationError<any, any>
         >() as any;
 
         const { path, doNotStopOnFirstError, rootValidationObject } =
             prevalidationContext;
 
-        const rootPropertyDescriptor: PropertyDescriptor<this, this> =
-            prevalidationContext.rootPropertyDescriptor as any;
+        const rootPropertyDescriptor: PropertyDescriptor<
+            this,
+            this,
+            undefined
+        > = prevalidationContext.rootPropertyDescriptor as any;
 
-        const currentPropertyDescriptor: PropertyDescriptor<this, this> =
-            prevalidationContext.currentPropertyDescriptor as any;
+        const currentPropertyDescriptor: PropertyDescriptor<
+            this,
+            this,
+            unknown
+        > = prevalidationContext.currentPropertyDescriptor as any;
 
         const addErrorFor = (
-            propertyDescriptor: PropertyDescriptor<any, any>,
+            propertyDescriptor: PropertyDescriptor<any, any, any>,
             message: string
         ) => {
             if (
@@ -378,7 +397,7 @@ export class ObjectSchemaBuilder<
 
             if (!validationError) {
                 validationError = new PropertyValidationError(
-                    propertyDescriptor,
+                    propertyDescriptor as any,
                     rootValidationObject
                 );
 
@@ -394,9 +413,9 @@ export class ObjectSchemaBuilder<
         const getErrorsFor = (<TPropertySchema extends SchemaBuilder<any, any>>(
             selector?: (
                 properties: PropertyDescriptorTree<this>
-            ) => PropertyDescriptor<this, TPropertySchema>
+            ) => PropertyDescriptor<this, TPropertySchema, any>
         ): PropertyValidationError<this, any> => {
-            const descriptor: PropertyDescriptor<this, any> =
+            const descriptor: PropertyDescriptor<this, any, any> =
                 typeof selector === 'function'
                     ? selector(currentPropertyDescriptor as any)
                     : currentPropertyDescriptor;
@@ -413,7 +432,7 @@ export class ObjectSchemaBuilder<
                 propertyDescriptorToErrorMap.set(
                     descriptor,
                     new PropertyValidationError(
-                        descriptor,
+                        descriptor as any,
                         rootValidationObject
                     )
                 );
@@ -1345,7 +1364,7 @@ export class ObjectSchemaBuilder<
     }
 
     public static isValidPropertyDescriptor(
-        descriptor: PropertyDescriptor<any, any>
+        descriptor: PropertyDescriptor<any, any, any>
     ) {
         return (
             typeof descriptor === 'object' &&
@@ -1399,7 +1418,7 @@ export interface Object {
      * @param descriptor a property descriptor to check
      */
     isValidPropertyDescriptor(
-        descriptor: PropertyDescriptor<any, any>
+        descriptor: PropertyDescriptor<any, any, any>
     ): boolean;
 }
 

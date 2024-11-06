@@ -26,15 +26,25 @@ export type ValidationError = { path: string; message: string };
  * objects/properties. Contains a list of errors and
  * the value that caused them.
  */
-export type NestedValidationError<T = any> = {
+export type NestedValidationError<
+    TSchema,
+    TRootSchema extends ObjectSchemaBuilder<any, any>,
+    TParentPropertyDescriptor
+> = {
     /**
      * Value that property had and which caused error or errors
      */
-    seenValue?: T;
+    seenValue?: InferType<TSchema>;
     /**
      * A list of errors, empty if object satisfies a schema
      */
     errors: ReadonlyArray<string>;
+
+    get descriptor(): PropertyDescriptorInner<
+        TRootSchema,
+        TSchema,
+        TParentPropertyDescriptor
+    >;
 };
 
 export type MakeOptional<T> = { prop?: T }['prop'];
@@ -73,7 +83,7 @@ export type PreValidationResult<T, TTransactionType> = Omit<
 > & {
     context: ValidationContext;
     transaction?: Transaction<TTransactionType>;
-    rootPropertyDescriptor?: PropertyDescriptor<any, any>;
+    rootPropertyDescriptor?: PropertyDescriptor<any, any, undefined>;
 };
 
 type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
@@ -114,7 +124,7 @@ export type ValidationContext<
      * should not be used directly (but who knows, maybe you will find a use case for it).
      */
     rootPropertyDescriptor?: TSchema extends ObjectSchemaBuilder<any, any, any>
-        ? PropertyDescriptor<TSchema, TSchema>
+        ? PropertyDescriptor<TSchema, TSchema, undefined>
         : never;
 
     /**
@@ -129,7 +139,7 @@ export type ValidationContext<
         any,
         any
     >
-        ? PropertyDescriptor<TSchema, TSchema>
+        ? PropertyDescriptor<TSchema, TSchema, unknown>
         : never;
 
     /**
@@ -221,68 +231,101 @@ export type PropertySetterOptions = {
     createMissingStructure?: boolean;
 };
 
-export type PropertyDescriptor<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertySchema
-> = {
-    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
-        /**
-         * Sets a new value to the property. If the process was successful,
-         * the method returns `true`, otherwise `false`.
-         * It can return `false` if the property could not be set to the object
-         * which can happen if the `setValue` method is called with an object
-         * which does not comply with the schema.
-         * for example, if you have a schema and property descriptopr like this:
-         * ```ts
-         * const schema = object({
-         *  name: string(),
-         *  address: object({
-         *   city: string(),
-         *   country: string()
-         *  }),
-         *  id: number()
-         * });
-         *
-         * const addressCityDescriptor = object.getPropertiesFor(schema).address.city;
-         * ```
-         * And then you try to set a new value to the `address.city` property on the object
-         * which does not have `address` property:
-         * ```ts
-         * const obj = {
-         * name: 'Leo'
-         * };
-         *
-         * const success = addressCityDescriptor.setValue(obj, 'Venyov');
-         * // success === false
-         * ```
-         *
-         * @param obj Object to set the value to
-         * @param value a new value to set to the property
-         * @param options additional optional parameters to control the process
-         * @returns
-         */
-        setValue: (
-            obj: InferType<TSchema>,
-            value: InferType<TPropertySchema>,
-            options?: PropertySetterOptions
-        ) => boolean;
-        /**
-         * Gets the value of the property from the object.
-         * @param obj object to get the value from
-         * @returns an object containing a `value` and `success` properties. `value` is the value of the property
-         * if it was found in the object, `success` is a boolean value indicating if the property was found in the object.
-         */
-        getValue: (obj: InferType<TSchema>) => {
-            value?: InferType<TPropertySchema>;
-            success: boolean;
-        };
+export type PropertyDescriptorInnerFromPropertyDescriptor<T> =
+    T extends PropertyDescriptor<
+        infer TSchema,
+        infer TPropertySchema,
+        infer TParentPropertyDescriptor
+    >
+        ? PropertyDescriptorInner<
+              TSchema,
+              TPropertySchema,
+              TParentPropertyDescriptor
+          >
+        : undefined;
 
-        /**
-         * Gets the schema for the property described by the property descriptor.
-         * @returns a schema for the property
-         */
-        getSchema: () => TPropertySchema;
+export type PropertyDescriptorInner<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TPropertySchema,
+    TParentPropertyDescriptor
+> = {
+    /**
+     * Sets a new value to the property. If the process was successful,
+     * the method returns `true`, otherwise `false`.
+     * It can return `false` if the property could not be set to the object
+     * which can happen if the `setValue` method is called with an object
+     * which does not comply with the schema.
+     * for example, if you have a schema and property descriptopr like this:
+     * ```ts
+     * const schema = object({
+     *  name: string(),
+     *  address: object({
+     *   city: string(),
+     *   country: string()
+     *  }),
+     *  id: number()
+     * });
+     *
+     * const addressCityDescriptor = object.getPropertiesFor(schema).address.city;
+     * ```
+     * And then you try to set a new value to the `address.city` property on the object
+     * which does not have `address` property:
+     * ```ts
+     * const obj = {
+     * name: 'Leo'
+     * };
+     *
+     * const success = addressCityDescriptor.setValue(obj, 'Venyov');
+     * // success === false
+     * ```
+     *
+     * @param obj Object to set the value to
+     * @param value a new value to set to the property
+     * @param options additional optional parameters to control the process
+     * @returns
+     */
+    setValue: (
+        obj: InferType<TSchema>,
+        value: InferType<TPropertySchema>,
+        options?: PropertySetterOptions
+    ) => boolean;
+    /**
+     * Gets the value of the property from the object.
+     * @param obj object to get the value from
+     * @returns an object containing a `value` and `success` properties. `value` is the value of the property
+     * if it was found in the object, `success` is a boolean value indicating if the property was found in the object.
+     */
+    getValue: (obj: InferType<TSchema>) => {
+        value?: InferType<TPropertySchema>;
+        success: boolean;
     };
+
+    /**
+     * Gets the schema for the property described by the property descriptor.
+     * @returns a schema for the property
+     */
+    getSchema: () => TPropertySchema;
+
+    parent: PropertyDescriptorInnerFromPropertyDescriptor<TParentPropertyDescriptor>;
+    // extends PropertyDescriptor<
+    //     any,
+    //     any,
+    //     any
+    // >
+    //     ? TParentPropertyDescriptor
+    //     : never;
+};
+
+export type PropertyDescriptor<
+    TRootSchema extends ObjectSchemaBuilder<any, any, any>,
+    TPropertySchema,
+    TParentPropertyDescriptor
+> = {
+    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: PropertyDescriptorInner<
+        TRootSchema,
+        TPropertySchema,
+        TParentPropertyDescriptor
+    >;
 };
 
 /**
@@ -292,8 +335,9 @@ export type PropertyDescriptor<
 export type PropertyDescriptorTree<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
     TRootSchema extends ObjectSchemaBuilder<any, any, any> = TSchema,
-    TAssignableTo = any
-> = PropertyDescriptor<TRootSchema, TSchema> &
+    TAssignableTo = any,
+    TParentPropertyDescriptor = undefined
+> = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> &
     (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
         ? {
               [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
@@ -301,9 +345,26 @@ export type PropertyDescriptorTree<
                   any,
                   any
               >
-                  ? PropertyDescriptorTree<TProperties[K], TRootSchema>
+                  ? PropertyDescriptorTree<
+                        TProperties[K],
+                        TRootSchema,
+                        any,
+                        PropertyDescriptor<
+                            TRootSchema,
+                            TSchema,
+                            TParentPropertyDescriptor
+                        >
+                    >
                   : InferType<TProperties[K]> extends TAssignableTo
-                    ? PropertyDescriptor<TRootSchema, TProperties[K]>
+                    ? PropertyDescriptor<
+                          TRootSchema,
+                          TProperties[K],
+                          PropertyDescriptor<
+                              TRootSchema,
+                              TSchema,
+                              TParentPropertyDescriptor
+                          >
+                      >
                     : never;
           }
         : never);
