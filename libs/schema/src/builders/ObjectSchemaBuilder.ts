@@ -3,6 +3,7 @@ import {
     NestedValidationError,
     PreValidationResult,
     PropertyDescriptor,
+    PropertyDescriptorInner,
     PropertyDescriptorTree,
     PropertySetterOptions,
     SchemaBuilder,
@@ -1273,7 +1274,8 @@ export class ObjectSchemaBuilder<
         selector?: (arg1: any, any) => any,
         // parent object to have a possibility to get link to itself
         parentSelector?: any,
-        currentName?: string
+        currentName?: string,
+        parentDescriptor?: PropertyDescriptorInner<any, any, any>
     ): PropertyDescriptorTree<TSchema> {
         const introspected = schema.introspect();
         if (!introspected.properties) {
@@ -1289,16 +1291,13 @@ export class ObjectSchemaBuilder<
         if (typeof selector !== 'function') {
             selector = (o) => o;
         }
-        const result =
-            // typeof selector !== 'function' || !parentSelector || !currentName
-            //     ? {}
-            //     :
-            createPropertyDescriptorFor(
-                (obj, createMissingStructure) =>
-                    (parentSelector || selector)(obj, createMissingStructure),
-                currentName,
-                schema
-            );
+        const result = createPropertyDescriptorFor(
+            (obj, createMissingStructure) =>
+                (parentSelector || selector)(obj, createMissingStructure),
+            currentName,
+            schema,
+            parentDescriptor
+        );
 
         for (const propName of propsNames) {
             const propSchema = introspected.properties[propName];
@@ -1324,12 +1323,15 @@ export class ObjectSchemaBuilder<
                         return null;
                     },
                     selector,
-                    propName
+                    propName,
+                    result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
                 );
             } else {
                 result[propName] = createPropertyDescriptorFor(
                     selector,
-                    propName
+                    propName,
+                    propSchema,
+                    result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
                 );
             }
         }
@@ -1437,7 +1439,8 @@ type PropertyDescriptorMap = Map<
 const createPropertyDescriptorFor = (
     selector: (any, boolean) => any,
     propertyName?: string,
-    schema?: SchemaBuilder<any, any>
+    schema?: SchemaBuilder<any, any>,
+    parent?: PropertyDescriptorInner<any, any, any>
 ) => ({
     [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
         setValue: (obj, newValue, options?: PropertySetterOptions) => {
@@ -1479,7 +1482,8 @@ const createPropertyDescriptorFor = (
             };
         },
 
-        getSchema: () => schema
+        getSchema: () => schema,
+        parent
     }
 });
 

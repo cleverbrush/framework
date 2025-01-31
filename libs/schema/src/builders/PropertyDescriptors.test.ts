@@ -489,3 +489,33 @@ test('Schema modification changes property descriptor', async () => {
         (initialDescriptorForLevel2 as any) === modifiedDescriptorForLevel2
     ).toEqual(false);
 });
+
+test('Parent property descriptor is accessible', async () => {
+    const Schema = object({
+        prop1: string(),
+        level2: object({
+            level3: object({
+                level4: number()
+            })
+        })
+    });
+
+    const descriptor =
+        object.getPropertiesFor(Schema).level2.level3.level4[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ].parent;
+
+    expect(descriptor).toBeDefined();
+    expect(descriptor.parent).toBeDefined();
+    expect(descriptor.parent.parent).toBeDefined();
+    expect(descriptor.parent.parent.parent).not.toBeDefined();
+
+    expect(
+        (descriptor.parent as any) ===
+            object.getPropertiesFor(Schema).level2.level3
+    ).toEqual(true);
+    expect(
+        (descriptor.parent.parent as any) ===
+            object.getPropertiesFor(Schema).level2
+    ).toEqual(true);
+});
