@@ -1269,11 +1269,11 @@ export class ObjectSchemaBuilder<
         > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
     >(
         schema: TSchema,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        // this is to make possibility to traverse the tree and select properties
+        /* this is to make possibility to traverse the tree and select properties */
         selector?: (arg1: any, any) => any,
-        // parent object to have a possibility to get link to itself
+        /* parent object to have a possibility to get link to itself */
         parentSelector?: any,
+        /* used to pass the needed property name if `parentSelector` is provided. */
         currentName?: string,
         parentDescriptor?: PropertyDescriptorInner<any, any, any>
     ): PropertyDescriptorTree<TSchema> {

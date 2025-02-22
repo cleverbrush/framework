@@ -5,6 +5,7 @@ import {
     InferType,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from './SchemaBuilder.js';
+import { I } from 'vitest/dist/chunks/reporters.C_zwCd4j.js';
 
 test('Throws with not ObjectSchemaBuilder instance', async () => {
     expect(() => (object as any).getPropertiesFor()).toThrowError();
@@ -500,22 +501,97 @@ test('Parent property descriptor is accessible', async () => {
         })
     });
 
+    // level3 descriptor
     const descriptor =
         object.getPropertiesFor(Schema).level2.level3.level4[
             SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
         ].parent;
 
+    // self check
     expect(descriptor).toBeDefined();
+
+    // level2 check
     expect(descriptor.parent).toBeDefined();
+
+    // top level check
     expect(descriptor.parent.parent).toBeDefined();
+
+    // can't go further
     expect(descriptor.parent.parent.parent).not.toBeDefined();
 
+    const pd = object.getPropertiesFor(Schema).level2;
+
+    // descriptor parent  (level2) must be equal to pd
     expect(
-        (descriptor.parent as any) ===
-            object.getPropertiesFor(Schema).level2.level3
+        (descriptor.parent as any) === pd[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
     ).toEqual(true);
+
+    // level2 parent (Schema) must be equal to pd
     expect(
         (descriptor.parent.parent as any) ===
-            object.getPropertiesFor(Schema).level2
+            object.getPropertiesFor(Schema)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
     ).toEqual(true);
+});
+
+test('Nested descriptors must be different in different schemas', async () => {
+    const UserSchema = object({
+        firstName: string(),
+        lastName: string(),
+        address: object({
+            street: string(),
+            city: string(),
+            zip: number()
+        })
+    });
+
+    const TaskSchema = object({
+        assignee: UserSchema,
+        title: string(),
+        description: string()
+    });
+
+    const InvoiceSchema = object({
+        responsible: UserSchema,
+        title: string(),
+        amount: number()
+    });
+
+    const invoiceUserFirstNameDescriptor =
+        object.getPropertiesFor(InvoiceSchema).responsible.firstName;
+
+    const taskUserFirstNameDescriptor =
+        object.getPropertiesFor(TaskSchema).assignee.firstName;
+
+    expect(
+        (invoiceUserFirstNameDescriptor as any) === taskUserFirstNameDescriptor
+    ).toEqual(false);
+
+    expect(
+        (invoiceUserFirstNameDescriptor[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ] as any) ===
+            taskUserFirstNameDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+    ).toEqual(false);
+
+    const invoice: InferType<typeof InvoiceSchema> = {
+        responsible: {
+            firstName: 'John',
+            lastName: 'Doe',
+            address: {
+                street: 'Some street',
+                city: 'Some city',
+                zip: 12345
+            }
+        },
+        amount: 10,
+        title: 'Some title'
+    };
+
+    const firstName =
+        invoiceUserFirstNameDescriptor[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ].getValue(invoice);
+
+    expect(firstName.success).toEqual(true);
+    expect(firstName.value).toEqual('John');
 });
