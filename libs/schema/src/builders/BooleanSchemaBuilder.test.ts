@@ -1,4 +1,5 @@
 import { test, expect, expectTypeOf } from 'vitest';
+
 import { InferType } from './SchemaBuilder.js';
 import { boolean } from './BooleanSchemaBuilder.js';
 
