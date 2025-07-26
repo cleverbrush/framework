@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { transaction } from './transaction.js';
 
 test('The same obj shape returned initially', () => {

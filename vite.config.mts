@@ -3,20 +3,22 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
     test: {
+        // Use simple glob pattern for auto-discovery
+        projects: ['libs/*'],
         include: [
-            'libs/**/*/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
+            'libs/**/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
         ],
         coverage: {
-            include: ['libs/**/*/src/**/*.{js,mjs,cjs,ts,mts,cts}'],
+            // Updated for v3: Define include patterns first
+            include: ['libs/**/src/**/*.{js,mjs,cjs,ts,mts,cts}'],
             exclude: [
                 '**/node_modules/**',
                 '**/dist/**',
-                '**/*/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
-                'libs/**/*/src/index.ts',
-                'libs/**/*/src/types.ts'
+                '**/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+                'libs/**/src/index.ts',
+                'libs/**/src/types.ts'
             ]
         },
-        globals: true,
         mockReset: true,
         environment: 'node'
     }

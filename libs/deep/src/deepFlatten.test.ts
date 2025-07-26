@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { deepFlatten } from './deepFlatten.js';
 
 test('deepFlatten - 1', () => {

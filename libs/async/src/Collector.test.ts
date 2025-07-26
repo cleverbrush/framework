@@ -1,3 +1,5 @@
+import { test, expect, vi } from 'vitest';
+
 import Collector from './Collector.js';
 
 test('Collector - 1', async () => {

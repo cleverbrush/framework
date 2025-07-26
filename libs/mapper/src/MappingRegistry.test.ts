@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 //import { object, string, number } from '@cleverbrush/schema';
 
 import { MappingRegistry } from './MappingRegistry.js';

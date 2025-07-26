@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { throttle } from './throttle.js';
 
 test('throttle - 1', async () => {

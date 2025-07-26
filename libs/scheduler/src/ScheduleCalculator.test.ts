@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { ScheduleCalculator } from './ScheduleCalculator.js';
 
 test('day - 1', () => {

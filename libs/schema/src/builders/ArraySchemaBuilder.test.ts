@@ -1,3 +1,5 @@
+import { test, expect, expectTypeOf } from 'vitest';
+
 import { array } from './ArraySchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';

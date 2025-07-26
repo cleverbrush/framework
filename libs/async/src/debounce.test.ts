@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { debounce } from './debounce.js';
 
 test('debounce - 1', async () => {

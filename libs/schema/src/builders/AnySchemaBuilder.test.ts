@@ -1,3 +1,5 @@
+import { test, expect, expectTypeOf } from 'vitest';
+
 import { any } from './AnySchemaBuilder.js';
 import { InferType } from './SchemaBuilder.js';
 

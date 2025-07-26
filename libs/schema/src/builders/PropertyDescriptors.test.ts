@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { object } from './ObjectSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
@@ -5,7 +7,6 @@ import {
     InferType,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from './SchemaBuilder.js';
-import { I } from 'vitest/dist/chunks/reporters.C_zwCd4j.js';
 
 test('Throws with not ObjectSchemaBuilder instance', async () => {
     expect(() => (object as any).getPropertiesFor()).toThrowError();

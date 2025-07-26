@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { deepEqual } from './deepEqual.js';
 
 test('deepEqual - 1', () => {

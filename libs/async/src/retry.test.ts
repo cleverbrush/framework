@@ -1,3 +1,5 @@
+import { test, expect } from 'vitest';
+
 import { retry } from './retry.js';
 
 test('retry - 1', async () => {
