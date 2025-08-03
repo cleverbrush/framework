@@ -2587,7 +2587,7 @@ test('getErrorsFor - self', async () => {
     expect(rootErrors.errors[0]).toEqual('must be an object');
 });
 
-test('getErrorsFor - nested', async () => {
+test('getErrorsFor - nested 1', async () => {
     const schema = object({
         first: string(),
         last: string(),
@@ -2598,10 +2598,7 @@ test('getErrorsFor - nested', async () => {
              * some comment here
              */
             nested2: string(),
-            nested3: number(),
-            nested4: object({
-                nested5: string()
-            }).optional()
+            nested3: number()
         })
     });
 
@@ -2616,15 +2613,22 @@ test('getErrorsFor - nested', async () => {
         }
     };
 
-    const { getErrorsFor } = await schema.validate(obj as any);
+    const { getErrorsFor, valid } = await schema.validate(obj as any);
     const rootErrors = getErrorsFor((t) => t);
     expect(rootErrors).toBeDefined();
     expect(rootErrors.errors).toBeDefined();
     expect(rootErrors.errors.length).toEqual(0);
 
     const nestedErrors = getErrorsFor((t) => t.nested);
+    expect(nestedErrors.isValid).toEqual(false);
     expect(nestedErrors.errors).toBeDefined();
     expect(nestedErrors.errors.length).toEqual(0);
+    const childErrors = nestedErrors.getChildErrors();
+    expect(childErrors.length).toEqual(1);
+    expect(childErrors[0].errors.length).toEqual(1);
+    expect(childErrors[0].errors[0]).toEqual(
+        'expected type number, but saw string'
+    );
 
     const nested3Errors = getErrorsFor((t) => t.nested.nested3);
     expect(nested3Errors.errors).toBeDefined();
@@ -2632,6 +2636,7 @@ test('getErrorsFor - nested', async () => {
     expect(nested3Errors.errors[0]).toEqual(
         'expected type number, but saw string'
     );
+    expect(valid).toEqual(false);
 
     // const nested4Errors = getErrorsFor((t) => t.nested.nested4.nested5)
     //     .descriptor.parent.parent.parent.getSchema()
@@ -2656,3 +2661,23 @@ test('getErrorsFor - nested', async () => {
     //         SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
     //     ].parent.parent.parent.getSchema().introspect().properties
 });
+
+// test('getErrorsFor - nested 2', async () => {
+//     const schema = object({
+//         first: string(),
+//         last: string(),
+//         age: number(),
+//         nested: object({
+//             nested1: string(),
+//             /**
+//              * some comment here
+//              */
+//             nested2: string(),
+//             nested3: number()
+//         })
+//     });
+
+//     const obj: InferType<typeof schema> = {
+//         first: 123,
+//     };
+// });

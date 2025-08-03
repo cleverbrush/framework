@@ -381,7 +381,8 @@ export class ObjectSchemaBuilder<
 
         const addErrorFor = (
             propertyDescriptor: PropertyDescriptor<any, any, any>,
-            message: string
+            message: string,
+            parentPropertyDescriptor?: PropertyDescriptor<any, any, any>
         ) => {
             if (
                 !ObjectSchemaBuilder.isValidPropertyDescriptor(
@@ -409,6 +410,33 @@ export class ObjectSchemaBuilder<
             }
 
             validationError.addError(message);
+
+            if (
+                parentPropertyDescriptor &&
+                ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    parentPropertyDescriptor
+                )
+            ) {
+                let parentValidationError: PropertyValidationError<this, any> =
+                    propertyDescriptorToErrorMap.has(parentPropertyDescriptor)
+                        ? propertyDescriptorToErrorMap.get(
+                              parentPropertyDescriptor
+                          )
+                        : (null as any);
+
+                if (!parentValidationError) {
+                    parentValidationError = new PropertyValidationError(
+                        parentPropertyDescriptor as any,
+                        rootValidationObject
+                    );
+                    propertyDescriptorToErrorMap.set(
+                        parentPropertyDescriptor,
+                        parentValidationError
+                    );
+                }
+
+                parentValidationError.addChildError(validationError);
+            }
         };
 
         const getErrorsFor = (<TPropertySchema extends SchemaBuilder<any, any>>(
@@ -583,16 +611,26 @@ export class ObjectSchemaBuilder<
                 typeof (result as any).getErrorsFor === 'function' &&
                 ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
             ) {
-                // const seenValue =
-                //     currentPropertyDescriptor[key][
-                //         SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-                //     ].getValue(rootValidationObject);
-                // console.log(seenValue);
-                // console.log(
-                //     'errors',
-                //     (result as any).getErrorsFor(currentPropertyDescriptor[key])
-                //         .errors
-                // );
+                for (let nestedPropertyName in (
+                    ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(
+                        descriptor
+                    ).introspect() as any
+                ).properties) {
+                    const nestedPropertyDescriptor =
+                        descriptor[nestedPropertyName];
+                    const nestedValidationError = (result as any).getErrorsFor(
+                        () => nestedPropertyDescriptor
+                    );
+                    if (!nestedValidationError.isValid) {
+                        for (const validationError of nestedValidationError.errors) {
+                            addErrorFor(
+                                nestedPropertyDescriptor,
+                                validationError,
+                                descriptor
+                            );
+                        }
+                    }
+                }
             } else if (Array.isArray(result.errors)) {
                 result.errors.forEach((error) => {
                     addErrorFor(descriptor, error.message);
@@ -1373,6 +1411,16 @@ export class ObjectSchemaBuilder<
             descriptor !== null &&
             typeof descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] === 'object'
         );
+    }
+
+    static #getSchemaForPropertyDescriptor(
+        descriptor: PropertyDescriptor<any, any, any>
+    ): SchemaBuilder<any, any> {
+        if (!ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)) {
+            throw new Error('descriptor is not a valid property descriptor');
+        }
+
+        return descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].getSchema();
     }
 }
 

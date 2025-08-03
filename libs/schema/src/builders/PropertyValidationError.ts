@@ -31,6 +31,7 @@ export class PropertyValidationError<
     >;
     #rootObjectValue: InferType<TRootSchema> | undefined;
     #errors: string[] = [];
+    #childErrors: NestedValidationError<any, any, any>[] = [];
 
     public get seenValue(): InferType<TSchema> | undefined {
         const result = this.#descriptor[
@@ -45,11 +46,13 @@ export class PropertyValidationError<
     }
 
     public get isValid(): boolean {
-        return this.#errors.length === 0;
+        return this.#errors.length === 0 && this.getChildErrors().length === 0;
     }
 
-    public getChildErrors(): NestedValidationError<any, any, any>[] {
-        return [];
+    public getChildErrors(): ReadonlyArray<
+        NestedValidationError<any, any, any>
+    > {
+        return this.#childErrors;
     }
 
     public get descriptor(): PropertyDescriptorInner<
@@ -80,5 +83,9 @@ export class PropertyValidationError<
 
     addError(error: string): void {
         this.#errors.push(error);
+    }
+
+    addChildError(childError: NestedValidationError<any, any, any>): void {
+        this.#childErrors.push(childError);
     }
 }

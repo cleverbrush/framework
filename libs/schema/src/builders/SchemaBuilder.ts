@@ -460,7 +460,9 @@ export abstract class SchemaBuilder<
 
         const resultingContext: ValidationContext = {
             path,
-            doNotStopOnFirstError
+            doNotStopOnFirstError,
+            rootPropertyDescriptor: context?.rootPropertyDescriptor,
+            currentPropertyDescriptor: context?.currentPropertyDescriptor
         };
 
         let preprocessingTransaction = transaction({
