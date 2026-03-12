@@ -217,8 +217,10 @@ export class UnionSchemaBuilder<
                 object: validatedOption
             } = await this.#options[i].validate(objToValidate, {
                 ...prevalidationContext,
-                path: `${path}[option ${i}]`
-            });
+                path: `${path}[option ${i}]`,
+                currentPropertyDescriptor: undefined,
+                rootPropertyDescriptor: undefined
+            } as any);
             if (valid) {
                 return {
                     valid: true,
