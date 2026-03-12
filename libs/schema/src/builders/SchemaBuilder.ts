@@ -390,13 +390,13 @@ export abstract class SchemaBuilder<
      * can't call method like `schema.hasType<Date>()`, so instead you can call `schema.hasType(new Date())`
      * with the same result.
      */
-    public abstract hasType<T>(notUsed?: T);
+    public abstract hasType<T>(notUsed?: T): any;
 
     /**
      * Clears type set by call to `.hasType<T>()`, default schema type inference will be used
      * for schema retuned by this call.
      */
-    public abstract clearHasType();
+    public abstract clearHasType(): any;
 
     /**
      * Protected method used to create an new instance of the Builder
@@ -404,7 +404,7 @@ export abstract class SchemaBuilder<
      * builders to keep builder's immutability.
      * @param props arbitrary props object
      */
-    protected abstract createFromProps(props): this;
+    protected abstract createFromProps(props: any): this;
 
     protected get type() {
         return this.#type;
@@ -707,7 +707,7 @@ export abstract class SchemaBuilder<
     ): Promise<ValidationResult<any>>;
 
     protected async getValidationErrorMessage(
-        provider: ValidationErrorMessageProvider,
+        provider: ValidationErrorMessageProvider<any>,
         seenValue: TResult
     ): Promise<string> {
         if (typeof provider === 'string') {
@@ -724,8 +724,8 @@ export abstract class SchemaBuilder<
     }
 
     protected assureValidationErrorMessageProvider(
-        provider: ValidationErrorMessageProvider | undefined,
-        defaultValue: ValidationErrorMessageProvider
+        provider: ValidationErrorMessageProvider<any> | undefined,
+        defaultValue: ValidationErrorMessageProvider<any>
     ): ValidationErrorMessageProvider<any> {
         if (typeof provider === 'string') {
             return provider;

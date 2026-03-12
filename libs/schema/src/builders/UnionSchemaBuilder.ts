@@ -14,11 +14,11 @@ type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =
     TArr['length'] extends 1
         ? InferType<TArr[0]>
         : TArr extends readonly [
-              infer TFirst extends SchemaBuilder<any, any>,
-              ...infer TRest extends SchemaBuilder<any, any>[]
-          ]
-        ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]>
-        : never;
+                infer TFirst extends SchemaBuilder<any, any>,
+                ...infer TRest extends SchemaBuilder<any, any>[]
+            ]
+          ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]>
+          : never;
 
 type TakeBeforeIndex<
     TArr extends readonly SchemaBuilder<any, any>[],
@@ -111,7 +111,7 @@ export class UnionSchemaBuilder<
         : TExplicitType,
     TRequired
 > {
-    #options: TOptions;
+    #options!: TOptions;
 
     public static create(props: UnionSchemaBuilderCreateProps<any>) {
         return new UnionSchemaBuilder({

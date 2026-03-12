@@ -12,7 +12,7 @@ type DateSchemaBuilderCreateProps<T = Date, R extends boolean = true> = Partial<
     ReturnType<DateSchemaBuilder<T, R>['introspect']>
 >;
 
-const parseFromJsonPreprocessor = (value) => {
+const parseFromJsonPreprocessor = (value: any) => {
     if (typeof value === 'undefined') return value;
     if (typeof value === 'string') {
         const time = Date.parse(value);
@@ -22,7 +22,7 @@ const parseFromJsonPreprocessor = (value) => {
     return value;
 };
 
-const parseFromEpochPreprocessor = (value) => {
+const parseFromEpochPreprocessor = (value: any) => {
     if (typeof value === 'undefined') return value;
     if (typeof value === 'number') {
         const time = new Date(value);

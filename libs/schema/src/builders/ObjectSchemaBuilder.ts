@@ -549,8 +549,9 @@ export class ObjectSchemaBuilder<
                         ...context,
                         path: `${path}.${key}`,
                         rootPropertyDescriptor: rootPropertyDescriptor as any,
-                        currentPropertyDescriptor:
-                            currentPropertyDescriptor[key]
+                        currentPropertyDescriptor: (
+                            currentPropertyDescriptor as any
+                        )[key]
                     }
                 )
             }))
@@ -570,7 +571,7 @@ export class ObjectSchemaBuilder<
             ...errors,
             ...notValidResults.reduce(
                 (acc, val) => [...acc, ...(val?.result?.errors || [])],
-                []
+                [] as any[]
             )
         ];
 
@@ -606,7 +607,7 @@ export class ObjectSchemaBuilder<
         }
 
         notValidResults.forEach(({ key, result }) => {
-            const descriptor = currentPropertyDescriptor[key];
+            const descriptor = (currentPropertyDescriptor as any)[key];
             if (
                 typeof (result as any).getErrorsFor === 'function' &&
                 ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
@@ -663,7 +664,7 @@ export class ObjectSchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             acceptUnknownProps: true
-        } as ObjectSchemaBuilderProps<TProperties, TRequired>) as any;
+        } as any) as any;
     }
 
     /**
@@ -678,7 +679,7 @@ export class ObjectSchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             acceptUnknownProps: false
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
@@ -690,7 +691,7 @@ export class ObjectSchemaBuilder<
     ): ObjectSchemaBuilder<TProperties, TRequired, T> {
         return this.createFromProps({
             ...this.introspect()
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
@@ -699,7 +700,7 @@ export class ObjectSchemaBuilder<
     public clearHasType(): ObjectSchemaBuilder<TProperties, TRequired> {
         return this.createFromProps({
             ...this.introspect()
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
@@ -793,7 +794,7 @@ export class ObjectSchemaBuilder<
           >
         : never;
 
-    public addProps(props) {
+    public addProps(props: any) {
         if (props instanceof ObjectSchemaBuilder) {
             return this.addProps(props.introspect().properties);
         }
@@ -822,7 +823,7 @@ export class ObjectSchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             properties: newProps
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
@@ -866,7 +867,7 @@ export class ObjectSchemaBuilder<
           >
         : never;
 
-    public omit(propNameOrArrayOrPropsOrBuilder): any {
+    public omit(propNameOrArrayOrPropsOrBuilder: any): any {
         if (typeof propNameOrArrayOrPropsOrBuilder === 'string') {
             // remove one field
             const propName =
@@ -975,10 +976,12 @@ export class ObjectSchemaBuilder<
         const newProps = Object.keys(localProps.properties).reduce(
             (acc, curr) => {
                 acc[curr] =
-                    curr in remoteProps ? remoteProps[curr] : localProps[curr];
+                    curr in remoteProps
+                        ? remoteProps[curr]
+                        : localProps.properties[curr];
                 return acc;
             },
-            {}
+            {} as Record<string, any>
         );
 
         return this.createFromProps({
@@ -1021,18 +1024,21 @@ export class ObjectSchemaBuilder<
         TExplicitType
     >;
 
-    public partial(propNameOrArray?): any {
+    public partial(propNameOrArray?: any): any {
         if (
             typeof propNameOrArray === 'undefined' ||
             propNameOrArray === null
         ) {
             return this.createFromProps({
                 ...this.introspect(),
-                properties: Object.keys(this.#properties).reduce((acc, key) => {
-                    acc[key] = this.#properties[key].optional();
-                    return acc;
-                }, {})
-            } as ObjectSchemaBuilderProps);
+                properties: Object.keys(this.#properties).reduce(
+                    (acc, key) => {
+                        acc[key] = this.#properties[key].optional();
+                        return acc;
+                    },
+                    {} as Record<string, any>
+                )
+            } as any);
         }
 
         if (Array.isArray(propNameOrArray)) {
@@ -1043,7 +1049,7 @@ export class ObjectSchemaBuilder<
 
             const newProps = {
                 ...this.introspect()
-            } as ObjectSchemaBuilderProps<TProperties, TRequired>;
+            } as any;
 
             propsArray.forEach((key) => {
                 if (typeof key !== 'string') {
@@ -1114,7 +1120,7 @@ export class ObjectSchemaBuilder<
         property: K
     ): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, undefined>;
 
-    public pick(properties): any {
+    public pick(properties: any): any {
         if (typeof properties === 'string') {
             const property = properties as string;
 
@@ -1216,7 +1222,7 @@ export class ObjectSchemaBuilder<
 
         const props = {
             ...this.introspect()
-        } as ObjectSchemaBuilderProps;
+        } as any;
 
         props.properties = {
             ...props.properties,
@@ -1271,10 +1277,13 @@ export class ObjectSchemaBuilder<
     > {
         return this.createFromProps({
             ...this.introspect(),
-            properties: Object.keys(this.#properties).reduce((acc, curr) => {
-                acc[curr] = this.#properties[curr].optional();
-                return acc;
-            }, {})
+            properties: Object.keys(this.#properties).reduce(
+                (acc, curr) => {
+                    acc[curr] = this.#properties[curr].optional();
+                    return acc;
+                },
+                {} as Record<string, any>
+            )
         } as any) as any;
     }
 
@@ -1289,10 +1298,13 @@ export class ObjectSchemaBuilder<
     > {
         return this.createFromProps({
             ...this.introspect(),
-            properties: Object.keys(this.#properties).reduce((acc, curr) => {
-                acc[curr] = this.#properties[curr].required();
-                return acc;
-            }, {})
+            properties: Object.keys(this.#properties).reduce(
+                (acc, curr) => {
+                    acc[curr] = this.#properties[curr].required();
+                    return acc;
+                },
+                {} as Record<string, any>
+            )
         } as any) as any;
     }
 
@@ -1308,7 +1320,7 @@ export class ObjectSchemaBuilder<
     >(
         schema: TSchema,
         /* this is to make possibility to traverse the tree and select properties */
-        selector?: (arg1: any, any) => any,
+        selector?: (arg1: any, arg2: any) => any,
         /* parent object to have a possibility to get link to itself */
         parentSelector?: any,
         /* used to pass the needed property name if `parentSelector` is provided. */
@@ -1340,11 +1352,11 @@ export class ObjectSchemaBuilder<
         for (const propName of propsNames) {
             const propSchema = introspected.properties[propName];
             if (propSchema instanceof ObjectSchemaBuilder) {
-                result[propName] = (
+                (result as any)[propName] = (
                     ObjectSchemaBuilder.#getPropertiesFor as any
                 )(
                     propSchema,
-                    (tree, createMissingStructure) => {
+                    (tree: any, createMissingStructure: any) => {
                         const selectorResult = selector(
                             tree,
                             createMissingStructure
@@ -1365,7 +1377,7 @@ export class ObjectSchemaBuilder<
                     result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
                 );
             } else {
-                result[propName] = createPropertyDescriptorFor(
+                (result as any)[propName] = createPropertyDescriptorFor(
                     selector,
                     propName,
                     propSchema,
@@ -1485,13 +1497,17 @@ type PropertyDescriptorMap = Map<
 >;
 
 const createPropertyDescriptorFor = (
-    selector: (any, boolean) => any,
+    selector: (arg0: any, arg1: boolean) => any,
     propertyName?: string,
     schema?: SchemaBuilder<any, any>,
     parent?: PropertyDescriptorInner<any, any, any>
 ) => ({
     [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
-        setValue: (obj, newValue, options?: PropertySetterOptions) => {
+        setValue: (
+            obj: any,
+            newValue: any,
+            options?: PropertySetterOptions
+        ) => {
             const selectorResult = selector(
                 obj,
                 !!options?.createMissingStructure
@@ -1504,7 +1520,7 @@ const createPropertyDescriptorFor = (
 
             return true;
         },
-        getValue: (obj) => {
+        getValue: (obj: any) => {
             const selectorResult = selector(obj, false);
             if (!selectorResult)
                 return {

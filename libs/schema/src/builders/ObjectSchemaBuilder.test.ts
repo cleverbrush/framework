@@ -2641,3 +2641,12 @@ test('getErrorsFor - nested 1', async () => {
 
     expect(nested4Errors === schema).toEqual(true);
 });
+
+// test('getErrorsFor - union', async () => {
+//     const IntervalSchema = union(string()).or(
+//         object({
+//             from: date(),
+//             to: date()
+//         })
+//     );
+// });
