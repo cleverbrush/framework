@@ -31,11 +31,11 @@
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD 3-Clause",
     "devDependencies": {
-        "@vitest/coverage-v8": "^3.2.4",
-        "@typescript/native-preview": "7.0.0-dev.20250725.3",
+        "@vitest/coverage-v8": "^4.0.18",
+        "@typescript/native-preview": "^7.0.0-dev.20260311.1",
         "eslint-config-airbnb": "^19.0.4",
-        "prettier": "^3.6.2",
-        "typescript-eslint": "^8.38.0",
-        "vitest": "^3.2.4"
+        "prettier": "^3.8.1",
+        "typescript-eslint": "^8.57.0",
+        "vitest": "^4.0.18"
     }
 }
