@@ -2642,11 +2642,25 @@ test('getErrorsFor - nested 1', async () => {
     expect(nested4Errors === schema).toEqual(true);
 });
 
-// test('getErrorsFor - union', async () => {
-//     const IntervalSchema = union(string()).or(
-//         object({
-//             from: date(),
-//             to: date()
-//         })
-//     );
-// });
+test('getErrorsFor - union', async () => {
+    const IntervalSchema = union(string()).or(
+        object({
+            from: date(),
+            to: date()
+        })
+    );
+
+    const wrongInterval: InferType<typeof IntervalSchema> = 123 as any;
+
+    const { getErrorsFor, valid } = await IntervalSchema.validate(
+        wrongInterval as any
+    );
+
+    expect(valid).toEqual(false);
+
+    const rootErrors = getErrorsFor((t) => t);
+    expect(rootErrors).toBeDefined();
+    expect(
+        Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1
+    ).toEqual(true);
+});

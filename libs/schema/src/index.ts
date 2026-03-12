@@ -5,12 +5,15 @@ export { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 export { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
 export {
     ObjectSchemaBuilder,
-    SchemaPropertySelector,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR as SYMBOL_SCHEMA_PROPERTY
+    SchemaPropertySelector
 } from './builders/ObjectSchemaBuilder.js';
 export { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 export { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
 export { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
+export type {
+    UnionSchemaValidationResult,
+    OptionValidationResults
+} from './builders/UnionSchemaBuilder.js';
 export { SchemaBuilder } from './builders/SchemaBuilder.js';
 
 export {

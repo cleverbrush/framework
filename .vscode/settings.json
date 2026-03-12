@@ -1,6 +1,7 @@
 {
     "js/ts.experimental.useTsgo": true,
     "chat.tools.terminal.autoApprove": {
-        "npx vitest": true
+        "npx vitest": true,
+        "npx tsc": true
     }
 }

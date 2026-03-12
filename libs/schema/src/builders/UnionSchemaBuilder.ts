@@ -2,13 +2,65 @@ import {
     SchemaBuilder,
     ValidationResult,
     ValidationContext,
-    InferType
+    InferType,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    NestedValidationError,
+    PropertyDescriptor
 } from './SchemaBuilder.js';
+
+import {
+    ObjectSchemaBuilder,
+    ObjectSchemaValidationResult
+} from './ObjectSchemaBuilder.js';
 
 type UnionSchemaBuilderCreateProps<
     T extends readonly SchemaBuilder<any, any>[],
     R extends boolean = true
 > = Partial<ReturnType<UnionSchemaBuilder<T, R>['introspect']>>;
+
+/**
+ * Mapped tuple type that converts a tuple of SchemaBuilder options into
+ * a tuple of their corresponding validation results.
+ * Union schema options get `UnionSchemaValidationResult` with recursive
+ * `getErrorsFor` navigation; object schema options get
+ * `ObjectSchemaValidationResult`; other types get `ValidationResult`.
+ */
+export type OptionValidationResults<
+    TOptions extends readonly SchemaBuilder<any, any>[]
+> = {
+    [K in keyof TOptions]: TOptions[K] extends UnionSchemaBuilder<
+        infer UOptions extends readonly SchemaBuilder<any, any>[],
+        any,
+        any
+    >
+        ? UnionSchemaValidationResult<InferType<TOptions[K]>, UOptions>
+        : TOptions[K] extends ObjectSchemaBuilder<any, any, any>
+          ? ObjectSchemaValidationResult<InferType<TOptions[K]>, TOptions[K]>
+          : ValidationResult<InferType<TOptions[K]>>;
+};
+
+/**
+ * Validation result type returned by `UnionSchemaBuilder.validate()`.
+ * Extends `ValidationResult` with:
+ * - `getErrorsFor` for root-level union errors
+ * - `getErrorsFor` returning root-level errors and per-branch validation results
+ */
+export type UnionSchemaValidationResult<
+    T,
+    TOptions extends readonly SchemaBuilder<any, any>[]
+> = ValidationResult<T> & {
+    /**
+     * Returns root-level union validation errors combined with
+     * per-branch validation results.
+     * The returned value has both `NestedValidationError` properties
+     * (`errors`, `isValid`, `descriptor`, `seenValue`) and tuple-indexed
+     * branch results (`[0]`, `[1]`, etc.).
+     * @param selector optional identity selector (ignored)
+     */
+    getErrorsFor(
+        selector?: (t: any) => any
+    ): OptionValidationResults<TOptions> & NestedValidationError<any, any, any>;
+};
 
 type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =
     TArr['length'] extends 1
@@ -169,10 +221,11 @@ export class UnionSchemaBuilder<
             : TExplicitType,
         context?: ValidationContext
     ): Promise<
-        ValidationResult<
+        UnionSchemaValidationResult<
             TExplicitType extends undefined
                 ? SchemaArrayToUnion<TOptions>
-                : TExplicitType
+                : TExplicitType,
+            TOptions
         >
     > {
         const superResult = await super.preValidate(object, context);
@@ -186,10 +239,56 @@ export class UnionSchemaBuilder<
 
         const { path } = prevalidationContext;
 
+        // Create a self-referencing property descriptor for the union root
+        const selfDescriptor: PropertyDescriptor<any, any, any> = {
+            [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+                setValue: () => false,
+                getValue: (obj: any) => ({
+                    success: true,
+                    value: obj
+                }),
+                getSchema: () => this,
+                parent: undefined
+            }
+        };
+
+        // Root error state
+        const rootErrors: string[] = [];
+
+        // Store all per-option validation results, augmented with
+        // root-level error properties so getErrorsFor() returns a
+        // hybrid array that is both tuple-indexable and carries
+        // NestedValidationError data.
+        const optionResults: any[] = [];
+        Object.defineProperties(optionResults, {
+            seenValue: {
+                get: () => object,
+                enumerable: false
+            },
+            errors: {
+                get: () => rootErrors,
+                enumerable: false
+            },
+            isValid: {
+                get: () => rootErrors.length === 0,
+                enumerable: false
+            },
+            descriptor: {
+                get: () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR],
+                enumerable: false
+            }
+        });
+
+        const getErrorsFor = (() => optionResults) as any;
+
         if (!valid) {
+            rootErrors.push(
+                ...(errors || []).map((e: any) => e.message || String(e))
+            );
             return {
                 valid,
-                errors
+                errors,
+                getErrorsFor
             };
         }
 
@@ -203,37 +302,42 @@ export class UnionSchemaBuilder<
         ) {
             return {
                 valid: true,
-                object: objToValidate
+                object: objToValidate,
+                getErrorsFor
             };
         }
 
         let minErrorsCount = Number.MAX_SAFE_INTEGER;
-        let resultingErrors = [];
+        let resultingErrors: any[] = [];
 
         for (let i = 0; i < this.#options.length; i++) {
-            const {
-                valid,
-                errors,
-                object: validatedOption
-            } = await this.#options[i].validate(objToValidate, {
-                ...prevalidationContext,
-                path: `${path}[option ${i}]`,
-                currentPropertyDescriptor: undefined,
-                rootPropertyDescriptor: undefined
-            } as any);
-            if (valid) {
+            const optionResult = await this.#options[i].validate(
+                objToValidate,
+                {
+                    ...prevalidationContext,
+                    path: `${path}[option ${i}]`,
+                    currentPropertyDescriptor: undefined,
+                    rootPropertyDescriptor: undefined
+                } as any
+            );
+
+            optionResults[i] = optionResult;
+
+            if (optionResult.valid) {
                 return {
                     valid: true,
-                    object: validatedOption as any
+                    object: optionResult.object as any,
+                    getErrorsFor
                 };
             } else {
+                const optErrors = optionResult.errors;
                 if (
-                    Array.isArray(errors) &&
-                    errors.length > 0 &&
-                    errors.length < minErrorsCount
+                    Array.isArray(optErrors) &&
+                    optErrors.length > 0 &&
+                    optErrors.length < minErrorsCount
                 ) {
-                    resultingErrors = errors as any;
-                    minErrorsCount = errors.length;
+                    resultingErrors = optErrors as any;
+                    minErrorsCount = optErrors.length;
                 }
 
                 objToValidate =
@@ -241,9 +345,12 @@ export class UnionSchemaBuilder<
             }
         }
 
+        rootErrors.push("value doesn't match any option in union schema");
+
         return {
             valid: false,
-            errors: resultingErrors
+            errors: resultingErrors,
+            getErrorsFor
         };
     }
 
