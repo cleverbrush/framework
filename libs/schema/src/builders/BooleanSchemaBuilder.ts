@@ -55,6 +55,9 @@ export class BooleanSchemaBuilder<
         BooleanSchemaBuilder<TResult, TRequired>
     > = this.#defaultEqualsToErrorMessageProvider;
 
+    /**
+     * @hidden
+     */
     public static create(props: BooleanSchemaBuilderCreateProps<any>) {
         return new BooleanSchemaBuilder({
             type: 'boolean',
@@ -95,6 +98,9 @@ export class BooleanSchemaBuilder<
         };
     }
 
+    /**
+     * @inheritdoc
+     */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): BooleanSchemaBuilder<TResult, true, T> {
         return this.createFromProps({
@@ -102,6 +108,9 @@ export class BooleanSchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * @inheritdoc
+     */
     public clearHasType(): BooleanSchemaBuilder<TResult, TRequired, undefined> {
         return this.createFromProps({
             ...this.introspect()
@@ -109,7 +118,7 @@ export class BooleanSchemaBuilder<
     }
 
     /**
-     * Performs validion of the schema over `object`. Basically runs
+     * Performs validation of the schema over `object`. Basically runs
      * validators, preprocessors and checks for required (if schema is not optional).
      * @param context Optional `ValidationContext` settings.
      */
@@ -188,10 +197,16 @@ export class BooleanSchemaBuilder<
         return BooleanSchemaBuilder.create(props as any) as any;
     }
 
+    /**
+     * @hidden
+     */
     public required(): BooleanSchemaBuilder<TResult, true, TExplicitType> {
         return super.required();
     }
 
+    /**
+     * @hidden
+     */
     public optional(): BooleanSchemaBuilder<TResult, false, TExplicitType> {
         return super.optional();
     }
@@ -217,7 +232,7 @@ export class BooleanSchemaBuilder<
     }
 
     /**
-     * Removes a `value` defeined by `equals()` call.
+     * Removes a `value` defined by `equals()` call.
      */
     public clearEquals(): BooleanSchemaBuilder<
         boolean,

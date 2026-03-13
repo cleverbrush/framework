@@ -160,7 +160,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public hasType<T>(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -172,7 +172,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): ArraySchemaBuilder<
         TElementSchema,
@@ -185,7 +185,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * Performs validion of the schema over `object`. Basically runs
+     * Performs validation of the schema over `object`. Basically runs
      * validators, preprocessors and checks for required (if schema is not optional).
      * @param context Optional `ValidationContext` settings.
      */
@@ -457,6 +457,10 @@ export class ArraySchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * Clears the element schema set by `of()`. After this call,
+     * array items of any type will be accepted.
+     */
     public clearOf(): ArraySchemaBuilder<any, TRequired, TExplicitType> {
         return ArraySchemaBuilder.create({
             ...this.introspect(),

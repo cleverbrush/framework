@@ -41,6 +41,9 @@ export class FunctionSchemaBuilder<
         ? (...args: any[]) => any
         : TExplicitType
 > extends SchemaBuilder<TResult, TRequired> {
+    /**
+     * @hidden
+     */
     public static create(props: FunctionSchemaBuilderCreateProps<any>) {
         return new FunctionSchemaBuilder({
             type: 'function',
@@ -72,7 +75,7 @@ export class FunctionSchemaBuilder<
     }
 
     /**
-     * Performs validion of the schema over `object`. Basically runs
+     * Performs validation of the schema over `object`. Basically runs
      * validators, preprocessors and checks for required (if schema is not optional).
      * @param context Optional `ValidationContext` settings.
      */
@@ -149,7 +152,7 @@ export class FunctionSchemaBuilder<
 
 /**
  * Creates a `function` schema.
- * @retuns {@link FunctionSchemaBuilder}
+ * @returns {@link FunctionSchemaBuilder}
  */
 export const func = () =>
     FunctionSchemaBuilder.create({

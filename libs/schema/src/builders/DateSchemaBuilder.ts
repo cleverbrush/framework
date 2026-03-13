@@ -129,6 +129,9 @@ export class DateSchemaBuilder<
     #parseFromJson = false;
     #parseFromEpoch = false;
 
+    /**
+     * @hidden
+     */
     public static create(props: DateSchemaBuilderCreateProps) {
         return new DateSchemaBuilder({
             type: 'date',
@@ -284,7 +287,7 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): DateSchemaBuilder<T, true> {
@@ -294,7 +297,7 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): DateSchemaBuilder<Date, TRequired> {
         return this.createFromProps({
@@ -303,7 +306,7 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * Performs validion of Date schema over `object`.
+     * Performs validation of Date schema over `object`.
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(

@@ -211,6 +211,9 @@ export class ObjectSchemaBuilder<
 
     #propertyDescriptorTreeMap: PropertyDescriptorMap = new WeakMap() as any;
 
+    /**
+     * @hidden
+     */
     public static create<
         P extends Record<string, SchemaBuilder>,
         R extends boolean
@@ -321,7 +324,7 @@ export class ObjectSchemaBuilder<
     }
 
     /**
-     * Performs validion of object schema over the `object`.
+     * Performs validation of object schema over the `object`.
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
@@ -683,7 +686,7 @@ export class ObjectSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public hasType<T>(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -695,7 +698,7 @@ export class ObjectSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): ObjectSchemaBuilder<TProperties, TRequired> {
         return this.createFromProps({
@@ -1312,11 +1315,8 @@ export class ObjectSchemaBuilder<
         TProperties extends Record<string, SchemaBuilder<any, any>> = {},
         TRequired extends boolean = true,
         TExplicitType = undefined,
-        TSchema extends ObjectSchemaBuilder<
-            any,
-            any,
-            any
-        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+        TSchema extends ObjectSchemaBuilder<any, any, any> =
+            ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
     >(
         schema: TSchema,
         /* this is to make possibility to traverse the tree and select properties */
@@ -1393,11 +1393,8 @@ export class ObjectSchemaBuilder<
         TProperties extends Record<string, SchemaBuilder<any, any>> = {},
         TRequired extends boolean = true,
         TExplicitType = undefined,
-        TSchema extends ObjectSchemaBuilder<
-            any,
-            any,
-            any
-        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+        TSchema extends ObjectSchemaBuilder<any, any, any> =
+            ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
     >(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema> {
         if (!(schema instanceof ObjectSchemaBuilder)) {
             throw new Error(
@@ -1466,11 +1463,8 @@ export interface Object {
         TProperties extends Record<string, SchemaBuilder<any, any>> = {},
         TRequired extends boolean = true,
         TExplicitType = undefined,
-        TSchema extends ObjectSchemaBuilder<
-            any,
-            any,
-            any
-        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+        TSchema extends ObjectSchemaBuilder<any, any, any> =
+            ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
     >(
         schema: TSchema
     ): PropertyDescriptorTree<TSchema, TSchema>;

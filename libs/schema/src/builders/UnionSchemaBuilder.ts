@@ -163,6 +163,9 @@ export class UnionSchemaBuilder<
 > {
     #options!: TOptions;
 
+    /**
+     * @hidden
+     */
     public static create(props: UnionSchemaBuilderCreateProps<any>) {
         return new UnionSchemaBuilder({
             type: 'union',
@@ -191,7 +194,7 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
@@ -201,7 +204,7 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): UnionSchemaBuilder<TOptions, TRequired, undefined> {
         return this.createFromProps({
@@ -210,7 +213,7 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * Performs validion of the union schema over `object`.
+     * Performs validation of the union schema over `object`.
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
@@ -435,7 +438,7 @@ export class UnionSchemaBuilder<
 
 /**
  * Creates a union schema.
- * @param schema required and will be considered as a first option for the union shchema.
+ * @param schema required and will be considered as a first option for the union schema.
  */
 export const union = <T extends SchemaBuilder<any, any>>(schema: T) =>
     UnionSchemaBuilder.create({

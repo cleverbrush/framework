@@ -130,6 +130,9 @@ export class StringSchemaBuilder<
         StringSchemaBuilder<TResult, TRequired>
     > = this.#defaultMatchesErrorMessageProvider;
 
+    /**
+     * @hidden
+     */
     public static create(props: StringSchemaBuilderCreateProps) {
         return new StringSchemaBuilder({
             type: 'string',
@@ -295,7 +298,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): StringSchemaBuilder<T, true> {
@@ -305,7 +308,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): StringSchemaBuilder<string, TRequired> {
         return this.createFromProps({
@@ -314,7 +317,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * Performs validion of string schema over `object`.
+     * Performs validation of string schema over `object`.
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
@@ -481,7 +484,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * Restricts object to be equal to `value`.
+     * Restricts string to be equal to `value`.
      */
     public equals<T extends string>(
         value: T,
@@ -526,7 +529,7 @@ export class StringSchemaBuilder<
 
     /**
      * Set minimal length of the valid value for schema.
-     * @param {number} length
+     * @param length minimum string length
      */
     public minLength(
         length: number,
@@ -559,7 +562,7 @@ export class StringSchemaBuilder<
 
     /**
      * Set maximal length of the valid value for schema.
-     * @length {number} length
+     * @param length maximum string length
      */
     public maxLength(
         length: number,
@@ -580,7 +583,7 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * cancel `maxLength()` call.
+     * Cancel `maxLength()` call.
      */
     public clearMaxLength(): StringSchemaBuilder<TResult, TRequired> {
         const schema = this.introspect();
@@ -662,6 +665,7 @@ export class StringSchemaBuilder<
 
     /**
      * Restricts string to match `regexp`.
+     * @param regexp regular expression pattern to match against
      */
     public matches(
         regexp: RegExp,
@@ -694,7 +698,7 @@ export class StringSchemaBuilder<
 
 /**
  * Creates a string schema restricted to be equal to `equals`.
- * @param equals number value
+ * @param equals string value the schema is restricted to
  */
 export function string<T extends string>(
     equals: T
@@ -702,7 +706,7 @@ export function string<T extends string>(
 
 /**
  * Creates a string schema restricted to be equal to `equals` with a custom error message.
- * @param equals number value
+ * @param equals string value the schema is restricted to
  */
 export function string<T extends string>(
     equals: T,
