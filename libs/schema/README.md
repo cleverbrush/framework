@@ -1,14 +1,14 @@
-This package resides in `@cleverbrush/schema` and contains utilities to define object schemas. Once created a Schema can be used to infer type and validate objects for satisfaction of the Schema.
+# @cleverbrush/schema
 
-The library is covered with unit-tests to make sure it works correctly.
+A schema definition and validation library for TypeScript. Define object schemas, infer their TypeScript types, and validate data at runtime — all with a single, immutable, fluent API.
 
 ## Installation
 
 ```bash
-    npm install @cleverbrush/schema
+npm install @cleverbrush/schema
 ```
 
-### An example:
+## Quick Start
 
 ```typescript
 import { InferType, object, number, string, date } from '@cleverbrush/schema';
@@ -19,90 +19,50 @@ const UserSchema = object({
     dateOfBirth: date().optional()
 });
 
-// user has { id: number; name: string; dateOfBirth?: Date } type
-const user: InferType<typeof UserSchema> = {
-    //...
+// Infer the TypeScript type: { id: number; name: string; dateOfBirth?: Date }
+type User = InferType<typeof UserSchema>;
+
+const user: User = {
+    id: 1,
+    name: 'Alice',
+    dateOfBirth: new Date('1990-01-01')
 };
 
 const { valid, object: result, errors } = await UserSchema.validate(user);
 ```
 
-Type inference can be used even on clean JavaScript (without TypeScript):
-
-```javascript
-const { valid, object, errors } = await UserSchema.validate(someObject);
-
-if (valid) {
-    // someObject satisfies UserSchema.
-    // And `object` has { id: number; name: string; dateOfBirth: Date; } type.
-} else {
-    // someObject does not satisfy UserSchema which means that
-    // `errors` contains a list of errors.
-}
-```
-
-Another way to have types using just Javascript is to make use of JSDoc:
+Type inference works in plain JavaScript too, using JSDoc:
 
 ```javascript
 /**
  * @type {import('@cleverbrush/schema').InferType<typeof UserSchema>}
  */
 const user = {
-    // inferred type is { id: number; name: string; dateOfBirth?: Date }
+    // type is inferred as { id: number; name: string; dateOfBirth?: Date }
 };
 ```
 
-See [Documentation](https://docs.cleverbrush.com/modules/_cleverbrush_schema.html) or `docs` folder for more information.
-
 ## Schema Types
 
-There are several schema types available out of the box:
+The following builder functions are available:
 
--   `any` - any object. Similar to the `any` type in TypeScript.
--   `string` - string value.
--   `number` - number value.
--   `boolean` - boolean value.
--   `func` - function value.
--   `object` - object schema (you can define list of properties, along with schemas for every property).
--   `date` - defines object of JavaScript `Date` class.
--   `array` - defines array, you can define a schema for Array emelement.
--   `union` - allows to define unions. e.g. `string | number` types (or any combination off schema types from this list).
--   custom schema types. You just need to inherit `SchemaBuilder` abstract class to implement your own schema type.
+| Function | Description |
+| --- | --- |
+| `any()` | Any value. Similar to TypeScript's `any` type. |
+| `string()` | String value with constraints like `minLength`, `maxLength`, `matches`, `equals`. |
+| `number()` | Numeric value with constraints like `min`, `max`, `equals`. |
+| `boolean()` | Boolean value. |
+| `date()` | JavaScript `Date` instance. |
+| `func()` | Function value. |
+| `object(props)` | Object with typed properties. Supports nested schemas. |
+| `array()` | Array with optional element schema (via `.of()`). |
+| `union(schema)` | Union of schemas — e.g. `string \| number`. Combine with `.or()`. |
 
-## What is exported from the library?
+## Immutability
 
-Library exports several functions used to define schemas:
+All schema builders are immutable. Every method call returns a **new** schema builder instance, so existing schemas are never modified:
 
--   `any`
--   `string`
--   `number`
--   `boolean`
--   `func`
--   `object`
--   `date`
--   `array`
--   `union`
-
-All these functions returns so called schema builders.
-Schema builder classes are also exported (in case if you want to develop your own schema builder based on it):
-
--   `AnySchemaBuilder`
--   `ArraySchemaBuilder`
--   `BooleanSchemaBuilder`
--   `DateSchemaBuilder`
--   `FunctionSchemaBuilder`
--   `ObjectSchemaBuilder`
--   `NumberSchemaBuilder`
--   `SchemaBuilder` - abstract class.
--   `StringSchemaBuilder`
--   `UnionSchemaBuilder`
-
-## Schema Builders Are Immutable
-
-All schema builders listed above are immutable, which means that every call of it's methods should return a new Schema builder.
-For example in the example below call to the `.optional()` method will not affect `UserSchema` or any other schemas using it. Instead it will return a new schema builder:
-
-```ts
+```typescript
 const UserSchema = object({
     id: number(),
     email: string()
@@ -110,16 +70,15 @@ const UserSchema = object({
 
 const OrderSchema = object({
     id: number(),
-    createdByUser: UserSchema.optional()
+    createdByUser: UserSchema.optional() // UserSchema is not modified
 });
 ```
 
-By combining immutable schema builders with TypeScript type inference you can create very powerful schemas
-which can be used to validate objects and infer their types.
+## Composing Schemas
 
-Every schema is built using a chain/superposition of calls to the schema builder methods. For example:
+Schemas are built by chaining method calls:
 
-```ts
+```typescript
 const UserSchema = object({
     id: number(),
     email: string()
@@ -130,23 +89,103 @@ const UserSchema = object({
     });
 ```
 
-In the example above `UserSchema` is an object schema with two properties: `id` and `email`. It is also optional and has an additional property `name`.
+Union types and array constraints can be combined freely:
 
-There is also a way to define union schemas. For example example below defines an array of strings or numbers
-having at least two elements, but not more than 5:
-
-```ts
-const StringOrNumberArraySchema = array()
-    .minLength(2)
-    .maxLength(5)
-    .of(union(string()).or(number()));
-```
-
-You can go further and restrict number to be in the range of 0 to 100 by adding more constraints:
-
-```ts
-const StringOrNumberArraySchema = array()
+```typescript
+// Array of strings or numbers, with 2–5 elements, numbers in 0–100 range
+const MixedArray = array()
     .minLength(2)
     .maxLength(5)
     .of(union(string()).or(number().min(0).max(100)));
 ```
+
+## Validation
+
+Every schema builder has an async `validate()` method:
+
+```typescript
+const { valid, object, errors } = await UserSchema.validate(someObject);
+
+if (valid) {
+    // `object` has the inferred type
+} else {
+    // `errors` is a list of error strings
+}
+```
+
+### Custom Error Messages
+
+Every constraint accepts an optional error message provider — either a plain string or a function:
+
+```typescript
+const Name = string()
+    .minLength(2, {
+        minLengthValidationErrorMessageProvider: 'Name is too short'
+    })
+    .maxLength(50, {
+        maxLengthValidationErrorMessageProvider: (seen) =>
+            `"${seen}" exceeds 50 characters`
+    });
+```
+
+### Per-Property Errors with `getErrorsFor()`
+
+`ObjectSchemaBuilder.validate()` returns an extended result with a `getErrorsFor()` method for inspecting errors on individual properties:
+
+```typescript
+const PersonSchema = object({
+    name: string().minLength(1),
+    address: object({
+        city: string(),
+        zip: number()
+    })
+});
+
+const result = await PersonSchema.validate(person);
+
+if (!result.valid) {
+    const addressErrors = result.getErrorsFor((p) => p.address);
+    console.log(addressErrors.errors);    // e.g. ['must be an object']
+    console.log(addressErrors.seenValue); // the value seen during validation
+    console.log(addressErrors.isValid);   // false
+
+    const cityErrors = result.getErrorsFor((p) => p.address.city);
+    console.log(cityErrors.errors);
+}
+```
+
+## Property Descriptors
+
+For advanced use cases, schema property descriptors provide type-safe programmatic access to read and write individual properties on schema-defined objects:
+
+```typescript
+import { object, string, number } from '@cleverbrush/schema';
+
+const PersonSchema = object({
+    firstName: string(),
+    lastName: string(),
+    address: object({
+        city: string(),
+        zip: number()
+    })
+});
+
+// Get the property descriptor tree
+const tree = object.getPropertiesFor(PersonSchema);
+```
+
+Property descriptors are primarily used by [`@cleverbrush/mapper`](../mapper) to provide type-safe property selectors for schema-to-schema mapping. See the [mapper documentation](../mapper/README.md) for usage examples.
+
+## Exports
+
+**Builder functions:** `any`, `string`, `number`, `boolean`, `func`, `object`, `date`, `array`, `union`
+
+**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
+
+**Types:** `InferType`, `ValidationResult`, `ValidationError`, `MakeOptional`, `SchemaPropertySelector`
+
+See [API documentation](https://docs.cleverbrush.com/) for the full reference.
+
+## License
+
+BSD-3-Clause
