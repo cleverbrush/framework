@@ -44,7 +44,7 @@ export type ElementValidationResult<
 
 /**
  * Validation result type returned by `ArraySchemaBuilder.validate()`.
- * Extends `ValidationResult` with `getErrorsFor` for root-level array
+ * Extends `ValidationResult` with `getNestedErrors` for root-level array
  * errors and per-element validation results.
  */
 export type ArraySchemaValidationResult<
@@ -57,11 +57,8 @@ export type ArraySchemaValidationResult<
      * The returned value has both `NestedValidationError` properties
      * (`errors`, `isValid`, `descriptor`, `seenValue`) and indexed
      * element results (`[0]`, `[1]`, etc.).
-     * @param selector optional identity selector (ignored)
      */
-    getErrorsFor(
-        selector?: (t: any) => any
-    ): Array<ElementValidationResult<TElementSchema>> &
+    getNestedErrors(): Array<ElementValidationResult<TElementSchema>> &
         NestedValidationError<any, any, any>;
 };
 
@@ -228,7 +225,7 @@ export class ArraySchemaBuilder<
             () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
         );
 
-        const getErrorsFor = (() => elementResults) as any;
+        const getNestedErrors = (() => elementResults) as any;
 
         if (!valid) {
             rootErrors.push(
@@ -237,7 +234,7 @@ export class ArraySchemaBuilder<
             return {
                 valid,
                 errors,
-                getErrorsFor
+                getNestedErrors
             };
         }
 
@@ -252,7 +249,7 @@ export class ArraySchemaBuilder<
             return {
                 valid: true,
                 object: objToValidate,
-                getErrorsFor
+                getNestedErrors
             };
         }
 
@@ -261,7 +258,7 @@ export class ArraySchemaBuilder<
             return {
                 valid: false,
                 errors: [{ message: 'array expected', path: path as string }],
-                getErrorsFor
+                getNestedErrors
             };
         }
 
@@ -282,7 +279,7 @@ export class ArraySchemaBuilder<
                         path: path as string
                     }
                 ],
-                getErrorsFor
+                getNestedErrors
             };
         }
 
@@ -303,7 +300,7 @@ export class ArraySchemaBuilder<
                         path: path as string
                     }
                 ],
-                getErrorsFor
+                getNestedErrors
             };
         }
 
@@ -330,7 +327,7 @@ export class ArraySchemaBuilder<
                 return Object.assign(
                     {
                         valid,
-                        getErrorsFor
+                        getNestedErrors
                     },
                     valid
                         ? {}
@@ -372,7 +369,7 @@ export class ArraySchemaBuilder<
                                 result.errors.length > 0
                                     ? [result.errors[0]]
                                     : [],
-                            getErrorsFor
+                            getNestedErrors
                         };
                     }
                 }
@@ -382,7 +379,7 @@ export class ArraySchemaBuilder<
         return {
             valid: true,
             object: objToValidate as TResult,
-            getErrorsFor
+            getNestedErrors
         };
     }
 

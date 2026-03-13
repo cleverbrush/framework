@@ -2652,13 +2652,13 @@ test('getErrorsFor - union', async () => {
 
     const wrongInterval: InferType<typeof IntervalSchema> = 123 as any;
 
-    const { getErrorsFor, valid } = await IntervalSchema.validate(
+    const { getNestedErrors, valid } = await IntervalSchema.validate(
         wrongInterval as any
     );
 
     expect(valid).toEqual(false);
 
-    const rootErrors = getErrorsFor((t) => t);
+    const rootErrors = getNestedErrors();
     expect(rootErrors).toBeDefined();
     expect(
         Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1

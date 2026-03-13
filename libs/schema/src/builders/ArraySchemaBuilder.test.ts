@@ -625,54 +625,54 @@ test('Max Length With Custom Validation Error Message', async () => {
     }
 });
 
-test('getErrorsFor - root errors on invalid array', async () => {
+test('getNestedErrors - root errors on invalid array', async () => {
     const schema = array().of(number());
-    const { valid, getErrorsFor } = await schema.validate(
+    const { valid, getNestedErrors } = await schema.validate(
         'not-an-array' as any
     );
 
     expect(valid).toEqual(false);
 
-    const rootErrors = getErrorsFor();
+    const rootErrors = getNestedErrors();
     expect(rootErrors.errors.length).toBeGreaterThan(0);
     expect(rootErrors.seenValue).toEqual('not-an-array');
 });
 
-test('getErrorsFor - root errors on successful array', async () => {
+test('getNestedErrors - root errors on successful array', async () => {
     const schema = array().of(number());
-    const { valid, getErrorsFor } = await schema.validate([1, 2, 3]);
+    const { valid, getNestedErrors } = await schema.validate([1, 2, 3]);
 
     expect(valid).toEqual(true);
 
-    const rootErrors = getErrorsFor();
+    const rootErrors = getNestedErrors();
     expect(rootErrors.errors.length).toEqual(0);
 });
 
-test('getErrorsFor - descriptor returns schema', async () => {
+test('getNestedErrors - descriptor returns schema', async () => {
     const schema = array().of(number());
-    const { getErrorsFor } = await schema.validate([1]);
+    const { getNestedErrors } = await schema.validate([1]);
 
-    const rootErrors = getErrorsFor();
+    const rootErrors = getNestedErrors();
     expect(rootErrors.descriptor.getSchema()).toBe(schema);
 });
 
-test('getErrorsFor - per-element errors with doNotStopOnFirstError', async () => {
+test('getNestedErrors - per-element errors with doNotStopOnFirstError', async () => {
     const schema = array().of(number());
-    const { valid, getErrorsFor } = await schema.validate(
+    const { valid, getNestedErrors } = await schema.validate(
         ['a', 2, 'b'] as any,
         { doNotStopOnFirstError: true }
     );
 
     expect(valid).toEqual(false);
 
-    const elementResults = getErrorsFor();
+    const elementResults = getNestedErrors();
     expect(elementResults.length).toEqual(3);
     expect(elementResults[0]!.valid).toEqual(false);
     expect(elementResults[1]!.valid).toEqual(true);
     expect(elementResults[2]!.valid).toEqual(false);
 });
 
-test('getErrorsFor - object elements with property navigation', async () => {
+test('getNestedErrors - object elements with property navigation', async () => {
     const schema = array().of(
         object({
             name: string().required(),
@@ -680,14 +680,14 @@ test('getErrorsFor - object elements with property navigation', async () => {
         })
     );
 
-    const { valid, getErrorsFor } = await schema.validate(
+    const { valid, getNestedErrors } = await schema.validate(
         [{ name: 'Alice', age: 'bad' as any }] as any,
         { doNotStopOnFirstError: true }
     );
 
     expect(valid).toEqual(false);
 
-    const elementResults = getErrorsFor();
+    const elementResults = getNestedErrors();
     expect(elementResults.length).toEqual(1);
 
     const first = elementResults[0]!;
@@ -698,39 +698,39 @@ test('getErrorsFor - object elements with property navigation', async () => {
     expect(ageErrors.errors.length).toBeGreaterThan(0);
 });
 
-test('getErrorsFor - union elements', async () => {
+test('getNestedErrors - union elements', async () => {
     const schema = array().of(union(string()).or(number()));
 
-    const { valid, getErrorsFor } = await schema.validate(
+    const { valid, getNestedErrors } = await schema.validate(
         ['hello', true as any] as any,
         { doNotStopOnFirstError: true }
     );
 
     expect(valid).toEqual(false);
 
-    const elementResults = getErrorsFor();
+    const elementResults = getNestedErrors();
     expect(elementResults.length).toEqual(2);
     expect(elementResults[0]!.valid).toEqual(true);
     expect(elementResults[1]!.valid).toEqual(false);
-    expect(typeof elementResults[1]!.getErrorsFor).toEqual('function');
+    expect(typeof elementResults[1]!.getNestedErrors).toEqual('function');
 });
 
-test('getErrorsFor - minLength error', async () => {
+test('getNestedErrors - minLength error', async () => {
     const schema = array().of(number()).minLength(3);
-    const { valid, getErrorsFor } = await schema.validate([1]);
+    const { valid, getNestedErrors } = await schema.validate([1]);
 
     expect(valid).toEqual(false);
 
-    const rootErrors = getErrorsFor();
+    const rootErrors = getNestedErrors();
     expect(rootErrors.errors.length).toBeGreaterThan(0);
 });
 
-test('getErrorsFor - optional null returns valid', async () => {
+test('getNestedErrors - optional null returns valid', async () => {
     const schema = array().of(number()).optional();
-    const { valid, getErrorsFor } = await schema.validate(null as any);
+    const { valid, getNestedErrors } = await schema.validate(null as any);
 
     expect(valid).toEqual(true);
 
-    const rootErrors = getErrorsFor();
+    const rootErrors = getNestedErrors();
     expect(rootErrors.errors.length).toEqual(0);
 });

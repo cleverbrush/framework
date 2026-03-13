@@ -23,7 +23,7 @@ type UnionSchemaBuilderCreateProps<
  * Mapped tuple type that converts a tuple of SchemaBuilder options into
  * a tuple of their corresponding validation results.
  * Union schema options get `UnionSchemaValidationResult` with recursive
- * `getErrorsFor` navigation; object schema options get
+ * `getNestedErrors` navigation; object schema options get
  * `ObjectSchemaValidationResult`; other types get `ValidationResult`.
  */
 export type OptionValidationResults<
@@ -43,8 +43,7 @@ export type OptionValidationResults<
 /**
  * Validation result type returned by `UnionSchemaBuilder.validate()`.
  * Extends `ValidationResult` with:
- * - `getErrorsFor` for root-level union errors
- * - `getErrorsFor` returning root-level errors and per-branch validation results
+ * - `getNestedErrors` for root-level union errors and per-branch validation results
  */
 export type UnionSchemaValidationResult<
     T,
@@ -56,11 +55,9 @@ export type UnionSchemaValidationResult<
      * The returned value has both `NestedValidationError` properties
      * (`errors`, `isValid`, `descriptor`, `seenValue`) and tuple-indexed
      * branch results (`[0]`, `[1]`, etc.).
-     * @param selector optional identity selector (ignored)
      */
-    getErrorsFor(
-        selector?: (t: any) => any
-    ): OptionValidationResults<TOptions> & NestedValidationError<any, any, any>;
+    getNestedErrors(): OptionValidationResults<TOptions> &
+        NestedValidationError<any, any, any>;
 };
 
 type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =
@@ -263,7 +260,7 @@ export class UnionSchemaBuilder<
             () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
         );
 
-        const getErrorsFor = (() => optionResults) as any;
+        const getNestedErrors = (() => optionResults) as any;
 
         if (!valid) {
             rootErrors.push(
@@ -272,7 +269,7 @@ export class UnionSchemaBuilder<
             return {
                 valid,
                 errors,
-                getErrorsFor
+                getNestedErrors
             };
         }
 
@@ -287,7 +284,7 @@ export class UnionSchemaBuilder<
             return {
                 valid: true,
                 object: objToValidate,
-                getErrorsFor
+                getNestedErrors
             };
         }
 
@@ -311,7 +308,7 @@ export class UnionSchemaBuilder<
                 return {
                     valid: true,
                     object: optionResult.object as any,
-                    getErrorsFor
+                    getNestedErrors
                 };
             } else {
                 const optErrors = optionResult.errors;
@@ -334,7 +331,7 @@ export class UnionSchemaBuilder<
         return {
             valid: false,
             errors: resultingErrors,
-            getErrorsFor
+            getNestedErrors
         };
     }
 

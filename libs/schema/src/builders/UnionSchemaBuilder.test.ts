@@ -392,14 +392,14 @@ test('Reset Error - 1', async () => {
     expect(() => schema1.reset({} as any)).toThrowError();
 });
 
-test('getErrorsFor - root errors on failed union', async () => {
+test('getNestedErrors - root errors on failed union', async () => {
     const schema = union(string()).or(number());
 
-    const { valid, getErrorsFor } = await schema.validate(true as any);
+    const { valid, getNestedErrors } = await schema.validate(true as any);
 
     expect(valid).toEqual(false);
 
-    const rootErrors = getErrorsFor((t: any) => t);
+    const rootErrors = getNestedErrors();
     expect(rootErrors).toBeDefined();
     expect(rootErrors.errors.length).toEqual(1);
     expect(rootErrors.errors[0]).toEqual(
@@ -407,37 +407,37 @@ test('getErrorsFor - root errors on failed union', async () => {
     );
 });
 
-test('getErrorsFor - root errors on successful union', async () => {
+test('getNestedErrors - root errors on successful union', async () => {
     const schema = union(string()).or(number());
 
-    const { valid, getErrorsFor } = await schema.validate('hello');
+    const { valid, getNestedErrors } = await schema.validate('hello');
 
     expect(valid).toEqual(true);
 
-    const rootErrors = getErrorsFor((t: any) => t);
+    const rootErrors = getNestedErrors();
     expect(rootErrors).toBeDefined();
     expect(rootErrors.errors.length).toEqual(0);
 });
 
-test('getErrorsFor - descriptor returns schema', async () => {
+test('getNestedErrors - descriptor returns schema', async () => {
     const schema = union(string()).or(number());
 
-    const { getErrorsFor } = await schema.validate(true as any);
+    const { getNestedErrors } = await schema.validate(true as any);
 
-    const rootErrors = getErrorsFor((t) => t);
+    const rootErrors = getNestedErrors();
     expect(rootErrors.descriptor).toBeDefined();
     expect(rootErrors.descriptor.getSchema()).toBe(schema);
     expect(rootErrors.descriptor.parent).toBeUndefined();
 });
 
-test('getErrorsFor - primitive branch errors', async () => {
+test('getNestedErrors - primitive branch errors', async () => {
     const schema = union(string()).or(number());
 
-    const { valid, getErrorsFor } = await schema.validate(true as any);
+    const { valid, getNestedErrors } = await schema.validate(true as any);
 
     expect(valid).toEqual(false);
 
-    const branchResults = getErrorsFor();
+    const branchResults = getNestedErrors();
 
     const option0 = branchResults[0];
     expect(option0).toBeDefined();
@@ -452,7 +452,7 @@ test('getErrorsFor - primitive branch errors', async () => {
     expect((option1.errors?.length ?? 0) > 0).toEqual(true);
 });
 
-test('getErrorsFor - object branch with property navigation', async () => {
+test('getNestedErrors - object branch with property navigation', async () => {
     const schema = union(string()).or(
         object({
             from: date(),
@@ -460,14 +460,14 @@ test('getErrorsFor - object branch with property navigation', async () => {
         })
     );
 
-    const { valid, getErrorsFor } = await schema.validate({
+    const { valid, getNestedErrors } = await schema.validate({
         from: 'not-a-date',
         to: 'not-a-date'
     } as any);
 
     expect(valid).toEqual(false);
 
-    const branchResults = getErrorsFor();
+    const branchResults = getNestedErrors();
 
     // Option 0 is the string() branch
     expect(branchResults[0].valid).toEqual(false);
@@ -487,19 +487,19 @@ test('getErrorsFor - object branch with property navigation', async () => {
     expect(toErrors.errors.length > 0).toEqual(true);
 });
 
-test('getErrorsFor - successful branch', async () => {
+test('getNestedErrors - successful branch', async () => {
     const schema = union(string()).or(number());
 
-    const { valid, getErrorsFor } = await schema.validate('hello');
+    const { valid, getNestedErrors } = await schema.validate('hello');
 
     expect(valid).toEqual(true);
 
     // Option 0 (string) matched
-    const option0 = getErrorsFor()[0];
+    const option0 = getNestedErrors()[0];
     expect(option0.valid).toEqual(true);
 });
 
-test('getErrorsFor - nested object branch', async () => {
+test('getNestedErrors - nested object branch', async () => {
     const schema = union(number()).or(
         object({
             address: object({
@@ -509,7 +509,7 @@ test('getErrorsFor - nested object branch', async () => {
         })
     );
 
-    const { valid, getErrorsFor } = await schema.validate({
+    const { valid, getNestedErrors } = await schema.validate({
         address: {
             city: 123,
             zip: 'not-a-number'
@@ -518,23 +518,23 @@ test('getErrorsFor - nested object branch', async () => {
 
     expect(valid).toEqual(false);
 
-    const option1 = getErrorsFor()[1];
+    const option1 = getNestedErrors()[1];
     expect(option1.valid).toEqual(false);
     expect(typeof (option1 as any).getErrorsFor).toEqual('function');
 });
 
-test('getErrorsFor - optional union with null', async () => {
+test('getNestedErrors - optional union with null', async () => {
     const schema = union(string()).or(number()).optional();
 
-    const { valid, getErrorsFor } = await schema.validate(null as any);
+    const { valid, getNestedErrors } = await schema.validate(null as any);
 
     expect(valid).toEqual(true);
 
-    const rootErrors = getErrorsFor();
+    const rootErrors = getNestedErrors();
     expect(rootErrors.errors.length).toEqual(0);
 });
 
-test('getErrorsFor - union with prevalidation error', async () => {
+test('getNestedErrors - union with prevalidation error', async () => {
     const schema = union(string())
         .or(number())
         .addValidator(() => ({
@@ -542,16 +542,16 @@ test('getErrorsFor - union with prevalidation error', async () => {
             errors: [{ message: 'custom validator failed' }]
         }));
 
-    const { valid, getErrorsFor } = await schema.validate('hello');
+    const { valid, getNestedErrors } = await schema.validate('hello');
 
     expect(valid).toEqual(false);
 
-    const rootErrors = getErrorsFor();
+    const rootErrors = getNestedErrors();
     expect(rootErrors).toBeDefined();
     expect(rootErrors.errors.length > 0).toEqual(true);
 });
 
-test('nested union with getErrorsFor', async () => {
+test('nested union with getNestedErrors', async () => {
     const branch11 = object({
         p111: string(),
         p112: number()
@@ -574,20 +574,20 @@ test('nested union with getErrorsFor', async () => {
 
     const schema = union(branch1).or(branch2);
 
-    const { valid, getErrorsFor } = await schema.validate({
+    const { valid, getNestedErrors } = await schema.validate({
         p121: 'hello',
         p112: 'not-a-number'
     } as any);
 
     expect(valid).toEqual(false);
 
-    const branchResults = getErrorsFor();
+    const branchResults = getNestedErrors();
     const option0 = branchResults[0];
     expect(option0).toBeDefined();
     expect(option0.valid).toEqual(false);
-    expect(typeof (option0 as any).getErrorsFor).toEqual('function');
+    expect(typeof (option0 as any).getNestedErrors).toEqual('function');
 
-    const branch1Errors = option0.getErrorsFor();
+    const branch1Errors = option0.getNestedErrors();
     const option1_1 = branch1Errors[0];
     expect(option1_1).toBeDefined();
     expect(option1_1.valid).toEqual(false);
