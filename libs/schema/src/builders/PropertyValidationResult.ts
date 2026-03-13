@@ -1,6 +1,6 @@
 import {
     InferType,
-    NestedValidationError,
+    NestedValidationResult,
     PropertyDescriptorInner,
     PropertyDescriptorTree,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
@@ -9,15 +9,15 @@ import {
 import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
 /**
- * Mutable container for nested validation errors associated with a specific
- * property descriptor. Implements {@link NestedValidationError} and tracks
- * the seen value, accumulated error messages, and child errors for
+ * Mutable container for nested validation results associated with a specific
+ * property descriptor. Implements {@link NestedValidationResult} and tracks
+ * the seen value, accumulated error messages, and child results for
  * nested object properties.
  *
  * Used internally by `ObjectSchemaBuilder` during validation to build up
  * a tree of per-property validation results.
  */
-export class PropertyValidationError<
+export class PropertyValidationResult<
     TSchema extends ObjectSchemaBuilder<any, any, any> = ObjectSchemaBuilder<
         any,
         any,
@@ -26,7 +26,7 @@ export class PropertyValidationError<
     TRootSchema extends ObjectSchemaBuilder<any, any, any> =
         ObjectSchemaBuilder<any, any, any>,
     TParentPropertyDescriptor = any
-> implements NestedValidationError<
+> implements NestedValidationResult<
     TSchema,
     TRootSchema,
     TParentPropertyDescriptor
@@ -39,7 +39,7 @@ export class PropertyValidationError<
     >;
     #rootObjectValue: InferType<TRootSchema> | undefined;
     #errors: string[] = [];
-    #childErrors: NestedValidationError<any, any, any>[] = [];
+    #childErrors: NestedValidationResult<any, any, any>[] = [];
 
     /**
      * The value that was seen at the property location described by the descriptor.
@@ -70,11 +70,11 @@ export class PropertyValidationError<
     }
 
     /**
-     * Returns the list of child `NestedValidationError` instances
-     * representing validation errors for nested properties.
+     * Returns the list of child `NestedValidationResult` instances
+     * representing validation results for nested properties.
      */
     public getChildErrors(): ReadonlyArray<
-        NestedValidationError<any, any, any>
+        NestedValidationResult<any, any, any>
     > {
         return this.#childErrors;
     }
@@ -92,7 +92,7 @@ export class PropertyValidationError<
     }
 
     /**
-     * Creates a new `PropertyValidationError`.
+     * Creates a new `PropertyValidationResult`.
      *
      * @param descriptor - the property descriptor tree node this error is associated with;
      *   must be a valid descriptor (checked via `ObjectSchemaBuilder.isValidPropertyDescriptor`)
@@ -127,10 +127,10 @@ export class PropertyValidationError<
     }
 
     /**
-     * Appends a child `NestedValidationError` for a nested property.
-     * @param childError - the child validation error to add
+     * Appends a child `NestedValidationResult` for a nested property.
+     * @param childError - the child validation result to add
      */
-    addChildError(childError: NestedValidationError<any, any, any>): void {
+    addChildError(childError: NestedValidationResult<any, any, any>): void {
         this.#childErrors.push(childError);
     }
 }

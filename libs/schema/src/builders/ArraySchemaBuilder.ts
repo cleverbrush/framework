@@ -5,7 +5,7 @@ import {
     ValidationResult,
     InferType,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
-    NestedValidationError,
+    NestedValidationResult,
     PropertyDescriptor,
     createHybridErrorArray
 } from './SchemaBuilder.js';
@@ -54,12 +54,12 @@ export type ArraySchemaValidationResult<
     /**
      * Returns root-level array validation errors combined with
      * per-element validation results.
-     * The returned value has both `NestedValidationError` properties
+     * The returned value has both `NestedValidationResult` properties
      * (`errors`, `isValid`, `descriptor`, `seenValue`) and indexed
      * element results (`[0]`, `[1]`, etc.).
      */
     getNestedErrors(): Array<ElementValidationResult<TElementSchema>> &
-        NestedValidationError<any, any, any>;
+        NestedValidationResult<any, any, any>;
 };
 
 type ArraySchemaBuilderCreateProps<

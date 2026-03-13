@@ -4,7 +4,7 @@ import {
     ValidationContext,
     InferType,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
-    NestedValidationError,
+    NestedValidationResult,
     PropertyDescriptor,
     createHybridErrorArray
 } from './SchemaBuilder.js';
@@ -52,12 +52,12 @@ export type UnionSchemaValidationResult<
     /**
      * Returns root-level union validation errors combined with
      * per-branch validation results.
-     * The returned value has both `NestedValidationError` properties
+     * The returned value has both `NestedValidationResult` properties
      * (`errors`, `isValid`, `descriptor`, `seenValue`) and tuple-indexed
      * branch results (`[0]`, `[1]`, etc.).
      */
     getNestedErrors(): OptionValidationResults<TOptions> &
-        NestedValidationError<any, any, any>;
+        NestedValidationResult<any, any, any>;
 };
 
 type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =

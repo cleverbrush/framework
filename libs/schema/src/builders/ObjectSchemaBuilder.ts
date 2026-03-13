@@ -1,6 +1,6 @@
 import {
     InferType,
-    NestedValidationError,
+    NestedValidationResult,
     PreValidationResult,
     PropertyDescriptor,
     PropertyDescriptorInner,
@@ -12,7 +12,7 @@ import {
     ValidationResult
 } from './SchemaBuilder.js';
 
-import { PropertyValidationError } from './PropertyValidationError.js';
+import { PropertyValidationResult } from './PropertyValidationResult.js';
 
 const MUST_BE_AN_OBJECT_ERROR_MESSSAGE = 'must be an object';
 
@@ -99,12 +99,12 @@ export type ObjectSchemaValidationResult<
             TParentPropertyDescriptor
         >
     ): TPropertySchema extends ObjectSchemaBuilder<any, any, any>
-        ? PropertyValidationError<
+        ? PropertyValidationResult<
               TPropertySchema,
               TRootSchema,
               TParentPropertyDescriptor
           >
-        : NestedValidationError<
+        : NestedValidationResult<
               TPropertySchema,
               TRootSchema,
               TParentPropertyDescriptor
@@ -364,7 +364,7 @@ export class ObjectSchemaBuilder<
 
         const propertyDescriptorToErrorMap = new WeakMap<
             PropertyDescriptor<any, any, any>,
-            PropertyValidationError<any, any>
+            PropertyValidationResult<any, any>
         >() as any;
 
         const { path, doNotStopOnFirstError, rootValidationObject } =
@@ -395,13 +395,13 @@ export class ObjectSchemaBuilder<
                 throw new Error('invalid property descriptor');
             }
 
-            let validationError: PropertyValidationError<this, any> =
+            let validationError: PropertyValidationResult<this, any> =
                 propertyDescriptorToErrorMap.has(propertyDescriptor)
                     ? propertyDescriptorToErrorMap.get(propertyDescriptor)
                     : (null as any);
 
             if (!validationError) {
-                validationError = new PropertyValidationError(
+                validationError = new PropertyValidationResult(
                     propertyDescriptor as any,
                     rootValidationObject
                 );
@@ -420,7 +420,7 @@ export class ObjectSchemaBuilder<
                     parentPropertyDescriptor
                 )
             ) {
-                let parentValidationError: PropertyValidationError<this, any> =
+                let parentValidationError: PropertyValidationResult<this, any> =
                     propertyDescriptorToErrorMap.has(parentPropertyDescriptor)
                         ? propertyDescriptorToErrorMap.get(
                               parentPropertyDescriptor
@@ -428,7 +428,7 @@ export class ObjectSchemaBuilder<
                         : (null as any);
 
                 if (!parentValidationError) {
-                    parentValidationError = new PropertyValidationError(
+                    parentValidationError = new PropertyValidationResult(
                         parentPropertyDescriptor as any,
                         rootValidationObject
                     );
@@ -446,7 +446,7 @@ export class ObjectSchemaBuilder<
             selector?: (
                 properties: PropertyDescriptorTree<this>
             ) => PropertyDescriptor<this, TPropertySchema, any>
-        ): PropertyValidationError<this, any> => {
+        ): PropertyValidationResult<this, any> => {
             const descriptor: PropertyDescriptor<this, any, any> =
                 typeof selector === 'function'
                     ? selector(currentPropertyDescriptor as any)
@@ -463,7 +463,7 @@ export class ObjectSchemaBuilder<
             if (!propertyDescriptorToErrorMap.has(descriptor)) {
                 propertyDescriptorToErrorMap.set(
                     descriptor,
-                    new PropertyValidationError(
+                    new PropertyValidationResult(
                         descriptor as any,
                         rootValidationObject
                     )

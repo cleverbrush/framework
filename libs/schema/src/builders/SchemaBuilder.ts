@@ -37,11 +37,11 @@ export type InferType<T> =
 export type ValidationError = { path: string; message: string };
 
 /**
- * Used to represent a validation error for nested
+ * Used to represent a validation result for nested
  * objects/properties. Contains a list of errors and
  * the value that caused them.
  */
-export type NestedValidationError<
+export type NestedValidationResult<
     TSchema,
     TRootSchema extends ObjectSchemaBuilder<any, any>,
     TParentPropertyDescriptor
@@ -423,7 +423,7 @@ export type PropertyDescriptorTree<
         : never);
 
 /**
- * Creates an array augmented with non-enumerable NestedValidationError
+ * Creates an array augmented with non-enumerable NestedValidationResult
  * properties (`seenValue`, `errors`, `isValid`, `descriptor`).
  * Used by UnionSchemaBuilder and ArraySchemaBuilder to return hybrid
  * arrays from `getErrorsFor()`.
