@@ -2,23 +2,73 @@ import {
     SchemaBuilder,
     ValidationResult,
     ValidationContext,
-    InferType
+    InferType,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    NestedValidationResult,
+    PropertyDescriptor,
+    createHybridErrorArray
 } from './SchemaBuilder.js';
+
+import {
+    ObjectSchemaBuilder,
+    ObjectSchemaValidationResult
+} from './ObjectSchemaBuilder.js';
 
 type UnionSchemaBuilderCreateProps<
     T extends readonly SchemaBuilder<any, any>[],
     R extends boolean = true
 > = Partial<ReturnType<UnionSchemaBuilder<T, R>['introspect']>>;
 
+/**
+ * Mapped tuple type that converts a tuple of SchemaBuilder options into
+ * a tuple of their corresponding validation results.
+ * Union schema options get `UnionSchemaValidationResult` with recursive
+ * `getNestedErrors` navigation; object schema options get
+ * `ObjectSchemaValidationResult`; other types get `ValidationResult`.
+ */
+export type OptionValidationResults<
+    TOptions extends readonly SchemaBuilder<any, any>[]
+> = {
+    [K in keyof TOptions]: TOptions[K] extends UnionSchemaBuilder<
+        infer UOptions extends readonly SchemaBuilder<any, any>[],
+        any,
+        any
+    >
+        ? UnionSchemaValidationResult<InferType<TOptions[K]>, UOptions>
+        : TOptions[K] extends ObjectSchemaBuilder<any, any, any>
+          ? ObjectSchemaValidationResult<InferType<TOptions[K]>, TOptions[K]>
+          : ValidationResult<InferType<TOptions[K]>>;
+};
+
+/**
+ * Validation result type returned by `UnionSchemaBuilder.validate()`.
+ * Extends `ValidationResult` with:
+ * - `getNestedErrors` for root-level union errors and per-branch validation results
+ */
+export type UnionSchemaValidationResult<
+    T,
+    TOptions extends readonly SchemaBuilder<any, any>[]
+> = ValidationResult<T> & {
+    /**
+     * Returns root-level union validation errors combined with
+     * per-branch validation results.
+     * The returned value has both `NestedValidationResult` properties
+     * (`errors`, `isValid`, `descriptor`, `seenValue`) and tuple-indexed
+     * branch results (`[0]`, `[1]`, etc.).
+     */
+    getNestedErrors(): OptionValidationResults<TOptions> &
+        NestedValidationResult<any, any, any>;
+};
+
 type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =
     TArr['length'] extends 1
         ? InferType<TArr[0]>
         : TArr extends readonly [
-              infer TFirst extends SchemaBuilder<any, any>,
-              ...infer TRest extends SchemaBuilder<any, any>[]
-          ]
-        ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]>
-        : never;
+                infer TFirst extends SchemaBuilder<any, any>,
+                ...infer TRest extends SchemaBuilder<any, any>[]
+            ]
+          ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]>
+          : never;
 
 type TakeBeforeIndex<
     TArr extends readonly SchemaBuilder<any, any>[],
@@ -111,8 +161,11 @@ export class UnionSchemaBuilder<
         : TExplicitType,
     TRequired
 > {
-    #options: TOptions;
+    #options!: TOptions;
 
+    /**
+     * @hidden
+     */
     public static create(props: UnionSchemaBuilderCreateProps<any>) {
         return new UnionSchemaBuilder({
             type: 'union',
@@ -141,7 +194,7 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
@@ -151,7 +204,7 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): UnionSchemaBuilder<TOptions, TRequired, undefined> {
         return this.createFromProps({
@@ -160,7 +213,7 @@ export class UnionSchemaBuilder<
     }
 
     /**
-     * Performs validion of the union schema over `object`.
+     * Performs validation of the union schema over `object`.
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
@@ -169,10 +222,11 @@ export class UnionSchemaBuilder<
             : TExplicitType,
         context?: ValidationContext
     ): Promise<
-        ValidationResult<
+        UnionSchemaValidationResult<
             TExplicitType extends undefined
                 ? SchemaArrayToUnion<TOptions>
-                : TExplicitType
+                : TExplicitType,
+            TOptions
         >
     > {
         const superResult = await super.preValidate(object, context);
@@ -186,10 +240,39 @@ export class UnionSchemaBuilder<
 
         const { path } = prevalidationContext;
 
+        // Create a self-referencing property descriptor for the union root
+        const selfDescriptor: PropertyDescriptor<any, any, any> = {
+            [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+                setValue: () => false,
+                getValue: (obj: any) => ({
+                    success: true,
+                    value: obj
+                }),
+                getSchema: () => this,
+                parent: undefined
+            }
+        };
+
+        // Root error state
+        const rootErrors: string[] = [];
+
+        const optionResults = createHybridErrorArray(
+            [] as any[],
+            () => object,
+            () => rootErrors,
+            () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+        );
+
+        const getNestedErrors = (() => optionResults) as any;
+
         if (!valid) {
+            rootErrors.push(
+                ...(errors || []).map((e: any) => e.message || String(e))
+            );
             return {
                 valid,
-                errors
+                errors,
+                getNestedErrors
             };
         }
 
@@ -203,35 +286,42 @@ export class UnionSchemaBuilder<
         ) {
             return {
                 valid: true,
-                object: objToValidate
+                object: objToValidate,
+                getNestedErrors
             };
         }
 
         let minErrorsCount = Number.MAX_SAFE_INTEGER;
-        let resultingErrors = [];
+        let resultingErrors: any[] = [];
 
         for (let i = 0; i < this.#options.length; i++) {
-            const {
-                valid,
-                errors,
-                object: validatedOption
-            } = await this.#options[i].validate(objToValidate, {
-                ...prevalidationContext,
-                path: `${path}[option ${i}]`
-            });
-            if (valid) {
+            const optionResult = await this.#options[i].validate(
+                objToValidate,
+                {
+                    ...prevalidationContext,
+                    path: `${path}[option ${i}]`,
+                    currentPropertyDescriptor: undefined,
+                    rootPropertyDescriptor: undefined
+                } as any
+            );
+
+            optionResults[i] = optionResult;
+
+            if (optionResult.valid) {
                 return {
                     valid: true,
-                    object: validatedOption as any
+                    object: optionResult.object as any,
+                    getNestedErrors
                 };
             } else {
+                const optErrors = optionResult.errors;
                 if (
-                    Array.isArray(errors) &&
-                    errors.length > 0 &&
-                    errors.length < minErrorsCount
+                    Array.isArray(optErrors) &&
+                    optErrors.length > 0 &&
+                    optErrors.length < minErrorsCount
                 ) {
-                    resultingErrors = errors as any;
-                    minErrorsCount = errors.length;
+                    resultingErrors = optErrors as any;
+                    minErrorsCount = optErrors.length;
                 }
 
                 objToValidate =
@@ -239,9 +329,12 @@ export class UnionSchemaBuilder<
             }
         }
 
+        rootErrors.push("value doesn't match any option in union schema");
+
         return {
             valid: false,
-            errors: resultingErrors
+            errors: resultingErrors,
+            getNestedErrors
         };
     }
 
@@ -345,7 +438,7 @@ export class UnionSchemaBuilder<
 
 /**
  * Creates a union schema.
- * @param schema required and will be considered as a first option for the union shchema.
+ * @param schema required and will be considered as a first option for the union schema.
  */
 export const union = <T extends SchemaBuilder<any, any>>(schema: T) =>
     UnionSchemaBuilder.create({

@@ -113,6 +113,9 @@ export class NumberSchemaBuilder<
         NumberSchemaBuilder<TResult, TRequired>
     > = this.#defaultEnsureIsIntegerErrorMessageProvider;
 
+    /**
+     * @hidden
+     */
     public static create(props: NumberSchemaBuilderCreateProps) {
         return new NumberSchemaBuilder({
             type: 'number',
@@ -266,7 +269,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(notUsed?: T): NumberSchemaBuilder<T, true> {
@@ -276,7 +279,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): NumberSchemaBuilder<number, TRequired> {
         return this.createFromProps({
@@ -285,7 +288,7 @@ export class NumberSchemaBuilder<
     }
 
     /**
-     * Performs validion of number schema over `object`.
+     * Performs validation of number schema over `object`.
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(

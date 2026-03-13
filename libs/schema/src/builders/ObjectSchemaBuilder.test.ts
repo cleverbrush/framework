@@ -5,10 +5,7 @@ import { number } from './NumberSchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
-import {
-    InferType,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-} from './SchemaBuilder.js';
+import { type InferType } from './SchemaBuilder.js';
 
 test('empty - 1', async () => {
     const schema = object();
@@ -2261,7 +2258,7 @@ test('Conditional Preprocessors', async () => {
 });
 
 test('Preprocessors', async () => {
-    const preprocessDateInterval = (value) => {
+    const preprocessDateInterval = (value: any) => {
         if (typeof value === 'undefined') return value;
 
         if (typeof value === 'string') {
@@ -2638,46 +2635,32 @@ test('getErrorsFor - nested 1', async () => {
     );
     expect(valid).toEqual(false);
 
-    // const nested4Errors = getErrorsFor((t) => t.nested.nested4.nested5)
-    //     .descriptor.parent.parent.parent.getSchema()
-    //     .introspect().properties;
+    const nested4Errors = getErrorsFor(
+        (t) => t.nested.nested2
+    ).descriptor.parent.parent.getSchema();
 
-    // const nested5Errors = getErrorsFor((t) => t.nested.nested4).descriptor;
-
-    // const S = object({
-    //     a: string(),
-    //     nested: object({
-    //         nested2: object({
-    //             nested3: number(),
-    //             nested4: number(),
-    //             nested5: number(),
-    //             nested6: number()
-    //         })
-    //     })
-    // });
-
-    // const pr =
-    //     object.getPropertiesFor(S).nested.nested2.nested3[
-    //         SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-    //     ].parent.parent.parent.getSchema().introspect().properties
+    expect(nested4Errors === schema).toEqual(true);
 });
 
-// test('getErrorsFor - nested 2', async () => {
-//     const schema = object({
-//         first: string(),
-//         last: string(),
-//         age: number(),
-//         nested: object({
-//             nested1: string(),
-//             /**
-//              * some comment here
-//              */
-//             nested2: string(),
-//             nested3: number()
-//         })
-//     });
+test('getErrorsFor - union', async () => {
+    const IntervalSchema = union(string()).or(
+        object({
+            from: date(),
+            to: date()
+        })
+    );
 
-//     const obj: InferType<typeof schema> = {
-//         first: 123,
-//     };
-// });
+    const wrongInterval: InferType<typeof IntervalSchema> = 123 as any;
+
+    const { getNestedErrors, valid } = await IntervalSchema.validate(
+        wrongInterval as any
+    );
+
+    expect(valid).toEqual(false);
+
+    const rootErrors = getNestedErrors();
+    expect(rootErrors).toBeDefined();
+    expect(
+        Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1
+    ).toEqual(true);
+});

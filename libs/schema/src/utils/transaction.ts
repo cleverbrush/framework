@@ -2,6 +2,9 @@ const TRANSACTION_SYMBOL = Symbol('transaction');
 
 const defaultNonTransactionalTypes = [Error, RegExp, Date];
 
+/**
+ * Options for customizing transaction behavior.
+ */
 export type TransactionOptions = {
     /**
      * An optional callback returning boolean. Called for every
@@ -22,6 +25,11 @@ const defaultTransactionOptions: TransactionOptions = {
         !!defaultNonTransactionalTypes.find((t) => child instanceof t)
 };
 
+/**
+ * A transaction wrapper around an object. Provides copy-on-write semantics:
+ * modifications to `object` are isolated from the original until `commit()` is called.
+ * Use `rollback()` to discard changes, and `isDirty()` to check for pending modifications.
+ */
 export type Transaction<T> = {
     /**
      * Transaction object you can modify (equals to `initial` right after the call).
@@ -40,13 +48,19 @@ export type Transaction<T> = {
      */
     rollback: () => T;
     /**
-     * Returns `true` if there are any changes to `object` which makes is different from `initial`
+     * Returns `true` if there are any changes to `object` which make it different from `initial`.
      */
     isDirty: () => boolean;
 };
 
 /**
- * Starts transaction over the `initial` object.
+ * Starts a transaction over the `initial` object. The returned `object` is a
+ * proxy (for plain objects) or a shallow copy (for arrays) that tracks mutations
+ * without modifying `initial`. Call `commit()` to apply or `rollback()` to discard changes.
+ *
+ * @param initial - the object or array to wrap in a transaction
+ * @param options - optional configuration to control which nested values are wrapped
+ * @returns a {@link Transaction} with `object`, `commit`, `rollback`, and `isDirty` members
  */
 export const transaction = <T extends {}>(
     initial: T,
@@ -252,9 +266,9 @@ export const transaction = <T extends {}>(
 };
 
 /**
- * Checks if `obj` is instance of transaction
+ * Checks if `obj` is an instance of a transaction.
  * @param obj object to check if it's a transaction
- * @returns
+ * @returns `true` if `obj` is a transaction, `false` otherwise
  */
 export const isTransaction = (obj) =>
     obj && typeof obj === 'object' && Object.hasOwn(obj, TRANSACTION_SYMBOL);

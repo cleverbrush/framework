@@ -3,8 +3,64 @@ import {
     ValidationContext,
     ValidationErrorMessageProvider,
     ValidationResult,
-    InferType
+    InferType,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    NestedValidationResult,
+    PropertyDescriptor,
+    createHybridErrorArray
 } from './SchemaBuilder.js';
+
+import {
+    ObjectSchemaBuilder,
+    ObjectSchemaValidationResult
+} from './ObjectSchemaBuilder.js';
+
+import {
+    UnionSchemaBuilder,
+    UnionSchemaValidationResult
+} from './UnionSchemaBuilder.js';
+
+/**
+ * Maps an element schema type to the appropriate validation result type.
+ * Union schema elements get `UnionSchemaValidationResult`,
+ * Object schema elements get `ObjectSchemaValidationResult`,
+ * other types get `ValidationResult`.
+ */
+export type ElementValidationResult<
+    TElementSchema extends SchemaBuilder<any, any>
+> =
+    TElementSchema extends UnionSchemaBuilder<
+        infer UOptions extends readonly SchemaBuilder<any, any>[],
+        any,
+        any
+    >
+        ? UnionSchemaValidationResult<InferType<TElementSchema>, UOptions>
+        : TElementSchema extends ObjectSchemaBuilder<any, any, any>
+          ? ObjectSchemaValidationResult<
+                InferType<TElementSchema>,
+                TElementSchema
+            >
+          : ValidationResult<InferType<TElementSchema>>;
+
+/**
+ * Validation result type returned by `ArraySchemaBuilder.validate()`.
+ * Extends `ValidationResult` with `getNestedErrors` for root-level array
+ * errors and per-element validation results.
+ */
+export type ArraySchemaValidationResult<
+    TResult,
+    TElementSchema extends SchemaBuilder<any, any>
+> = ValidationResult<TResult> & {
+    /**
+     * Returns root-level array validation errors combined with
+     * per-element validation results.
+     * The returned value has both `NestedValidationResult` properties
+     * (`errors`, `isValid`, `descriptor`, `seenValue`) and indexed
+     * element results (`[0]`, `[1]`, etc.).
+     */
+    getNestedErrors(): Array<ElementValidationResult<TElementSchema>> &
+        NestedValidationResult<any, any, any>;
+};
 
 type ArraySchemaBuilderCreateProps<
     TElementSchema extends SchemaBuilder<any, any>,
@@ -104,7 +160,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public hasType<T>(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -116,7 +172,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): ArraySchemaBuilder<
         TElementSchema,
@@ -129,14 +185,14 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * Performs validion of the schema over `object`. Basically runs
+     * Performs validation of the schema over `object`. Basically runs
      * validators, preprocessors and checks for required (if schema is not optional).
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
         object: TResult,
         context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
+    ): Promise<ArraySchemaValidationResult<TResult, TElementSchema>> {
         const superResult = await super.preValidate(object, context);
 
         const {
@@ -147,10 +203,38 @@ export class ArraySchemaBuilder<
         } = superResult;
         const { path } = prevalidationContext;
 
+        // Self-referencing property descriptor for the array root
+        const selfDescriptor: PropertyDescriptor<any, any, any> = {
+            [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+                setValue: () => false,
+                getValue: (obj: any) => ({
+                    success: true,
+                    value: obj
+                }),
+                getSchema: () => this,
+                parent: undefined
+            }
+        };
+
+        const rootErrors: string[] = [];
+
+        const elementResults = createHybridErrorArray(
+            [] as any[],
+            () => object,
+            () => rootErrors,
+            () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+        );
+
+        const getNestedErrors = (() => elementResults) as any;
+
         if (!valid) {
+            rootErrors.push(
+                ...(errors || []).map((e: any) => e.message || String(e))
+            );
             return {
                 valid,
-                errors
+                errors,
+                getNestedErrors
             };
         }
 
@@ -164,14 +248,17 @@ export class ArraySchemaBuilder<
         ) {
             return {
                 valid: true,
-                object: objToValidate
+                object: objToValidate,
+                getNestedErrors
             };
         }
 
         if (!Array.isArray(objToValidate)) {
+            rootErrors.push('array expected');
             return {
                 valid: false,
-                errors: [{ message: 'array expected', path: path as string }]
+                errors: [{ message: 'array expected', path: path as string }],
+                getNestedErrors
             };
         }
 
@@ -179,17 +266,20 @@ export class ArraySchemaBuilder<
             typeof this.#maxLength === 'number' &&
             objToValidate.length > this.#maxLength
         ) {
+            const msg = await this.getValidationErrorMessage(
+                this.#maxLengthErrorMessageProvider,
+                objToValidate as TResult
+            );
+            rootErrors.push(msg);
             return {
                 valid: false,
                 errors: [
                     {
-                        message: await this.getValidationErrorMessage(
-                            this.#maxLengthErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
+                        message: msg,
                         path: path as string
                     }
-                ]
+                ],
+                getNestedErrors
             };
         }
 
@@ -197,17 +287,20 @@ export class ArraySchemaBuilder<
             typeof this.#minLength === 'number' &&
             objToValidate.length < this.#minLength
         ) {
+            const msg = await this.getValidationErrorMessage(
+                this.#minLengthErrorMessageProvider,
+                objToValidate as TResult
+            );
+            rootErrors.push(msg);
             return {
                 valid: false,
                 errors: [
                     {
-                        message: await this.getValidationErrorMessage(
-                            this.#minLengthErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
+                        message: msg,
                         path: path as string
                     }
-                ]
+                ],
+                getNestedErrors
             };
         }
 
@@ -228,11 +321,13 @@ export class ArraySchemaBuilder<
                     if (!results[i]?.valid) {
                         valid = false;
                     }
+                    elementResults[i] = results[i] as any;
                 }
 
                 return Object.assign(
                     {
-                        valid
+                        valid,
+                        getNestedErrors
                     },
                     valid
                         ? {}
@@ -256,23 +351,25 @@ export class ArraySchemaBuilder<
                 ) as any;
             } else {
                 for (let i = 0; i < objToValidate.length; i++) {
-                    const {
-                        valid,
-                        errors,
-                        object: validatedItem
-                    } = await this.#elementSchema.validate(objToValidate[i], {
-                        ...prevalidationContext,
-                        path: `${path}[${i}]`
-                    });
-                    if (valid) {
-                        objToValidate[i] = validatedItem;
+                    const result = await this.#elementSchema.validate(
+                        objToValidate[i],
+                        {
+                            ...prevalidationContext,
+                            path: `${path}[${i}]`
+                        }
+                    );
+                    elementResults[i] = result as any;
+                    if (result.valid) {
+                        objToValidate[i] = result.object;
                     } else {
                         return {
                             valid: false,
                             errors:
-                                Array.isArray(errors) && errors.length > 0
-                                    ? [errors[0]]
-                                    : []
+                                Array.isArray(result.errors) &&
+                                result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getNestedErrors
                         };
                     }
                 }
@@ -281,7 +378,8 @@ export class ArraySchemaBuilder<
 
         return {
             valid: true,
-            object: objToValidate as TResult
+            object: objToValidate as TResult,
+            getNestedErrors
         };
     }
 
@@ -359,6 +457,10 @@ export class ArraySchemaBuilder<
         } as any) as any;
     }
 
+    /**
+     * Clears the element schema set by `of()`. After this call,
+     * array items of any type will be accepted.
+     */
     public clearOf(): ArraySchemaBuilder<any, TRequired, TExplicitType> {
         return ArraySchemaBuilder.create({
             ...this.introspect(),

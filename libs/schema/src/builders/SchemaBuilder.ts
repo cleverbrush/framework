@@ -1,6 +1,17 @@
 import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 import { Transaction, transaction } from '../utils/transaction.js';
 
+/**
+ * Infers the TypeScript type that a `SchemaBuilder` instance validates.
+ * Takes into account type optimizations (via `optimize()`) and whether the schema is optional.
+ *
+ * @example
+ * ```ts
+ * const userSchema = object({ name: string(), age: number().optional() });
+ * type User = InferType<typeof userSchema>;
+ * // { name: string; age?: number }
+ * ```
+ */
 export type InferType<T> =
     T extends SchemaBuilder<infer TResult, infer TRequired>
         ? T extends {
@@ -19,14 +30,18 @@ export type InferType<T> =
               : MakeOptional<TResult>
         : T;
 
+/**
+ * Represents a single validation error with the path to the invalid field
+ * and a human-readable error message.
+ */
 export type ValidationError = { path: string; message: string };
 
 /**
- * Used to represent a validation error for nested
+ * Used to represent a validation result for nested
  * objects/properties. Contains a list of errors and
  * the value that caused them.
  */
-export type NestedValidationError<
+export type NestedValidationResult<
     TSchema,
     TRootSchema extends ObjectSchemaBuilder<any, any>,
     TParentPropertyDescriptor
@@ -47,6 +62,10 @@ export type NestedValidationError<
     >;
 };
 
+/**
+ * Utility type that makes a value `T` optional (i.e. `T | undefined`).
+ * Used internally by {@link InferType} to represent optional schema fields.
+ */
 export type MakeOptional<T> = { prop?: T }['prop'];
 
 /**
@@ -77,6 +96,11 @@ export type ValidationResult<T> = {
     errors?: ValidationError[];
 };
 
+/**
+ * Internal result returned by the `preValidate` step of `SchemaBuilder`.
+ * Contains the validation context, any early errors, and the transaction
+ * wrapping the (possibly preprocessed) value.
+ */
 export type PreValidationResult<T, TTransactionType> = Omit<
     ValidationResult<T>,
     'object'
@@ -90,11 +114,31 @@ type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
     errors?: Omit<ValidationError, 'path'>[];
 };
 
+/**
+ * A function that transforms the value before validation.
+ * Preprocessors run in order before validators and can modify or replace the value.
+ *
+ * @param object - the current value to preprocess
+ * @returns the transformed value, or a Promise resolving to it
+ */
 export type Preprocessor<T> = (object: T) => Promise<T> | T;
+
+/**
+ * A custom validation function that checks a value and returns a result
+ * indicating whether the value is valid, along with optional error messages.
+ *
+ * @param object - the value to validate
+ * @returns a result with `valid` boolean and optional `errors` array, or a Promise resolving to it
+ */
 export type Validator<T> = (
     object: T
 ) => Promise<ValidatorResult<T>> | ValidatorResult<T>;
 
+/**
+ * Configuration properties used to construct a `SchemaBuilder` instance.
+ * Contains the schema type identifier, requirement flag, and lists of
+ * preprocessors and validators.
+ */
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
@@ -231,6 +275,10 @@ export type PropertySetterOptions = {
     createMissingStructure?: boolean;
 };
 
+/**
+ * Extracts the inner property descriptor type from a `PropertyDescriptor`.
+ * Returns `undefined` if `T` is not a valid `PropertyDescriptor`.
+ */
 export type PropertyDescriptorInnerFromPropertyDescriptor<T> =
     T extends PropertyDescriptor<
         infer TSchema,
@@ -316,6 +364,11 @@ export type PropertyDescriptorInner<
     //     : never;
 };
 
+/**
+ * A wrapper object keyed by {@link SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR} that
+ * holds a {@link PropertyDescriptorInner} for a particular property within
+ * an object schema. Used to get/set property values on validated objects.
+ */
 export type PropertyDescriptor<
     TRootSchema extends ObjectSchemaBuilder<any, any, any>,
     TPropertySchema,
@@ -370,6 +423,39 @@ export type PropertyDescriptorTree<
         : never);
 
 /**
+ * Creates an array augmented with non-enumerable NestedValidationResult
+ * properties (`seenValue`, `errors`, `isValid`, `descriptor`).
+ * Used by UnionSchemaBuilder and ArraySchemaBuilder to return hybrid
+ * arrays from `getErrorsFor()`.
+ */
+export function createHybridErrorArray<T extends any[]>(
+    items: T,
+    seenValue: () => any,
+    errors: () => ReadonlyArray<string>,
+    descriptor: () => any
+): T {
+    Object.defineProperties(items, {
+        seenValue: {
+            get: seenValue,
+            enumerable: false
+        },
+        errors: {
+            get: errors,
+            enumerable: false
+        },
+        isValid: {
+            get: () => errors().length === 0,
+            enumerable: false
+        },
+        descriptor: {
+            get: descriptor,
+            enumerable: false
+        }
+    });
+    return items;
+}
+
+/**
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
@@ -386,30 +472,36 @@ export abstract class SchemaBuilder<
     #type = 'base';
 
     /**
-     * Set type of schema explicitly. `notUsed` param is needed only for cas when JS is used. E.g. when you
+     * Set type of schema explicitly. `notUsed` param is needed only for case when JS is used. E.g. when you
      * can't call method like `schema.hasType<Date>()`, so instead you can call `schema.hasType(new Date())`
      * with the same result.
      */
-    public abstract hasType<T>(notUsed?: T);
+    public abstract hasType<T>(notUsed?: T): any;
 
     /**
      * Clears type set by call to `.hasType<T>()`, default schema type inference will be used
-     * for schema retuned by this call.
+     * for schema returned by this call.
      */
-    public abstract clearHasType();
+    public abstract clearHasType(): any;
 
     /**
-     * Protected method used to create an new instance of the Builder
-     * defined by the `props` object. Should be used to instanticate new
+     * Protected method used to create a new instance of the Builder
+     * defined by the `props` object. Should be used to instantiate new
      * builders to keep builder's immutability.
      * @param props arbitrary props object
      */
-    protected abstract createFromProps(props): this;
+    protected abstract createFromProps(props: any): this;
 
+    /**
+     * The string identifier of the schema type (e.g. `'string'`, `'number'`, `'object'`).
+     */
     protected get type() {
         return this.#type;
     }
 
+    /**
+     * Sets the schema type identifier. Must be a non-empty string.
+     */
     protected set type(value: string) {
         if (typeof value !== 'string' || !value)
             throw new Error('value should be non empty string');
@@ -432,16 +524,31 @@ export abstract class SchemaBuilder<
         return this.#validators;
     }
 
+    /**
+     * Whether the schema requires a non-null/non-undefined value.
+     */
     protected get isRequired(): TRequired {
         return this.#isRequired as TRequired;
     }
 
+    /**
+     * Sets the requirement flag. Must be a boolean.
+     */
     protected set isRequired(value: boolean) {
         if (typeof value !== 'boolean')
             throw new Error('should be a boolean value');
         this.#isRequired = value as any;
     }
 
+    /**
+     * Runs preprocessors, validators, and the required/optional check on `object`.
+     * Subclasses call this at the start of their `validate()` implementation to get
+     * a preprocessed value wrapped in a transaction, along with any early errors.
+     *
+     * @param object - the value to pre-validate
+     * @param context - optional validation context settings
+     * @returns a `PreValidationResult` containing the preprocessed transaction, context, and any errors
+     */
     protected async preValidate(
         /**
          * Object to validate
@@ -706,8 +813,16 @@ export abstract class SchemaBuilder<
         context?: ValidationContext
     ): Promise<ValidationResult<any>>;
 
+    /**
+     * Resolves a `ValidationErrorMessageProvider` to a string error message.
+     * Handles both string providers and function providers (sync or async).
+     *
+     * @param provider - the error message provider (string or function)
+     * @param seenValue - the value that caused the validation error
+     * @returns the resolved error message string
+     */
     protected async getValidationErrorMessage(
-        provider: ValidationErrorMessageProvider,
+        provider: ValidationErrorMessageProvider<any>,
         seenValue: TResult
     ): Promise<string> {
         if (typeof provider === 'string') {
@@ -723,9 +838,18 @@ export abstract class SchemaBuilder<
         );
     }
 
+    /**
+     * Ensures a `ValidationErrorMessageProvider` is valid.
+     * If `provider` is `undefined`, falls back to `defaultValue`.
+     * Function providers are bound to `this` for access to schema state.
+     *
+     * @param provider - the provider to validate, or `undefined`
+     * @param defaultValue - fallback provider when `provider` is not supplied
+     * @returns a valid `ValidationErrorMessageProvider`
+     */
     protected assureValidationErrorMessageProvider(
-        provider: ValidationErrorMessageProvider | undefined,
-        defaultValue: ValidationErrorMessageProvider
+        provider: ValidationErrorMessageProvider<any> | undefined,
+        defaultValue: ValidationErrorMessageProvider<any>
     ): ValidationErrorMessageProvider<any> {
         if (typeof provider === 'string') {
             return provider;

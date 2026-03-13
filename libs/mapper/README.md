@@ -3,7 +3,7 @@
 This document describes the intent and design of changes introduced in the `mapper` branch. The work spans two packages — `@cleverbrush/schema` and `@cleverbrush/mapper` — and can be grouped into three areas:
 
 1. **Property Descriptors** — a type-safe mechanism in `@cleverbrush/schema` for addressing, reading and writing individual properties inside a schema-defined object.
-2. **Improved Validation Errors** — custom error messages for every schema constraint and a new `PropertyValidationError` class that reports errors against the property descriptor tree, giving callers structured, per-property error information.
+2. **Improved Validation Errors** — custom error messages for every schema constraint and a new `PropertyValidationResult` class that reports errors against the property descriptor tree, giving callers structured, per-property error information.
 3. **Schema-to-Schema Mapper** — the new `@cleverbrush/mapper` library that uses property descriptors to declare and execute object-to-object mappings.
 
 ---
@@ -19,11 +19,22 @@ Schema builders already know the full structure of an object at definition time,
 A **property descriptor tree** mirrors the shape of an `ObjectSchemaBuilder`. Each node in the tree carries a `PropertyDescriptorInner` hidden behind the `SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR` symbol key. The inner descriptor exposes:
 
 ```typescript
-type PropertyDescriptorInner<TSchema, TPropertySchema, TParentPropertyDescriptor> = {
+type PropertyDescriptorInner<
+    TSchema,
+    TPropertySchema,
+    TParentPropertyDescriptor
+> = {
     /** Read the property value from a root object. */
-    getValue: (obj: InferType<TSchema>) => { value?: InferType<TPropertySchema>; success: boolean };
+    getValue: (obj: InferType<TSchema>) => {
+        value?: InferType<TPropertySchema>;
+        success: boolean;
+    };
     /** Write a new value. Returns false if the path does not exist in the object. */
-    setValue: (obj: InferType<TSchema>, value: InferType<TPropertySchema>, options?: PropertySetterOptions) => boolean;
+    setValue: (
+        obj: InferType<TSchema>,
+        value: InferType<TPropertySchema>,
+        options?: PropertySetterOptions
+    ) => boolean;
     /** The schema that describes this property. */
     getSchema: () => TPropertySchema;
     /** Link to the parent descriptor (undefined at root level). */
@@ -60,7 +71,8 @@ const person: InferType<typeof PersonSchema> = {
 };
 
 // Read
-const { success, value } = tree.address.city[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].getValue(person);
+const { success, value } =
+    tree.address.city[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].getValue(person);
 // success === true, value === 'Yasnaya Polyana'
 
 // Write
@@ -72,9 +84,9 @@ When the intermediate path does not exist, `setValue` returns `false` by default
 
 ```typescript
 const empty = {} as any;
-tree.address.city[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].setValue(
-    empty, 'Moscow', { createMissingStructure: true }
-);
+tree.address.city[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].setValue(empty, 'Moscow', {
+    createMissingStructure: true
+});
 // empty === { address: { city: 'Moscow' } }
 ```
 
@@ -97,10 +109,13 @@ const Schema = object({
     })
 });
 
-const desc = object.getPropertiesFor(Schema).level2.level3.value[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+const desc =
+    object.getPropertiesFor(Schema).level2.level3.value[
+        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+    ];
 
-desc.parent;              // level3 descriptor
-desc.parent.parent;       // level2 descriptor
+desc.parent; // level3 descriptor
+desc.parent.parent; // level2 descriptor
 desc.parent.parent.parent; // root descriptor (Schema)
 ```
 
@@ -109,7 +124,12 @@ desc.parent.parent.parent; // root descriptor (Schema)
 A `SchemaPropertySelector` callback is the public-facing way to pick a descriptor from a tree:
 
 ```typescript
-type SchemaPropertySelector<TSchema, TPropertySchema, TAssignableTo, TParentPropertyDescriptor> = (
+type SchemaPropertySelector<
+    TSchema,
+    TPropertySchema,
+    TAssignableTo,
+    TParentPropertyDescriptor
+> = (
     tree: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>
 ) => PropertyDescriptor<TSchema, TPropertySchema, TParentPropertyDescriptor>;
 ```
@@ -127,15 +147,23 @@ Every constraint on the built-in schema builders (`StringSchemaBuilder`, `Number
 ```typescript
 type ValidationErrorMessageProvider<TSchema> =
     | string
-    | ((seenValue: InferType<TSchema>, schema: TSchema) => string | Promise<string>);
+    | ((
+          seenValue: InferType<TSchema>,
+          schema: TSchema
+      ) => string | Promise<string>);
 ```
 
 Example — every `StringSchemaBuilder` constraint has a corresponding provider:
 
 ```typescript
 const Name = string()
-    .minLength(2, { minLengthValidationErrorMessageProvider: 'Name is too short' })
-    .maxLength(50, { maxLengthValidationErrorMessageProvider: (seen) => `"${seen}" exceeds 50 chars` });
+    .minLength(2, {
+        minLengthValidationErrorMessageProvider: 'Name is too short'
+    })
+    .maxLength(50, {
+        maxLengthValidationErrorMessageProvider: (seen) =>
+            `"${seen}" exceeds 50 chars`
+    });
 ```
 
 When no custom provider is given the builder falls back to a built-in default (e.g. `"is expected to have a length of at least 2 characters"`). The base `SchemaBuilder` class provides two protected helpers shared by all builders:
@@ -143,25 +171,35 @@ When no custom provider is given the builder falls back to a built-in default (e
 - `getValidationErrorMessage(provider, seenValue)` — resolves the provider to a string.
 - `assureValidationErrorMessageProvider(provider, defaultProvider)` — normalises and binds the provider during construction.
 
-### 2b. `PropertyValidationError` and `getErrorsFor()`
+### 2b. `PropertyValidationResult` and `getErrorsFor()`
 
 `ObjectSchemaBuilder.validate()` now returns an `ObjectSchemaValidationResult` that extends the original `ValidationResult` with a `getErrorsFor()` method:
 
 ```typescript
-type ObjectSchemaValidationResult<T, TRootSchema, TSchema> = ValidationResult<T> & {
-    getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(
-        selector?: (properties: PropertyDescriptorTree<TSchema, TRootSchema>)
-            => PropertyDescriptor<TRootSchema, TPropertySchema, TParentPropertyDescriptor>
-    ): NestedValidationError<TPropertySchema, TRootSchema, TParentPropertyDescriptor>;
-};
+type ObjectSchemaValidationResult<T, TRootSchema, TSchema> =
+    ValidationResult<T> & {
+        getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(
+            selector?: (
+                properties: PropertyDescriptorTree<TSchema, TRootSchema>
+            ) => PropertyDescriptor<
+                TRootSchema,
+                TPropertySchema,
+                TParentPropertyDescriptor
+            >
+        ): NestedValidationResult<
+            TPropertySchema,
+            TRootSchema,
+            TParentPropertyDescriptor
+        >;
+    };
 ```
 
-`getErrorsFor()` accepts the same kind of property selector callback used elsewhere. It returns a `PropertyValidationError` instance that holds:
+`getErrorsFor()` accepts the same kind of property selector callback used elsewhere. It returns a `PropertyValidationResult` instance that holds:
 
 - **`errors`** — a list of error strings specific to the selected property.
 - **`seenValue`** — the value the property had at validation time (retrieved through the descriptor).
 - **`isValid`** — `true` when there are no errors and no child errors.
-- **`getChildErrors()`** — nested `PropertyValidationError` instances for sub-properties.
+- **`getChildErrors()`** — nested `PropertyValidationResult` instances for sub-properties.
 - **`descriptor`** — the `PropertyDescriptorInner` for this property.
 
 ```typescript
@@ -170,9 +208,9 @@ const result = await PersonSchema.validate(person);
 if (!result.valid) {
     // errors for the whole address sub-object
     const addressErrors = result.getErrorsFor((p) => p.address);
-    console.log(addressErrors.errors);       // e.g. ['must be an object']
-    console.log(addressErrors.seenValue);    // the value seen during validation
-    console.log(addressErrors.isValid);      // false
+    console.log(addressErrors.errors); // e.g. ['must be an object']
+    console.log(addressErrors.seenValue); // the value seen during validation
+    console.log(addressErrors.isValid); // false
 
     // errors for a leaf property
     const cityErrors = result.getErrorsFor((p) => p.address.city);
@@ -269,11 +307,11 @@ const dto = await mapUserToDto(user);
 
 ### Mapping strategies
 
-| Strategy | Usage | Purpose |
-|---|---|---|
-| `mapFromProp(selector)` | `.forProp(t => t.x).mapFromProp(s => s.y)` | Copy from a source property (supports nested paths). |
-| `mapFrom(fn)` | `.forProp(t => t.x).mapFrom(s => s.a + s.b)` | Compute from a sync or async function receiving the source object. |
-| `ignore()` | `.forProp(t => t.x).ignore()` | Exclude a target property — prevents `MapperConfigurationError`. |
+| Strategy                | Usage                                        | Purpose                                                            |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| `mapFromProp(selector)` | `.forProp(t => t.x).mapFromProp(s => s.y)`   | Copy from a source property (supports nested paths).               |
+| `mapFrom(fn)`           | `.forProp(t => t.x).mapFrom(s => s.a + s.b)` | Compute from a sync or async function receiving the source object. |
+| `ignore()`              | `.forProp(t => t.x).ignore()`                | Exclude a target property — prevents `MapperConfigurationError`.   |
 
 Every target property must be either mapped or explicitly ignored. Unmapped properties cause a `MapperConfigurationError` when `getMapper()` is called.
 

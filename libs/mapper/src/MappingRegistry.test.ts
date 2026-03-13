@@ -2,7 +2,7 @@ import { test, expect } from 'vitest';
 
 //import { object, string, number } from '@cleverbrush/schema';
 
-import { MappingRegistry } from './MappingRegistry.js';
+// import { MappingRegistry } from './MappingRegistry.js';
 
 // const UserSchema = object({
 //     name: string(),
@@ -22,7 +22,7 @@ import { MappingRegistry } from './MappingRegistry.js';
 // });
 
 test('Throws on nulls', async () => {
-    const mappers = new MappingRegistry();
+    // const mappers = new MappingRegistry();
     expect(true).toEqual(true);
 
     // expect(() => mappers.map(null as any, null as any)).toThrow();
