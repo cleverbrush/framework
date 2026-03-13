@@ -19,8 +19,10 @@
         "clean_scheduler": "rm -rf libs/scheduler/dist",
         "docs": "typedoc",
         "prettier": "npx prettier --write ./libs",
-        "publish": "npm run clean && npm run build && npm publish --workspace @cleverbrush/schema --access=public && npm publish --workspace @cleverbrush/deep --access=public && npm publish --workspace @cleverbrush/knex-clickhouse --access=public && npm publish --workspace @cleverbrush/async --access=public && npm publish --workspace @cleverbrush/scheduler --access=public && npm publish --workspace @cleverbrush/mapper --access=public",
-        "publish:beta": "npm run clean && npm run build && npm publish --tag beta --workspace @cleverbrush/deep --access=public && npm publish --tag beta --workspace @cleverbrush/knex-clickhouse --access=public && npm publish --tag beta --workspace @cleverbrush/async --access=public && npm publish --tag beta --workspace @cleverbrush/schema --access=public && npm publish --tag beta --workspace @cleverbrush/scheduler --access=public && npm publish --tag beta --workspace @cleverbrush/mapper --access=public",
+        "changeset": "changeset",
+        "version": "changeset version",
+        "release": "npm run clean && npm run build && changeset publish",
+        "publish:beta": "npm run clean && npm run build && changeset publish --tag beta",
         "run_scheduler": "node ./libs/scheduler/dist/index.js",
         "test": "vitest --run"
     },
@@ -31,10 +33,11 @@
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD 3-Clause",
     "devDependencies": {
+        "@changesets/cli": "^2.30.0",
         "@vitest/coverage-v8": "^4.0.18",
-        "typescript": "^5.9.3",
         "eslint-config-airbnb": "^19.0.4",
         "prettier": "^3.8.1",
+        "typescript": "^5.9.3",
         "typescript-eslint": "^8.57.0",
         "vitest": "^4.0.18"
     }

@@ -31,6 +31,6 @@
     "types": "./dist/index.d.ts",
     "version": "1.1.10",
     "devDependencies": {
-        "@cleverbrush/deep": "1.1.11"
+        "@cleverbrush/deep": "^1.1.10"
     }
 }
