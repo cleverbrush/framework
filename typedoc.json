@@ -4,6 +4,8 @@
     "entryPoints": [
         "libs/async",
         "libs/deep",
+        "libs/knex-clickhouse",
+        "libs/mapper",
         "libs/scheduler",
         "libs/schema"
     ],

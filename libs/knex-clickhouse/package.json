@@ -16,7 +16,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "CHANGE ME",
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_knex_clickhouse.html",
     "keywords": [
         "knex",
         "query builder",
@@ -25,11 +25,18 @@
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
     "name": "@cleverbrush/knex-clickhouse",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/knex-clickhouse#readme",
     "repository": {
         "type": "git",
-        "url": "github:cleverbrush/framework"
+        "url": "github:cleverbrush/framework",
+        "directory": "libs/knex-clickhouse"
     },
     "scripts": {
         "watch": "tsc --watch",

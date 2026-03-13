@@ -7,24 +7,31 @@
     "dependencies": {
         "@cleverbrush/schema": "^1.1.10"
     },
-    "description": "Library for deep operations on objects like deep equal, deep extend, etc.",
+    "description": "Schema-to-Schema object mapper for Cleverbrush framework",
     "files": [
         "dist"
     ],
     "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_mapper.html",
     "keywords": [
-        "deep operations on objects",
-        "deep equal",
-        "deep extend",
+        "object mapper",
+        "schema mapper",
+        "object mapping",
         "cleverbrush"
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
     "name": "@cleverbrush/mapper",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/mapper#readme",
     "repository": {
         "type": "git",
-        "url": "github:cleverbrush/framework"
+        "url": "github:cleverbrush/framework",
+        "directory": "libs/mapper"
     },
     "scripts": {
         "watch": "tsc --watch",

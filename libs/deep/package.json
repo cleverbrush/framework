@@ -17,11 +17,18 @@
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
     "name": "@cleverbrush/deep",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/deep#readme",
     "repository": {
         "type": "git",
-        "url": "github:cleverbrush/framework"
+        "url": "github:cleverbrush/framework",
+        "directory": "libs/deep"
     },
     "scripts": {
         "watch": "tsc --watch",

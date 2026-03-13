@@ -15,11 +15,18 @@
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
     "name": "@cleverbrush/async",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/async#readme",
     "repository": {
         "type": "git",
-        "url": "github:cleverbrush/framework"
+        "url": "github:cleverbrush/framework",
+        "directory": "libs/async"
     },
     "scripts": {
         "watch": "tsc --watch",
