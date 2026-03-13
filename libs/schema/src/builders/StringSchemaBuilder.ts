@@ -700,16 +700,31 @@ export function string<T extends string>(
     equals: T
 ): StringSchemaBuilder<T, true>;
 
+/**
+ * Creates a string schema restricted to be equal to `equals` with a custom error message.
+ * @param equals number value
+ */
+export function string<T extends string>(
+    equals: T,
+    errorMessage: ValidationErrorMessageProvider<StringSchemaBuilder<T, true>>
+): StringSchemaBuilder<T, true>;
+
 export function string(): StringSchemaBuilder<string, true>;
 
 /**
  * Creates a string schema.
  */
-export function string(equals?: string) {
+export function string(
+    equals?: string,
+    errorMessage?: ValidationErrorMessageProvider<
+        StringSchemaBuilder<string, true>
+    >
+) {
     if (typeof equals === 'string') {
         return StringSchemaBuilder.create({
             isRequired: true,
-            equalsTo: equals
+            equalsTo: equals,
+            equalsToValidationErrorMessageProvider: errorMessage
         });
     }
     return StringSchemaBuilder.create({

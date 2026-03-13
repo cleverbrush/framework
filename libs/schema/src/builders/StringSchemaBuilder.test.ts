@@ -994,3 +994,17 @@ test('string(value)', async () => {
         expect(object).toBeUndefined();
     }
 });
+
+test('string(value, customErrorMessage)', async () => {
+    const schema = string('abc', 'This is a custom error message');
+
+    {
+        const { valid, errors, object } = await schema.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+});
