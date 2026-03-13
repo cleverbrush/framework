@@ -159,7 +159,7 @@ if (!result.valid) {
 For advanced use cases, schema property descriptors provide type-safe programmatic access to read and write individual properties on schema-defined objects:
 
 ```typescript
-import { object, string, number, SYMBOL_SCHEMA_PROPERTY } from '@cleverbrush/schema';
+import { object, string, number } from '@cleverbrush/schema';
 
 const PersonSchema = object({
     firstName: string(),
@@ -170,22 +170,11 @@ const PersonSchema = object({
     })
 });
 
+// Get the property descriptor tree
 const tree = object.getPropertiesFor(PersonSchema);
-
-const person = {
-    firstName: 'Leo',
-    lastName: 'Tolstoy',
-    address: { city: 'Yasnaya Polyana', zip: 12345 }
-};
-
-// Read a value
-const { success, value } =
-    tree.address.city[SYMBOL_SCHEMA_PROPERTY].getValue(person);
-// success === true, value === 'Yasnaya Polyana'
-
-// Write a value
-tree.address.city[SYMBOL_SCHEMA_PROPERTY].setValue(person, 'Moscow');
 ```
+
+Property descriptors are primarily used by [`@cleverbrush/mapper`](../mapper) to provide type-safe property selectors for schema-to-schema mapping. See the [mapper documentation](../mapper/README.md) for usage examples.
 
 ## Exports
 
