@@ -5,7 +5,8 @@ import {
     InferType,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     NestedValidationError,
-    PropertyDescriptor
+    PropertyDescriptor,
+    createHybridErrorArray
 } from './SchemaBuilder.js';
 
 import {
@@ -255,29 +256,12 @@ export class UnionSchemaBuilder<
         // Root error state
         const rootErrors: string[] = [];
 
-        // Store all per-option validation results, augmented with
-        // root-level error properties so getErrorsFor() returns a
-        // hybrid array that is both tuple-indexable and carries
-        // NestedValidationError data.
-        const optionResults: any[] = [];
-        Object.defineProperties(optionResults, {
-            seenValue: {
-                get: () => object,
-                enumerable: false
-            },
-            errors: {
-                get: () => rootErrors,
-                enumerable: false
-            },
-            isValid: {
-                get: () => rootErrors.length === 0,
-                enumerable: false
-            },
-            descriptor: {
-                get: () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR],
-                enumerable: false
-            }
-        });
+        const optionResults = createHybridErrorArray(
+            [] as any[],
+            () => object,
+            () => rootErrors,
+            () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+        );
 
         const getErrorsFor = (() => optionResults) as any;
 

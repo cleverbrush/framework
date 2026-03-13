@@ -370,6 +370,39 @@ export type PropertyDescriptorTree<
         : never);
 
 /**
+ * Creates an array augmented with non-enumerable NestedValidationError
+ * properties (`seenValue`, `errors`, `isValid`, `descriptor`).
+ * Used by UnionSchemaBuilder and ArraySchemaBuilder to return hybrid
+ * arrays from `getErrorsFor()`.
+ */
+export function createHybridErrorArray<T extends any[]>(
+    items: T,
+    seenValue: () => any,
+    errors: () => ReadonlyArray<string>,
+    descriptor: () => any
+): T {
+    Object.defineProperties(items, {
+        seenValue: {
+            get: seenValue,
+            enumerable: false
+        },
+        errors: {
+            get: errors,
+            enumerable: false
+        },
+        isValid: {
+            get: () => errors().length === 0,
+            enumerable: false
+        },
+        descriptor: {
+            get: descriptor,
+            enumerable: false
+        }
+    });
+    return items;
+}
+
+/**
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.

@@ -1,5 +1,9 @@
 export { AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
 export { ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
+export type {
+    ArraySchemaValidationResult,
+    ElementValidationResult
+} from './builders/ArraySchemaBuilder.js';
 export { BooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
 export { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 export { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
