@@ -8,14 +8,14 @@ Libraries are written in **TypeScript** and distributed as **ES6 modules**. You 
 
 ## Packages
 
-| Package | Description |
-| --- | --- |
-| [`@cleverbrush/async`](./libs/async) | Async utilities: `Collector`, `debounce`, `throttle`, `retry` |
-| [`@cleverbrush/deep`](./libs/deep) | Deep operations on objects: equality, merge, flatten |
-| [`@cleverbrush/schema`](./libs/schema) | Schema definition and validation with TypeScript type inference |
-| [`@cleverbrush/mapper`](./libs/mapper) | Schema-to-schema object mapping with type-safe property selectors |
-| [`@cleverbrush/scheduler`](./libs/scheduler) | Job scheduler for Node.js using worker threads |
-| [`@cleverbrush/knex-clickhouse`](./libs/knex-clickhouse) | Knex query builder dialect for ClickHouse |
+| Package                                                  | Description                                                       |
+| -------------------------------------------------------- | ----------------------------------------------------------------- |
+| [`@cleverbrush/async`](./libs/async)                     | Async utilities: `Collector`, `debounce`, `throttle`, `retry`     |
+| [`@cleverbrush/deep`](./libs/deep)                       | Deep operations on objects: equality, merge, flatten              |
+| [`@cleverbrush/schema`](./libs/schema)                   | Schema definition and validation with TypeScript type inference   |
+| [`@cleverbrush/mapper`](./libs/mapper)                   | Schema-to-schema object mapping with type-safe property selectors |
+| [`@cleverbrush/scheduler`](./libs/scheduler)             | Job scheduler for Node.js using worker threads                    |
+| [`@cleverbrush/knex-clickhouse`](./libs/knex-clickhouse) | Knex query builder dialect for ClickHouse                         |
 
 ## Development
 
@@ -44,6 +44,38 @@ npm run docs
 ```
 
 Each library also has its own `README.md` with usage examples and API reference.
+
+## Release
+
+This project uses [Changesets](https://github.com/changesets/changesets) for versioning and publishing. All packages are versioned together (fixed versioning).
+
+1. **Add a changeset** — after making changes, run:
+
+   ```bash
+   npm run changeset
+   ```
+
+   Follow the prompts to select the affected packages and describe the change. This creates a changeset file in the `.changeset` directory.
+
+2. **Version packages** — when ready to release, consume all pending changesets and bump versions:
+
+   ```bash
+   npm run version
+   ```
+
+   This updates `package.json` versions and `CHANGELOG.md` files. Review and commit the result.
+
+3. **Publish to npm** — build and publish all packages:
+
+   ```bash
+   npm run release
+   ```
+
+   To publish a beta release instead:
+
+   ```bash
+   npm run publish:beta
+   ```
 
 ## Contributing
 
