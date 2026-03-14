@@ -121,11 +121,11 @@ const result = await mapFn(sourceObject);
 
 ## Mapping Strategies
 
-| Strategy | Usage | Purpose |
-| --- | --- | --- |
-| `mapFromProp(selector)` | `.forProp(t => t.x).mapFromProp(s => s.y)` | Copy from a source property (supports nested paths) |
-| `mapFrom(fn)` | `.forProp(t => t.x).mapFrom(s => s.a + s.b)` | Compute from a sync or async function |
-| `ignore()` | `.forProp(t => t.x).ignore()` | Exclude a target property |
+| Strategy                | Usage                                        | Purpose                                             |
+| ----------------------- | -------------------------------------------- | --------------------------------------------------- |
+| `mapFromProp(selector)` | `.forProp(t => t.x).mapFromProp(s => s.y)`   | Copy from a source property (supports nested paths) |
+| `mapFrom(fn)`           | `.forProp(t => t.x).mapFrom(s => s.a + s.b)` | Compute from a sync or async function               |
+| `ignore()`              | `.forProp(t => t.x).ignore()`                | Exclude a target property                           |
 
 Every target property must be either mapped or explicitly ignored. Unmapped properties cause a `MapperConfigurationError` when `getMapper()` is called.
 
