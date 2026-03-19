@@ -24,7 +24,15 @@ export {
     InferType,
     MakeOptional,
     ValidationError,
-    ValidationResult
+    ValidationResult,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+} from './builders/SchemaBuilder.js';
+
+export type {
+    PropertyDescriptor,
+    PropertyDescriptorInner,
+    PropertyDescriptorTree,
+    PropertySetterOptions
 } from './builders/SchemaBuilder.js';
 export { any } from './builders/AnySchemaBuilder.js';
 export { array } from './builders/ArraySchemaBuilder.js';

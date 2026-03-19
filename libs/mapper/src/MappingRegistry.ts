@@ -1,70 +1,355 @@
 import {
     InferType,
     ObjectSchemaBuilder,
-    SchemaPropertySelector
+    SchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    PropertyDescriptorTree,
+    PropertyDescriptor
 } from '@cleverbrush/schema';
 
-export type SchemaToSchemaMapperResult<TFromSchema, TToSchema> = (
-    from: InferType<TFromSchema>
-) => Promise<InferType<TToSchema>>;
+// ── Helper Types ──────────────────────────────────────────────────────
 
-export type PropertyMappingStrategy<
-    TToSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertyType,
-    TReturnType
-> = {
-    ignore: () => TReturnType;
-    mapFromProp: (
-        p: SchemaPropertySelector<TToSchema, TPropertyType>
-    ) => TReturnType;
-    mapFrom: (
-        setings:
-            | ((obj?: InferType<TToSchema>) => TPropertyType)
-            | ((obj?: InferType<TToSchema>) => Promise<TPropertyType>)
-    ) => TReturnType;
+/**
+ * Extracts the properties record from an ObjectSchemaBuilder.
+ */
+type ExtractSchemaProperties<T> =
+    T extends ObjectSchemaBuilder<infer TProperties, any, any>
+        ? TProperties
+        : never;
+
+/**
+ * Gets all top-level property key names of an ObjectSchemaBuilder.
+ */
+type SchemaKeys<T extends ObjectSchemaBuilder<any, any, any>> =
+    keyof ExtractSchemaProperties<T> & string;
+
+/**
+ * Branded phantom type that tags a property descriptor with its key name.
+ * This allows TypeScript to infer which property was selected in the
+ * `forProp` callback, enabling compile-time tracking of mapped vs unmapped
+ * properties.
+ */
+type TargetPropertyKey<K extends string> = {
+    readonly __targetPropertyKey: K;
 };
 
 /**
- * A class to map properties from one schema to another
- * by defualt it will map all properties with the same name
- * and type (schema). If you want to map a property to a different
- * property you can use the forProp method to specify the target.
- * When you are done you can call the `getMapper` method to get the
- * function that will do the mapping.
+ * Creates a tree of selectable target properties, filtered to only show
+ * properties whose keys are in `TAllowedKeys`. Each property is branded
+ * with `TargetPropertyKey<K>` so the key can be inferred from the return
+ * type of the selector callback.
+ */
+type TargetPropertyTree<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TAllowedKeys extends string
+> = {
+    [K in SchemaKeys<TSchema> & TAllowedKeys]: TargetPropertyKey<K> &
+        PropertyDescriptor<TSchema, ExtractSchemaProperties<TSchema>[K], any>;
+};
+
+/**
+ * Infers the TypeScript type of a specific property in an ObjectSchemaBuilder
+ * by its key name.
+ */
+type SchemaPropertyInferredType<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    K extends string
+> = K extends keyof ExtractSchemaProperties<TSchema>
+    ? InferType<ExtractSchemaProperties<TSchema>[K]>
+    : never;
+
+// ── Mapper Result Type ────────────────────────────────────────────────
+
+export type SchemaToSchemaMapperResult<
+    TFromSchema extends ObjectSchemaBuilder<any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any>
+> = (from: InferType<TFromSchema>) => Promise<InferType<TToSchema>>;
+
+// ── Error Class ───────────────────────────────────────────────────────
+
+export class MapperConfigurationError extends Error {
+    constructor(unmappedProperties: string[]) {
+        super(
+            `Mapper configuration error: the following target properties are not mapped and not ignored: ${unmappedProperties.join(', ')}`
+        );
+        this.name = 'MapperConfigurationError';
+    }
+}
+
+// ── Internal Mapping Entry ────────────────────────────────────────────
+
+type MappingEntry = {
+    type: 'prop' | 'custom' | 'ignore';
+    sourceDescriptorInner?: ReturnType<
+        PropertyDescriptor<
+            any,
+            any,
+            any
+        >[typeof SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]['getValue']
+    > extends any
+        ? any
+        : never;
+    fn?: (obj: any) => any;
+};
+
+// ── PropertyMappingBuilder ────────────────────────────────────────────
+
+/**
+ * Intermediate builder returned by `forProp()`. Provides three strategies
+ * to configure how the selected target property is populated:
+ * - `mapFromProp()` — copy from a source property
+ * - `mapFrom()` — compute from the entire source object
+ * - `ignore()` — explicitly skip the property
+ */
+export class PropertyMappingBuilder<
+    TFromSchema extends ObjectSchemaBuilder<any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TKey extends string,
+    TUnmapped extends string
+> {
+    private readonly _mapper: Mapper<TFromSchema, TToSchema, any>;
+    private readonly _targetKey: TKey;
+
+    /** @internal */
+    constructor(mapper: Mapper<TFromSchema, TToSchema, any>, targetKey: TKey) {
+        this._mapper = mapper;
+        this._targetKey = targetKey;
+    }
+
+    /**
+     * Maps the target property from a source property. The selector
+     * receives the source schema's PropertyDescriptorTree and supports
+     * nested paths (e.g. `(s) => s.address.city`).
+     *
+     * Type compatibility is enforced: only source properties whose
+     * inferred type is assignable to the target property type will
+     * appear in the selector callback.
+     */
+    public mapFromProp<TPropertySchema extends SchemaBuilder<any, any>>(
+        selector: (
+            tree: PropertyDescriptorTree<
+                TFromSchema,
+                TFromSchema,
+                SchemaPropertyInferredType<TToSchema, TKey>
+            >
+        ) => PropertyDescriptor<TFromSchema, TPropertySchema, any>
+    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>> {
+        const sourceTree = ObjectSchemaBuilder.getPropertiesFor(
+            this._mapper['_fromSchema']
+        );
+        const sourceDescriptor = selector(sourceTree as any);
+        const inner = sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+
+        this._mapper['_mappings'].set(this._targetKey, {
+            type: 'prop',
+            sourceDescriptorInner: inner
+        });
+
+        return this._mapper as any;
+    }
+
+    /**
+     * Computes the target property value from the entire source object.
+     * Supports both sync and async functions.
+     */
+    public mapFrom(
+        fn:
+            | ((
+                  obj: InferType<TFromSchema>
+              ) => SchemaPropertyInferredType<TToSchema, TKey>)
+            | ((
+                  obj: InferType<TFromSchema>
+              ) => Promise<SchemaPropertyInferredType<TToSchema, TKey>>)
+    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>> {
+        this._mapper['_mappings'].set(this._targetKey, {
+            type: 'custom',
+            fn: fn as any
+        });
+
+        return this._mapper as any;
+    }
+
+    /**
+     * Explicitly excludes the target property from mapping.
+     * The property will not appear in the output object.
+     */
+    public ignore(): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>> {
+        this._mapper['_mappings'].set(this._targetKey, {
+            type: 'ignore'
+        });
+
+        return this._mapper as any;
+    }
+}
+
+// ── Mapper ────────────────────────────────────────────────────────────
+
+/**
+ * A fluent builder for configuring how each target property is populated
+ * from a source schema. Uses PropertyDescriptors as pointers to properties
+ * (similar to expressions in C# .NET).
  *
- * If there are properties that you don't want to map you can use the
- * ignore method.
- * Also if at the time of calling `getMapper` function there are properties
- * in the target schema that are not mapped (and not ignored)
- * and MapperConfigurationError will be thrown.
+ * The `TUnmapped` type parameter tracks which target properties have not
+ * yet been mapped or ignored. `getMapper()` is only callable (without
+ * arguments) when `TUnmapped` is `never` — i.e. all properties have been
+ * accounted for. If any property is missing, TypeScript will produce a
+ * compile-time error showing the names of the unmapped properties.
+ *
+ * @typeParam TFromSchema - source ObjectSchemaBuilder
+ * @typeParam TToSchema - target ObjectSchemaBuilder
+ * @typeParam TUnmapped - union of target property key names not yet mapped
  */
 export class Mapper<
     TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-    TToSchema extends ObjectSchemaBuilder<any, any, any>
+    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TUnmapped extends string = SchemaKeys<TToSchema>
 > {
     private readonly _fromSchema: TFromSchema;
     private readonly _toSchema: TToSchema;
+    private readonly _registry: MappingRegistry | undefined;
+    private readonly _mappings: Map<string, MappingEntry> = new Map();
 
     /**
-     * Creates a new instance of the Mapper class given the two schemas.
+     * Creates a new instance of the Mapper class.
      * @param fromSchema - `object` schema to map from
-     * @param toSchema  - `object` schema to map to
+     * @param toSchema - `object` schema to map to
+     * @param registry - optional MappingRegistry to auto-register the mapper
      */
-    public constructor(fromSchema: TFromSchema, toSchema: TToSchema) {
+    public constructor(
+        fromSchema: TFromSchema,
+        toSchema: TToSchema,
+        registry?: MappingRegistry
+    ) {
         this._fromSchema = fromSchema;
         this._toSchema = toSchema;
+        this._registry = registry;
     }
 
-    public forProp<TPropertyType>(
-        selector: SchemaPropertySelector<TToSchema, TPropertyType>
-    ): PropertyMappingStrategy<TFromSchema, TPropertyType, this> {
-        throw new Error();
+    /**
+     * Selects a target property to configure. The selector callback
+     * receives a tree of all unmapped target properties. Navigate by
+     * property name: `(t) => t.cityName`.
+     *
+     * Only properties that have not yet been mapped or ignored are
+     * available in the selector tree.
+     */
+    public forProp<TKey extends TUnmapped>(
+        selector: (
+            tree: TargetPropertyTree<TToSchema, TUnmapped>
+        ) => TargetPropertyKey<TKey>
+    ): PropertyMappingBuilder<TFromSchema, TToSchema, TKey, TUnmapped> {
+        // At runtime, use a Proxy to detect which property was accessed
+        let capturedKey: string | undefined;
+        const proxy = new Proxy({} as any, {
+            get(_target, prop) {
+                if (typeof prop === 'string') {
+                    capturedKey = prop;
+                }
+                return { __targetPropertyKey: prop };
+            }
+        });
+
+        selector(proxy);
+
+        if (!capturedKey) {
+            throw new Error(
+                'forProp selector must access a property on the target tree'
+            );
+        }
+
+        return new PropertyMappingBuilder(this, capturedKey as TKey);
     }
 
-    public getMapper(): SchemaToSchemaMapperResult<TFromSchema, TToSchema> {
-        throw new Error();
+    /**
+     * Returns the configured async mapping function.
+     *
+     * **Compile-time safety:** This method is only callable without
+     * arguments when all target properties have been mapped or explicitly
+     * ignored. If any property is unmapped, TypeScript will require
+     * a string argument describing the unmapped properties, producing
+     * a clear compile-time error.
+     *
+     * **Runtime safety:** Even if TypeScript checks are bypassed (e.g.
+     * via `as any`), a `MapperConfigurationError` is thrown at runtime
+     * listing the unmapped properties.
+     */
+    public getMapper(
+        ...args: [TUnmapped] extends [never]
+            ? []
+            : [error: `Unmapped properties: ${TUnmapped}`]
+    ): SchemaToSchemaMapperResult<TFromSchema, TToSchema> {
+        // Runtime validation: ensure all target properties are covered
+        const introspection = this._toSchema.introspect();
+        const targetProperties = introspection.properties
+            ? Object.keys(introspection.properties)
+            : [];
+
+        const unmapped = targetProperties.filter(
+            (key) => !this._mappings.has(key)
+        );
+
+        if (unmapped.length > 0) {
+            throw new MapperConfigurationError(unmapped);
+        }
+
+        const targetTree = ObjectSchemaBuilder.getPropertiesFor(this._toSchema);
+
+        const mappings = new Map(this._mappings);
+
+        const mapperFn = async (
+            source: InferType<TFromSchema>
+        ): Promise<InferType<TToSchema>> => {
+            const result = {} as any;
+
+            for (const [key, entry] of mappings) {
+                if (entry.type === 'ignore') {
+                    continue;
+                }
+
+                let value: any;
+
+                if (entry.type === 'prop') {
+                    const getResult =
+                        entry.sourceDescriptorInner.getValue(source);
+                    if (getResult.success) {
+                        value = getResult.value;
+                    } else {
+                        continue;
+                    }
+                } else if (entry.type === 'custom') {
+                    value = await entry.fn!(source);
+                }
+
+                const targetDescriptor = (targetTree as any)[key];
+                if (
+                    targetDescriptor &&
+                    targetDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                ) {
+                    targetDescriptor[
+                        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                    ].setValue(result, value, {
+                        createMissingStructure: true
+                    });
+                } else {
+                    result[key] = value;
+                }
+            }
+
+            return result;
+        };
+
+        // Auto-register in the registry if available
+        if (this._registry) {
+            this._registry['_mappers']
+                .get(this._fromSchema)
+                ?.set(this._toSchema, mapperFn);
+        }
+
+        return mapperFn;
     }
 }
+
+// ── MappingRegistry ───────────────────────────────────────────────────
 
 export class MappingRegistry {
     protected readonly _mappers: Map<
@@ -94,7 +379,7 @@ export class MappingRegistry {
      * If the fromSchema or toSchema are not instances of ObjectSchemaBuilder
      * an error will be thrown.
      * @param fromSchema a schema to map from
-     * @param toSchema a schema to map to
+     * @param toSchema a schema to map to (must be an ObjectSchemaBuilder)
      * @returns a new instance of the Mapper class for the given schemas pair
      * to allow for further configuration
      */
@@ -112,9 +397,9 @@ export class MappingRegistry {
         }
 
         const fromSchemaMappers = this._mappers.get(fromSchema) || new Map();
-        const result = new Mapper(fromSchema, toSchema);
-        fromSchemaMappers.set(toSchema, result);
         this._mappers.set(fromSchema, fromSchemaMappers);
+
+        const result = new Mapper(fromSchema, toSchema, this);
         return result;
     }
 
@@ -151,50 +436,3 @@ export class MappingRegistry {
         return mapper;
     }
 }
-
-// const UserSchema = object({
-//     name: string(),
-//     age: number(),
-//     address: object({
-//         city: string(),
-//         houseNr: number()
-//     })
-// });
-
-// const DtoSchema = object({
-//     name: string(),
-//     cityName: string(),
-//     houseNr: string(),
-//     fullAddress: string(),
-//     alwaysTen: number().equals(10)
-// });
-
-// const mapper = new MappingRegistry();
-
-// const mapUserToUserDto = mapper
-//     .map(UserSchema, DtoSchema)
-//     .forProp((t) => t.name)
-//     .mapFromProp((t) => t.name)
-//     .forProp((t) => t.cityName)
-//     .mapFromProp((t) => t.address.city)
-//     .forProp((t) => t.houseNr)
-//     .mapFrom((user) => {
-//         var houseNr = user.address.houseNr;
-//         return houseNr.toString();
-//     })
-//     .forProp((t) => t.fullAddress)
-//     .mapFrom((t) => t.address.city + ' ' + t.address.houseNr)
-//     .forProp((t) => t.alwaysTen)
-//     .mapFrom(() => 10)
-//     .getMapper();
-
-// const user: InferType<typeof UserSchema> = {
-//     address: {
-//         city: 'New York',
-//         houseNr: 123
-//     },
-//     age: 25,
-//     name: 'John Doe'
-// };
-
-// const dto = await mapUserToUserDto(user);
