@@ -31,17 +31,18 @@ const UserDtoSchema = object({
     fullAddress: string()
 });
 
-const registry = new MappingRegistry();
+const registry = new MappingRegistry()
+    .configure(UserSchema, UserDtoSchema, (m) =>
+        m
+            .forProp((t) => t.name)
+            .mapFromProp((f) => f.name)
+            .forProp((t) => t.cityName)
+            .mapFromProp((f) => f.address.city)
+            .forProp((t) => t.fullAddress)
+            .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
+    );
 
-const mapUserToDto = registry
-    .map(UserSchema, UserDtoSchema)
-    .forProp((t) => t.name)
-    .mapFromProp((f) => f.name)
-    .forProp((t) => t.cityName)
-    .mapFromProp((f) => f.address.city)
-    .forProp((t) => t.fullAddress)
-    .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
-    .getMapper();
+const mapUserToDto = registry.getMapper(UserSchema, UserDtoSchema);
 
 const dto = await mapUserToDto({
     name: 'John Doe',
@@ -56,17 +57,14 @@ const dto = await mapUserToDto({
 Every target property must be either mapped or explicitly ignored. If you forget to map a property, TypeScript will produce a compile-time error:
 
 ```typescript
-registry
-    .map(UserSchema, UserDtoSchema)
-    .forProp((t) => t.name)
-    .mapFromProp((f) => f.name)
-    .forProp((t) => t.cityName)
-    .mapFromProp((f) => f.address.city)
-    .getMapper();
-//  ^^^^^^^^^^
-//  TS Error: Expected 1 arguments, but got 0.
-//  Argument of type '...' is not assignable to
-//  parameter of type '`Unmapped properties: fullAddress`'
+new MappingRegistry().configure(UserSchema, UserDtoSchema, (m) =>
+    m
+        .forProp((t) => t.name)
+        .mapFromProp((f) => f.name)
+        .forProp((t) => t.cityName)
+        .mapFromProp((f) => f.address.city)
+);
+//  Compile-time error: 'fullAddress' is unmapped
 ```
 
 The error message shows the names of the unmapped properties. Once all properties are mapped or ignored, `getMapper()` becomes callable with zero arguments.
@@ -83,9 +81,9 @@ Central registry for storing and retrieving mappers.
 const registry = new MappingRegistry();
 ```
 
-#### `registry.map(fromSchema, toSchema)`
+#### `registry.configure(fromSchema, toSchema, fn)`
 
-Creates a new `Mapper` builder for the given schema pair. The `toSchema` parameter must be an `ObjectSchemaBuilder`. Returns the `Mapper` instance for fluent configuration. The resulting mapper is automatically registered when `getMapper()` is called.
+Defines a mapping between two schemas and returns a new immutable registry containing the mapping. The callback `fn` receives a fresh `Mapper` and must return it after configuring property mappings. The mapper is automatically finalized and registered. Properties not explicitly mapped or ignored may be auto-mapped if a matching nested mapping is already registered in the registry. Throws if schemas are invalid, the mapping is a duplicate, or unmapped properties remain that cannot be auto-mapped.
 
 #### `registry.getMapper(fromSchema, toSchema)`
 

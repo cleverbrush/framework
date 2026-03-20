@@ -24,25 +24,37 @@ const UserDtoSchema = object({
 describe('MappingRegistry', () => {
     test('throws on null schemas', () => {
         const registry = new MappingRegistry();
-        expect(() => registry.map(null as any, null as any)).toThrow();
-        expect(() => registry.map(null as any, UserDtoSchema)).toThrow();
-        expect(() => registry.map(UserSchema, null as any)).toThrow();
+        expect(() =>
+            registry.configure(null as any, null as any, (m) => m as any)
+        ).toThrow();
+        expect(() =>
+            registry.configure(null as any, UserDtoSchema, (m) => m as any)
+        ).toThrow();
+        expect(() =>
+            registry.configure(UserSchema, null as any, (m) => m as any)
+        ).toThrow();
     });
 
     test('throws on non-ObjectSchemaBuilder schemas', () => {
         const registry = new MappingRegistry();
-        expect(() => registry.map(string() as any, UserDtoSchema)).toThrow(
+        expect(() =>
+            registry.configure(
+                string() as any,
+                UserDtoSchema,
+                (m) => m as any
+            )
+        ).toThrow(
             'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
         );
-        expect(() => registry.map(UserSchema, number() as any)).toThrow(
+        expect(() =>
+            registry.configure(
+                UserSchema,
+                number() as any,
+                (m) => m as any
+            )
+        ).toThrow(
             'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
         );
-    });
-
-    test('creates mapper for valid schema pair', () => {
-        const registry = new MappingRegistry();
-        const mapper = registry.map(UserSchema, UserDtoSchema);
-        expect(mapper).toBeInstanceOf(Mapper);
     });
 
     test('getMapper throws when no mapper registered', () => {
@@ -53,16 +65,21 @@ describe('MappingRegistry', () => {
     });
 
     test('getMapper retrieves registered mapper', async () => {
-        const registry = new MappingRegistry();
-        registry
-            .map(UserSchema, UserDtoSchema)
-            .forProp((t) => t.name)
-            .mapFromProp((f) => f.name)
-            .forProp((t) => t.cityName)
-            .mapFromProp((f) => f.address.city)
-            .forProp((t) => t.fullAddress)
-            .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
-            .getMapper();
+        const registry = new MappingRegistry().configure(
+            UserSchema,
+            UserDtoSchema,
+            (m) =>
+                m
+                    .forProp((t) => t.name)
+                    .mapFromProp((f) => f.name)
+                    .forProp((t) => t.cityName)
+                    .mapFromProp((f) => f.address.city)
+                    .forProp((t) => t.fullAddress)
+                    .mapFrom(
+                        (user) =>
+                            `${user.address.city} ${user.address.houseNr}`
+                    )
+        );
 
         const mapFn = registry.getMapper(UserSchema, UserDtoSchema);
         expect(typeof mapFn).toBe('function');
@@ -249,17 +266,23 @@ describe('Mapper', () => {
     });
 
     test('full fluent chain with registry', async () => {
-        const registry = new MappingRegistry();
+        const registry = new MappingRegistry().configure(
+            UserSchema,
+            UserDtoSchema,
+            (m) =>
+                m
+                    .forProp((t) => t.name)
+                    .mapFromProp((f) => f.name)
+                    .forProp((t) => t.cityName)
+                    .mapFromProp((f) => f.address.city)
+                    .forProp((t) => t.fullAddress)
+                    .mapFrom(
+                        (user) =>
+                            `${user.address.city} ${user.address.houseNr}`
+                    )
+        );
 
-        const mapUserToDto = registry
-            .map(UserSchema, UserDtoSchema)
-            .forProp((t) => t.name)
-            .mapFromProp((f) => f.name)
-            .forProp((t) => t.cityName)
-            .mapFromProp((f) => f.address.city)
-            .forProp((t) => t.fullAddress)
-            .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
-            .getMapper();
+        const mapUserToDto = registry.getMapper(UserSchema, UserDtoSchema);
 
         const dto = await mapUserToDto({
             name: 'John Doe',
@@ -273,7 +296,7 @@ describe('Mapper', () => {
             fullAddress: 'New York 123'
         });
 
-        // Also retrievable from registry
+        // Also retrievable from registry again
         const retrievedMapper = registry.getMapper(UserSchema, UserDtoSchema);
         const dto2 = await retrievedMapper({
             name: 'Jane',
@@ -295,20 +318,25 @@ describe('Mapper', () => {
             internalField: string()
         });
 
-        const registry = new MappingRegistry();
+        const registry = new MappingRegistry().configure(
+            UserSchema,
+            ExtendedDtoSchema,
+            (m) =>
+                m
+                    .forProp((t) => t.name)
+                    .mapFromProp((f) => f.name)
+                    .forProp((t) => t.cityName)
+                    .mapFromProp((f) => f.address.city)
+                    .forProp((t) => t.fullAddress)
+                    .mapFrom(
+                        (user) =>
+                            `${user.address.city} ${user.address.houseNr}`
+                    )
+                    .forProp((t) => t.internalField)
+                    .ignore()
+        );
 
-        const mapFn = registry
-            .map(UserSchema, ExtendedDtoSchema)
-            .forProp((t) => t.name)
-            .mapFromProp((f) => f.name)
-            .forProp((t) => t.cityName)
-            .mapFromProp((f) => f.address.city)
-            .forProp((t) => t.fullAddress)
-            .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
-            .forProp((t) => t.internalField)
-            .ignore()
-            .getMapper();
-
+        const mapFn = registry.getMapper(UserSchema, ExtendedDtoSchema);
         const result = await mapFn({
             name: 'Test',
             age: 20,
@@ -719,29 +747,7 @@ describe('Auto-mapping of nested schemas', () => {
     });
 
     test('optional fields: skips auto-mapping when source value is undefined', async () => {
-        const OptAddressSchema = object({
-            city: string(),
-            houseNr: number()
-        }).optional();
-
-        const SourceWithOptAddress = object({
-            name: string(),
-            address: OptAddressSchema
-        });
-
-        const TargetWithAddress = object({
-            name: string(),
-            address: AddressDtoSchema
-        });
-
-        // Need to use the direct map API for this edge case
-        // since the schema instances differ
-        const registry = new MappingRegistry();
-        const fromSchemaMappers = new Map();
-        // Manually set up a mapping for the nested optional type
-        // by using the existing configure for a simpler test
-
-        // Simpler approach: test that auto-mapped values skip undefined
+        // Test that auto-mapped values skip undefined
         const reg = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
                 m

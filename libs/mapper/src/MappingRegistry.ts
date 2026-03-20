@@ -418,37 +418,6 @@ export class MappingRegistry {
     }
 
     /**
-     * Registers a new mapper for the given schemas pair.
-     * If a mapper already exists for the given schemas pair
-     * it will be overwritten silently.
-     * If the fromSchema or toSchema are not instances of ObjectSchemaBuilder
-     * an error will be thrown.
-     * @param fromSchema a schema to map from
-     * @param toSchema a schema to map to (must be an ObjectSchemaBuilder)
-     * @returns a new instance of the Mapper class for the given schemas pair
-     * to allow for further configuration
-     */
-    public map<
-        TFromSchema extends ObjectSchemaBuilder<any, any, any>,
-        TToSchema extends ObjectSchemaBuilder<any, any, any>
-    >(
-        fromSchema: TFromSchema,
-        toSchema: TToSchema
-    ): Mapper<TFromSchema, TToSchema> {
-        if (!this.#ensureObjectSchemas(fromSchema, toSchema)) {
-            throw new Error(
-                'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
-            );
-        }
-
-        const fromSchemaMappers = this._mappers.get(fromSchema) || new Map();
-        this._mappers.set(fromSchema, fromSchemaMappers);
-
-        const result = new Mapper(fromSchema, toSchema, this);
-        return result;
-    }
-
-    /**
      * Defines a mapping between two schemas and returns a new immutable
      * registry containing the mapping. The callback `fn` receives a fresh
      * `Mapper` and must return it after configuring property mappings.
