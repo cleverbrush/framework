@@ -64,7 +64,9 @@ new MappingRegistry().configure(UserSchema, UserDtoSchema, (m) =>
         .forProp((t) => t.cityName)
         .mapFromProp((f) => f.address.city)
 );
-//  Compile-time error: 'fullAddress' is unmapped
+//  TS Error: Type 'Mapper<..., ..., "fullAddress">' is not assignable to
+//  type 'Mapper<..., ..., any>'. The callback must return a fully configured
+//  mapper with all target properties mapped or ignored.
 ```
 
 The error message shows the names of the unmapped properties. Once all properties are mapped or ignored, `getMapper()` becomes callable with zero arguments.
