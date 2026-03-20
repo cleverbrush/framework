@@ -79,7 +79,7 @@ export class MapperConfigurationError extends Error {
 // ── Internal Mapping Entry ────────────────────────────────────────────
 
 type MappingEntry = {
-    type: 'prop' | 'custom' | 'ignore';
+    type: 'prop' | 'custom' | 'ignore' | 'auto';
     sourceDescriptorInner?: ReturnType<
         PropertyDescriptor<
             any,
@@ -90,6 +90,7 @@ type MappingEntry = {
         ? any
         : never;
     fn?: (obj: any) => any;
+    autoMapper?: SchemaToSchemaMapperResult<any, any>;
 };
 
 // ── PropertyMappingBuilder ────────────────────────────────────────────
@@ -279,10 +280,46 @@ export class Mapper<
             : [error: `Unmapped properties: ${TUnmapped}`]
     ): SchemaToSchemaMapperResult<TFromSchema, TToSchema> {
         // Runtime validation: ensure all target properties are covered
-        const introspection = this._toSchema.introspect();
-        const targetProperties = introspection.properties
-            ? Object.keys(introspection.properties)
+        const toIntrospection = this._toSchema.introspect();
+        const targetProperties = toIntrospection.properties
+            ? Object.keys(toIntrospection.properties)
             : [];
+
+        // Auto-mapping: fill in unmapped properties using registered nested mappers
+        if (this._registry) {
+            const fromIntrospection = this._fromSchema.introspect();
+            const fromProperties = (fromIntrospection.properties || {}) as Record<string, any>;
+            const toProperties = (toIntrospection.properties || {}) as Record<string, any>;
+            const fromTree = ObjectSchemaBuilder.getPropertiesFor(this._fromSchema);
+
+            for (const key of targetProperties) {
+                if (this._mappings.has(key)) continue;
+
+                const fromPropSchema = fromProperties[key];
+                const toPropSchema = toProperties[key];
+
+                if (!fromPropSchema || !toPropSchema) continue;
+                if (!(fromPropSchema instanceof ObjectSchemaBuilder)) continue;
+                if (!(toPropSchema instanceof ObjectSchemaBuilder)) continue;
+
+                const fromSchemaMappers = this._registry['_mappers'].get(fromPropSchema);
+                if (!fromSchemaMappers) continue;
+                const autoMapper = fromSchemaMappers.get(toPropSchema);
+                if (!autoMapper) continue;
+
+                const sourceDescriptor = (fromTree as any)[key];
+                if (
+                    !sourceDescriptor ||
+                    !sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                ) continue;
+
+                this._mappings.set(key, {
+                    type: 'auto',
+                    sourceDescriptorInner: sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR],
+                    autoMapper
+                });
+            }
+        }
 
         const unmapped = targetProperties.filter(
             (key) => !this._mappings.has(key)
@@ -318,6 +355,14 @@ export class Mapper<
                     }
                 } else if (entry.type === 'custom') {
                     value = await entry.fn!(source);
+                } else if (entry.type === 'auto') {
+                    const getResult =
+                        entry.sourceDescriptorInner.getValue(source);
+                    if (getResult.success && getResult.value !== undefined) {
+                        value = await entry.autoMapper!(getResult.value);
+                    } else {
+                        continue;
+                    }
                 }
 
                 const targetDescriptor = (targetTree as any)[key];
@@ -401,6 +446,69 @@ export class MappingRegistry {
 
         const result = new Mapper(fromSchema, toSchema, this);
         return result;
+    }
+
+    /**
+     * Defines a mapping between two schemas and returns a new immutable
+     * registry containing the mapping. The callback `fn` receives a fresh
+     * `Mapper` and must return it after configuring property mappings.
+     * The mapper is automatically finalized and registered. Properties
+     * not explicitly mapped or ignored may be auto-mapped if a matching
+     * nested mapping is already registered in the registry.
+     *
+     * @param fromSchema - source ObjectSchemaBuilder
+     * @param toSchema - target ObjectSchemaBuilder
+     * @param fn - callback that configures property mappings on the mapper
+     * @returns a new MappingRegistry containing all previous mappings plus
+     *          the newly configured one
+     * @throws if schemas are invalid, mapping is duplicate, or unmapped
+     *         properties remain that cannot be auto-mapped
+     */
+    public configure<
+        TFromSchema extends ObjectSchemaBuilder<any, any, any>,
+        TToSchema extends ObjectSchemaBuilder<any, any, any>
+    >(
+        fromSchema: TFromSchema,
+        toSchema: TToSchema,
+        fn: (
+            mapper: Mapper<TFromSchema, TToSchema>
+        ) => Mapper<TFromSchema, TToSchema, any>
+    ): MappingRegistry {
+        if (!this.#ensureObjectSchemas(fromSchema, toSchema)) {
+            throw new Error(
+                'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
+            );
+        }
+
+        // Check for duplicate mappings
+        const existingFromMappers = this._mappers.get(fromSchema);
+        if (existingFromMappers && existingFromMappers.has(toSchema)) {
+            throw new Error(
+                'Duplicate mapping: a mapping for this schemas pair is already registered'
+            );
+        }
+
+        // Create new immutable registry with cloned mappings
+        const newRegistry = new MappingRegistry();
+        for (const [from, toMap] of this._mappers) {
+            newRegistry._mappers.set(from, new Map(toMap));
+        }
+
+        // Ensure the from→to map slot exists so getMapper can register
+        if (!newRegistry._mappers.has(fromSchema)) {
+            newRegistry._mappers.set(fromSchema, new Map());
+        }
+
+        // Create mapper with new registry reference
+        const mapper = new Mapper(fromSchema, toSchema, newRegistry);
+
+        // Configure via user callback
+        const configuredMapper = fn(mapper);
+
+        // Implicit finalization: auto-map + validate + register
+        (configuredMapper as Mapper<TFromSchema, TToSchema, never>).getMapper();
+
+        return newRegistry;
     }
 
     /**
