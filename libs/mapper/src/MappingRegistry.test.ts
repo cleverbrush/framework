@@ -574,6 +574,10 @@ describe('Auto-mapping of nested schemas', () => {
     });
 
     test('ordering matters: nested mapping must be configured first', () => {
+        // PersonDtoSchema.address can only be auto-mapped if
+        // AddressSchema→AddressDtoSchema is already registered.
+        // Configuring Person first fails because the Address mapping
+        // does not yet exist in the registry.
         expect(() =>
             new MappingRegistry()
                 .configure(PersonSchema, PersonDtoSchema, (m) =>
