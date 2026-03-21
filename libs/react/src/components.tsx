@@ -16,34 +16,58 @@ import { getSchemaType } from './helpers.js';
 // ─── FormSystemProvider ──────────────────────────────────────────────────────
 
 export type FormSystemProviderProps = {
-    config: FormSystemConfig;
+    /**
+     * Renderer registry mapping schema types to renderer functions.
+     * Example: `{ string: (props) => <input .../>, number: (props) => <input type="number" .../> }`
+     */
+    renderers?: Record<string, FieldRenderer>;
+    /**
+     * Full configuration object (for future extensibility).
+     * If both `renderers` and `config.renderers` are provided, `renderers` takes precedence.
+     */
+    config?: FormSystemConfig;
     children: React.ReactNode;
 };
 
 /**
  * Provides global renderer configuration via React Context.
  * Supports nesting — inner provider overrides outer.
+ *
+ * @example
+ * ```tsx
+ * <FormSystemProvider renderers={htmlRenderers}>
+ *   <App />
+ * </FormSystemProvider>
+ * ```
  */
 export function FormSystemProvider({
+    renderers,
     config,
     children
 }: FormSystemProviderProps): React.ReactNode {
     const parentConfig = useContext(FormSystemContext);
 
-    const mergedConfig = useMemo(() => {
-        if (!parentConfig) return config;
-        return {
-            ...parentConfig,
+    const resolvedConfig: FormSystemConfig = useMemo(() => {
+        const current: FormSystemConfig = {
             ...config,
             renderers: {
-                ...parentConfig.renderers,
-                ...config.renderers
+                ...config?.renderers,
+                ...renderers
             }
         };
-    }, [parentConfig, config]);
+        if (!parentConfig) return current;
+        return {
+            ...parentConfig,
+            ...current,
+            renderers: {
+                ...parentConfig.renderers,
+                ...current.renderers
+            }
+        };
+    }, [parentConfig, config, renderers]);
 
     return (
-        <FormSystemContext.Provider value={mergedConfig}>
+        <FormSystemContext.Provider value={resolvedConfig}>
             {children}
         </FormSystemContext.Provider>
     );

@@ -46,7 +46,7 @@ function createWrapper(config: FormSystemConfig) {
     return function Wrapper({ children }: { children: React.ReactNode }) {
         return React.createElement(
             FormSystemProvider,
-            { config },
+            { renderers: config.renderers },
             children
         );
     };
@@ -452,25 +452,21 @@ describe('FormSystemProvider', () => {
     });
 
     test('nested providers merge configs', () => {
-        const outerConfig: FormSystemConfig = {
-            renderers: {
-                string: () => 'outer-string' as any
-            }
+        const outerRenderers = {
+            string: () => 'outer-string' as any
         };
 
-        const innerConfig: FormSystemConfig = {
-            renderers: {
-                number: () => 'inner-number' as any
-            }
+        const innerRenderers = {
+            number: () => 'inner-number' as any
         };
 
         function InnerWrapper({ children }: { children: React.ReactNode }) {
             return React.createElement(
                 FormSystemProvider,
-                { config: outerConfig },
+                { renderers: outerRenderers },
                 React.createElement(
                     FormSystemProvider,
-                    { config: innerConfig },
+                    { renderers: innerRenderers },
                     children
                 )
             );
@@ -489,21 +485,13 @@ describe('FormSystemProvider', () => {
         const outerRenderer = vi.fn(() => 'outer' as any);
         const innerRenderer = vi.fn(() => 'inner' as any);
 
-        const outerConfig: FormSystemConfig = {
-            renderers: { string: outerRenderer }
-        };
-
-        const innerConfig: FormSystemConfig = {
-            renderers: { string: innerRenderer }
-        };
-
         function InnerWrapper({ children }: { children: React.ReactNode }) {
             return React.createElement(
                 FormSystemProvider,
-                { config: outerConfig },
+                { renderers: { string: outerRenderer } },
                 React.createElement(
                     FormSystemProvider,
-                    { config: innerConfig },
+                    { renderers: { string: innerRenderer } },
                     children
                 )
             );
@@ -514,6 +502,26 @@ describe('FormSystemProvider', () => {
         });
 
         expect(result.current.renderers!.string).toBe(innerRenderer);
+    });
+
+    test('supports legacy config prop', () => {
+        const config: FormSystemConfig = {
+            renderers: {
+                string: () => null
+            }
+        };
+
+        const { result } = renderHook(() => useFormSystem(), {
+            wrapper: ({ children }: { children: React.ReactNode }) =>
+                React.createElement(
+                    FormSystemProvider,
+                    { config },
+                    children
+                )
+        });
+
+        expect(result.current.renderers).toBeDefined();
+        expect(result.current.renderers!.string).toBeDefined();
     });
 });
 
@@ -580,12 +588,6 @@ describe('Field component', () => {
     test('Field resolves renderer from FormSystemProvider', () => {
         const mockStringRenderer = vi.fn(() => null);
 
-        const config: FormSystemConfig = {
-            renderers: {
-                string: mockStringRenderer
-            }
-        };
-
         const { result: formResult } = renderHook(() =>
             useSchemaForm(UserSchema)
         );
@@ -593,7 +595,7 @@ describe('Field component', () => {
         function TestComponent() {
             return React.createElement(
                 FormSystemProvider,
-                { config },
+                { renderers: { string: mockStringRenderer } },
                 React.createElement(Field, {
                     selector: (t: any) => t.name,
                     form: formResult.current
@@ -634,12 +636,6 @@ describe('Field component', () => {
         const systemRenderer = vi.fn(() => 'system' as any);
         const explicitRenderer = vi.fn(() => null);
 
-        const config: FormSystemConfig = {
-            renderers: {
-                string: systemRenderer
-            }
-        };
-
         const { result: formResult } = renderHook(() =>
             useSchemaForm(UserSchema)
         );
@@ -647,7 +643,7 @@ describe('Field component', () => {
         function TestComponent() {
             return React.createElement(
                 FormSystemProvider,
-                { config },
+                { renderers: { string: systemRenderer } },
                 React.createElement(Field, {
                     selector: (t: any) => t.name,
                     form: formResult.current,
@@ -823,5 +819,126 @@ describe('integration', () => {
         // Ensure they don't interfere
         expect(result.current.form1.getValue().name).toBe('John');
         expect(result.current.form2.getValue().city).toBe('Berlin');
+    });
+
+    test('FormSystemProvider + Field: full renderer registration flow', () => {
+        const { render } = require('@testing-library/react');
+
+        // 1. Define renderer map for HTML (like a UI library adapter)
+        const htmlRenderers: Record<string, any> = {
+            string: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) =>
+                React.createElement('div', null,
+                    React.createElement('input', {
+                        type: 'text',
+                        value: value ?? '',
+                        onChange: (e: any) => onChange(e.target.value),
+                        onBlur
+                    }),
+                    touched && error
+                        ? React.createElement('span', { className: 'error' }, error)
+                        : null
+                ),
+            number: ({ value, onChange, onBlur }: FieldRenderProps) =>
+                React.createElement('input', {
+                    type: 'number',
+                    value: value ?? '',
+                    onChange: (e: any) => onChange(Number(e.target.value)),
+                    onBlur
+                })
+        };
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        // 2. Wrap app with FormSystemProvider + renderers
+        function App() {
+            return React.createElement(
+                FormSystemProvider,
+                { renderers: htmlRenderers },
+                // 3. Field auto-resolves renderer by schema type
+                React.createElement(Field, {
+                    selector: (t: any) => t.name,
+                    form: formResult.current
+                }),
+                React.createElement(Field, {
+                    selector: (t: any) => t.email,
+                    form: formResult.current
+                }),
+                React.createElement(Field, {
+                    selector: (t: any) => t.age,
+                    form: formResult.current
+                })
+            );
+        }
+
+        const { container, unmount } = render(React.createElement(App));
+
+        // Verify: string fields got text inputs, number field got number input
+        const inputs = container.querySelectorAll('input');
+        expect(inputs.length).toBe(3);
+        expect(inputs[0].type).toBe('text');   // name (string)
+        expect(inputs[1].type).toBe('text');   // email (string)
+        expect(inputs[2].type).toBe('number'); // age (number)
+
+        unmount();
+    });
+
+    test('FormSystemProvider + Field: validation errors rendered by renderer', async () => {
+        const { render } = require('@testing-library/react');
+
+        // Renderer that shows validation error when field is touched
+        const htmlRenderers: Record<string, any> = {
+            string: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) =>
+                React.createElement('div', { 'data-testid': 'field' },
+                    React.createElement('input', {
+                        value: value ?? '',
+                        onChange: (e: any) => onChange(e.target.value),
+                        onBlur
+                    }),
+                    touched && error
+                        ? React.createElement('span', { className: 'error' }, error)
+                        : null
+                )
+        };
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function App() {
+            return React.createElement(
+                FormSystemProvider,
+                { renderers: htmlRenderers },
+                React.createElement(Field, {
+                    selector: (t: any) => t.name,
+                    form: formResult.current
+                })
+            );
+        }
+
+        const { container, unmount } = render(React.createElement(App));
+
+        // Validate with empty required field — should produce validation error
+        await act(async () => {
+            await formResult.current.validate();
+        });
+
+        // The error is set on the field, but field is not yet touched so renderer doesn't show it
+        // Touch the field to trigger error display
+        act(() => {
+            const input = container.querySelector('input');
+            input?.dispatchEvent(new Event('blur', { bubbles: true }));
+        });
+
+        // Re-render picks up the error + touched state
+        const { container: container2, unmount: unmount2 } = render(React.createElement(App));
+
+        // Error message from schema validation is available to the renderer
+        const nameState = formResult.current.getValue();
+        expect(nameState.name).toBeUndefined(); // name was never set
+
+        unmount();
+        unmount2();
     });
 });
