@@ -1633,23 +1633,13 @@ describe('E-commerce: Product catalog mapping', () => {
             )
             .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
                 m
-                    .for((t) => t.sku)
-                    .from((f) => f.sku)
                     .for((t) => t.label)
                     .compute((v) => `${v.color} / ${v.size}`)
-                    .for((t) => t.price)
-                    .from((f) => f.price)
             )
             .configure(ProductSchema, ProductListItemSchema, (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.title)
-                    .from((f) => f.title)
                     .for((t) => t.categoryName)
                     .from((f) => f.category.name)
-                    .for((t) => t.variants)
-                    .from((f) => f.variants)
             );
 
         const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
@@ -1708,23 +1698,13 @@ describe('E-commerce: Product catalog mapping', () => {
             )
             .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
                 m
-                    .for((t) => t.sku)
-                    .from((f) => f.sku)
                     .for((t) => t.label)
                     .compute((v) => `${v.color} / ${v.size}`)
-                    .for((t) => t.price)
-                    .from((f) => f.price)
             )
             .configure(ProductSchema, ProductListItemSchema, (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.title)
-                    .from((f) => f.title)
                     .for((t) => t.categoryName)
                     .from((f) => f.category.name)
-                    .for((t) => t.variants)
-                    .from((f) => f.variants)
             );
 
         const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
@@ -1778,14 +1758,10 @@ describe('User management: Profile to public DTO', () => {
             PublicProfileSchema,
             (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
                     .for((t) => t.displayName)
                     .compute((u) => `${u.firstName} ${u.lastName}`)
                     .for((t) => t.location)
                     .compute((u) => `${u.address.city}, ${u.address.state}`)
-                    .for((t) => t.role)
-                    .from((f) => f.role)
         );
 
         const mapFn = registry.getMapper(UserProfileSchema, PublicProfileSchema);
@@ -1830,19 +1806,13 @@ describe('User management: Profile to public DTO', () => {
             AdminUserViewSchema,
             (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
                     .for((t) => t.displayName)
                     .compute((u) => `${u.firstName} ${u.lastName}`)
-                    .for((t) => t.email)
-                    .from((f) => f.email)
                     .for((t) => t.fullAddress)
                     .compute(
                         (u) =>
                             `${u.address.street}, ${u.address.city}, ${u.address.state} ${u.address.zipCode}, ${u.address.country}`
                     )
-                    .for((t) => t.role)
-                    .from((f) => f.role)
         );
 
         const mapFn = registry.getMapper(
@@ -1933,24 +1903,10 @@ describe('Blog CMS: Post entity to API response', () => {
 
     test('maps blog post entity to API response with computed fields', async () => {
         const registry = new MappingRegistry()
-            .configure(TagSchema, TagDtoSchema, (m) =>
-                m.for((t) => t.label).from((f) => f.label)
-            )
-            .configure(CommentSchema, CommentDtoSchema, (m) =>
-                m
-                    .for((t) => t.authorName)
-                    .from((f) => f.authorName)
-                    .for((t) => t.body)
-                    .from((f) => f.body)
-                    .for((t) => t.likes)
-                    .from((f) => f.likes)
-            )
+            .configure(TagSchema, TagDtoSchema, (m) => m)
+            .configure(CommentSchema, CommentDtoSchema, (m) => m)
             .configure(BlogPostSchema, BlogPostResponseSchema, (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.title)
-                    .from((f) => f.title)
                     .for((t) => t.excerpt)
                     .compute((post) => post.body.substring(0, 100))
                     .for((t) => t.authorName)
@@ -1958,12 +1914,8 @@ describe('Blog CMS: Post entity to API response', () => {
                         (post) =>
                             `${post.author.firstName} ${post.author.lastName}`
                     )
-                    .for((t) => t.tags)
-                    .from((f) => f.tags)
                     .for((t) => t.commentCount)
                     .compute((post) => post.comments.length)
-                    .for((t) => t.comments)
-                    .from((f) => f.comments)
             );
 
         const mapFn = registry.getMapper(
@@ -2021,24 +1973,10 @@ describe('Blog CMS: Post entity to API response', () => {
 
     test('maps blog post with no tags and no comments', async () => {
         const registry = new MappingRegistry()
-            .configure(TagSchema, TagDtoSchema, (m) =>
-                m.for((t) => t.label).from((f) => f.label)
-            )
-            .configure(CommentSchema, CommentDtoSchema, (m) =>
-                m
-                    .for((t) => t.authorName)
-                    .from((f) => f.authorName)
-                    .for((t) => t.body)
-                    .from((f) => f.body)
-                    .for((t) => t.likes)
-                    .from((f) => f.likes)
-            )
+            .configure(TagSchema, TagDtoSchema, (m) => m)
+            .configure(CommentSchema, CommentDtoSchema, (m) => m)
             .configure(BlogPostSchema, BlogPostResponseSchema, (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.title)
-                    .from((f) => f.title)
                     .for((t) => t.excerpt)
                     .compute((post) => post.body.substring(0, 100))
                     .for((t) => t.authorName)
@@ -2046,12 +1984,8 @@ describe('Blog CMS: Post entity to API response', () => {
                         (post) =>
                             `${post.author.firstName} ${post.author.lastName}`
                     )
-                    .for((t) => t.tags)
-                    .from((f) => f.tags)
                     .for((t) => t.commentCount)
                     .compute((post) => post.comments.length)
-                    .for((t) => t.comments)
-                    .from((f) => f.comments)
             );
 
         const mapFn = registry.getMapper(
@@ -2128,21 +2062,15 @@ describe('Invoice billing: Invoice to summary', () => {
         const registry = new MappingRegistry()
             .configure(LineItemSchema, LineItemDtoSchema, (m) =>
                 m
-                    .for((t) => t.description)
-                    .from((f) => f.description)
                     .for((t) => t.total)
                     .compute((item) => item.quantity * item.unitPrice)
             )
             .configure(InvoiceSchema, InvoiceSummarySchema, (m) =>
                 m
-                    .for((t) => t.invoiceNumber)
-                    .from((f) => f.invoiceNumber)
                     .for((t) => t.issuerName)
                     .from((f) => f.issuer.name)
                     .for((t) => t.recipientName)
                     .from((f) => f.recipient.name)
-                    .for((t) => t.lineItems)
-                    .from((f) => f.lineItems)
                     .for((t) => t.totalAmount)
                     .compute((inv) =>
                         inv.lineItems.reduce(
@@ -2194,21 +2122,15 @@ describe('Invoice billing: Invoice to summary', () => {
         const registry = new MappingRegistry()
             .configure(LineItemSchema, LineItemDtoSchema, (m) =>
                 m
-                    .for((t) => t.description)
-                    .from((f) => f.description)
                     .for((t) => t.total)
                     .compute((item) => item.quantity * item.unitPrice)
             )
             .configure(InvoiceSchema, InvoiceSummarySchema, (m) =>
                 m
-                    .for((t) => t.invoiceNumber)
-                    .from((f) => f.invoiceNumber)
                     .for((t) => t.issuerName)
                     .from((f) => f.issuer.name)
                     .for((t) => t.recipientName)
                     .from((f) => f.recipient.name)
-                    .for((t) => t.lineItems)
-                    .from((f) => f.lineItems)
                     .for((t) => t.totalAmount)
                     .compute((inv) =>
                         inv.lineItems.reduce(
@@ -2290,8 +2212,6 @@ describe('REST API: Weather response to domain model', () => {
                     m
                         .for((t) => t.summary)
                         .from((f) => f.main)
-                        .for((t) => t.description)
-                        .from((f) => f.description)
             )
             .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
                 m
@@ -2353,8 +2273,6 @@ describe('REST API: Weather response to domain model', () => {
                     m
                         .for((t) => t.summary)
                         .from((f) => f.main)
-                        .for((t) => t.description)
-                        .from((f) => f.description)
             )
             .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
                 m
@@ -2425,14 +2343,10 @@ describe('HR system: Employee to organization chart entry', () => {
             OrgChartEntrySchema,
             (m) =>
                 m
-                    .for((t) => t.employeeId)
-                    .from((f) => f.employeeId)
                     .for((t) => t.fullName)
                     .compute((e) => `${e.firstName} ${e.lastName}`)
                     .for((t) => t.departmentName)
                     .from((f) => f.department.name)
-                    .for((t) => t.skills)
-                    .from((f) => f.skills)
         );
 
         const mapFn = registry.getMapper(EmployeeSchema, OrgChartEntrySchema);
@@ -2462,14 +2376,10 @@ describe('HR system: Employee to organization chart entry', () => {
             OrgChartEntrySchema,
             (m) =>
                 m
-                    .for((t) => t.employeeId)
-                    .from((f) => f.employeeId)
                     .for((t) => t.fullName)
                     .compute((e) => `${e.firstName} ${e.lastName}`)
                     .for((t) => t.departmentName)
                     .from((f) => f.department.name)
-                    .for((t) => t.skills)
-                    .from((f) => f.skills)
         );
 
         const mapFn = registry.getMapper(EmployeeSchema, OrgChartEntrySchema);
@@ -2550,21 +2460,9 @@ describe('Reservation system: Hotel booking mapping', () => {
                     .for((t) => t.contactEmail)
                     .from((f) => f.email)
             )
-            .configure(RoomSchema, RoomDtoSchema, (m) =>
-                m
-                    .for((t) => t.roomNumber)
-                    .from((f) => f.roomNumber)
-                    .for((t) => t.type)
-                    .from((f) => f.type)
-            )
+            .configure(RoomSchema, RoomDtoSchema, (m) => m)
             .configure(BookingSchema, BookingConfirmationSchema, (m) =>
                 m
-                    .for((t) => t.bookingId)
-                    .from((f) => f.bookingId)
-                    .for((t) => t.guest)
-                    .from((f) => f.guest)
-                    .for((t) => t.rooms)
-                    .from((f) => f.rooms)
                     .for((t) => t.nights)
                     .compute((b) =>
                         calcNights(b.checkInDate, b.checkOutDate)
@@ -2628,21 +2526,9 @@ describe('Reservation system: Hotel booking mapping', () => {
                     .for((t) => t.contactEmail)
                     .from((f) => f.email)
             )
-            .configure(RoomSchema, RoomDtoSchema, (m) =>
-                m
-                    .for((t) => t.roomNumber)
-                    .from((f) => f.roomNumber)
-                    .for((t) => t.type)
-                    .from((f) => f.type)
-            )
+            .configure(RoomSchema, RoomDtoSchema, (m) => m)
             .configure(BookingSchema, BookingConfirmationSchema, (m) =>
                 m
-                    .for((t) => t.bookingId)
-                    .from((f) => f.bookingId)
-                    .for((t) => t.guest)
-                    .from((f) => f.guest)
-                    .for((t) => t.rooms)
-                    .from((f) => f.rooms)
                     .for((t) => t.nights)
                     .compute((b) =>
                         calcNights(b.checkInDate, b.checkOutDate)
@@ -2729,21 +2615,11 @@ describe('Healthcare: Patient record to appointment summary', () => {
 
     test('maps patient record to appointment summary, excluding SSN', async () => {
         const registry = new MappingRegistry()
-            .configure(MedicationSchema, MedicationDtoSchema, (m) =>
-                m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.dosage)
-                    .from((f) => f.dosage)
-            )
+            .configure(MedicationSchema, MedicationDtoSchema, (m) => m)
             .configure(PatientSchema, AppointmentSummarySchema, (m) =>
                 m
-                    .for((t) => t.patientId)
-                    .from((f) => f.patientId)
                     .for((t) => t.patientName)
                     .compute((p) => `${p.lastName}, ${p.firstName}`)
-                    .for((t) => t.dateOfBirth)
-                    .from((f) => f.dateOfBirth)
                     .for((t) => t.insuranceProvider)
                     .from((f) => f.insurance.provider)
                     .for((t) => t.currentMedications)
@@ -2794,21 +2670,11 @@ describe('Healthcare: Patient record to appointment summary', () => {
 
     test('maps patient with no medications', async () => {
         const registry = new MappingRegistry()
-            .configure(MedicationSchema, MedicationDtoSchema, (m) =>
-                m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.dosage)
-                    .from((f) => f.dosage)
-            )
+            .configure(MedicationSchema, MedicationDtoSchema, (m) => m)
             .configure(PatientSchema, AppointmentSummarySchema, (m) =>
                 m
-                    .for((t) => t.patientId)
-                    .from((f) => f.patientId)
                     .for((t) => t.patientName)
                     .compute((p) => `${p.lastName}, ${p.firstName}`)
-                    .for((t) => t.dateOfBirth)
-                    .from((f) => f.dateOfBirth)
                     .for((t) => t.insuranceProvider)
                     .from((f) => f.insurance.provider)
                     .for((t) => t.currentMedications)
@@ -2887,21 +2753,9 @@ describe('Project management: Task board mapping', () => {
 
     test('maps task entity to task card for kanban board', async () => {
         const registry = new MappingRegistry()
-            .configure(LabelSchema, LabelDtoSchema, (m) =>
-                m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.color)
-                    .from((f) => f.color)
-            )
+            .configure(LabelSchema, LabelDtoSchema, (m) => m)
             .configure(TaskSchema, TaskCardSchema, (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.title)
-                    .from((f) => f.title)
-                    .for((t) => t.status)
-                    .from((f) => f.status)
                     .for((t) => t.priorityLabel)
                     .compute((task) => {
                         const labels: Record<number, string> = {
@@ -2914,8 +2768,6 @@ describe('Project management: Task board mapping', () => {
                     })
                     .for((t) => t.assigneeUsername)
                     .from((f) => f.assignee.username)
-                    .for((t) => t.labels)
-                    .from((f) => f.labels)
             );
 
         const mapFn = registry.getMapper(TaskSchema, TaskCardSchema);
@@ -2955,21 +2807,9 @@ describe('Project management: Task board mapping', () => {
 
     test('maps low-priority task with no labels', async () => {
         const registry = new MappingRegistry()
-            .configure(LabelSchema, LabelDtoSchema, (m) =>
-                m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.color)
-                    .from((f) => f.color)
-            )
+            .configure(LabelSchema, LabelDtoSchema, (m) => m)
             .configure(TaskSchema, TaskCardSchema, (m) =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.title)
-                    .from((f) => f.title)
-                    .for((t) => t.status)
-                    .from((f) => f.status)
                     .for((t) => t.priorityLabel)
                     .compute((task) => {
                         const labels: Record<number, string> = {
@@ -2982,8 +2822,6 @@ describe('Project management: Task board mapping', () => {
                     })
                     .for((t) => t.assigneeUsername)
                     .from((f) => f.assignee.username)
-                    .for((t) => t.labels)
-                    .from((f) => f.labels)
             );
 
         const mapFn = registry.getMapper(TaskSchema, TaskCardSchema);
