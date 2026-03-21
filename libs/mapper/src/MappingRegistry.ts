@@ -58,6 +58,106 @@ type SchemaPropertyInferredType<
     ? InferType<ExtractSchemaProperties<TSchema>[K]>
     : never;
 
+/**
+ * Extracts the schema (SchemaBuilder) of a specific property in an
+ * ObjectSchemaBuilder by its key name.
+ */
+type TargetPropertySchema<
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    K extends string
+> = K extends keyof ExtractSchemaProperties<TSchema>
+    ? ExtractSchemaProperties<TSchema>[K]
+    : never;
+
+/**
+ * Determines whether a property needs an explicit mapping configuration.
+ *
+ * - Both are ObjectSchemaBuilder with registered mapping → `false` (auto-mappable)
+ * - Both are ObjectSchemaBuilder without registered mapping → `true`
+ * - Either is ObjectSchemaBuilder but the other is not → `true`
+ * - Neither is ObjectSchemaBuilder + InferType<source> extends InferType<target>
+ *   → `false` (same-name, compatible primitive types → auto-mappable)
+ * - Neither is ObjectSchemaBuilder + incompatible InferType → `true`
+ */
+type NeedsMapping<TSourcePropSchema, TTargetPropSchema, TRegistered> =
+    TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
+        ? TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
+            ? [TSourcePropSchema, TTargetPropSchema] extends TRegistered
+                ? false
+                : true
+            : true
+        : TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
+          ? true
+          : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
+            ? false
+            : true;
+
+/**
+ * From all keys of the target schema, filter down to only those that
+ * require explicit mapping (i.e. `NeedsMapping` is `true`).
+ * Keys where `NeedsMapping` is `false` can be auto-mapped via the registry.
+ */
+type KeysNeedingMapping<
+    TFromSchema extends ObjectSchemaBuilder<any, any, any>,
+    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TRegistered
+> = {
+    [K in SchemaKeys<TToSchema>]: K extends SchemaKeys<TFromSchema>
+        ? NeedsMapping<
+              ExtractSchemaProperties<TFromSchema>[K],
+              ExtractSchemaProperties<TToSchema>[K],
+              TRegistered
+          > extends true
+            ? K
+            : never
+        : K;
+}[SchemaKeys<TToSchema>];
+
+/**
+ * Checks whether a `mapFromProp` call should produce a compile-time error.
+ *
+ * Returns `true` (error) when:
+ * - `TSourcePropSchema` is `never` (the PropertyDescriptorTree filtered
+ *   it out because InferType is not assignable to the target property type)
+ * - Source is ObjectSchemaBuilder but target property is not
+ *   (cannot auto-map object → primitive)
+ * - Both are ObjectSchemaBuilder but no mapping is registered
+ *
+ * Returns `false` (OK) when:
+ * - Source is not ObjectSchemaBuilder and not `never`
+ *   (type-compatible; the PropertyDescriptorTree filter ensures this)
+ * - Both are ObjectSchemaBuilder and a mapping is registered
+ */
+type MapFromPropNeedsRegistration<
+    TSourcePropSchema,
+    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TKey extends string,
+    TRegistered
+> = [TSourcePropSchema] extends [never]
+    ? true
+    : TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
+      ? TargetPropertySchema<TToSchema, TKey> extends ObjectSchemaBuilder<
+            any,
+            any,
+            any
+        >
+          ? [
+                TSourcePropSchema,
+                TargetPropertySchema<TToSchema, TKey>
+            ] extends TRegistered
+              ? false
+              : true
+          : true
+      : false;
+
+/**
+ * Extracts the schema type parameter from a PropertyDescriptor.
+ * Used to recover the source property schema from the inferred return
+ * type of the `mapFromProp` selector callback.
+ */
+type GetSchemaFromDescriptor<T> =
+    T extends PropertyDescriptor<any, infer TSchema, any> ? TSchema : never;
+
 // ── Mapper Result Type ────────────────────────────────────────────────
 
 export type SchemaToSchemaMapperResult<
@@ -106,13 +206,17 @@ export class PropertyMappingBuilder<
     TFromSchema extends ObjectSchemaBuilder<any, any, any>,
     TToSchema extends ObjectSchemaBuilder<any, any, any>,
     TKey extends string,
-    TUnmapped extends string
+    TUnmapped extends string,
+    TRegistered = never
 > {
-    private readonly _mapper: Mapper<TFromSchema, TToSchema, any>;
+    private readonly _mapper: Mapper<TFromSchema, TToSchema, any, TRegistered>;
     private readonly _targetKey: TKey;
 
     /** @internal */
-    constructor(mapper: Mapper<TFromSchema, TToSchema, any>, targetKey: TKey) {
+    constructor(
+        mapper: Mapper<TFromSchema, TToSchema, any, TRegistered>,
+        targetKey: TKey
+    ) {
         this._mapper = mapper;
         this._targetKey = targetKey;
     }
@@ -126,20 +230,62 @@ export class PropertyMappingBuilder<
      * inferred type is assignable to the target property type will
      * appear in the selector callback.
      */
-    public mapFromProp<TPropertySchema extends SchemaBuilder<any, any>>(
+    public mapFromProp<
+        TPropertySchema extends SchemaBuilder<any, any>,
+        TReturn extends PropertyDescriptor<TFromSchema, TPropertySchema, any>
+    >(
         selector: (
             tree: PropertyDescriptorTree<
                 TFromSchema,
                 TFromSchema,
                 SchemaPropertyInferredType<TToSchema, TKey>
             >
-        ) => PropertyDescriptor<TFromSchema, TPropertySchema, any>
-    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>> {
+        ) => TReturn,
+        ...args: [TReturn] extends [never]
+            ? [
+                  error: `Source property type is not assignable to target property '${TKey}' type`
+              ]
+            : MapFromPropNeedsRegistration<
+                    GetSchemaFromDescriptor<TReturn>,
+                    TToSchema,
+                    TKey,
+                    TRegistered
+                > extends true
+              ? [
+                    error: `Property '${TKey}' maps between incompatible schema types. Register a mapping for the source→target schema pair first, or use mapFrom() instead.`
+                ]
+              : []
+    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>, TRegistered> {
         const sourceTree = ObjectSchemaBuilder.getPropertiesFor(
             this._mapper['_fromSchema']
         );
         const sourceDescriptor = selector(sourceTree as any);
         const inner = sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+
+        // Check if both source and target property schemas are ObjectSchemaBuilder;
+        // if so, look up the registered mapper and use it at runtime.
+        const sourceSchema = inner.getSchema();
+        const toProperties = (this._mapper['_toSchema'].introspect()
+            .properties || {}) as Record<string, any>;
+        const targetPropSchema = toProperties[this._targetKey];
+
+        if (
+            sourceSchema instanceof ObjectSchemaBuilder &&
+            targetPropSchema instanceof ObjectSchemaBuilder &&
+            this._mapper['_registry']
+        ) {
+            const fromSchemaMappers =
+                this._mapper['_registry']['_mappers'].get(sourceSchema);
+            const autoMapper = fromSchemaMappers?.get(targetPropSchema);
+            if (autoMapper) {
+                this._mapper['_mappings'].set(this._targetKey, {
+                    type: 'auto',
+                    sourceDescriptorInner: inner,
+                    autoMapper
+                });
+                return this._mapper as any;
+            }
+        }
 
         this._mapper['_mappings'].set(this._targetKey, {
             type: 'prop',
@@ -161,7 +307,7 @@ export class PropertyMappingBuilder<
             | ((
                   obj: InferType<TFromSchema>
               ) => Promise<SchemaPropertyInferredType<TToSchema, TKey>>)
-    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>> {
+    ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>, TRegistered> {
         this._mapper['_mappings'].set(this._targetKey, {
             type: 'custom',
             fn: fn as any
@@ -174,7 +320,12 @@ export class PropertyMappingBuilder<
      * Explicitly excludes the target property from mapping.
      * The property will not appear in the output object.
      */
-    public ignore(): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>> {
+    public ignore(): Mapper<
+        TFromSchema,
+        TToSchema,
+        Exclude<TUnmapped, TKey>,
+        TRegistered
+    > {
         this._mapper['_mappings'].set(this._targetKey, {
             type: 'ignore'
         });
@@ -203,11 +354,15 @@ export class PropertyMappingBuilder<
 export class Mapper<
     TFromSchema extends ObjectSchemaBuilder<any, any, any>,
     TToSchema extends ObjectSchemaBuilder<any, any, any>,
-    TUnmapped extends string = SchemaKeys<TToSchema>
+    TUnmapped extends string = SchemaKeys<TToSchema>,
+    TRegistered = never
 > {
+    /** Phantom property for structural type-checking of TUnmapped. */
+    declare readonly __unmapped: TUnmapped;
+
     private readonly _fromSchema: TFromSchema;
     private readonly _toSchema: TToSchema;
-    private readonly _registry: MappingRegistry | undefined;
+    private readonly _registry: MappingRegistry<any> | undefined;
     private readonly _mappings: Map<string, MappingEntry> = new Map();
 
     /**
@@ -219,7 +374,7 @@ export class Mapper<
     public constructor(
         fromSchema: TFromSchema,
         toSchema: TToSchema,
-        registry?: MappingRegistry
+        registry?: MappingRegistry<any>
     ) {
         this._fromSchema = fromSchema;
         this._toSchema = toSchema;
@@ -228,17 +383,24 @@ export class Mapper<
 
     /**
      * Selects a target property to configure. The selector callback
-     * receives a tree of all unmapped target properties. Navigate by
+     * receives a tree of all target properties. Navigate by
      * property name: `(t) => t.cityName`.
      *
-     * Only properties that have not yet been mapped or ignored are
-     * available in the selector tree.
+     * Auto-mappable properties (same name and compatible type, or
+     * ObjectSchemaBuilder with a registered mapping) are also available
+     * for explicit override.
      */
-    public forProp<TKey extends TUnmapped>(
+    public forProp<TKey extends SchemaKeys<TToSchema>>(
         selector: (
-            tree: TargetPropertyTree<TToSchema, TUnmapped>
+            tree: TargetPropertyTree<TToSchema, SchemaKeys<TToSchema>>
         ) => TargetPropertyKey<TKey>
-    ): PropertyMappingBuilder<TFromSchema, TToSchema, TKey, TUnmapped> {
+    ): PropertyMappingBuilder<
+        TFromSchema,
+        TToSchema,
+        TKey,
+        TUnmapped,
+        TRegistered
+    > {
         // At runtime, use a Proxy to detect which property was accessed
         let capturedKey: string | undefined;
         const proxy = new Proxy({} as any, {
@@ -288,9 +450,15 @@ export class Mapper<
         // Auto-mapping: fill in unmapped properties using registered nested mappers
         if (this._registry) {
             const fromIntrospection = this._fromSchema.introspect();
-            const fromProperties = (fromIntrospection.properties || {}) as Record<string, any>;
-            const toProperties = (toIntrospection.properties || {}) as Record<string, any>;
-            const fromTree = ObjectSchemaBuilder.getPropertiesFor(this._fromSchema);
+            const fromProperties = (fromIntrospection.properties ||
+                {}) as Record<string, any>;
+            const toProperties = (toIntrospection.properties || {}) as Record<
+                string,
+                any
+            >;
+            const fromTree = ObjectSchemaBuilder.getPropertiesFor(
+                this._fromSchema
+            );
 
             for (const key of targetProperties) {
                 if (this._mappings.has(key)) continue;
@@ -299,25 +467,47 @@ export class Mapper<
                 const toPropSchema = toProperties[key];
 
                 if (!fromPropSchema || !toPropSchema) continue;
-                if (!(fromPropSchema instanceof ObjectSchemaBuilder)) continue;
-                if (!(toPropSchema instanceof ObjectSchemaBuilder)) continue;
-
-                const fromSchemaMappers = this._registry['_mappers'].get(fromPropSchema);
-                if (!fromSchemaMappers) continue;
-                const autoMapper = fromSchemaMappers.get(toPropSchema);
-                if (!autoMapper) continue;
 
                 const sourceDescriptor = (fromTree as any)[key];
                 if (
                     !sourceDescriptor ||
                     !sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
-                ) continue;
+                )
+                    continue;
 
-                this._mappings.set(key, {
-                    type: 'auto',
-                    sourceDescriptorInner: sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR],
-                    autoMapper
-                });
+                // ObjectSchemaBuilder → ObjectSchemaBuilder: use registered mapper
+                if (
+                    fromPropSchema instanceof ObjectSchemaBuilder &&
+                    toPropSchema instanceof ObjectSchemaBuilder
+                ) {
+                    const fromSchemaMappers =
+                        this._registry['_mappers'].get(fromPropSchema);
+                    if (!fromSchemaMappers) continue;
+                    const autoMapper = fromSchemaMappers.get(toPropSchema);
+                    if (!autoMapper) continue;
+
+                    this._mappings.set(key, {
+                        type: 'auto',
+                        sourceDescriptorInner:
+                            sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR],
+                        autoMapper
+                    });
+                    continue;
+                }
+
+                // Primitive → Primitive: auto-map same-name props
+                // (type compatibility is ensured at the type level by
+                // KeysNeedingMapping / NeedsMapping)
+                if (
+                    !(fromPropSchema instanceof ObjectSchemaBuilder) &&
+                    !(toPropSchema instanceof ObjectSchemaBuilder)
+                ) {
+                    this._mappings.set(key, {
+                        type: 'prop',
+                        sourceDescriptorInner:
+                            sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                    });
+                }
             }
         }
 
@@ -396,7 +586,7 @@ export class Mapper<
 
 // ── MappingRegistry ───────────────────────────────────────────────────
 
-export class MappingRegistry {
+export class MappingRegistry<TRegistered = never> {
     protected readonly _mappers: Map<
         ObjectSchemaBuilder<any, any, any>,
         Map<
@@ -440,9 +630,14 @@ export class MappingRegistry {
         fromSchema: TFromSchema,
         toSchema: TToSchema,
         fn: (
-            mapper: Mapper<TFromSchema, TToSchema>
-        ) => Mapper<TFromSchema, TToSchema, any>
-    ): MappingRegistry {
+            mapper: Mapper<
+                TFromSchema,
+                TToSchema,
+                KeysNeedingMapping<TFromSchema, TToSchema, TRegistered>,
+                TRegistered
+            >
+        ) => Mapper<TFromSchema, TToSchema, never, TRegistered>
+    ): MappingRegistry<TRegistered | [TFromSchema, TToSchema]> {
         if (!this.#ensureObjectSchemas(fromSchema, toSchema)) {
             throw new Error(
                 'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
@@ -458,7 +653,9 @@ export class MappingRegistry {
         }
 
         // Create new immutable registry with cloned mappings
-        const newRegistry = new MappingRegistry();
+        const newRegistry = new MappingRegistry<
+            TRegistered | [TFromSchema, TToSchema]
+        >();
         for (const [from, toMap] of this._mappers) {
             newRegistry._mappers.set(from, new Map(toMap));
         }
@@ -469,13 +666,25 @@ export class MappingRegistry {
         }
 
         // Create mapper with new registry reference
-        const mapper = new Mapper(fromSchema, toSchema, newRegistry);
+        const mapper = new Mapper<
+            TFromSchema,
+            TToSchema,
+            KeysNeedingMapping<TFromSchema, TToSchema, TRegistered>,
+            TRegistered
+        >(fromSchema, toSchema, newRegistry);
 
         // Configure via user callback
         const configuredMapper = fn(mapper);
 
         // Implicit finalization: auto-map + validate + register
-        (configuredMapper as Mapper<TFromSchema, TToSchema, never>).getMapper();
+        (
+            configuredMapper as Mapper<
+                TFromSchema,
+                TToSchema,
+                never,
+                TRegistered
+            >
+        ).getMapper();
 
         return newRegistry;
     }

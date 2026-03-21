@@ -38,20 +38,12 @@ describe('MappingRegistry', () => {
     test('throws on non-ObjectSchemaBuilder schemas', () => {
         const registry = new MappingRegistry();
         expect(() =>
-            registry.configure(
-                string() as any,
-                UserDtoSchema,
-                (m) => m as any
-            )
+            registry.configure(string() as any, UserDtoSchema, (m) => m as any)
         ).toThrow(
             'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
         );
         expect(() =>
-            registry.configure(
-                UserSchema,
-                number() as any,
-                (m) => m as any
-            )
+            registry.configure(UserSchema, number() as any, (m) => m as any)
         ).toThrow(
             'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
         );
@@ -76,8 +68,7 @@ describe('MappingRegistry', () => {
                     .mapFromProp((f) => f.address.city)
                     .forProp((t) => t.fullAddress)
                     .mapFrom(
-                        (user) =>
-                            `${user.address.city} ${user.address.houseNr}`
+                        (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
@@ -277,8 +268,7 @@ describe('Mapper', () => {
                     .mapFromProp((f) => f.address.city)
                     .forProp((t) => t.fullAddress)
                     .mapFrom(
-                        (user) =>
-                            `${user.address.city} ${user.address.houseNr}`
+                        (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
@@ -329,8 +319,7 @@ describe('Mapper', () => {
                     .mapFromProp((f) => f.address.city)
                     .forProp((t) => t.fullAddress)
                     .mapFrom(
-                        (user) =>
-                            `${user.address.city} ${user.address.houseNr}`
+                        (user) => `${user.address.city} ${user.address.houseNr}`
                     )
                     .forProp((t) => t.internalField)
                     .ignore()
@@ -385,8 +374,7 @@ describe('MappingRegistry.configure', () => {
                     .mapFromProp((f) => f.address.city)
                     .forProp((t) => t.fullAddress)
                     .mapFrom(
-                        (user) =>
-                            `${user.address.city} ${user.address.houseNr}`
+                        (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
@@ -419,9 +407,9 @@ describe('MappingRegistry.configure', () => {
         );
 
         // Original registry should NOT have the mapping
-        expect(() =>
-            original.getMapper(UserSchema, UserDtoSchema)
-        ).toThrow('No mapper found');
+        expect(() => original.getMapper(UserSchema, UserDtoSchema)).toThrow(
+            'No mapper found'
+        );
     });
 
     test('chaining multiple configure calls', async () => {
@@ -451,8 +439,7 @@ describe('MappingRegistry.configure', () => {
                     .mapFromProp((f) => f.address.city)
                     .forProp((t) => t.fullAddress)
                     .mapFrom(
-                        (user) =>
-                            `${user.address.city} ${user.address.houseNr}`
+                        (user) => `${user.address.city} ${user.address.houseNr}`
                     )
             );
 
@@ -485,8 +472,7 @@ describe('MappingRegistry.configure', () => {
                     .mapFromProp((f) => f.address.city)
                     .forProp((t) => t.fullAddress)
                     .mapFrom(
-                        (user) =>
-                            `${user.address.city} ${user.address.houseNr}`
+                        (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
@@ -499,8 +485,7 @@ describe('MappingRegistry.configure', () => {
                     .mapFromProp((f) => f.address.city)
                     .forProp((t) => t.fullAddress)
                     .mapFrom(
-                        (user) =>
-                            `${user.address.city} ${user.address.houseNr}`
+                        (user) => `${user.address.city} ${user.address.houseNr}`
                     )
             )
         ).toThrow('Duplicate mapping');
@@ -520,6 +505,7 @@ describe('MappingRegistry.configure', () => {
         const registry = new MappingRegistry();
         expect(() =>
             registry.configure(UserSchema, UserDtoSchema, (m) =>
+                // @ts-expect-error - intentionally leaving cityName and fullAddress unmapped
                 m.forProp((t) => t.name).mapFromProp((f) => f.name)
             )
         ).toThrow(MapperConfigurationError);
@@ -607,10 +593,12 @@ describe('Auto-mapping of nested schemas', () => {
         // Configuring Person first fails because the Address mapping
         // does not yet exist in the registry.
         expect(() =>
-            new MappingRegistry()
-                .configure(PersonSchema, PersonDtoSchema, (m) =>
-                    m.forProp((t) => t.name).mapFromProp((f) => f.name)
-                )
+            new MappingRegistry().configure(
+                PersonSchema,
+                PersonDtoSchema,
+                // @ts-expect-error - address not registered yet, so it remains unmapped
+                (m) => m.forProp((t) => t.name).mapFromProp((f) => f.name)
+            )
         ).toThrow(MapperConfigurationError);
     });
 
@@ -673,7 +661,7 @@ describe('Auto-mapping of nested schemas', () => {
         expect(result).not.toHaveProperty('address');
     });
 
-    test('non-object fields are not auto-mapped', () => {
+    test('same-name, same-type primitive fields are auto-mapped', async () => {
         const SourceSchema = object({
             name: string(),
             label: string()
@@ -684,14 +672,17 @@ describe('Auto-mapping of nested schemas', () => {
             label: string()
         });
 
-        // Without configuring the string→string mapping (which makes no sense),
-        // configure should fail because 'label' can't be auto-mapped
-        const registry = new MappingRegistry();
-        expect(() =>
-            registry.configure(SourceSchema, TargetSchema, (m) =>
-                m.forProp((t) => t.name).mapFromProp((f) => f.name)
-            )
-        ).toThrow(MapperConfigurationError);
+        // Both 'name' and 'label' are string→string with matching names,
+        // so they should be auto-mapped without explicit mapping.
+        const registry = new MappingRegistry().configure(
+            SourceSchema,
+            TargetSchema,
+            (m) => m
+        );
+
+        const mapFn = registry.getMapper(SourceSchema, TargetSchema);
+        const result = await mapFn({ name: 'Alice', label: 'admin' });
+        expect(result).toEqual({ name: 'Alice', label: 'admin' });
     });
 
     test('deep nesting: auto-map multiple levels', async () => {
@@ -791,8 +782,268 @@ describe('Auto-mapping of nested schemas', () => {
         // 'data' should not be auto-mapped because source 'data' is string, not object
         expect(() =>
             new MappingRegistry().configure(SourceSchema, TargetSchema, (m) =>
+                // @ts-expect-error - data remains unmapped (string vs ObjectSchemaBuilder)
                 m.forProp((t) => t.name).mapFromProp((f) => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
+
+    test('auto-mapping', () => {
+        const AddressSchema = object({
+            city: string(),
+            street: string(),
+            country: string(),
+            zipCode: string()
+        });
+        const AddressDtoSchema = object({
+            city: string(),
+            street: string(),
+            country: string()
+        });
+
+        const UserSchema = object({
+            firstName: string(),
+            lastName: string(),
+            address: AddressSchema
+        });
+
+        const UserDtoSchema = object({
+            name: string(),
+            address: AddressDtoSchema
+        });
+
+        // Without registering AddressSchema→AddressDtoSchema first,
+        // mapFromProp for the address property should be a type error
+        const registry = new MappingRegistry()
+            .configure(AddressSchema, AddressDtoSchema, (m) =>
+                m
+                    .forProp((t) => t.city)
+                    .mapFromProp((f) => f.city)
+                    .forProp((t) => t.street)
+                    .mapFromProp((f) => f.street)
+                    .forProp((t) => t.country)
+                    .mapFromProp((f) => f.country)
+            )
+            .configure(UserSchema, UserDtoSchema, (m) =>
+                m
+                    .forProp((t) => t.name)
+                    .mapFrom((u) => `${u.firstName} ${u.lastName}`)
+                    .forProp((t) => t.address)
+                    .mapFromProp((f) => f.address)
+            );
+
+        expect(registry).toBeInstanceOf(MappingRegistry);
+    });
+
+    test('mapFromProp type-errors without registered mapping for ObjectSchemaBuilder props', () => {
+        const AddressSchema = object({
+            city: string(),
+            street: string()
+        });
+        const AddressDtoSchema = object({
+            city: string(),
+            street: string()
+        });
+
+        const PersonSchema = object({
+            name: string(),
+            address: AddressSchema
+        });
+
+        const PersonDtoSchema = object({
+            name: string(),
+            address: AddressDtoSchema
+        });
+
+        // Without registering AddressSchema→AddressDtoSchema,
+        // mapFromProp for address should produce a type error
+        new MappingRegistry().configure(PersonSchema, PersonDtoSchema, (m) =>
+            m
+                .forProp((t) => t.name)
+                .mapFromProp((f) => f.name)
+                .forProp((t) => t.address)
+                // @ts-expect-error - no AddressSchema→AddressDtoSchema mapping registered
+                .mapFromProp((f) => f.address)
+        );
+    });
+
+    test('mapFromProp succeeds when mapping is registered for ObjectSchemaBuilder props', async () => {
+        const AddressSchema = object({
+            city: string(),
+            houseNr: number()
+        });
+
+        const AddressDtoSchema = object({
+            city: string()
+        });
+
+        const PersonSchema = object({
+            name: string(),
+            address: AddressSchema
+        });
+
+        const PersonDtoSchema = object({
+            name: string(),
+            address: AddressDtoSchema
+        });
+
+        // With AddressSchema→AddressDtoSchema registered first, no type error
+        const registry = new MappingRegistry()
+            .configure(AddressSchema, AddressDtoSchema, (m) =>
+                m.forProp((t) => t.city).mapFromProp((f) => f.city)
+            )
+            .configure(PersonSchema, PersonDtoSchema, (m) =>
+                m
+                    .forProp((t) => t.name)
+                    .mapFromProp((f) => f.name)
+                    .forProp((t) => t.address)
+                    .mapFromProp((f) => f.address)
+            );
+
+        const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
+        const result = await mapFn({
+            name: 'Alice',
+            address: { city: 'Berlin', houseNr: 10 }
+        });
+
+        // The registered AddressSchema→AddressDtoSchema mapper is applied,
+        // so houseNr is dropped (not in AddressDtoSchema)
+        expect(result).toEqual({
+            name: 'Alice',
+            address: { city: 'Berlin' }
+        });
+    });
+
+    test('auto-mapping removes need to explicitly map registered ObjectSchemaBuilder props', async () => {
+        const AddressSchema = object({
+            city: string(),
+            houseNr: number()
+        });
+
+        const AddressDtoSchema = object({
+            city: string()
+        });
+
+        const PersonSchema = object({
+            name: string(),
+            address: AddressSchema
+        });
+
+        const PersonDtoSchema = object({
+            name: string(),
+            address: AddressDtoSchema
+        });
+
+        const reg = new MappingRegistry();
+
+        reg.configure(AddressSchema, AddressDtoSchema, (m) =>
+            m
+                .forProp((t) => t.city)
+                // @ts-expect-error - houseNr (number) is not assignable to city (string)
+                .mapFromProp((t) => t.houseNr)
+        );
+
+        // address is not explicitly mapped — auto-mapping picks it up
+        // because AddressSchema→AddressDtoSchema is registered
+        const registry = new MappingRegistry()
+            .configure(AddressSchema, AddressDtoSchema, (m) =>
+                m.forProp((t) => t.city).mapFromProp((f) => f.city)
+            )
+            .configure(PersonSchema, PersonDtoSchema, (m) =>
+                m.forProp((t) => t.name).mapFromProp((f) => f.name)
+            );
+
+        const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
+        const result = await mapFn({
+            name: 'Bob',
+            address: { city: 'Paris', houseNr: 7 }
+        });
+
+        expect(result).toEqual({
+            name: 'Bob',
+            address: { city: 'Paris' }
+        });
+    });
+
+    test('auto-mapping of the same properties (same name and inferred type)', async () => {
+        const AddressSchema = object({
+            city: string(),
+            houseNr: number()
+        });
+
+        const AddressDtoSchema = object({
+            city: string(),
+            houseNr: string()
+        });
+
+        // here city can be auto-mapped but houseNr cannot because of incompatible types
+        const registry = new MappingRegistry().configure(
+            AddressSchema,
+            AddressDtoSchema,
+            (m) =>
+                m.forProp((t) => t.houseNr).mapFrom((f) => f.houseNr.toString())
+        );
+
+        const mapFn = registry.getMapper(AddressSchema, AddressDtoSchema);
+        const result = await mapFn({ city: 'NYC', houseNr: 42 });
+
+        expect(result).toEqual({ city: 'NYC', houseNr: '42' });
+    });
+
+    test('error on missed mapping', () => {
+        const AddressSchema = object({
+            city: string(),
+            houseNr: number()
+        });
+
+        const AddressDtoSchema = object({
+            city2: string(),
+            houseNr: string()
+        });
+
+        expect(() =>
+            new MappingRegistry().configure(
+                AddressSchema,
+                AddressDtoSchema,
+                (m) =>
+                    // @ts-expect-error - city2 is not mapped, and it can't be auto-mapped because there is no property with the same name and inferred type in AddressSchema
+                    m
+                        .forProp((t) => t.houseNr)
+                        .mapFrom((f) => f.houseNr.toString())
+            )
+        ).toThrow(MapperConfigurationError);
+    });
+
+    // test('different schemas, but the same inferred type and name are auto-mapped', async () => {
+    //     const SchemaA = object({
+    //         name: string(),
+    //         value: number()
+    //     });
+
+    //     const SchemaB = object({
+    //         name: string(),
+    //         value: number()
+    //     });
+
+    //     const schemaC = object({
+    //         prop: SchemaA,
+    //         anotherProp: string()
+    //     });
+
+    //     const schemaD = object({
+    //         prop: SchemaB,
+    //         oneMoreProp: string()
+    //     });
+
+    //     const registry = new MappingRegistry().configure(
+    //         schemaC,
+    //         schemaD,
+    //         (m) =>
+    //             m
+    //                 .forProp((t) => t.oneMoreProp)
+    //                 .mapFromProp((f) => f.anotherProp)
+    //                 .forProp((t) => t.prop)
+    //                 .mapFromProp((f) => f.prop)
+    //     );
+    // });
 });
