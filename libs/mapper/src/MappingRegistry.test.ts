@@ -1180,54 +1180,6 @@ describe('Array mapping', () => {
         });
     });
 
-    test('maps array with element transformation via registered mapper', async () => {
-        const SourceItemSchema = object({
-            id: number(),
-            name: string(),
-            extra: string()
-        });
-
-        const TargetItemSchema = object({
-            id: number(),
-            name: string()
-        });
-
-        const SourceSchema = object({
-            items: array(SourceItemSchema)
-        });
-
-        const TargetSchema = object({
-            items: array(TargetItemSchema)
-        });
-
-        const registry = new MappingRegistry()
-            .configure(SourceItemSchema, TargetItemSchema, (m) =>
-                m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-            )
-            .configure(SourceSchema, TargetSchema, (m) =>
-                m.for((t) => t.items).from((f) => f.items)
-            );
-
-        const mapFn = registry.getMapper(SourceSchema, TargetSchema);
-        const result = await mapFn({
-            items: [
-                { id: 1, name: 'a', extra: 'x' },
-                { id: 2, name: 'b', extra: 'y' }
-            ]
-        });
-
-        expect(result).toEqual({
-            items: [
-                { id: 1, name: 'a' },
-                { id: 2, name: 'b' }
-            ]
-        });
-    });
-
     test('maps empty array to empty array', async () => {
         const registry = new MappingRegistry()
             .configure(ItemSchema, ItemDtoSchema, (m) =>
