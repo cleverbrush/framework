@@ -1571,3 +1571,1450 @@ describe('Array mapping', () => {
         });
     });
 });
+
+// ── Real-world mapping scenarios ─────────────────────────────────────
+
+describe('E-commerce: Product catalog mapping', () => {
+    // --- Domain models ---
+    const MoneySchema = object({
+        amount: number(),
+        currency: string()
+    });
+
+    const ProductVariantSchema = object({
+        sku: string(),
+        color: string(),
+        size: string(),
+        price: MoneySchema
+    });
+
+    const CategorySchema = object({
+        id: number(),
+        name: string(),
+        slug: string()
+    });
+
+    const ProductSchema = object({
+        id: number(),
+        title: string(),
+        description: string(),
+        category: CategorySchema,
+        variants: array(ProductVariantSchema),
+        internalNotes: string()
+    });
+
+    // --- API DTOs ---
+    const MoneyDtoSchema = object({
+        displayPrice: string()
+    });
+
+    const VariantDtoSchema = object({
+        sku: string(),
+        label: string(),
+        price: MoneyDtoSchema
+    });
+
+    const ProductListItemSchema = object({
+        id: number(),
+        title: string(),
+        categoryName: string(),
+        variants: array(VariantDtoSchema)
+    });
+
+    test('maps product entity to product listing DTO', async () => {
+        const registry = new MappingRegistry()
+            .configure(MoneySchema, MoneyDtoSchema, (m) =>
+                m
+                    .for((t) => t.displayPrice)
+                    .compute(
+                        (money) =>
+                            `${money.currency} ${money.amount.toFixed(2)}`
+                    )
+            )
+            .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
+                m
+                    .for((t) => t.sku)
+                    .from((f) => f.sku)
+                    .for((t) => t.label)
+                    .compute((v) => `${v.color} / ${v.size}`)
+                    .for((t) => t.price)
+                    .from((f) => f.price)
+            )
+            .configure(ProductSchema, ProductListItemSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.title)
+                    .from((f) => f.title)
+                    .for((t) => t.categoryName)
+                    .from((f) => f.category.name)
+                    .for((t) => t.variants)
+                    .from((f) => f.variants)
+            );
+
+        const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
+        const result = await mapFn({
+            id: 1001,
+            title: 'Classic T-Shirt',
+            description: 'A comfortable cotton t-shirt',
+            category: { id: 5, name: 'Clothing', slug: 'clothing' },
+            variants: [
+                {
+                    sku: 'TS-BLK-M',
+                    color: 'Black',
+                    size: 'M',
+                    price: { amount: 29.99, currency: 'USD' }
+                },
+                {
+                    sku: 'TS-WHT-L',
+                    color: 'White',
+                    size: 'L',
+                    price: { amount: 29.99, currency: 'USD' }
+                }
+            ],
+            internalNotes: 'Restock Q3'
+        });
+
+        expect(result).toEqual({
+            id: 1001,
+            title: 'Classic T-Shirt',
+            categoryName: 'Clothing',
+            variants: [
+                {
+                    sku: 'TS-BLK-M',
+                    label: 'Black / M',
+                    price: { displayPrice: 'USD 29.99' }
+                },
+                {
+                    sku: 'TS-WHT-L',
+                    label: 'White / L',
+                    price: { displayPrice: 'USD 29.99' }
+                }
+            ]
+        });
+        expect(result).not.toHaveProperty('description');
+        expect(result).not.toHaveProperty('internalNotes');
+    });
+
+    test('maps product with empty variants array', async () => {
+        const registry = new MappingRegistry()
+            .configure(MoneySchema, MoneyDtoSchema, (m) =>
+                m
+                    .for((t) => t.displayPrice)
+                    .compute(
+                        (money) =>
+                            `${money.currency} ${money.amount.toFixed(2)}`
+                    )
+            )
+            .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
+                m
+                    .for((t) => t.sku)
+                    .from((f) => f.sku)
+                    .for((t) => t.label)
+                    .compute((v) => `${v.color} / ${v.size}`)
+                    .for((t) => t.price)
+                    .from((f) => f.price)
+            )
+            .configure(ProductSchema, ProductListItemSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.title)
+                    .from((f) => f.title)
+                    .for((t) => t.categoryName)
+                    .from((f) => f.category.name)
+                    .for((t) => t.variants)
+                    .from((f) => f.variants)
+            );
+
+        const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
+        const result = await mapFn({
+            id: 1002,
+            title: 'Limited Edition Sneakers',
+            description: 'Sold out',
+            category: { id: 3, name: 'Footwear', slug: 'footwear' },
+            variants: [],
+            internalNotes: 'Discontinued'
+        });
+
+        expect(result).toEqual({
+            id: 1002,
+            title: 'Limited Edition Sneakers',
+            categoryName: 'Footwear',
+            variants: []
+        });
+    });
+});
+
+describe('User management: Profile to public DTO', () => {
+    const AddressSchema = object({
+        street: string(),
+        city: string(),
+        state: string(),
+        zipCode: string(),
+        country: string()
+    });
+
+    const UserProfileSchema = object({
+        id: number(),
+        firstName: string(),
+        lastName: string(),
+        email: string(),
+        passwordHash: string(),
+        address: AddressSchema,
+        role: string()
+    });
+
+    const PublicProfileSchema = object({
+        id: number(),
+        displayName: string(),
+        location: string(),
+        role: string()
+    });
+
+    test('flattens user profile to public profile, hiding sensitive fields', async () => {
+        const registry = new MappingRegistry().configure(
+            UserProfileSchema,
+            PublicProfileSchema,
+            (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.displayName)
+                    .compute((u) => `${u.firstName} ${u.lastName}`)
+                    .for((t) => t.location)
+                    .compute((u) => `${u.address.city}, ${u.address.state}`)
+                    .for((t) => t.role)
+                    .from((f) => f.role)
+        );
+
+        const mapFn = registry.getMapper(UserProfileSchema, PublicProfileSchema);
+        const result = await mapFn({
+            id: 42,
+            firstName: 'Jane',
+            lastName: 'Doe',
+            email: 'jane.doe@example.com',
+            passwordHash: '$2b$10$abcdef...',
+            address: {
+                street: '123 Main St',
+                city: 'Portland',
+                state: 'OR',
+                zipCode: '97201',
+                country: 'US'
+            },
+            role: 'admin'
+        });
+
+        expect(result).toEqual({
+            id: 42,
+            displayName: 'Jane Doe',
+            location: 'Portland, OR',
+            role: 'admin'
+        });
+        expect(result).not.toHaveProperty('email');
+        expect(result).not.toHaveProperty('passwordHash');
+        expect(result).not.toHaveProperty('address');
+    });
+
+    test('maps user profile to admin view with full address', async () => {
+        const AdminUserViewSchema = object({
+            id: number(),
+            displayName: string(),
+            email: string(),
+            fullAddress: string(),
+            role: string()
+        });
+
+        const registry = new MappingRegistry().configure(
+            UserProfileSchema,
+            AdminUserViewSchema,
+            (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.displayName)
+                    .compute((u) => `${u.firstName} ${u.lastName}`)
+                    .for((t) => t.email)
+                    .from((f) => f.email)
+                    .for((t) => t.fullAddress)
+                    .compute(
+                        (u) =>
+                            `${u.address.street}, ${u.address.city}, ${u.address.state} ${u.address.zipCode}, ${u.address.country}`
+                    )
+                    .for((t) => t.role)
+                    .from((f) => f.role)
+        );
+
+        const mapFn = registry.getMapper(
+            UserProfileSchema,
+            AdminUserViewSchema
+        );
+        const result = await mapFn({
+            id: 7,
+            firstName: 'Alice',
+            lastName: 'Smith',
+            email: 'alice@company.com',
+            passwordHash: '$2b$10$xyz...',
+            address: {
+                street: '456 Oak Ave',
+                city: 'Seattle',
+                state: 'WA',
+                zipCode: '98101',
+                country: 'US'
+            },
+            role: 'manager'
+        });
+
+        expect(result).toEqual({
+            id: 7,
+            displayName: 'Alice Smith',
+            email: 'alice@company.com',
+            fullAddress: '456 Oak Ave, Seattle, WA 98101, US',
+            role: 'manager'
+        });
+        expect(result).not.toHaveProperty('passwordHash');
+    });
+});
+
+describe('Blog CMS: Post entity to API response', () => {
+    const AuthorSchema = object({
+        id: number(),
+        firstName: string(),
+        lastName: string(),
+        bio: string()
+    });
+
+    const AuthorSummarySchema = object({
+        id: number(),
+        name: string()
+    });
+
+    const TagSchema = object({
+        id: number(),
+        label: string()
+    });
+
+    const TagDtoSchema = object({
+        label: string()
+    });
+
+    const CommentSchema = object({
+        id: number(),
+        authorName: string(),
+        body: string(),
+        likes: number()
+    });
+
+    const CommentDtoSchema = object({
+        authorName: string(),
+        body: string(),
+        likes: number()
+    });
+
+    const BlogPostSchema = object({
+        id: number(),
+        title: string(),
+        body: string(),
+        author: AuthorSchema,
+        tags: array(TagSchema),
+        comments: array(CommentSchema),
+        isDraft: string()
+    });
+
+    const BlogPostResponseSchema = object({
+        id: number(),
+        title: string(),
+        excerpt: string(),
+        authorName: string(),
+        tags: array(TagDtoSchema),
+        commentCount: number(),
+        comments: array(CommentDtoSchema)
+    });
+
+    test('maps blog post entity to API response with computed fields', async () => {
+        const registry = new MappingRegistry()
+            .configure(TagSchema, TagDtoSchema, (m) =>
+                m.for((t) => t.label).from((f) => f.label)
+            )
+            .configure(CommentSchema, CommentDtoSchema, (m) =>
+                m
+                    .for((t) => t.authorName)
+                    .from((f) => f.authorName)
+                    .for((t) => t.body)
+                    .from((f) => f.body)
+                    .for((t) => t.likes)
+                    .from((f) => f.likes)
+            )
+            .configure(BlogPostSchema, BlogPostResponseSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.title)
+                    .from((f) => f.title)
+                    .for((t) => t.excerpt)
+                    .compute((post) => post.body.substring(0, 100))
+                    .for((t) => t.authorName)
+                    .compute(
+                        (post) =>
+                            `${post.author.firstName} ${post.author.lastName}`
+                    )
+                    .for((t) => t.tags)
+                    .from((f) => f.tags)
+                    .for((t) => t.commentCount)
+                    .compute((post) => post.comments.length)
+                    .for((t) => t.comments)
+                    .from((f) => f.comments)
+            );
+
+        const mapFn = registry.getMapper(
+            BlogPostSchema,
+            BlogPostResponseSchema
+        );
+        const longBody =
+            'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam.';
+        const result = await mapFn({
+            id: 101,
+            title: 'Getting Started with TypeScript',
+            body: longBody,
+            author: {
+                id: 5,
+                firstName: 'John',
+                lastName: 'Writer',
+                bio: 'Tech blogger since 2015'
+            },
+            tags: [
+                { id: 1, label: 'typescript' },
+                { id: 2, label: 'tutorial' }
+            ],
+            comments: [
+                {
+                    id: 1,
+                    authorName: 'Reader1',
+                    body: 'Great post!',
+                    likes: 5
+                },
+                {
+                    id: 2,
+                    authorName: 'Reader2',
+                    body: 'Very helpful',
+                    likes: 3
+                }
+            ],
+            isDraft: 'false'
+        });
+
+        expect(result).toEqual({
+            id: 101,
+            title: 'Getting Started with TypeScript',
+            excerpt: longBody.substring(0, 100),
+            authorName: 'John Writer',
+            tags: [{ label: 'typescript' }, { label: 'tutorial' }],
+            commentCount: 2,
+            comments: [
+                { authorName: 'Reader1', body: 'Great post!', likes: 5 },
+                { authorName: 'Reader2', body: 'Very helpful', likes: 3 }
+            ]
+        });
+        expect(result).not.toHaveProperty('isDraft');
+        expect(result).not.toHaveProperty('body');
+    });
+
+    test('maps blog post with no tags and no comments', async () => {
+        const registry = new MappingRegistry()
+            .configure(TagSchema, TagDtoSchema, (m) =>
+                m.for((t) => t.label).from((f) => f.label)
+            )
+            .configure(CommentSchema, CommentDtoSchema, (m) =>
+                m
+                    .for((t) => t.authorName)
+                    .from((f) => f.authorName)
+                    .for((t) => t.body)
+                    .from((f) => f.body)
+                    .for((t) => t.likes)
+                    .from((f) => f.likes)
+            )
+            .configure(BlogPostSchema, BlogPostResponseSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.title)
+                    .from((f) => f.title)
+                    .for((t) => t.excerpt)
+                    .compute((post) => post.body.substring(0, 100))
+                    .for((t) => t.authorName)
+                    .compute(
+                        (post) =>
+                            `${post.author.firstName} ${post.author.lastName}`
+                    )
+                    .for((t) => t.tags)
+                    .from((f) => f.tags)
+                    .for((t) => t.commentCount)
+                    .compute((post) => post.comments.length)
+                    .for((t) => t.comments)
+                    .from((f) => f.comments)
+            );
+
+        const mapFn = registry.getMapper(
+            BlogPostSchema,
+            BlogPostResponseSchema
+        );
+        const result = await mapFn({
+            id: 102,
+            title: 'Empty Post',
+            body: 'Short',
+            author: {
+                id: 10,
+                firstName: 'Jane',
+                lastName: 'Author',
+                bio: 'New writer'
+            },
+            tags: [],
+            comments: [],
+            isDraft: 'true'
+        });
+
+        expect(result).toEqual({
+            id: 102,
+            title: 'Empty Post',
+            excerpt: 'Short',
+            authorName: 'Jane Author',
+            tags: [],
+            commentCount: 0,
+            comments: []
+        });
+    });
+});
+
+describe('Invoice billing: Invoice to summary', () => {
+    const CompanySchema = object({
+        name: string(),
+        taxId: string(),
+        address: string()
+    });
+
+    const CompanyDtoSchema = object({
+        name: string(),
+        address: string()
+    });
+
+    const LineItemSchema = object({
+        description: string(),
+        quantity: number(),
+        unitPrice: number()
+    });
+
+    const LineItemDtoSchema = object({
+        description: string(),
+        total: number()
+    });
+
+    const InvoiceSchema = object({
+        invoiceNumber: string(),
+        issuer: CompanySchema,
+        recipient: CompanySchema,
+        lineItems: array(LineItemSchema),
+        notes: string()
+    });
+
+    const InvoiceSummarySchema = object({
+        invoiceNumber: string(),
+        issuerName: string(),
+        recipientName: string(),
+        lineItems: array(LineItemDtoSchema),
+        totalAmount: number()
+    });
+
+    test('maps invoice entity to invoice summary with line item totals', async () => {
+        const registry = new MappingRegistry()
+            .configure(LineItemSchema, LineItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.description)
+                    .from((f) => f.description)
+                    .for((t) => t.total)
+                    .compute((item) => item.quantity * item.unitPrice)
+            )
+            .configure(InvoiceSchema, InvoiceSummarySchema, (m) =>
+                m
+                    .for((t) => t.invoiceNumber)
+                    .from((f) => f.invoiceNumber)
+                    .for((t) => t.issuerName)
+                    .from((f) => f.issuer.name)
+                    .for((t) => t.recipientName)
+                    .from((f) => f.recipient.name)
+                    .for((t) => t.lineItems)
+                    .from((f) => f.lineItems)
+                    .for((t) => t.totalAmount)
+                    .compute((inv) =>
+                        inv.lineItems.reduce(
+                            (sum, item) =>
+                                sum + item.quantity * item.unitPrice,
+                            0
+                        )
+                    )
+            );
+
+        const mapFn = registry.getMapper(InvoiceSchema, InvoiceSummarySchema);
+        const result = await mapFn({
+            invoiceNumber: 'INV-2024-001',
+            issuer: {
+                name: 'Acme Corp',
+                taxId: 'US-123456',
+                address: '100 Business Rd'
+            },
+            recipient: {
+                name: 'Client LLC',
+                taxId: 'US-654321',
+                address: '200 Client Ave'
+            },
+            lineItems: [
+                {
+                    description: 'Consulting (40h)',
+                    quantity: 40,
+                    unitPrice: 150
+                },
+                { description: 'Travel expenses', quantity: 1, unitPrice: 500 }
+            ],
+            notes: 'Net 30'
+        });
+
+        expect(result).toEqual({
+            invoiceNumber: 'INV-2024-001',
+            issuerName: 'Acme Corp',
+            recipientName: 'Client LLC',
+            lineItems: [
+                { description: 'Consulting (40h)', total: 6000 },
+                { description: 'Travel expenses', total: 500 }
+            ],
+            totalAmount: 6500
+        });
+        expect(result).not.toHaveProperty('notes');
+    });
+
+    test('maps invoice with single line item', async () => {
+        const registry = new MappingRegistry()
+            .configure(LineItemSchema, LineItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.description)
+                    .from((f) => f.description)
+                    .for((t) => t.total)
+                    .compute((item) => item.quantity * item.unitPrice)
+            )
+            .configure(InvoiceSchema, InvoiceSummarySchema, (m) =>
+                m
+                    .for((t) => t.invoiceNumber)
+                    .from((f) => f.invoiceNumber)
+                    .for((t) => t.issuerName)
+                    .from((f) => f.issuer.name)
+                    .for((t) => t.recipientName)
+                    .from((f) => f.recipient.name)
+                    .for((t) => t.lineItems)
+                    .from((f) => f.lineItems)
+                    .for((t) => t.totalAmount)
+                    .compute((inv) =>
+                        inv.lineItems.reduce(
+                            (sum, item) =>
+                                sum + item.quantity * item.unitPrice,
+                            0
+                        )
+                    )
+            );
+
+        const mapFn = registry.getMapper(InvoiceSchema, InvoiceSummarySchema);
+        const result = await mapFn({
+            invoiceNumber: 'INV-2024-002',
+            issuer: {
+                name: 'Freelancer Inc',
+                taxId: 'US-111111',
+                address: '50 Home Office'
+            },
+            recipient: {
+                name: 'Big Corp',
+                taxId: 'US-999999',
+                address: '1 Corporate Blvd'
+            },
+            lineItems: [
+                { description: 'Monthly retainer', quantity: 1, unitPrice: 5000 }
+            ],
+            notes: ''
+        });
+
+        expect(result).toEqual({
+            invoiceNumber: 'INV-2024-002',
+            issuerName: 'Freelancer Inc',
+            recipientName: 'Big Corp',
+            lineItems: [{ description: 'Monthly retainer', total: 5000 }],
+            totalAmount: 5000
+        });
+    });
+});
+
+describe('REST API: Weather response to domain model', () => {
+    // Simulates mapping an external weather API response to an internal domain model
+    const ApiCoordinatesSchema = object({
+        lat: number(),
+        lon: number()
+    });
+
+    const ApiWeatherConditionSchema = object({
+        id: number(),
+        main: string(),
+        description: string(),
+        icon: string()
+    });
+
+    const ApiWeatherResponseSchema = object({
+        name: string(),
+        coord: ApiCoordinatesSchema,
+        weather: array(ApiWeatherConditionSchema),
+        visibility: number()
+    });
+
+    const WeatherConditionSchema = object({
+        summary: string(),
+        description: string()
+    });
+
+    const WeatherReportSchema = object({
+        cityName: string(),
+        latitude: number(),
+        longitude: number(),
+        conditions: array(WeatherConditionSchema)
+    });
+
+    test('maps external API response to internal weather report', async () => {
+        const registry = new MappingRegistry()
+            .configure(
+                ApiWeatherConditionSchema,
+                WeatherConditionSchema,
+                (m) =>
+                    m
+                        .for((t) => t.summary)
+                        .from((f) => f.main)
+                        .for((t) => t.description)
+                        .from((f) => f.description)
+            )
+            .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
+                m
+                    .for((t) => t.cityName)
+                    .from((f) => f.name)
+                    .for((t) => t.latitude)
+                    .from((f) => f.coord.lat)
+                    .for((t) => t.longitude)
+                    .from((f) => f.coord.lon)
+                    .for((t) => t.conditions)
+                    .from((f) => f.weather)
+            );
+
+        const mapFn = registry.getMapper(
+            ApiWeatherResponseSchema,
+            WeatherReportSchema
+        );
+        const result = await mapFn({
+            name: 'London',
+            coord: { lat: 51.5074, lon: -0.1278 },
+            weather: [
+                {
+                    id: 300,
+                    main: 'Drizzle',
+                    description: 'light intensity drizzle',
+                    icon: '09d'
+                },
+                {
+                    id: 701,
+                    main: 'Mist',
+                    description: 'mist',
+                    icon: '50d'
+                }
+            ],
+            visibility: 10000
+        });
+
+        expect(result).toEqual({
+            cityName: 'London',
+            latitude: 51.5074,
+            longitude: -0.1278,
+            conditions: [
+                {
+                    summary: 'Drizzle',
+                    description: 'light intensity drizzle'
+                },
+                { summary: 'Mist', description: 'mist' }
+            ]
+        });
+        expect(result).not.toHaveProperty('visibility');
+    });
+
+    test('maps API response with single weather condition', async () => {
+        const registry = new MappingRegistry()
+            .configure(
+                ApiWeatherConditionSchema,
+                WeatherConditionSchema,
+                (m) =>
+                    m
+                        .for((t) => t.summary)
+                        .from((f) => f.main)
+                        .for((t) => t.description)
+                        .from((f) => f.description)
+            )
+            .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
+                m
+                    .for((t) => t.cityName)
+                    .from((f) => f.name)
+                    .for((t) => t.latitude)
+                    .from((f) => f.coord.lat)
+                    .for((t) => t.longitude)
+                    .from((f) => f.coord.lon)
+                    .for((t) => t.conditions)
+                    .from((f) => f.weather)
+            );
+
+        const mapFn = registry.getMapper(
+            ApiWeatherResponseSchema,
+            WeatherReportSchema
+        );
+        const result = await mapFn({
+            name: 'Tokyo',
+            coord: { lat: 35.6762, lon: 139.6503 },
+            weather: [
+                {
+                    id: 800,
+                    main: 'Clear',
+                    description: 'clear sky',
+                    icon: '01d'
+                }
+            ],
+            visibility: 16093
+        });
+
+        expect(result).toEqual({
+            cityName: 'Tokyo',
+            latitude: 35.6762,
+            longitude: 139.6503,
+            conditions: [{ summary: 'Clear', description: 'clear sky' }]
+        });
+    });
+});
+
+describe('HR system: Employee to organization chart entry', () => {
+    const DepartmentSchema = object({
+        id: number(),
+        name: string(),
+        floor: number()
+    });
+
+    const EmployeeSchema = object({
+        employeeId: string(),
+        firstName: string(),
+        lastName: string(),
+        email: string(),
+        salary: number(),
+        department: DepartmentSchema,
+        skills: array(string())
+    });
+
+    const OrgChartEntrySchema = object({
+        employeeId: string(),
+        fullName: string(),
+        departmentName: string(),
+        skills: array(string())
+    });
+
+    test('maps employee to org chart entry, hiding salary', async () => {
+        const registry = new MappingRegistry().configure(
+            EmployeeSchema,
+            OrgChartEntrySchema,
+            (m) =>
+                m
+                    .for((t) => t.employeeId)
+                    .from((f) => f.employeeId)
+                    .for((t) => t.fullName)
+                    .compute((e) => `${e.firstName} ${e.lastName}`)
+                    .for((t) => t.departmentName)
+                    .from((f) => f.department.name)
+                    .for((t) => t.skills)
+                    .from((f) => f.skills)
+        );
+
+        const mapFn = registry.getMapper(EmployeeSchema, OrgChartEntrySchema);
+        const result = await mapFn({
+            employeeId: 'EMP-001',
+            firstName: 'Bob',
+            lastName: 'Johnson',
+            email: 'bob.johnson@company.com',
+            salary: 95000,
+            department: { id: 3, name: 'Engineering', floor: 4 },
+            skills: ['TypeScript', 'React', 'Node.js']
+        });
+
+        expect(result).toEqual({
+            employeeId: 'EMP-001',
+            fullName: 'Bob Johnson',
+            departmentName: 'Engineering',
+            skills: ['TypeScript', 'React', 'Node.js']
+        });
+        expect(result).not.toHaveProperty('salary');
+        expect(result).not.toHaveProperty('email');
+    });
+
+    test('maps employee with empty skills array', async () => {
+        const registry = new MappingRegistry().configure(
+            EmployeeSchema,
+            OrgChartEntrySchema,
+            (m) =>
+                m
+                    .for((t) => t.employeeId)
+                    .from((f) => f.employeeId)
+                    .for((t) => t.fullName)
+                    .compute((e) => `${e.firstName} ${e.lastName}`)
+                    .for((t) => t.departmentName)
+                    .from((f) => f.department.name)
+                    .for((t) => t.skills)
+                    .from((f) => f.skills)
+        );
+
+        const mapFn = registry.getMapper(EmployeeSchema, OrgChartEntrySchema);
+        const result = await mapFn({
+            employeeId: 'EMP-002',
+            firstName: 'New',
+            lastName: 'Hire',
+            email: 'new.hire@company.com',
+            salary: 60000,
+            department: { id: 1, name: 'Onboarding', floor: 1 },
+            skills: []
+        });
+
+        expect(result).toEqual({
+            employeeId: 'EMP-002',
+            fullName: 'New Hire',
+            departmentName: 'Onboarding',
+            skills: []
+        });
+    });
+});
+
+describe('Reservation system: Hotel booking mapping', () => {
+    const GuestSchema = object({
+        firstName: string(),
+        lastName: string(),
+        email: string(),
+        phone: string()
+    });
+
+    const GuestSummarySchema = object({
+        fullName: string(),
+        contactEmail: string()
+    });
+
+    const RoomSchema = object({
+        roomNumber: string(),
+        type: string(),
+        ratePerNight: number()
+    });
+
+    const RoomDtoSchema = object({
+        roomNumber: string(),
+        type: string()
+    });
+
+    const BookingSchema = object({
+        bookingId: string(),
+        guest: GuestSchema,
+        rooms: array(RoomSchema),
+        checkInDate: string(),
+        checkOutDate: string(),
+        specialRequests: string()
+    });
+
+    const BookingConfirmationSchema = object({
+        bookingId: string(),
+        guest: GuestSummarySchema,
+        rooms: array(RoomDtoSchema),
+        nights: number(),
+        totalCost: number()
+    });
+
+    test('maps booking to confirmation with computed nights and total', async () => {
+        const registry = new MappingRegistry()
+            .configure(GuestSchema, GuestSummarySchema, (m) =>
+                m
+                    .for((t) => t.fullName)
+                    .compute((g) => `${g.firstName} ${g.lastName}`)
+                    .for((t) => t.contactEmail)
+                    .from((f) => f.email)
+            )
+            .configure(RoomSchema, RoomDtoSchema, (m) =>
+                m
+                    .for((t) => t.roomNumber)
+                    .from((f) => f.roomNumber)
+                    .for((t) => t.type)
+                    .from((f) => f.type)
+            )
+            .configure(BookingSchema, BookingConfirmationSchema, (m) =>
+                m
+                    .for((t) => t.bookingId)
+                    .from((f) => f.bookingId)
+                    .for((t) => t.guest)
+                    .from((f) => f.guest)
+                    .for((t) => t.rooms)
+                    .from((f) => f.rooms)
+                    .for((t) => t.nights)
+                    .compute((b) => {
+                        const checkIn = new Date(b.checkInDate);
+                        const checkOut = new Date(b.checkOutDate);
+                        return Math.round(
+                            (checkOut.getTime() - checkIn.getTime()) /
+                                (1000 * 60 * 60 * 24)
+                        );
+                    })
+                    .for((t) => t.totalCost)
+                    .compute((b) => {
+                        const checkIn = new Date(b.checkInDate);
+                        const checkOut = new Date(b.checkOutDate);
+                        const nights = Math.round(
+                            (checkOut.getTime() - checkIn.getTime()) /
+                                (1000 * 60 * 60 * 24)
+                        );
+                        return b.rooms.reduce(
+                            (sum, room) => sum + room.ratePerNight * nights,
+                            0
+                        );
+                    })
+            );
+
+        const mapFn = registry.getMapper(
+            BookingSchema,
+            BookingConfirmationSchema
+        );
+        const result = await mapFn({
+            bookingId: 'BK-20240315-001',
+            guest: {
+                firstName: 'Maria',
+                lastName: 'Garcia',
+                email: 'maria@email.com',
+                phone: '+1-555-0100'
+            },
+            rooms: [
+                { roomNumber: '301', type: 'Deluxe', ratePerNight: 200 },
+                { roomNumber: '302', type: 'Standard', ratePerNight: 120 }
+            ],
+            checkInDate: '2024-03-15',
+            checkOutDate: '2024-03-18',
+            specialRequests: 'Late checkout please'
+        });
+
+        expect(result).toEqual({
+            bookingId: 'BK-20240315-001',
+            guest: {
+                fullName: 'Maria Garcia',
+                contactEmail: 'maria@email.com'
+            },
+            rooms: [
+                { roomNumber: '301', type: 'Deluxe' },
+                { roomNumber: '302', type: 'Standard' }
+            ],
+            nights: 3,
+            totalCost: 960
+        });
+        expect(result).not.toHaveProperty('specialRequests');
+    });
+
+    test('maps single-room booking for one night', async () => {
+        const registry = new MappingRegistry()
+            .configure(GuestSchema, GuestSummarySchema, (m) =>
+                m
+                    .for((t) => t.fullName)
+                    .compute((g) => `${g.firstName} ${g.lastName}`)
+                    .for((t) => t.contactEmail)
+                    .from((f) => f.email)
+            )
+            .configure(RoomSchema, RoomDtoSchema, (m) =>
+                m
+                    .for((t) => t.roomNumber)
+                    .from((f) => f.roomNumber)
+                    .for((t) => t.type)
+                    .from((f) => f.type)
+            )
+            .configure(BookingSchema, BookingConfirmationSchema, (m) =>
+                m
+                    .for((t) => t.bookingId)
+                    .from((f) => f.bookingId)
+                    .for((t) => t.guest)
+                    .from((f) => f.guest)
+                    .for((t) => t.rooms)
+                    .from((f) => f.rooms)
+                    .for((t) => t.nights)
+                    .compute((b) => {
+                        const checkIn = new Date(b.checkInDate);
+                        const checkOut = new Date(b.checkOutDate);
+                        return Math.round(
+                            (checkOut.getTime() - checkIn.getTime()) /
+                                (1000 * 60 * 60 * 24)
+                        );
+                    })
+                    .for((t) => t.totalCost)
+                    .compute((b) => {
+                        const checkIn = new Date(b.checkInDate);
+                        const checkOut = new Date(b.checkOutDate);
+                        const nights = Math.round(
+                            (checkOut.getTime() - checkIn.getTime()) /
+                                (1000 * 60 * 60 * 24)
+                        );
+                        return b.rooms.reduce(
+                            (sum, room) => sum + room.ratePerNight * nights,
+                            0
+                        );
+                    })
+            );
+
+        const mapFn = registry.getMapper(
+            BookingSchema,
+            BookingConfirmationSchema
+        );
+        const result = await mapFn({
+            bookingId: 'BK-20240401-010',
+            guest: {
+                firstName: 'Tom',
+                lastName: 'Lee',
+                email: 'tom@email.com',
+                phone: '+44-20-1234'
+            },
+            rooms: [{ roomNumber: '101', type: 'Economy', ratePerNight: 80 }],
+            checkInDate: '2024-04-01',
+            checkOutDate: '2024-04-02',
+            specialRequests: ''
+        });
+
+        expect(result).toEqual({
+            bookingId: 'BK-20240401-010',
+            guest: {
+                fullName: 'Tom Lee',
+                contactEmail: 'tom@email.com'
+            },
+            rooms: [{ roomNumber: '101', type: 'Economy' }],
+            nights: 1,
+            totalCost: 80
+        });
+    });
+});
+
+describe('Healthcare: Patient record to appointment summary', () => {
+    const InsuranceSchema = object({
+        provider: string(),
+        policyNumber: string(),
+        groupNumber: string()
+    });
+
+    const MedicationSchema = object({
+        name: string(),
+        dosage: string(),
+        frequency: string()
+    });
+
+    const MedicationDtoSchema = object({
+        name: string(),
+        dosage: string()
+    });
+
+    const PatientSchema = object({
+        patientId: string(),
+        firstName: string(),
+        lastName: string(),
+        dateOfBirth: string(),
+        insurance: InsuranceSchema,
+        medications: array(MedicationSchema),
+        socialSecurityNumber: string()
+    });
+
+    const AppointmentSummarySchema = object({
+        patientId: string(),
+        patientName: string(),
+        dateOfBirth: string(),
+        insuranceProvider: string(),
+        currentMedications: array(MedicationDtoSchema)
+    });
+
+    test('maps patient record to appointment summary, excluding SSN', async () => {
+        const registry = new MappingRegistry()
+            .configure(MedicationSchema, MedicationDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.dosage)
+                    .from((f) => f.dosage)
+            )
+            .configure(PatientSchema, AppointmentSummarySchema, (m) =>
+                m
+                    .for((t) => t.patientId)
+                    .from((f) => f.patientId)
+                    .for((t) => t.patientName)
+                    .compute((p) => `${p.lastName}, ${p.firstName}`)
+                    .for((t) => t.dateOfBirth)
+                    .from((f) => f.dateOfBirth)
+                    .for((t) => t.insuranceProvider)
+                    .from((f) => f.insurance.provider)
+                    .for((t) => t.currentMedications)
+                    .from((f) => f.medications)
+            );
+
+        const mapFn = registry.getMapper(
+            PatientSchema,
+            AppointmentSummarySchema
+        );
+        const result = await mapFn({
+            patientId: 'PT-10042',
+            firstName: 'Sarah',
+            lastName: 'Connor',
+            dateOfBirth: '1965-02-28',
+            insurance: {
+                provider: 'Blue Cross',
+                policyNumber: 'BC-123456',
+                groupNumber: 'GRP-789'
+            },
+            medications: [
+                {
+                    name: 'Lisinopril',
+                    dosage: '10mg',
+                    frequency: 'once daily'
+                },
+                {
+                    name: 'Metformin',
+                    dosage: '500mg',
+                    frequency: 'twice daily'
+                }
+            ],
+            socialSecurityNumber: '123-45-6789'
+        });
+
+        expect(result).toEqual({
+            patientId: 'PT-10042',
+            patientName: 'Connor, Sarah',
+            dateOfBirth: '1965-02-28',
+            insuranceProvider: 'Blue Cross',
+            currentMedications: [
+                { name: 'Lisinopril', dosage: '10mg' },
+                { name: 'Metformin', dosage: '500mg' }
+            ]
+        });
+        expect(result).not.toHaveProperty('socialSecurityNumber');
+    });
+
+    test('maps patient with no medications', async () => {
+        const registry = new MappingRegistry()
+            .configure(MedicationSchema, MedicationDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.dosage)
+                    .from((f) => f.dosage)
+            )
+            .configure(PatientSchema, AppointmentSummarySchema, (m) =>
+                m
+                    .for((t) => t.patientId)
+                    .from((f) => f.patientId)
+                    .for((t) => t.patientName)
+                    .compute((p) => `${p.lastName}, ${p.firstName}`)
+                    .for((t) => t.dateOfBirth)
+                    .from((f) => f.dateOfBirth)
+                    .for((t) => t.insuranceProvider)
+                    .from((f) => f.insurance.provider)
+                    .for((t) => t.currentMedications)
+                    .from((f) => f.medications)
+            );
+
+        const mapFn = registry.getMapper(
+            PatientSchema,
+            AppointmentSummarySchema
+        );
+        const result = await mapFn({
+            patientId: 'PT-20001',
+            firstName: 'Alex',
+            lastName: 'Young',
+            dateOfBirth: '2000-07-15',
+            insurance: {
+                provider: 'Aetna',
+                policyNumber: 'AET-001',
+                groupNumber: 'GRP-100'
+            },
+            medications: [],
+            socialSecurityNumber: '987-65-4321'
+        });
+
+        expect(result).toEqual({
+            patientId: 'PT-20001',
+            patientName: 'Young, Alex',
+            dateOfBirth: '2000-07-15',
+            insuranceProvider: 'Aetna',
+            currentMedications: []
+        });
+    });
+});
+
+describe('Project management: Task board mapping', () => {
+    const AssigneeSchema = object({
+        id: number(),
+        username: string(),
+        avatarUrl: string()
+    });
+
+    const AssigneeDtoSchema = object({
+        username: string()
+    });
+
+    const LabelSchema = object({
+        id: number(),
+        name: string(),
+        color: string()
+    });
+
+    const LabelDtoSchema = object({
+        name: string(),
+        color: string()
+    });
+
+    const TaskSchema = object({
+        id: number(),
+        title: string(),
+        description: string(),
+        status: string(),
+        priority: number(),
+        assignee: AssigneeSchema,
+        labels: array(LabelSchema),
+        estimatedHours: number()
+    });
+
+    const TaskCardSchema = object({
+        id: number(),
+        title: string(),
+        status: string(),
+        priorityLabel: string(),
+        assigneeUsername: string(),
+        labels: array(LabelDtoSchema)
+    });
+
+    test('maps task entity to task card for kanban board', async () => {
+        const registry = new MappingRegistry()
+            .configure(LabelSchema, LabelDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.color)
+                    .from((f) => f.color)
+            )
+            .configure(TaskSchema, TaskCardSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.title)
+                    .from((f) => f.title)
+                    .for((t) => t.status)
+                    .from((f) => f.status)
+                    .for((t) => t.priorityLabel)
+                    .compute((task) => {
+                        const labels: Record<number, string> = {
+                            1: 'Critical',
+                            2: 'High',
+                            3: 'Medium',
+                            4: 'Low'
+                        };
+                        return labels[task.priority] || 'Unknown';
+                    })
+                    .for((t) => t.assigneeUsername)
+                    .from((f) => f.assignee.username)
+                    .for((t) => t.labels)
+                    .from((f) => f.labels)
+            );
+
+        const mapFn = registry.getMapper(TaskSchema, TaskCardSchema);
+        const result = await mapFn({
+            id: 42,
+            title: 'Fix login bug',
+            description:
+                'Users are unable to log in when using special characters in passwords',
+            status: 'in-progress',
+            priority: 1,
+            assignee: {
+                id: 7,
+                username: 'jdoe',
+                avatarUrl: 'https://avatars.example.com/jdoe.png'
+            },
+            labels: [
+                { id: 1, name: 'bug', color: '#d73a4a' },
+                { id: 2, name: 'security', color: '#e4e669' }
+            ],
+            estimatedHours: 4
+        });
+
+        expect(result).toEqual({
+            id: 42,
+            title: 'Fix login bug',
+            status: 'in-progress',
+            priorityLabel: 'Critical',
+            assigneeUsername: 'jdoe',
+            labels: [
+                { name: 'bug', color: '#d73a4a' },
+                { name: 'security', color: '#e4e669' }
+            ]
+        });
+        expect(result).not.toHaveProperty('description');
+        expect(result).not.toHaveProperty('estimatedHours');
+    });
+
+    test('maps low-priority task with no labels', async () => {
+        const registry = new MappingRegistry()
+            .configure(LabelSchema, LabelDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.color)
+                    .from((f) => f.color)
+            )
+            .configure(TaskSchema, TaskCardSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.title)
+                    .from((f) => f.title)
+                    .for((t) => t.status)
+                    .from((f) => f.status)
+                    .for((t) => t.priorityLabel)
+                    .compute((task) => {
+                        const labels: Record<number, string> = {
+                            1: 'Critical',
+                            2: 'High',
+                            3: 'Medium',
+                            4: 'Low'
+                        };
+                        return labels[task.priority] || 'Unknown';
+                    })
+                    .for((t) => t.assigneeUsername)
+                    .from((f) => f.assignee.username)
+                    .for((t) => t.labels)
+                    .from((f) => f.labels)
+            );
+
+        const mapFn = registry.getMapper(TaskSchema, TaskCardSchema);
+        const result = await mapFn({
+            id: 100,
+            title: 'Update README',
+            description: 'Add new API examples to documentation',
+            status: 'todo',
+            priority: 4,
+            assignee: {
+                id: 12,
+                username: 'docwriter',
+                avatarUrl: 'https://avatars.example.com/docwriter.png'
+            },
+            labels: [],
+            estimatedHours: 1
+        });
+
+        expect(result).toEqual({
+            id: 100,
+            title: 'Update README',
+            status: 'todo',
+            priorityLabel: 'Low',
+            assigneeUsername: 'docwriter',
+            labels: []
+        });
+    });
+});
