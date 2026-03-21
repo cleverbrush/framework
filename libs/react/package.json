@@ -1,0 +1,43 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^2.0.0"
+    },
+    "devDependencies": {
+        "@types/react": "^19.0.0",
+        "react": "^19.0.0"
+    },
+    "peerDependencies": {
+        "react": ">=18.0.0"
+    },
+    "description": "Headless, schema-driven form system for React based on @cleverbrush/schema",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_react.html",
+    "keywords": [
+        "react forms",
+        "schema validation",
+        "form system",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "name": "@cleverbrush/react",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/react#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --watch",
+        "build": "tsc"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "2.0.0"
+}
