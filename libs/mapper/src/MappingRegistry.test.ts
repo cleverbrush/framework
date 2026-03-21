@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { object, string, number } from '@cleverbrush/schema';
+import { object, string, number, array } from '@cleverbrush/schema';
 import {
     MappingRegistry,
     Mapper,
@@ -1118,6 +1118,456 @@ describe('Auto-mapping of nested schemas', () => {
         expect(result).toEqual({
             prop: { name: 'Bob', value: 99 },
             oneMoreProp: 'world'
+        });
+    });
+});
+
+// ── Array mapping ────────────────────────────────────────────────────
+
+describe('Array mapping', () => {
+    const ItemSchema = object({
+        id: number(),
+        label: string()
+    });
+
+    const ItemDtoSchema = object({
+        id: number(),
+        label: string()
+    });
+
+    const ContainerSchema = object({
+        name: string(),
+        items: array(ItemSchema)
+    });
+
+    const ContainerDtoSchema = object({
+        name: string(),
+        items: array(ItemDtoSchema)
+    });
+
+    test('maps array property via from() with registered element mapping', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .from((f) => f.items)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const result = await mapFn({
+            name: 'Test',
+            items: [
+                { id: 1, label: 'first' },
+                { id: 2, label: 'second' }
+            ]
+        });
+
+        expect(result).toEqual({
+            name: 'Test',
+            items: [
+                { id: 1, label: 'first' },
+                { id: 2, label: 'second' }
+            ]
+        });
+    });
+
+    test('maps empty array to empty array', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .from((f) => f.items)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const result = await mapFn({
+            name: 'Empty',
+            items: []
+        });
+
+        expect(result).toEqual({
+            name: 'Empty',
+            items: []
+        });
+    });
+
+    test('null array is skipped (treated as undefined)', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .from((f) => f.items)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const result = await mapFn({
+            name: 'NullItems',
+            items: null as any
+        });
+
+        expect(result).toEqual({ name: 'NullItems' });
+        expect(result).not.toHaveProperty('items');
+    });
+
+    test('undefined array is skipped', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .from((f) => f.items)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const result = await mapFn({
+            name: 'UndefinedItems',
+            items: undefined as any
+        });
+
+        expect(result).toEqual({ name: 'UndefinedItems' });
+        expect(result).not.toHaveProperty('items');
+    });
+
+    test('throws error when non-array value is encountered for array property', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .from((f) => f.items)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        await expect(
+            mapFn({
+                name: 'BadItems',
+                items: 'not-an-array' as any
+            })
+        ).rejects.toThrow(MapperConfigurationError);
+    });
+
+    test('compute() overrides array element mapping', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .compute((src) =>
+                        src.items.map((item) => ({
+                            id: item.id * 10,
+                            label: item.label.toUpperCase()
+                        }))
+                    )
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const result = await mapFn({
+            name: 'Computed',
+            items: [{ id: 1, label: 'hello' }]
+        });
+
+        expect(result).toEqual({
+            name: 'Computed',
+            items: [{ id: 10, label: 'HELLO' }]
+        });
+    });
+
+    test('ignore() skips array property', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .ignore()
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const result = await mapFn({
+            name: 'Ignored',
+            items: [{ id: 1, label: 'a' }]
+        });
+
+        expect(result).toEqual({ name: 'Ignored' });
+        expect(result).not.toHaveProperty('items');
+    });
+
+    test('auto-maps array property when same-name element schemas match', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m.for((t) => t.name).from((f) => f.name)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const result = await mapFn({
+            name: 'AutoMapped',
+            items: [
+                { id: 1, label: 'one' },
+                { id: 2, label: 'two' }
+            ]
+        });
+
+        expect(result).toEqual({
+            name: 'AutoMapped',
+            items: [
+                { id: 1, label: 'one' },
+                { id: 2, label: 'two' }
+            ]
+        });
+    });
+
+    test('throws when array property is not mapped and not ignored', () => {
+        const SourceSchema = object({
+            name: string(),
+            tags: array(string())
+        });
+
+        const TargetSchema = object({
+            name: string(),
+            labels: array(string())
+        });
+
+        expect(() =>
+            new MappingRegistry().configure(
+                SourceSchema,
+                TargetSchema,
+                (m) =>
+                    // @ts-expect-error - labels is not mapped
+                    m.for((t) => t.name).from((f) => f.name)
+            )
+        ).toThrow(MapperConfigurationError);
+    });
+
+    test('auto-maps array of primitives with same-name properties', async () => {
+        const SourceSchema = object({
+            name: string(),
+            tags: array(string())
+        });
+
+        const TargetSchema = object({
+            name: string(),
+            tags: array(string())
+        });
+
+        const registry = new MappingRegistry().configure(
+            SourceSchema,
+            TargetSchema,
+            (m) => m
+        );
+
+        const mapFn = registry.getMapper(SourceSchema, TargetSchema);
+        const result = await mapFn({
+            name: 'Alice',
+            tags: ['admin', 'user']
+        });
+
+        expect(result).toEqual({
+            name: 'Alice',
+            tags: ['admin', 'user']
+        });
+    });
+
+    test('preserves order of array elements during mapping', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .from((f) => f.items)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        const items = Array.from({ length: 10 }, (_, i) => ({
+            id: i,
+            label: `item-${i}`
+        }));
+        const result = await mapFn({ name: 'Ordered', items });
+
+        expect(result.items).toEqual(items);
+        for (let i = 0; i < 10; i++) {
+            expect(result.items[i].id).toBe(i);
+        }
+    });
+
+    test('maps array with async element mapper', async () => {
+        const SourceItemSchema = object({
+            value: number()
+        });
+
+        const TargetItemSchema = object({
+            doubled: number()
+        });
+
+        const SourceSchema = object({
+            data: array(SourceItemSchema)
+        });
+
+        const TargetSchema = object({
+            data: array(TargetItemSchema)
+        });
+
+        const registry = new MappingRegistry()
+            .configure(SourceItemSchema, TargetItemSchema, (m) =>
+                m
+                    .for((t) => t.doubled)
+                    .compute(async (src) => src.value * 2)
+            )
+            .configure(SourceSchema, TargetSchema, (m) =>
+                m.for((t) => t.data).from((f) => f.data)
+            );
+
+        const mapFn = registry.getMapper(SourceSchema, TargetSchema);
+        const result = await mapFn({
+            data: [{ value: 1 }, { value: 2 }, { value: 3 }]
+        });
+
+        expect(result).toEqual({
+            data: [{ doubled: 2 }, { doubled: 4 }, { doubled: 6 }]
+        });
+    });
+
+    test('completeness check: array properties must be explicitly mapped or ignored', () => {
+        // Array properties should NOT be auto-covered just because element mapping exists
+        // when their names differ between source and target
+        const SourceSchema = object({
+            name: string(),
+            sourceItems: array(ItemSchema)
+        });
+
+        const TargetSchema = object({
+            name: string(),
+            targetItems: array(ItemDtoSchema)
+        });
+
+        expect(() =>
+            new MappingRegistry()
+                .configure(ItemSchema, ItemDtoSchema, (m) =>
+                    m
+                        .for((t) => t.id)
+                        .from((f) => f.id)
+                        .for((t) => t.label)
+                        .from((f) => f.label)
+                )
+                .configure(SourceSchema, TargetSchema, (m) =>
+                    // @ts-expect-error - targetItems not mapped
+                    m.for((t) => t.name).from((f) => f.name)
+                )
+        ).toThrow(MapperConfigurationError);
+    });
+
+    test('nested arrays inside objects', async () => {
+        const TagSchema = object({
+            name: string()
+        });
+
+        const TagDtoSchema = object({
+            name: string()
+        });
+
+        const GroupSchema = object({
+            title: string(),
+            tags: array(TagSchema)
+        });
+
+        const GroupDtoSchema = object({
+            title: string(),
+            tags: array(TagDtoSchema)
+        });
+
+        const registry = new MappingRegistry()
+            .configure(TagSchema, TagDtoSchema, (m) =>
+                m.for((t) => t.name).from((f) => f.name)
+            )
+            .configure(GroupSchema, GroupDtoSchema, (m) =>
+                m
+                    .for((t) => t.title)
+                    .from((f) => f.title)
+                    .for((t) => t.tags)
+                    .from((f) => f.tags)
+            );
+
+        const mapFn = registry.getMapper(GroupSchema, GroupDtoSchema);
+        const result = await mapFn({
+            title: 'Group A',
+            tags: [{ name: 'tag1' }, { name: 'tag2' }]
+        });
+
+        expect(result).toEqual({
+            title: 'Group A',
+            tags: [{ name: 'tag1' }, { name: 'tag2' }]
         });
     });
 });
