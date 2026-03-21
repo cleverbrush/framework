@@ -18,7 +18,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_react.html",
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_react_form.html",
     "keywords": [
         "react forms",
         "schema validation",
@@ -27,8 +27,8 @@
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
-    "name": "@cleverbrush/react",
-    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/react#readme",
+    "name": "@cleverbrush/react-form",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/react-form#readme",
     "repository": {
         "type": "git",
         "url": "github:cleverbrush/framework"
