@@ -1,6 +1,6 @@
 # @cleverbrush/mapper
 
-A type-safe, declarative object mapper for converting objects between different `@cleverbrush/schema` representations. Uses PropertyDescriptors as pointers to properties (similar to expressions in C# .NET) and enforces **compile-time completeness** — TypeScript will produce an error if any target property is not mapped or explicitly ignored.
+A type-safe, declarative object mapper for converting objects between different `@cleverbrush/schema` representations. Uses PropertyDescriptors as pointers to properties (similar to expressions in C# .NET) and enforces **compile-time completeness** — TypeScript will produce an error if any target property is not mapped, auto-mapped, or explicitly ignored.
 
 ## Installation
 
@@ -31,17 +31,20 @@ const UserDtoSchema = object({
     fullAddress: string()
 });
 
-const registry = new MappingRegistry();
+const registry = new MappingRegistry().configure(
+    UserSchema,
+    UserDtoSchema,
+    (m) =>
+        m
+            .forProp((t) => t.name)
+            .mapFromProp((f) => f.name)
+            .forProp((t) => t.cityName)
+            .mapFromProp((f) => f.address.city)
+            .forProp((t) => t.fullAddress)
+            .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
+);
 
-const mapUserToDto = registry
-    .map(UserSchema, UserDtoSchema)
-    .forProp((t) => t.name)
-    .mapFromProp((f) => f.name)
-    .forProp((t) => t.cityName)
-    .mapFromProp((f) => f.address.city)
-    .forProp((t) => t.fullAddress)
-    .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
-    .getMapper();
+const mapUserToDto = registry.getMapper(UserSchema, UserDtoSchema);
 
 const dto = await mapUserToDto({
     name: 'John Doe',
@@ -53,39 +56,140 @@ const dto = await mapUserToDto({
 
 ## Compile-Time Safety
 
-Every target property must be either mapped or explicitly ignored. If you forget to map a property, TypeScript will produce a compile-time error:
+The mapper enforces multiple layers of compile-time safety:
+
+### Unmapped properties
+
+Every target property must be either mapped, auto-mapped, or explicitly ignored. If you forget to map a property, TypeScript will produce a compile-time error on the `configure` callback return:
 
 ```typescript
-registry
-    .map(UserSchema, UserDtoSchema)
-    .forProp((t) => t.name)
-    .mapFromProp((f) => f.name)
-    .forProp((t) => t.cityName)
-    .mapFromProp((f) => f.address.city)
-    .getMapper();
-//  ^^^^^^^^^^
-//  TS Error: Expected 1 arguments, but got 0.
-//  Argument of type '...' is not assignable to
-//  parameter of type '`Unmapped properties: fullAddress`'
+new MappingRegistry().configure(
+    UserSchema,
+    UserDtoSchema,
+    (m) =>
+        m
+            .forProp((t) => t.name)
+            .mapFromProp((f) => f.name)
+            .forProp((t) => t.cityName)
+            .mapFromProp((f) => f.address.city)
+    // TS Error: Type 'Mapper<..., "fullAddress", ...>' is not assignable to
+    // type 'Mapper<..., never, ...>'.
+    //   Types of property '__unmapped' are incompatible.
+    //     Type '"fullAddress"' is not assignable to type 'never'.
+);
 ```
 
-The error message shows the names of the unmapped properties. Once all properties are mapped or ignored, `getMapper()` becomes callable with zero arguments.
+The error message shows the names of the unmapped properties directly in the type mismatch.
 
-Additionally, `forProp` only shows properties that have not yet been mapped — already-mapped properties disappear from the selector tree, preventing duplicate mappings.
+### Type-incompatible `mapFromProp`
+
+`mapFromProp` only shows source properties whose `InferType` is assignable to the target property's type. If you select an incompatible property (e.g., mapping a `number` to a `string`), TypeScript produces a compile-time error:
+
+```typescript
+const AddressSchema = object({ city: string(), houseNr: number() });
+const AddressDtoSchema = object({ city: string() });
+
+new MappingRegistry().configure(
+    AddressSchema,
+    AddressDtoSchema,
+    (m) => m.forProp((t) => t.city).mapFromProp((f) => f.houseNr) // TS Error: source property type is
+    // not assignable to target property type
+);
+```
+
+### Unregistered ObjectSchemaBuilder mappings
+
+When `mapFromProp` maps between two `ObjectSchemaBuilder` properties, a mapping for that schema pair must be registered in the registry first. Otherwise, TypeScript produces a compile-time error:
+
+```typescript
+const PersonSchema = object({ name: string(), address: AddressSchema });
+const PersonDtoSchema = object({ name: string(), address: AddressDtoSchema });
+
+// Error — AddressSchema→AddressDtoSchema is not registered
+new MappingRegistry().configure(
+    PersonSchema,
+    PersonDtoSchema,
+    (m) =>
+        m
+            .forProp((t) => t.name)
+            .mapFromProp((f) => f.name)
+            .forProp((t) => t.address)
+            .mapFromProp((f) => f.address) // TS Error: Register a mapping for the
+    // source→target schema pair first
+);
+```
+
+## Auto-Mapping
+
+Properties that can be automatically determined don't need explicit mapping configuration. Auto-mapping activates in two scenarios:
+
+### Same-name, same-type primitives
+
+When the source and target schemas have a property with the **same name** and **compatible `InferType`**, it is auto-mapped automatically:
+
+```typescript
+const SourceSchema = object({ city: string(), houseNr: number() });
+const TargetSchema = object({ city: string(), houseNr: string() });
+
+// Only houseNr needs explicit mapping — city is auto-mapped (string → string)
+const registry = new MappingRegistry().configure(
+    SourceSchema,
+    TargetSchema,
+    (m) => m.forProp((t) => t.houseNr).mapFrom((f) => f.houseNr.toString())
+);
+```
+
+Properties with incompatible types (e.g., `number` source → `string` target) or properties that exist only in the target schema are **not** auto-mapped and must be explicitly configured.
+
+### Nested ObjectSchemaBuilder properties
+
+When both the source and target have a same-name property that is an `ObjectSchemaBuilder`, and a mapping for that schema pair has been previously registered, the nested property is auto-mapped using the registered mapper:
+
+```typescript
+const AddressSchema = object({ city: string(), houseNr: number() });
+const AddressDtoSchema = object({ city: string() });
+
+const PersonSchema = object({ name: string(), address: AddressSchema });
+const PersonDtoSchema = object({ name: string(), address: AddressDtoSchema });
+
+const registry = new MappingRegistry()
+    // Register Address mapping first
+    .configure(AddressSchema, AddressDtoSchema, (m) =>
+        m.forProp((t) => t.city).mapFromProp((f) => f.city)
+    )
+    // address is auto-mapped using the registered AddressSchema→AddressDtoSchema mapper
+    .configure(PersonSchema, PersonDtoSchema, (m) =>
+        m.forProp((t) => t.name).mapFromProp((f) => f.name)
+    );
+
+const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
+const result = await mapFn({
+    name: 'Alice',
+    address: { city: 'Berlin', houseNr: 10 }
+});
+// result: { name: 'Alice', address: { city: 'Berlin' } }
+// houseNr is dropped because it's not in AddressDtoSchema
+```
+
+**Ordering matters:** nested mappings must be registered before the parent mapping. Explicit mappings via `mapFrom` or `ignore` take priority over auto-mapping.
 
 ## API
 
 ### `MappingRegistry`
 
-Central registry for storing and retrieving mappers.
+Central registry for storing and retrieving mappers. Each `configure` call returns a **new immutable registry** — the original is not modified.
 
 ```typescript
 const registry = new MappingRegistry();
 ```
 
-#### `registry.map(fromSchema, toSchema)`
+#### `registry.configure(fromSchema, toSchema, fn)`
 
-Creates a new `Mapper` builder for the given schema pair. The `toSchema` parameter must be an `ObjectSchemaBuilder`. Returns the `Mapper` instance for fluent configuration. The resulting mapper is automatically registered when `getMapper()` is called.
+Defines a mapping between two schemas and returns a new immutable registry containing the mapping. The callback `fn` receives a fresh `Mapper` and must return it after configuring all non-auto-mappable property mappings. The mapper is automatically finalized and registered.
+
+The `configure` callback only needs to map properties that **cannot** be auto-mapped. The `forProp` selector only shows these properties — auto-mappable properties are excluded from the selector tree. You can still explicitly map an auto-mappable property using `forProp` to override the default behavior.
+
+Throws if schemas are invalid, the mapping is a duplicate, or unmapped properties remain that cannot be auto-mapped.
 
 #### `registry.getMapper(fromSchema, toSchema)`
 
@@ -107,11 +211,11 @@ Selects a target property to configure. The selector uses PropertyDescriptors as
 mapper.forProp((target) => target.cityName);
 ```
 
-Only unmapped properties appear in the selector. After calling `.forProp()`, use one of the following strategies:
+After calling `.forProp()`, use one of the following strategies:
 
 #### `.mapFromProp(selector)`
 
-Maps the target property from a source property. Supports nested paths via PropertyDescriptor navigation. Only source properties with compatible types are shown:
+Maps the target property from a source property. Supports nested paths via PropertyDescriptor navigation. Only source properties with compatible types are shown. When mapping between `ObjectSchemaBuilder` properties, a mapping for the source→target schema pair must be registered first:
 
 ```typescript
 .forProp((t) => t.cityName)
@@ -153,13 +257,14 @@ const result = await mapFn(sourceObject);
 
 ## Mapping Strategies
 
-| Strategy                | Usage                                        | Purpose                                             |
-| ----------------------- | -------------------------------------------- | --------------------------------------------------- |
-| `mapFromProp(selector)` | `.forProp(t => t.x).mapFromProp(s => s.y)`   | Copy from a source property (supports nested paths) |
-| `mapFrom(fn)`           | `.forProp(t => t.x).mapFrom(s => s.a + s.b)` | Compute from a sync or async function               |
-| `ignore()`              | `.forProp(t => t.x).ignore()`                | Exclude a target property                           |
+| Strategy                | Usage                                        | Purpose                                                            |
+| ----------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
+| `mapFromProp(selector)` | `.forProp(t => t.x).mapFromProp(s => s.y)`   | Copy from a source property (supports nested paths)                |
+| `mapFrom(fn)`           | `.forProp(t => t.x).mapFrom(s => s.a + s.b)` | Compute from a sync or async function                              |
+| `ignore()`              | `.forProp(t => t.x).ignore()`                | Exclude a target property                                          |
+| _(auto-mapped)_         | _(no configuration needed)_                  | Same-name, compatible-type primitives or registered nested schemas |
 
-Every target property must be either mapped or explicitly ignored. Unmapped properties cause:
+Every non-auto-mappable target property must be either mapped or explicitly ignored. Unmapped properties cause:
 
 - A **compile-time TypeScript error** showing the unmapped property names
 - A **runtime `MapperConfigurationError`** if type checks are bypassed
