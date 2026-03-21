@@ -588,15 +588,33 @@ describe('Auto-mapping of nested schemas', () => {
     });
 
     test('ordering matters: nested mapping must be configured first', () => {
-        // PersonDtoSchema.address can only be auto-mapped if
-        // AddressSchema→AddressDtoSchema is already registered.
-        // Configuring Person first fails because the Address mapping
-        // does not yet exist in the registry.
+        // When source and target ObjectSchemaBuilder have different InferTypes,
+        // a registered mapping is required. Configuring Person first fails
+        // because the Address mapping does not yet exist in the registry.
+        const AddrSchema = object({
+            city: string(),
+            houseNr: number()
+        });
+
+        const AddrDtoSchema = object({
+            city: string()
+        });
+
+        const PersonWithAddrSchema = object({
+            name: string(),
+            address: AddrSchema
+        });
+
+        const PersonDtoWithAddrSchema = object({
+            name: string(),
+            address: AddrDtoSchema
+        });
+
         expect(() =>
             new MappingRegistry().configure(
-                PersonSchema,
-                PersonDtoSchema,
-                // @ts-expect-error - address not registered yet, so it remains unmapped
+                PersonWithAddrSchema,
+                PersonDtoWithAddrSchema,
+                // @ts-expect-error - address not registered yet and InferTypes differ
                 (m) => m.forProp((t) => t.name).mapFromProp((f) => f.name)
             )
         ).toThrow(MapperConfigurationError);
@@ -835,10 +853,11 @@ describe('Auto-mapping of nested schemas', () => {
         expect(registry).toBeInstanceOf(MappingRegistry);
     });
 
-    test('mapFromProp type-errors without registered mapping for ObjectSchemaBuilder props', () => {
+    test('mapFromProp type-errors without registered mapping for ObjectSchemaBuilder props with different InferTypes', () => {
         const AddressSchema = object({
             city: string(),
-            street: string()
+            street: string(),
+            zipCode: string()
         });
         const AddressDtoSchema = object({
             city: string(),
@@ -857,12 +876,13 @@ describe('Auto-mapping of nested schemas', () => {
 
         // Without registering AddressSchema→AddressDtoSchema,
         // mapFromProp for address should produce a type error
+        // because InferTypes differ ({ city, street, zipCode } vs { city, street })
         new MappingRegistry().configure(PersonSchema, PersonDtoSchema, (m) =>
             m
                 .forProp((t) => t.name)
                 .mapFromProp((f) => f.name)
                 .forProp((t) => t.address)
-                // @ts-expect-error - no AddressSchema→AddressDtoSchema mapping registered
+                // @ts-expect-error - no mapping registered and InferTypes differ
                 .mapFromProp((f) => f.address)
         );
     });
@@ -1014,36 +1034,90 @@ describe('Auto-mapping of nested schemas', () => {
         ).toThrow(MapperConfigurationError);
     });
 
-    // test('different schemas, but the same inferred type and name are auto-mapped', async () => {
-    //     const SchemaA = object({
-    //         name: string(),
-    //         value: number()
-    //     });
+    test('different schemas, but the same inferred type and name can use mapFromProp', async () => {
+        const SchemaA = object({
+            name: string(),
+            value: number()
+        });
 
-    //     const SchemaB = object({
-    //         name: string(),
-    //         value: number()
-    //     });
+        const SchemaB = object({
+            name: string(),
+            value: number()
+        });
 
-    //     const schemaC = object({
-    //         prop: SchemaA,
-    //         anotherProp: string()
-    //     });
+        const schemaC = object({
+            prop: SchemaA,
+            anotherProp: string()
+        });
 
-    //     const schemaD = object({
-    //         prop: SchemaB,
-    //         oneMoreProp: string()
-    //     });
+        const schemaD = object({
+            prop: SchemaB,
+            oneMoreProp: string()
+        });
 
-    //     const registry = new MappingRegistry().configure(
-    //         schemaC,
-    //         schemaD,
-    //         (m) =>
-    //             m
-    //                 .forProp((t) => t.oneMoreProp)
-    //                 .mapFromProp((f) => f.anotherProp)
-    //                 .forProp((t) => t.prop)
-    //                 .mapFromProp((f) => f.prop)
-    //     );
-    // });
+        const registry = new MappingRegistry().configure(
+            schemaC,
+            schemaD,
+            (m) =>
+                m
+                    .forProp((t) => t.oneMoreProp)
+                    .mapFromProp((f) => f.anotherProp)
+                    .forProp((t) => t.prop)
+                    .mapFromProp((f) => f.prop)
+        );
+
+        const mapFn = registry.getMapper(schemaC, schemaD);
+        const result = await mapFn({
+            prop: { name: 'Alice', value: 42 },
+            anotherProp: 'hello'
+        });
+
+        expect(result).toEqual({
+            prop: { name: 'Alice', value: 42 },
+            oneMoreProp: 'hello'
+        });
+    });
+
+    test('different schemas with same inferred type and name are auto-mapped', async () => {
+        const SchemaA = object({
+            name: string(),
+            value: number()
+        });
+
+        const SchemaB = object({
+            name: string(),
+            value: number()
+        });
+
+        const schemaC = object({
+            prop: SchemaA,
+            anotherProp: string()
+        });
+
+        const schemaD = object({
+            prop: SchemaB,
+            oneMoreProp: string()
+        });
+
+        // prop is auto-mapped because SchemaA and SchemaB have the same InferType
+        const registry = new MappingRegistry().configure(
+            schemaC,
+            schemaD,
+            (m) =>
+                m
+                    .forProp((t) => t.oneMoreProp)
+                    .mapFromProp((f) => f.anotherProp)
+        );
+
+        const mapFn = registry.getMapper(schemaC, schemaD);
+        const result = await mapFn({
+            prop: { name: 'Bob', value: 99 },
+            anotherProp: 'world'
+        });
+
+        expect(result).toEqual({
+            prop: { name: 'Bob', value: 99 },
+            oneMoreProp: 'world'
+        });
+    });
 });

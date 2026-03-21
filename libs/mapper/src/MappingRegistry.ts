@@ -84,7 +84,11 @@ type NeedsMapping<TSourcePropSchema, TTargetPropSchema, TRegistered> =
         ? TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
             ? [TSourcePropSchema, TTargetPropSchema] extends TRegistered
                 ? false
-                : true
+                : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
+                  ? InferType<TTargetPropSchema> extends InferType<TSourcePropSchema>
+                      ? false
+                      : true
+                  : true
             : true
         : TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
           ? true
@@ -146,7 +150,15 @@ type MapFromPropNeedsRegistration<
                 TargetPropertySchema<TToSchema, TKey>
             ] extends TRegistered
               ? false
-              : true
+              : InferType<TSourcePropSchema> extends InferType<
+                      TargetPropertySchema<TToSchema, TKey>
+                  >
+                ? InferType<
+                      TargetPropertySchema<TToSchema, TKey>
+                  > extends InferType<TSourcePropSchema>
+                    ? false
+                    : true
+                : true
           : true
       : false;
 
@@ -482,16 +494,40 @@ export class Mapper<
                 ) {
                     const fromSchemaMappers =
                         this._registry['_mappers'].get(fromPropSchema);
-                    if (!fromSchemaMappers) continue;
-                    const autoMapper = fromSchemaMappers.get(toPropSchema);
-                    if (!autoMapper) continue;
+                    const autoMapper = fromSchemaMappers?.get(toPropSchema);
+                    if (autoMapper) {
+                        this._mappings.set(key, {
+                            type: 'auto',
+                            sourceDescriptorInner:
+                                sourceDescriptor[
+                                    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                                ],
+                            autoMapper
+                        });
+                        continue;
+                    }
 
-                    this._mappings.set(key, {
-                        type: 'auto',
-                        sourceDescriptorInner:
-                            sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR],
-                        autoMapper
-                    });
+                    // Same-name ObjectSchemaBuilder with identical property keys:
+                    // copy directly (full type safety ensured at compile time
+                    // via bidirectional InferType check)
+                    const fromKeys = Object.keys(
+                        fromPropSchema.introspect().properties || {}
+                    ).sort();
+                    const toKeys = Object.keys(
+                        toPropSchema.introspect().properties || {}
+                    ).sort();
+                    if (
+                        fromKeys.length === toKeys.length &&
+                        fromKeys.every((k, i) => k === toKeys[i])
+                    ) {
+                        this._mappings.set(key, {
+                            type: 'prop',
+                            sourceDescriptorInner:
+                                sourceDescriptor[
+                                    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                                ]
+                        });
+                    }
                     continue;
                 }
 
