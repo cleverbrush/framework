@@ -1263,6 +1263,32 @@ describe('Array mapping', () => {
         expect(result).not.toHaveProperty('items');
     });
 
+    test('throws error when non-array value is encountered for array property', async () => {
+        const registry = new MappingRegistry()
+            .configure(ItemSchema, ItemDtoSchema, (m) =>
+                m
+                    .for((t) => t.id)
+                    .from((f) => f.id)
+                    .for((t) => t.label)
+                    .from((f) => f.label)
+            )
+            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.items)
+                    .from((f) => f.items)
+            );
+
+        const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
+        await expect(
+            mapFn({
+                name: 'BadItems',
+                items: 'not-an-array' as any
+            })
+        ).rejects.toThrow(MapperConfigurationError);
+    });
+
     test('compute() overrides array element mapping', async () => {
         const registry = new MappingRegistry()
             .configure(ItemSchema, ItemDtoSchema, (m) =>

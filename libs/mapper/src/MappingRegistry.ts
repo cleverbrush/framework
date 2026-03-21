@@ -234,9 +234,11 @@ export type SchemaToSchemaMapperResult<
 // ── Error Class ───────────────────────────────────────────────────────
 
 export class MapperConfigurationError extends Error {
-    constructor(unmappedProperties: string[]) {
+    constructor(messageOrUnmappedProperties: string | string[]) {
         super(
-            `Mapper configuration error: the following target properties are not mapped and not ignored: ${unmappedProperties.join(', ')}`
+            typeof messageOrUnmappedProperties === 'string'
+                ? messageOrUnmappedProperties
+                : `Mapper configuration error: the following target properties are not mapped and not ignored: ${messageOrUnmappedProperties.join(', ')}`
         );
         this.name = 'MapperConfigurationError';
     }
@@ -806,15 +808,16 @@ export class Mapper<
                 } else if (entry.type === 'autoArray') {
                     const getResult =
                         entry.sourceDescriptorInner.getValue(source);
-                    // null/undefined → skip (spec §6); non-array → skip
+                    // null/undefined → skip (spec §6); non-array → error
                     if (getResult.success && getResult.value != null) {
-                        if (Array.isArray(getResult.value)) {
-                            value = await Promise.all(
-                                getResult.value.map(entry.elementMapper!)
+                        if (!Array.isArray(getResult.value)) {
+                            throw new MapperConfigurationError(
+                                `Expected array for property "${key}" but got ${typeof getResult.value}`
                             );
-                        } else {
-                            continue;
                         }
+                        value = await Promise.all(
+                            getResult.value.map(entry.elementMapper!)
+                        );
                     } else {
                         continue;
                     }
