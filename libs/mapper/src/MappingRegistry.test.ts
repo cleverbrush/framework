@@ -62,12 +62,12 @@ describe('MappingRegistry', () => {
             UserDtoSchema,
             (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.cityName)
-                    .mapFromProp((f) => f.address.city)
-                    .forProp((t) => t.fullAddress)
-                    .mapFrom(
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
                         (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
@@ -89,7 +89,7 @@ describe('MappingRegistry', () => {
 });
 
 describe('Mapper', () => {
-    test('maps all properties correctly with mapFromProp', async () => {
+    test('maps all properties correctly with from', async () => {
         const TargetSchema = object({
             userName: string(),
             userCity: string()
@@ -97,10 +97,10 @@ describe('Mapper', () => {
 
         const mapper = new Mapper(UserSchema, TargetSchema);
         const mapFn = mapper
-            .forProp((t) => t.userName)
-            .mapFromProp((f) => f.name)
-            .forProp((t) => t.userCity)
-            .mapFromProp((f) => f.address.city)
+            .for((t) => t.userName)
+            .from((f) => f.name)
+            .for((t) => t.userCity)
+            .from((f) => f.address.city)
             .getMapper();
 
         const result = await mapFn({
@@ -115,7 +115,7 @@ describe('Mapper', () => {
         });
     });
 
-    test('maps with nested source property via mapFromProp', async () => {
+    test('maps with nested source property via from', async () => {
         const TargetSchema = object({
             city: string(),
             houseNr: number()
@@ -123,10 +123,10 @@ describe('Mapper', () => {
 
         const mapper = new Mapper(UserSchema, TargetSchema);
         const mapFn = mapper
-            .forProp((t) => t.city)
-            .mapFromProp((f) => f.address.city)
-            .forProp((t) => t.houseNr)
-            .mapFromProp((f) => f.address.houseNr)
+            .for((t) => t.city)
+            .from((f) => f.address.city)
+            .for((t) => t.houseNr)
+            .from((f) => f.address.houseNr)
             .getMapper();
 
         const result = await mapFn({
@@ -138,15 +138,15 @@ describe('Mapper', () => {
         expect(result).toEqual({ city: 'Paris', houseNr: 7 });
     });
 
-    test('maps with mapFrom using sync function', async () => {
+    test('maps with compute using sync function', async () => {
         const mapper = new Mapper(UserSchema, UserDtoSchema);
         const mapFn = mapper
-            .forProp((t) => t.name)
-            .mapFromProp((f) => f.name)
-            .forProp((t) => t.cityName)
-            .mapFrom((user) => user.address.city)
-            .forProp((t) => t.fullAddress)
-            .mapFrom((user) => `${user.address.city} ${user.address.houseNr}`)
+            .for((t) => t.name)
+            .from((f) => f.name)
+            .for((t) => t.cityName)
+            .compute((user) => user.address.city)
+            .for((t) => t.fullAddress)
+            .compute((user) => `${user.address.city} ${user.address.houseNr}`)
             .getMapper();
 
         const result = await mapFn({
@@ -162,17 +162,17 @@ describe('Mapper', () => {
         });
     });
 
-    test('maps with mapFrom using async function', async () => {
+    test('maps with compute using async function', async () => {
         const mapper = new Mapper(UserSchema, UserDtoSchema);
         const mapFn = mapper
-            .forProp((t) => t.name)
-            .mapFromProp((f) => f.name)
-            .forProp((t) => t.cityName)
-            .mapFrom(async (user) => {
+            .for((t) => t.name)
+            .from((f) => f.name)
+            .for((t) => t.cityName)
+            .compute(async (user) => {
                 return user.address.city;
             })
-            .forProp((t) => t.fullAddress)
-            .mapFrom(async (user) => {
+            .for((t) => t.fullAddress)
+            .compute(async (user) => {
                 return `${user.address.city} ${user.address.houseNr}`;
             })
             .getMapper();
@@ -202,9 +202,9 @@ describe('Mapper', () => {
 
         const mapper = new Mapper(SourceSchema, TargetSchema);
         const mapFn = mapper
-            .forProp((t) => t.name)
-            .mapFromProp((f) => f.name)
-            .forProp((t) => t.extra)
+            .for((t) => t.name)
+            .from((f) => f.name)
+            .for((t) => t.extra)
             .ignore()
             .getMapper();
 
@@ -236,8 +236,8 @@ describe('Mapper', () => {
 
         // Map only one property
         (mapper as any)
-            .forProp((t: any) => t.name)
-            .mapFromProp((f: any) => f.name);
+            .for((t: any) => t.name)
+            .from((f: any) => f.name);
 
         try {
             (mapper as any).getMapper();
@@ -249,10 +249,10 @@ describe('Mapper', () => {
         }
     });
 
-    test('forProp throws when selector does not access a property', () => {
+    test('for throws when selector does not access a property', () => {
         const mapper = new Mapper(UserSchema, UserDtoSchema);
-        expect(() => mapper.forProp((() => undefined) as any)).toThrow(
-            'forProp selector must access a property'
+        expect(() => mapper.for((() => undefined) as any)).toThrow(
+            'for selector must access a property'
         );
     });
 
@@ -262,12 +262,12 @@ describe('Mapper', () => {
             UserDtoSchema,
             (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.cityName)
-                    .mapFromProp((f) => f.address.city)
-                    .forProp((t) => t.fullAddress)
-                    .mapFrom(
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
                         (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
@@ -300,7 +300,7 @@ describe('Mapper', () => {
         });
     });
 
-    test('mixed mapFromProp and mapFrom with ignore', async () => {
+    test('mixed from and compute with ignore', async () => {
         const ExtendedDtoSchema = object({
             name: string(),
             cityName: string(),
@@ -313,15 +313,15 @@ describe('Mapper', () => {
             ExtendedDtoSchema,
             (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.cityName)
-                    .mapFromProp((f) => f.address.city)
-                    .forProp((t) => t.fullAddress)
-                    .mapFrom(
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
                         (user) => `${user.address.city} ${user.address.houseNr}`
                     )
-                    .forProp((t) => t.internalField)
+                    .for((t) => t.internalField)
                     .ignore()
         );
 
@@ -348,12 +348,12 @@ describe('MappingRegistry.configure', () => {
         const original = new MappingRegistry();
         const result = original.configure(UserSchema, UserDtoSchema, (m) =>
             m
-                .forProp((t) => t.name)
-                .mapFromProp((f) => f.name)
-                .forProp((t) => t.cityName)
-                .mapFromProp((f) => f.address.city)
-                .forProp((t) => t.fullAddress)
-                .mapFrom(
+                .for((t) => t.name)
+                .from((f) => f.name)
+                .for((t) => t.cityName)
+                .from((f) => f.address.city)
+                .for((t) => t.fullAddress)
+                .compute(
                     (user) => `${user.address.city} ${user.address.houseNr}`
                 )
         );
@@ -368,12 +368,12 @@ describe('MappingRegistry.configure', () => {
             UserDtoSchema,
             (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.cityName)
-                    .mapFromProp((f) => f.address.city)
-                    .forProp((t) => t.fullAddress)
-                    .mapFrom(
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
                         (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
@@ -396,12 +396,12 @@ describe('MappingRegistry.configure', () => {
         const original = new MappingRegistry();
         original.configure(UserSchema, UserDtoSchema, (m) =>
             m
-                .forProp((t) => t.name)
-                .mapFromProp((f) => f.name)
-                .forProp((t) => t.cityName)
-                .mapFromProp((f) => f.address.city)
-                .forProp((t) => t.fullAddress)
-                .mapFrom(
+                .for((t) => t.name)
+                .from((f) => f.name)
+                .for((t) => t.cityName)
+                .from((f) => f.address.city)
+                .for((t) => t.fullAddress)
+                .compute(
                     (user) => `${user.address.city} ${user.address.houseNr}`
                 )
         );
@@ -426,19 +426,19 @@ describe('MappingRegistry.configure', () => {
         const registry = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.city)
-                    .mapFromProp((f) => f.city)
-                    .forProp((t) => t.houseNr)
-                    .mapFromProp((f) => f.houseNr)
+                    .for((t) => t.city)
+                    .from((f) => f.city)
+                    .for((t) => t.houseNr)
+                    .from((f) => f.houseNr)
             )
             .configure(UserSchema, UserDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.cityName)
-                    .mapFromProp((f) => f.address.city)
-                    .forProp((t) => t.fullAddress)
-                    .mapFrom(
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
                         (user) => `${user.address.city} ${user.address.houseNr}`
                     )
             );
@@ -466,12 +466,12 @@ describe('MappingRegistry.configure', () => {
             UserDtoSchema,
             (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.cityName)
-                    .mapFromProp((f) => f.address.city)
-                    .forProp((t) => t.fullAddress)
-                    .mapFrom(
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
                         (user) => `${user.address.city} ${user.address.houseNr}`
                     )
         );
@@ -479,12 +479,12 @@ describe('MappingRegistry.configure', () => {
         expect(() =>
             registry.configure(UserSchema, UserDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.cityName)
-                    .mapFromProp((f) => f.address.city)
-                    .forProp((t) => t.fullAddress)
-                    .mapFrom(
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
                         (user) => `${user.address.city} ${user.address.houseNr}`
                     )
             )
@@ -506,7 +506,7 @@ describe('MappingRegistry.configure', () => {
         expect(() =>
             registry.configure(UserSchema, UserDtoSchema, (m) =>
                 // @ts-expect-error - intentionally leaving cityName and fullAddress unmapped
-                m.forProp((t) => t.name).mapFromProp((f) => f.name)
+                m.for((t) => t.name).from((f) => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -526,9 +526,9 @@ describe('MappingRegistry.configure', () => {
             TargetSchema,
             (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.extra)
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.extra)
                     .ignore()
         );
 
@@ -566,13 +566,13 @@ describe('Auto-mapping of nested schemas', () => {
         const registry = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.city)
-                    .mapFromProp((f) => f.city)
-                    .forProp((t) => t.houseNr)
-                    .mapFromProp((f) => f.houseNr)
+                    .for((t) => t.city)
+                    .from((f) => f.city)
+                    .for((t) => t.houseNr)
+                    .from((f) => f.houseNr)
             )
             .configure(PersonSchema, PersonDtoSchema, (m) =>
-                m.forProp((t) => t.name).mapFromProp((f) => f.name)
+                m.for((t) => t.name).from((f) => f.name)
             );
 
         const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
@@ -615,7 +615,7 @@ describe('Auto-mapping of nested schemas', () => {
                 PersonWithAddrSchema,
                 PersonDtoWithAddrSchema,
                 // @ts-expect-error - address not registered yet and InferTypes differ
-                (m) => m.forProp((t) => t.name).mapFromProp((f) => f.name)
+                (m) => m.for((t) => t.name).from((f) => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -624,17 +624,17 @@ describe('Auto-mapping of nested schemas', () => {
         const registry = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.city)
-                    .mapFromProp((f) => f.city)
-                    .forProp((t) => t.houseNr)
-                    .mapFromProp((f) => f.houseNr)
+                    .for((t) => t.city)
+                    .from((f) => f.city)
+                    .for((t) => t.houseNr)
+                    .from((f) => f.houseNr)
             )
             .configure(PersonSchema, PersonDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.address)
-                    .mapFrom((p) => ({
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.address)
+                    .compute((p) => ({
                         city: p.address.city.toUpperCase(),
                         houseNr: p.address.houseNr
                     }))
@@ -656,16 +656,16 @@ describe('Auto-mapping of nested schemas', () => {
         const registry = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.city)
-                    .mapFromProp((f) => f.city)
-                    .forProp((t) => t.houseNr)
-                    .mapFromProp((f) => f.houseNr)
+                    .for((t) => t.city)
+                    .from((f) => f.city)
+                    .for((t) => t.houseNr)
+                    .from((f) => f.houseNr)
             )
             .configure(PersonSchema, PersonDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.address)
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.address)
                     .ignore()
             );
 
@@ -732,13 +732,13 @@ describe('Auto-mapping of nested schemas', () => {
 
         const registry = new MappingRegistry()
             .configure(InnerSchema, InnerDtoSchema, (m) =>
-                m.forProp((t) => t.value).mapFromProp((f) => f.value)
+                m.for((t) => t.value).from((f) => f.value)
             )
             .configure(MiddleSchema, MiddleDtoSchema, (m) =>
-                m.forProp((t) => t.inner).ignore()
+                m.for((t) => t.inner).ignore()
             )
             .configure(OuterSchema, OuterDtoSchema, (m) =>
-                m.forProp((t) => t.name).mapFromProp((f) => f.name)
+                m.for((t) => t.name).from((f) => f.name)
             );
 
         const mapFn = registry.getMapper(OuterSchema, OuterDtoSchema);
@@ -760,13 +760,13 @@ describe('Auto-mapping of nested schemas', () => {
         const reg = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.city)
-                    .mapFromProp((f) => f.city)
-                    .forProp((t) => t.houseNr)
-                    .mapFromProp((f) => f.houseNr)
+                    .for((t) => t.city)
+                    .from((f) => f.city)
+                    .for((t) => t.houseNr)
+                    .from((f) => f.houseNr)
             )
             .configure(PersonSchema, PersonDtoSchema, (m) =>
-                m.forProp((t) => t.name).mapFromProp((f) => f.name)
+                m.for((t) => t.name).from((f) => f.name)
             );
 
         const mapFn = reg.getMapper(PersonSchema, PersonDtoSchema);
@@ -801,7 +801,7 @@ describe('Auto-mapping of nested schemas', () => {
         expect(() =>
             new MappingRegistry().configure(SourceSchema, TargetSchema, (m) =>
                 // @ts-expect-error - data remains unmapped (string vs ObjectSchemaBuilder)
-                m.forProp((t) => t.name).mapFromProp((f) => f.name)
+                m.for((t) => t.name).from((f) => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -831,29 +831,29 @@ describe('Auto-mapping of nested schemas', () => {
         });
 
         // Without registering AddressSchema→AddressDtoSchema first,
-        // mapFromProp for the address property should be a type error
+        // from for the address property should be a type error
         const registry = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.city)
-                    .mapFromProp((f) => f.city)
-                    .forProp((t) => t.street)
-                    .mapFromProp((f) => f.street)
-                    .forProp((t) => t.country)
-                    .mapFromProp((f) => f.country)
+                    .for((t) => t.city)
+                    .from((f) => f.city)
+                    .for((t) => t.street)
+                    .from((f) => f.street)
+                    .for((t) => t.country)
+                    .from((f) => f.country)
             )
             .configure(UserSchema, UserDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFrom((u) => `${u.firstName} ${u.lastName}`)
-                    .forProp((t) => t.address)
-                    .mapFromProp((f) => f.address)
+                    .for((t) => t.name)
+                    .compute((u) => `${u.firstName} ${u.lastName}`)
+                    .for((t) => t.address)
+                    .from((f) => f.address)
             );
 
         expect(registry).toBeInstanceOf(MappingRegistry);
     });
 
-    test('mapFromProp type-errors without registered mapping for ObjectSchemaBuilder props with different InferTypes', () => {
+    test('from type-errors without registered mapping for ObjectSchemaBuilder props with different InferTypes', () => {
         const AddressSchema = object({
             city: string(),
             street: string(),
@@ -875,19 +875,19 @@ describe('Auto-mapping of nested schemas', () => {
         });
 
         // Without registering AddressSchema→AddressDtoSchema,
-        // mapFromProp for address should produce a type error
+        // from for address should produce a type error
         // because InferTypes differ ({ city, street, zipCode } vs { city, street })
         new MappingRegistry().configure(PersonSchema, PersonDtoSchema, (m) =>
             m
-                .forProp((t) => t.name)
-                .mapFromProp((f) => f.name)
-                .forProp((t) => t.address)
+                .for((t) => t.name)
+                .from((f) => f.name)
+                .for((t) => t.address)
                 // @ts-expect-error - no mapping registered and InferTypes differ
-                .mapFromProp((f) => f.address)
+                .from((f) => f.address)
         );
     });
 
-    test('mapFromProp succeeds when mapping is registered for ObjectSchemaBuilder props', async () => {
+    test('from succeeds when mapping is registered for ObjectSchemaBuilder props', async () => {
         const AddressSchema = object({
             city: string(),
             houseNr: number()
@@ -910,14 +910,14 @@ describe('Auto-mapping of nested schemas', () => {
         // With AddressSchema→AddressDtoSchema registered first, no type error
         const registry = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
-                m.forProp((t) => t.city).mapFromProp((f) => f.city)
+                m.for((t) => t.city).from((f) => f.city)
             )
             .configure(PersonSchema, PersonDtoSchema, (m) =>
                 m
-                    .forProp((t) => t.name)
-                    .mapFromProp((f) => f.name)
-                    .forProp((t) => t.address)
-                    .mapFromProp((f) => f.address)
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.address)
+                    .from((f) => f.address)
             );
 
         const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
@@ -958,19 +958,19 @@ describe('Auto-mapping of nested schemas', () => {
 
         reg.configure(AddressSchema, AddressDtoSchema, (m) =>
             m
-                .forProp((t) => t.city)
+                .for((t) => t.city)
                 // @ts-expect-error - houseNr (number) is not assignable to city (string)
-                .mapFromProp((t) => t.houseNr)
+                .from((t) => t.houseNr)
         );
 
         // address is not explicitly mapped — auto-mapping picks it up
         // because AddressSchema→AddressDtoSchema is registered
         const registry = new MappingRegistry()
             .configure(AddressSchema, AddressDtoSchema, (m) =>
-                m.forProp((t) => t.city).mapFromProp((f) => f.city)
+                m.for((t) => t.city).from((f) => f.city)
             )
             .configure(PersonSchema, PersonDtoSchema, (m) =>
-                m.forProp((t) => t.name).mapFromProp((f) => f.name)
+                m.for((t) => t.name).from((f) => f.name)
             );
 
         const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
@@ -1001,7 +1001,7 @@ describe('Auto-mapping of nested schemas', () => {
             AddressSchema,
             AddressDtoSchema,
             (m) =>
-                m.forProp((t) => t.houseNr).mapFrom((f) => f.houseNr.toString())
+                m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
         );
 
         const mapFn = registry.getMapper(AddressSchema, AddressDtoSchema);
@@ -1028,13 +1028,13 @@ describe('Auto-mapping of nested schemas', () => {
                 (m) =>
                     // @ts-expect-error - city2 is not mapped, and it can't be auto-mapped because there is no property with the same name and inferred type in AddressSchema
                     m
-                        .forProp((t) => t.houseNr)
-                        .mapFrom((f) => f.houseNr.toString())
+                        .for((t) => t.houseNr)
+                        .compute((f) => f.houseNr.toString())
             )
         ).toThrow(MapperConfigurationError);
     });
 
-    test('different schemas, but the same inferred type and name can use mapFromProp', async () => {
+    test('different schemas, but the same inferred type and name can use from', async () => {
         const SchemaA = object({
             name: string(),
             value: number()
@@ -1060,10 +1060,10 @@ describe('Auto-mapping of nested schemas', () => {
             schemaD,
             (m) =>
                 m
-                    .forProp((t) => t.oneMoreProp)
-                    .mapFromProp((f) => f.anotherProp)
-                    .forProp((t) => t.prop)
-                    .mapFromProp((f) => f.prop)
+                    .for((t) => t.oneMoreProp)
+                    .from((f) => f.anotherProp)
+                    .for((t) => t.prop)
+                    .from((f) => f.prop)
         );
 
         const mapFn = registry.getMapper(schemaC, schemaD);
@@ -1105,8 +1105,8 @@ describe('Auto-mapping of nested schemas', () => {
             schemaD,
             (m) =>
                 m
-                    .forProp((t) => t.oneMoreProp)
-                    .mapFromProp((f) => f.anotherProp)
+                    .for((t) => t.oneMoreProp)
+                    .from((f) => f.anotherProp)
         );
 
         const mapFn = registry.getMapper(schemaC, schemaD);

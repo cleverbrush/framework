@@ -26,7 +26,7 @@ type SchemaKeys<T extends ObjectSchemaBuilder<any, any, any>> =
 /**
  * Branded phantom type that tags a property descriptor with its key name.
  * This allows TypeScript to infer which property was selected in the
- * `forProp` callback, enabling compile-time tracking of mapped vs unmapped
+ * `for` callback, enabling compile-time tracking of mapped vs unmapped
  * properties.
  */
 type TargetPropertyKey<K extends string> = {
@@ -118,7 +118,7 @@ type KeysNeedingMapping<
 }[SchemaKeys<TToSchema>];
 
 /**
- * Checks whether a `mapFromProp` call should produce a compile-time error.
+ * Checks whether a `from` call should produce a compile-time error.
  *
  * Returns `true` (error) when:
  * - `TSourcePropSchema` is `never` (the PropertyDescriptorTree filtered
@@ -132,7 +132,7 @@ type KeysNeedingMapping<
  *   (type-compatible; the PropertyDescriptorTree filter ensures this)
  * - Both are ObjectSchemaBuilder and a mapping is registered
  */
-type MapFromPropNeedsRegistration<
+type FromNeedsRegistration<
     TSourcePropSchema,
     TToSchema extends ObjectSchemaBuilder<any, any, any>,
     TKey extends string,
@@ -165,7 +165,7 @@ type MapFromPropNeedsRegistration<
 /**
  * Extracts the schema type parameter from a PropertyDescriptor.
  * Used to recover the source property schema from the inferred return
- * type of the `mapFromProp` selector callback.
+ * type of the `from` selector callback.
  */
 type GetSchemaFromDescriptor<T> =
     T extends PropertyDescriptor<any, infer TSchema, any> ? TSchema : never;
@@ -208,10 +208,10 @@ type MappingEntry = {
 // ── PropertyMappingBuilder ────────────────────────────────────────────
 
 /**
- * Intermediate builder returned by `forProp()`. Provides three strategies
+ * Intermediate builder returned by `for()`. Provides three strategies
  * to configure how the selected target property is populated:
- * - `mapFromProp()` — copy from a source property
- * - `mapFrom()` — compute from the entire source object
+ * - `from()` — copy from a source property
+ * - `compute()` — compute from the entire source object
  * - `ignore()` — explicitly skip the property
  */
 export class PropertyMappingBuilder<
@@ -242,7 +242,7 @@ export class PropertyMappingBuilder<
      * inferred type is assignable to the target property type will
      * appear in the selector callback.
      */
-    public mapFromProp<
+    public from<
         TPropertySchema extends SchemaBuilder<any, any>,
         TReturn extends PropertyDescriptor<TFromSchema, TPropertySchema, any>
     >(
@@ -257,14 +257,14 @@ export class PropertyMappingBuilder<
             ? [
                   error: `Source property type is not assignable to target property '${TKey}' type`
               ]
-            : MapFromPropNeedsRegistration<
+            : FromNeedsRegistration<
                     GetSchemaFromDescriptor<TReturn>,
                     TToSchema,
                     TKey,
                     TRegistered
                 > extends true
               ? [
-                    error: `Property '${TKey}' maps between incompatible schema types. Register a mapping for the source→target schema pair first, or use mapFrom() instead.`
+                    error: `Property '${TKey}' maps between incompatible schema types. Register a mapping for the source→target schema pair first, or use compute() instead.`
                 ]
               : []
     ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>, TRegistered> {
@@ -311,7 +311,7 @@ export class PropertyMappingBuilder<
      * Computes the target property value from the entire source object.
      * Supports both sync and async functions.
      */
-    public mapFrom(
+    public compute(
         fn:
             | ((
                   obj: InferType<TFromSchema>
@@ -402,7 +402,7 @@ export class Mapper<
      * ObjectSchemaBuilder with a registered mapping) are also available
      * for explicit override.
      */
-    public forProp<TKey extends SchemaKeys<TToSchema>>(
+    public for<TKey extends SchemaKeys<TToSchema>>(
         selector: (
             tree: TargetPropertyTree<TToSchema, SchemaKeys<TToSchema>>
         ) => TargetPropertyKey<TKey>
@@ -428,7 +428,7 @@ export class Mapper<
 
         if (!capturedKey) {
             throw new Error(
-                'forProp selector must access a property on the target tree'
+                'for selector must access a property on the target tree'
             );
         }
 
