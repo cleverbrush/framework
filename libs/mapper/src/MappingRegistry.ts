@@ -1,6 +1,7 @@
 import {
     InferType,
     ObjectSchemaBuilder,
+    ArraySchemaBuilder,
     SchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     PropertyDescriptorTree,
@@ -70,31 +71,52 @@ type TargetPropertySchema<
     : never;
 
 /**
+ * Extracts the element schema from an ArraySchemaBuilder.
+ */
+type ExtractArrayElementSchema<T> =
+    T extends ArraySchemaBuilder<infer TElementSchema, any, any>
+        ? TElementSchema
+        : never;
+
+/**
  * Determines whether a property needs an explicit mapping configuration.
  *
  * - Both are ObjectSchemaBuilder with registered mapping → `false` (auto-mappable)
  * - Both are ObjectSchemaBuilder without registered mapping → `true`
  * - Either is ObjectSchemaBuilder but the other is not → `true`
+ * - Both are ArraySchemaBuilder with element schemas that have registered mapping → `false`
+ * - Both are ArraySchemaBuilder with same InferType → `false`
+ * - Array vs non-array → `true`
  * - Neither is ObjectSchemaBuilder + InferType<source> extends InferType<target>
  *   → `false` (same-name, compatible primitive types → auto-mappable)
  * - Neither is ObjectSchemaBuilder + incompatible InferType → `true`
  */
 type NeedsMapping<TSourcePropSchema, TTargetPropSchema, TRegistered> =
-    TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
-        ? TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
-            ? [TSourcePropSchema, TTargetPropSchema] extends TRegistered
-                ? false
-                : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
-                  ? InferType<TTargetPropSchema> extends InferType<TSourcePropSchema>
-                      ? false
-                      : true
-                  : true
+    TSourcePropSchema extends ArraySchemaBuilder<any, any, any>
+        ? TTargetPropSchema extends ArraySchemaBuilder<any, any, any>
+            ? NeedsMapping<
+                  ExtractArrayElementSchema<TSourcePropSchema>,
+                  ExtractArrayElementSchema<TTargetPropSchema>,
+                  TRegistered
+              >
             : true
-        : TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
+        : TTargetPropSchema extends ArraySchemaBuilder<any, any, any>
           ? true
-          : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
-            ? false
-            : true;
+          : TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
+            ? TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
+                ? [TSourcePropSchema, TTargetPropSchema] extends TRegistered
+                    ? false
+                    : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
+                      ? InferType<TTargetPropSchema> extends InferType<TSourcePropSchema>
+                          ? false
+                          : true
+                      : true
+                : true
+            : TTargetPropSchema extends ObjectSchemaBuilder<any, any, any>
+              ? true
+              : InferType<TSourcePropSchema> extends InferType<TTargetPropSchema>
+                ? false
+                : true;
 
 /**
  * From all keys of the target schema, filter down to only those that
@@ -126,11 +148,14 @@ type KeysNeedingMapping<
  * - Source is ObjectSchemaBuilder but target property is not
  *   (cannot auto-map object → primitive)
  * - Both are ObjectSchemaBuilder but no mapping is registered
+ * - Array → non-array or non-array → array
+ * - Both are ArraySchemaBuilder but element mapping does not exist
  *
  * Returns `false` (OK) when:
  * - Source is not ObjectSchemaBuilder and not `never`
  *   (type-compatible; the PropertyDescriptorTree filter ensures this)
  * - Both are ObjectSchemaBuilder and a mapping is registered
+ * - Both are ArraySchemaBuilder and element mapping is registered
  */
 type FromNeedsRegistration<
     TSourcePropSchema,
@@ -139,28 +164,57 @@ type FromNeedsRegistration<
     TRegistered
 > = [TSourcePropSchema] extends [never]
     ? true
-    : TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
-      ? TargetPropertySchema<TToSchema, TKey> extends ObjectSchemaBuilder<
+    : TSourcePropSchema extends ArraySchemaBuilder<any, any, any>
+      ? TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
             any,
             any,
             any
         >
-          ? [
-                TSourcePropSchema,
-                TargetPropertySchema<TToSchema, TKey>
-            ] extends TRegistered
-              ? false
-              : InferType<TSourcePropSchema> extends InferType<
-                      TargetPropertySchema<TToSchema, TKey>
-                  >
-                ? InferType<
-                      TargetPropertySchema<TToSchema, TKey>
-                  > extends InferType<TSourcePropSchema>
-                    ? false
-                    : true
-                : true
+          ? FromNeedsRegistration<
+                ExtractArrayElementSchema<TSourcePropSchema>,
+                TToSchema,
+                TKey,
+                TRegistered
+            > extends true
+              ? NeedsMapping<
+                    ExtractArrayElementSchema<TSourcePropSchema>,
+                    ExtractArrayElementSchema<
+                        TargetPropertySchema<TToSchema, TKey>
+                    >,
+                    TRegistered
+                > extends true
+                  ? true
+                  : false
+              : false
           : true
-      : false;
+      : TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
+              any,
+              any,
+              any
+          >
+        ? true
+        : TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
+          ? TargetPropertySchema<TToSchema, TKey> extends ObjectSchemaBuilder<
+                any,
+                any,
+                any
+            >
+              ? [
+                    TSourcePropSchema,
+                    TargetPropertySchema<TToSchema, TKey>
+                ] extends TRegistered
+                  ? false
+                  : InferType<TSourcePropSchema> extends InferType<
+                          TargetPropertySchema<TToSchema, TKey>
+                      >
+                    ? InferType<
+                          TargetPropertySchema<TToSchema, TKey>
+                      > extends InferType<TSourcePropSchema>
+                        ? false
+                        : true
+                    : true
+              : true
+          : false;
 
 /**
  * Extracts the schema type parameter from a PropertyDescriptor.
@@ -191,7 +245,7 @@ export class MapperConfigurationError extends Error {
 // ── Internal Mapping Entry ────────────────────────────────────────────
 
 type MappingEntry = {
-    type: 'prop' | 'custom' | 'ignore' | 'auto';
+    type: 'prop' | 'custom' | 'ignore' | 'auto' | 'autoArray';
     sourceDescriptorInner?: ReturnType<
         PropertyDescriptor<
             any,
@@ -203,7 +257,89 @@ type MappingEntry = {
         : never;
     fn?: (obj: any) => any;
     autoMapper?: SchemaToSchemaMapperResult<any, any>;
+    elementMapper?: (element: any) => Promise<any>;
 };
+
+// ── Array Element Mapper Resolution ───────────────────────────────────
+
+/**
+ * Resolves an element mapper for array properties.
+ * Handles ObjectSchemaBuilder elements (via registry) and
+ * primitive elements (direct copy when types match).
+ * Returns null if no valid element mapper can be resolved.
+ */
+function resolveElementMapper(
+    sourceElementSchema: SchemaBuilder<any, any>,
+    targetElementSchema: SchemaBuilder<any, any>,
+    registry: MappingRegistry<any> | undefined
+): ((element: any) => Promise<any>) | null {
+    // Both element schemas are ObjectSchemaBuilder: look up registered mapper
+    if (
+        sourceElementSchema instanceof ObjectSchemaBuilder &&
+        targetElementSchema instanceof ObjectSchemaBuilder
+    ) {
+        if (registry) {
+            const fromSchemaMappers =
+                registry['_mappers'].get(sourceElementSchema);
+            const autoMapper = fromSchemaMappers?.get(targetElementSchema);
+            if (autoMapper) {
+                return autoMapper as (element: any) => Promise<any>;
+            }
+        }
+        // Same inferred structure: copy directly
+        const fromKeys = Object.keys(
+            sourceElementSchema.introspect().properties || {}
+        ).sort();
+        const toKeys = Object.keys(
+            targetElementSchema.introspect().properties || {}
+        ).sort();
+        if (
+            fromKeys.length === toKeys.length &&
+            fromKeys.every((k, i) => k === toKeys[i])
+        ) {
+            return async (element: any) => element;
+        }
+        return null;
+    }
+
+    // Both element schemas are ArraySchemaBuilder: recursive element mapping
+    if (
+        sourceElementSchema instanceof ArraySchemaBuilder &&
+        targetElementSchema instanceof ArraySchemaBuilder
+    ) {
+        const innerSourceElement =
+            sourceElementSchema.introspect().elementSchema;
+        const innerTargetElement =
+            targetElementSchema.introspect().elementSchema;
+        if (innerSourceElement && innerTargetElement) {
+            const innerMapper = resolveElementMapper(
+                innerSourceElement,
+                innerTargetElement,
+                registry
+            );
+            if (innerMapper) {
+                return async (arr: any) => {
+                    if (arr == null) return undefined;
+                    if (!Array.isArray(arr)) return arr;
+                    return Promise.all(arr.map(innerMapper));
+                };
+            }
+        }
+        return null;
+    }
+
+    // Neither is ObjectSchemaBuilder: primitive-compatible, direct copy
+    if (
+        !(sourceElementSchema instanceof ObjectSchemaBuilder) &&
+        !(targetElementSchema instanceof ObjectSchemaBuilder) &&
+        !(sourceElementSchema instanceof ArraySchemaBuilder) &&
+        !(targetElementSchema instanceof ArraySchemaBuilder)
+    ) {
+        return async (element: any) => element;
+    }
+
+    return null;
+}
 
 // ── PropertyMappingBuilder ────────────────────────────────────────────
 
@@ -296,6 +432,36 @@ export class PropertyMappingBuilder<
                     autoMapper
                 });
                 return this._mapper as any;
+            }
+        }
+
+        // Check if both source and target are ArraySchemaBuilder;
+        // if so, resolve the element mapper and use element-wise mapping.
+        if (
+            sourceSchema instanceof ArraySchemaBuilder &&
+            targetPropSchema instanceof ArraySchemaBuilder
+        ) {
+            const sourceElementSchema = (
+                sourceSchema as ArraySchemaBuilder<any, any, any>
+            ).introspect().elementSchema;
+            const targetElementSchema = (
+                targetPropSchema as ArraySchemaBuilder<any, any, any>
+            ).introspect().elementSchema;
+
+            if (sourceElementSchema && targetElementSchema) {
+                const elementMapper = resolveElementMapper(
+                    sourceElementSchema,
+                    targetElementSchema,
+                    this._mapper['_registry']
+                );
+                if (elementMapper) {
+                    this._mapper['_mappings'].set(this._targetKey, {
+                        type: 'autoArray',
+                        sourceDescriptorInner: inner,
+                        elementMapper
+                    });
+                    return this._mapper as any;
+                }
             }
         }
 
@@ -536,13 +702,44 @@ export class Mapper<
                 // KeysNeedingMapping / NeedsMapping)
                 if (
                     !(fromPropSchema instanceof ObjectSchemaBuilder) &&
-                    !(toPropSchema instanceof ObjectSchemaBuilder)
+                    !(toPropSchema instanceof ObjectSchemaBuilder) &&
+                    !(fromPropSchema instanceof ArraySchemaBuilder) &&
+                    !(toPropSchema instanceof ArraySchemaBuilder)
                 ) {
                     this._mappings.set(key, {
                         type: 'prop',
                         sourceDescriptorInner:
                             sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
                     });
+                    continue;
+                }
+
+                // ArraySchemaBuilder → ArraySchemaBuilder: use element mapper
+                if (
+                    fromPropSchema instanceof ArraySchemaBuilder &&
+                    toPropSchema instanceof ArraySchemaBuilder
+                ) {
+                    const sourceElementSchema =
+                        fromPropSchema.introspect().elementSchema;
+                    const targetElementSchema =
+                        toPropSchema.introspect().elementSchema;
+                    if (sourceElementSchema && targetElementSchema) {
+                        const elementMapper = resolveElementMapper(
+                            sourceElementSchema,
+                            targetElementSchema,
+                            this._registry
+                        );
+                        if (elementMapper) {
+                            this._mappings.set(key, {
+                                type: 'autoArray',
+                                sourceDescriptorInner:
+                                    sourceDescriptor[
+                                        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                                    ],
+                                elementMapper
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -586,6 +783,20 @@ export class Mapper<
                         entry.sourceDescriptorInner.getValue(source);
                     if (getResult.success && getResult.value !== undefined) {
                         value = await entry.autoMapper!(getResult.value);
+                    } else {
+                        continue;
+                    }
+                } else if (entry.type === 'autoArray') {
+                    const getResult =
+                        entry.sourceDescriptorInner.getValue(source);
+                    if (getResult.success && getResult.value != null) {
+                        if (Array.isArray(getResult.value)) {
+                            value = await Promise.all(
+                                getResult.value.map(entry.elementMapper!)
+                            );
+                        } else {
+                            continue;
+                        }
                     } else {
                         continue;
                     }
