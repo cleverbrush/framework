@@ -10,7 +10,7 @@ import type {
     InferType,
     ValidationResult
 } from '@cleverbrush/schema';
-import { useCallback, useRef, useState, useMemo } from 'react';
+import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
 import { createFormStore } from './FormStore.js';
 import type { FormStore } from './FormStore.js';
 import type { FormContextValue } from './contexts.js';
@@ -232,21 +232,13 @@ export function useFieldFromContext<
 
     const [, setRenderTick] = useState(0);
 
-    // Subscribe to field changes
-    const unsubRef = useRef<(() => void) | null>(null);
-    const pathRef = useRef(path);
-
-    if (pathRef.current !== path && unsubRef.current) {
-        unsubRef.current();
-        unsubRef.current = null;
-    }
-    pathRef.current = path;
-
-    if (!unsubRef.current) {
-        unsubRef.current = store.subscribe(path, () => {
+    // Subscribe to field changes with proper cleanup on unmount/path change
+    useEffect(() => {
+        const unsub = store.subscribe(path, () => {
             setRenderTick((c) => c + 1);
         });
-    }
+        return unsub;
+    }, [store, path]);
 
     const onChange = useCallback(
         (value: any) => {
