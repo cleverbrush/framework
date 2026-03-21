@@ -1,5 +1,5 @@
 import { test, expect, describe } from 'vitest';
-import { object, string, number, array } from '@cleverbrush/schema';
+import { object, string, number, array, boolean } from '@cleverbrush/schema';
 import {
     MappingRegistry,
     Mapper,
@@ -1918,7 +1918,7 @@ describe('Blog CMS: Post entity to API response', () => {
         author: AuthorSchema,
         tags: array(TagSchema),
         comments: array(CommentSchema),
-        isDraft: string()
+        isDraft: boolean()
     });
 
     const BlogPostResponseSchema = object({
@@ -2000,7 +2000,7 @@ describe('Blog CMS: Post entity to API response', () => {
                     likes: 3
                 }
             ],
-            isDraft: 'false'
+            isDraft: false
         });
 
         expect(result).toEqual({
@@ -2070,7 +2070,7 @@ describe('Blog CMS: Post entity to API response', () => {
             },
             tags: [],
             comments: [],
-            isDraft: 'true'
+            isDraft: true
         });
 
         expect(result).toEqual({
@@ -2533,6 +2533,14 @@ describe('Reservation system: Hotel booking mapping', () => {
         totalCost: number()
     });
 
+    const calcNights = (checkInDate: string, checkOutDate: string) => {
+        const checkIn = new Date(checkInDate);
+        const checkOut = new Date(checkOutDate);
+        return Math.round(
+            (checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)
+        );
+    };
+
     test('maps booking to confirmation with computed nights and total', async () => {
         const registry = new MappingRegistry()
             .configure(GuestSchema, GuestSummarySchema, (m) =>
@@ -2558,21 +2566,14 @@ describe('Reservation system: Hotel booking mapping', () => {
                     .for((t) => t.rooms)
                     .from((f) => f.rooms)
                     .for((t) => t.nights)
-                    .compute((b) => {
-                        const checkIn = new Date(b.checkInDate);
-                        const checkOut = new Date(b.checkOutDate);
-                        return Math.round(
-                            (checkOut.getTime() - checkIn.getTime()) /
-                                (1000 * 60 * 60 * 24)
-                        );
-                    })
+                    .compute((b) =>
+                        calcNights(b.checkInDate, b.checkOutDate)
+                    )
                     .for((t) => t.totalCost)
                     .compute((b) => {
-                        const checkIn = new Date(b.checkInDate);
-                        const checkOut = new Date(b.checkOutDate);
-                        const nights = Math.round(
-                            (checkOut.getTime() - checkIn.getTime()) /
-                                (1000 * 60 * 60 * 24)
+                        const nights = calcNights(
+                            b.checkInDate,
+                            b.checkOutDate
                         );
                         return b.rooms.reduce(
                             (sum, room) => sum + room.ratePerNight * nights,
@@ -2643,21 +2644,14 @@ describe('Reservation system: Hotel booking mapping', () => {
                     .for((t) => t.rooms)
                     .from((f) => f.rooms)
                     .for((t) => t.nights)
-                    .compute((b) => {
-                        const checkIn = new Date(b.checkInDate);
-                        const checkOut = new Date(b.checkOutDate);
-                        return Math.round(
-                            (checkOut.getTime() - checkIn.getTime()) /
-                                (1000 * 60 * 60 * 24)
-                        );
-                    })
+                    .compute((b) =>
+                        calcNights(b.checkInDate, b.checkOutDate)
+                    )
                     .for((t) => t.totalCost)
                     .compute((b) => {
-                        const checkIn = new Date(b.checkInDate);
-                        const checkOut = new Date(b.checkOutDate);
-                        const nights = Math.round(
-                            (checkOut.getTime() - checkIn.getTime()) /
-                                (1000 * 60 * 60 * 24)
+                        const nights = calcNights(
+                            b.checkInDate,
+                            b.checkOutDate
                         );
                         return b.rooms.reduce(
                             (sum, room) => sum + room.ratePerNight * nights,
