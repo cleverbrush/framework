@@ -789,6 +789,7 @@ export class Mapper<
                 } else if (entry.type === 'autoArray') {
                     const getResult =
                         entry.sourceDescriptorInner.getValue(source);
+                    // null/undefined → skip (spec §6); non-array → skip
                     if (getResult.success && getResult.value != null) {
                         if (Array.isArray(getResult.value)) {
                             value = await Promise.all(
