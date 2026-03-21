@@ -328,13 +328,30 @@ function resolveElementMapper(
         return null;
     }
 
-    // Neither is ObjectSchemaBuilder: primitive-compatible, direct copy
+    // Neither is ObjectSchemaBuilder nor ArraySchemaBuilder:
+    // treat as primitive-compatible only when element schema types match.
     if (
         !(sourceElementSchema instanceof ObjectSchemaBuilder) &&
         !(targetElementSchema instanceof ObjectSchemaBuilder) &&
         !(sourceElementSchema instanceof ArraySchemaBuilder) &&
         !(targetElementSchema instanceof ArraySchemaBuilder)
     ) {
+        const sourceIntrospection =
+            typeof (sourceElementSchema as any).introspect === 'function'
+                ? (sourceElementSchema as any).introspect()
+                : undefined;
+        const targetIntrospection =
+            typeof (targetElementSchema as any).introspect === 'function'
+                ? (targetElementSchema as any).introspect()
+                : undefined;
+
+        if (
+            !sourceIntrospection ||
+            !targetIntrospection ||
+            sourceIntrospection.type !== targetIntrospection.type
+        ) {
+            return null;
+        }
         return async (element: any) => element;
     }
 
