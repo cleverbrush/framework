@@ -187,9 +187,9 @@ const registry = new MappingRegistry();
 
 Defines a mapping between two schemas and returns a new immutable registry containing the mapping. The callback `fn` receives a fresh `Mapper` and must return it after configuring all non-auto-mappable property mappings. The mapper is automatically finalized and registered.
 
-The `configure` callback only needs to map properties that **cannot** be auto-mapped. The `for` selector only shows these properties — auto-mappable properties are excluded from the selector tree. You can still explicitly map an auto-mappable property using `for` to override the default behavior.
+The `configure` callback only needs to explicitly map or ignore properties that **cannot** be auto-mapped. The `for` selector can target any property in the target schema; you typically only use it for non-auto-mappable properties or when you want to override the default auto-mapping behavior for a particular property.
 
-Throws if schemas are invalid, the mapping is a duplicate, or unmapped properties remain that cannot be auto-mapped.
+Throws if schemas are invalid, the mapping is a duplicate, or if, after applying auto-mapping and any explicit `compute`/`ignore` rules, unmapped properties remain that cannot be auto-mapped.
 
 #### `registry.getMapper(fromSchema, toSchema)`
 
