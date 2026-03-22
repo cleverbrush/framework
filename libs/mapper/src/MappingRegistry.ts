@@ -198,9 +198,7 @@ type FromNeedsRegistration<
                     TargetPropertySchema<TToSchema, TKey>
                 >,
                 TRegistered
-            > extends true
-              ? true
-              : false
+            >
           : true
       : TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
               any,
@@ -565,7 +563,7 @@ export class PropertyMappingBuilder<
         const sourceTree = ObjectSchemaBuilder.getPropertiesFor(
             this._mapper['_fromSchema']
         );
-        const sourceDescriptor = selector(sourceTree as any) as any;
+        const sourceDescriptor: any = selector(sourceTree as any);
         const inner = sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
 
         // Check if both source and target property schemas are ObjectSchemaBuilder;
