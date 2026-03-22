@@ -69,6 +69,7 @@ export function buildSelectorFromPath(path: string): (tree: any) => any {
     return (tree: any) => {
         let current = tree;
         for (const part of parts) {
+            if (current == null) return undefined;
             current = current[part];
         }
         return current;
@@ -96,7 +97,9 @@ export function extractFieldPath(errorPath: string): string {
         p = p.slice(1);
     }
 
-    // Strip validator suffix like "($validators[0])" or "($validators[0] (name))"
+    // Strip validator suffix — matches patterns like:
+    //   "($validators[0])"
+    //   "($validators[0] (validatorName))"
     p = p.replace(/\(\$validators\[\d+\](?:\s*\([^)]*\))?\)\s*$/, '');
 
     return p;

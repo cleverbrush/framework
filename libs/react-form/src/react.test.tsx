@@ -936,3 +936,67 @@ describe('integration', () => {
         unmount();
     });
 });
+
+// ─── Helper function tests ───────────────────────────────────────────────────
+
+import { buildSelectorFromPath, extractFieldPath } from './helpers.js';
+
+describe('extractFieldPath', () => {
+    test('extracts simple field path', () => {
+        expect(extractFieldPath('$.email')).toBe('email');
+    });
+
+    test('extracts field path with validator suffix', () => {
+        expect(extractFieldPath('$.email($validators[0])')).toBe('email');
+    });
+
+    test('extracts nested field path', () => {
+        expect(extractFieldPath('$.customer.address.city')).toBe('customer.address.city');
+    });
+
+    test('extracts nested field path with validator suffix', () => {
+        expect(extractFieldPath('$.customer.address.city($validators[0])')).toBe('customer.address.city');
+    });
+
+    test('returns empty string for root path', () => {
+        expect(extractFieldPath('$')).toBe('');
+    });
+
+    test('returns empty string for root validator path', () => {
+        expect(extractFieldPath('$($validators[0])')).toBe('');
+    });
+
+    test('returns empty string for root validator with name', () => {
+        expect(extractFieldPath('$($validators[0] (myValidator))')).toBe('');
+    });
+
+    test('handles field path with named validator', () => {
+        expect(extractFieldPath('$.email($validators[1] (emailCheck))')).toBe('email');
+    });
+});
+
+describe('buildSelectorFromPath', () => {
+    test('builds selector for simple path', () => {
+        const tree = { email: 'test@test.com' };
+        const selector = buildSelectorFromPath('email');
+        expect(selector(tree)).toBe('test@test.com');
+    });
+
+    test('builds selector for nested path', () => {
+        const tree = { customer: { address: { city: 'NYC' } } };
+        const selector = buildSelectorFromPath('customer.address.city');
+        expect(selector(tree)).toBe('NYC');
+    });
+
+    test('returns undefined for missing path', () => {
+        const tree = { email: 'test' };
+        const selector = buildSelectorFromPath('name');
+        expect(selector(tree)).toBeUndefined();
+    });
+
+    test('handles null intermediate values safely', () => {
+        const tree = { customer: null };
+        const selector = buildSelectorFromPath('customer.address.city');
+        expect(selector(tree)).toBeUndefined();
+    });
+});
