@@ -4,7 +4,7 @@ import {
     Field,
     FormSystemProvider
 } from '@cleverbrush/react-form';
-import { htmlRenderers, ValidationSummary } from '../renderers';
+import { htmlRenderers } from '../renderers';
 
 /**
  * Example 1: Basic Contact Form
@@ -16,7 +16,7 @@ import { htmlRenderers, ValidationSummary } from '../renderers';
  * - submit() with validation result
  * - reset() to clear form
  * - Validation runs on every field change — errors appear immediately
- * - Root-level schema errors shown in ValidationSummary
+ * - Validation errors displayed inline per field
  */
 
 const ContactSchema = object({
@@ -65,8 +65,6 @@ export function BasicContactForm() {
                     <code>FormSystemProvider</code>. Validation runs on every
                     field change.
                 </p>
-
-                <ValidationSummary rootErrors={form.rootErrors} />
 
                 <div className="form-grid">
                     <label>

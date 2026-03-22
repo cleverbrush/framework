@@ -939,41 +939,7 @@ describe('integration', () => {
 
 // ─── Helper function tests ───────────────────────────────────────────────────
 
-import { buildSelectorFromPath, extractFieldPath } from './helpers.js';
-
-describe('extractFieldPath', () => {
-    test('extracts simple field path', () => {
-        expect(extractFieldPath('$.email')).toBe('email');
-    });
-
-    test('extracts field path with validator suffix', () => {
-        expect(extractFieldPath('$.email($validators[0])')).toBe('email');
-    });
-
-    test('extracts nested field path', () => {
-        expect(extractFieldPath('$.customer.address.city')).toBe('customer.address.city');
-    });
-
-    test('extracts nested field path with validator suffix', () => {
-        expect(extractFieldPath('$.customer.address.city($validators[0])')).toBe('customer.address.city');
-    });
-
-    test('returns empty string for root path', () => {
-        expect(extractFieldPath('$')).toBe('');
-    });
-
-    test('returns empty string for root validator path', () => {
-        expect(extractFieldPath('$($validators[0])')).toBe('');
-    });
-
-    test('returns empty string for root validator with name', () => {
-        expect(extractFieldPath('$($validators[0] (myValidator))')).toBe('');
-    });
-
-    test('handles field path with named validator', () => {
-        expect(extractFieldPath('$.email($validators[1] (emailCheck))')).toBe('email');
-    });
-});
+import { buildSelectorFromPath } from './helpers.js';
 
 describe('buildSelectorFromPath', () => {
     test('builds selector for simple path', () => {

@@ -65,25 +65,4 @@ export const htmlRenderers: Record<
     )
 };
 
-/**
- * Validation Summary component — displays root-level schema errors
- * that are not associated with specific fields.
- */
-export function ValidationSummary({
-    rootErrors
-}: {
-    rootErrors: ReadonlyArray<string>;
-}) {
-    if (rootErrors.length === 0) return null;
 
-    return (
-        <div className="validation-summary">
-            <strong>Validation Errors:</strong>
-            <ul>
-                {rootErrors.map((err, i) => (
-                    <li key={i}>{err}</li>
-                ))}
-            </ul>
-        </div>
-    );
-}

@@ -4,7 +4,7 @@ import {
     Field,
     FormSystemProvider
 } from '@cleverbrush/react-form';
-import { htmlRenderers, ValidationSummary } from '../renderers';
+import { htmlRenderers } from '../renderers';
 
 /**
  * Example 3: Nested Object Schema
@@ -15,7 +15,7 @@ import { htmlRenderers, ValidationSummary } from '../renderers';
  * - createMissingStructure option (auto-creates parent objects)
  * - getValue() to inspect full form state
  * - Validation on every field change with getErrorsFor
- * - Root-level validation summary
+ * - Validation errors displayed inline per field
  */
 
 const OrderSchema = object({
@@ -124,8 +124,6 @@ export function NestedObjectForm() {
                     <code>{'t => t.customer.address.city'}</code>.
                     Validation runs on every field change.
                 </p>
-
-                <ValidationSummary rootErrors={form.rootErrors} />
 
                 <div className="form-grid">
                     <h3>Customer Info</h3>

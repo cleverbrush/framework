@@ -1,6 +1,6 @@
 import { object, string, number } from '@cleverbrush/schema';
 import { useSchemaForm } from '@cleverbrush/react-form';
-import { ValidationSummary } from '../renderers';
+
 
 /**
  * Example 4: Headless Form (useField)
@@ -11,7 +11,7 @@ import { ValidationSummary } from '../renderers';
  * - Field state: value, dirty, touched, error
  * - Programmatic setValue() and getValue()
  * - Validation runs on every field change — errors appear as you type
- * - Root-level validation summary
+ * - Validation errors displayed inline per field
  */
 
 const ProfileSchema = object({
@@ -94,8 +94,6 @@ export function HeadlessForm() {
                 <code>form.useField()</code> for full rendering control.
                 Validation runs on every field change.
             </p>
-
-            <ValidationSummary rootErrors={form.rootErrors} />
 
             <div className="form-grid">
                 <label>

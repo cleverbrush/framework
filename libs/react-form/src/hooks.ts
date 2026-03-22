@@ -20,7 +20,7 @@ import type {
     FormSystemConfig,
     FieldRenderer
 } from './types.js';
-import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath, extractFieldPath } from './helpers.js';
+import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath } from './helpers.js';
 
 // ─── SchemaFormInstance ──────────────────────────────────────────────────────
 
@@ -40,8 +40,6 @@ export type SchemaFormInstance<
     reset: (values?: Partial<InferType<TSchema>>) => void;
     getValue: () => InferType<TSchema>;
     setValue: (values: Partial<InferType<TSchema>>) => void;
-    /** Root-level schema validation errors (not associated with specific fields) */
-    rootErrors: ReadonlyArray<string>;
     /** @internal — Used by FormProvider and Field to access internal context */
     _getFormContext: () => FormContextValue;
 };
@@ -104,15 +102,6 @@ export function useSchemaForm<
     const formContextRef = useRef(formContextValue);
     formContextRef.current = formContextValue;
 
-    // Subscribe to root errors for re-rendering
-    const [, setRootErrorTick] = useState(0);
-    useEffect(() => {
-        const unsub = store.subscribeRootErrors(() => {
-            setRootErrorTick((c) => c + 1);
-        });
-        return unsub;
-    }, [store]);
-
     /**
      * Runs full schema validation using getErrorsFor to extract per-field errors.
      * Optionally marks all fields as touched (used by submit/explicit validate).
@@ -128,7 +117,6 @@ export function useSchemaForm<
             }) as ValidationResult<InferType<TSchema>>;
         } catch {
             // If validation itself throws (e.g., null values), treat as no errors
-            store.setRootErrors([]);
             return { valid: false } as ValidationResult<InferType<TSchema>>;
         }
 
@@ -169,49 +157,6 @@ export function useSchemaForm<
                     // If getErrorsFor fails for this path, skip
                 }
             }
-
-            // Extract root-level errors from errors array
-            // (getErrorsFor((t) => t) does not surface root-level validator errors)
-            const rootErrs: string[] = [];
-            if (!result.valid && result.errors) {
-                const fieldPathSet = new Set(pathMap.values());
-                for (const error of result.errors) {
-                    const fieldPath = extractFieldPath(error.path);
-                    if (!fieldPath) {
-                        // Root-level error (not tied to any specific field)
-                        rootErrs.push(error.message);
-                    } else if (!fieldPathSet.has(fieldPath)) {
-                        // Error for a path not covered by getErrorsFor — set via path fallback
-                        const currentState = store.getFieldState(fieldPath);
-                        if (!currentState.error) {
-                            const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: error.message };
-                            if (markTouched) {
-                                patch.touched = true;
-                            }
-                            store.updateFieldState(fieldPath, patch);
-                        }
-                    }
-                }
-            }
-            store.setRootErrors(rootErrs);
-        } else {
-            // No getErrorsFor available, fall back to path-based error matching
-            const rootErrs: string[] = [];
-            if (!result.valid && result.errors) {
-                for (const error of result.errors) {
-                    const fieldPath = extractFieldPath(error.path);
-                    if (fieldPath) {
-                        const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: error.message };
-                        if (markTouched) {
-                            patch.touched = true;
-                        }
-                        store.updateFieldState(fieldPath, patch);
-                    } else {
-                        rootErrs.push(error.message);
-                    }
-                }
-            }
-            store.setRootErrors(rootErrs);
         }
 
         return result as ValidationResult<InferType<TSchema>>;
@@ -267,8 +212,6 @@ export function useSchemaForm<
         [runValidation]
     );
 
-    const rootErrors = store.getRootErrors();
-
     return useMemo(
         () => ({
             useField: useFieldHook,
@@ -277,10 +220,9 @@ export function useSchemaForm<
             reset,
             getValue,
             setValue: setValueFn,
-            rootErrors,
             _getFormContext
         }),
-        [useFieldHook, submit, validate, reset, getValue, setValueFn, rootErrors, _getFormContext]
+        [useFieldHook, submit, validate, reset, getValue, setValueFn, _getFormContext]
     );
 }
 

@@ -4,7 +4,7 @@ import {
     Field,
     FormSystemProvider
 } from '@cleverbrush/react-form';
-import { htmlRenderers, ValidationSummary } from '../renderers';
+import { htmlRenderers } from '../renderers';
 
 /**
  * Example 2: Validation Showcase
@@ -14,7 +14,7 @@ import { htmlRenderers, ValidationSummary } from '../renderers';
  * - Min-length, regex, and range validation
  * - Error messages flowing from schema to Field renderers via getErrorsFor
  * - Validation runs automatically on every field change
- * - Root-level validation summary
+ * - Validation errors displayed inline per field
  */
 
 const SignupSchema = object({
@@ -128,8 +128,6 @@ export function ValidationShowcaseForm() {
                     patterns, numeric range. Validation runs on every field
                     change — errors appear immediately as you type.
                 </p>
-
-                <ValidationSummary rootErrors={form.rootErrors} />
 
                 <div className="form-grid">
                     <label>

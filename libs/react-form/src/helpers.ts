@@ -75,32 +75,3 @@ export function buildSelectorFromPath(path: string): (tree: any) => any {
         return current;
     };
 }
-
-/**
- * Extracts the field path from a schema validation error path.
- * Schema error paths look like:
- *   "$.email"           → "email"
- *   "$.email($validators[0])" → "email"
- *   "$.customer.address.city" → "customer.address.city"
- *   "$($validators[0])" → "" (root-level error)
- *   "$"                 → "" (root-level error)
- *
- * Returns the dot-separated field path, or empty string for root errors.
- */
-export function extractFieldPath(errorPath: string): string {
-    let p = errorPath;
-
-    // Strip leading "$." or "$"
-    if (p.startsWith('$.')) {
-        p = p.slice(2);
-    } else if (p.startsWith('$')) {
-        p = p.slice(1);
-    }
-
-    // Strip validator suffix — matches patterns like:
-    //   "($validators[0])"
-    //   "($validators[0] (validatorName))"
-    p = p.replace(/\(\$validators\[\d+\](?:\s*\([^)]*\))?\)\s*$/, '');
-
-    return p;
-}

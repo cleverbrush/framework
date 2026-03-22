@@ -7,7 +7,7 @@ import {
     Field
 } from '@cleverbrush/react-form';
 import type { FieldRenderProps } from '@cleverbrush/react-form';
-import { htmlRenderers, ValidationSummary } from '../renderers';
+import { htmlRenderers } from '../renderers';
 
 /**
  * Example 5: FormProvider & Nested Provider Override
@@ -17,7 +17,7 @@ import { htmlRenderers, ValidationSummary } from '../renderers';
  * - Nested FormSystemProvider overriding a specific renderer
  * - Custom renderer passed via explicit renderer prop
  * - Validation on every field change
- * - Root-level validation summary
+ * - Validation errors displayed inline per field
  */
 
 const FeedbackSchema = object({
@@ -161,8 +161,6 @@ export function AdvancedFeaturesForm() {
                     and custom explicit renderers. Validation runs on every
                     field change.
                 </p>
-
-                <ValidationSummary rootErrors={form.rootErrors} />
 
                 <div className="form-grid">
                     {/* Section 1: FormProvider — useField via context */}
