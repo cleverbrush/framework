@@ -143,10 +143,16 @@ export function useSchemaForm<
         }
 
         // Use getErrorsFor to extract per-field errors via descriptor selectors
-        const getErrorsFor = (result as any).getErrorsFor;
-        if (typeof getErrorsFor === 'function') {
+        const resultWithErrors = result as ValidationResult<InferType<TSchema>> & {
+            getErrorsFor?: (selector: (t: unknown) => unknown) => {
+                errors: ReadonlyArray<string>;
+                isValid: boolean;
+            };
+        };
+        if (typeof resultWithErrors.getErrorsFor === 'function') {
+            const getErrorsFor = resultWithErrors.getErrorsFor;
             // Get root-level errors (errors on the schema object itself)
-            const rootResult = getErrorsFor((t: any) => t);
+            const rootResult = getErrorsFor((t: unknown) => t);
             const rootErrs: string[] = [];
             if (rootResult && Array.isArray(rootResult.errors)) {
                 for (const err of rootResult.errors) {
@@ -159,8 +165,8 @@ export function useSchemaForm<
             for (const [inner, path] of pathMap) {
                 try {
                     // Build a selector that returns the descriptor for this path
-                    const descriptor = { [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: inner } as any;
-                    const fieldResult = getErrorsFor(() => descriptor);
+                    const descriptor = { [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: inner };
+                    const fieldResult = getErrorsFor(() => descriptor as unknown);
                     if (fieldResult && Array.isArray(fieldResult.errors) && fieldResult.errors.length > 0) {
                         const errorMessage = fieldResult.errors[0];
                         const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: errorMessage };
@@ -269,6 +275,8 @@ export function useSchemaForm<
         [runValidation]
     );
 
+    const rootErrors = store.getRootErrors();
+
     return useMemo(
         () => ({
             useField: useFieldHook,
@@ -277,11 +285,10 @@ export function useSchemaForm<
             reset,
             getValue,
             setValue: setValueFn,
-            rootErrors: store.getRootErrors(),
+            rootErrors,
             _getFormContext
         }),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [useFieldHook, submit, validate, reset, getValue, setValueFn, _getFormContext, store.getRootErrors()]
+        [useFieldHook, submit, validate, reset, getValue, setValueFn, rootErrors, _getFormContext]
     );
 }
 
