@@ -20,7 +20,7 @@ import type {
     FormSystemConfig,
     FieldRenderer
 } from './types.js';
-import { buildDescriptorPathMap, getDescriptorPath, getSchemaType } from './helpers.js';
+import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath, extractFieldPath } from './helpers.js';
 
 // ─── SchemaFormInstance ──────────────────────────────────────────────────────
 
@@ -142,31 +142,21 @@ export function useSchemaForm<
             store.updateFieldState(p, patch);
         }
 
-        // Use getErrorsFor to extract per-field errors via descriptor selectors
+        // Use getErrorsFor to extract per-field errors via tree selectors
         const resultWithErrors = result as ValidationResult<InferType<TSchema>> & {
-            getErrorsFor?: (selector: (t: unknown) => unknown) => {
+            getErrorsFor?: (selector: (t: any) => any) => {
                 errors: ReadonlyArray<string>;
                 isValid: boolean;
             };
         };
         if (typeof resultWithErrors.getErrorsFor === 'function') {
             const getErrorsFor = resultWithErrors.getErrorsFor;
-            // Get root-level errors (errors on the schema object itself)
-            const rootResult = getErrorsFor((t: unknown) => t);
-            const rootErrs: string[] = [];
-            if (rootResult && Array.isArray(rootResult.errors)) {
-                for (const err of rootResult.errors) {
-                    rootErrs.push(err);
-                }
-            }
-            store.setRootErrors(rootErrs);
 
-            // Extract per-field errors using the pathMap descriptors
-            for (const [inner, path] of pathMap) {
+            // Extract per-field errors by building selectors from field paths
+            for (const [, path] of pathMap) {
                 try {
-                    // Build a selector that returns the descriptor for this path
-                    const descriptor = { [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: inner };
-                    const fieldResult = getErrorsFor(() => descriptor as unknown);
+                    const selector = buildSelectorFromPath(path);
+                    const fieldResult = getErrorsFor(selector);
                     if (fieldResult && Array.isArray(fieldResult.errors) && fieldResult.errors.length > 0) {
                         const errorMessage = fieldResult.errors[0];
                         const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: errorMessage };
@@ -176,50 +166,52 @@ export function useSchemaForm<
                         store.updateFieldState(path, patch);
                     }
                 } catch {
-                    // If getErrorsFor fails for this descriptor, fall back to path-based matching
+                    // If getErrorsFor fails for this path, skip
                 }
             }
 
-            // Also fall back to errors array for any paths not covered by getErrorsFor
+            // Extract root-level errors from errors array
+            // (getErrorsFor((t) => t) does not surface root-level validator errors)
+            const rootErrs: string[] = [];
             if (!result.valid && result.errors) {
+                const fieldPathSet = new Set(pathMap.values());
                 for (const error of result.errors) {
-                    const p = error.path.startsWith('$.')
-                        ? error.path.slice(2)
-                        : error.path === '$'
-                          ? ''
-                          : error.path;
-                    if (p) {
-                        const currentState = store.getFieldState(p);
-                        // Only set if not already set by getErrorsFor
+                    const fieldPath = extractFieldPath(error.path);
+                    if (!fieldPath) {
+                        // Root-level error (not tied to any specific field)
+                        rootErrs.push(error.message);
+                    } else if (!fieldPathSet.has(fieldPath)) {
+                        // Error for a path not covered by getErrorsFor — set via path fallback
+                        const currentState = store.getFieldState(fieldPath);
                         if (!currentState.error) {
                             const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: error.message };
                             if (markTouched) {
                                 patch.touched = true;
                             }
-                            store.updateFieldState(p, patch);
+                            store.updateFieldState(fieldPath, patch);
                         }
                     }
                 }
             }
+            store.setRootErrors(rootErrs);
         } else {
             // No getErrorsFor available, fall back to path-based error matching
-            store.setRootErrors([]);
+            const rootErrs: string[] = [];
             if (!result.valid && result.errors) {
                 for (const error of result.errors) {
-                    const p = error.path.startsWith('$.')
-                        ? error.path.slice(2)
-                        : error.path === '$'
-                          ? ''
-                          : error.path;
-                    if (p) {
+                    const fieldPath = extractFieldPath(error.path);
+                    if (fieldPath) {
                         const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: error.message };
                         if (markTouched) {
                             patch.touched = true;
                         }
-                        store.updateFieldState(p, patch);
+                        store.updateFieldState(fieldPath, patch);
+                    } else {
+                        rootErrs.push(error.message);
                     }
                 }
             }
+            store.setRootErrors(rootErrs);
         }
 
         return result as ValidationResult<InferType<TSchema>>;

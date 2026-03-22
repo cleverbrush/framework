@@ -58,3 +58,46 @@ export function getSchemaType(schema: SchemaBuilder<any, any>): string {
     const introspected = schema.introspect();
     return introspected?.type ?? 'unknown';
 }
+
+/**
+ * Builds a selector function from a dot-separated path string.
+ * The selector traverses the PropertyDescriptorTree by property access.
+ * Example: "customer.address.city" → (tree) => tree.customer.address.city
+ */
+export function buildSelectorFromPath(path: string): (tree: any) => any {
+    const parts = path.split('.');
+    return (tree: any) => {
+        let current = tree;
+        for (const part of parts) {
+            current = current[part];
+        }
+        return current;
+    };
+}
+
+/**
+ * Extracts the field path from a schema validation error path.
+ * Schema error paths look like:
+ *   "$.email"           → "email"
+ *   "$.email($validators[0])" → "email"
+ *   "$.customer.address.city" → "customer.address.city"
+ *   "$($validators[0])" → "" (root-level error)
+ *   "$"                 → "" (root-level error)
+ *
+ * Returns the dot-separated field path, or empty string for root errors.
+ */
+export function extractFieldPath(errorPath: string): string {
+    let p = errorPath;
+
+    // Strip leading "$." or "$"
+    if (p.startsWith('$.')) {
+        p = p.slice(2);
+    } else if (p.startsWith('$')) {
+        p = p.slice(1);
+    }
+
+    // Strip validator suffix like "($validators[0])" or "($validators[0] (name))"
+    p = p.replace(/\(\$validators\[\d+\](?:\s*\([^)]*\))?\)\s*$/, '');
+
+    return p;
+}
