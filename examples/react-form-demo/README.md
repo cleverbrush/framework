@@ -36,6 +36,17 @@ npm run build
 npm run preview
 ```
 
+## Docker
+
+Build and run with Docker from the **repository root** (the build context needs access to `libs/`):
+
+```bash
+docker build -f examples/react-form-demo/Dockerfile -t react-form-demo .
+docker run -p 8080:80 react-form-demo
+```
+
+The app will be available at `http://localhost:8080`.
+
 ## Prerequisites
 
 The `@cleverbrush/schema` and `@cleverbrush/react-form` packages must be built first:
