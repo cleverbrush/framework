@@ -9,6 +9,8 @@ export function createFormStore(initialValues: any) {
     const fieldStates = new Map<string, FieldState>();
     const listeners = new Map<string, Set<() => void>>();
     const globalListeners = new Set<() => void>();
+    let rootErrors: ReadonlyArray<string> = [];
+    const rootErrorListeners = new Set<() => void>();
 
     function ensureFieldState(path: string): FieldState {
         if (!fieldStates.has(path)) {
@@ -53,6 +55,7 @@ export function createFormStore(initialValues: any) {
         for (const listener of globalListeners) {
             listener();
         }
+        notifyRootErrors();
     }
 
     function subscribe(path: string, listener: () => void): () => void {
@@ -83,11 +86,34 @@ export function createFormStore(initialValues: any) {
     function resetAll(newInitialValues?: any) {
         values = newInitialValues != null ? { ...newInitialValues } : {};
         fieldStates.clear();
+        rootErrors = [];
         notifyAll();
     }
 
     function getAllFieldPaths(): string[] {
         return Array.from(fieldStates.keys());
+    }
+
+    function getRootErrors(): ReadonlyArray<string> {
+        return rootErrors;
+    }
+
+    function setRootErrors(errors: ReadonlyArray<string>) {
+        rootErrors = errors;
+        notifyRootErrors();
+    }
+
+    function notifyRootErrors() {
+        for (const listener of rootErrorListeners) {
+            listener();
+        }
+    }
+
+    function subscribeRootErrors(listener: () => void): () => void {
+        rootErrorListeners.add(listener);
+        return () => {
+            rootErrorListeners.delete(listener);
+        };
     }
 
     return {
@@ -99,7 +125,10 @@ export function createFormStore(initialValues: any) {
         setValues,
         resetAll,
         notifyAll,
-        getAllFieldPaths
+        getAllFieldPaths,
+        getRootErrors,
+        setRootErrors,
+        subscribeRootErrors
     };
 }
 

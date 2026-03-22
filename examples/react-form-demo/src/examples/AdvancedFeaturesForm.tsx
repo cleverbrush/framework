@@ -7,7 +7,7 @@ import {
     Field
 } from '@cleverbrush/react-form';
 import type { FieldRenderProps } from '@cleverbrush/react-form';
-import { htmlRenderers } from '../renderers';
+import { htmlRenderers, ValidationSummary } from '../renderers';
 
 /**
  * Example 5: FormProvider & Nested Provider Override
@@ -16,6 +16,8 @@ import { htmlRenderers } from '../renderers';
  * - FormProvider for context-based useField()
  * - Nested FormSystemProvider overriding a specific renderer
  * - Custom renderer passed via explicit renderer prop
+ * - Validation on every field change
+ * - Root-level validation summary
  */
 
 const FeedbackSchema = object({
@@ -72,19 +74,18 @@ const textareaRenderer = ({
     value,
     onChange,
     onBlur,
-    error,
-    touched
+    error
 }: FieldRenderProps) => (
     <div className="field">
         <textarea
             value={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
-            className={`custom-textarea ${touched && error ? 'input-error' : ''}`}
+            className={`custom-textarea ${error ? 'input-error' : ''}`}
             rows={4}
             placeholder="Write your message here..."
         />
-        {touched && error && <span className="error">{error}</span>}
+        {error && <span className="error">{error}</span>}
     </div>
 );
 
@@ -97,7 +98,6 @@ const fancyStringRenderer = ({
     onChange,
     onBlur,
     error,
-    touched,
     dirty
 }: FieldRenderProps) => (
     <div className="field fancy-field">
@@ -106,10 +106,10 @@ const fancyStringRenderer = ({
             value={value ?? ''}
             onChange={(e) => onChange(e.target.value)}
             onBlur={onBlur}
-            className={touched && error ? 'input-error' : ''}
+            className={error ? 'input-error' : ''}
         />
         {dirty && <span className="dirty-indicator">✏️</span>}
-        {touched && error && <span className="error">{error}</span>}
+        {error && <span className="error">{error}</span>}
     </div>
 );
 
@@ -129,10 +129,10 @@ function NameFieldViaContext() {
                     value={name.value ?? ''}
                     onChange={(e) => name.onChange(e.target.value)}
                     onBlur={name.onBlur}
-                    className={name.touched && name.error ? 'input-error' : ''}
+                    className={name.error ? 'input-error' : ''}
                     placeholder="Your name (from useField context)"
                 />
-                {name.touched && name.error && (
+                {name.error && (
                     <span className="error">{name.error}</span>
                 )}
             </div>
@@ -158,8 +158,11 @@ export function AdvancedFeaturesForm() {
                 <h2>5. Advanced Features</h2>
                 <p className="description">
                     Shows FormProvider context, nested provider overrides,
-                    and custom explicit renderers.
+                    and custom explicit renderers. Validation runs on every
+                    field change.
                 </p>
+
+                <ValidationSummary rootErrors={form.rootErrors} />
 
                 <div className="form-grid">
                     {/* Section 1: FormProvider — useField via context */}

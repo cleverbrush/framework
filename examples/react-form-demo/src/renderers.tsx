@@ -3,6 +3,7 @@ import { FieldRenderProps } from '@cleverbrush/react-form';
 /**
  * Plain HTML renderers for each schema type.
  * These map schema types (string, number, boolean) to React components.
+ * Errors are displayed immediately when present (validation runs on every change).
  */
 export const htmlRenderers: Record<
     string,
@@ -13,7 +14,6 @@ export const htmlRenderers: Record<
         onChange,
         onBlur,
         error,
-        touched,
         dirty
     }: FieldRenderProps) => (
         <div className="field">
@@ -22,10 +22,10 @@ export const htmlRenderers: Record<
                 value={value ?? ''}
                 onChange={(e) => onChange(e.target.value)}
                 onBlur={onBlur}
-                className={touched && error ? 'input-error' : ''}
+                className={error ? 'input-error' : ''}
             />
             {dirty && <span className="dirty-indicator">*</span>}
-            {touched && error && <span className="error">{error}</span>}
+            {error && <span className="error">{error}</span>}
         </div>
     ),
 
@@ -34,7 +34,6 @@ export const htmlRenderers: Record<
         onChange,
         onBlur,
         error,
-        touched,
         dirty
     }: FieldRenderProps) => (
         <div className="field">
@@ -47,10 +46,10 @@ export const htmlRenderers: Record<
                     )
                 }
                 onBlur={onBlur}
-                className={touched && error ? 'input-error' : ''}
+                className={error ? 'input-error' : ''}
             />
             {dirty && <span className="dirty-indicator">*</span>}
-            {touched && error && <span className="error">{error}</span>}
+            {error && <span className="error">{error}</span>}
         </div>
     ),
 
@@ -65,3 +64,26 @@ export const htmlRenderers: Record<
         </div>
     )
 };
+
+/**
+ * Validation Summary component — displays root-level schema errors
+ * that are not associated with specific fields.
+ */
+export function ValidationSummary({
+    rootErrors
+}: {
+    rootErrors: ReadonlyArray<string>;
+}) {
+    if (rootErrors.length === 0) return null;
+
+    return (
+        <div className="validation-summary">
+            <strong>Validation Errors:</strong>
+            <ul>
+                {rootErrors.map((err, i) => (
+                    <li key={i}>{err}</li>
+                ))}
+            </ul>
+        </div>
+    );
+}

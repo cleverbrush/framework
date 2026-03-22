@@ -1,5 +1,6 @@
 import { object, string, number } from '@cleverbrush/schema';
 import { useSchemaForm } from '@cleverbrush/react-form';
+import { ValidationSummary } from '../renderers';
 
 /**
  * Example 4: Headless Form (useField)
@@ -9,6 +10,8 @@ import { useSchemaForm } from '@cleverbrush/react-form';
  * - Full control over rendering — no renderer registry needed
  * - Field state: value, dirty, touched, error
  * - Programmatic setValue() and getValue()
+ * - Validation runs on every field change — errors appear as you type
+ * - Root-level validation summary
  */
 
 const ProfileSchema = object({
@@ -89,7 +92,10 @@ export function HeadlessForm() {
                 No <code>&lt;Field&gt;</code> component, no{' '}
                 <code>FormSystemProvider</code>. Uses{' '}
                 <code>form.useField()</code> for full rendering control.
+                Validation runs on every field change.
             </p>
+
+            <ValidationSummary rootErrors={form.rootErrors} />
 
             <div className="form-grid">
                 <label>
@@ -104,7 +110,7 @@ export function HeadlessForm() {
                             }
                             onBlur={displayName.onBlur}
                             className={
-                                displayName.touched && displayName.error
+                                displayName.error
                                     ? 'input-error'
                                     : ''
                             }
@@ -113,7 +119,7 @@ export function HeadlessForm() {
                         {displayName.dirty && (
                             <span className="dirty-indicator">*</span>
                         )}
-                        {displayName.touched && displayName.error && (
+                        {displayName.error && (
                             <span className="error">{displayName.error}</span>
                         )}
                     </div>
@@ -127,7 +133,7 @@ export function HeadlessForm() {
                             onChange={(e) => bio.onChange(e.target.value)}
                             onBlur={bio.onBlur}
                             className={
-                                bio.touched && bio.error ? 'input-error' : ''
+                                bio.error ? 'input-error' : ''
                             }
                             placeholder="Tell us about yourself"
                             rows={3}
@@ -135,7 +141,7 @@ export function HeadlessForm() {
                         {bio.dirty && (
                             <span className="dirty-indicator">*</span>
                         )}
-                        {bio.touched && bio.error && (
+                        {bio.error && (
                             <span className="error">{bio.error}</span>
                         )}
                         <small className="char-count">
@@ -153,7 +159,7 @@ export function HeadlessForm() {
                             onChange={(e) => website.onChange(e.target.value)}
                             onBlur={website.onBlur}
                             className={
-                                website.touched && website.error
+                                website.error
                                     ? 'input-error'
                                     : ''
                             }
@@ -162,7 +168,7 @@ export function HeadlessForm() {
                         {website.dirty && (
                             <span className="dirty-indicator">*</span>
                         )}
-                        {website.touched && website.error && (
+                        {website.error && (
                             <span className="error">{website.error}</span>
                         )}
                     </div>

@@ -4,7 +4,7 @@ import {
     Field,
     FormSystemProvider
 } from '@cleverbrush/react-form';
-import { htmlRenderers } from '../renderers';
+import { htmlRenderers, ValidationSummary } from '../renderers';
 
 /**
  * Example 3: Nested Object Schema
@@ -14,6 +14,8 @@ import { htmlRenderers } from '../renderers';
  * - PropertyDescriptor selectors traversing nested paths: t => t.user.address.city
  * - createMissingStructure option (auto-creates parent objects)
  * - getValue() to inspect full form state
+ * - Validation on every field change with getErrorsFor
+ * - Root-level validation summary
  */
 
 const OrderSchema = object({
@@ -119,8 +121,11 @@ export function NestedObjectForm() {
                 <p className="description">
                     Deeply nested schemas: customer → address → city/zip.
                     Selectors traverse the full path:{' '}
-                    <code>{'t => t.customer.address.city'}</code>
+                    <code>{'t => t.customer.address.city'}</code>.
+                    Validation runs on every field change.
                 </p>
+
+                <ValidationSummary rootErrors={form.rootErrors} />
 
                 <div className="form-grid">
                     <h3>Customer Info</h3>

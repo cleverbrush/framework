@@ -40,6 +40,8 @@ export type SchemaFormInstance<
     reset: (values?: Partial<InferType<TSchema>>) => void;
     getValue: () => InferType<TSchema>;
     setValue: (values: Partial<InferType<TSchema>>) => void;
+    /** Root-level schema validation errors (not associated with specific fields) */
+    rootErrors: ReadonlyArray<string>;
     /** @internal — Used by FormProvider and Field to access internal context */
     _getFormContext: () => FormContextValue;
 };
@@ -102,47 +104,126 @@ export function useSchemaForm<
     const formContextRef = useRef(formContextValue);
     formContextRef.current = formContextValue;
 
-    const useFieldHook = useCallback(
-        <TPropertySchema extends SchemaBuilder<any, any>>(
-            selector: (
-                tree: PropertyDescriptorTree<TSchema, TSchema>
-            ) => PropertyDescriptor<TSchema, TPropertySchema, any>
-        ): UseFieldResult => {
-            return useFieldFromContext(formContextRef.current, selector);
-        },
-        []
-    );
+    // Subscribe to root errors for re-rendering
+    const [, setRootErrorTick] = useState(0);
+    useEffect(() => {
+        const unsub = store.subscribeRootErrors(() => {
+            setRootErrorTick((c) => c + 1);
+        });
+        return unsub;
+    }, [store]);
 
-    const validate = useCallback(async (): Promise<
+    /**
+     * Runs full schema validation using getErrorsFor to extract per-field errors.
+     * Optionally marks all fields as touched (used by submit/explicit validate).
+     */
+    const runValidation = useCallback(async (markTouched: boolean): Promise<
         ValidationResult<InferType<TSchema>>
     > => {
         const values = store.getValues();
-        const result = await schemaRef.current.validate(values, {
-            doNotStopOnFirstError: true
-        });
-
-        // Mark all registered fields as touched and clear errors
-        const allPaths = store.getAllFieldPaths();
-        for (const p of allPaths) {
-            store.updateFieldState(p, { error: undefined, touched: true });
+        let result: ValidationResult<InferType<TSchema>>;
+        try {
+            result = await schemaRef.current.validate(values, {
+                doNotStopOnFirstError: true
+            }) as ValidationResult<InferType<TSchema>>;
+        } catch {
+            // If validation itself throws (e.g., null values), treat as no errors
+            store.setRootErrors([]);
+            return { valid: false } as ValidationResult<InferType<TSchema>>;
         }
 
-        if (!result.valid && result.errors) {
-            for (const error of result.errors) {
-                // Convert error path from $.field.subfield to field.subfield
-                const p = error.path.startsWith('$.')
-                    ? error.path.slice(2)
-                    : error.path === '$'
-                      ? ''
-                      : error.path;
-                if (p) {
-                    store.updateFieldState(p, { error: error.message, touched: true });
+        // Clear all existing field errors
+        const allPaths = store.getAllFieldPaths();
+        for (const p of allPaths) {
+            const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: undefined };
+            if (markTouched) {
+                patch.touched = true;
+            }
+            store.updateFieldState(p, patch);
+        }
+
+        // Use getErrorsFor to extract per-field errors via descriptor selectors
+        const getErrorsFor = (result as any).getErrorsFor;
+        if (typeof getErrorsFor === 'function') {
+            // Get root-level errors (errors on the schema object itself)
+            const rootResult = getErrorsFor((t: any) => t);
+            const rootErrs: string[] = [];
+            if (rootResult && Array.isArray(rootResult.errors)) {
+                for (const err of rootResult.errors) {
+                    rootErrs.push(err);
+                }
+            }
+            store.setRootErrors(rootErrs);
+
+            // Extract per-field errors using the pathMap descriptors
+            for (const [inner, path] of pathMap) {
+                try {
+                    // Build a selector that returns the descriptor for this path
+                    const descriptor = { [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: inner } as any;
+                    const fieldResult = getErrorsFor(() => descriptor);
+                    if (fieldResult && Array.isArray(fieldResult.errors) && fieldResult.errors.length > 0) {
+                        const errorMessage = fieldResult.errors[0];
+                        const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: errorMessage };
+                        if (markTouched) {
+                            patch.touched = true;
+                        }
+                        store.updateFieldState(path, patch);
+                    }
+                } catch {
+                    // If getErrorsFor fails for this descriptor, fall back to path-based matching
+                }
+            }
+
+            // Also fall back to errors array for any paths not covered by getErrorsFor
+            if (!result.valid && result.errors) {
+                for (const error of result.errors) {
+                    const p = error.path.startsWith('$.')
+                        ? error.path.slice(2)
+                        : error.path === '$'
+                          ? ''
+                          : error.path;
+                    if (p) {
+                        const currentState = store.getFieldState(p);
+                        // Only set if not already set by getErrorsFor
+                        if (!currentState.error) {
+                            const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: error.message };
+                            if (markTouched) {
+                                patch.touched = true;
+                            }
+                            store.updateFieldState(p, patch);
+                        }
+                    }
+                }
+            }
+        } else {
+            // No getErrorsFor available, fall back to path-based error matching
+            store.setRootErrors([]);
+            if (!result.valid && result.errors) {
+                for (const error of result.errors) {
+                    const p = error.path.startsWith('$.')
+                        ? error.path.slice(2)
+                        : error.path === '$'
+                          ? ''
+                          : error.path;
+                    if (p) {
+                        const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: error.message };
+                        if (markTouched) {
+                            patch.touched = true;
+                        }
+                        store.updateFieldState(p, patch);
+                    }
                 }
             }
         }
 
         return result as ValidationResult<InferType<TSchema>>;
-    }, [store]);
+    }, [store, pathMap]);
+
+    const validate = useCallback(async (): Promise<
+        ValidationResult<InferType<TSchema>>
+    > => {
+        return runValidation(true);
+    }, [runValidation]);
 
     const submit = useCallback(async (): Promise<
         ValidationResult<InferType<TSchema>>
@@ -177,6 +258,17 @@ export function useSchemaForm<
         []
     );
 
+    const useFieldHook = useCallback(
+        <TPropertySchema extends SchemaBuilder<any, any>>(
+            selector: (
+                tree: PropertyDescriptorTree<TSchema, TSchema>
+            ) => PropertyDescriptor<TSchema, TPropertySchema, any>
+        ): UseFieldResult => {
+            return useFieldFromContext(formContextRef.current, selector, runValidation);
+        },
+        [runValidation]
+    );
+
     return useMemo(
         () => ({
             useField: useFieldHook,
@@ -185,9 +277,11 @@ export function useSchemaForm<
             reset,
             getValue,
             setValue: setValueFn,
+            rootErrors: store.getRootErrors(),
             _getFormContext
         }),
-        [useFieldHook, submit, validate, reset, getValue, setValueFn, _getFormContext]
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [useFieldHook, submit, validate, reset, getValue, setValueFn, _getFormContext, store.getRootErrors()]
     );
 }
 
@@ -203,7 +297,8 @@ export function useFieldFromContext<
     formContext: FormContextValue,
     selector: (
         tree: PropertyDescriptorTree<TSchema, TSchema>
-    ) => PropertyDescriptor<TSchema, TPropertySchema, any>
+    ) => PropertyDescriptor<TSchema, TPropertySchema, any>,
+    triggerValidation?: (markTouched: boolean) => Promise<any>
 ): UseFieldResult {
     const { store, descriptorTree, options, pathMap } = formContext;
 
@@ -251,8 +346,12 @@ export function useFieldFromContext<
                 value,
                 dirty: value !== currentState.initialValue
             });
+            // Run validation on every field change (without marking all fields touched)
+            if (triggerValidation) {
+                triggerValidation(false);
+            }
         },
-        [store, inner, path, options]
+        [store, inner, path, options, triggerValidation]
     );
 
     const onBlur = useCallback(() => {
