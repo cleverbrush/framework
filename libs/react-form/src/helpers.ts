@@ -77,6 +77,20 @@ export function buildSelectorFromPath(path: string): (tree: any) => any {
 }
 
 /**
+ * Checks whether a validation error path matches a field's expected error path.
+ * Matches exact path, path with nested suffix, or path with validator suffix.
+ * Example: isErrorPathMatch("$.user.name", "$.user.name") → true
+ *          isErrorPathMatch("$.user.name($validators[0])", "$.user.name") → true
+ */
+export function isErrorPathMatch(errPath: string, fieldErrorPath: string): boolean {
+    return (
+        errPath === fieldErrorPath ||
+        errPath.startsWith(fieldErrorPath + '.') ||
+        errPath.startsWith(fieldErrorPath + '(')
+    );
+}
+
+/**
  * Ensures all nested object structures exist in the values object
  * by traversing the schema and creating empty objects where needed.
  * This prevents ObjectSchemaBuilder.validate() from throwing when

@@ -20,7 +20,7 @@ import type {
     FormSystemConfig,
     FieldRenderer
 } from './types.js';
-import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath, ensureNestedStructure } from './helpers.js';
+import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath, ensureNestedStructure, isErrorPathMatch } from './helpers.js';
 
 // ─── SchemaFormInstance ──────────────────────────────────────────────────────
 
@@ -176,9 +176,7 @@ export function useSchemaForm<
                 if (fieldsWithErrors.has(path)) continue;
                 const errorPath = `$.${path}`;
                 for (const err of resultWithErrors.errors) {
-                    const errPath = err.path ?? '';
-                    // Match exact path or path with validator suffix like ($validators[0])
-                    if (errPath === errorPath || errPath.startsWith(errorPath + '.') || errPath.startsWith(errorPath + '(')) {
+                    if (isErrorPathMatch(err.path ?? '', errorPath)) {
                         const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: err.message };
                         if (markTouched) {
                             patch.touched = true;
