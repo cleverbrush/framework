@@ -121,10 +121,10 @@ export function useSchemaForm<
             doNotStopOnFirstError: true
         });
 
-        // Clear all existing errors first
+        // Mark all registered fields as touched and clear errors
         const allPaths = store.getAllFieldPaths();
         for (const p of allPaths) {
-            store.updateFieldState(p, { error: undefined });
+            store.updateFieldState(p, { error: undefined, touched: true });
         }
 
         if (!result.valid && result.errors) {
@@ -136,7 +136,7 @@ export function useSchemaForm<
                       ? ''
                       : error.path;
                 if (p) {
-                    store.updateFieldState(p, { error: error.message });
+                    store.updateFieldState(p, { error: error.message, touched: true });
                 }
             }
         }

@@ -920,25 +920,19 @@ describe('integration', () => {
         const { container, unmount } = render(React.createElement(App));
 
         // Validate with empty required field — should produce validation error
+        // validate() marks all fields as touched so errors display immediately
         await act(async () => {
             await formResult.current.validate();
         });
 
-        // The error is set on the field, but field is not yet touched so renderer doesn't show it
-        // Touch the field to trigger error display
-        act(() => {
-            const input = container.querySelector('input');
-            input?.dispatchEvent(new Event('blur', { bubbles: true }));
-        });
-
-        // Re-render picks up the error + touched state
-        const { container: container2, unmount: unmount2 } = render(React.createElement(App));
+        // After validate, field is touched and error is set — renderer shows the error
+        const errorSpan = container.querySelector('.error');
+        expect(errorSpan).not.toBeNull();
 
         // Error message from schema validation is available to the renderer
         const nameState = formResult.current.getValue();
         expect(nameState.name).toBeUndefined(); // name was never set
 
         unmount();
-        unmount2();
     });
 });
