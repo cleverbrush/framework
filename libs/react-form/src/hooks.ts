@@ -25,7 +25,8 @@ import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelector
 // ─── SchemaFormInstance ──────────────────────────────────────────────────────
 
 /**
- * Return type for useSchemaForm.
+ * Return type for useSchemaForm — fully typed for IntelliSense.
+ * The `useField` method infers the field value type from the schema via PropertyDescriptor.
  */
 export type SchemaFormInstance<
     TSchema extends ObjectSchemaBuilder<any, any, any>
@@ -34,7 +35,7 @@ export type SchemaFormInstance<
         selector: (
             tree: PropertyDescriptorTree<TSchema, TSchema>
         ) => PropertyDescriptor<TSchema, TPropertySchema, any>
-    ) => UseFieldResult;
+    ) => UseFieldResult<InferType<TPropertySchema>>;
     submit: () => Promise<ValidationResult<InferType<TSchema>>>;
     validate: () => Promise<ValidationResult<InferType<TSchema>>>;
     reset: (values?: Partial<InferType<TSchema>>) => void;
@@ -206,8 +207,8 @@ export function useSchemaForm<
             selector: (
                 tree: PropertyDescriptorTree<TSchema, TSchema>
             ) => PropertyDescriptor<TSchema, TPropertySchema, any>
-        ): UseFieldResult => {
-            return useFieldFromContext(formContextRef.current, selector, runValidation);
+        ): UseFieldResult<InferType<TPropertySchema>> => {
+            return useFieldFromContext(formContextRef.current, selector, runValidation) as UseFieldResult<InferType<TPropertySchema>>;
         },
         [runValidation]
     );
@@ -230,15 +231,11 @@ export function useSchemaForm<
 
 /**
  * Internal useField implementation, requires FormContextValue.
+ * Returns UseFieldResult with untyped values — callers should cast to the proper generic type.
  */
-export function useFieldFromContext<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertySchema extends SchemaBuilder<any, any>
->(
+export function useFieldFromContext(
     formContext: FormContextValue,
-    selector: (
-        tree: PropertyDescriptorTree<TSchema, TSchema>
-    ) => PropertyDescriptor<TSchema, TPropertySchema, any>,
+    selector: (tree: any) => any,
     triggerValidation?: (markTouched: boolean) => Promise<any>
 ): UseFieldResult {
     const { store, descriptorTree, options, pathMap } = formContext;

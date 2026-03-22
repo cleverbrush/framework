@@ -6,7 +6,8 @@ import type {
     ObjectSchemaBuilder,
     PropertyDescriptorTree,
     PropertyDescriptor,
-    SchemaBuilder
+    SchemaBuilder,
+    InferType
 } from '@cleverbrush/schema';
 import type { SchemaFormInstance } from './hooks.js';
 import { useFieldFromContext, resolveRenderer } from './hooks.js';
@@ -100,15 +101,22 @@ export function FormProvider<
 
 /**
  * Context-based useField — can be used inside a FormProvider.
+ * For best IntelliSense, prefer `form.useField()` which infers field types from the schema.
+ * When using this context-based version, specify the schema type explicitly:
+ *
+ * @example
+ * ```tsx
+ * const name = useField<typeof MySchema>((t) => t.name);
+ * ```
  */
 export function useField<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertySchema extends SchemaBuilder<any, any>
+    TPropertySchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
 >(
     selector: (
         tree: PropertyDescriptorTree<TSchema, TSchema>
     ) => PropertyDescriptor<TSchema, TPropertySchema, any>
-): UseFieldResult {
+): UseFieldResult<InferType<TPropertySchema>> {
     const formContext = useContext(FormContext);
     if (!formContext) {
         throw new Error(
@@ -116,7 +124,7 @@ export function useField<
                 'Wrap your component tree with <FormProvider form={form}>.'
         );
     }
-    return useFieldFromContext(formContext, selector);
+    return useFieldFromContext(formContext, selector) as UseFieldResult<InferType<TPropertySchema>>;
 }
 
 // ─── useFormSystem ───────────────────────────────────────────────────────────
@@ -137,7 +145,7 @@ export function useFormSystem(): FormSystemConfig {
 // ─── Field Component ─────────────────────────────────────────────────────────
 
 export type FieldProps<
-    TSchema extends ObjectSchemaBuilder<any, any, any> = any
+    TSchema extends ObjectSchemaBuilder<any, any, any>
 > = {
     selector: (
         tree: PropertyDescriptorTree<TSchema, TSchema>

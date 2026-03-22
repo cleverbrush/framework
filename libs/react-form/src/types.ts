@@ -1,4 +1,4 @@
-import type { SchemaBuilder } from '@cleverbrush/schema';
+import type { SchemaBuilder, InferType } from '@cleverbrush/schema';
 import type { ReactNode } from 'react';
 
 /**
@@ -42,12 +42,19 @@ export type FieldState = {
 };
 
 /**
- * Return type for useField.
+ * Return type for useField — strongly typed with the inferred property value type.
+ * When the value type cannot be inferred, falls back to `any`.
  */
-export type UseFieldResult = FieldState & {
-    onChange: (value: any) => void;
+export type UseFieldResult<T = any> = {
+    value: T | undefined;
+    initialValue: T | undefined;
+    dirty: boolean;
+    touched: boolean;
+    error: string | undefined;
+    validating: boolean;
+    onChange: (value: T) => void;
     onBlur: () => void;
-    setValue: (value: any) => void;
+    setValue: (value: T) => void;
     schema: SchemaBuilder<any, any>;
 };
 
