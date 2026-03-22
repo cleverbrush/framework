@@ -966,3 +966,69 @@ describe('buildSelectorFromPath', () => {
         expect(selector(tree)).toBeUndefined();
     });
 });
+
+// ─── ensureNestedStructure tests ─────────────────────────────────────────────
+
+import { ensureNestedStructure } from './helpers.js';
+
+describe('ensureNestedStructure', () => {
+    test('creates empty nested objects from schema', () => {
+        const result = ensureNestedStructure({}, NestedSchema);
+        expect(result).toEqual({ user: { address: {} } });
+    });
+
+    test('preserves existing values', () => {
+        const result = ensureNestedStructure(
+            { user: { name: 'John', address: { city: 'NYC' } } },
+            NestedSchema
+        );
+        expect(result).toEqual({ user: { name: 'John', address: { city: 'NYC' } } });
+    });
+
+    test('fills in missing nested objects without overwriting', () => {
+        const result = ensureNestedStructure(
+            { user: { name: 'John' } },
+            NestedSchema
+        );
+        expect(result).toEqual({ user: { name: 'John', address: {} } });
+    });
+
+    test('handles null/undefined values', () => {
+        expect(ensureNestedStructure(null, NestedSchema)).toEqual({ user: { address: {} } });
+        expect(ensureNestedStructure(undefined, NestedSchema)).toEqual({ user: { address: {} } });
+    });
+});
+
+// ─── Nested validation integration test ──────────────────────────────────────
+
+describe('nested form validation', () => {
+    test('validate() returns errors for deeply nested fields', async () => {
+        const { result } = renderHook(() => useSchemaForm(NestedSchema));
+
+        let validationResult: any;
+        await act(async () => {
+            validationResult = await result.current.validate();
+        });
+
+        expect(validationResult.valid).toBe(false);
+    });
+
+    test('nested fields show errors after validate', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(NestedSchema);
+            const city = form.useField((t) => t.user.address.city);
+            const zip = form.useField((t) => t.user.address.zip);
+            const name = form.useField((t) => t.user.name);
+            return { form, city, zip, name };
+        });
+
+        await act(async () => {
+            await result.current.form.validate();
+        });
+
+        // All nested fields should have errors after validation
+        expect(result.current.name.error).toBeTruthy();
+        expect(result.current.city.error).toBeTruthy();
+        expect(result.current.zip.error).toBeTruthy();
+    });
+});

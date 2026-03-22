@@ -75,3 +75,29 @@ export function buildSelectorFromPath(path: string): (tree: any) => any {
         return current;
     };
 }
+
+/**
+ * Ensures all nested object structures exist in the values object
+ * by traversing the schema and creating empty objects where needed.
+ * This prevents ObjectSchemaBuilder.validate() from throwing when
+ * nested object properties are undefined.
+ *
+ * Example: ensureNestedStructure({}, OrderSchema)
+ *   → { customer: { address: {} } }
+ */
+export function ensureNestedStructure(
+    values: any,
+    schema: ObjectSchemaBuilder<any, any, any>
+): any {
+    const introspected = schema.introspect();
+    if (!introspected.properties) return values != null ? values : {};
+
+    const result = values != null ? { ...values } : {};
+    for (const key of Object.keys(introspected.properties)) {
+        const propSchema = introspected.properties[key];
+        if (propSchema instanceof ObjectSchemaBuilder) {
+            result[key] = ensureNestedStructure(result[key], propSchema);
+        }
+    }
+    return result;
+}

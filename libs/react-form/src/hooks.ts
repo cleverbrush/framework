@@ -20,7 +20,7 @@ import type {
     FormSystemConfig,
     FieldRenderer
 } from './types.js';
-import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath } from './helpers.js';
+import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath, ensureNestedStructure } from './helpers.js';
 
 // ─── SchemaFormInstance ──────────────────────────────────────────────────────
 
@@ -111,13 +111,16 @@ export function useSchemaForm<
         ValidationResult<InferType<TSchema>>
     > => {
         const values = store.getValues();
+        // Ensure all nested object structures exist to prevent
+        // ObjectSchemaBuilder.validate() from throwing on undefined nested objects
+        const safeValues = ensureNestedStructure(values, schemaRef.current);
         let result: ValidationResult<InferType<TSchema>>;
         try {
-            result = await schemaRef.current.validate(values, {
+            result = await schemaRef.current.validate(safeValues, {
                 doNotStopOnFirstError: true
             }) as ValidationResult<InferType<TSchema>>;
         } catch {
-            // If validation itself throws (e.g., null values), treat as no errors
+            // If validation itself throws, treat as no errors
             return { valid: false } as ValidationResult<InferType<TSchema>>;
         }
 
@@ -137,7 +140,12 @@ export function useSchemaForm<
                 errors: ReadonlyArray<string>;
                 isValid: boolean;
             };
+            errors?: ReadonlyArray<{ message: string; path?: string }>;
         };
+        
+        // Build a map of errors found via getErrorsFor so we can detect gaps
+        const fieldsWithErrors = new Set<string>();
+        
         if (typeof resultWithErrors.getErrorsFor === 'function') {
             const getErrorsFor = resultWithErrors.getErrorsFor;
 
@@ -153,9 +161,32 @@ export function useSchemaForm<
                             patch.touched = true;
                         }
                         store.updateFieldState(path, patch);
+                        fieldsWithErrors.add(path);
                     }
                 } catch {
-                    // If getErrorsFor fails for this path, skip
+                    // If getErrorsFor fails for this path, skip — fallback below will handle it
+                }
+            }
+        }
+
+        // Fallback: for fields not covered by getErrorsFor (e.g., deeply nested fields
+        // where getErrorsFor has a known issue), match errors by path from result.errors
+        if (Array.isArray(resultWithErrors.errors)) {
+            for (const [, path] of pathMap) {
+                if (fieldsWithErrors.has(path)) continue;
+                const errorPath = `$.${path}`;
+                for (const err of resultWithErrors.errors) {
+                    const errPath = err.path ?? '';
+                    // Match exact path or path with validator suffix like ($validators[0])
+                    if (errPath === errorPath || errPath.startsWith(errorPath + '.') || errPath.startsWith(errorPath + '(')) {
+                        const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: err.message };
+                        if (markTouched) {
+                            patch.touched = true;
+                        }
+                        store.updateFieldState(path, patch);
+                        fieldsWithErrors.add(path);
+                        break;
+                    }
                 }
             }
         }
