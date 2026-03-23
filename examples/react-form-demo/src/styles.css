@@ -552,6 +552,12 @@ pre code {
     }
 
     .navbar-links {
-        display: none;
+        gap: 0.5rem;
+        overflow-x: auto;
+    }
+
+    .navbar-links a {
+        font-size: 0.8rem;
+        white-space: nowrap;
     }
 }
