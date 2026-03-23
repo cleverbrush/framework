@@ -151,6 +151,108 @@ export default function ReactFormPage() {
                     </p>
                 </div>
 
+                {/* ── Quick Start ──────────────────────────────────── */}
+                <div className="card">
+                    <h2>Quick Start</h2>
+                    <p>
+                        Define a schema, register renderers, create a form,
+                        and render fields — all type-safe:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
+import {
+  useSchemaForm, Field, FormSystemProvider
+} from '@cleverbrush/react-form';
+
+// 1. Define your schema (single source of truth)
+const ContactSchema = object({
+  name: string()
+    .required('Name is required')
+    .minLength(2, 'Name must be at least 2 characters')
+    .maxLength(100, 'Name must be at most 100 characters'),
+  email: string()
+    .required('Email is required')
+    .matches(
+      /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/,
+      'Please enter a valid email address'
+    ),
+  age: number()
+    .required('Age is required')
+    .min(18, 'Must be at least 18 years old')
+    .max(120, 'Must be at most 120')
+});
+
+// 2. Define renderers (map schema types to React components)
+const renderers = {
+  string: ({ value, onChange, onBlur, touched, error }) => (
+    <div>
+      <input
+        type="text"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
+      />
+      {touched && error && <span className="error">{error}</span>}
+    </div>
+  ),
+  number: ({ value, onChange, onBlur, touched, error }) => (
+    <div>
+      <input
+        type="number"
+        value={value ?? ''}
+        onChange={(e) => onChange(Number(e.target.value))}
+        onBlur={onBlur}
+      />
+      {touched && error && <span className="error">{error}</span>}
+    </div>
+  )
+};
+
+// 3. Create a form component
+function ContactForm() {
+  const form = useSchemaForm(ContactSchema);
+
+  const handleSubmit = async () => {
+    const result = await form.submit();
+    if (result.valid) {
+      console.log('Submitted:', result.object);
+    }
+  };
+
+  return (
+    <div>
+      <Field selector={(t) => t.name} form={form} />
+      <Field selector={(t) => t.email} form={form} />
+      <Field selector={(t) => t.age} form={form} />
+      <button onClick={handleSubmit}>Submit</button>
+    </div>
+  );
+}
+
+// 4. Wrap with FormSystemProvider at the app root
+function App() {
+  return (
+    <FormSystemProvider renderers={renderers}>
+      <ContactForm />
+    </FormSystemProvider>
+  );
+}`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Try it live</h3>
+                    <p>
+                        This is the exact form described above, rendered with
+                        <code> @cleverbrush/react-form</code>. Try submitting
+                        with empty fields, a short name, an invalid email, or
+                        an out-of-range age to see validation in action:
+                    </p>
+                    <QuickStartLiveDemo />
+                </div>
+
                 {/* ── Why ──────────────────────────────────────────── */}
                 <div className="why-box">
                     <h2>💡 Why @cleverbrush/react-form?</h2>
@@ -324,108 +426,6 @@ const { register } = useForm<User>();
                             </tbody>
                         </table>
                     </div>
-                </div>
-
-                {/* ── Quick Start ──────────────────────────────────── */}
-                <div className="card">
-                    <h2>Quick Start</h2>
-                    <p>
-                        Define a schema, register renderers, create a form,
-                        and render fields — all type-safe:
-                    </p>
-                    <pre>
-                        <code
-                            dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
-import {
-  useSchemaForm, Field, FormSystemProvider
-} from '@cleverbrush/react-form';
-
-// 1. Define your schema (single source of truth)
-const ContactSchema = object({
-  name: string()
-    .required('Name is required')
-    .minLength(2, 'Name must be at least 2 characters')
-    .maxLength(100, 'Name must be at most 100 characters'),
-  email: string()
-    .required('Email is required')
-    .matches(
-      /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/,
-      'Please enter a valid email address'
-    ),
-  age: number()
-    .required('Age is required')
-    .min(18, 'Must be at least 18 years old')
-    .max(120, 'Must be at most 120')
-});
-
-// 2. Define renderers (map schema types to React components)
-const renderers = {
-  string: ({ value, onChange, onBlur, touched, error }) => (
-    <div>
-      <input
-        type="text"
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-        onBlur={onBlur}
-      />
-      {touched && error && <span className="error">{error}</span>}
-    </div>
-  ),
-  number: ({ value, onChange, onBlur, touched, error }) => (
-    <div>
-      <input
-        type="number"
-        value={value ?? ''}
-        onChange={(e) => onChange(Number(e.target.value))}
-        onBlur={onBlur}
-      />
-      {touched && error && <span className="error">{error}</span>}
-    </div>
-  )
-};
-
-// 3. Create a form component
-function ContactForm() {
-  const form = useSchemaForm(ContactSchema);
-
-  const handleSubmit = async () => {
-    const result = await form.submit();
-    if (result.valid) {
-      console.log('Submitted:', result.object);
-    }
-  };
-
-  return (
-    <div>
-      <Field selector={(t) => t.name} form={form} />
-      <Field selector={(t) => t.email} form={form} />
-      <Field selector={(t) => t.age} form={form} />
-      <button onClick={handleSubmit}>Submit</button>
-    </div>
-  );
-}
-
-// 4. Wrap with FormSystemProvider at the app root
-function App() {
-  return (
-    <FormSystemProvider renderers={renderers}>
-      <ContactForm />
-    </FormSystemProvider>
-  );
-}`)
-                            }}
-                        />
-                    </pre>
-
-                    <h3>Try it live</h3>
-                    <p>
-                        This is the exact form described above, rendered with
-                        <code> @cleverbrush/react-form</code>. Try submitting
-                        with empty fields, a short name, an invalid email, or
-                        an out-of-range age to see validation in action:
-                    </p>
-                    <QuickStartLiveDemo />
                 </div>
 
                 {/* ── Registering Renderers ────────────────────────── */}
