@@ -27,8 +27,8 @@
         "url": "github:cleverbrush/framework"
     },
     "scripts": {
-        "watch": "tsc --watch",
-        "build": "tsc"
+        "watch": "tsc -p tsconfig.build.json --watch",
+        "build": "tsc -p tsconfig.build.json"
     },
     "type": "module",
     "types": "./dist/index.d.ts",

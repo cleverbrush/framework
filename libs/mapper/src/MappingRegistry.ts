@@ -188,7 +188,8 @@ type RegisteredSourceInferType<
           : never;
 
 /**
- * The InferType value acceptable for the `from()` setValue constraint.
+ * The InferType value acceptable for the `from()` setValue constraint
+ * (contravariant position).
  *
  * When no registration exists, this is the target property's InferType.
  * When a registration exists, this is the intersection of the target
@@ -205,6 +206,26 @@ type AcceptableFromValue<
     ? SchemaPropertyInferredType<TToSchema, TKey>
     : SchemaPropertyInferredType<TToSchema, TKey> &
           RegisteredSourceInferType<TToSchema, TKey, TRegistered>;
+
+/**
+ * The InferType value acceptable for the `from()` getValue constraint
+ * (covariant position).
+ *
+ * When no registration exists, this is the target property's InferType.
+ * When a registration exists, this is the union of the target property's
+ * InferType and the registered source's InferType. The union widens the
+ * constraint under covariance (getValue's return), allowing registered
+ * source schemas whose InferType differs from the target's.
+ */
+type AcceptableFromValueCovariant<
+    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TKey extends string,
+    TRegistered
+> = [RegisteredSourceInferType<TToSchema, TKey, TRegistered>] extends [never]
+    ? SchemaPropertyInferredType<TToSchema, TKey>
+    :
+          | SchemaPropertyInferredType<TToSchema, TKey>
+          | RegisteredSourceInferType<TToSchema, TKey, TRegistered>;
 
 // ── Mapper Result Type ────────────────────────────────────────────────
 
@@ -379,9 +400,10 @@ export class PropertyMappingBuilder<
      * inferred type is assignable to the target property type will
      * appear in the selector callback.
      *
-     * Under `strictFunctionTypes`, the `setValue` constraint provides
-     * bidirectional type checking via contravariance:
-     * - source schemas with extra properties are rejected unless registered
+     * Under `strictFunctionTypes`, the `setValue` and `getValue` constraints
+     * provide bidirectional type checking:
+     * - `setValue` contravariance rejects source schemas with extra properties
+     * - `getValue` covariance rejects source schemas with missing properties
      * - registered mappings widen the constraint via intersection
      */
     public from<
@@ -392,6 +414,14 @@ export class PropertyMappingBuilder<
                     obj: any,
                     value: AcceptableFromValue<TToSchema, TKey, TRegistered>
                 ) => any;
+                getValue: (obj: any) => {
+                    value?: AcceptableFromValueCovariant<
+                        TToSchema,
+                        TKey,
+                        TRegistered
+                    >;
+                    success: boolean;
+                };
             };
         }
     >(

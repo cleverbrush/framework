@@ -235,9 +235,7 @@ describe('Mapper', () => {
         >;
 
         // Map only one property
-        (mapper as any)
-            .for((t: any) => t.name)
-            .from((f: any) => f.name);
+        (mapper as any).for((t: any) => t.name).from((f: any) => f.name);
 
         try {
             (mapper as any).getMapper();
@@ -856,12 +854,12 @@ describe('Auto-mapping of nested schemas', () => {
     test('from type-errors without registered mapping for ObjectSchemaBuilder props with different InferTypes', () => {
         const AddressSchema = object({
             city: string(),
-            street: string(),
-            zipCode: string()
+            street: string()
         });
         const AddressDtoSchema = object({
             city: string(),
-            street: string()
+            street: string(),
+            zipCode: string()
         });
 
         const PersonSchema = object({
@@ -876,7 +874,7 @@ describe('Auto-mapping of nested schemas', () => {
 
         // Without registering AddressSchema→AddressDtoSchema,
         // from for address should produce a type error
-        // because InferTypes differ ({ city, street, zipCode } vs { city, street })
+        // because InferTypes differ ({ city, street } vs { city, street, zipCode })
         new MappingRegistry().configure(PersonSchema, PersonDtoSchema, (m) =>
             m
                 .for((t) => t.name)
@@ -1000,8 +998,7 @@ describe('Auto-mapping of nested schemas', () => {
         const registry = new MappingRegistry().configure(
             AddressSchema,
             AddressDtoSchema,
-            (m) =>
-                m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
+            (m) => m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
         );
 
         const mapFn = registry.getMapper(AddressSchema, AddressDtoSchema);
@@ -1027,9 +1024,7 @@ describe('Auto-mapping of nested schemas', () => {
                 AddressDtoSchema,
                 (m) =>
                     // @ts-expect-error - city2 is not mapped, and it can't be auto-mapped because there is no property with the same name and inferred type in AddressSchema
-                    m
-                        .for((t) => t.houseNr)
-                        .compute((f) => f.houseNr.toString())
+                    m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -1103,10 +1098,7 @@ describe('Auto-mapping of nested schemas', () => {
         const registry = new MappingRegistry().configure(
             schemaC,
             schemaD,
-            (m) =>
-                m
-                    .for((t) => t.oneMoreProp)
-                    .from((f) => f.anotherProp)
+            (m) => m.for((t) => t.oneMoreProp).from((f) => f.anotherProp)
         );
 
         const mapFn = registry.getMapper(schemaC, schemaD);
@@ -1393,12 +1385,9 @@ describe('Array mapping', () => {
         });
 
         expect(() =>
-            new MappingRegistry().configure(
-                SourceSchema,
-                TargetSchema,
-                (m) =>
-                    // @ts-expect-error - labels is not mapped
-                    m.for((t) => t.name).from((f) => f.name)
+            new MappingRegistry().configure(SourceSchema, TargetSchema, (m) =>
+                // @ts-expect-error - labels is not mapped
+                m.for((t) => t.name).from((f) => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -1481,9 +1470,7 @@ describe('Array mapping', () => {
 
         const registry = new MappingRegistry()
             .configure(SourceItemSchema, TargetItemSchema, (m) =>
-                m
-                    .for((t) => t.doubled)
-                    .compute(async (src) => src.value * 2)
+                m.for((t) => t.doubled).compute(async (src) => src.value * 2)
             )
             .configure(SourceSchema, TargetSchema, (m) =>
                 m.for((t) => t.data).from((f) => f.data)
@@ -1632,14 +1619,10 @@ describe('E-commerce: Product catalog mapping', () => {
                     )
             )
             .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
-                m
-                    .for((t) => t.label)
-                    .compute((v) => `${v.color} / ${v.size}`)
+                m.for((t) => t.label).compute((v) => `${v.color} / ${v.size}`)
             )
             .configure(ProductSchema, ProductListItemSchema, (m) =>
-                m
-                    .for((t) => t.categoryName)
-                    .from((f) => f.category.name)
+                m.for((t) => t.categoryName).from((f) => f.category.name)
             );
 
         const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
@@ -1697,14 +1680,10 @@ describe('E-commerce: Product catalog mapping', () => {
                     )
             )
             .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
-                m
-                    .for((t) => t.label)
-                    .compute((v) => `${v.color} / ${v.size}`)
+                m.for((t) => t.label).compute((v) => `${v.color} / ${v.size}`)
             )
             .configure(ProductSchema, ProductListItemSchema, (m) =>
-                m
-                    .for((t) => t.categoryName)
-                    .from((f) => f.category.name)
+                m.for((t) => t.categoryName).from((f) => f.category.name)
             );
 
         const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
@@ -1764,7 +1743,10 @@ describe('User management: Profile to public DTO', () => {
                     .compute((u) => `${u.address.city}, ${u.address.state}`)
         );
 
-        const mapFn = registry.getMapper(UserProfileSchema, PublicProfileSchema);
+        const mapFn = registry.getMapper(
+            UserProfileSchema,
+            PublicProfileSchema
+        );
         const result = await mapFn({
             id: 42,
             firstName: 'Jane',
@@ -2074,8 +2056,7 @@ describe('Invoice billing: Invoice to summary', () => {
                     .for((t) => t.totalAmount)
                     .compute((inv) =>
                         inv.lineItems.reduce(
-                            (sum, item) =>
-                                sum + item.quantity * item.unitPrice,
+                            (sum, item) => sum + item.quantity * item.unitPrice,
                             0
                         )
                     )
@@ -2134,8 +2115,7 @@ describe('Invoice billing: Invoice to summary', () => {
                     .for((t) => t.totalAmount)
                     .compute((inv) =>
                         inv.lineItems.reduce(
-                            (sum, item) =>
-                                sum + item.quantity * item.unitPrice,
+                            (sum, item) => sum + item.quantity * item.unitPrice,
                             0
                         )
                     )
@@ -2155,7 +2135,11 @@ describe('Invoice billing: Invoice to summary', () => {
                 address: '1 Corporate Blvd'
             },
             lineItems: [
-                { description: 'Monthly retainer', quantity: 1, unitPrice: 5000 }
+                {
+                    description: 'Monthly retainer',
+                    quantity: 1,
+                    unitPrice: 5000
+                }
             ],
             notes: ''
         });
@@ -2205,13 +2189,8 @@ describe('REST API: Weather response to domain model', () => {
 
     test('maps external API response to internal weather report', async () => {
         const registry = new MappingRegistry()
-            .configure(
-                ApiWeatherConditionSchema,
-                WeatherConditionSchema,
-                (m) =>
-                    m
-                        .for((t) => t.summary)
-                        .from((f) => f.main)
+            .configure(ApiWeatherConditionSchema, WeatherConditionSchema, (m) =>
+                m.for((t) => t.summary).from((f) => f.main)
             )
             .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
                 m
@@ -2266,13 +2245,8 @@ describe('REST API: Weather response to domain model', () => {
 
     test('maps API response with single weather condition', async () => {
         const registry = new MappingRegistry()
-            .configure(
-                ApiWeatherConditionSchema,
-                WeatherConditionSchema,
-                (m) =>
-                    m
-                        .for((t) => t.summary)
-                        .from((f) => f.main)
+            .configure(ApiWeatherConditionSchema, WeatherConditionSchema, (m) =>
+                m.for((t) => t.summary).from((f) => f.main)
             )
             .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
                 m
@@ -2464,9 +2438,7 @@ describe('Reservation system: Hotel booking mapping', () => {
             .configure(BookingSchema, BookingConfirmationSchema, (m) =>
                 m
                     .for((t) => t.nights)
-                    .compute((b) =>
-                        calcNights(b.checkInDate, b.checkOutDate)
-                    )
+                    .compute((b) => calcNights(b.checkInDate, b.checkOutDate))
                     .for((t) => t.totalCost)
                     .compute((b) => {
                         const nights = calcNights(
@@ -2530,9 +2502,7 @@ describe('Reservation system: Hotel booking mapping', () => {
             .configure(BookingSchema, BookingConfirmationSchema, (m) =>
                 m
                     .for((t) => t.nights)
-                    .compute((b) =>
-                        calcNights(b.checkInDate, b.checkOutDate)
-                    )
+                    .compute((b) => calcNights(b.checkInDate, b.checkOutDate))
                     .for((t) => t.totalCost)
                     .compute((b) => {
                         const nights = calcNights(
