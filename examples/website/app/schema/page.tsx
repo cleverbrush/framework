@@ -1,4 +1,4 @@
-import { highlightTS } from '../highlight';
+import { highlightTS } from '@/lib/highlight';
 
 export default function SchemaPage() {
     return (

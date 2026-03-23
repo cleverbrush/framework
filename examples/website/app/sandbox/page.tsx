@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, useCallback, useRef } from 'react';
 import * as Schema from '@cleverbrush/schema';
 import * as Mapper from '@cleverbrush/mapper';

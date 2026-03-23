@@ -1,3 +1,5 @@
+'use client';
+
 import { useState, type ReactNode } from 'react';
 import { object, string, number } from '@cleverbrush/schema';
 import {
@@ -6,7 +8,7 @@ import {
     FormSystemProvider
 } from '@cleverbrush/react-form';
 import type { FieldRenderProps } from '@cleverbrush/react-form';
-import { highlightTS } from '../highlight';
+import { highlightTS } from '@/lib/highlight';
 
 /* ── Live Quick-Start form ──────────────────────────────────────── */
 
