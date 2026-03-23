@@ -20,7 +20,7 @@ import { htmlRenderers } from '../renderers';
  */
 
 const ContactSchema = object({
-    firstName: string().minLength(1, 'First name is required'),
+    firstName: string().minLength(1, 'First name is required').required(),
     lastName: string().minLength(1, 'Last name is required'),
     email: string().addValidator(async (val) => {
         if (!val || typeof val !== 'string') {
