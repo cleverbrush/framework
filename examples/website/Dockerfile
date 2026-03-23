@@ -36,6 +36,7 @@ FROM node:22-alpine
 
 WORKDIR /app
 
+# Copy the self-contained Next.js server and its dependencies
 COPY --from=build /app/examples/website/.next/standalone ./
 COPY --from=build /app/examples/website/.next/static ./.next/static
 COPY --from=build /app/examples/website/public ./public
