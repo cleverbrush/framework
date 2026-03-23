@@ -14,7 +14,7 @@ npm install @cleverbrush/mapper
 
 ```typescript
 import { object, string, number } from '@cleverbrush/schema';
-import { MappingRegistry } from '@cleverbrush/mapper';
+import { mapper } from '@cleverbrush/mapper';
 
 const UserSchema = object({
     name: string(),
@@ -31,7 +31,7 @@ const UserDtoSchema = object({
     fullAddress: string()
 });
 
-const registry = new MappingRegistry().configure(
+const registry = mapper().configure(
     UserSchema,
     UserDtoSchema,
     (m) =>
@@ -63,7 +63,7 @@ The mapper enforces multiple layers of compile-time safety:
 Every target property must be either mapped, auto-mapped, or explicitly ignored. If you forget to map a property, TypeScript will produce a compile-time error on the `configure` callback return:
 
 ```typescript
-new MappingRegistry().configure(
+mapper().configure(
     UserSchema,
     UserDtoSchema,
     (m) =>
@@ -89,7 +89,7 @@ The error message shows the names of the unmapped properties directly in the typ
 const AddressSchema = object({ city: string(), houseNr: number() });
 const AddressDtoSchema = object({ city: string() });
 
-new MappingRegistry().configure(
+mapper().configure(
     AddressSchema,
     AddressDtoSchema,
     (m) => m.for((t) => t.city).from((f) => f.houseNr) // TS Error: source property type is
@@ -106,7 +106,7 @@ const PersonSchema = object({ name: string(), address: AddressSchema });
 const PersonDtoSchema = object({ name: string(), address: AddressDtoSchema });
 
 // Error — AddressSchema→AddressDtoSchema is not registered
-new MappingRegistry().configure(
+mapper().configure(
     PersonSchema,
     PersonDtoSchema,
     (m) =>
@@ -132,7 +132,7 @@ const SourceSchema = object({ city: string(), houseNr: number() });
 const TargetSchema = object({ city: string(), houseNr: string() });
 
 // Only houseNr needs explicit mapping — city is auto-mapped (string → string)
-const registry = new MappingRegistry().configure(
+const registry = mapper().configure(
     SourceSchema,
     TargetSchema,
     (m) => m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
@@ -152,7 +152,7 @@ const AddressDtoSchema = object({ city: string() });
 const PersonSchema = object({ name: string(), address: AddressSchema });
 const PersonDtoSchema = object({ name: string(), address: AddressDtoSchema });
 
-const registry = new MappingRegistry()
+const registry = mapper()
     // Register Address mapping first
     .configure(AddressSchema, AddressDtoSchema, (m) =>
         m.for((t) => t.city).from((f) => f.city)
@@ -180,7 +180,17 @@ const result = await mapFn({
 Central registry for storing and retrieving mappers. Each `configure` call returns a **new immutable registry** — the original is not modified.
 
 ```typescript
-const registry = new MappingRegistry();
+const registry = mapper();
+```
+
+### `mapper()`
+
+A convenience factory function that creates a new `MappingRegistry`. Equivalent to `new MappingRegistry()` but reads better in a fluent chain:
+
+```typescript
+const registry = mapper()
+    .configure(A, B, (m) => ...)
+    .configure(C, D, (m) => ...);
 ```
 
 #### `registry.configure(fromSchema, toSchema, fn)`

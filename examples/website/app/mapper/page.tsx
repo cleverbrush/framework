@@ -131,7 +131,7 @@ export default function MapperPage() {
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
-import { MappingRegistry } from '@cleverbrush/mapper';
+import { mapper } from '@cleverbrush/mapper';
 
 const ApiUser = object({
   first_name: string(),
@@ -145,7 +145,7 @@ const DomainUser = object({
 });
 
 // Configure the mapping — returns a new (immutable) registry
-const registry = new MappingRegistry()
+const registry = mapper()
   .configure(ApiUser, DomainUser, (m) =>
     m
       .for((t) => t.fullName)
@@ -155,10 +155,10 @@ const registry = new MappingRegistry()
   );
 
 // Get the mapper function
-const mapper = registry.getMapper(ApiUser, DomainUser);
+const mapFn = registry.getMapper(ApiUser, DomainUser);
 
 // Map an object
-const user = await mapper({
+const user = await mapFn({
   first_name: 'Jane',
   last_name:  'Doe',
   birth_year: 1995
@@ -188,7 +188,7 @@ const user = await mapper({
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const registry = new MappingRegistry()
+                                __html: highlightTS(`const registry = mapper()
   .configure(ApiUser, DomainUser, (m) =>
     m
       .for((t) => t.fullName)
@@ -267,7 +267,7 @@ const Target = object({
   ageGroup: string()     // different name → must be configured
 });
 
-const registry = new MappingRegistry()
+const registry = mapper()
   .configure(Source, Target, (m) =>
     m
       .for((t) => t.ageGroup)
@@ -292,16 +292,15 @@ const Source = object({ name: string(), address: SourceAddr });
 const Target = object({ name: string(), address: TargetAddr });
 
 // Register the nested mapping first
-let registry = new MappingRegistry()
+const registry = mapper()
   .configure(SourceAddr, TargetAddr, (m) =>
     m.for((t) => t.fullAddress)
       .compute((src) => src.line1 + ', ' + src.line2)
-  );
-
-// Now the parent mapping auto-applies the nested one
-registry = registry.configure(Source, Target, (m) =>
-  m // name is auto-mapped, address uses the registered nested mapping
-);`)
+  )
+  // Now the parent mapping auto-applies the nested one
+  .configure(Source, Target, (m) =>
+    m // name is auto-mapped, address uses the registered nested mapping
+  );`)
                             }}
                         />
                     </pre>
@@ -491,6 +490,18 @@ registry = registry.configure(Source, Target, (m) =>
                             <tbody>
                                 <tr>
                                     <td>
+                                        <code>mapper()</code>
+                                    </td>
+                                    <td>
+                                        Factory function that creates a new
+                                        MappingRegistry
+                                    </td>
+                                    <td>
+                                        <code>() =&gt; MappingRegistry</code>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>MappingRegistry</code>
                                     </td>
                                     <td>
@@ -498,7 +509,7 @@ registry = registry.configure(Source, Target, (m) =>
                                         schema-to-schema mappings
                                     </td>
                                     <td>
-                                        <code>new MappingRegistry()</code>
+                                        <code>mapper()</code>
                                     </td>
                                 </tr>
                                 <tr>

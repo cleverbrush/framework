@@ -93,8 +93,8 @@ const UserSchema = object({
 const result = await UserSchema.validate(someData);
 
 // 3. Use it for object mapping
-import { MappingRegistry } from '@cleverbrush/mapper';
-const registry = new MappingRegistry();
+import { mapper } from '@cleverbrush/mapper';
+const registry = mapper();
 // ... map between schemas
 
 // 4. Use it for React forms
