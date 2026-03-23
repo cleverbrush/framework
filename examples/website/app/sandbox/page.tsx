@@ -33,7 +33,7 @@ log('Errors:', JSON.stringify(bad.errors, null, 2));`,
 
     mapper: `// @cleverbrush/mapper — schema-to-schema mapping
 const { object, string, number } = Schema;
-const { MappingRegistry } = Mapper;
+const { mapper } = Mapper;
 
 const Source = object({
   firstName: string(),
@@ -46,7 +46,7 @@ const Dest = object({
   age:      number()
 });
 
-const registry = new MappingRegistry()
+const registry = mapper()
   .configure(Source, Dest, (m) =>
     m
       .for((t) => t.fullName)
@@ -55,8 +55,8 @@ const registry = new MappingRegistry()
         .compute((src) => src.years)
   );
 
-const mapper = registry.getMapper(Source, Dest);
-const mapped = await mapper({
+const mapFn = registry.getMapper(Source, Dest);
+const mapped = await mapFn({
   firstName: 'Jane',
   lastName:  'Doe',
   years:     28

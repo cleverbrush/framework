@@ -3,7 +3,8 @@ import { object, string, number, array, boolean } from '@cleverbrush/schema';
 import {
     MappingRegistry,
     Mapper,
-    MapperConfigurationError
+    MapperConfigurationError,
+    mapper
 } from './MappingRegistry.js';
 
 const UserSchema = object({
@@ -2817,6 +2818,88 @@ describe('Project management: Task board mapping', () => {
             priorityLabel: 'Low',
             assigneeUsername: 'docwriter',
             labels: []
+        });
+    });
+});
+
+// ── mapper() factory function ────────────────────────────────────────
+
+describe('mapper() factory function', () => {
+    test('returns a MappingRegistry instance', () => {
+        const registry = mapper();
+        expect(registry).toBeInstanceOf(MappingRegistry);
+    });
+
+    test('supports fluent configure chaining', async () => {
+        const registry = mapper().configure(
+            UserSchema,
+            UserDtoSchema,
+            (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
+                        (user) => `${user.address.city} ${user.address.houseNr}`
+                    )
+        );
+
+        const mapFn = registry.getMapper(UserSchema, UserDtoSchema);
+        const result = await mapFn({
+            name: 'Alice',
+            age: 30,
+            address: { city: 'Berlin', houseNr: 42 }
+        });
+
+        expect(result).toEqual({
+            name: 'Alice',
+            cityName: 'Berlin',
+            fullAddress: 'Berlin 42'
+        });
+    });
+
+    test('supports multiple chained configure calls', async () => {
+        const AddressSchema = object({
+            city: string(),
+            houseNr: number()
+        });
+
+        const AddressDtoSchema = object({
+            city: string()
+        });
+
+        const registry = mapper()
+            .configure(AddressSchema, AddressDtoSchema, (m) =>
+                m.for((t) => t.city).from((f) => f.city)
+            )
+            .configure(UserSchema, UserDtoSchema, (m) =>
+                m
+                    .for((t) => t.name)
+                    .from((f) => f.name)
+                    .for((t) => t.cityName)
+                    .from((f) => f.address.city)
+                    .for((t) => t.fullAddress)
+                    .compute(
+                        (user) => `${user.address.city} ${user.address.houseNr}`
+                    )
+            );
+
+        const addrMapper = registry.getMapper(AddressSchema, AddressDtoSchema);
+        const addrResult = await addrMapper({ city: 'NYC', houseNr: 7 });
+        expect(addrResult).toEqual({ city: 'NYC' });
+
+        const userMapper = registry.getMapper(UserSchema, UserDtoSchema);
+        const userResult = await userMapper({
+            name: 'Bob',
+            age: 25,
+            address: { city: 'NYC', houseNr: 7 }
+        });
+        expect(userResult).toEqual({
+            name: 'Bob',
+            cityName: 'NYC',
+            fullAddress: 'NYC 7'
         });
     });
 });

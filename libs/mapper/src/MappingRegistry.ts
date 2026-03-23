@@ -1005,3 +1005,19 @@ export class MappingRegistry<TRegistered = never> {
         return mapper;
     }
 }
+
+/**
+ * Creates a new empty {@link MappingRegistry}.
+ *
+ * This is a convenience factory function — an alternative to
+ * `new MappingRegistry()` that reads better in a fluent chain:
+ *
+ * ```ts
+ * const registry = mapper()
+ *   .configure(A, B, m => ...)
+ *   .configure(C, D, m => ...);
+ * ```
+ */
+export function mapper(): MappingRegistry {
+    return new MappingRegistry();
+}
