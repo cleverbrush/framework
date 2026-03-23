@@ -36,27 +36,61 @@ export default function ReactFormPage() {
 
                     <h3>The Problem</h3>
                     <p>
-                        Traditional React form libraries make you wire
-                        validation manually. You define TypeScript types in one
-                        file, Zod/Yup schemas in another, and form field
-                        bindings in a third. Change a field in the type and you
-                        need to remember to update the validation schema{' '}
-                        <em>and</em> the form component. These three sources of
-                        truth drift apart over time, causing subtle bugs that
-                        only surface in production.
+                        Every popular React form library — React Hook Form,
+                        Formik, React Final Form — requires you to reference
+                        fields by <strong>string names</strong>:{' '}
+                        <code>register(&quot;email&quot;)</code>,{' '}
+                        <code>
+                            &lt;Field name=&quot;address.city&quot; /&gt;
+                        </code>
+                        . The moment you pass a field name as a string, you
+                        lose TypeScript&apos;s type safety. Rename a property
+                        in your data model and the compiler stays silent —
+                        your form just silently breaks at runtime. The larger
+                        your codebase, the more of these invisible string
+                        references you accumulate, and the more fragile every
+                        refactor becomes.
                     </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// React Hook Form — field names are plain strings
+const { register } = useForm<User>();
+<input {...register("name")} />     // ← no compiler error if "name" is renamed
+<input {...register("emial")} />    // ← typo: silently fails at runtime
+
+// Formik — same problem
+<Field name="address.city" />       // ← rename "city" → "town" and nothing warns you`)
+                            }}
+                        />
+                    </pre>
 
                     <h3>The Solution</h3>
                     <p>
-                        <code>@cleverbrush/react-form</code> takes a{' '}
-                        <code>@cleverbrush/schema</code> definition and
-                        generates a complete form system. The schema{' '}
+                        <code>@cleverbrush/react-form</code> binds fields via{' '}
+                        <strong>PropertyDescriptor selectors</strong> — actual
+                        TypeScript expressions like{' '}
+                        <code>(t) =&gt; t.address.city</code> — instead of
+                        strings. The compiler knows the exact shape of your
+                        schema, so a renamed or mistyped property is a{' '}
+                        <strong>compile-time error</strong>, not a runtime
+                        surprise. On top of that the schema{' '}
                         <strong>IS</strong> the validation, the type
                         definition, <strong>AND</strong> the form field
                         configuration. One source of truth. Change the schema
                         and everything updates — types, validation rules,
                         and form field behavior.
                     </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// @cleverbrush/react-form — fully type-safe selectors
+<Field selector={(t) => t.name} form={form} />           // ✓ checked at compile time
+<Field selector={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
+<Field selector={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist`)
+                            }}
+                        />
+                    </pre>
 
                     <h3>Headless Architecture</h3>
                     <p>
