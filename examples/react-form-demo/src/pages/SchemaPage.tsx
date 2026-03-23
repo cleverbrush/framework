@@ -337,7 +337,7 @@ const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { object, string, number, InferType } from '@cleverbrush/schema';
 
 const UserSchema = object({
   /** Full display name of the user */
