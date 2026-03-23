@@ -140,89 +140,50 @@ type KeysNeedingMapping<
 }[SchemaKeys<TToSchema>];
 
 /**
- * Checks whether a `from` call should produce a compile-time error.
- *
- * Returns `true` (error) when:
- * - `TSourcePropSchema` is `never` (the PropertyDescriptorTree filtered
- *   it out because InferType is not assignable to the target property type)
- * - Source is ObjectSchemaBuilder but target property is not
- *   (cannot auto-map object → primitive)
- * - Both are ObjectSchemaBuilder but no mapping is registered
- * - Array → non-array or non-array → array
- * - Both are ArraySchemaBuilder but element mapping does not exist
- *
- * Returns `false` (OK) when:
- * - Source is not ObjectSchemaBuilder and not `never`
- *   (type-compatible; the PropertyDescriptorTree filter ensures this)
- * - Both are ObjectSchemaBuilder and a mapping is registered
- * - Both are ArraySchemaBuilder and element mapping is registered
+ * From a TRegistered union of [SourceSchema, TargetSchema] tuples,
+ * extract the source schema(s) registered for a given target schema.
  */
-type FromNeedsRegistration<
-    TSourcePropSchema,
+type ExtractRegisteredSource<TTargetSchema, TRegistered> =
+    TRegistered extends [infer TSource, TTargetSchema] ? TSource : never;
+
+/**
+ * Compute the InferType of the registered source schema for a target
+ * property's schema. Returns `never` when no registration exists.
+ */
+type RegisteredSourceInferType<
     TToSchema extends ObjectSchemaBuilder<any, any, any>,
     TKey extends string,
     TRegistered
-> = [TSourcePropSchema] extends [never]
-    ? true
-    : TSourcePropSchema extends ArraySchemaBuilder<any, any, any>
-      ? TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
-            any,
+> = TargetPropertySchema<TToSchema, TKey> extends ObjectSchemaBuilder<any, any, any>
+    ? InferType<ExtractRegisteredSource<TargetPropertySchema<TToSchema, TKey>, TRegistered>>
+    : TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
+            infer TTargetElem,
             any,
             any
         >
-          ? FromNeedsRegistration<
-                ExtractArrayElementSchema<TSourcePropSchema>,
-                TToSchema,
-                TKey,
-                TRegistered
-            > extends true
-              ? NeedsMapping<
-                    ExtractArrayElementSchema<TSourcePropSchema>,
-                    ExtractArrayElementSchema<
-                        TargetPropertySchema<TToSchema, TKey>
-                    >,
-                    TRegistered
-                > extends true
-                  ? true
-                  : false
-              : false
-          : true
-      : TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
-              any,
-              any,
-              any
-          >
-        ? true
-        : TSourcePropSchema extends ObjectSchemaBuilder<any, any, any>
-          ? TargetPropertySchema<TToSchema, TKey> extends ObjectSchemaBuilder<
-                any,
-                any,
-                any
-            >
-              ? [
-                    TSourcePropSchema,
-                    TargetPropertySchema<TToSchema, TKey>
-                ] extends TRegistered
-                  ? false
-                  : InferType<TSourcePropSchema> extends InferType<
-                          TargetPropertySchema<TToSchema, TKey>
-                      >
-                    ? InferType<
-                          TargetPropertySchema<TToSchema, TKey>
-                      > extends InferType<TSourcePropSchema>
-                        ? false
-                        : true
-                    : true
-              : true
-          : false;
+      ? TTargetElem extends ObjectSchemaBuilder<any, any, any>
+          ? InferType<ExtractRegisteredSource<TTargetElem, TRegistered>>[]
+          : never
+      : never;
 
 /**
- * Extracts the schema type parameter from a PropertyDescriptor.
- * Used to recover the source property schema from the inferred return
- * type of the `from` selector callback.
+ * The InferType value acceptable for the `from()` setValue constraint.
+ *
+ * When no registration exists, this is the target property's InferType.
+ * When a registration exists, this is the intersection of the target
+ * property's InferType and the registered source's InferType. The
+ * intersection widens the constraint under `strictFunctionTypes`
+ * contravariance (setValue's parameter), allowing registered source
+ * schemas whose InferType differs from the target's.
  */
-type GetSchemaFromDescriptor<T> =
-    T extends PropertyDescriptor<any, infer TSchema, any> ? TSchema : never;
+type AcceptableFromValue<
+    TToSchema extends ObjectSchemaBuilder<any, any, any>,
+    TKey extends string,
+    TRegistered
+> = [RegisteredSourceInferType<TToSchema, TKey, TRegistered>] extends [never]
+    ? SchemaPropertyInferredType<TToSchema, TKey>
+    : SchemaPropertyInferredType<TToSchema, TKey> &
+          RegisteredSourceInferType<TToSchema, TKey, TRegistered>;
 
 // ── Mapper Result Type ────────────────────────────────────────────────
 
@@ -396,10 +357,22 @@ export class PropertyMappingBuilder<
      * Type compatibility is enforced: only source properties whose
      * inferred type is assignable to the target property type will
      * appear in the selector callback.
+     *
+     * Under `strictFunctionTypes`, the `setValue` constraint provides
+     * bidirectional type checking via contravariance:
+     * - source schemas with extra properties are rejected unless registered
+     * - registered mappings widen the constraint via intersection
      */
     public from<
-        TPropertySchema extends SchemaBuilder<any, any>,
-        TReturn extends PropertyDescriptor<TFromSchema, TPropertySchema, any>
+        TReturn extends {
+            [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+                getSchema(): SchemaBuilder<any, any>;
+                setValue: (
+                    obj: any,
+                    value: AcceptableFromValue<TToSchema, TKey, TRegistered>
+                ) => any;
+            };
+        }
     >(
         selector: (
             tree: PropertyDescriptorTree<
@@ -410,18 +383,9 @@ export class PropertyMappingBuilder<
         ) => TReturn,
         ...args: [TReturn] extends [never]
             ? [
-                  error: `Source property type is not assignable to target property '${TKey}' type`
+                  error: `Property '${TKey}': source property type is not assignable to the target property type. Use compute() instead.`
               ]
-            : FromNeedsRegistration<
-                    GetSchemaFromDescriptor<TReturn>,
-                    TToSchema,
-                    TKey,
-                    TRegistered
-                > extends true
-              ? [
-                    error: `Property '${TKey}' maps between incompatible schema types. Register a mapping for the source→target schema pair first, or use compute() instead.`
-                ]
-              : []
+            : []
     ): Mapper<TFromSchema, TToSchema, Exclude<TUnmapped, TKey>, TRegistered> {
         const sourceTree = ObjectSchemaBuilder.getPropertiesFor(
             this._mapper['_fromSchema']

@@ -1,4 +1,5 @@
 import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
+import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
 import { Transaction, transaction } from '../utils/transaction.js';
 
 /**
@@ -408,7 +409,11 @@ export type PropertyDescriptorTree<
                             TParentPropertyDescriptor
                         >
                     >
-                  : InferType<TProperties[K]> extends TAssignableTo
+                  : TProperties[K] extends ArraySchemaBuilder<
+                          ObjectSchemaBuilder<any, any, any>,
+                          any,
+                          any
+                      >
                     ? PropertyDescriptor<
                           TRootSchema,
                           TProperties[K],
@@ -418,7 +423,17 @@ export type PropertyDescriptorTree<
                               TParentPropertyDescriptor
                           >
                       >
-                    : never;
+                    : InferType<TProperties[K]> extends TAssignableTo
+                      ? PropertyDescriptor<
+                            TRootSchema,
+                            TProperties[K],
+                            PropertyDescriptor<
+                                TRootSchema,
+                                TSchema,
+                                TParentPropertyDescriptor
+                            >
+                        >
+                      : never;
           }
         : never);
 
