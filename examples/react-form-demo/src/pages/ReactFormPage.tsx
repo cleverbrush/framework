@@ -1,4 +1,125 @@
+import { useState, type ReactNode } from 'react';
+import { object, string, number } from '@cleverbrush/schema';
+import {
+    useSchemaForm,
+    Field,
+    FormSystemProvider
+} from '@cleverbrush/react-form';
+import type { FieldRenderProps } from '@cleverbrush/react-form';
 import { highlightTS } from '../highlight';
+
+/* ── Live Quick-Start form ──────────────────────────────────────── */
+
+const ContactSchema = object({
+    name: string()
+        .required('Name is required')
+        .minLength(2, 'Name must be at least 2 characters')
+        .maxLength(100, 'Name must be at most 100 characters'),
+    email: string()
+        .required('Email is required')
+        .matches(
+            /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+            'Please enter a valid email address'
+        ),
+    age: number()
+        .required('Age is required')
+        .min(18, 'Must be at least 18 years old')
+        .max(120, 'Must be at most 120')
+});
+
+function DemoStringRenderer(props: FieldRenderProps): ReactNode {
+    return (
+        <div className="demo-field">
+            <input
+                type="text"
+                value={(props.value as string) ?? ''}
+                onChange={(e) => props.onChange(e.target.value)}
+                onBlur={props.onBlur}
+                className={props.touched && props.error ? 'has-error' : ''}
+                placeholder={props.touched ? '' : 'Type here…'}
+            />
+            {props.touched && props.error && (
+                <span className="demo-error">{props.error}</span>
+            )}
+        </div>
+    );
+}
+
+function DemoNumberRenderer(props: FieldRenderProps): ReactNode {
+    return (
+        <div className="demo-field">
+            <input
+                type="number"
+                value={props.value != null ? String(props.value) : ''}
+                onChange={(e) =>
+                    props.onChange(
+                        e.target.value === '' ? undefined : Number(e.target.value)
+                    )
+                }
+                onBlur={props.onBlur}
+                className={props.touched && props.error ? 'has-error' : ''}
+                placeholder="Enter a number…"
+            />
+            {props.touched && props.error && (
+                <span className="demo-error">{props.error}</span>
+            )}
+        </div>
+    );
+}
+
+const demoRenderers: Record<string, (props: FieldRenderProps) => ReactNode> = {
+    string: DemoStringRenderer,
+    number: DemoNumberRenderer
+};
+
+function ContactFormDemo() {
+    const form = useSchemaForm(ContactSchema);
+    const [result, setResult] = useState<string | null>(null);
+
+    const handleSubmit = async () => {
+        const res = await form.submit();
+        if (res.valid) {
+            setResult(JSON.stringify(res.object, null, 2));
+        } else {
+            setResult(null);
+        }
+    };
+
+    return (
+        <div className="demo-form">
+            <div className="demo-form-row">
+                <label>Name</label>
+                <Field selector={(t) => t.name} form={form} />
+            </div>
+            <div className="demo-form-row">
+                <label>Email</label>
+                <Field selector={(t) => t.email} form={form} />
+            </div>
+            <div className="demo-form-row">
+                <label>Age</label>
+                <Field selector={(t) => t.age} form={form} />
+            </div>
+            <button className="demo-submit" onClick={handleSubmit}>
+                Submit
+            </button>
+            {result && (
+                <pre className="demo-result">
+                    <code>{result}</code>
+                </pre>
+            )}
+        </div>
+    );
+}
+
+function QuickStartLiveDemo() {
+    return (
+        <FormSystemProvider renderers={demoRenderers}>
+            <ContactFormDemo />
+        </FormSystemProvider>
+    );
+}
+
+/* ── Page ────────────────────────────────────────────────────────── */
 
 export default function ReactFormPage() {
     return (
@@ -222,14 +343,25 @@ import {
 
 // 1. Define your schema (single source of truth)
 const ContactSchema = object({
-  name:  string().minLength(2, 'Name must be at least 2 characters').maxLength(100),
-  email: string().minLength(5, 'Please enter a valid email address'),
-  age:   number().min(18, 'Must be at least 18 years old').max(120)
+  name: string()
+    .required('Name is required')
+    .minLength(2, 'Name must be at least 2 characters')
+    .maxLength(100, 'Name must be at most 100 characters'),
+  email: string()
+    .required('Email is required')
+    .matches(
+      /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/,
+      'Please enter a valid email address'
+    ),
+  age: number()
+    .required('Age is required')
+    .min(18, 'Must be at least 18 years old')
+    .max(120, 'Must be at most 120')
 });
 
 // 2. Define renderers (map schema types to React components)
 const renderers = {
-  string: ({ value, onChange, onBlur, error }) => (
+  string: ({ value, onChange, onBlur, touched, error }) => (
     <div>
       <input
         type="text"
@@ -237,10 +369,10 @@ const renderers = {
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
       />
-      {error && <span className="error">{error}</span>}
+      {touched && error && <span className="error">{error}</span>}
     </div>
   ),
-  number: ({ value, onChange, onBlur, error }) => (
+  number: ({ value, onChange, onBlur, touched, error }) => (
     <div>
       <input
         type="number"
@@ -248,7 +380,7 @@ const renderers = {
         onChange={(e) => onChange(Number(e.target.value))}
         onBlur={onBlur}
       />
-      {error && <span className="error">{error}</span>}
+      {touched && error && <span className="error">{error}</span>}
     </div>
   )
 };
@@ -285,6 +417,15 @@ function App() {
                             }}
                         />
                     </pre>
+
+                    <h3>Try it live</h3>
+                    <p>
+                        This is the exact form described above, rendered with
+                        <code> @cleverbrush/react-form</code>. Try submitting
+                        with empty fields, a short name, an invalid email, or
+                        an out-of-range age to see validation in action:
+                    </p>
+                    <QuickStartLiveDemo />
                 </div>
 
                 {/* ── Registering Renderers ────────────────────────── */}

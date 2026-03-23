@@ -731,3 +731,86 @@ pre code {
         font-size: 0.85rem;
     }
 }
+
+/* ── Live form demo ──────────────────────────────────────────────── */
+
+.demo-form {
+    background: #1a1f35;
+    border: 1px solid #2a3050;
+    border-radius: 10px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.demo-form-row {
+    margin-bottom: 1rem;
+}
+
+.demo-form-row label {
+    display: block;
+    color: #93a3c0;
+    font-size: 0.85rem;
+    margin-bottom: 0.35rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.demo-field input {
+    width: 100%;
+    padding: 0.55rem 0.75rem;
+    background: #0f1320;
+    border: 1px solid #2a3050;
+    border-radius: 6px;
+    color: #e0e6f0;
+    font-size: 0.95rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+    box-sizing: border-box;
+}
+
+.demo-field input:focus {
+    border-color: #4a8cff;
+}
+
+.demo-field input.has-error {
+    border-color: #ff6b6b;
+}
+
+.demo-error {
+    display: block;
+    color: #ff6b6b;
+    font-size: 0.8rem;
+    margin-top: 0.3rem;
+}
+
+.demo-submit {
+    display: inline-block;
+    padding: 0.55rem 1.75rem;
+    background: linear-gradient(135deg, #4a8cff 0%, #6a5acd 100%);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.25rem;
+    transition: opacity 0.15s;
+}
+
+.demo-submit:hover {
+    opacity: 0.88;
+}
+
+.demo-result {
+    margin-top: 1rem;
+    background: #0f1320;
+    border: 1px solid #2a3050;
+    border-radius: 6px;
+    padding: 1rem;
+}
+
+.demo-result code {
+    color: #81d4a8;
+    font-size: 0.85rem;
+}
