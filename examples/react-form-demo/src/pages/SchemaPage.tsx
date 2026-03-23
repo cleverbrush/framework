@@ -465,25 +465,30 @@ const TagsSchema = array(string())
                     <h3>Custom Validators</h3>
                     <p>
                         Add custom synchronous or asynchronous validators to
-                        any schema. They receive the value and return an error
-                        message (or <code>undefined</code> if valid):
+                        any schema. They receive the value and must return an
+                        object with <code>valid</code> (boolean) and
+                        optionally <code>errors</code> (array of{' '}
+                        <code>{'{ message: string }'}</code>):
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const EmailSchema = string()
-  .minLength(5)
+  .minLength(5, 'Email is too short')
   .addValidator(async (value) => {
     // Example: check against an API
     if (value === 'taken@example.com') {
-      return 'This email is already registered';
+      return {
+        valid: false,
+        errors: [{ message: 'This email is already registered' }]
+      };
     }
-    return undefined; // valid
+    return { valid: true };
   });
 
 const result = await EmailSchema.validate('taken@example.com');
 console.log(result.valid);  // false
-console.log(result.errors); // [{ path: '', message: 'This email is already registered' }]`)
+console.log(result.errors); // [{ path: '$($validators[0])', message: 'This email is already registered' }]`)
                             }}
                         />
                     </pre>

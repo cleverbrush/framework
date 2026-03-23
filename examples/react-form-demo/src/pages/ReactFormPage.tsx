@@ -188,9 +188,9 @@ import {
 
 // 1. Define your schema (single source of truth)
 const ContactSchema = object({
-  name:  string().minLength(2).maxLength(100),
-  email: string().minLength(5),
-  age:   number().min(18).max(120)
+  name:  string().minLength(2, 'Name must be at least 2 characters').maxLength(100),
+  email: string().minLength(5, 'Please enter a valid email address'),
+  age:   number().min(18, 'Must be at least 18 years old').max(120)
 });
 
 // 2. Define renderers (map schema types to React components)
@@ -863,17 +863,19 @@ function UserForm() {
   username: string().minLength(3).maxLength(20).addValidator(async (value) => {
     // Check if username is taken (async!)
     const taken = await checkUsernameAvailability(value);
-    if (taken) return 'This username is already taken';
-    return undefined;
+    if (taken) {
+      return { valid: false, errors: [{ message: 'This username is already taken' }] };
+    }
+    return { valid: true };
   }),
-  password: string().minLength(8),
-  confirmPassword: string().minLength(8)
+  password: string().minLength(8, 'Password must be at least 8 characters'),
+  confirmPassword: string().minLength(8, 'Please confirm your password')
 }).addValidator(async (value) => {
   // Object-level validation
   if (value.password !== value.confirmPassword) {
-    return 'Passwords do not match';
+    return { valid: false, errors: [{ message: 'Passwords do not match' }] };
   }
-  return undefined;
+  return { valid: true };
 });`)
                             }}
                         />
