@@ -140,6 +140,10 @@ export default function SandboxPage() {
                         are available as globals. Use <code>log()</code> to
                         print output. Async/await is supported.
                     </p>
+                    <p style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
+                        ⚠️ This sandbox executes code directly in the browser.
+                        Only run code you trust.
+                    </p>
                 </div>
 
                 <div className="card">

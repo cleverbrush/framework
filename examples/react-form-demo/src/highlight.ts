@@ -110,55 +110,60 @@ export function highlightTS(code: string): string {
 
     // Phase 4: Type annotations (after : or in generics < >)
     // Match `: TypeName` patterns (type annotations)
+    // Uses capture groups instead of lookbehinds for browser compatibility
     const typeAnnotationRe =
-        /(?<=:\s*)([A-Z][A-Za-z0-9]*(?:<[^>]*>)?)/g;
+        /(:\s*)([A-Z][A-Za-z0-9]*(?:<[^>]*>)?)/g;
     while ((m = typeAnnotationRe.exec(code)) !== null) {
-        if (!isInsideToken(tokens, m.index)) {
+        const typeStart = m.index + m[1].length;
+        if (!isInsideToken(tokens, typeStart)) {
             tokens.push({
-                start: m.index,
-                end: m.index + m[0].length,
+                start: typeStart,
+                end: typeStart + m[2].length,
                 cls: 'tp',
-                text: m[0]
+                text: m[2]
             });
         }
     }
 
     // Match type keyword usages like `type X = ...`
-    const typeDefRe = /(?<=\btype\s+)([A-Z][A-Za-z0-9]*)/g;
+    const typeDefRe = /\btype\s+([A-Z][A-Za-z0-9]*)/g;
     while ((m = typeDefRe.exec(code)) !== null) {
-        if (!isInsideToken(tokens, m.index)) {
+        const nameStart = m.index + m[0].length - m[1].length;
+        if (!isInsideToken(tokens, nameStart)) {
             tokens.push({
-                start: m.index,
-                end: m.index + m[0].length,
+                start: nameStart,
+                end: nameStart + m[1].length,
                 cls: 'tp',
-                text: m[0]
+                text: m[1]
             });
         }
     }
 
     // Match `<TypeName>` in generics like InferType<typeof X>
-    const genericRe = /(?<=<)([A-Z][A-Za-z0-9]*)/g;
+    const genericRe = /<([A-Z][A-Za-z0-9]*)/g;
     while ((m = genericRe.exec(code)) !== null) {
-        if (!isInsideToken(tokens, m.index)) {
+        const typeStart = m.index + 1;
+        if (!isInsideToken(tokens, typeStart)) {
             tokens.push({
-                start: m.index,
-                end: m.index + m[0].length,
+                start: typeStart,
+                end: typeStart + m[1].length,
                 cls: 'tp',
-                text: m[0]
+                text: m[1]
             });
         }
     }
 
     // Match lowercase type names when used as annotations (`: string`, `: number`, etc.)
     const lowerTypeRe =
-        /(?<=:\s*)\b(string|number|boolean|void|any|never|unknown)\b(?!\s*[.(])/g;
+        /(:\s*)\b(string|number|boolean|void|any|never|unknown)\b(?!\s*[.(])/g;
     while ((m = lowerTypeRe.exec(code)) !== null) {
-        if (!isInsideToken(tokens, m.index)) {
+        const typeStart = m.index + m[1].length;
+        if (!isInsideToken(tokens, typeStart)) {
             tokens.push({
-                start: m.index,
-                end: m.index + m[0].length,
+                start: typeStart,
+                end: typeStart + m[2].length,
                 cls: 'tp',
-                text: m[0]
+                text: m[2]
             });
         }
     }
