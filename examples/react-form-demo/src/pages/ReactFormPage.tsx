@@ -156,7 +156,12 @@ export default function ReactFormPage() {
                     <h2>Quick Start</h2>
                     <p>
                         Define a schema, register renderers, create a form,
-                        and render fields — all type-safe:
+                        and render fields — all type-safe.
+                        The <strong>schema</strong> and{' '}
+                        <strong>renderers</strong> are defined{' '}
+                        <strong>once per app</strong> and reused by every
+                        form — individual form components only declare
+                        which fields to show:
                     </p>
                     <pre>
                         <code
@@ -166,7 +171,7 @@ import {
   useSchemaForm, Field, FormSystemProvider
 } from '@cleverbrush/react-form';
 
-// 1. Define your schema (single source of truth)
+// 1. Define your schema once — reuse across forms, API validation, mapping, etc.
 const ContactSchema = object({
   name: string()
     .required('Name is required')
@@ -184,7 +189,7 @@ const ContactSchema = object({
     .max(120, 'Must be at most 120')
 });
 
-// 2. Define renderers (map schema types to React components)
+// 2. Register renderers once at the app root — every form inherits them
 const renderers = {
   string: ({ value, onChange, onBlur, touched, error }) => (
     <div>
@@ -210,7 +215,7 @@ const renderers = {
   )
 };
 
-// 3. Create a form component
+// 3. Each form component only picks which fields to show — no boilerplate
 function ContactForm() {
   const form = useSchemaForm(ContactSchema);
 
@@ -231,7 +236,7 @@ function ContactForm() {
   );
 }
 
-// 4. Wrap with FormSystemProvider at the app root
+// 4. Wrap once at the app root — all forms below share the renderers
 function App() {
   return (
     <FormSystemProvider renderers={renderers}>
