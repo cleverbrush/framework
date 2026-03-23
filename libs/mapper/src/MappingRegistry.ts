@@ -143,8 +143,12 @@ type KeysNeedingMapping<
  * From a TRegistered union of [SourceSchema, TargetSchema] tuples,
  * extract the source schema(s) registered for a given target schema.
  */
-type ExtractRegisteredSource<TTargetSchema, TRegistered> =
-    TRegistered extends [infer TSource, TTargetSchema] ? TSource : never;
+type ExtractRegisteredSource<TTargetSchema, TRegistered> = TRegistered extends [
+    infer TSource,
+    TTargetSchema
+]
+    ? TSource
+    : never;
 
 /**
  * Compute the InferType of the registered source schema for a target
@@ -154,17 +158,27 @@ type RegisteredSourceInferType<
     TToSchema extends ObjectSchemaBuilder<any, any, any>,
     TKey extends string,
     TRegistered
-> = TargetPropertySchema<TToSchema, TKey> extends ObjectSchemaBuilder<any, any, any>
-    ? InferType<ExtractRegisteredSource<TargetPropertySchema<TToSchema, TKey>, TRegistered>>
-    : TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
-            infer TTargetElem,
-            any,
-            any
-        >
-      ? TTargetElem extends ObjectSchemaBuilder<any, any, any>
-          ? InferType<ExtractRegisteredSource<TTargetElem, TRegistered>>[]
-          : never
-      : never;
+> =
+    TargetPropertySchema<TToSchema, TKey> extends ObjectSchemaBuilder<
+        any,
+        any,
+        any
+    >
+        ? InferType<
+              ExtractRegisteredSource<
+                  TargetPropertySchema<TToSchema, TKey>,
+                  TRegistered
+              >
+          >
+        : TargetPropertySchema<TToSchema, TKey> extends ArraySchemaBuilder<
+                infer TTargetElem,
+                any,
+                any
+            >
+          ? TTargetElem extends ObjectSchemaBuilder<any, any, any>
+              ? InferType<ExtractRegisteredSource<TTargetElem, TRegistered>>[]
+              : never
+          : never;
 
 /**
  * The InferType value acceptable for the `from()` setValue constraint.
