@@ -188,8 +188,8 @@ import {
 
 // 1. Define your schema (single source of truth)
 const ContactSchema = object({
-  name:  string().min(2).max(100),
-  email: string().min(5),
+  name:  string().minLength(2).maxLength(100),
+  email: string().minLength(5),
   age:   number().min(18).max(120)
 });
 
@@ -799,13 +799,13 @@ function MyForm() {
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const AddressSchema = object({
-  city:   string().min(1),
-  street: string().min(1),
-  zip:    string().min(5).max(10)
+  city:   string().minLength(1),
+  street: string().minLength(1),
+  zip:    string().minLength(5).maxLength(10)
 });
 
 const UserSchema = object({
-  name:    string().min(2),
+  name:    string().minLength(2),
   address: AddressSchema
 });
 
@@ -836,8 +836,8 @@ function UserForm() {
                     </p>
                     <ol>
                         <li>
-                            <strong>Schema constraints</strong> (min, max,
-                            pattern, etc.) are checked first
+                            <strong>Schema constraints</strong> (minLength, max,
+                            matches, etc.) are checked first
                         </li>
                         <li>
                             <strong>Custom validators</strong> added via{' '}
@@ -860,14 +860,14 @@ function UserForm() {
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const RegistrationSchema = object({
-  username: string().min(3).max(20).addValidator(async (value) => {
+  username: string().minLength(3).maxLength(20).addValidator(async (value) => {
     // Check if username is taken (async!)
     const taken = await checkUsernameAvailability(value);
     if (taken) return 'This username is already taken';
     return undefined;
   }),
-  password: string().min(8),
-  confirmPassword: string().min(8)
+  password: string().minLength(8),
+  confirmPassword: string().minLength(8)
 }).addValidator(async (value) => {
   // Object-level validation
   if (value.password !== value.confirmPassword) {

@@ -83,8 +83,8 @@ export default function HomePage() {
 import { object, string, number } from '@cleverbrush/schema';
 
 const UserSchema = object({
-  name:  string().min(2).max(100),
-  email: string().min(5),
+  name:  string().minLength(2).maxLength(100),
+  email: string().minLength(5),
   age:   number().min(0).max(150)
 });
 

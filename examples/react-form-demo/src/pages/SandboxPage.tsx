@@ -7,8 +7,8 @@ const SANDBOX_EXAMPLES: Record<string, string> = {
 const { object, string, number, boolean } = Schema;
 
 const UserSchema = object({
-  name:  string().min(2).max(50),
-  email: string().min(5),
+  name:  string().minLength(2).maxLength(50),
+  email: string().minLength(5),
   age:   number().min(0).max(150),
   admin: boolean()
 });

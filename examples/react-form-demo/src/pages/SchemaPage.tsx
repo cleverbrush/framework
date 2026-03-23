@@ -97,11 +97,11 @@ export default function SchemaPage() {
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number, boolean, InferType } from '@cleverbrush/schema';
 
-// Define a schema with fluent constraints
+// Define a schema with fluent constraints and custom error messages
 const UserSchema = object({
-  name:     string().min(2).max(100),
-  email:    string().min(5),
-  age:      number().min(0).max(150),
+  name:     string().minLength(2, 'Name must be at least 2 characters').maxLength(100, 'Name cannot exceed 100 characters'),
+  email:    string().minLength(5, 'Please enter a valid email address'),
+  age:      number().min(0, 'Age cannot be negative').max(150, 'Age seems unrealistic'),
   isActive: boolean()
 });
 
@@ -121,15 +121,18 @@ console.log(result.valid);  // true
 console.log(result.object); // the validated object
 
 // Invalid data produces structured errors
-const bad = await UserSchema.validate({
-  name: 'A',       // too short (min 2)
-  email: '',       // too short (min 5)
-  age: -5,         // below minimum (min 0)
-  isActive: true
-});
+const bad = await UserSchema.validate(
+  { name: 'A', email: '', age: -5, isActive: true },
+  { doNotStopOnFirstError: true }
+);
 
 console.log(bad.valid);  // false
-console.log(bad.errors); // array of { path, message } objects`)
+console.log(bad.errors);
+// [
+//   { path: '$.name', message: 'Name must be at least 2 characters' },
+//   { path: '$.email', message: 'Please enter a valid email address' },
+//   { path: '$.age', message: 'Age cannot be negative' }
+// ]`)
                             }}
                         />
                     </pre>
@@ -175,9 +178,9 @@ console.log(bad.errors); // array of { path, message } objects`)
                                         constraints.
                                     </td>
                                     <td>
-                                        <code>.min(n)</code>,{' '}
-                                        <code>.max(n)</code>,{' '}
-                                        <code>.pattern(re)</code>,{' '}
+                                        <code>.minLength(n)</code>,{' '}
+                                        <code>.maxLength(n)</code>,{' '}
+                                        <code>.matches(re)</code>,{' '}
                                         <code>.optional()</code>
                                     </td>
                                 </tr>
@@ -255,8 +258,8 @@ console.log(bad.errors); // array of { path, message } objects`)
                                         element schema.
                                     </td>
                                     <td>
-                                        <code>.min(n)</code>,{' '}
-                                        <code>.max(n)</code>,{' '}
+                                        <code>.minLength(n)</code>,{' '}
+                                        <code>.maxLength(n)</code>,{' '}
                                         <code>.optional()</code>
                                     </td>
                                 </tr>
@@ -292,13 +295,13 @@ console.log(bad.errors); // array of { path, message } objects`)
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { string } from '@cleverbrush/schema';
 
-const base = string().min(1);
-const strict = base.max(50);    // new instance — base is unchanged
+const base = string().minLength(1);
+const strict = base.maxLength(50);    // new instance — base is unchanged
 const loose  = base.optional(); // another new instance
 
-// base still only has min(1)
-// strict has min(1) + max(50)
-// loose has min(1) + optional`)
+// base still only has minLength(1)
+// strict has minLength(1) + maxLength(50)
+// loose has minLength(1) + optional`)
                             }}
                         />
                     </pre>
@@ -309,8 +312,8 @@ const loose  = base.optional(); // another new instance
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const Email = string().min(5).max(255);
-const Name  = string().min(1).max(100);
+                                __html: highlightTS(`const Email = string().minLength(5).maxLength(255);
+const Name  = string().minLength(1).maxLength(100);
 
 const CreateUser = object({ name: Name, email: Email });
 const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
@@ -340,20 +343,20 @@ const BaseEntity = object({
 });
 
 const UserEntity = BaseEntity.addProps({
-  name:  string().min(2),
-  email: string().min(5)
+  name:  string().minLength(2),
+  email: string().minLength(5)
 });
 
 // Nest objects
 const TeamSchema = object({
-  name:    string().min(1),
-  members: array(UserEntity).min(1).max(50)
+  name:    string().minLength(1),
+  members: array(UserEntity).minLength(1).maxLength(50)
 });
 
 // Union types
 const IdOrEmail = union(
-  string().min(1),   // lookup by ID
-  string().pattern(/^[^@]+@[^@]+$/) // or by email
+  string().minLength(1),   // lookup by ID
+  string().matches(/^[^@]+@[^@]+$/) // or by email
 );`)
                             }}
                         />
@@ -395,7 +398,15 @@ if (result.valid) {
                     <p>
                         Use <code>getErrorsFor()</code> with a
                         PropertyDescriptor selector to get errors for a specific
-                        field — perfect for showing inline form errors:
+                        field — perfect for showing inline form errors. It
+                        returns an object with <code>isValid</code> (boolean),{' '}
+                        <code>errors</code> (array of error strings), and{' '}
+                        <code>seenValue</code> (the value that was validated).
+                    </p>
+                    <p>
+                        Pass <code>{'{ doNotStopOnFirstError: true }'}</code>{' '}
+                        to <code>.validate()</code> to collect <strong>all</strong>{' '}
+                        errors at once, instead of stopping at the first failure:
                     </p>
                     <pre>
                         <code
@@ -406,10 +417,47 @@ if (result.valid) {
 );
 
 if (result.getErrorsFor) {
+  // Get errors for a top-level property
   const nameErrors = result.getErrorsFor((t) => t.name);
-  console.log(nameErrors.isValid);  // false
-  console.log(nameErrors.errors);   // ['Value must be at least 2 characters long']
+  console.log(nameErrors.isValid);    // false
+  console.log(nameErrors.errors);     // ['Name must be at least 2 characters']
+  console.log(nameErrors.seenValue);  // 'A'
+
+  // Get errors for a nested property (e.g. address.city)
+  // const cityErrors = result.getErrorsFor((t) => t.address.city);
+  // console.log(cityErrors.isValid);  // true or false
+  // console.log(cityErrors.errors);   // array of error strings
 }`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Custom Error Messages</h3>
+                    <p>
+                        Every constraint method accepts an optional second
+                        argument for a custom error message. This lets you
+                        provide user-friendly messages instead of the default
+                        generic ones:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { string, number, array } from '@cleverbrush/schema';
+
+// String constraints with custom messages
+const NameSchema = string()
+  .minLength(2, 'Name must be at least 2 characters')
+  .maxLength(100, 'Name cannot exceed 100 characters');
+
+// Number constraints with custom messages
+const AgeSchema = number()
+  .min(0, 'Age cannot be negative')
+  .max(150, 'Age seems unrealistic');
+
+// Array constraints with custom messages
+const TagsSchema = array(string())
+  .minLength(1, 'At least one tag is required')
+  .maxLength(10, 'No more than 10 tags allowed');`)
                             }}
                         />
                     </pre>
@@ -424,7 +472,7 @@ if (result.getErrorsFor) {
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const EmailSchema = string()
-  .min(5)
+  .minLength(5)
   .addValidator(async (value) => {
     // Example: check against an API
     if (value === 'taken@example.com') {
@@ -480,13 +528,13 @@ console.log(result.errors); // [{ path: '', message: 'This email is already regi
                                 __html: highlightTS(`import { object, string, ObjectSchemaBuilder } from '@cleverbrush/schema';
 
 const AddressSchema = object({
-  city:   string().min(1),
-  street: string().min(1),
-  zip:    string().min(5).max(10)
+  city:   string().minLength(1),
+  street: string().minLength(1),
+  zip:    string().minLength(5).maxLength(10)
 });
 
 const UserSchema = object({
-  name:    string().min(2),
+  name:    string().minLength(2),
   address: AddressSchema
 });
 
@@ -630,9 +678,9 @@ console.log(cityResult.value); // 'NYC'`)
                                     </td>
                                     <td>String schema builder</td>
                                     <td>
-                                        <code>.min(n)</code>,{' '}
-                                        <code>.max(n)</code>,{' '}
-                                        <code>.pattern(re)</code>,{' '}
+                                        <code>.minLength(n)</code>,{' '}
+                                        <code>.maxLength(n)</code>,{' '}
+                                        <code>.matches(re)</code>,{' '}
                                         <code>.optional()</code>
                                     </td>
                                 </tr>
@@ -695,8 +743,8 @@ console.log(cityResult.value); // 'NYC'`)
                                     </td>
                                     <td>Array of items schema</td>
                                     <td>
-                                        <code>.min(n)</code>,{' '}
-                                        <code>.max(n)</code>,{' '}
+                                        <code>.minLength(n)</code>,{' '}
+                                        <code>.maxLength(n)</code>,{' '}
                                         <code>.optional()</code>
                                     </td>
                                 </tr>
