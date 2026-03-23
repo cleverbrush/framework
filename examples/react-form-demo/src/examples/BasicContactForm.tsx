@@ -20,8 +20,8 @@ import { htmlRenderers } from '../renderers';
  */
 
 const ContactSchema = object({
-    firstName: string(),
-    lastName: string(),
+    firstName: string().minLength(1, 'First name is required'),
+    lastName: string().minLength(1, 'Last name is required'),
     email: string().addValidator(async (val) => {
         if (!val || typeof val !== 'string') {
             return {
@@ -37,7 +37,9 @@ const ContactSchema = object({
         }
         return { valid: true };
     }),
-    age: number().optional(),
+    /** User's age */
+    age: number().min(16, 'Age must be at least 16').optional(),
+    /** Subscribe to newsletter */
     subscribeToNewsletter: boolean().optional()
 });
 

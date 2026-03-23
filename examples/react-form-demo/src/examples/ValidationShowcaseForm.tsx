@@ -18,28 +18,33 @@ import { htmlRenderers } from '../renderers';
  */
 
 const SignupSchema = object({
-    username: string().addValidator(async (val) => {
-        if (!val || typeof val !== 'string' || val.length < 3) {
-            return {
-                valid: false,
-                errors: [
-                    { message: 'Username must be at least 3 characters long' }
-                ]
-            };
-        }
-        if (!/^[a-zA-Z0-9_]+$/.test(val)) {
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message:
-                            'Username can only contain letters, numbers, and underscores'
-                    }
-                ]
-            };
-        }
-        return { valid: true };
-    }),
+    username: string()
+        .minLength(1)
+        .addValidator(async (val) => {
+            if (!val || typeof val !== 'string' || val.length < 3) {
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message:
+                                'Username must be at least 3 characters long'
+                        }
+                    ]
+                };
+            }
+            if (!/^[a-zA-Z0-9_]+$/.test(val)) {
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message:
+                                'Username can only contain letters, numbers, and underscores'
+                        }
+                    ]
+                };
+            }
+            return { valid: true };
+        }),
     email: string().addValidator(async (val) => {
         if (!val || typeof val !== 'string') {
             return {
@@ -115,7 +120,9 @@ export function ValidationShowcaseForm() {
     const handleSubmit = async () => {
         const result = await form.submit();
         if (result.valid) {
-            alert(`Signup successful!\n${JSON.stringify(result.object, null, 2)}`);
+            alert(
+                `Signup successful!\n${JSON.stringify(result.object, null, 2)}`
+            );
         }
     };
 
@@ -124,15 +131,17 @@ export function ValidationShowcaseForm() {
             <div className="example">
                 <h2>2. Validation Showcase</h2>
                 <p className="description">
-                    Demonstrates various validators: min-length, regex
-                    patterns, numeric range. Validation runs on every field
-                    change — errors appear immediately as you type.
+                    Demonstrates various validators: min-length, regex patterns,
+                    numeric range. Validation runs on every field change —
+                    errors appear immediately as you type.
                 </p>
 
                 <div className="form-grid">
                     <label>
                         Username{' '}
-                        <small>(min 3 chars, letters/numbers/underscores)</small>
+                        <small>
+                            (min 3 chars, letters/numbers/underscores)
+                        </small>
                         <Field selector={(t) => t.username} form={form} />
                     </label>
 
