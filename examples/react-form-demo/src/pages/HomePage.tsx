@@ -4,7 +4,7 @@ export default function HomePage() {
     return (
         <>
             <section className="hero">
-                <h1>Cleverbrush Framework</h1>
+                <h1>Cleverbrush Libs</h1>
                 <p className="tagline">
                     Type-safe TypeScript libraries for schema validation, object
                     mapping, and headless React forms. Define once — validate,

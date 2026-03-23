@@ -323,6 +323,49 @@ const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
                     </pre>
                 </div>
 
+                {/* ── JSDoc Comments Preservation ─────────────────── */}
+                <div className="card">
+                    <h2>JSDoc Comments Preservation</h2>
+                    <p>
+                        When you define an object schema, JSDoc comments on
+                        properties are preserved in the inferred TypeScript
+                        type. This means your IDE tooltips, hover
+                        documentation, and autocomplete descriptions all carry
+                        through from the schema definition — no need to
+                        maintain separate documentation:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
+
+const UserSchema = object({
+  /** Full display name of the user */
+  name: string().minLength(1).maxLength(200),
+  /** Contact email — must be unique across all users */
+  email: string().minLength(5),
+  /** Age in years. Must be a positive integer. */
+  age: number().min(0).max(150)
+});
+
+type User = InferType<typeof UserSchema>;
+// Hovering over User.name in your IDE shows:
+//   "Full display name of the user"
+// Hovering over User.email shows:
+//   "Contact email — must be unique across all users"`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        This is a unique advantage over other validation
+                        libraries: your schema is not just a runtime validator
+                        but also the canonical source of documentation for
+                        every property. Other libraries like Zod, Yup, and Joi
+                        do not carry JSDoc comments through to their inferred
+                        types.
+                    </p>
+                </div>
+
                 {/* ── Composing Schemas ────────────────────────────── */}
                 <div className="card">
                     <h2>Composing Schemas</h2>
@@ -599,14 +642,9 @@ console.log(cityResult.value); // 'NYC'`)
                                     <td className="partial">~</td>
                                 </tr>
                                 <tr>
-                                    <td>Drives form generation</td>
-                                    <td className="check">✓</td>
-                                    <td className="cross">✗</td>
-                                    <td className="cross">✗</td>
-                                    <td className="cross">✗</td>
-                                </tr>
-                                <tr>
-                                    <td>Drives object mapping</td>
+                                    <td>
+                                        JSDoc comments preservation
+                                    </td>
                                     <td className="check">✓</td>
                                     <td className="cross">✗</td>
                                     <td className="cross">✗</td>

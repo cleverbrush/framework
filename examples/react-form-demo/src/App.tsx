@@ -68,7 +68,7 @@ function Navbar() {
     return (
         <nav className="navbar">
             <a href="#/" className="navbar-brand">
-                Cleverbrush Framework
+                Cleverbrush Libs
             </a>
             <button
                 className={`navbar-toggle${menuOpen ? ' open' : ''}`}
@@ -101,7 +101,7 @@ function Footer() {
         <footer className="site-footer">
             <div className="footer-content">
                 <div className="footer-section">
-                    <h4>Cleverbrush Framework</h4>
+                    <h4>Cleverbrush Libs</h4>
                     <p>
                         Open-source TypeScript libraries for schema validation,
                         object mapping, and headless React forms.
