@@ -1,4 +1,5 @@
-import { highlightTS } from '../highlight';
+import Link from 'next/link';
+import { highlightTS } from '@/lib/highlight';
 
 export default function HomePage() {
     return (
@@ -37,7 +38,7 @@ export default function HomePage() {
                 <div className="container">
                     <h2 className="section-title">The Libraries</h2>
                     <div className="lib-cards">
-                        <a href="#/schema" className="lib-card">
+                        <Link href="/schema" className="lib-card">
                             <h3>@cleverbrush/schema</h3>
                             <p>
                                 Immutable, composable schema definitions with
@@ -48,8 +49,8 @@ export default function HomePage() {
                             <span className="lib-card-link">
                                 Learn more →
                             </span>
-                        </a>
-                        <a href="#/mapper" className="lib-card">
+                        </Link>
+                        <Link href="/mapper" className="lib-card">
                             <h3>@cleverbrush/mapper</h3>
                             <p>
                                 Type-safe object mapping between schemas with
@@ -59,8 +60,8 @@ export default function HomePage() {
                             <span className="lib-card-link">
                                 Learn more →
                             </span>
-                        </a>
-                        <a href="#/react-form" className="lib-card">
+                        </Link>
+                        <Link href="/react-form" className="lib-card">
                             <h3>@cleverbrush/react-form</h3>
                             <p>
                                 Headless, schema-driven React forms. Define your
@@ -71,7 +72,7 @@ export default function HomePage() {
                             <span className="lib-card-link">
                                 Learn more →
                             </span>
-                        </a>
+                        </Link>
                     </div>
 
                     <div className="card" style={{ marginTop: '2rem' }}>
