@@ -8,6 +8,13 @@ import {
     PropertyDescriptor
 } from '@cleverbrush/schema';
 
+/**
+ * Internal symbol used to brand target property descriptors with their key.
+ * Using a symbol instead of a string property keeps it out of IntelliSense.
+ */
+const SYMBOL_TARGET_PROPERTY_KEY: unique symbol = Symbol('targetPropertyKey');
+type SYMBOL_TARGET_PROPERTY_KEY = typeof SYMBOL_TARGET_PROPERTY_KEY;
+
 // ── Helper Types ──────────────────────────────────────────────────────
 
 /**
@@ -31,7 +38,7 @@ type SchemaKeys<T extends ObjectSchemaBuilder<any, any, any>> =
  * properties.
  */
 type TargetPropertyKey<K extends string> = {
-    readonly __targetPropertyKey: K;
+    readonly [SYMBOL_TARGET_PROPERTY_KEY]: K;
 };
 
 /**
@@ -583,7 +590,7 @@ export class Mapper<
                 if (typeof prop === 'string') {
                     capturedKey = prop;
                 }
-                return { __targetPropertyKey: prop };
+                return { [SYMBOL_TARGET_PROPERTY_KEY]: prop };
             }
         });
 
