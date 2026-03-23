@@ -19,6 +19,7 @@ import { htmlRenderers } from '../renderers';
 
 const SignupSchema = object({
     username: string()
+        .required('Username is required')
         .minLength(1)
         .addValidator(async (val) => {
             if (!val || typeof val !== 'string' || val.length < 3) {
@@ -45,66 +46,48 @@ const SignupSchema = object({
             }
             return { valid: true };
         }),
-    email: string().addValidator(async (val) => {
-        if (!val || typeof val !== 'string') {
-            return {
-                valid: false,
-                errors: [{ message: 'Email is required' }]
-            };
-        }
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
-            return {
-                valid: false,
-                errors: [{ message: 'Invalid email format' }]
-            };
-        }
-        return { valid: true };
-    }),
-    password: string().addValidator(async (val) => {
-        if (!val || typeof val !== 'string' || val.length < 8) {
-            return {
-                valid: false,
-                errors: [
-                    { message: 'Password must be at least 8 characters long' }
-                ]
-            };
-        }
-        if (!/[A-Z]/.test(val)) {
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message:
-                            'Password must contain at least one uppercase letter'
-                    }
-                ]
-            };
-        }
-        if (!/[0-9]/.test(val)) {
-            return {
-                valid: false,
-                errors: [
-                    { message: 'Password must contain at least one number' }
-                ]
-            };
-        }
-        return { valid: true };
-    }),
-    age: number().addValidator(async (val) => {
-        if (val === undefined || val === null) {
-            return {
-                valid: false,
-                errors: [{ message: 'Age is required' }]
-            };
-        }
-        if (typeof val !== 'number' || val < 18 || val > 120) {
-            return {
-                valid: false,
-                errors: [{ message: 'Age must be between 18 and 120' }]
-            };
-        }
-        return { valid: true };
-    })
+    /** Some email comment */
+    email: string()
+        .required('Email is required')
+        .addValidator(async (val) => {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) {
+                return {
+                    valid: false,
+                    errors: [{ message: 'Invalid email format' }]
+                };
+            }
+            return { valid: true };
+        }),
+    password: string()
+        .required('Password is required')
+        .minLength(8, 'Password must be at least 8 characters long')
+        .maxLength(16, 'Password cannot be longer than 16 characters')
+        .addValidator(async (val) => {
+            if (!/[A-Z]/.test(val)) {
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message:
+                                'Password must contain at least one uppercase letter'
+                        }
+                    ]
+                };
+            }
+            if (!/[0-9]/.test(val)) {
+                return {
+                    valid: false,
+                    errors: [
+                        { message: 'Password must contain at least one number' }
+                    ]
+                };
+            }
+            return { valid: true };
+        }),
+    age: number()
+        .required('Age is required')
+        .min(18, 'Age must be at least 18')
+        .max(120, 'Age cannot be greater than 120')
 });
 
 export function ValidationShowcaseForm() {
