@@ -10,6 +10,7 @@
     },
     "dependencies": {
         "@cleverbrush/schema": "file:../../libs/schema",
+        "@cleverbrush/mapper": "file:../../libs/mapper",
         "@cleverbrush/react-form": "file:../../libs/react-form",
         "react": "^19.0.0",
         "react-dom": "^19.0.0"
