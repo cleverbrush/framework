@@ -37,12 +37,13 @@ FROM node:22-alpine
 WORKDIR /app
 
 # Copy the self-contained Next.js server and its dependencies
+# Standalone output preserves monorepo directory structure
 COPY --from=build /app/examples/website/.next/standalone ./
-COPY --from=build /app/examples/website/.next/static ./.next/static
+COPY --from=build /app/examples/website/.next/static ./examples/website/.next/static
 
 EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["node", "examples/website/server.js"]
