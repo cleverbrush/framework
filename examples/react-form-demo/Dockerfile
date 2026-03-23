@@ -6,8 +6,9 @@ WORKDIR /app
 # Copy root workspace config and lockfile
 COPY package.json package-lock.json ./
 
-# Copy the libraries the demo depends on (schema, react-form)
+# Copy the libraries the demo depends on (schema, mapper, react-form)
 COPY libs/schema/ libs/schema/
+COPY libs/mapper/ libs/mapper/
 COPY libs/react-form/ libs/react-form/
 
 # Copy the demo app
@@ -16,8 +17,11 @@ COPY examples/react-form-demo/ examples/react-form-demo/
 # Install root workspace dependencies
 RUN npm ci --ignore-scripts
 
-# Build @cleverbrush/schema (required by react-form)
+# Build @cleverbrush/schema (required by mapper and react-form)
 RUN cd libs/schema && npm run build
+
+# Build @cleverbrush/mapper
+RUN cd libs/mapper && npm run build
 
 # Build @cleverbrush/react-form
 RUN cd libs/react-form && npm run build
