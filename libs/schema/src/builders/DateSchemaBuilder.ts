@@ -496,8 +496,10 @@ export class DateSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): DateSchemaBuilder<TResult, true> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): DateSchemaBuilder<TResult, true> {
+        return super.required(errorMessage);
     }
 
     /**

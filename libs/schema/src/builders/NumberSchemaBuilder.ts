@@ -530,8 +530,10 @@ export class NumberSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): NumberSchemaBuilder<TResult, true> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): NumberSchemaBuilder<TResult, true> {
+        return super.required(errorMessage);
     }
 
     /**

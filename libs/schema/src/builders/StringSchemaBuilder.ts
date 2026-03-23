@@ -516,8 +516,10 @@ export class StringSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): StringSchemaBuilder<TResult, true> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): StringSchemaBuilder<TResult, true> {
+        return super.required(errorMessage);
     }
 
     /**

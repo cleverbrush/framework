@@ -1,7 +1,8 @@
 import {
     SchemaBuilder,
     ValidationResult,
-    ValidationContext
+    ValidationContext,
+    ValidationErrorMessageProvider
 } from './SchemaBuilder.js';
 
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
@@ -138,8 +139,10 @@ export class FunctionSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): FunctionSchemaBuilder<true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): FunctionSchemaBuilder<true, TExplicitType> {
+        return super.required(errorMessage);
     }
 
     /**

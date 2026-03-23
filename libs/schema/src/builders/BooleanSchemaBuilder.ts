@@ -200,8 +200,10 @@ export class BooleanSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): BooleanSchemaBuilder<TResult, true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): BooleanSchemaBuilder<TResult, true, TExplicitType> {
+        return super.required(errorMessage);
     }
 
     /**

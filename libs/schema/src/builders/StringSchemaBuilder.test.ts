@@ -1008,3 +1008,77 @@ test('string(value, customErrorMessage)', async () => {
         expect(object).toBeUndefined();
     }
 });
+
+test('required with default error message', async () => {
+    const schema = string();
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('is required');
+});
+
+test('required with custom string error message', async () => {
+    const schema = string().required('Name cannot be empty');
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('Name cannot be empty');
+});
+
+test('required with custom function error message', async () => {
+    const schema = string().required(
+        (seenValue) => `Expected a string but saw ${seenValue}`
+    );
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('Expected a string but saw null');
+});
+
+test('required with async function error message', async () => {
+    const schema = string().required(() =>
+        Promise.resolve('Async required message')
+    );
+
+    const { valid, errors } = await schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('Async required message');
+});
+
+test('required custom message survives introspect round-trip', async () => {
+    const schema = string().required('Custom required');
+    const introspected = schema.introspect();
+    expect(introspected.requiredValidationErrorMessageProvider).toEqual(
+        'Custom required'
+    );
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors?.[0].message).toEqual('Custom required');
+});
+
+test('required custom message preserved through optional().required()', async () => {
+    const schema = string().required('Custom required');
+    const schema2 = schema.optional().required();
+
+    const { valid, errors } = await schema2.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors?.[0].message).toEqual('Custom required');
+});
+
+test('required custom message overridden by new required() call', async () => {
+    const schema = string().required('Custom required');
+    const schema2 = schema.optional().required('Another message');
+
+    const { valid, errors } = await schema2.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors?.[0].message).toEqual('Another message');
+});

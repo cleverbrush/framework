@@ -6,6 +6,7 @@ import {
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     NestedValidationResult,
     PropertyDescriptor,
+    ValidationErrorMessageProvider,
     createHybridErrorArray
 } from './SchemaBuilder.js';
 
@@ -348,8 +349,10 @@ export class UnionSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): UnionSchemaBuilder<TOptions, true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): UnionSchemaBuilder<TOptions, true, TExplicitType> {
+        return super.required(errorMessage);
     }
 
     /**
