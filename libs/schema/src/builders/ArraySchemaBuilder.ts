@@ -395,8 +395,10 @@ export class ArraySchemaBuilder<
     /**
      * @hidden
      */
-    public required(): ArraySchemaBuilder<TElementSchema, true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType> {
+        return super.required(errorMessage);
     }
 
     /**

@@ -10,11 +10,12 @@
         "allowSyntheticDefaultImports": true,
         "sourceMap": false,
         "declarationMap": false,
-        "strictFunctionTypes": true,
+        "jsx": "react-jsx",
         "strictNullChecks": true,
-        "skipLibCheck": true
+        "noImplicitThis": true
     },
-    "include": ["src/**/*.ts"],
+    "include": ["src/**/*.ts", "src/**/*.tsx"],
+    "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx"],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }

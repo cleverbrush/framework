@@ -1,4 +1,5 @@
 import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
+import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
 import { Transaction, transaction } from '../utils/transaction.js';
 
 /**
@@ -144,6 +145,7 @@ export type SchemaBuilderProps<T> = {
     isRequired?: boolean;
     preprocessors: Preprocessor<T>[];
     validators: Validator<T>[];
+    requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
 };
 
 export type ValidationContext<
@@ -408,7 +410,11 @@ export type PropertyDescriptorTree<
                             TParentPropertyDescriptor
                         >
                     >
-                  : InferType<TProperties[K]> extends TAssignableTo
+                  : TProperties[K] extends ArraySchemaBuilder<
+                          ObjectSchemaBuilder<any, any, any>,
+                          any,
+                          any
+                      >
                     ? PropertyDescriptor<
                           TRootSchema,
                           TProperties[K],
@@ -418,7 +424,17 @@ export type PropertyDescriptorTree<
                               TParentPropertyDescriptor
                           >
                       >
-                    : never;
+                    : InferType<TProperties[K]> extends TAssignableTo
+                      ? PropertyDescriptor<
+                            TRootSchema,
+                            TProperties[K],
+                            PropertyDescriptor<
+                                TRootSchema,
+                                TSchema,
+                                TParentPropertyDescriptor
+                            >
+                        >
+                      : never;
           }
         : never);
 
@@ -470,6 +486,10 @@ export abstract class SchemaBuilder<
     #preprocessors: Preprocessor<TResult>[] = [];
     #validators: Validator<TResult>[] = [];
     #type = 'base';
+    #defaultRequiredErrorMessageProvider: ValidationErrorMessageProvider =
+        'is required';
+    #requiredErrorMessageProvider: ValidationErrorMessageProvider =
+        'is required';
 
     /**
      * Set type of schema explicitly. `notUsed` param is needed only for case when JS is used. E.g. when you
@@ -675,7 +695,10 @@ export abstract class SchemaBuilder<
                 preprocessedObject === null)
         ) {
             errors.push({
-                message: 'is required',
+                message: await this.getValidationErrorMessage(
+                    this.#requiredErrorMessageProvider,
+                    preprocessedObject
+                ),
                 path
             });
             if (!doNotStopOnFirstError) {
@@ -729,7 +752,12 @@ export abstract class SchemaBuilder<
             /**
              * Array of validator functions
              */
-            validators: [...this.validators] as readonly Validator<TResult>[]
+            validators: [...this.validators] as readonly Validator<TResult>[],
+            /**
+             * Custom error message provider for the 'is required' validation error.
+             */
+            requiredValidationErrorMessageProvider:
+                this.#requiredErrorMessageProvider
         };
     }
 
@@ -745,11 +773,21 @@ export abstract class SchemaBuilder<
 
     /**
      * Makes schema required (consider `null` and `undefined` as invalid objects for this schema)
+     * @param errorMessage - optional custom error message or provider for the 'is required' validation error
      */
-    public required() {
+    public required(errorMessage?: ValidationErrorMessageProvider) {
         return this.createFromProps({
             ...this.introspect(),
-            isRequired: true
+            isRequired: true,
+            ...(errorMessage !== undefined
+                ? {
+                      requiredValidationErrorMessageProvider:
+                          this.assureValidationErrorMessageProvider(
+                              errorMessage,
+                              this.#defaultRequiredErrorMessageProvider
+                          )
+                  }
+                : {})
         }) as any;
     }
 
@@ -876,5 +914,11 @@ export abstract class SchemaBuilder<
         if (Array.isArray(validators)) {
             this.#validators = [...validators];
         }
+
+        this.#requiredErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.requiredValidationErrorMessageProvider,
+                this.#defaultRequiredErrorMessageProvider
+            );
     }
 }

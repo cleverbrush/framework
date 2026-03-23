@@ -9,6 +9,7 @@ import {
     SchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     ValidationContext,
+    ValidationErrorMessageProvider,
     ValidationResult
 } from './SchemaBuilder.js';
 
@@ -263,8 +264,10 @@ export class ObjectSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): ObjectSchemaBuilder<TProperties, true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): ObjectSchemaBuilder<TProperties, true, TExplicitType> {
+        return super.required(errorMessage);
     }
 
     /**

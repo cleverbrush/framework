@@ -9,12 +9,9 @@
         "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
         "sourceMap": false,
-        "declarationMap": false,
-        "strictFunctionTypes": true,
-        "strictNullChecks": true,
-        "skipLibCheck": true
+        "declarationMap": false
     },
-    "include": ["src/**/*.ts"],
+    "files": ["src/index.ts"],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }
