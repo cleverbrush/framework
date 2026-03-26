@@ -61,7 +61,7 @@ export class ClickhouseKnexClient extends Knex.Client {
                   },
                   retryOptions
               )
-            : null;
+            : undefined;
     }
 
     #typeParsers = {

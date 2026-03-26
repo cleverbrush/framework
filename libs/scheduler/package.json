@@ -20,6 +20,13 @@
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
     "name": "@cleverbrush/scheduler",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/scheduler#readme",
     "repository": {
@@ -28,7 +35,7 @@
     },
     "scripts": {
         "watch": "tsc --build --watch",
-        "build": "tsc --build",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "type": "module",

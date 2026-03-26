@@ -17,6 +17,49 @@
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./string": {
+            "types": "./dist/builders/StringSchemaBuilder.d.ts",
+            "import": "./dist/builders/StringSchemaBuilder.js"
+        },
+        "./number": {
+            "types": "./dist/builders/NumberSchemaBuilder.d.ts",
+            "import": "./dist/builders/NumberSchemaBuilder.js"
+        },
+        "./boolean": {
+            "types": "./dist/builders/BooleanSchemaBuilder.d.ts",
+            "import": "./dist/builders/BooleanSchemaBuilder.js"
+        },
+        "./object": {
+            "types": "./dist/builders/ObjectSchemaBuilder.d.ts",
+            "import": "./dist/builders/ObjectSchemaBuilder.js"
+        },
+        "./array": {
+            "types": "./dist/builders/ArraySchemaBuilder.d.ts",
+            "import": "./dist/builders/ArraySchemaBuilder.js"
+        },
+        "./date": {
+            "types": "./dist/builders/DateSchemaBuilder.d.ts",
+            "import": "./dist/builders/DateSchemaBuilder.js"
+        },
+        "./any": {
+            "types": "./dist/builders/AnySchemaBuilder.d.ts",
+            "import": "./dist/builders/AnySchemaBuilder.js"
+        },
+        "./union": {
+            "types": "./dist/builders/UnionSchemaBuilder.d.ts",
+            "import": "./dist/builders/UnionSchemaBuilder.js"
+        },
+        "./function": {
+            "types": "./dist/builders/FunctionSchemaBuilder.d.ts",
+            "import": "./dist/builders/FunctionSchemaBuilder.js"
+        }
+    },
+    "sideEffects": false,
     "name": "@cleverbrush/schema",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/schema#readme",
     "repository": {
@@ -25,7 +68,7 @@
     },
     "scripts": {
         "watch": "tsc --build --watch",
-        "build": "tsc --build",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "type": "module",

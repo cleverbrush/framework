@@ -6,8 +6,10 @@
         "target": "ES2022",
         "module": "ES2022",
         "esModuleInterop": true,
-        "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
+        "moduleResolution": "Node",
+        "strictNullChecks": true,
+        "noImplicitThis": true,
         "sourceMap": false,
         "declarationMap": false
     },
