@@ -632,6 +632,17 @@ export class Mapper<
             );
         }
 
+        // Validate that the captured key exists in the target schema
+        const toIntrospection = this._toSchema.introspect();
+        const targetProperties = toIntrospection.properties
+            ? Object.keys(toIntrospection.properties)
+            : [];
+        if (!targetProperties.includes(capturedKey)) {
+            throw new MapperConfigurationError(
+                `Property "${capturedKey}" does not exist in the target schema`
+            );
+        }
+
         return new PropertyMappingBuilder(this, capturedKey as TKey);
     }
 

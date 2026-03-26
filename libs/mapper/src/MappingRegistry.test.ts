@@ -2903,3 +2903,71 @@ describe('mapper() factory function', () => {
         });
     });
 });
+
+// ── Property not in target schema ────────────────────────────────────
+
+describe('Mapping property not in target schema', () => {
+    test('for() throws when selected property does not exist in target schema', () => {
+        const SourceSchema = object({
+            id: number(),
+            name: string(),
+            email: string(),
+            address: object({
+                street: string(),
+                city: string(),
+                zipCode: string()
+            })
+        });
+
+        const TargetSchema = SourceSchema.omit('address');
+
+        // 'street' is NOT a property of TargetSchema
+        const registry = new MappingRegistry();
+        expect(() =>
+            registry.configure(SourceSchema, TargetSchema, (m) =>
+                (m as any)
+                    .for((t: any) => t.street)
+                    .compute(
+                        (user: any) =>
+                            `${user.address.street} - ${user.address.city}`
+                    )
+            )
+        ).toThrow();
+    });
+
+    test('for() throws when property exists in source but not in target', () => {
+        const SourceSchema = object({
+            name: string(),
+            age: number()
+        });
+
+        const TargetSchema = object({
+            name: string()
+        });
+
+        const mapper = new Mapper(SourceSchema, TargetSchema);
+        expect(() =>
+            (mapper as any).for((t: any) => t.age)
+        ).toThrow(
+            'Property "age" does not exist in the target schema'
+        );
+    });
+
+    test('for() succeeds when property exists in target schema', () => {
+        const SourceSchema = object({
+            name: string(),
+            age: number()
+        });
+
+        const TargetSchema = object({
+            name: string(),
+            age: number()
+        });
+
+        const mapper = new Mapper(SourceSchema, TargetSchema);
+        // Should NOT throw
+        expect(() =>
+            mapper.for((t) => t.name)
+        ).not.toThrow();
+    });
+});
