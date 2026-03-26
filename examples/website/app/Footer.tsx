@@ -3,14 +3,37 @@ export function Footer() {
         <footer className="site-footer">
             <div className="footer-content">
                 <div className="footer-section">
-                    <h4>Cleverbrush Libs</h4>
+                    <h4>
+                        <svg
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            style={{
+                                marginRight: '0.4rem',
+                                verticalAlign: 'middle',
+                                display: 'inline-block',
+                                marginTop: '-2px'
+                            }}
+                        >
+                            <path
+                                d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                opacity="0.5"
+                            />
+                        </svg>
+                        Cleverbrush
+                    </h4>
                     <p>
                         Open-source TypeScript libraries for schema validation,
                         object mapping, and headless React forms.
                     </p>
                 </div>
                 <div className="footer-section">
-                    <h4>Links</h4>
+                    <h4>Resources</h4>
                     <a
                         href="https://github.com/cleverbrush/framework"
                         target="_blank"

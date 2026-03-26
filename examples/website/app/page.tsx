@@ -5,27 +5,35 @@ export default function HomePage() {
     return (
         <>
             <section className="hero">
-                <h1>Cleverbrush Libs</h1>
+                <p className="hero-eyebrow">Open-Source TypeScript Framework</p>
+                <h1>Build with confidence.<br />Validate with ease.</h1>
                 <p className="tagline">
-                    Type-safe TypeScript libraries for schema validation, object
-                    mapping, and headless React forms. Define once — validate,
-                    map, and render anywhere.
+                    Type-safe schema validation, object mapping, and headless
+                    React forms. Define once — validate, map, and render
+                    anywhere.
                 </p>
-                <p className="production-note">
-                    🚀 These libraries are fairly new and not yet widely known,
-                    but they are battle-tested in production at{' '}
+                <div className="hero-actions">
                     <a
-                        href="https://cleverbrush.com/editor"
+                        href="#libraries"
+                        className="hero-btn hero-btn-primary"
+                    >
+                        Get Started
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </a>
+                    <a
+                        href="https://github.com/cleverbrush/framework"
                         target="_blank"
                         rel="noopener noreferrer"
+                        className="hero-btn hero-btn-secondary"
                     >
-                        cleverbrush.com/editor
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                        </svg>
+                        GitHub
                     </a>
-                    . The entire editor — with dozens of interactive panels,
-                    complex forms, and real-time collaboration — runs on these
-                    three packages. They are stable, performant, and ready for
-                    production use.
-                </p>
+                </div>
                 <div className="hero-badges">
                     <span className="badge">TypeScript-first</span>
                     <span className="badge">Zero dependencies*</span>
@@ -34,11 +42,16 @@ export default function HomePage() {
                 </div>
             </section>
 
-            <section className="section">
+            <section className="section" id="libraries">
                 <div className="container">
                     <h2 className="section-title">The Libraries</h2>
                     <div className="lib-cards">
                         <Link href="/schema" className="lib-card">
+                            <div className="lib-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                                </svg>
+                            </div>
                             <h3>@cleverbrush/schema</h3>
                             <p>
                                 Immutable, composable schema definitions with
@@ -47,10 +60,15 @@ export default function HomePage() {
                                 and runtime introspection from a single source.
                             </p>
                             <span className="lib-card-link">
-                                Learn more →
+                                Explore docs <span aria-hidden="true">→</span>
                             </span>
                         </Link>
                         <Link href="/mapper" className="lib-card">
+                            <div className="lib-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/>
+                                </svg>
+                            </div>
                             <h3>@cleverbrush/mapper</h3>
                             <p>
                                 Type-safe object mapping between schemas with
@@ -58,10 +76,15 @@ export default function HomePage() {
                                 property when converting between object shapes.
                             </p>
                             <span className="lib-card-link">
-                                Learn more →
+                                Explore docs <span aria-hidden="true">→</span>
                             </span>
                         </Link>
                         <Link href="/react-form" className="lib-card">
+                            <div className="lib-card-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/>
+                                </svg>
+                            </div>
                             <h3>@cleverbrush/react-form</h3>
                             <p>
                                 Headless, schema-driven React forms. Define your
@@ -70,12 +93,12 @@ export default function HomePage() {
                                 HTML.
                             </p>
                             <span className="lib-card-link">
-                                Learn more →
+                                Explore docs <span aria-hidden="true">→</span>
                             </span>
                         </Link>
                     </div>
 
-                    <div className="card" style={{ marginTop: '2rem' }}>
+                    <div className="card" style={{ marginTop: '2.5rem' }}>
                         <h3>How They Work Together</h3>
                         <p>
                             The three libraries share a single source of truth
