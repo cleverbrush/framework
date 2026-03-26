@@ -5,6 +5,7 @@ export default defineConfig({
     format: ['esm'],
     tsconfig: './tsconfig.build.json',
     minify: true,
+    sourcemap: true,
     clean: true,
     target: 'es2022',
     external: ['react']
