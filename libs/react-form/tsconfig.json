@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        "composite": true,
         "rootDir": "./src",
         "outDir": "./dist",
         "declaration": true,
@@ -16,6 +17,9 @@
     },
     "include": ["src/**/*.ts", "src/**/*.tsx"],
     "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx"],
+    "references": [
+        { "path": "../schema" }
+    ],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }
