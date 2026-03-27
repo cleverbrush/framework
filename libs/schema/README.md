@@ -14,15 +14,15 @@ A schema definition and validation library for TypeScript. Define object schemas
 - **JSDoc comment preservation** — JSDoc comments on schema properties carry through to the inferred TypeScript type, so IDE tooltips and autocomplete descriptions come from the schema definition itself.
 - **Zero dependencies** — no runtime dependencies at all.
 
-| Feature | @cleverbrush/schema | Zod | Yup | Joi |
-| --- | --- | --- | --- | --- |
-| TypeScript type inference | ✓ | ✓ | ~ | ✗ |
-| Immutable schemas | ✓ | ✓ | ✗ | ✗ |
-| PropertyDescriptors | ✓ | ✗ | ✗ | ~ |
-| JSDoc preservation | ✓ | ✗ | ✗ | ✗ |
-| Zero dependencies | ✓ | ✓ | ✗ | ✗ |
-| Async validation | ✓ | ✓ | ✓ | ✓ |
-| Per-property error inspection | ✓ | ~ | ~ | ~ |
+| Feature                       | @cleverbrush/schema | Zod | Yup | Joi |
+| ----------------------------- | ------------------- | --- | --- | --- |
+| TypeScript type inference     | ✓                   | ✓   | ~   | ✗   |
+| Immutable schemas             | ✓                   | ✓   | ✗   | ✗   |
+| PropertyDescriptors           | ✓                   | ✗   | ✗   | ~   |
+| JSDoc preservation            | ✓                   | ✗   | ✗   | ✗   |
+| Zero dependencies             | ✓                   | ✓   | ✗   | ✗   |
+| Async validation              | ✓                   | ✓   | ✓   | ✓   |
+| Per-property error inspection | ✓                   | ~   | ~   | ~   |
 
 ## Installation
 
@@ -33,13 +33,19 @@ npm install @cleverbrush/schema
 ## Quick Start
 
 ```typescript
-import { object, string, number, boolean, InferType } from '@cleverbrush/schema';
+import {
+    object,
+    string,
+    number,
+    boolean,
+    InferType
+} from '@cleverbrush/schema';
 
 // 1. Define a schema with fluent constraints
 const UserSchema = object({
-    name:     string().minLength(2, 'Name must be at least 2 characters'),
-    email:    string().minLength(5, 'Please enter a valid email'),
-    age:      number().min(0, 'Age cannot be negative').max(150),
+    name: string().minLength(2, 'Name must be at least 2 characters'),
+    email: string().minLength(5, 'Please enter a valid email'),
+    age: number().min(0, 'Age cannot be negative').max(150),
     isActive: boolean()
 });
 
@@ -60,8 +66,8 @@ if (result.valid) {
 } else {
     // For object schemas, prefer getErrorsFor() for per-property error inspection:
     const nameErrors = result.getErrorsFor((p) => p.name);
-    console.log(nameErrors.isValid);   // false
-    console.log(nameErrors.errors);    // ['Name must be at least 2 characters']
+    console.log(nameErrors.isValid); // false
+    console.log(nameErrors.errors); // ['Name must be at least 2 characters']
 
     // result.errors on object schemas is deprecated — use getErrorsFor() instead
     console.log('Errors:', result.errors);
@@ -84,17 +90,17 @@ const user = {
 
 The following builder functions are available:
 
-| Function | Description | Key Methods |
-| --- | --- | --- |
-| `any()` | Any value. Similar to TypeScript's `any` type. | `.optional()`, `.addValidator(fn)` |
-| `string()` | String value with constraints. | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.optional()` |
-| `number()` | Numeric value with constraints. | `.min(n)`, `.max(n)`, `.integer()`, `.optional()` |
-| `boolean()` | Boolean value. | `.optional()` |
-| `date()` | JavaScript `Date` instance. | `.optional()` |
-| `func()` | Function value. | `.optional()` |
-| `object(props)` | Object with typed properties. Supports nesting. | `.validate(data)`, `.addProps({...})`, `.optional()` |
-| `array()` | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.optional()` |
-| `union(schema)` | Union of schemas — e.g. `string \| number`. | `.or(schema)`, `.validate(data)`, `.optional()` |
+| Function        | Description                                       | Key Methods                                                     |
+| --------------- | ------------------------------------------------- | --------------------------------------------------------------- |
+| `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.addValidator(fn)`                              |
+| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.optional()` |
+| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.optional()`               |
+| `boolean()`     | Boolean value.                                    | `.optional()`                                                   |
+| `date()`        | JavaScript `Date` instance.                       | `.optional()`                                                   |
+| `func()`        | Function value.                                   | `.optional()`                                                   |
+| `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`            |
+| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.optional()`  |
+| `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`                 |
 
 ## Immutability
 
@@ -102,8 +108,8 @@ All schema builders are immutable. Every method call returns a **new** schema bu
 
 ```typescript
 const base = string().minLength(1);
-const strict = base.maxLength(50);  // new instance — base is unchanged
-const loose  = base.optional();     // another new instance
+const strict = base.maxLength(50); // new instance — base is unchanged
+const loose = base.optional(); // another new instance
 
 // base still only has minLength(1)
 // strict has minLength(1) + maxLength(50)
@@ -114,7 +120,7 @@ This is especially powerful when building a library of reusable schema fragments
 
 ```typescript
 const Email = string().minLength(5).maxLength(255);
-const Name  = string().minLength(1).maxLength(100);
+const Name = string().minLength(1).maxLength(100);
 
 const CreateUser = object({ name: Name, email: Email });
 const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
@@ -130,18 +136,18 @@ import { object, string, number, array, union } from '@cleverbrush/schema';
 
 // Extend an existing schema with new properties
 const BaseEntity = object({
-    id:        string(),
+    id: string(),
     createdAt: string()
 });
 
 const UserEntity = BaseEntity.addProps({
-    name:  string().minLength(2),
+    name: string().minLength(2),
     email: string().minLength(5)
 });
 
 // Nest objects inside arrays
 const TeamSchema = object({
-    name:    string().minLength(1),
+    name: string().minLength(1),
     members: array().of(UserEntity).minLength(1).maxLength(50)
 });
 
@@ -245,7 +251,10 @@ const SignupSchema = object({
     confirmPassword: string().minLength(8)
 }).addValidator(async (value) => {
     if (value.password !== value.confirmPassword) {
-        return { valid: false, errors: [{ message: 'Passwords do not match' }] };
+        return {
+            valid: false,
+            errors: [{ message: 'Passwords do not match' }]
+        };
     }
     return { valid: true };
 });
@@ -264,14 +273,16 @@ const PersonSchema = object({
     })
 });
 
-const result = await PersonSchema.validate(person, { doNotStopOnFirstError: true });
+const result = await PersonSchema.validate(person, {
+    doNotStopOnFirstError: true
+});
 
 if (!result.valid) {
     // Get errors for a single property
     const nameErrors = result.getErrorsFor((p) => p.name);
-    console.log(nameErrors.isValid);    // false
-    console.log(nameErrors.errors);     // ['must be at least 1 character']
-    console.log(nameErrors.seenValue);  // the value that was validated
+    console.log(nameErrors.isValid); // false
+    console.log(nameErrors.errors); // ['must be at least 1 character']
+    console.log(nameErrors.seenValue); // the value that was validated
 
     // Works with nested properties too
     const cityErrors = result.getErrorsFor((p) => p.address.city);
@@ -287,13 +298,18 @@ PropertyDescriptors are a runtime metadata tree attached to each property in an 
 - [`@cleverbrush/react-form`](../react-form) uses them to bind form fields to schema properties and read their validation constraints automatically.
 
 ```typescript
-import { object, string, number, ObjectSchemaBuilder } from '@cleverbrush/schema';
+import {
+    object,
+    string,
+    number,
+    ObjectSchemaBuilder
+} from '@cleverbrush/schema';
 
 const UserSchema = object({
-    name:    string().minLength(2),
+    name: string().minLength(2),
     address: object({
         city: string(),
-        zip:  number()
+        zip: number()
     })
 });
 

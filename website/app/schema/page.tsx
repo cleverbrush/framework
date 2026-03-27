@@ -34,12 +34,13 @@ export default function SchemaPage() {
                     <p>
                         In a typical TypeScript project, types and runtime
                         validation are separate concerns. You define a{' '}
-                        <code>User</code> type in one file, then write Joi /
-                        Yup / Zod schemas (or manual <code>if</code> checks) in
+                        <code>User</code> type in one file, then write Joi / Yup
+                        / Zod schemas (or manual <code>if</code> checks) in
                         another. Over time these drift apart — the type says a
                         field is required, but the validation allows it to be{' '}
                         <code>undefined</code>. Tests pass, but production data
-                        breaks because the validation didn&apos;t match the type.
+                        breaks because the validation didn&apos;t match the
+                        type.
                     </p>
 
                     <h3>The Solution</h3>
@@ -49,17 +50,19 @@ export default function SchemaPage() {
                         TypeScript type (via <code>InferType</code>) and runtime
                         validation from the same source. Because every method
                         returns a <strong>new builder instance</strong>
-                        (immutability), you can safely compose and extend schemas
-                        without accidentally mutating shared definitions.
+                        (immutability), you can safely compose and extend
+                        schemas without accidentally mutating shared
+                        definitions.
                     </p>
 
                     <h3>The Unique Feature: PropertyDescriptors</h3>
                     <p>
                         Unlike other schema libraries,{' '}
                         <code>@cleverbrush/schema</code> exposes a{' '}
-                        <strong>runtime descriptor tree</strong> that other tools
-                        can introspect. The <code>@cleverbrush/mapper</code>{' '}
-                        uses it for type-safe property selectors. The{' '}
+                        <strong>runtime descriptor tree</strong> that other
+                        tools can introspect. The{' '}
+                        <code>@cleverbrush/mapper</code> uses it for type-safe
+                        property selectors. The{' '}
                         <code>@cleverbrush/react-form</code> uses it to
                         auto-generate form fields with correct validation. This
                         makes the schema library a <strong>foundation</strong>{' '}
@@ -92,8 +95,8 @@ export default function SchemaPage() {
                         <li>
                             <strong>Define a schema</strong> using builder
                             functions like <code>object()</code>,{' '}
-                            <code>string()</code>, <code>number()</code> —
-                            chain constraints with a fluent API
+                            <code>string()</code>, <code>number()</code> — chain
+                            constraints with a fluent API
                         </li>
                         <li>
                             <strong>Infer the TypeScript type</strong> with{' '}
@@ -104,21 +107,19 @@ export default function SchemaPage() {
                         </li>
                         <li>
                             <strong>Validate data</strong> with{' '}
-                            <code>await schema.validate(data)</code> — get
-                            typed results with per-property errors
+                            <code>await schema.validate(data)</code> — get typed
+                            results with per-property errors
                         </li>
                         <li>
-                            <strong>Compose and extend</strong> — every
-                            method returns a new immutable instance, so you
-                            can safely build schema libraries from shared
-                            fragments
+                            <strong>Compose and extend</strong> — every method
+                            returns a new immutable instance, so you can safely
+                            build schema libraries from shared fragments
                         </li>
                         <li>
                             <strong>Integrate</strong> — pass schemas to{' '}
-                            <code>@cleverbrush/mapper</code> for object
-                            mapping or{' '}
-                            <code>@cleverbrush/react-form</code> for
-                            React forms — same schema, everywhere
+                            <code>@cleverbrush/mapper</code> for object mapping
+                            or <code>@cleverbrush/react-form</code> for React
+                            forms — same schema, everywhere
                         </li>
                     </ol>
                 </div>
@@ -251,8 +252,8 @@ console.log(bad.errors);
                                         <code>date()</code>
                                     </td>
                                     <td>
-                                        Date values. Validates that the input
-                                        is a valid Date instance.
+                                        Date values. Validates that the input is
+                                        a valid Date instance.
                                     </td>
                                     <td>
                                         <code>.optional()</code>
@@ -272,9 +273,7 @@ console.log(bad.errors);
                                 </tr>
                                 <tr>
                                     <td>
-                                        <code>
-                                            object({'{...}'})
-                                        </code>
+                                        <code>object({'{...}'})</code>
                                     </td>
                                     <td>
                                         Object schemas with named properties.
@@ -367,10 +366,10 @@ const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
                     <p>
                         When you define an object schema, JSDoc comments on
                         properties are preserved in the inferred TypeScript
-                        type. This means your IDE tooltips, hover
-                        documentation, and autocomplete descriptions all carry
-                        through from the schema definition — no need to
-                        maintain separate documentation:
+                        type. This means your IDE tooltips, hover documentation,
+                        and autocomplete descriptions all carry through from the
+                        schema definition — no need to maintain separate
+                        documentation:
                     </p>
                     <pre>
                         <code
@@ -397,10 +396,9 @@ type User = InferType<typeof UserSchema>;
                     <p>
                         This is a unique advantage over other validation
                         libraries: your schema is not just a runtime validator
-                        but also the canonical source of documentation for
-                        every property. Other libraries like Zod, Yup, and Joi
-                        do not carry JSDoc comments through to their inferred
-                        types.
+                        but also the canonical source of documentation for every
+                        property. Other libraries like Zod, Yup, and Joi do not
+                        carry JSDoc comments through to their inferred types.
                     </p>
                 </div>
 
@@ -452,13 +450,12 @@ const IdOrEmail = union(
                     <p>
                         Call <code>.validate(data)</code> on any schema. It
                         returns a promise with <code>valid</code>,{' '}
-                        <code>errors</code>, and the cleaned{' '}
-                        <code>object</code>. For object schemas,
-                        the result also includes a <code>getErrorsFor()</code>{' '}
-                        method for per-property error inspection — the flat{' '}
-                        <code>errors</code> array is <strong>deprecated</strong>{' '}
-                        on object schema results and will be removed in a
-                        future major version.
+                        <code>errors</code>, and the cleaned <code>object</code>
+                        . For object schemas, the result also includes a{' '}
+                        <code>getErrorsFor()</code> method for per-property
+                        error inspection — the flat <code>errors</code> array is{' '}
+                        <strong>deprecated</strong> on object schema results and
+                        will be removed in a future major version.
                     </p>
                     <pre>
                         <code
@@ -485,19 +482,22 @@ if (result.valid) {
                     <p>
                         Use <code>getErrorsFor()</code> with a
                         PropertyDescriptor selector to get errors for a specific
-                        field — perfect for showing inline form errors. <strong>This
-                        is the recommended way to inspect validation errors on
-                        object schemas</strong>{' '}
+                        field — perfect for showing inline form errors.{' '}
+                        <strong>
+                            This is the recommended way to inspect validation
+                            errors on object schemas
+                        </strong>{' '}
                         and replaces the deprecated <code>errors</code> array on
-                        object schema validation results.
-                        It returns an object with <code>isValid</code> (boolean),{' '}
-                        <code>errors</code> (array of error strings), and{' '}
-                        <code>seenValue</code> (the value that was validated).
+                        object schema validation results. It returns an object
+                        with <code>isValid</code> (boolean), <code>errors</code>{' '}
+                        (array of error strings), and <code>seenValue</code>{' '}
+                        (the value that was validated).
                     </p>
                     <p>
-                        Pass <code>{'{ doNotStopOnFirstError: true }'}</code>{' '}
-                        to <code>.validate()</code> to collect <strong>all</strong>{' '}
-                        errors at once, instead of stopping at the first failure:
+                        Pass <code>{'{ doNotStopOnFirstError: true }'}</code> to{' '}
+                        <code>.validate()</code> to collect <strong>all</strong>{' '}
+                        errors at once, instead of stopping at the first
+                        failure:
                     </p>
                     <pre>
                         <code
@@ -555,10 +555,10 @@ const TagsSchema = array(string())
 
                     <h3>Custom Validators</h3>
                     <p>
-                        Add custom synchronous or asynchronous validators to
-                        any schema. They receive the value and must return an
-                        object with <code>valid</code> (boolean) and
-                        optionally <code>errors</code> (array of{' '}
+                        Add custom synchronous or asynchronous validators to any
+                        schema. They receive the value and must return an object
+                        with <code>valid</code> (boolean) and optionally{' '}
+                        <code>errors</code> (array of{' '}
                         <code>{'{ message: string }'}</code>):
                     </p>
                     <pre>
@@ -605,8 +605,8 @@ console.log(result.errors); // [{ path: '$($validators[0])', message: 'This emai
                             validators)
                         </li>
                         <li>
-                            <strong>parent</strong> — navigate up the
-                            descriptor tree
+                            <strong>parent</strong> — navigate up the descriptor
+                            tree
                         </li>
                     </ul>
                     <p>
@@ -690,9 +690,7 @@ console.log(cityResult.value); // 'NYC'`)
                                     <td className="partial">~</td>
                                 </tr>
                                 <tr>
-                                    <td>
-                                        JSDoc comments preservation
-                                    </td>
+                                    <td>JSDoc comments preservation</td>
                                     <td className="check">✓</td>
                                     <td className="cross">✗</td>
                                     <td className="cross">✗</td>
@@ -816,13 +814,9 @@ console.log(cityResult.value); // 'NYC'`)
                                 </tr>
                                 <tr>
                                     <td>
-                                        <code>
-                                            object({'{...}'})
-                                        </code>
+                                        <code>object({'{...}'})</code>
                                     </td>
-                                    <td>
-                                        Object schema with named properties
-                                    </td>
+                                    <td>Object schema with named properties</td>
                                     <td>
                                         <code>.validate(data)</code>,{' '}
                                         <code>.addProps({'{...}'})</code>
@@ -864,9 +858,7 @@ console.log(cityResult.value); // 'NYC'`)
                             <tbody>
                                 <tr>
                                     <td>
-                                        <code>
-                                            InferType&lt;T&gt;
-                                        </code>
+                                        <code>InferType&lt;T&gt;</code>
                                     </td>
                                     <td>
                                         Extracts the TypeScript type from a
@@ -885,8 +877,8 @@ console.log(cityResult.value); // 'NYC'`)
                                         Result of <code>.validate()</code>.
                                         Contains <code>valid</code>,{' '}
                                         <code>errors</code>, and{' '}
-                                        <code>object</code>.
-                                        For object schemas, also includes{' '}
+                                        <code>object</code>. For object schemas,
+                                        also includes{' '}
                                         <code>getErrorsFor()</code> ({' '}
                                         <code>errors</code> is{' '}
                                         <strong>deprecated</strong> on object
@@ -900,7 +892,9 @@ console.log(cityResult.value); // 'NYC'`)
                                     <td>
                                         Individual error:{' '}
                                         <code>
-                                            {'{ path: string; message: string }'}
+                                            {
+                                                '{ path: string; message: string }'
+                                            }
                                         </code>
                                     </td>
                                 </tr>
@@ -928,8 +922,8 @@ console.log(cityResult.value); // 'NYC'`)
                                         <code>MakeOptional</code>
                                     </td>
                                     <td>
-                                        Utility type that makes a type
-                                        optional (used internally by{' '}
+                                        Utility type that makes a type optional
+                                        (used internally by{' '}
                                         <code>InferType</code>).
                                     </td>
                                 </tr>
