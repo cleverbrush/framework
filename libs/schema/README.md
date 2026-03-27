@@ -58,6 +58,12 @@ const result = await UserSchema.validate({
 if (result.valid) {
     console.log('Validated:', result.object); // typed as User
 } else {
+    // For object schemas, prefer getErrorsFor() for per-property error inspection:
+    const nameErrors = result.getErrorsFor((p) => p.name);
+    console.log(nameErrors.isValid);   // false
+    console.log(nameErrors.errors);    // ['Name must be at least 2 characters']
+
+    // result.errors on object schemas is deprecated — use getErrorsFor() instead
     console.log('Errors:', result.errors);
     // Array of { path: string; message: string }
 }
@@ -176,7 +182,8 @@ const result = await UserSchema.validate(someObject);
 if (result.valid) {
     console.log(result.object); // typed as InferType<typeof UserSchema>
 } else {
-    console.log(result.errors); // Array of { path: string; message: string }
+    // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
+    console.log(result.errors); // deprecated for object schemas — Array of { path: string; message: string }
 }
 ```
 
@@ -244,9 +251,9 @@ const SignupSchema = object({
 });
 ```
 
-### Per-Property Errors with `getErrorsFor()`
+### Per-Property Errors with `getErrorsFor()` (Recommended)
 
-`ObjectSchemaBuilder.validate()` returns an extended result with a `getErrorsFor()` method for inspecting errors on individual properties — perfect for showing inline form errors:
+`ObjectSchemaBuilder.validate()` returns an extended result with a `getErrorsFor()` method for inspecting errors on individual properties — perfect for showing inline form errors. **This is the recommended way to inspect validation errors on object schemas** and replaces the deprecated `errors` array on `ObjectSchemaValidationResult`:
 
 ```typescript
 const PersonSchema = object({

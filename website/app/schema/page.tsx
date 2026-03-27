@@ -453,7 +453,12 @@ const IdOrEmail = union(
                         Call <code>.validate(data)</code> on any schema. It
                         returns a promise with <code>valid</code>,{' '}
                         <code>errors</code>, and the cleaned{' '}
-                        <code>object</code>:
+                        <code>object</code>. For object schemas,
+                        the result also includes a <code>getErrorsFor()</code>{' '}
+                        method for per-property error inspection — the flat{' '}
+                        <code>errors</code> array is <strong>deprecated</strong>{' '}
+                        on object schema results and will be removed in a
+                        future major version.
                     </p>
                     <pre>
                         <code
@@ -468,19 +473,24 @@ const IdOrEmail = union(
 if (result.valid) {
   console.log('Validated:', result.object);
 } else {
+  // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
   console.log('Errors:', result.errors);
-  // errors is an array of { path: string; message: string }
+  // errors is deprecated on object schemas — Array of { path: string; message: string }
 }`)
                             }}
                         />
                     </pre>
 
-                    <h3>Per-Property Errors</h3>
+                    <h3>Per-Property Errors (Recommended)</h3>
                     <p>
                         Use <code>getErrorsFor()</code> with a
                         PropertyDescriptor selector to get errors for a specific
-                        field — perfect for showing inline form errors. It
-                        returns an object with <code>isValid</code> (boolean),{' '}
+                        field — perfect for showing inline form errors. <strong>This
+                        is the recommended way to inspect validation errors on
+                        object schemas</strong>{' '}
+                        and replaces the deprecated <code>errors</code> array on
+                        object schema validation results.
+                        It returns an object with <code>isValid</code> (boolean),{' '}
                         <code>errors</code> (array of error strings), and{' '}
                         <code>seenValue</code> (the value that was validated).
                     </p>
@@ -874,9 +884,13 @@ console.log(cityResult.value); // 'NYC'`)
                                     <td>
                                         Result of <code>.validate()</code>.
                                         Contains <code>valid</code>,{' '}
-                                        <code>errors</code>,{' '}
-                                        <code>object</code>, and{' '}
-                                        <code>getErrorsFor()</code>.
+                                        <code>errors</code>, and{' '}
+                                        <code>object</code>.
+                                        For object schemas, also includes{' '}
+                                        <code>getErrorsFor()</code> ({' '}
+                                        <code>errors</code> is{' '}
+                                        <strong>deprecated</strong> on object
+                                        schema results).
                                     </td>
                                 </tr>
                                 <tr>

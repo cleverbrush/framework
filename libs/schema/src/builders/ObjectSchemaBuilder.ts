@@ -9,6 +9,7 @@ import {
     SchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     ValidationContext,
+    ValidationError,
     ValidationErrorMessageProvider,
     ValidationResult
 } from './SchemaBuilder.js';
@@ -86,9 +87,22 @@ export type ObjectSchemaValidationResult<
     T,
     TRootSchema extends ObjectSchemaBuilder<any, any, any>,
     TSchema extends ObjectSchemaBuilder<any, any, any> = TRootSchema
-> = ValidationResult<T> & {
+> = Omit<ValidationResult<T>, 'errors'> & {
+    /**
+     * A flat list of validation errors.
+     *
+     * @deprecated Use {@link ObjectSchemaValidationResult.getErrorsFor | getErrorsFor()} instead for
+     * per-property error inspection with type-safe property selectors. The `errors` array on
+     * `ObjectSchemaBuilder` validation results will be removed in a future major version.
+     */
+    errors?: ValidationError[];
     /**
      * Returns a nested validation error for the property selected by the `selector` function.
+     * This is the **recommended** way to inspect validation errors — it provides type-safe,
+     * per-property error details including `isValid`, `errors`, and `seenValue`.
+     *
+     * Prefer this over the deprecated `errors` array.
+     *
      * @param selector a callback function to select property from the schema.
      */
     getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(
@@ -167,7 +181,8 @@ export type ObjectSchemaValidationResult<
  * });
  *
  * // result.valid === false
- * // result.errors[0].message === "is expected to have property 'age'"
+ * // result.errors is deprecated — use result.getErrorsFor() instead
+ * // result.getErrorsFor((p) => p.age).errors // ["is expected to have property 'age'"]
  * ```
  *
  * @example
@@ -328,6 +343,12 @@ export class ObjectSchemaBuilder<
 
     /**
      * Performs validation of object schema over the `object`.
+     *
+     * The returned result includes a `getErrorsFor()` method for type-safe,
+     * per-property error inspection. The flat `errors` array is **deprecated**
+     * and will be removed in a future major version — use `getErrorsFor()` instead.
+     *
+     * @param object The object to validate against this schema.
      * @param context Optional `ValidationContext` settings.
      */
     public async validate(
