@@ -5,12 +5,13 @@ export default function HomePage() {
     return (
         <>
             <section className="hero">
-                <p className="hero-eyebrow">Open-Source TypeScript Framework</p>
-                <h1>Build with confidence.<br />Validate with ease.</h1>
+                <p className="hero-eyebrow">Strongly Typed Full-Stack Libraries</p>
+                <h1>Your types are your safety net.<br />We make them work harder.</h1>
                 <p className="tagline">
-                    Type-safe schema validation, object mapping, and headless
-                    React forms. Define once — validate, map, and render
-                    anywhere.
+                    Open-source TypeScript libraries for front-end and back-end
+                    web apps. Schema validation, object mapping, headless React
+                    forms — all with end-to-end type safety so the compiler
+                    catches mistakes before your users do.
                 </p>
                 <div className="hero-actions">
                     <a
@@ -35,9 +36,10 @@ export default function HomePage() {
                     </a>
                 </div>
                 <div className="hero-badges">
-                    <span className="badge">TypeScript-first</span>
+                    <span className="badge">End-to-end type safety</span>
+                    <span className="badge">Front-end &amp; back-end</span>
                     <span className="badge">Zero dependencies*</span>
-                    <span className="badge">Immutable schemas</span>
+                    <span className="badge">Compile-time guarantees</span>
                     <span className="badge">BSD-3 Licensed</span>
                 </div>
             </section>
@@ -296,6 +298,45 @@ function ProductForm() {
                         dependencies. <code>@cleverbrush/react-form</code>{' '}
                         depends only on React and the schema library.
                     </p>
+                </div>
+            </section>
+
+            {/* ── Contribute CTA ──────────────────────────────────── */}
+            <section className="section">
+                <div className="container">
+                    <div className="contribute-banner">
+                        <div className="contribute-content">
+                            <h2>Help us build the future of typed web development</h2>
+                            <p>
+                                Cleverbrush libraries are open source and
+                                community-driven. Whether it&apos;s fixing a bug,
+                                improving docs, suggesting a feature, or building
+                                a new library — every contribution makes the
+                                ecosystem stronger for everyone.
+                            </p>
+                            <div className="contribute-actions">
+                                <a
+                                    href="https://github.com/cleverbrush/framework"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hero-btn hero-btn-primary"
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                                    </svg>
+                                    Contribute on GitHub
+                                </a>
+                                <a
+                                    href="https://github.com/cleverbrush/framework/issues"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hero-btn hero-btn-secondary"
+                                >
+                                    Open an Issue
+                                </a>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </section>
         </>

@@ -28,8 +28,8 @@ export function Footer() {
                         Cleverbrush
                     </h4>
                     <p>
-                        Open-source TypeScript libraries for schema validation,
-                        object mapping, and headless React forms.
+                        Strongly typed libraries for full-stack web
+                        development. Open source &amp; community-driven.
                     </p>
                 </div>
                 <div className="footer-section">
@@ -54,6 +54,30 @@ export function Footer() {
                         rel="noopener noreferrer"
                     >
                         Cleverbrush Editor
+                    </a>
+                </div>
+                <div className="footer-section">
+                    <h4>Contribute</h4>
+                    <a
+                        href="https://github.com/cleverbrush/framework/issues"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Report an Issue
+                    </a>
+                    <a
+                        href="https://github.com/cleverbrush/framework/pulls"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Pull Requests
+                    </a>
+                    <a
+                        href="https://github.com/cleverbrush/framework/discussions"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Discussions
                     </a>
                 </div>
                 <div className="footer-section">

@@ -555,6 +555,57 @@ li {
     gap: 0.6rem;
 }
 
+/* ── Contribute Banner ───────────────────────────────────────────── */
+
+.contribute-banner {
+    position: relative;
+    background: var(--bg-card);
+    border: 1px solid rgba(129, 140, 248, 0.1);
+    border-radius: var(--radius-lg);
+    padding: 2.5rem 2rem;
+    text-align: center;
+    overflow: hidden;
+}
+
+.contribute-banner::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 50% 80% at 20% 50%, rgba(129, 140, 248, 0.06), transparent),
+        radial-gradient(ellipse 50% 80% at 80% 50%, rgba(167, 139, 250, 0.05), transparent);
+    pointer-events: none;
+}
+
+.contribute-content {
+    position: relative;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.contribute-content h2 {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-primary);
+    margin: 0 0 0.75rem;
+    letter-spacing: -0.03em;
+    line-height: 1.3;
+}
+
+.contribute-content p {
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    line-height: 1.7;
+    margin: 0 0 1.5rem;
+}
+
+.contribute-actions {
+    display: flex;
+    gap: 0.75rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 /* ── Card ────────────────────────────────────────────────────────── */
 
 .card {
