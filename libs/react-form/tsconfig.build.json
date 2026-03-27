@@ -1,6 +1,5 @@
 {
     "compilerOptions": {
-        "composite": true,
         "rootDir": "./src",
         "outDir": "./dist",
         "declaration": true,
@@ -10,14 +9,11 @@
         "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
         "sourceMap": false,
-        "declarationMap": false
+        "declarationMap": false,
+        "jsx": "react-jsx",
+        "strictNullChecks": true,
+        "noImplicitThis": true
     },
-    "include": ["src/**/*.ts"],
-    "exclude": ["src/**/*.test.ts"],
-    "references": [
-        { "path": "../schema" }
-    ],
-    "watchOptions": {
-        "excludeDirectories": ["./dist"]
-    }
+    "include": ["src/**/*.ts", "src/**/*.tsx"],
+    "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx", "src/**/*.spec.ts", "src/**/*.spec.tsx"]
 }

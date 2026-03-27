@@ -1,0 +1,12 @@
+{
+    "files": [],
+    "references": [
+        { "path": "libs/async" },
+        { "path": "libs/deep" },
+        { "path": "libs/schema" },
+        { "path": "libs/knex-clickhouse" },
+        { "path": "libs/mapper/tsconfig.build.json" },
+        { "path": "libs/react-form" },
+        { "path": "libs/scheduler" }
+    ]
+}

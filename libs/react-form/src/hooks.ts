@@ -103,6 +103,9 @@ export function useSchemaForm<
     const formContextRef = useRef(formContextValue);
     formContextRef.current = formContextValue;
 
+    // Generation counter to discard stale validation results from concurrent runs
+    const validationGenRef = useRef(0);
+
     /**
      * Runs full schema validation using getErrorsFor to extract per-field errors.
      * Optionally marks all fields as touched (used by submit/explicit validate).
@@ -110,6 +113,7 @@ export function useSchemaForm<
     const runValidation = useCallback(async (markTouched: boolean): Promise<
         ValidationResult<InferType<TSchema>>
     > => {
+        const gen = ++validationGenRef.current;
         const values = store.getValues();
         // Ensure all nested object structures exist to prevent
         // ObjectSchemaBuilder.validate() from throwing on undefined nested objects
@@ -122,6 +126,11 @@ export function useSchemaForm<
         } catch {
             // If validation itself throws, treat as no errors
             return { valid: false } as ValidationResult<InferType<TSchema>>;
+        }
+
+        // Discard results if a newer validation has started since this one began
+        if (gen !== validationGenRef.current) {
+            return result as ValidationResult<InferType<TSchema>>;
         }
 
         // Clear all existing field errors
@@ -308,6 +317,7 @@ export function useFieldFromContext(
             inner.setValue(values, value, {
                 createMissingStructure: options.createMissingStructure !== false
             });
+            store.setValues(values);
             const currentState = store.getFieldState(path);
             store.updateFieldState(path, {
                 value,

@@ -1,6 +1,5 @@
 {
     "compilerOptions": {
-        "composite": true,
         "rootDir": "./src",
         "outDir": "./dist",
         "declaration": true,
@@ -10,14 +9,11 @@
         "moduleResolution": "Node",
         "allowSyntheticDefaultImports": true,
         "sourceMap": false,
-        "declarationMap": false
+        "declarationMap": false,
+        "strictFunctionTypes": true,
+        "strictNullChecks": true,
+        "skipLibCheck": true
     },
     "include": ["src/**/*.ts"],
-    "exclude": ["src/**/*.test.ts"],
-    "references": [
-        { "path": "../schema" }
-    ],
-    "watchOptions": {
-        "excludeDirectories": ["./dist"]
-    }
+    "exclude": ["src/**/*.test.ts"]
 }

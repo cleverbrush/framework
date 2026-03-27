@@ -2,6 +2,30 @@
 
 A type-safe, declarative object mapper for converting objects between different `@cleverbrush/schema` representations. Uses PropertyDescriptors as pointers to properties (similar to expressions in C# .NET) and enforces **compile-time completeness** — TypeScript will produce an error if any target property is not mapped, auto-mapped, or explicitly ignored.
 
+## Why @cleverbrush/mapper?
+
+**The problem:** Converting between different object shapes — API responses to domain models, domain models to DTOs, database rows to view models — is tedious and error-prone. You write manual mapping functions full of `destination.x = source.y` assignments. Add a new property to a schema and nothing tells you the mapper is incomplete. The bug shows up at runtime, not at compile time.
+
+**The solution:** `@cleverbrush/mapper` uses **PropertyDescriptor-based selectors** (similar to C# expression trees) for type-safe property mapping. The TypeScript compiler enforces that **every target property is mapped** — unmapped properties cause a compile-time error. You literally cannot forget a field.
+
+**What makes it different:**
+
+- **Compile-time completeness** — unmapped properties are a TypeScript error, not a runtime surprise
+- **Type-safe selectors** — `.for((t) => t.name).from((s) => s.name)` — fully checked at compile time, not string-based
+- **Auto-mapping** — properties with the same name and compatible type are mapped automatically; you only configure what differs
+- **Immutable registry** — `configure()` returns a new registry; safe to share and extend
+- **No decorators or classes** — works with plain objects and schemas
+
+| Feature | @cleverbrush/mapper | AutoMapper-ts | class-transformer | morphism |
+| --- | --- | --- | --- | --- |
+| Compile-time completeness | ✓ | ✗ | ✗ | ✗ |
+| Type-safe selectors | ✓ | ✗ | ✗ | ✗ |
+| No decorators required | ✓ | ✗ | ✗ | ✓ |
+| Works without classes | ✓ | ✗ | ✗ | ✓ |
+| Auto-mapping | ✓ | ✓ | ✗ | ✗ |
+| Immutable registry | ✓ | ✗ | ✗ | ✗ |
+| Nested schema support | ✓ | ~ | ~ | ✗ |
+
 ## Installation
 
 ```bash
@@ -16,43 +40,48 @@ npm install @cleverbrush/mapper
 import { object, string, number } from '@cleverbrush/schema';
 import { mapper } from '@cleverbrush/mapper';
 
-const UserSchema = object({
-    name: string(),
-    age: number(),
-    address: object({
-        city: string(),
-        houseNr: number()
-    })
+// Define source and target schemas
+const ApiUser = object({
+    first_name: string(),
+    last_name:  string(),
+    birth_year: number()
 });
 
-const UserDtoSchema = object({
-    name: string(),
-    cityName: string(),
-    fullAddress: string()
+const DomainUser = object({
+    fullName: string(),
+    age:      number()
 });
 
+// Configure the mapping — returns a new (immutable) registry
 const registry = mapper().configure(
-    UserSchema,
-    UserDtoSchema,
+    ApiUser,
+    DomainUser,
     (m) =>
         m
-            .for((t) => t.name)
-            .from((f) => f.name)
-            .for((t) => t.cityName)
-            .from((f) => f.address.city)
-            .for((t) => t.fullAddress)
-            .compute((user) => `${user.address.city} ${user.address.houseNr}`)
+            .for((t) => t.fullName)
+                .compute((src) => src.first_name + ' ' + src.last_name)
+            .for((t) => t.age)
+                .compute((src) => new Date().getFullYear() - src.birth_year)
 );
 
-const mapUserToDto = registry.getMapper(UserSchema, UserDtoSchema);
+// Get the mapper function and use it
+const mapFn = registry.getMapper(ApiUser, DomainUser);
 
-const dto = await mapUserToDto({
-    name: 'John Doe',
-    age: 25,
-    address: { city: 'New York', houseNr: 123 }
+const dto = await mapFn({
+    first_name: 'Jane',
+    last_name:  'Doe',
+    birth_year: 1995
 });
-// dto: { name: 'John Doe', cityName: 'New York', fullAddress: 'New York 123' }
+// { fullName: 'Jane Doe', age: <current year - 1995> }
 ```
+
+## How It Works — Step by Step
+
+1. **Define schemas** — use `@cleverbrush/schema` to define source and target shapes
+2. **Configure mappings** — use `.for()` to select a target property, then `.from()`, `.compute()`, or `.ignore()` to define how it's populated
+3. **Auto-mapping fills the gaps** — properties with the same name and compatible type are mapped automatically
+4. **Get a mapper function** — `registry.getMapper(from, to)` returns an async function that transforms objects
+5. **TypeScript enforces completeness** — if any target property is unmapped, you get a compile-time error
 
 ## Compile-Time Safety
 
@@ -86,18 +115,13 @@ The error message shows the names of the unmapped properties directly in the typ
 `from` only shows source properties whose `InferType` is assignable to the target property's type. If you select an incompatible property (e.g., mapping a `number` to a `string`), TypeScript produces a compile-time error:
 
 ```typescript
-const AddressSchema = object({ city: string(), houseNr: number() });
-const AddressDtoSchema = object({ city: string() });
-
-mapper().configure(
-    AddressSchema,
-    AddressDtoSchema,
-    (m) => m.for((t) => t.city).from((f) => f.houseNr) // TS Error: source property type is
-    // not assignable to target property type
-);
+// Trying to map a string target from a number source
+m.for((t) => t.cityName).from((f) => f.houseNr)
+// TS Error: source property type is not assignable to target property type
+// Use .compute() instead to transform the value
 ```
 
-### Unregistered ObjectSchemaBuilder mappings
+### Unregistered nested mappings
 
 When `from` maps between two `ObjectSchemaBuilder` properties, a mapping for that schema pair must be registered in the registry first. Otherwise, TypeScript produces a compile-time error:
 
@@ -128,18 +152,27 @@ Properties that can be automatically determined don't need explicit mapping conf
 When the source and target schemas have a property with the **same name** and **compatible `InferType`**, it is auto-mapped automatically:
 
 ```typescript
-const SourceSchema = object({ city: string(), houseNr: number() });
-const TargetSchema = object({ city: string(), houseNr: string() });
+const Source = object({
+    id:    string(),
+    name:  string(),
+    email: string(),
+    age:   number()
+});
 
-// Only houseNr needs explicit mapping — city is auto-mapped (string → string)
-const registry = mapper().configure(
-    SourceSchema,
-    TargetSchema,
-    (m) => m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
+const Target = object({
+    id:       string(),    // same name + type → auto-mapped
+    name:     string(),    // same name + type → auto-mapped
+    email:    string(),    // same name + type → auto-mapped
+    ageGroup: string()     // different name → must be configured
+});
+
+const registry = mapper().configure(Source, Target, (m) =>
+    m
+        .for((t) => t.ageGroup)
+            .compute((src) => src.age < 18 ? 'minor' : 'adult')
+    // id, name, email are auto-mapped — no configuration needed!
 );
 ```
-
-Properties with incompatible types (e.g., `number` source → `string` target) or properties that exist only in the target schema are **not** auto-mapped and must be explicitly configured.
 
 ### Nested ObjectSchemaBuilder properties
 
@@ -168,24 +201,29 @@ const result = await mapFn({
     address: { city: 'Berlin', houseNr: 10 }
 });
 // result: { name: 'Alice', address: { city: 'Berlin' } }
-// houseNr is dropped because it's not in AddressDtoSchema
 ```
 
 **Ordering matters:** nested mappings must be registered before the parent mapping. Explicit mappings via `compute` or `ignore` take priority over auto-mapping.
 
+## Mapping Strategies
+
+| Strategy | Usage | Purpose |
+| --- | --- | --- |
+| `.from(selector)` | `.for(t => t.x).from(s => s.y)` | Copy from a source property (supports nested paths) |
+| `.compute(fn)` | `.for(t => t.x).compute(s => s.a + s.b)` | Compute from a sync or async function |
+| `.ignore()` | `.for(t => t.x).ignore()` | Exclude a target property |
+| _(auto-mapped)_ | _(no configuration needed)_ | Same-name, compatible-type primitives or registered nested schemas |
+
+Every non-auto-mappable target property must be either mapped or explicitly ignored. Unmapped properties cause:
+
+- A **compile-time TypeScript type error** — a type-assignability mismatch that includes the unmapped property names in the type parameters
+- A **runtime `MapperConfigurationError`** if type checks are bypassed
+
 ## API
-
-### `MappingRegistry`
-
-Central registry for storing and retrieving mappers. Each `configure` call returns a **new immutable registry** — the original is not modified.
-
-```typescript
-const registry = mapper();
-```
 
 ### `mapper()`
 
-A convenience factory function that creates a new `MappingRegistry`. Equivalent to `new MappingRegistry()` but reads better in a fluent chain:
+A convenience factory function that creates a new `MappingRegistry`:
 
 ```typescript
 const registry = mapper()
@@ -193,91 +231,96 @@ const registry = mapper()
     .configure(C, D, (m) => ...);
 ```
 
-#### `registry.configure(fromSchema, toSchema, fn)`
+### `registry.configure(fromSchema, toSchema, fn)`
 
-Defines a mapping between two schemas and returns a new immutable registry containing the mapping. The callback `fn` receives a fresh `Mapper` and must return it after configuring all non-auto-mappable property mappings. The mapper is automatically finalized and registered.
+Defines a mapping between two schemas and returns a new immutable registry containing the mapping. The callback `fn` receives a fresh `Mapper` and must return it after configuring all non-auto-mappable property mappings.
 
-The `configure` callback only needs to explicitly map or ignore properties that **cannot** be auto-mapped. The `for` selector can target any property in the target schema; you typically only use it for non-auto-mappable properties or when you want to override the default auto-mapping behavior for a particular property.
+Throws if schemas are invalid, the mapping is a duplicate, or if unmapped properties remain that cannot be auto-mapped.
 
-Throws if schemas are invalid, the mapping is a duplicate, or if, after applying auto-mapping and any explicit `compute`/`ignore` rules, unmapped properties remain that cannot be auto-mapped.
-
-#### `registry.getMapper(fromSchema, toSchema)`
+### `registry.getMapper(fromSchema, toSchema)`
 
 Retrieves a previously registered mapper function. Throws if no mapper has been registered for the given schema pair.
 
-### `Mapper`
-
-A fluent builder for configuring how each target property is populated. Can also be used standalone without a registry:
-
 ```typescript
-const mapper = new Mapper(SourceSchema, TargetSchema);
-```
-
-#### `.for(selector)`
-
-Selects a target property to configure. The selector uses PropertyDescriptors as pointers — similar to C# expression trees:
-
-```typescript
-mapper.for((target) => target.cityName);
-```
-
-After calling `.for()`, use one of the following strategies:
-
-#### `.from(selector)`
-
-Maps the target property from a source property. Supports nested paths via PropertyDescriptor navigation. Only source properties with compatible types are shown. When mapping between `ObjectSchemaBuilder` properties, a mapping for the source→target schema pair must be registered first:
-
-```typescript
-.for((t) => t.cityName)
-.from((source) => source.address.city)
-```
-
-#### `.compute(fn)`
-
-Computes the target property value from the entire source object. Supports both sync and async functions:
-
-```typescript
-.for((t) => t.fullAddress)
-.compute((source) => `${source.address.city} ${source.address.houseNr}`)
-
-// Async example
-.for((t) => t.cityName)
-.compute(async (source) => {
-    return await lookupCityName(source.address.city);
-})
-```
-
-#### `.ignore()`
-
-Explicitly excludes a target property from mapping. The property will not appear in the output:
-
-```typescript
-.for((t) => t.internalField)
-.ignore()
-```
-
-#### `.getMapper()`
-
-Returns the configured async mapping function. Only callable when all target properties have been mapped or explicitly ignored (enforced at compile time). Additionally throws `MapperConfigurationError` at runtime if checks are bypassed.
-
-```typescript
-const mapFn = mapper.getMapper();
+const mapFn = registry.getMapper(ApiUser, DomainUser);
 const result = await mapFn(sourceObject);
 ```
 
-## Mapping Strategies
+### `Mapper`
 
-| Strategy                | Usage                                        | Purpose                                                            |
-| ----------------------- | -------------------------------------------- | ------------------------------------------------------------------ |
-| `from(selector)` | `.for(t => t.x).from(s => s.y)`   | Copy from a source property (supports nested paths)                |
-| `compute(fn)`           | `.for(t => t.x).compute(s => s.a + s.b)` | Compute from a sync or async function                              |
-| `ignore()`              | `.for(t => t.x).ignore()`                | Exclude a target property                                          |
-| _(auto-mapped)_         | _(no configuration needed)_                  | Same-name, compatible-type primitives or registered nested schemas |
+A fluent builder for configuring how each target property is populated:
 
-Every non-auto-mappable target property must be either mapped or explicitly ignored. Unmapped properties cause:
+- **`.for(selector)`** — selects a target property to configure
+- **`.from(selector)`** — maps from a source property (types must be compatible)
+- **`.compute(fn)`** — computes the value from the entire source object (sync or async)
+- **`.ignore()`** — explicitly excludes the property
+- **`.getMapper()`** — returns the mapping function (only available when all properties are mapped)
 
-- A **compile-time TypeScript error** showing the unmapped property names
-- A **runtime `MapperConfigurationError`** if type checks are bypassed
+```typescript
+const mapper = new Mapper(SourceSchema, TargetSchema);
+const mapFn = mapper
+    .for((t) => t.fullName)
+        .compute((src) => `${src.firstName} ${src.lastName}`)
+    .for((t) => t.age)
+        .from((src) => src.years)
+    .getMapper();
+
+const result = await mapFn(sourceObject);
+```
+
+## Real-World Example
+
+A complete example mapping API responses through multiple layers:
+
+```typescript
+import { object, string, number } from '@cleverbrush/schema';
+import { mapper } from '@cleverbrush/mapper';
+
+// API response shape
+const ApiOrderResponse = object({
+    order_id:      string(),
+    customer_name: string(),
+    total_cents:   number(),
+    status_code:   number()
+});
+
+// Domain model
+const Order = object({
+    id:         string(),
+    customer:   string(),
+    totalPrice: string(),
+    status:     string()
+});
+
+const registry = mapper().configure(
+    ApiOrderResponse,
+    Order,
+    (m) =>
+        m
+            .for((t) => t.id)
+                .from((s) => s.order_id)
+            .for((t) => t.customer)
+                .from((s) => s.customer_name)
+            .for((t) => t.totalPrice)
+                .compute((s) => `$${(s.total_cents / 100).toFixed(2)}`)
+            .for((t) => t.status)
+                .compute((s) => {
+                    const statuses: Record<number, string> = {
+                        0: 'pending', 1: 'confirmed', 2: 'shipped', 3: 'delivered'
+                    };
+                    return statuses[s.status_code] ?? 'unknown';
+                })
+);
+
+const mapOrder = registry.getMapper(ApiOrderResponse, Order);
+const order = await mapOrder({
+    order_id: 'ORD-123',
+    customer_name: 'Alice Smith',
+    total_cents: 4999,
+    status_code: 2
+});
+// { id: 'ORD-123', customer: 'Alice Smith', totalPrice: '$49.99', status: 'shipped' }
+```
 
 ## License
 

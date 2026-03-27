@@ -361,6 +361,46 @@ const { register } = useForm<User>();
                     </p>
                 </div>
 
+                {/* ── How It Works ─────────────────────────────────── */}
+                <div className="card">
+                    <h2>How It Works — Step by Step</h2>
+                    <ol>
+                        <li>
+                            <strong>Define a schema</strong> using{' '}
+                            <code>@cleverbrush/schema</code> — this is your
+                            single source of truth for types, validation rules,
+                            and field metadata
+                        </li>
+                        <li>
+                            <strong>Register renderers</strong> via{' '}
+                            <code>FormSystemProvider</code> — plain functions
+                            that map schema types (<code>&quot;string&quot;</code>,{' '}
+                            <code>&quot;number&quot;</code>) to your UI
+                            components (plain HTML, MUI, Ant Design, etc.)
+                        </li>
+                        <li>
+                            <strong>Create a form instance</strong> via{' '}
+                            <code>useSchemaForm(schema)</code> — returns state
+                            management, validation, and submit/reset lifecycle
+                        </li>
+                        <li>
+                            <strong>Render fields</strong> via{' '}
+                            <code>
+                                &lt;Field selector={'{(t) => t.name}'}
+                                form={'{form}'} /&gt;
+                            </code>{' '}
+                            — the component looks up the registered renderer
+                            for the field&apos;s schema type automatically
+                        </li>
+                        <li>
+                            <strong>Submit</strong> —{' '}
+                            <code>form.submit()</code> runs the schema&apos;s
+                            full validation and returns a typed result with
+                            per-field errors
+                        </li>
+                    </ol>
+                </div>
+
                 {/* ── Core Concepts ────────────────────────────────── */}
                 <div className="card">
                     <h2>Core Concepts</h2>

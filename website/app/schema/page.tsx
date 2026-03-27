@@ -85,6 +85,44 @@ export default function SchemaPage() {
                     </p>
                 </div>
 
+                {/* ── How It Works ─────────────────────────────────── */}
+                <div className="card">
+                    <h2>How It Works — Step by Step</h2>
+                    <ol>
+                        <li>
+                            <strong>Define a schema</strong> using builder
+                            functions like <code>object()</code>,{' '}
+                            <code>string()</code>, <code>number()</code> —
+                            chain constraints with a fluent API
+                        </li>
+                        <li>
+                            <strong>Infer the TypeScript type</strong> with{' '}
+                            <code>
+                                type T = InferType&lt;typeof MySchema&gt;
+                            </code>{' '}
+                            — no manual interface needed
+                        </li>
+                        <li>
+                            <strong>Validate data</strong> with{' '}
+                            <code>await schema.validate(data)</code> — get
+                            typed results with per-property errors
+                        </li>
+                        <li>
+                            <strong>Compose and extend</strong> — every
+                            method returns a new immutable instance, so you
+                            can safely build schema libraries from shared
+                            fragments
+                        </li>
+                        <li>
+                            <strong>Integrate</strong> — pass schemas to{' '}
+                            <code>@cleverbrush/mapper</code> for object
+                            mapping or{' '}
+                            <code>@cleverbrush/react-form</code> for
+                            React forms — same schema, everywhere
+                        </li>
+                    </ol>
+                </div>
+
                 {/* ── Quick Start ──────────────────────────────────── */}
                 <div className="card">
                     <h2>Quick Start</h2>

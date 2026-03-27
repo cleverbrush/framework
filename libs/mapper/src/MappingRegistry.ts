@@ -557,7 +557,8 @@ export class PropertyMappingBuilder<
  * yet been mapped or ignored. `getMapper()` is only callable (without
  * arguments) when `TUnmapped` is `never` — i.e. all properties have been
  * accounted for. If any property is missing, TypeScript will produce a
- * compile-time error showing the names of the unmapped properties.
+ * compile-time type error (a type-assignability mismatch that includes
+ * the unmapped property names in its type parameters).
  *
  * @typeParam TFromSchema - source ObjectSchemaBuilder
  * @typeParam TToSchema - target ObjectSchemaBuilder
@@ -629,6 +630,17 @@ export class Mapper<
         if (!capturedKey) {
             throw new Error(
                 'for selector must access a property on the target tree'
+            );
+        }
+
+        // Validate that the captured key exists in the target schema
+        const toIntrospection = this._toSchema.introspect();
+        const targetProperties = toIntrospection.properties
+            ? Object.keys(toIntrospection.properties)
+            : [];
+        if (!targetProperties.includes(capturedKey)) {
+            throw new MapperConfigurationError(
+                `Property "${capturedKey}" does not exist in the target schema`
             );
         }
 

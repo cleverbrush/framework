@@ -120,6 +120,49 @@ export default function MapperPage() {
                     </p>
                 </div>
 
+                {/* ── How It Works ─────────────────────────────────── */}
+                <div className="card">
+                    <h2>How It Works — Step by Step</h2>
+                    <ol>
+                        <li>
+                            <strong>Define source and target schemas</strong>{' '}
+                            using <code>@cleverbrush/schema</code> — these
+                            describe the input and output shapes
+                        </li>
+                        <li>
+                            <strong>Create a registry</strong> with{' '}
+                            <code>mapper()</code> — this is where all your
+                            mappings live
+                        </li>
+                        <li>
+                            <strong>Configure mappings</strong> with{' '}
+                            <code>.configure(from, to, fn)</code> — use{' '}
+                            <code>.for()</code> to pick a target property, then{' '}
+                            <code>.from()</code>, <code>.compute()</code>, or{' '}
+                            <code>.ignore()</code> to define how it&apos;s
+                            populated
+                        </li>
+                        <li>
+                            <strong>Auto-mapping fills the gaps</strong> —
+                            properties with the same name and compatible type
+                            are mapped automatically; you only configure what
+                            differs
+                        </li>
+                        <li>
+                            <strong>Get a mapper function</strong> with{' '}
+                            <code>registry.getMapper(from, to)</code> — returns
+                            an async function that transforms objects
+                        </li>
+                        <li>
+                            <strong>TypeScript enforces completeness</strong> —
+                            if any target property is unmapped, you get a
+                            compile-time type error (a type-assignability
+                            mismatch that includes the unmapped property
+                            names in the type parameters)
+                        </li>
+                    </ol>
+                </div>
+
                 {/* ── Quick Start ──────────────────────────────────── */}
                 <div className="card">
                     <h2>Quick Start</h2>
@@ -631,6 +674,68 @@ const registry = mapper()
                             </tbody>
                         </table>
                     </div>
+                </div>
+
+                {/* ── Real-World Example ───────────────────────────── */}
+                <div className="card">
+                    <h2>Real-World Example</h2>
+                    <p>
+                        A complete example mapping API responses through
+                        multiple layers — a common pattern in production apps:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
+import { mapper } from '@cleverbrush/mapper';
+
+// API response shape (from backend)
+const ApiOrderResponse = object({
+  order_id:      string(),
+  customer_name: string(),
+  total_cents:   number(),
+  status_code:   number()
+});
+
+// Domain model (used in the app)
+const Order = object({
+  id:         string(),
+  customer:   string(),
+  totalPrice: string(),
+  status:     string()
+});
+
+const registry = mapper().configure(
+  ApiOrderResponse,
+  Order,
+  (m) =>
+    m
+      .for((t) => t.id)
+        .from((s) => s.order_id)
+      .for((t) => t.customer)
+        .from((s) => s.customer_name)
+      .for((t) => t.totalPrice)
+        .compute((s) => '$' + (s.total_cents / 100).toFixed(2))
+      .for((t) => t.status)
+        .compute((s) => {
+          const statuses: Record<number, string> = {
+            0: 'pending', 1: 'confirmed', 2: 'shipped', 3: 'delivered'
+          };
+          return statuses[s.status_code] ?? 'unknown';
+        })
+);
+
+const mapOrder = registry.getMapper(ApiOrderResponse, Order);
+const order = await mapOrder({
+  order_id: 'ORD-123',
+  customer_name: 'Alice Smith',
+  total_cents: 4999,
+  status_code: 2
+});
+// { id: 'ORD-123', customer: 'Alice Smith', totalPrice: '$49.99', status: 'shipped' }`)
+                            }}
+                        />
+                    </pre>
                 </div>
             </div>
         </div>

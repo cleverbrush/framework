@@ -20,6 +20,13 @@
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
     "name": "@cleverbrush/mapper",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/mapper#readme",
     "repository": {
@@ -27,8 +34,9 @@
         "url": "github:cleverbrush/framework"
     },
     "scripts": {
-        "watch": "tsc -p tsconfig.build.json --watch",
-        "build": "tsc -p tsconfig.build.json"
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
     },
     "type": "module",
     "types": "./dist/index.d.ts",

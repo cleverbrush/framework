@@ -1,5 +1,6 @@
 {
     "compilerOptions": {
+        "composite": true,
         "rootDir": "./src",
         "outDir": "./dist",
         "declaration": true,
@@ -11,7 +12,8 @@
         "sourceMap": false,
         "declarationMap": false
     },
-    "files": ["./src/index.ts"],
+    "include": ["src/**/*.ts"],
+    "exclude": ["src/**/*.test.ts"],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }
