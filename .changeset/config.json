@@ -9,7 +9,8 @@
             "@cleverbrush/async",
             "@cleverbrush/scheduler",
             "@cleverbrush/mapper",
-            "@cleverbrush/knex-clickhouse"
+            "@cleverbrush/knex-clickhouse",
+            "@cleverbrush/react-form"
         ]
     ],
     "linked": [],
