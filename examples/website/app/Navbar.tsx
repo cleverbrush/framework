@@ -8,8 +8,7 @@ const NAV_ITEMS = [
     { href: '/', label: 'Home' },
     { href: '/schema', label: 'Schema' },
     { href: '/mapper', label: 'Mapper' },
-    { href: '/react-form', label: 'React Form' },
-    { href: '/sandbox', label: 'Sandbox' }
+    { href: '/react-form', label: 'React Form' }
 ];
 
 export function Navbar() {
