@@ -581,12 +581,7 @@ test('multiple errors - 1', async () => {
         second: 5
     };
 
-    const {
-        valid,
-        errors,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        object: objResult
-    } = await schema.validate(objToValidate, {
+    const { valid, errors } = await schema.validate(objToValidate, {
         doNotStopOnFirstError: true
     });
 

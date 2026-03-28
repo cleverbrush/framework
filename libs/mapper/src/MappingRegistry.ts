@@ -13,7 +13,6 @@ import {
  * Using a symbol instead of a string property keeps it out of IntelliSense.
  */
 const SYMBOL_TARGET_PROPERTY_KEY: unique symbol = Symbol('targetPropertyKey');
-type SYMBOL_TARGET_PROPERTY_KEY = typeof SYMBOL_TARGET_PROPERTY_KEY;
 
 // ── Helper Types ──────────────────────────────────────────────────────
 

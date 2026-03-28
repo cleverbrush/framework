@@ -4,7 +4,8 @@
  *  because they are useful when it comes to write your own knex dialect
  */
 
-const charsRegex = /[\0\b\t\n\r\x1a"'\\]/g; // eslint-disable-line no-control-regex
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional regex for escaping control characters in strings
+const charsRegex = /[\0\b\t\n\r\x1a"'\\]/g;
 const charsMap = {
     '\0': '\\0',
     '\b': '\\b',
@@ -31,12 +32,12 @@ const escapeObject = (val, _finalEscape, ctx) => {
 
 // eslint-disable-next-line
 const escapeString = (val) => {
-    // eslint-disable-next-line
-    let chunkIndex = (charsRegex.lastIndex = 0);
+    charsRegex.lastIndex = 0;
+    let chunkIndex = 0;
     let escapedVal = '';
     let match;
 
-    // eslint-disable-next-line
+    // biome-ignore  lint/suspicious/noAssignInExpressions: intentional assignment in while condition to find matches in the string
     while ((match = charsRegex.exec(val))) {
         escapedVal += val.slice(chunkIndex, match.index) + charsMap[match[0]];
         chunkIndex = charsRegex.lastIndex;

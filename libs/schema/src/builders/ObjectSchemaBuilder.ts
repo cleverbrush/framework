@@ -593,13 +593,17 @@ export class ObjectSchemaBuilder<
                 objToValidate[key] = result.object;
             });
 
-        errors = [
-            ...errors,
-            ...notValidResults.reduce(
-                (acc, val) => [...acc, ...(val?.result?.errors || [])],
-                [] as any[]
-            )
-        ];
+        const nestedErrors = notValidResults.reduce((acc, val) => {
+            const currentErrors = val?.result?.errors;
+            if (Array.isArray(currentErrors)) {
+                for (const error of currentErrors) {
+                    acc.push(error);
+                }
+            }
+            return acc;
+        }, [] as any[]);
+
+        errors = errors.concat(nestedErrors);
 
         for (let i = 0; i < objKeys.length; i++) {
             const key = objKeys[i];
@@ -806,13 +810,7 @@ export class ObjectSchemaBuilder<
      */
     public addProps<K extends ObjectSchemaBuilder<any, any, any>>(
         schema: K
-    ): K extends ObjectSchemaBuilder<
-        infer TProp,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TReq,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TExpType
-    >
+    ): K extends ObjectSchemaBuilder<infer TProp, infer _, infer __>
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProp> & TProp,
               TRequired,
@@ -977,12 +975,7 @@ export class ObjectSchemaBuilder<
      */
     public intersect<T extends ObjectSchemaBuilder<any, any, any>>(
         schema: T
-    ): T extends ObjectSchemaBuilder<
-        infer TProps,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TReq,
-        infer TExplType
-    >
+    ): T extends ObjectSchemaBuilder<infer TProps, infer _, infer TExplType>
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps> & TProps,
               TRequired,
@@ -1122,13 +1115,7 @@ export class ObjectSchemaBuilder<
      */
     public pick<K extends ObjectSchemaBuilder<any, any, any>>(
         schema: K
-    ): K extends ObjectSchemaBuilder<
-        infer TProps,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T1,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T2
-    >
+    ): K extends ObjectSchemaBuilder<infer TProps, infer _, infer __>
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof Omit<TProperties, keyof TProps>>,
               TRequired,
@@ -1595,11 +1582,7 @@ const createPropertyDescriptorFor = (
 export { object };
 
 type RequiredProps<T extends Record<string, SchemaBuilder<any, any>>> = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TRes,
-        infer TReq
-    >
+    [k in keyof T as T[k] extends SchemaBuilder<infer _, infer TReq>
         ? TReq extends true
             ? k
             : never
@@ -1608,11 +1591,7 @@ type RequiredProps<T extends Record<string, SchemaBuilder<any, any>>> = keyof {
 
 type NotRequiredProps<T extends Record<string, SchemaBuilder<any, any>>> =
     keyof {
-        [k in keyof T as T[k] extends SchemaBuilder<
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            infer TRes,
-            infer TReq
-        >
+        [k in keyof T as T[k] extends SchemaBuilder<infer _, infer TReq>
             ? TReq extends true
                 ? never
                 : k

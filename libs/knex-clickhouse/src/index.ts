@@ -228,14 +228,15 @@ export class ClickhouseKnexClient extends Knex.Client {
               )
             : fields;
 
-        const rowToObj = (row) =>
-            fields.reduce(
-                (acc, field, index) => ({
-                    ...acc,
-                    [field.name]: parsers[index](row[index])
-                }),
-                {}
-            );
+        const rowToObj = (row) => {
+            const result: Record<string, unknown> = {};
+
+            fields.forEach((field, index) => {
+                result[field.name] = parsers[index](row[index]);
+            });
+
+            return result;
+        };
 
         if (obj.output) return obj.output.call(runner, rows, fields);
 

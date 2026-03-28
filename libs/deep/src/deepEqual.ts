@@ -25,7 +25,7 @@ export const deepEqual = (
 ): boolean => {
     const cache = new Map();
 
-    const compare = function (o1, o2) {
+    const compare = (...args) => {
         const arraysAreIdentical = (a1, a2) => {
             if (a1.length !== a2.length) return false;
             if (a1.length === 0 && a2.length === 0) return true;
@@ -55,7 +55,8 @@ export const deepEqual = (
             return true;
         };
 
-        if (arguments.length !== 2) return false;
+        if (args.length !== 2) return false;
+        const [o1, o2] = args;
         if (o1 === o2) return true;
         if (typeof o1 !== typeof o2) return false;
         if (isBothNaN(o1, o2)) return true;

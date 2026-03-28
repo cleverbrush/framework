@@ -75,8 +75,7 @@ type TakeBeforeIndex<
     TIndex extends number
 > = TArr extends [
     ...infer TRest extends SchemaBuilder<any, any>[],
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    infer TLast extends SchemaBuilder<any, any>
+    infer _ extends SchemaBuilder<any, any>
 ]
     ? TRest['length'] extends TIndex
         ? TRest
@@ -409,8 +408,7 @@ export class UnionSchemaBuilder<
      * Removes first option from the union schema.
      */
     public removeFirstOption(): TOptions extends [
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TFirst,
+        infer _,
         ...infer TRest extends SchemaBuilder<any, any>[]
     ]
         ? UnionSchemaBuilder<TRest, TRequired, TExplicitType>
