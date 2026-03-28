@@ -35,7 +35,7 @@ export const deepExtend = ((...rest) => {
 
     const result = {};
 
-    const extendObject = (o1, o2) => {
+    const extendObject = (o1: any, o2: any) => {
         const keys = Object.keys(o2);
 
         for (let i = 0; i < keys.length; i++) {

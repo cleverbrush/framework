@@ -57,9 +57,9 @@ export default class Collector<
 
     #isTimedOut = false;
 
-    #promiseResolve: (...args: any[]) => any;
+    #promiseResolve!: (...args: any[]) => any;
 
-    #promiseReject: (...args: any[]) => any;
+    #promiseReject!: (...args: any[]) => any;
 
     /**
      *

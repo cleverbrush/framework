@@ -18,7 +18,7 @@ export function deepFlatten(
     obj: Record<string, any>,
     delimiter = '.'
 ): Record<string, any> {
-    const shouldFlatten = (obj) =>
+    const shouldFlatten = (obj: any) =>
         typeof obj === 'object' &&
         obj !== null &&
         !Array.isArray(obj) &&
