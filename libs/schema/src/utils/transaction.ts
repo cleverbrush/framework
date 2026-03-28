@@ -66,7 +66,7 @@ export const transaction = <T extends {}>(
     initial: T,
     options?: TransactionOptions
 ): Transaction<T> => {
-    let newProperties = {};
+    let newProperties: Record<string | symbol, any> = {};
     let deletedProperties = new Map<keyof T, true>();
 
     options = Object.assign({}, defaultTransactionOptions, options || {});
@@ -83,9 +83,9 @@ export const transaction = <T extends {}>(
         }) || ((deletedProperties.size > 0) as any);
 
     const commit = () => {
-        const result = {} as Record<keyof T, any>;
+        const result = {} as Record<string, any>;
         Object.keys(initial).forEach((key) => {
-            result[key] = initial[key];
+            result[key] = (initial as any)[key];
         });
 
         Object.keys(newProperties).forEach((key) => {
@@ -99,13 +99,13 @@ export const transaction = <T extends {}>(
         });
 
         for (const key of deletedProperties.keys()) {
-            delete result[key];
+            delete result[key as string];
         }
 
         newProperties = {};
         deletedProperties = new Map<keyof T, true>();
 
-        return result;
+        return result as T;
     };
 
     const rollback = () => {
@@ -167,7 +167,7 @@ export const transaction = <T extends {}>(
 
     const proxy = new Proxy<T>(initial, {
         set: (target, property, value) => {
-            if (target && target[property] === value) {
+            if (target && (target as any)[property] === value) {
                 delete newProperties[property];
                 return true;
             }
@@ -216,7 +216,7 @@ export const transaction = <T extends {}>(
                         isDirty
                     };
                 }
-                return target[prop];
+                return (target as any)[prop];
             }
 
             if (prop in newProperties) {
@@ -228,17 +228,17 @@ export const transaction = <T extends {}>(
             }
 
             if (
-                !isTransaction(target[prop]) &&
-                typeof target[prop] === 'object' &&
-                target[prop] &&
-                !shouldNotWrapWithTransaction(target[prop])
+                !isTransaction((target as any)[prop]) &&
+                typeof (target as any)[prop] === 'object' &&
+                (target as any)[prop] &&
+                !shouldNotWrapWithTransaction((target as any)[prop])
             ) {
-                const { object } = transaction(target[prop], options);
+                const { object } = transaction((target as any)[prop], options);
                 newProperties[prop] = object;
                 return object;
             }
 
-            return target[prop];
+            return (target as any)[prop];
         },
         deleteProperty: (target, p) => {
             if (p in newProperties) {
@@ -270,5 +270,5 @@ export const transaction = <T extends {}>(
  * @param obj object to check if it's a transaction
  * @returns `true` if `obj` is a transaction, `false` otherwise
  */
-export const isTransaction = (obj) =>
+export const isTransaction = (obj: any) =>
     obj && typeof obj === 'object' && Object.hasOwn(obj, TRANSACTION_SYMBOL);
