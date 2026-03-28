@@ -1,4 +1,4 @@
-import type { SchemaBuilder, InferType } from '@cleverbrush/schema';
+import type { SchemaBuilder } from '@cleverbrush/schema';
 import type { ReactNode } from 'react';
 
 /**

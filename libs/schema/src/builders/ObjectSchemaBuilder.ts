@@ -1,20 +1,19 @@
+import { PropertyValidationResult } from './PropertyValidationResult.js';
 import {
-    InferType,
-    NestedValidationResult,
-    PreValidationResult,
-    PropertyDescriptor,
-    PropertyDescriptorInner,
-    PropertyDescriptorTree,
-    PropertySetterOptions,
+    type InferType,
+    type NestedValidationResult,
+    type PreValidationResult,
+    type PropertyDescriptor,
+    type PropertyDescriptorInner,
+    type PropertyDescriptorTree,
+    type PropertySetterOptions,
     SchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
-    ValidationContext,
-    ValidationError,
-    ValidationErrorMessageProvider,
-    ValidationResult
+    type ValidationContext,
+    type ValidationError,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
 } from './SchemaBuilder.js';
-
-import { PropertyValidationResult } from './PropertyValidationResult.js';
 
 const MUST_BE_AN_OBJECT_ERROR_MESSSAGE = 'must be an object';
 
@@ -639,7 +638,7 @@ export class ObjectSchemaBuilder<
                 typeof (result as any).getErrorsFor === 'function' &&
                 ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
             ) {
-                for (let nestedPropertyName in (
+                for (const nestedPropertyName in (
                     ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(
                         descriptor
                     ).introspect() as any
@@ -714,7 +713,7 @@ export class ObjectSchemaBuilder<
      */
     public hasType<T>(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        notUsed?: T
+        _notUsed?: T
     ): ObjectSchemaBuilder<TProperties, TRequired, T> {
         return this.createFromProps({
             ...this.introspect()
@@ -1339,8 +1338,11 @@ export class ObjectSchemaBuilder<
         TProperties extends Record<string, SchemaBuilder<any, any>> = {},
         TRequired extends boolean = true,
         TExplicitType = undefined,
-        TSchema extends ObjectSchemaBuilder<any, any, any> =
-            ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
     >(
         schema: TSchema,
         /* this is to make possibility to traverse the tree and select properties */
@@ -1417,8 +1419,11 @@ export class ObjectSchemaBuilder<
         TProperties extends Record<string, SchemaBuilder<any, any>> = {},
         TRequired extends boolean = true,
         TExplicitType = undefined,
-        TSchema extends ObjectSchemaBuilder<any, any, any> =
-            ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
     >(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema> {
         if (!(schema instanceof ObjectSchemaBuilder)) {
             throw new Error(
@@ -1487,11 +1492,12 @@ export interface Object {
         TProperties extends Record<string, SchemaBuilder<any, any>> = {},
         TRequired extends boolean = true,
         TExplicitType = undefined,
-        TSchema extends ObjectSchemaBuilder<any, any, any> =
-            ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
-    >(
-        schema: TSchema
-    ): PropertyDescriptorTree<TSchema, TSchema>;
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>
+    >(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema>;
 
     /**
      * Verifies if the given `descriptor` is a valid property descriptor.

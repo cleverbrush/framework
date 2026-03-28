@@ -14,9 +14,7 @@
     },
     "include": ["src/**/*.ts"],
     "exclude": ["src/**/*.test.ts"],
-    "references": [
-        { "path": "../schema" }
-    ],
+    "references": [{ "path": "../schema" }],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }

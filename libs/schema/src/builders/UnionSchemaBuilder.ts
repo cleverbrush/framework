@@ -1,19 +1,18 @@
-import {
-    SchemaBuilder,
-    ValidationResult,
-    ValidationContext,
-    InferType,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
-    NestedValidationResult,
-    PropertyDescriptor,
-    ValidationErrorMessageProvider,
-    createHybridErrorArray
-} from './SchemaBuilder.js';
-
-import {
+import type {
     ObjectSchemaBuilder,
     ObjectSchemaValidationResult
 } from './ObjectSchemaBuilder.js';
+import {
+    createHybridErrorArray,
+    type InferType,
+    type NestedValidationResult,
+    type PropertyDescriptor,
+    SchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    type ValidationContext,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
+} from './SchemaBuilder.js';
 
 type UnionSchemaBuilderCreateProps<
     T extends readonly SchemaBuilder<any, any>[],
@@ -198,7 +197,7 @@ export class UnionSchemaBuilder<
      * @inheritdoc
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public hasType<T>(notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
+    public hasType<T>(_notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -402,7 +401,7 @@ export class UnionSchemaBuilder<
         }
         return this.createFromProps({
             ...this.introspect(),
-            options: this.#options.filter((v, i) => i !== index)
+            options: this.#options.filter((_v, i) => i !== index)
         } as any) as any;
     }
 

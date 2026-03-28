@@ -1,16 +1,16 @@
 import {
-    InferType,
     array,
     boolean,
     date,
     func,
+    type InferType,
     number,
     object,
     string,
     union
 } from '@cleverbrush/schema';
 
-import { IJobRepository } from './jobRepository.js';
+import type { IJobRepository } from './jobRepository.js';
 
 const ScheduleSchemaBase = object({
     /** Number of intervals (days, months, minutes or weeks)

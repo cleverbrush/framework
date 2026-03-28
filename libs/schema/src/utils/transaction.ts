@@ -76,7 +76,7 @@ export const transaction = <T extends {}>(
 
     const isDirty = () =>
         !!Object.keys(newProperties).find((key) => {
-            if (newProperties[key] && newProperties[key][TRANSACTION_SYMBOL]) {
+            if (newProperties[key]?.[TRANSACTION_SYMBOL]) {
                 return newProperties[key][TRANSACTION_SYMBOL].isDirty();
             }
             return true;

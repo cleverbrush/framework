@@ -33,6 +33,7 @@ export function HashObject(unkType, exclude?) {
     if (ex === undefined) {
         ex = [];
     }
+    // biome-ignore lint/suspicious/noGlobalIsNan: intentional coercion — isNaN returns true for non-numeric types like objects
     if (!isNaN(unkType) && typeof unkType !== 'string') {
         return unkType;
     }

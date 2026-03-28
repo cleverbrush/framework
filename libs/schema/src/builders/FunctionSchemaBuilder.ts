@@ -1,8 +1,8 @@
 import {
     SchemaBuilder,
-    ValidationResult,
-    ValidationContext,
-    ValidationErrorMessageProvider
+    type ValidationContext,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
 } from './SchemaBuilder.js';
 
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
@@ -60,7 +60,7 @@ export class FunctionSchemaBuilder<
      * @hidden
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public hasType<T>(notUsed?: T): FunctionSchemaBuilder<true, T> {
+    public hasType<T>(_notUsed?: T): FunctionSchemaBuilder<true, T> {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;

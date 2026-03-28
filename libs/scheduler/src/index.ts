@@ -1,26 +1,24 @@
-import fs from 'fs';
 import { EventEmitter } from 'events';
-import { Readable, PassThrough } from 'stream';
+import fs from 'fs';
 import { access as fsAccess } from 'fs/promises';
 import { join as pathJoin } from 'path';
+import { PassThrough, type Readable } from 'stream';
 import { Worker } from 'worker_threads';
+import { type IJobRepository, InMemoryJobRepository } from './jobRepository.js';
 
+import { ScheduleCalculator } from './ScheduleCalculator.js';
 import {
-    JobSchedulerProps,
-    CreateJobRequest,
-    SchedulerStatus,
+    type CreateJobRequest,
+    type Job,
+    type JobInstance,
+    type JobInstanceStatus,
+    type JobSchedulerProps,
     Schedule,
-    Job,
-    JobInstance,
-    JobInstanceStatus,
+    type SchedulerStatus,
     Schemas
 } from './types.js';
 
-import { ScheduleCalculator } from './ScheduleCalculator.js';
-
-import { IJobRepository, InMemoryJobRepository } from './jobRepository.js';
-
-export { ScheduleCalculator, Schedule as TaskSchedule, Schemas };
+export { Schedule as TaskSchedule, ScheduleCalculator, Schemas };
 
 type WorkerResult = {
     status: JobInstanceStatus;
@@ -395,7 +393,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             }, interval);
 
             return instance;
-        } catch (e) {
+        } catch (_e) {
             clearTimeout(timer);
             // console.log(e);
             // console.log('task failed!');

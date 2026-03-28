@@ -1,6 +1,6 @@
-import { test, expect, expectTypeOf } from 'vitest';
+import { expect, expectTypeOf, test } from 'vitest';
 
-import { InferType } from './SchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 
 test('Clean', () => {
@@ -379,10 +379,7 @@ test('startsWith - 1', async () => {
         const schema2 = schema1.clearStartsWith();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-
-    {
-        expect(() => string().startsWith(123 as any)).toThrowError();
-    }
+    expect(() => string().startsWith(123 as any)).toThrowError();
 
     {
         const schema = string().startsWith('abc');
@@ -457,10 +454,7 @@ test('endsWith - 1', async () => {
         const schema2 = schema1.clearEndsWith();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-
-    {
-        expect(() => string().endsWith(123 as any)).toThrowError();
-    }
+    expect(() => string().endsWith(123 as any)).toThrowError();
 
     {
         const schema = string().endsWith('abc');
@@ -535,10 +529,7 @@ test('matches - 1', async () => {
         const schema2 = schema1.clearMatches();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-
-    {
-        expect(() => string().matches(123 as any)).toThrowError();
-    }
+    expect(() => string().matches(123 as any)).toThrowError();
 
     {
         const schema = string().matches(/^abc\d+/);

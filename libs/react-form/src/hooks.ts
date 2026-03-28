@@ -1,26 +1,33 @@
+import type {
+    InferType,
+    PropertyDescriptor,
+    PropertyDescriptorInner,
+    PropertyDescriptorTree,
+    SchemaBuilder,
+    ValidationResult
+} from '@cleverbrush/schema';
 import {
     ObjectSchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
-import type {
-    SchemaBuilder,
-    PropertyDescriptorTree,
-    PropertyDescriptor,
-    PropertyDescriptorInner,
-    InferType,
-    ValidationResult
-} from '@cleverbrush/schema';
-import { useCallback, useRef, useState, useMemo, useEffect } from 'react';
-import { createFormStore } from './FormStore.js';
-import type { FormStore } from './FormStore.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormContextValue } from './contexts.js';
+import type { FormStore } from './FormStore.js';
+import { createFormStore } from './FormStore.js';
+import {
+    buildDescriptorPathMap,
+    buildSelectorFromPath,
+    ensureNestedStructure,
+    getDescriptorPath,
+    getSchemaType,
+    isErrorPathMatch
+} from './helpers.js';
 import type {
-    UseFieldResult,
-    UseSchemaFormOptions,
+    FieldRenderer,
     FormSystemConfig,
-    FieldRenderer
+    UseFieldResult,
+    UseSchemaFormOptions
 } from './types.js';
-import { buildDescriptorPathMap, getDescriptorPath, getSchemaType, buildSelectorFromPath, ensureNestedStructure, isErrorPathMatch } from './helpers.js';
 
 // ─── SchemaFormInstance ──────────────────────────────────────────────────────
 
@@ -79,7 +86,10 @@ export function useSchemaForm<
     }
     const descriptorTree = descriptorTreeRef.current;
 
-    const pathMapRef = useRef<Map<PropertyDescriptorInner<any, any, any>, string> | null>(null);
+    const pathMapRef = useRef<Map<
+        PropertyDescriptorInner<any, any, any>,
+        string
+    > | null>(null);
     if (!pathMapRef.current) {
         pathMapRef.current = buildDescriptorPathMap(descriptorTree, schema);
     }
@@ -110,96 +120,114 @@ export function useSchemaForm<
      * Runs full schema validation using getErrorsFor to extract per-field errors.
      * Optionally marks all fields as touched (used by submit/explicit validate).
      */
-    const runValidation = useCallback(async (markTouched: boolean): Promise<
-        ValidationResult<InferType<TSchema>>
-    > => {
-        const gen = ++validationGenRef.current;
-        const values = store.getValues();
-        // Ensure all nested object structures exist to prevent
-        // ObjectSchemaBuilder.validate() from throwing on undefined nested objects
-        const safeValues = ensureNestedStructure(values, schemaRef.current);
-        let result: ValidationResult<InferType<TSchema>>;
-        try {
-            result = await schemaRef.current.validate(safeValues, {
-                doNotStopOnFirstError: true
-            }) as ValidationResult<InferType<TSchema>>;
-        } catch {
-            // If validation itself throws, treat as no errors
-            return { valid: false } as ValidationResult<InferType<TSchema>>;
-        }
-
-        // Discard results if a newer validation has started since this one began
-        if (gen !== validationGenRef.current) {
-            return result as ValidationResult<InferType<TSchema>>;
-        }
-
-        // Clear all existing field errors
-        const allPaths = store.getAllFieldPaths();
-        for (const p of allPaths) {
-            const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: undefined };
-            if (markTouched) {
-                patch.touched = true;
+    const runValidation = useCallback(
+        async (
+            markTouched: boolean
+        ): Promise<ValidationResult<InferType<TSchema>>> => {
+            const gen = ++validationGenRef.current;
+            const values = store.getValues();
+            // Ensure all nested object structures exist to prevent
+            // ObjectSchemaBuilder.validate() from throwing on undefined nested objects
+            const safeValues = ensureNestedStructure(values, schemaRef.current);
+            let result: ValidationResult<InferType<TSchema>>;
+            try {
+                result = (await schemaRef.current.validate(safeValues, {
+                    doNotStopOnFirstError: true
+                })) as ValidationResult<InferType<TSchema>>;
+            } catch {
+                // If validation itself throws, treat as no errors
+                return { valid: false } as ValidationResult<InferType<TSchema>>;
             }
-            store.updateFieldState(p, patch);
-        }
 
-        // Use getErrorsFor to extract per-field errors via tree selectors
-        const resultWithErrors = result as ValidationResult<InferType<TSchema>> & {
-            getErrorsFor?: (selector: (t: any) => any) => {
-                errors: ReadonlyArray<string>;
-                isValid: boolean;
+            // Discard results if a newer validation has started since this one began
+            if (gen !== validationGenRef.current) {
+                return result as ValidationResult<InferType<TSchema>>;
+            }
+
+            // Clear all existing field errors
+            const allPaths = store.getAllFieldPaths();
+            for (const p of allPaths) {
+                const patch: Partial<{
+                    error: string | undefined;
+                    touched: boolean;
+                }> = { error: undefined };
+                if (markTouched) {
+                    patch.touched = true;
+                }
+                store.updateFieldState(p, patch);
+            }
+
+            // Use getErrorsFor to extract per-field errors via tree selectors
+            const resultWithErrors = result as ValidationResult<
+                InferType<TSchema>
+            > & {
+                getErrorsFor?: (selector: (t: any) => any) => {
+                    errors: ReadonlyArray<string>;
+                    isValid: boolean;
+                };
+                errors?: ReadonlyArray<{ message: string; path?: string }>;
             };
-            errors?: ReadonlyArray<{ message: string; path?: string }>;
-        };
-        
-        // Build a map of errors found via getErrorsFor so we can detect gaps
-        const fieldsWithErrors = new Set<string>();
-        
-        if (typeof resultWithErrors.getErrorsFor === 'function') {
-            const getErrorsFor = resultWithErrors.getErrorsFor;
 
-            // Extract per-field errors by building selectors from field paths
-            for (const [, path] of pathMap) {
-                try {
-                    const selector = buildSelectorFromPath(path);
-                    const fieldResult = getErrorsFor(selector);
-                    if (fieldResult && Array.isArray(fieldResult.errors) && fieldResult.errors.length > 0) {
-                        const errorMessage = fieldResult.errors[0];
-                        const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: errorMessage };
-                        if (markTouched) {
-                            patch.touched = true;
-                        }
-                        store.updateFieldState(path, patch);
-                        fieldsWithErrors.add(path);
-                    }
-                } catch {
-                    // If getErrorsFor fails for this path, skip — fallback below will handle it
-                }
-            }
-        }
+            // Build a map of errors found via getErrorsFor so we can detect gaps
+            const fieldsWithErrors = new Set<string>();
 
-        // Fallback: for fields not covered by getErrorsFor (e.g., deeply nested fields
-        // where getErrorsFor has a known issue), match errors by path from result.errors
-        if (Array.isArray(resultWithErrors.errors)) {
-            for (const [, path] of pathMap) {
-                if (fieldsWithErrors.has(path)) continue;
-                const errorPath = `$.${path}`;
-                for (const err of resultWithErrors.errors) {
-                    if (isErrorPathMatch(err.path ?? '', errorPath)) {
-                        const patch: Partial<{ error: string | undefined; touched: boolean }> = { error: err.message };
-                        if (markTouched) {
-                            patch.touched = true;
+            if (typeof resultWithErrors.getErrorsFor === 'function') {
+                const getErrorsFor = resultWithErrors.getErrorsFor;
+
+                // Extract per-field errors by building selectors from field paths
+                for (const [, path] of pathMap) {
+                    try {
+                        const selector = buildSelectorFromPath(path);
+                        const fieldResult = getErrorsFor(selector);
+                        if (
+                            fieldResult &&
+                            Array.isArray(fieldResult.errors) &&
+                            fieldResult.errors.length > 0
+                        ) {
+                            const errorMessage = fieldResult.errors[0];
+                            const patch: Partial<{
+                                error: string | undefined;
+                                touched: boolean;
+                            }> = { error: errorMessage };
+                            if (markTouched) {
+                                patch.touched = true;
+                            }
+                            store.updateFieldState(path, patch);
+                            fieldsWithErrors.add(path);
                         }
-                        store.updateFieldState(path, patch);
-                        fieldsWithErrors.add(path);
-                        break;
+                    } catch {
+                        // If getErrorsFor fails for this path, skip — fallback below will handle it
                     }
                 }
             }
-        }
 
-        return result as ValidationResult<InferType<TSchema>>;
-    }, [store, pathMap]);
+            // Fallback: for fields not covered by getErrorsFor (e.g., deeply nested fields
+            // where getErrorsFor has a known issue), match errors by path from result.errors
+            if (Array.isArray(resultWithErrors.errors)) {
+                for (const [, path] of pathMap) {
+                    if (fieldsWithErrors.has(path)) continue;
+                    const errorPath = `$.${path}`;
+                    for (const err of resultWithErrors.errors) {
+                        if (isErrorPathMatch(err.path ?? '', errorPath)) {
+                            const patch: Partial<{
+                                error: string | undefined;
+                                touched: boolean;
+                            }> = { error: err.message };
+                            if (markTouched) {
+                                patch.touched = true;
+                            }
+                            store.updateFieldState(path, patch);
+                            fieldsWithErrors.add(path);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            return result as ValidationResult<InferType<TSchema>>;
+        },
+        [store, pathMap]
+    );
 
     const validate = useCallback(async (): Promise<
         ValidationResult<InferType<TSchema>>
@@ -235,10 +263,7 @@ export function useSchemaForm<
         [store]
     );
 
-    const _getFormContext = useCallback(
-        () => formContextRef.current,
-        []
-    );
+    const _getFormContext = useCallback(() => formContextRef.current, []);
 
     const useFieldHook = useCallback(
         <TPropertySchema extends SchemaBuilder<any, any>>(
@@ -246,7 +271,11 @@ export function useSchemaForm<
                 tree: PropertyDescriptorTree<TSchema, TSchema>
             ) => PropertyDescriptor<TSchema, TPropertySchema, any>
         ): UseFieldResult<InferType<TPropertySchema>> => {
-            return useFieldFromContext(formContextRef.current, selector, runValidation) as UseFieldResult<InferType<TPropertySchema>>;
+            return useFieldFromContext(
+                formContextRef.current,
+                selector,
+                runValidation
+            ) as UseFieldResult<InferType<TPropertySchema>>;
         },
         [runValidation]
     );
@@ -261,7 +290,15 @@ export function useSchemaForm<
             setValue: setValueFn,
             _getFormContext
         }),
-        [useFieldHook, submit, validate, reset, getValue, setValueFn, _getFormContext]
+        [
+            useFieldHook,
+            submit,
+            validate,
+            reset,
+            getValue,
+            setValueFn,
+            _getFormContext
+        ]
     );
 }
 

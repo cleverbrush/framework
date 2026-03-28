@@ -16,9 +16,7 @@
     },
     "include": ["src/**/*.ts"],
     "exclude": ["src/**/*.test.ts"],
-    "references": [
-        { "path": "../deep" }
-    ],
+    "references": [{ "path": "../deep" }],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }

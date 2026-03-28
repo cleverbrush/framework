@@ -1,12 +1,11 @@
+import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 import {
-    InferType,
-    NestedValidationResult,
-    PropertyDescriptorInner,
-    PropertyDescriptorTree,
+    type InferType,
+    type NestedValidationResult,
+    type PropertyDescriptorInner,
+    type PropertyDescriptorTree,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from './SchemaBuilder.js';
-
-import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
 /**
  * Mutable container for nested validation results associated with a specific
@@ -23,14 +22,15 @@ export class PropertyValidationResult<
         any,
         any
     >,
-    TRootSchema extends ObjectSchemaBuilder<any, any, any> =
-        ObjectSchemaBuilder<any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any
+    > = ObjectSchemaBuilder<any, any, any>,
     TParentPropertyDescriptor = any
-> implements NestedValidationResult<
-    TSchema,
-    TRootSchema,
-    TParentPropertyDescriptor
-> {
+> implements
+        NestedValidationResult<TSchema, TRootSchema, TParentPropertyDescriptor>
+{
     #descriptor: PropertyDescriptorTree<
         TSchema,
         TRootSchema,

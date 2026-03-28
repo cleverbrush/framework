@@ -1,11 +1,11 @@
 import {
-    InferType,
-    ObjectSchemaBuilder,
     ArraySchemaBuilder,
-    SchemaBuilder,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
-    PropertyDescriptorTree,
-    PropertyDescriptor
+    type InferType,
+    ObjectSchemaBuilder,
+    type PropertyDescriptor,
+    type PropertyDescriptorTree,
+    type SchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
 
 /**
@@ -432,7 +432,7 @@ export class PropertyMappingBuilder<
                 SchemaPropertyInferredType<TToSchema, TKey>
             >
         ) => TReturn,
-        ...args: [TReturn] extends [never]
+        ..._args: [TReturn] extends [never]
             ? [
                   error: `Property '${TKey}': source property type is not assignable to the target property type. Use compute() instead.`
               ]
@@ -661,7 +661,7 @@ export class Mapper<
      * listing the unmapped properties.
      */
     public getMapper(
-        ...args: [TUnmapped] extends [never]
+        ..._args: [TUnmapped] extends [never]
             ? []
             : [error: `Unmapped properties: ${TUnmapped}`]
     ): SchemaToSchemaMapperResult<TFromSchema, TToSchema> {
@@ -693,10 +693,7 @@ export class Mapper<
                 if (!fromPropSchema || !toPropSchema) continue;
 
                 const sourceDescriptor = (fromTree as any)[key];
-                if (
-                    !sourceDescriptor ||
-                    !sourceDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
-                )
+                if (!sourceDescriptor?.[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR])
                     continue;
 
                 // ObjectSchemaBuilder → ObjectSchemaBuilder: use registered mapper
@@ -851,10 +848,7 @@ export class Mapper<
                 }
 
                 const targetDescriptor = (targetTree as any)[key];
-                if (
-                    targetDescriptor &&
-                    targetDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
-                ) {
+                if (targetDescriptor?.[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]) {
                     targetDescriptor[
                         SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
                     ].setValue(result, value, {
@@ -941,7 +935,7 @@ export class MappingRegistry<TRegistered = never> {
 
         // Check for duplicate mappings
         const existingFromMappers = this._mappers.get(fromSchema);
-        if (existingFromMappers && existingFromMappers.has(toSchema)) {
+        if (existingFromMappers?.has(toSchema)) {
             throw new Error(
                 'Duplicate mapping: a mapping for this schemas pair is already registered'
             );

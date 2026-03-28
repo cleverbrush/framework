@@ -1,4 +1,4 @@
-import { Schedule } from './types.js';
+import type { Schedule } from './types.js';
 
 const MS_IN_DAY = 1000 * 60 * 60 * 24;
 const MS_IN_WEEK = MS_IN_DAY * 7;
@@ -151,7 +151,7 @@ export class ScheduleCalculator {
                         if (Number.isNaN(dayOfWeek)) return;
                         for (let i = 0; i < 7 - dayOfWeek + 1; i++) {
                             date = new Date(
-                                date.getTime() + (i == 0 ? 0 : MS_IN_DAY)
+                                date.getTime() + (i === 0 ? 0 : MS_IN_DAY)
                             );
                             if (
                                 this.#schedule.endsOn &&
@@ -191,7 +191,7 @@ export class ScheduleCalculator {
                         date = new Date(
                             date.getTime() +
                                 MS_IN_DAY +
-                                (this.#repeatCount == 0
+                                (this.#repeatCount === 0
                                     ? 0
                                     : (this.#schedule.interval - 1) *
                                       MS_IN_WEEK)
@@ -327,7 +327,7 @@ export class ScheduleCalculator {
         if (typeof span !== 'number') return this.#hasNext;
 
         if (!this.#next) return false;
-        return this.#next.getTime() - new Date().getTime() <= span;
+        return this.#next.getTime() - Date.now() <= span;
     }
 
     public next(): {

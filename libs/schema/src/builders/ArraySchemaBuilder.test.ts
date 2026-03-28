@@ -1,11 +1,11 @@
-import { test, expect, expectTypeOf } from 'vitest';
+import { expect, expectTypeOf, test } from 'vitest';
 
 import { array } from './ArraySchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
-import { string } from './StringSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
+import { string } from './StringSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
 
 test('Types - 1', async () => {
     const schema1 = array();

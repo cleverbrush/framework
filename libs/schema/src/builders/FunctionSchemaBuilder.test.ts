@@ -1,7 +1,7 @@
-import { test, expect, expectTypeOf } from 'vitest';
+import { expect, expectTypeOf, test } from 'vitest';
 
 import { func } from './FunctionSchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 
 test('Func checks', async () => {
     const schema = func();

@@ -1,9 +1,9 @@
-import { test, expect, describe } from 'vitest';
-import { object, string, number, array, boolean } from '@cleverbrush/schema';
+import { array, boolean, number, object, string } from '@cleverbrush/schema';
+import { describe, expect, test } from 'vitest';
 import {
-    MappingRegistry,
     Mapper,
     MapperConfigurationError,
+    MappingRegistry,
     mapper
 } from './MappingRegistry.js';
 
@@ -1837,7 +1837,7 @@ describe('Blog CMS: Post entity to API response', () => {
         bio: string()
     });
 
-    const AuthorSummarySchema = object({
+    const _AuthorSummarySchema = object({
         id: number(),
         name: string()
     });
@@ -2009,7 +2009,7 @@ describe('Invoice billing: Invoice to summary', () => {
         address: string()
     });
 
-    const CompanyDtoSchema = object({
+    const _CompanyDtoSchema = object({
         name: string(),
         address: string()
     });
@@ -2687,7 +2687,7 @@ describe('Project management: Task board mapping', () => {
         avatarUrl: string()
     });
 
-    const AssigneeDtoSchema = object({
+    const _AssigneeDtoSchema = object({
         username: string()
     });
 
@@ -2831,19 +2831,16 @@ describe('mapper() factory function', () => {
     });
 
     test('supports fluent configure chaining', async () => {
-        const registry = mapper().configure(
-            UserSchema,
-            UserDtoSchema,
-            (m) =>
-                m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
-                    .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
-                    )
+        const registry = mapper().configure(UserSchema, UserDtoSchema, (m) =>
+            m
+                .for((t) => t.name)
+                .from((f) => f.name)
+                .for((t) => t.cityName)
+                .from((f) => f.address.city)
+                .for((t) => t.fullAddress)
+                .compute(
+                    (user) => `${user.address.city} ${user.address.houseNr}`
+                )
         );
 
         const mapFn = registry.getMapper(UserSchema, UserDtoSchema);
@@ -2946,9 +2943,7 @@ describe('Mapping property not in target schema', () => {
         });
 
         const mapper = new Mapper(SourceSchema, TargetSchema);
-        expect(() =>
-            (mapper as any).for((t: any) => t.age)
-        ).toThrow(
+        expect(() => (mapper as any).for((t: any) => t.age)).toThrow(
             'Property "age" does not exist in the target schema'
         );
     });
@@ -2966,8 +2961,6 @@ describe('Mapping property not in target schema', () => {
 
         const mapper = new Mapper(SourceSchema, TargetSchema);
         // Should NOT throw
-        expect(() =>
-            mapper.for((t) => t.name)
-        ).not.toThrow();
+        expect(() => mapper.for((t) => t.name)).not.toThrow();
     });
 });

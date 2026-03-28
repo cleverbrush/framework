@@ -1,10 +1,9 @@
-import { test, expect, expectTypeOf } from 'vitest';
-
+import { expect, expectTypeOf, test } from 'vitest';
+import { date } from './DateSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
-import { date } from './DateSchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
 
 test('Simple Union - 1', async () => {
@@ -32,7 +31,7 @@ test('Simple Union - 1', async () => {
 test('Simple Union - 2', async () => {
     const schema1 = union(number().equals(10));
     const schema = schema1.or(number().equals(20));
-    let obj: InferType<typeof schema> = null as any;
+    const obj: InferType<typeof schema> = null as any;
     expectTypeOf(obj).toEqualTypeOf<10 | 20>();
 
     expect((schema as any) !== schema1).toEqual(true);

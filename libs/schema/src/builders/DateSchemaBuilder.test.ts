@@ -1,7 +1,6 @@
-import { test, expect, expectTypeOf } from 'vitest';
-
-import { InferType } from './SchemaBuilder.js';
+import { expect, expectTypeOf, test } from 'vitest';
 import { date } from './DateSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 
 test('Clean', async () => {
     const builder = date();

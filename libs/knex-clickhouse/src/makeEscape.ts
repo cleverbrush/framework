@@ -22,7 +22,7 @@ const wrapEscape = (escapeFn) =>
         return escapeFn(val, finalEscape, ctx);
     };
 
-const escapeObject = (val, finalEscape, ctx) => {
+const escapeObject = (val, _finalEscape, ctx) => {
     if (val && typeof val.toSQL === 'function') {
         return val.toSQL(ctx);
     }
@@ -90,7 +90,7 @@ const convertTimezone = (tz) => {
     if (m) {
         return (
             // eslint-disable-next-line
-            (m[1] == '-' ? -1 : 1) *
+            (m[1] === '-' ? -1 : 1) *
             (parseInt(m[2], 10) + (m[3] ? parseInt(m[3], 10) : 0) / 60) *
             60
         );
@@ -98,8 +98,8 @@ const convertTimezone = (tz) => {
     return false;
 };
 
-const dateToString = (date, finalEscape, ctx = {}) => {
-    // @ts-ignore
+const dateToString = (date, _finalEscape, ctx = {}) => {
+    // @ts-expect-error
     const timeZone = ctx.timeZone || 'local';
 
     const dt = new Date(date);

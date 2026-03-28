@@ -1,14 +1,13 @@
-import Knex from 'knex';
-import ClickhouseDriver, {
-    ClickHouseClient,
-    type ClickHouseSettings
-} from '@clickhouse/client';
-
 import { retry } from '@cleverbrush/async';
 import { deepExtend } from '@cleverbrush/deep';
+import ClickhouseDriver, {
+    type ClickHouseClient,
+    type ClickHouseSettings
+} from '@clickhouse/client';
+import Knex from 'knex';
 import { makeEscape } from './makeEscape.js';
 
-export { type ClickHouseClient };
+export type { ClickHouseClient };
 
 const parseDate = (value) => new Date(Date.parse(value));
 
@@ -106,7 +105,7 @@ export class ClickhouseKnexClient extends Knex.Client {
                 escaped += "'";
                 return escaped;
             },
-            escapeObject(val, prepareValue, timezone, seen: any[] = []) {
+            escapeObject(val, prepareValue, _timezone, seen: any[] = []) {
                 if (val && typeof val.toPostgres === 'function') {
                     seen = seen || [];
                     if (seen.indexOf(val) !== -1) {
@@ -278,20 +277,20 @@ export class ClickhouseKnexClient extends Knex.Client {
     async acquireRawConnection() {
         if (!this.#connection) {
             const connection = ClickhouseDriver.createClient({
-                // @ts-ignore
+                // @ts-expect-error
                 url: this.config.connection.url,
-                // @ts-ignore
+                // @ts-expect-error
                 username: this.config.connection.user,
-                // @ts-ignore
+                // @ts-expect-error
                 password: this.config.connection.password,
-                // @ts-ignore
+                // @ts-expect-error
                 database: this.config.connection.database,
                 compression: { request: true, response: true },
-                // @ts-ignore
+                // @ts-expect-error
                 clickhouse_settings: this.config.clickHouseSettings
             });
 
-            // @ts-ignore
+            // @ts-expect-error
             connection.connected = true;
 
             this.#connection = connection;
@@ -345,7 +344,7 @@ const registerKnexClickhouseExtensions = (knex) => {
                 .join(', ') +
             p[1];
         const values = rows.map((r) => getTuple(r));
-        // @ts-ignore
+        // @ts-expect-error
         return knex.raw(`INSERT INTO ${this._single.table} VALUES ${values}`);
     });
 };
@@ -373,7 +372,7 @@ export const getClickhouseConnection = (
     const connection = Knex({
         ...config,
         client: ClickhouseKnexClient,
-        // @ts-ignore
+        // @ts-expect-error
         clickHouseSettings,
         preQueryCallback
     });

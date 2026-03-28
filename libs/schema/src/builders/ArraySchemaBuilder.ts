@@ -1,21 +1,20 @@
-import {
-    SchemaBuilder,
-    ValidationContext,
-    ValidationErrorMessageProvider,
-    ValidationResult,
-    InferType,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
-    NestedValidationResult,
-    PropertyDescriptor,
-    createHybridErrorArray
-} from './SchemaBuilder.js';
-
-import {
+import type {
     ObjectSchemaBuilder,
     ObjectSchemaValidationResult
 } from './ObjectSchemaBuilder.js';
-
 import {
+    createHybridErrorArray,
+    type InferType,
+    type NestedValidationResult,
+    type PropertyDescriptor,
+    SchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    type ValidationContext,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
+} from './SchemaBuilder.js';
+
+import type {
     UnionSchemaBuilder,
     UnionSchemaValidationResult
 } from './UnionSchemaBuilder.js';
@@ -164,7 +163,7 @@ export class ArraySchemaBuilder<
      */
     public hasType<T>(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        notUsed?: T
+        _notUsed?: T
     ): ArraySchemaBuilder<TElementSchema, true, T> {
         return this.createFromProps({
             ...this.introspect()
@@ -335,13 +334,12 @@ export class ArraySchemaBuilder<
                               errors: results
                                   .map((r) => r?.errors)
                                   .filter((r) => r)
-                                  .map((e) =>
+                                  .flatMap((e) =>
                                       e?.map((r, index) => ({
                                           ...r,
                                           path: `${r.path}[${index}]`
                                       }))
-                                  )
-                                  .flat() as any
+                                  ) as any
                           },
                     valid
                         ? {

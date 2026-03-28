@@ -1,11 +1,10 @@
-import { test, expect, expectTypeOf } from 'vitest';
-
-import { object } from './ObjectSchemaBuilder.js';
+import { expect, expectTypeOf, test } from 'vitest';
+import { date } from './DateSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
+import { object } from './ObjectSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
-import { date } from './DateSchemaBuilder.js';
-import { type InferType } from './SchemaBuilder.js';
 
 test('empty - 1', async () => {
     const schema = object();
@@ -1776,7 +1775,7 @@ test('pick - 4', async () => {
         third: number()
     });
 
-    const schemaPickFrom = object({
+    const _schemaPickFrom = object({
         first: number(),
         /**
          * some comment
@@ -2267,7 +2266,7 @@ test('Preprocessors', async () => {
                     from: new Date(2022, 0, 1),
                     to: new Date(2023, 0, 1)
                 };
-            } catch (e) {
+            } catch (_e) {
                 return value;
             }
         }
@@ -2363,7 +2362,7 @@ test('Optional Property', async () => {
 });
 
 test('no errors returned from validator', async () => {
-    const schema = object({ a: string() }).addValidator((val) => ({
+    const schema = object({ a: string() }).addValidator((_val) => ({
         valid: false,
         errors: []
     }));

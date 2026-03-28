@@ -1,12 +1,11 @@
-import { test, expect } from 'vitest';
-
-import { object } from './ObjectSchemaBuilder.js';
+import { expect, test } from 'vitest';
 import { number } from './NumberSchemaBuilder.js';
-import { string } from './StringSchemaBuilder.js';
+import { object } from './ObjectSchemaBuilder.js';
 import {
-    InferType,
+    type InferType,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from './SchemaBuilder.js';
+import { string } from './StringSchemaBuilder.js';
 
 test('Throws with not ObjectSchemaBuilder instance', async () => {
     expect(() => (object as any).getPropertiesFor()).toThrowError();

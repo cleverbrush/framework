@@ -1,19 +1,19 @@
-import { describe, test, expect, vi } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { number, object, string } from '@cleverbrush/schema';
+import { act, renderHook } from '@testing-library/react';
 import React from 'react';
-import { object, string, number } from '@cleverbrush/schema';
+import { describe, expect, test, vi } from 'vitest';
+import type {
+    FieldRenderProps,
+    FormSystemConfig,
+    SchemaFormInstance
+} from './index.js';
 import {
-    useSchemaForm,
-    FormSystemProvider,
+    Field,
     FormProvider,
+    FormSystemProvider,
     useField,
     useFormSystem,
-    Field
-} from './index.js';
-import type {
-    FormSystemConfig,
-    FieldRenderProps,
-    SchemaFormInstance
+    useSchemaForm
 } from './index.js';
 
 // ─── Test Schemas ────────────────────────────────────────────────────────────
@@ -513,13 +513,9 @@ describe('FormSystemProvider', () => {
 
         const { result } = renderHook(() => useFormSystem(), {
             wrapper: ({ children }: { children: React.ReactNode }) =>
-                React.createElement(
-                    FormSystemProvider,
-                    { config },
-                    children
-                )
+                // @ts-expect-error
+                React.createElement(FormSystemProvider, { config }, children)
         });
-
         expect(result.current.renderers).toBeDefined();
         expect(result.current.renderers!.string).toBeDefined();
     });
@@ -625,7 +621,9 @@ describe('Field component', () => {
 
         const { render } = require('@testing-library/react');
         // Suppress React error boundary output
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const consoleSpy = vi
+            .spyOn(console, 'error')
+            .mockImplementation(() => {});
         expect(() => {
             render(React.createElement(TestComponent));
         }).toThrow('No renderer found for schema type');
@@ -826,8 +824,16 @@ describe('integration', () => {
 
         // 1. Define renderer map for HTML (like a UI library adapter)
         const htmlRenderers: Record<string, any> = {
-            string: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) =>
-                React.createElement('div', null,
+            string: ({
+                value,
+                onChange,
+                onBlur,
+                error,
+                touched
+            }: FieldRenderProps) =>
+                React.createElement(
+                    'div',
+                    null,
                     React.createElement('input', {
                         type: 'text',
                         value: value ?? '',
@@ -835,7 +841,11 @@ describe('integration', () => {
                         onBlur
                     }),
                     touched && error
-                        ? React.createElement('span', { className: 'error' }, error)
+                        ? React.createElement(
+                              'span',
+                              { className: 'error' },
+                              error
+                          )
                         : null
                 ),
             number: ({ value, onChange, onBlur }: FieldRenderProps) =>
@@ -877,8 +887,8 @@ describe('integration', () => {
         // Verify: string fields got text inputs, number field got number input
         const inputs = container.querySelectorAll('input');
         expect(inputs.length).toBe(3);
-        expect(inputs[0].type).toBe('text');   // name (string)
-        expect(inputs[1].type).toBe('text');   // email (string)
+        expect(inputs[0].type).toBe('text'); // name (string)
+        expect(inputs[1].type).toBe('text'); // email (string)
         expect(inputs[2].type).toBe('number'); // age (number)
 
         unmount();
@@ -889,15 +899,27 @@ describe('integration', () => {
 
         // Renderer that shows validation error when field is touched
         const htmlRenderers: Record<string, any> = {
-            string: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) =>
-                React.createElement('div', { 'data-testid': 'field' },
+            string: ({
+                value,
+                onChange,
+                onBlur,
+                error,
+                touched
+            }: FieldRenderProps) =>
+                React.createElement(
+                    'div',
+                    { 'data-testid': 'field' },
                     React.createElement('input', {
                         value: value ?? '',
                         onChange: (e: any) => onChange(e.target.value),
                         onBlur
                     }),
                     touched && error
-                        ? React.createElement('span', { className: 'error' }, error)
+                        ? React.createElement(
+                              'span',
+                              { className: 'error' },
+                              error
+                          )
                         : null
                 )
         };
@@ -982,7 +1004,9 @@ describe('ensureNestedStructure', () => {
             { user: { name: 'John', address: { city: 'NYC' } } },
             NestedSchema
         );
-        expect(result).toEqual({ user: { name: 'John', address: { city: 'NYC' } } });
+        expect(result).toEqual({
+            user: { name: 'John', address: { city: 'NYC' } }
+        });
     });
 
     test('fills in missing nested objects without overwriting', () => {
@@ -994,8 +1018,12 @@ describe('ensureNestedStructure', () => {
     });
 
     test('handles null/undefined values', () => {
-        expect(ensureNestedStructure(null, NestedSchema)).toEqual({ user: { address: {} } });
-        expect(ensureNestedStructure(undefined, NestedSchema)).toEqual({ user: { address: {} } });
+        expect(ensureNestedStructure(null, NestedSchema)).toEqual({
+            user: { address: {} }
+        });
+        expect(ensureNestedStructure(undefined, NestedSchema)).toEqual({
+            user: { address: {} }
+        });
     });
 });
 

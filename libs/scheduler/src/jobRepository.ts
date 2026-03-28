@@ -1,4 +1,9 @@
-import { Job, JobInstance, JobInstanceStatus, JobStatus } from './types.js';
+import type {
+    Job,
+    JobInstance,
+    JobInstanceStatus,
+    JobStatus
+} from './types.js';
 
 type AddJobRequest = Omit<Job, 'status'>;
 type AddJobInstanceRequest = Omit<JobInstance, 'id' | 'jobId'>;

@@ -12,7 +12,7 @@ const isBothNaN = (v1, v2) => Number.isNaN(v1) && Number.isNaN(v2);
  * @param options additional options
  * @returns {boolean} `true` if the objects are equal, `false` otherwise
  */
-export const deepEqual = function (
+export const deepEqual = (
     p1,
     p2,
     options?: {
@@ -22,11 +22,11 @@ export const deepEqual = function (
          */
         disregardArrayOrder?: boolean;
     }
-): boolean {
+): boolean => {
     const cache = new Map();
 
     const compare = function (o1, o2) {
-        const arraysAreIdentical = function (a1, a2) {
+        const arraysAreIdentical = (a1, a2) => {
             if (a1.length !== a2.length) return false;
             if (a1.length === 0 && a2.length === 0) return true;
 
@@ -79,7 +79,9 @@ export const deepEqual = function (
 
             if (o1 instanceof Date && o2 instanceof Date) {
                 return (
+                    // biome-ignore lint/suspicious/noGlobalIsNan: isNaN coerces Date to number, which is the intended behavior here
                     !isNaN(o1 as any) &&
+                    // biome-ignore lint/suspicious/noGlobalIsNan: isNaN coerces Date to number, which is the intended behavior here
                     !isNaN(o2 as any) &&
                     o1.getTime() === o2.getTime()
                 );
@@ -87,7 +89,7 @@ export const deepEqual = function (
 
             const keys1 = Object.keys(o1);
             const keys2 = Object.keys(o2);
-            if (keys1.length != keys2.length) return false;
+            if (keys1.length !== keys2.length) return false;
 
             keys1.sort();
             keys2.sort();

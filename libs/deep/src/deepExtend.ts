@@ -2,8 +2,8 @@ export type CommonProps<T1, T2> = {
     [k in keyof T1 & keyof T2]: T1[k] extends never
         ? never
         : T2[k] extends never
-        ? never
-        : T2[k];
+          ? never
+          : T2[k];
 };
 
 export type PropsInFirstOnly<T1, T2> = Omit<T1, keyof T2>;
@@ -20,12 +20,12 @@ export type MergeTwo<T1, T2> = PropsInFirstOnly<T1, T2> &
 export type Merge<T extends unknown[]> = T['length'] extends 3
     ? MergeTwo<T[0], MergeTwo<T[1], T[2]>>
     : T['length'] extends 2
-    ? MergeTwo<T[0], T[1]>
-    : T['length'] extends 1
-    ? T[0]
-    : T extends [...infer K, infer PL, infer L]
-    ? Merge<[Merge<[...K]>, MergeTwo<PL, L>]>
-    : never;
+      ? MergeTwo<T[0], T[1]>
+      : T['length'] extends 1
+        ? T[0]
+        : T extends [...infer K, infer PL, infer L]
+          ? Merge<[Merge<[...K]>, MergeTwo<PL, L>]>
+          : never;
 
 export const deepExtend = ((...rest) => {
     if (rest.length === 0) throw new Error('no arguments');
@@ -35,7 +35,7 @@ export const deepExtend = ((...rest) => {
 
     const result = {};
 
-    const extendObject = function (o1, o2) {
+    const extendObject = (o1, o2) => {
         const keys = Object.keys(o2);
 
         for (let i = 0; i < keys.length; i++) {

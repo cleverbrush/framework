@@ -1,18 +1,21 @@
-import React, { useContext, useMemo } from 'react';
-import { FormSystemContext, FormContext } from './contexts.js';
-import type { FormContextValue } from './contexts.js';
-import type { FormSystemConfig, FieldRenderer } from './types.js';
 import type {
+    InferType,
     ObjectSchemaBuilder,
-    PropertyDescriptorTree,
     PropertyDescriptor,
-    SchemaBuilder,
-    InferType
+    PropertyDescriptorTree,
+    SchemaBuilder
 } from '@cleverbrush/schema';
-import type { SchemaFormInstance } from './hooks.js';
-import { useFieldFromContext, resolveRenderer } from './hooks.js';
-import type { UseFieldResult } from './types.js';
+import type React from 'react';
+import { useContext, useMemo } from 'react';
+import { FormContext, FormSystemContext } from './contexts.js';
 import { getSchemaType } from './helpers.js';
+import type { SchemaFormInstance } from './hooks.js';
+import { resolveRenderer, useFieldFromContext } from './hooks.js';
+import type {
+    FieldRenderer,
+    FormSystemConfig,
+    UseFieldResult
+} from './types.js';
 
 // ─── FormSystemProvider ──────────────────────────────────────────────────────
 
@@ -124,7 +127,9 @@ export function useField<
                 'Wrap your component tree with <FormProvider form={form}>.'
         );
     }
-    return useFieldFromContext(formContext, selector) as UseFieldResult<InferType<TPropertySchema>>;
+    return useFieldFromContext(formContext, selector) as UseFieldResult<
+        InferType<TPropertySchema>
+    >;
 }
 
 // ─── useFormSystem ───────────────────────────────────────────────────────────
@@ -144,9 +149,7 @@ export function useFormSystem(): FormSystemConfig {
 
 // ─── Field Component ─────────────────────────────────────────────────────────
 
-export type FieldProps<
-    TSchema extends ObjectSchemaBuilder<any, any, any>
-> = {
+export type FieldProps<TSchema extends ObjectSchemaBuilder<any, any, any>> = {
     selector: (
         tree: PropertyDescriptorTree<TSchema, TSchema>
     ) => PropertyDescriptor<TSchema, any, any>;

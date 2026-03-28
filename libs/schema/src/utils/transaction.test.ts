@@ -1,4 +1,4 @@
-import { test, expect } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { transaction } from './transaction.js';
 
@@ -290,7 +290,7 @@ test('error and regex are preserved', () => {
         field1: 1,
         field2: 'str',
         err: new Error(),
-        regex: new RegExp('aaa'),
+        regex: /aaa/,
         nested: {}
     };
 

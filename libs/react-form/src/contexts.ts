@@ -1,12 +1,11 @@
-import { createContext } from 'react';
-import type { FormSystemConfig } from './types.js';
-import type { FormStore } from './FormStore.js';
 import type {
     ObjectSchemaBuilder,
-    PropertyDescriptorTree,
-    PropertyDescriptorInner
+    PropertyDescriptorInner,
+    PropertyDescriptorTree
 } from '@cleverbrush/schema';
-import type { UseSchemaFormOptions } from './types.js';
+import { createContext } from 'react';
+import type { FormStore } from './FormStore.js';
+import type { FormSystemConfig, UseSchemaFormOptions } from './types.js';
 
 /**
  * Context for global form system configuration (renderers, etc).

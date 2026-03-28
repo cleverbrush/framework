@@ -66,7 +66,7 @@ export const retry = <T>(
                         (!options?.shouldRetry || options.shouldRetry(error))
                     ) {
                         retries++;
-                        let delay = minDelay * Math.pow(delayFactor, retries);
+                        let delay = minDelay * delayFactor ** retries;
                         if (delayRandomizationPercent) {
                             delay -=
                                 delay *

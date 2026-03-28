@@ -10,7 +10,7 @@ export function throttle<T extends (...args: any[]) => void>(
 ): (...args: Parameters<T>) => void {
     let lastCall = 0;
 
-    return function (...args: Parameters<T>) {
+    return (...args: Parameters<T>) => {
         const now = Date.now();
 
         if (now - lastCall >= limit) {

@@ -1,6 +1,6 @@
-import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
+import { type Transaction, transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
-import { Transaction, transaction } from '../utils/transaction.js';
+import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
 /**
  * Infers the TypeScript type that a `SchemaBuilder` instance validates.
@@ -716,7 +716,9 @@ export abstract class SchemaBuilder<
                 valid: false,
                 errors: errors
                     .filter((e) => e)
-                    .filter((e, i) => (doNotStopOnFirstError ? true : i === 0)),
+                    .filter((_e, i) =>
+                        doNotStopOnFirstError ? true : i === 0
+                    ),
                 context: resultingContext,
                 transaction: preprocessingTransaction
             };

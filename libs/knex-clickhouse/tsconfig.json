@@ -14,10 +14,7 @@
     },
     "include": ["src/**/*.ts"],
     "exclude": ["src/**/*.test.ts"],
-    "references": [
-        { "path": "../async" },
-        { "path": "../deep" }
-    ],
+    "references": [{ "path": "../async" }, { "path": "../deep" }],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }

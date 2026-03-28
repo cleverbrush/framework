@@ -1,11 +1,11 @@
-import {
-    ObjectSchemaBuilder,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-} from '@cleverbrush/schema';
 import type {
     PropertyDescriptorInner,
     PropertyDescriptorTree,
     SchemaBuilder
+} from '@cleverbrush/schema';
+import {
+    ObjectSchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
 
 /**
@@ -22,10 +22,15 @@ export function buildDescriptorPathMap(
 
     for (const propName of Object.keys(introspected.properties)) {
         const propDescriptor = (tree as any)[propName];
-        if (!propDescriptor || !(SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in propDescriptor)) {
+        if (
+            !propDescriptor ||
+            !(SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in propDescriptor)
+        ) {
             continue;
         }
-        const inner = propDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] as PropertyDescriptorInner<any, any, any>;
+        const inner = propDescriptor[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ] as PropertyDescriptorInner<any, any, any>;
         map.set(inner, propName);
 
         // Recurse into nested objects
@@ -82,7 +87,10 @@ export function buildSelectorFromPath(path: string): (tree: any) => any {
  * Example: isErrorPathMatch("$.user.name", "$.user.name") → true
  *          isErrorPathMatch("$.user.name($validators[0])", "$.user.name") → true
  */
-export function isErrorPathMatch(errPath: string, fieldErrorPath: string): boolean {
+export function isErrorPathMatch(
+    errPath: string,
+    fieldErrorPath: string
+): boolean {
     return (
         errPath === fieldErrorPath ||
         errPath.startsWith(fieldErrorPath + '.') ||

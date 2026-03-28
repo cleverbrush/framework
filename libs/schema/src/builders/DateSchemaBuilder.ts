@@ -1,11 +1,11 @@
 import { transaction } from '../utils/transaction.js';
 import {
-    Preprocessor,
+    type Preprocessor,
     SchemaBuilder,
-    ValidationContext,
-    ValidationErrorMessageProvider,
-    ValidationResult,
-    Validator
+    type ValidationContext,
+    type ValidationErrorMessageProvider,
+    type ValidationResult,
+    type Validator
 } from './SchemaBuilder.js';
 
 type DateSchemaBuilderCreateProps<T = Date, R extends boolean = true> = Partial<
@@ -290,7 +290,7 @@ export class DateSchemaBuilder<
      * @inheritdoc
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public hasType<T>(notUsed?: T): DateSchemaBuilder<T, true> {
+    public hasType<T>(_notUsed?: T): DateSchemaBuilder<T, true> {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;

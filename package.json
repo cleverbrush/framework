@@ -9,7 +9,9 @@
         "clean": "turbo run clean",
         "watch": "tsc --build --watch tsconfig.build.json",
         "docs": "typedoc",
-        "prettier": "npx prettier --write ./libs",
+        "lint": "biome check ./libs",
+        "lint:fix": "biome check --write ./libs",
+        "format": "biome format --write ./libs",
         "changeset": "changeset",
         "version": "changeset version",
         "release": "npm run clean && npm run build && changeset publish",
@@ -24,16 +26,14 @@
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD 3-Clause",
     "devDependencies": {
+        "@biomejs/biome": "^2.0.0",
         "@changesets/cli": "^2.30.0",
         "@testing-library/react": "^16.3.2",
         "@vitest/coverage-v8": "^4.1.2",
-        "eslint-config-airbnb": "^19.0.4",
         "jsdom": "^29.0.1",
-        "prettier": "^3.8.1",
         "tsup": "^8.5.1",
         "turbo": "^2.8.20",
         "typescript": "^6.0.2",
-        "typescript-eslint": "^8.57.2",
         "vitest": "^4.1.2"
     }
 }
