@@ -4,15 +4,18 @@ import ClickhouseDriver, {
     type ClickHouseClient,
     type ClickHouseSettings
 } from '@clickhouse/client';
-import Knex from 'knex';
+import knex, { type Knex } from 'knex';
 import { makeEscape } from './makeEscape.js';
 
 export type { ClickHouseClient };
 
-const parseDate = (value) => new Date(Date.parse(value));
+const parseDate = (value: any) => new Date(Date.parse(value));
+
+// Access the Client class from the knex runtime object (CJS compat)
+const KnexClient: typeof Knex.Client = (knex as any).Client;
 
 // this function is taken from knex npm package
-function arrayString(arr, esc) {
+function arrayString(arr: any[], esc: (val: any) => string) {
     let result = '';
     for (let i = 0; i < arr.length; i++) {
         if (i > 0) result += ',';
@@ -42,14 +45,14 @@ type AdditionalClientOptions = {
     retry?: Parameters<typeof retry>[1];
 };
 
-export class ClickhouseKnexClient extends Knex.Client {
+export class ClickhouseKnexClient extends KnexClient {
     _driver() {
         return ClickhouseDriver;
     }
 
     #retryOptions: Parameters<typeof retry>[1];
 
-    constructor(config: Knex.Knex.Config<any> & AdditionalClientOptions = {}) {
+    constructor(config: Knex.Config<any> & AdditionalClientOptions = {}) {
         const { retry: retryOptions } = config;
 
         super(config);
@@ -61,7 +64,7 @@ export class ClickhouseKnexClient extends Knex.Client {
                       delayFactor: 2,
                       minDelay: 100,
                       delayRandomizationPercent: 0.1,
-                      shouldRetry: (error) => error.code === 'ECONNRESET'
+                      shouldRetry: (error: any) => error.code === 'ECONNRESET'
                   },
                   retryOptions
               )
@@ -79,18 +82,18 @@ export class ClickhouseKnexClient extends Knex.Client {
         "Nullable(DateTime('UTC'))": parseDate,
         'LowCardinality(Nullable(Date))': parseDate,
         'LowCardinality(Nullable(DateTime))': parseDate,
-        UInt64: (value) => Number(value),
-        UInt32: (value) => Number(value)
+        UInt64: (value: any) => Number(value),
+        UInt32: (value: any) => Number(value)
     };
 
     #selectQueryRegex = /^(\s+)?(select|with)/i;
 
-    _escapeBinding(value) {
+    _escapeBinding(value: any) {
         const escapeBinding = makeEscape({
-            escapeArray(val, esc) {
+            escapeArray(val: any, esc: any) {
                 return arrayString(val, esc);
             },
-            escapeString(str) {
+            escapeString(str: string) {
                 let escaped = "'";
                 for (let i = 0; i < str.length; i++) {
                     const c = str[i];
@@ -105,7 +108,12 @@ export class ClickhouseKnexClient extends Knex.Client {
                 escaped += "'";
                 return escaped;
             },
-            escapeObject(val, prepareValue, _timezone, seen: any[] = []) {
+            escapeObject(
+                val: any,
+                prepareValue: any,
+                _timezone: any,
+                seen: any[] = []
+            ) {
                 if (val && typeof val.toPostgres === 'function') {
                     seen = seen || [];
                     if (seen.indexOf(val) !== -1) {
@@ -134,7 +142,7 @@ export class ClickhouseKnexClient extends Knex.Client {
      * @param {import('@clickhouse/client').QueryParams} obj
      * @returns
      */
-    async _query(connection: ClickHouseClient, obj) {
+    async _query(connection: ClickHouseClient, obj: any) {
         if (!obj || typeof obj === 'string') {
             obj = { sql: obj };
         } else if (!obj.sql) {
@@ -152,7 +160,7 @@ export class ClickhouseKnexClient extends Knex.Client {
                 ? obj.sql
                       .split('?')
                       .map(
-                          (x, i) =>
+                          (x: any, i: number) =>
                               `${x}${
                                   obj.bindings.length > i
                                       ? this._escapeBinding(obj.bindings[i])
@@ -215,23 +223,27 @@ export class ClickhouseKnexClient extends Knex.Client {
      * @param {*} runner
      * @returns
      */
-    processResponse(obj, runner) {
+    processResponse(obj: any, runner: any) {
         if (obj == null) return null;
         const { response } = obj;
         const [rows, fields, meta] = response || [[]];
 
         const parsers = Array.isArray(fields)
-            ? fields.map((field) =>
-                  typeof this.#typeParsers[field.type] === 'function'
-                      ? this.#typeParsers[field.type]
-                      : (x) => x
+            ? fields.map((field: any) =>
+                  typeof (this.#typeParsers as Record<string, (v: any) => any>)[
+                      field.type
+                  ] === 'function'
+                      ? (this.#typeParsers as Record<string, (v: any) => any>)[
+                            field.type
+                        ]
+                      : (x: any) => x
               )
             : fields;
 
-        const rowToObj = (row) => {
+        const rowToObj = (row: any) => {
             const result: Record<string, unknown> = {};
 
-            fields.forEach((field, index) => {
+            fields.forEach((field: any, index: number) => {
                 result[field.name] = parsers[index](row[index]);
             });
 
@@ -248,15 +260,19 @@ export class ClickhouseKnexClient extends Knex.Client {
 
         switch (method) {
             case 'select':
-                return [rows.map((r) => rowToObj(r)), fields, meta];
+                return [rows.map((r: any) => rowToObj(r)), fields, meta];
             case 'first':
                 return [rowToObj(rows[0]), fields, meta];
             case 'pluck': {
                 const pluckIndex = fields.findIndex(
-                    (val) => val.name === obj.pluck
+                    (val: any) => val.name === obj.pluck
                 );
                 if (pluckIndex === -1) return rows;
-                return [rows.map((row) => row[pluckIndex]), obj.pluck, meta];
+                return [
+                    rows.map((row: any) => row[pluckIndex]),
+                    obj.pluck,
+                    meta
+                ];
             }
             case 'insert':
             case 'del':
@@ -271,24 +287,19 @@ export class ClickhouseKnexClient extends Knex.Client {
     /**
      * @type {import('@clickhouse/client').ClickHouseClient}
      */
-    #connection;
+    #connection: any;
 
     // Get a raw connection, called by the `pool` whenever a new
     // connection needs to be added to the pool.
     async acquireRawConnection() {
         if (!this.#connection) {
             const connection = ClickhouseDriver.createClient({
-                // @ts-expect-error
-                url: this.config.connection.url,
-                // @ts-expect-error
-                username: this.config.connection.user,
-                // @ts-expect-error
-                password: this.config.connection.password,
-                // @ts-expect-error
-                database: this.config.connection.database,
+                url: (this.config as any).connection.url,
+                username: (this.config as any).connection.user,
+                password: (this.config as any).connection.password,
+                database: (this.config as any).connection.database,
                 compression: { request: true, response: true },
-                // @ts-expect-error
-                clickhouse_settings: this.config.clickHouseSettings
+                clickhouse_settings: (this.config as any).clickHouseSettings
             });
 
             // @ts-expect-error
@@ -300,7 +311,7 @@ export class ClickhouseKnexClient extends Knex.Client {
         return this.#connection;
     }
 
-    async destroyRawConnection(connection) {
+    async destroyRawConnection(connection: any) {
         connection.close();
     }
 }
@@ -311,43 +322,47 @@ Object.assign(ClickhouseKnexClient.prototype, {
     canCancelQuery: true
 });
 
-const registerKnexClickhouseExtensions = (knex) => {
-    Knex.QueryBuilder.extend('insertToClickhouse', function (rows) {
-        const getTuple = (r, p = ['(', ')']) =>
-            p[0] +
-            r
-                .map((c) => {
-                    if (c === null) {
-                        return 'NULL';
-                    }
-                    if (typeof c === 'string') {
-                        return knex.raw('?', [c]).toQuery();
-                    }
+const registerKnexClickhouseExtensions = (knex: any) => {
+    (knex as any).QueryBuilder.extend(
+        'insertToClickhouse',
+        function (this: any, rows: any) {
+            const getTuple = (r: any, p = ['(', ')']) =>
+                p[0] +
+                r
+                    .map((c: any) => {
+                        if (c === null) {
+                            return 'NULL';
+                        }
+                        if (typeof c === 'string') {
+                            return knex.raw('?', [c]).toQuery();
+                        }
 
-                    if (Array.isArray(c)) {
-                        return getTuple(c, ['[', ']']);
-                    }
+                        if (Array.isArray(c)) {
+                            return getTuple(c, ['[', ']']);
+                        }
 
-                    if (typeof c === 'object') {
-                        const keys = Object.keys(c);
-                        return `[${keys
-                            .map(
-                                (k) =>
-                                    `(${knex.raw('?', [k]).toQuery()}, ${knex
-                                        .raw('?', [c[k]])
-                                        .toQuery()})`
-                            )
-                            .join(', ')}]`;
-                    }
+                        if (typeof c === 'object') {
+                            const keys = Object.keys(c);
+                            return `[${keys
+                                .map(
+                                    (k) =>
+                                        `(${knex.raw('?', [k]).toQuery()}, ${knex
+                                            .raw('?', [c[k]])
+                                            .toQuery()})`
+                                )
+                                .join(', ')}]`;
+                        }
 
-                    return c;
-                })
-                .join(', ') +
-            p[1];
-        const values = rows.map((r) => getTuple(r));
-        // @ts-expect-error
-        return knex.raw(`INSERT INTO ${this._single.table} VALUES ${values}`);
-    });
+                        return c;
+                    })
+                    .join(', ') +
+                p[1];
+            const values = rows.map((r: any) => getTuple(r));
+            return knex.raw(
+                `INSERT INTO ${(this as any)._single.table} VALUES ${values}`
+            );
+        }
+    );
 };
 
 /**
@@ -355,7 +370,7 @@ const registerKnexClickhouseExtensions = (knex) => {
  * @returns {import('knex').Knex<any, unknown[]>}
  */
 export const getClickhouseConnection = (
-    config: Knex.Knex.Config<any> & AdditionalClientOptions = {},
+    config: Knex.Config<any> & AdditionalClientOptions = {},
     clickHouseSettings?: ClickHouseSettings,
     /**
      * If defined, this function will be called before each query
@@ -370,13 +385,12 @@ export const getClickhouseConnection = (
      */
     preQueryCallback?: (connection: ClickHouseClient) => Promise<void>
 ) => {
-    const connection = Knex({
+    const connection = knex({
         ...config,
-        client: ClickhouseKnexClient,
-        // @ts-expect-error
+        client: ClickhouseKnexClient as any,
         clickHouseSettings,
         preQueryCallback
-    });
+    } as any);
 
     registerKnexClickhouseExtensions(connection);
 

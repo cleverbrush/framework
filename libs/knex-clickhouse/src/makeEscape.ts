@@ -18,27 +18,28 @@ const charsMap = {
     '\\': '\\\\'
 };
 
-const wrapEscape = (escapeFn) =>
-    function finalEscape(val, ctx = {}) {
+const wrapEscape = (escapeFn: (val: any, finalEscape: any, ctx: any) => any) =>
+    function finalEscape(val: any, ctx: any = {}) {
         return escapeFn(val, finalEscape, ctx);
     };
 
-const escapeObject = (val, _finalEscape, ctx) => {
+const escapeObject = (val: any, _finalEscape: any, ctx: any) => {
     if (val && typeof val.toSQL === 'function') {
         return val.toSQL(ctx);
     }
     return JSON.stringify(val);
 };
 
-const escapeString = (val) => {
+const escapeString = (val: any) => {
     charsRegex.lastIndex = 0;
     let chunkIndex = 0;
     let escapedVal = '';
-    let match;
+    let match: RegExpExecArray | null = null;
 
     // biome-ignore  lint/suspicious/noAssignInExpressions: intentional assignment in while condition to find matches in the string
     while ((match = charsRegex.exec(val))) {
-        escapedVal += val.slice(chunkIndex, match.index) + charsMap[match[0]];
+        escapedVal +=
+            val.slice(chunkIndex, match.index) + (charsMap as any)[match[0]];
         chunkIndex = charsRegex.lastIndex;
     }
 
@@ -54,9 +55,10 @@ const escapeString = (val) => {
     return `'${escapedVal}'`;
 };
 
-const bufferToString = (buffer) => `X${escapeString(buffer.toString('hex'))}`;
+const bufferToString = (buffer: Buffer) =>
+    `X${escapeString(buffer.toString('hex'))}`;
 
-const arrayToList = (array, finalEscape, ctx) => {
+const arrayToList = (array: any[], finalEscape: any, ctx: any) => {
     let sql = '';
     for (let i = 0; i < array.length; i++) {
         const val = array[i];
@@ -73,15 +75,15 @@ const arrayToList = (array, finalEscape, ctx) => {
     return sql;
 };
 
-const zeroPad = (number, length) => {
-    number = number.toString();
-    while (number.length < length) {
-        number = `0${number}`;
+const zeroPad = (number: number, length: number) => {
+    let numberStr = number.toString();
+    while (numberStr.length < length) {
+        numberStr = `0${numberStr}`;
     }
-    return number;
+    return numberStr;
 };
 
-const convertTimezone = (tz) => {
+const convertTimezone = (tz: any) => {
     if (tz === 'Z') {
         return 0;
     }
@@ -96,8 +98,7 @@ const convertTimezone = (tz) => {
     return false;
 };
 
-const dateToString = (date, _finalEscape, ctx = {}) => {
-    // @ts-expect-error
+const dateToString = (date: any, _finalEscape: any, ctx: any = {}) => {
     const timeZone = ctx.timeZone || 'local';
 
     const dt = new Date(date);
@@ -151,7 +152,7 @@ export const makeEscape = (config: any = {}) => {
     const finalEscapeObject = config.escapeObject || escapeObject;
     const finalWrap = config.wrap || wrapEscape;
 
-    function escapeFn(val, finalEscape, ctx) {
+    function escapeFn(val: any, finalEscape: any, ctx: any) {
         if (val === undefined || val === null) {
             return 'NULL';
         }
