@@ -63,7 +63,7 @@ const ScheduleWeekSchema = ScheduleSchemaBase.addProps({
         .minLength(1)
         .maxLength(7)
         .addValidator((val) => {
-            const map = {};
+            const map: Record<number, boolean> = {};
             for (let i = 0; i < val.length; i++) {
                 if (map[val[i]]) {
                     return {

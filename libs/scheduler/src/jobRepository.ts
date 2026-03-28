@@ -73,12 +73,12 @@ export class InMemoryJobRepository implements IJobRepository {
     }
 
     async getJobById(jobId: string): Promise<Job> {
-        return this._jobs.find((j) => j.id === jobId);
+        return this._jobs.find((j) => j.id === jobId)!;
     }
 
     async setJobStatus(jobId: string, status: JobStatus): Promise<Job> {
         const job = await this.getJobById(jobId);
-        if (!job) return null;
+        if (!job) return null as any;
         job.status = status;
         return job;
     }
@@ -110,7 +110,7 @@ export class InMemoryJobRepository implements IJobRepository {
     }
 
     async getInstanceById(id: number): Promise<JobInstance> {
-        return this._jobInstances.find((ji) => ji.id === id);
+        return this._jobInstances.find((ji) => ji.id === id)!;
     }
 
     async saveInstance(instance: JobInstance): Promise<JobInstance> {
