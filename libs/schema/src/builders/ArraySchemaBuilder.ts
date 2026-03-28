@@ -162,7 +162,6 @@ export class ArraySchemaBuilder<
      * @inheritdoc
      */
     public hasType<T>(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         _notUsed?: T
     ): ArraySchemaBuilder<TElementSchema, true, T> {
         return this.createFromProps({

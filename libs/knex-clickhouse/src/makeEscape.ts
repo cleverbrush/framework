@@ -30,7 +30,6 @@ const escapeObject = (val, _finalEscape, ctx) => {
     return JSON.stringify(val);
 };
 
-// eslint-disable-next-line
 const escapeString = (val) => {
     charsRegex.lastIndex = 0;
     let chunkIndex = 0;
@@ -63,7 +62,6 @@ const arrayToList = (array, finalEscape, ctx) => {
         const val = array[i];
         if (Array.isArray(val)) {
             sql +=
-                // eslint-disable-next-line
                 (i === 0 ? '' : ', ') +
                 '(' +
                 arrayToList(val, finalEscape, ctx) +
@@ -90,7 +88,6 @@ const convertTimezone = (tz) => {
     const m = tz.match(/([+\-\s])(\d\d):?(\d\d)?/);
     if (m) {
         return (
-            // eslint-disable-next-line
             (m[1] === '-' ? -1 : 1) *
             (parseInt(m[2], 10) + (m[3] ? parseInt(m[3], 10) : 0) / 60) *
             60
@@ -158,12 +155,10 @@ export const makeEscape = (config: any = {}) => {
         if (val === undefined || val === null) {
             return 'NULL';
         }
-        // eslint-disable-next-line
         switch (typeof val) {
             case 'boolean':
                 return val ? 'true' : 'false';
             case 'number':
-                // eslint-disable-next-line
                 return val + '';
             case 'object':
                 if (val instanceof Date) {

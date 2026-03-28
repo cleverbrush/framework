@@ -716,7 +716,6 @@ export class ObjectSchemaBuilder<
      * @inheritdoc
      */
     public hasType<T>(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         _notUsed?: T
     ): ObjectSchemaBuilder<TProperties, TRequired, T> {
         return this.createFromProps({

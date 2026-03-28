@@ -59,7 +59,6 @@ export class FunctionSchemaBuilder<
     /**
      * @hidden
      */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(_notUsed?: T): FunctionSchemaBuilder<true, T> {
         return this.createFromProps({
             ...this.introspect()

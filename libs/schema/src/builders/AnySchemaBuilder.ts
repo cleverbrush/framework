@@ -48,7 +48,6 @@ export class AnySchemaBuilder<
     /**
      * @inheritdoc
      */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(_notUsed?: T): AnySchemaBuilder<true, T> {
         return this.createFromProps({
             ...this.introspect()

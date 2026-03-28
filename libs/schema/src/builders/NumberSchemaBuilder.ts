@@ -271,7 +271,6 @@ export class NumberSchemaBuilder<
     /**
      * @inheritdoc
      */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(_notUsed?: T): NumberSchemaBuilder<T, true> {
         return this.createFromProps({
             ...this.introspect()

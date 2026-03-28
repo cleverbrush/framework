@@ -131,11 +131,7 @@ test('one prop - 3', async () => {
         first: number().optional()
     });
 
-    const {
-        valid,
-        object: result,
-        errors
-    } = await schema.validate({
+    const { valid, errors } = await schema.validate({
         first: '123' as any
     });
 
@@ -143,10 +139,6 @@ test('one prop - 3', async () => {
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(1);
     expect(errors?.findIndex((e) => e.path === '$.first')).not.toEqual(-1);
-    if (typeof result !== 'undefined') {
-        // eslint-disable-next-line
-        // const typeTest: Expect<Equal<{ first?: number }, typeof result>> = true;
-    }
 });
 
 test('one prop - 4', async () => {
@@ -163,10 +155,6 @@ test('one prop - 4', async () => {
     expect(valid).toEqual(true);
     expect(result !== obj).toEqual(true);
     expect(errors).not.toBeDefined();
-    if (typeof result !== 'undefined') {
-        // eslint-disable-next-line
-        // const typeTest: Expect<Equal<{ first?: number }, typeof result>> = true;
-    }
 });
 
 test('one prop - 5', async () => {

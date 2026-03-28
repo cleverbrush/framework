@@ -133,7 +133,6 @@ export default class Collector<
                 }
             });
 
-        // eslint-disable-next-line
         return this;
     }
 

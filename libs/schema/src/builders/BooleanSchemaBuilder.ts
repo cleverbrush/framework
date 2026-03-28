@@ -101,7 +101,6 @@ export class BooleanSchemaBuilder<
     /**
      * @inheritdoc
      */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     public hasType<T>(_notUsed?: T): BooleanSchemaBuilder<TResult, true, T> {
         return this.createFromProps({
             ...this.introspect()
