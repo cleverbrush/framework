@@ -400,9 +400,14 @@ export function withExtensions<
 
         // Create a factory that uses the extended class
         factories[builderName] = (...args: any[]) => {
-            // Delegate to the original factory to get initial props, then reconstruct
+            // Delegate to the original factory to get an initialized instance,
+            // then upgrade its prototype so it gains the extension methods.
+            // Note: Object.setPrototypeOf can cause V8 hidden-class deoptimization
+            // on the mutated object, but avoids the double allocation and
+            // introspect() round-trip of the previous approach.
             const original = builderFactories[builderName](...args);
-            return ExtendedClass.create(original.introspect());
+            Object.setPrototypeOf(original, ExtendedClass.prototype);
+            return original;
         };
     }
 

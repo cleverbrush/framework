@@ -1117,12 +1117,7 @@ describe('realistic object schemas with extensions', () => {
             slug: 'my-first-post',
             tags: ['js', 'js'] // duplicate
         };
-        const result2 = (await invalidPost.tags)
-            ? await s
-                  .array(string())
-                  .unique()
-                  .validate(invalidPost.tags as any)
-            : { valid: false };
+        const result2 = await postSchema.validate(invalidPost as any);
         expect(result2.valid).toBe(false);
     });
 
