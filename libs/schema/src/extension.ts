@@ -276,7 +276,8 @@ const RESERVED_METHODS = new Set([
 export function defineExtension<T extends ExtensionConfig>(
     config: T
 ): ExtensionDescriptor<T> {
-    // Validate at definition time
+    // Validate at definition time and wrap methods for auto-infer extension key
+    const wrappedConfig: any = {};
     for (const builderName of Object.keys(config) as BuilderTypeName[]) {
         if (!(builderName in builderClasses)) {
             throw new Error(
@@ -291,21 +292,50 @@ export function defineExtension<T extends ExtensionConfig>(
             );
         }
 
+        wrappedConfig[builderName] = {};
         for (const methodName of Object.keys(methods)) {
             if (RESERVED_METHODS.has(methodName)) {
                 throw new Error(
                     `Cannot override reserved method "${methodName}" on "${builderName}"`
                 );
             }
-            if (typeof methods[methodName] !== 'function') {
+            const origMethod = methods[methodName];
+            if (typeof origMethod !== 'function') {
                 throw new Error(
                     `Extension method "${builderName}.${methodName}" must be a function`
                 );
             }
+            // Wrap the method to auto-infer extension key if not already set
+            wrappedConfig[builderName][methodName] = function (
+                this: any,
+                ...args: any[]
+            ) {
+                const result = origMethod.apply(this, args);
+                // If result is a builder and does not have the extension key, auto-apply withExtension
+                if (
+                    result &&
+                    typeof result === 'object' &&
+                    typeof result.withExtension === 'function' &&
+                    // Only auto-apply if the extension key is not already present
+                    (typeof result.getExtension !== 'function' ||
+                        result.getExtension(methodName) === undefined)
+                ) {
+                    // Only auto-apply if the original method did not call withExtension
+                    return result.withExtension(
+                        methodName,
+                        args.length === 1
+                            ? args[0]
+                            : args.length === 0
+                              ? true
+                              : args
+                    );
+                }
+                return result;
+            };
         }
     }
 
-    return { config } as ExtensionDescriptor<T>;
+    return { config: wrappedConfig } as ExtensionDescriptor<T>;
 }
 
 // ---------------------------------------------------------------------------
