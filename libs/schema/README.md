@@ -11,6 +11,7 @@ A schema definition and validation library for TypeScript. Define object schemas
 **What makes it different from Zod / Yup / Joi:**
 
 - **PropertyDescriptors** — a runtime descriptor tree that other tools can introspect. The [`@cleverbrush/mapper`](../mapper) uses it for type-safe property selectors. The [`@cleverbrush/react-form`](../react-form) uses it to auto-generate form fields with correct validation. This makes the schema library a **foundation** for an entire ecosystem — not just a standalone validation tool.
+- **Extension system** — add custom methods to any builder type (`string`, `number`, `date`, …) via `defineExtension()` + `withExtensions()`. Extensions are fully typed, chainable, and composable. No other popular schema library offers a comparable type-safe plugin system.
 - **JSDoc comment preservation** — JSDoc comments on schema properties carry through to the inferred TypeScript type, so IDE tooltips and autocomplete descriptions come from the schema definition itself.
 - **Zero dependencies** — no runtime dependencies at all.
 
@@ -23,6 +24,7 @@ A schema definition and validation library for TypeScript. Define object schemas
 | Zero dependencies             | ✓                   | ✓   | ✗   | ✗   |
 | Async validation              | ✓                   | ✓   | ✓   | ✓   |
 | Per-property error inspection | ✓                   | ~   | ~   | ~   |
+| Extension / plugin system     | ✓                   | ~   | ✗   | ~   |
 
 ## Installation
 
@@ -321,6 +323,243 @@ const tree = ObjectSchemaBuilder.getPropertiesFor(UserSchema);
 // react-form: <Field selector={(t) => t.address.city} form={form} />
 ```
 
+## Extensions
+
+The extension system lets you add **custom methods** to any schema builder type without modifying the core library. Define an extension once, apply it with `withExtensions()`, and every builder produced by the returned factories includes your new methods — fully typed and chainable.
+
+### Defining an Extension
+
+Use `defineExtension()` to declare which builder types your extension targets and what methods it adds. Extension methods receive `this` bound to the builder instance and must return a builder to support fluent chaining:
+
+```typescript
+import {
+    defineExtension,
+    withExtensions,
+    StringSchemaBuilder,
+    NumberSchemaBuilder,
+    DateSchemaBuilder
+} from '@cleverbrush/schema';
+
+// Email extension — adds .email() to string builders
+const emailExt = defineExtension({
+    string: {
+        email(this: StringSchemaBuilder) {
+            return this.addValidator((val) => {
+                const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val as string);
+                return {
+                    valid,
+                    errors: valid
+                        ? []
+                        : [{ message: 'Invalid email address' }]
+                };
+            });
+        }
+    }
+});
+
+// Port extension — adds .port() to number builders
+const portExt = defineExtension({
+    number: {
+        port(this: NumberSchemaBuilder) {
+            return this.isInteger().min(1).max(65535);
+        }
+    }
+});
+
+// Slug extension — adds .slug() to string builders
+const slugExt = defineExtension({
+    string: {
+        slug(this: StringSchemaBuilder) {
+            return this.addValidator((val) => {
+                const valid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(val as string);
+                return {
+                    valid,
+                    errors: valid
+                        ? []
+                        : [{ message: 'Must be a valid URL slug' }]
+                };
+            });
+        }
+    }
+});
+```
+
+### Using Extensions
+
+Pass one or more extension descriptors to `withExtensions()` to get augmented factory functions. All original builder methods remain available and fully chainable alongside the new ones:
+
+```typescript
+const s = withExtensions(emailExt, portExt, slugExt);
+
+// .email() and .slug() are now available on string builders
+const EmailSchema = s.string().email().minLength(5);
+const SlugSchema = s.string().slug().minLength(1).maxLength(200);
+
+// .port() is now available on number builders
+const PortSchema = s.number().port();
+
+// Use in object schemas — just like normal builders
+const ServerConfig = s.object({
+    adminEmail: s.string().email(),
+    port: s.number().port(),
+    slug: s.string().slug(),
+    name: s.string().minLength(1)
+});
+
+// Validate as usual
+const result = await ServerConfig.validate({
+    adminEmail: 'admin@example.com',
+    port: 8080,
+    slug: 'my-server',
+    name: 'Production'
+});
+```
+
+### Multi-Builder Extensions
+
+A single extension can target multiple builder types:
+
+```typescript
+const timestampsExt = defineExtension({
+    string: {
+        /** Marks this string property as an ISO timestamp */
+        isoTimestamp(this: StringSchemaBuilder) {
+            return this.addValidator((val) => {
+                const valid = !isNaN(Date.parse(val as string));
+                return {
+                    valid,
+                    errors: valid
+                        ? []
+                        : [{ message: 'Must be a valid ISO timestamp' }]
+                };
+            });
+        }
+    },
+    date: {
+        /** Adds a validator that rejects dates in the future */
+        pastOnly(this: DateSchemaBuilder) {
+            return this.addValidator((val) => {
+                const valid = (val as Date) <= new Date();
+                return {
+                    valid,
+                    errors: valid ? [] : [{ message: 'Date must be in the past' }]
+                };
+            });
+        }
+    }
+});
+```
+
+### Extension Metadata & Introspection
+
+Extension methods automatically record metadata that can be inspected at runtime via `.introspect().extensions`. The system auto-infers the metadata value based on the arguments passed to the extension method:
+
+- **Zero-arg methods** → metadata value is `true`
+- **Single-arg methods** → metadata value is the argument itself
+- **Multi-arg methods** → metadata value is the arguments array
+
+```typescript
+const s = withExtensions(emailExt, portExt);
+
+// Zero-arg method — metadata is `true`
+const emailSchema = s.string().email();
+console.log(emailSchema.introspect().extensions.email); // true
+
+// Single-arg method — metadata is the argument
+const rangeExt = defineExtension({
+    number: {
+        percentage(this: NumberSchemaBuilder) {
+            return this.min(0).max(100);
+        }
+    }
+});
+const s2 = withExtensions(rangeExt);
+const pctSchema = s2.number().percentage();
+console.log(pctSchema.introspect().extensions.percentage); // true
+
+// Multi-arg method — metadata is the arguments array
+const rangeExt2 = defineExtension({
+    number: {
+        range(this: NumberSchemaBuilder, min: number, max: number) {
+            return this.min(min).max(max);
+        }
+    }
+});
+const s3 = withExtensions(rangeExt2);
+const rangeSchema = s3.number().range(0, 100);
+console.log(rangeSchema.introspect().extensions.range); // [0, 100]
+```
+
+### Custom Metadata
+
+If you need structured metadata (e.g. an object with named fields rather than the raw arguments), call `this.withExtension(key, value)` explicitly inside the method. The auto-infer logic detects the existing key and skips automatic attachment:
+
+```typescript
+const currencyExt = defineExtension({
+    number: {
+        currency(this: NumberSchemaBuilder, opts?: { maxDecimals?: number }) {
+            const maxDec = opts?.maxDecimals ?? 2;
+            // Explicit withExtension() call — auto-infer is skipped
+            return this
+                .withExtension('currency', { maxDecimals: maxDec })
+                .min(0)
+                .addValidator((val) => {
+                    const decimals = (String(val).split('.')[1] ?? '').length;
+                    const valid = decimals <= maxDec;
+                    return {
+                        valid,
+                        errors: valid
+                            ? []
+                            : [{ message: `Max ${maxDec} decimal places` }]
+                    };
+                });
+        }
+    }
+});
+
+const s = withExtensions(currencyExt);
+const priceSchema = s.number().currency({ maxDecimals: 4 });
+console.log(priceSchema.introspect().extensions.currency);
+// { maxDecimals: 4 }  — structured metadata, not the raw args
+```
+
+### Stacking Extensions
+
+Multiple extensions can be stacked — their methods are merged per builder type. A runtime error is thrown if two extensions define the same method name on the same builder type:
+
+```typescript
+// All three extensions target StringSchemaBuilder
+const s = withExtensions(emailExt, slugExt, trimmedExt);
+
+// All methods are available and chainable
+const schema = s.string().email().slug().trimmed().minLength(5);
+```
+
+### Validation
+
+`defineExtension()` validates the configuration eagerly:
+
+- **Unknown builder type names** throw immediately (e.g. `{ str: { ... } }` instead of `{ string: { ... } }`)
+- **Reserved method names** cannot be overridden — `validate`, `introspect`, `optional`, `required`, `addValidator`, `addPreprocessor`, `withExtension`, `getExtension`, etc.
+- **Non-function values** in the method record are rejected
+
+```typescript
+// ❌ Throws: Unknown builder type "str"
+defineExtension({ str: { foo() { return this; } } });
+
+// ❌ Throws: Cannot override reserved method "validate"
+defineExtension({ string: { validate() { return this; } } });
+```
+
+### Extension API Reference
+
+| Function / Type                | Description                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `defineExtension(config)`      | Defines an extension. `config` is an `ExtensionConfig` keyed by builder type name. Returns an `ExtensionDescriptor`. |
+| `withExtensions(...exts)`      | Accepts one or more `ExtensionDescriptor`s. Returns an object with augmented factory functions (`string`, `number`, `boolean`, `date`, `object`, `array`, `union`, `func`, `any`). |
+| `ExtensionConfig`              | Type for the configuration object passed to `defineExtension`. Maps builder type names to method records. |
+| `ExtensionDescriptor`          | Branded type returned by `defineExtension`. Pass to `withExtensions()` to apply.                         |
+
 ## Part of the Cleverbrush Ecosystem
 
 `@cleverbrush/schema` is the foundation of a three-library ecosystem:
@@ -341,7 +580,9 @@ Define a schema once and use it for runtime validation, object mapping between d
 
 **Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
 
-**Types:** `InferType`, `ValidationResult`, `ValidationError`, `MakeOptional`, `SchemaPropertySelector`, `PropertyDescriptor`, `PropertyDescriptorTree`
+**Extension system:** `defineExtension`, `withExtensions`
+
+**Types:** `InferType`, `ValidationResult`, `ValidationError`, `MakeOptional`, `SchemaPropertySelector`, `PropertyDescriptor`, `PropertyDescriptorTree`, `ExtensionConfig`, `ExtensionDescriptor`
 
 See [API documentation](https://docs.cleverbrush.com/) for the full reference.
 

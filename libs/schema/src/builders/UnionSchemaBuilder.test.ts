@@ -289,7 +289,7 @@ test('Clear Has Type - 1', async () => {
 
 test('or error - 1', async () => {
     const schema1 = union(number().equals(10)).hasType<Date>();
-    expect(() => schema1.or({} as any)).toThrowError();
+    expect(() => schema1.or({} as any)).toThrow();
 });
 
 test('Remove Option - 1', async () => {
@@ -352,9 +352,9 @@ test('Remove First Option - 1', async () => {
 
 test('Remove Option Error - 1', async () => {
     const schema1 = union(number().equals(10)).or(number().equals(20));
-    expect(() => schema1.removeOption(-1)).toThrowError();
-    expect(() => schema1.removeOption('123' as any)).toThrowError();
-    expect(() => schema1.removeOption(123 as any)).toThrowError();
+    expect(() => schema1.removeOption(-1)).toThrow();
+    expect(() => schema1.removeOption('123' as any)).toThrow();
+    expect(() => schema1.removeOption(123 as any)).toThrow();
 });
 
 test('Reset - 1', async () => {
@@ -388,7 +388,7 @@ test('Reset - 1', async () => {
 
 test('Reset Error - 1', async () => {
     const schema1 = union(number().equals(10)).or(number().equals(20));
-    expect(() => schema1.reset({} as any)).toThrowError();
+    expect(() => schema1.reset({} as any)).toThrow();
 });
 
 test('getNestedErrors - root errors on failed union', async () => {

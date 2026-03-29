@@ -39,3 +39,5 @@ export type {
     UnionSchemaValidationResult
 } from './builders/UnionSchemaBuilder.js';
 export { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
+export type { ExtensionConfig, ExtensionDescriptor } from './extension.js';
+export { defineExtension, withExtensions } from './extension.js';

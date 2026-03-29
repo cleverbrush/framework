@@ -15,7 +15,7 @@ import {
 } from './SchemaBuilder.js';
 
 type UnionSchemaBuilderCreateProps<
-    T extends readonly SchemaBuilder<any, any>[],
+    T extends readonly SchemaBuilder<any, any, any>[],
     R extends boolean = true
 > = Partial<ReturnType<UnionSchemaBuilder<T, R>['introspect']>>;
 
@@ -27,15 +27,15 @@ type UnionSchemaBuilderCreateProps<
  * `ObjectSchemaValidationResult`; other types get `ValidationResult`.
  */
 export type OptionValidationResults<
-    TOptions extends readonly SchemaBuilder<any, any>[]
+    TOptions extends readonly SchemaBuilder<any, any, any>[]
 > = {
     [K in keyof TOptions]: TOptions[K] extends UnionSchemaBuilder<
-        infer UOptions extends readonly SchemaBuilder<any, any>[],
+        infer UOptions extends readonly SchemaBuilder<any, any, any>[],
         any,
         any
     >
         ? UnionSchemaValidationResult<InferType<TOptions[K]>, UOptions>
-        : TOptions[K] extends ObjectSchemaBuilder<any, any, any>
+        : TOptions[K] extends ObjectSchemaBuilder<any, any, any, any>
           ? ObjectSchemaValidationResult<InferType<TOptions[K]>, TOptions[K]>
           : ValidationResult<InferType<TOptions[K]>>;
 };
@@ -47,7 +47,7 @@ export type OptionValidationResults<
  */
 export type UnionSchemaValidationResult<
     T,
-    TOptions extends readonly SchemaBuilder<any, any>[]
+    TOptions extends readonly SchemaBuilder<any, any, any>[]
 > = ValidationResult<T> & {
     /**
      * Returns root-level union validation errors combined with
@@ -60,22 +60,22 @@ export type UnionSchemaValidationResult<
         NestedValidationResult<any, any, any>;
 };
 
-type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any>[]> =
+type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any, any>[]> =
     TArr['length'] extends 1
         ? InferType<TArr[0]>
         : TArr extends readonly [
-                infer TFirst extends SchemaBuilder<any, any>,
-                ...infer TRest extends SchemaBuilder<any, any>[]
+                infer TFirst extends SchemaBuilder<any, any, any>,
+                ...infer TRest extends SchemaBuilder<any, any, any>[]
             ]
           ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]>
           : never;
 
 type TakeBeforeIndex<
-    TArr extends readonly SchemaBuilder<any, any>[],
+    TArr extends readonly SchemaBuilder<any, any, any>[],
     TIndex extends number
 > = TArr extends [
-    ...infer TRest extends SchemaBuilder<any, any>[],
-    infer _ extends SchemaBuilder<any, any>
+    ...infer TRest extends SchemaBuilder<any, any, any>[],
+    infer _ extends SchemaBuilder<any, any, any>
 ]
     ? TRest['length'] extends TIndex
         ? TRest
@@ -83,12 +83,12 @@ type TakeBeforeIndex<
     : never;
 
 type TakeAfterIndex<
-    TArr extends readonly SchemaBuilder<any, any>[],
+    TArr extends readonly SchemaBuilder<any, any, any>[],
     TIndex extends number,
-    TAcc extends readonly SchemaBuilder<any, any>[] = []
+    TAcc extends readonly SchemaBuilder<any, any, any>[] = []
 > = TArr extends [
-    ...infer TRest extends SchemaBuilder<any, any>[],
-    infer TLast extends SchemaBuilder<any, any>
+    ...infer TRest extends SchemaBuilder<any, any, any>[],
+    infer TLast extends SchemaBuilder<any, any, any>
 ]
     ? TRest['length'] extends TIndex
         ? TAcc
@@ -96,7 +96,7 @@ type TakeAfterIndex<
     : never;
 
 type TakeExceptIndex<
-    TArr extends readonly SchemaBuilder<any, any>[],
+    TArr extends readonly SchemaBuilder<any, any, any>[],
     TIndex extends number
 > = [...TakeBeforeIndex<TArr, TIndex>, ...TakeAfterIndex<TArr, TIndex>];
 
@@ -151,14 +151,16 @@ type TakeExceptIndex<
  * @see {@link union}
  */
 export class UnionSchemaBuilder<
-    TOptions extends readonly SchemaBuilder<any, any>[],
+    TOptions extends readonly SchemaBuilder<any, any, any>[],
     TRequired extends boolean = true,
-    TExplicitType = undefined
+    TExplicitType = undefined,
+    TExtensions = {}
 > extends SchemaBuilder<
     TExplicitType extends undefined
         ? SchemaArrayToUnion<TOptions>
         : TExplicitType,
-    TRequired
+    TRequired,
+    TExtensions
 > {
     #options!: TOptions;
 
@@ -172,7 +174,7 @@ export class UnionSchemaBuilder<
         });
     }
 
-    private constructor(
+    protected constructor(
         props: UnionSchemaBuilderCreateProps<TOptions, TRequired>
     ) {
         super(props as any);
@@ -195,7 +197,9 @@ export class UnionSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public hasType<T>(_notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
+    public hasType<T>(
+        _notUsed?: T
+    ): UnionSchemaBuilder<TOptions, true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -204,7 +208,13 @@ export class UnionSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): UnionSchemaBuilder<TOptions, TRequired, undefined> {
+    public clearHasType(): UnionSchemaBuilder<
+        TOptions,
+        TRequired,
+        undefined,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -337,7 +347,7 @@ export class UnionSchemaBuilder<
     }
 
     protected createFromProps<
-        T extends readonly SchemaBuilder<any, any>[],
+        T extends readonly SchemaBuilder<any, any, any>[],
         TReq extends boolean
     >(props: UnionSchemaBuilderCreateProps<T, TReq>): this {
         return UnionSchemaBuilder.create(props as any) as any;
@@ -348,14 +358,21 @@ export class UnionSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): UnionSchemaBuilder<TOptions, true, TExplicitType> {
+    ): UnionSchemaBuilder<TOptions, true, TExplicitType, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): UnionSchemaBuilder<TOptions, false, TExplicitType> {
+    public optional(): UnionSchemaBuilder<
+        TOptions,
+        false,
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
     }
 
@@ -364,9 +381,15 @@ export class UnionSchemaBuilder<
      * schema must be an instance of `SchemaBuilder` class ancestor.
      * @param schema schema to be added as an option.
      */
-    public or<T extends SchemaBuilder<any, any>>(
+    public or<T extends SchemaBuilder<any, any, any>>(
         schema: T
-    ): UnionSchemaBuilder<[...TOptions, T], TRequired, TExplicitType> {
+    ): UnionSchemaBuilder<
+        [...TOptions, T],
+        TRequired,
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         if (!(schema instanceof SchemaBuilder)) {
             throw new Error(
                 'schema must be an instance of the SchemaBuilder class'
@@ -388,8 +411,10 @@ export class UnionSchemaBuilder<
     ): UnionSchemaBuilder<
         TakeExceptIndex<TOptions, T>,
         TRequired,
-        TExplicitType
-    > {
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         if (
             typeof index !== 'number' ||
             index < 0 ||
@@ -408,9 +433,10 @@ export class UnionSchemaBuilder<
      */
     public removeFirstOption(): TOptions extends [
         infer _,
-        ...infer TRest extends SchemaBuilder<any, any>[]
+        ...infer TRest extends SchemaBuilder<any, any, any>[]
     ]
-        ? UnionSchemaBuilder<TRest, TRequired, TExplicitType>
+        ? UnionSchemaBuilder<TRest, TRequired, TExplicitType, TExtensions> &
+              TExtensions
         : never {
         return this.removeOption(0) as any;
     }
@@ -420,9 +446,10 @@ export class UnionSchemaBuilder<
      * Equivalent to `union(schema)` function, but could be useful in some cases.
      * @param schema schema to be added as a single option to the new schema.
      */
-    public reset<T extends SchemaBuilder<any, any>>(
+    public reset<T extends SchemaBuilder<any, any, any>>(
         schema: T
-    ): UnionSchemaBuilder<[T], TRequired, TExplicitType> {
+    ): UnionSchemaBuilder<[T], TRequired, TExplicitType, TExtensions> &
+        TExtensions {
         if (!(schema instanceof SchemaBuilder)) {
             throw new Error(
                 'schema must be an instance of the SchemaBuilder class'
@@ -439,7 +466,7 @@ export class UnionSchemaBuilder<
  * Creates a union schema.
  * @param schema required and will be considered as a first option for the union schema.
  */
-export const union = <T extends SchemaBuilder<any, any>>(schema: T) =>
+export const union = <T extends SchemaBuilder<any, any, any>>(schema: T) =>
     UnionSchemaBuilder.create({
         isRequired: true,
         options: [schema]

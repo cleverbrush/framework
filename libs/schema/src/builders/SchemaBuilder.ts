@@ -2,6 +2,11 @@ import { type Transaction, transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
+/** @internal Symbol used as the key for the type brand on schema builders. */
+declare const __type: unique symbol;
+/** @internal */
+export type SchemaTypeBrand = typeof __type;
+
 /**
  * Infers the TypeScript type that a `SchemaBuilder` instance validates.
  * Takes into account type optimizations (via `optimize()`) and whether the schema is optional.
@@ -13,23 +18,15 @@ import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
  * // { name: string; age?: number }
  * ```
  */
-export type InferType<T> =
-    T extends SchemaBuilder<infer TResult, infer TRequired>
-        ? T extends {
-              optimize: (
-                  ...args: any[]
-              ) => SchemaBuilder<
-                  infer TOptimizedType,
-                  infer TOptimizedRequired
-              >;
-          }
-            ? TOptimizedRequired extends true
-                ? TOptimizedType
-                : MakeOptional<TOptimizedType>
-            : TRequired extends true
-              ? TResult
-              : MakeOptional<TResult>
-        : T;
+export type InferType<T> = T extends {
+    optimize: (...args: any[]) => {
+        readonly [K in SchemaTypeBrand]: infer TOptimized;
+    };
+}
+    ? TOptimized
+    : T extends { readonly [K in SchemaTypeBrand]: infer TType }
+      ? TType
+      : T;
 
 /**
  * Represents a single validation error with the path to the invalid field
@@ -44,7 +41,7 @@ export type ValidationError = { path: string; message: string };
  */
 export type NestedValidationResult<
     TSchema,
-    TRootSchema extends ObjectSchemaBuilder<any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any>,
     TParentPropertyDescriptor
 > = {
     /**
@@ -76,7 +73,7 @@ export type MakeOptional<T> = { prop?: T }['prop'];
  * Should be used to provide a custom validation error message.
  */
 export type ValidationErrorMessageProvider<
-    TSchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
+    TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>
 > =
     | string
     | ((
@@ -146,10 +143,11 @@ export type SchemaBuilderProps<T> = {
     preprocessors: Preprocessor<T>[];
     validators: Validator<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
+    extensions?: Record<string, unknown>;
 };
 
 export type ValidationContext<
-    TSchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
+    TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>
 > = {
     /**
      * Path of the field. **Optional**, used to display correct error path in the {@link ValidationError}
@@ -169,7 +167,12 @@ export type ValidationContext<
      * Normally it's used internally by the library for validation of nested objects and
      * should not be used directly (but who knows, maybe you will find a use case for it).
      */
-    rootPropertyDescriptor?: TSchema extends ObjectSchemaBuilder<any, any, any>
+    rootPropertyDescriptor?: TSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any
+    >
         ? PropertyDescriptor<TSchema, TSchema, undefined>
         : never;
 
@@ -295,7 +298,7 @@ export type PropertyDescriptorInnerFromPropertyDescriptor<T> =
         : undefined;
 
 export type PropertyDescriptorInner<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any>,
     TPropertySchema,
     TParentPropertyDescriptor
 > = {
@@ -372,7 +375,7 @@ export type PropertyDescriptorInner<
  * an object schema. Used to get/set property values on validated objects.
  */
 export type PropertyDescriptor<
-    TRootSchema extends ObjectSchemaBuilder<any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any>,
     TPropertySchema,
     TParentPropertyDescriptor
 > = {
@@ -388,8 +391,8 @@ export type PropertyDescriptor<
  * Has a possibility to filter properties by the type (`TAssignableTo` type parameter).
  */
 export type PropertyDescriptorTree<
-    TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TRootSchema extends ObjectSchemaBuilder<any, any, any> = TSchema,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any> = TSchema,
     TAssignableTo = any,
     TParentPropertyDescriptor = undefined
 > = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> &
@@ -411,7 +414,7 @@ export type PropertyDescriptorTree<
                         >
                     >
                   : TProperties[K] extends ArraySchemaBuilder<
-                          ObjectSchemaBuilder<any, any, any>,
+                          ObjectSchemaBuilder<any, any, any, any>,
                           any,
                           any
                       >
@@ -480,16 +483,28 @@ export function createHybridErrorArray<T extends any[]>(
  */
 export abstract class SchemaBuilder<
     TResult = any,
-    TRequired extends boolean = true
+    TRequired extends boolean = true,
+    // biome-ignore lint/correctness/noUnusedVariables: used in extensions
+    TExtensions = {}
 > {
     #isRequired = true;
     #preprocessors: Preprocessor<TResult>[] = [];
     #validators: Validator<TResult>[] = [];
+    #extensions: Record<string, unknown> = {};
     #type = 'base';
     #defaultRequiredErrorMessageProvider: ValidationErrorMessageProvider =
         'is required';
     #requiredErrorMessageProvider: ValidationErrorMessageProvider =
         'is required';
+
+    /**
+     * Type-level brand encoding the inferred type of this schema.
+     * Not emitted at runtime — used only by {@link InferType}.
+     * @internal
+     */
+    declare readonly [__type]: TRequired extends true
+        ? TResult
+        : MakeOptional<TResult>;
 
     /**
      * Set type of schema explicitly. `notUsed` param is needed only for case when JS is used. E.g. when you
@@ -759,7 +774,11 @@ export abstract class SchemaBuilder<
              * Custom error message provider for the 'is required' validation error.
              */
             requiredValidationErrorMessageProvider:
-                this.#requiredErrorMessageProvider
+                this.#requiredErrorMessageProvider,
+            /**
+             * Extension metadata. Stores custom state set by schema extensions.
+             */
+            extensions: { ...this.#extensions }
         };
     }
 
@@ -905,6 +924,29 @@ export abstract class SchemaBuilder<
         return defaultValue;
     }
 
+    /**
+     * Sets extension metadata by key. Returns a new schema instance with the
+     * extension data stored. The data survives fluent chaining.
+     * @internal Used by extension authors inside `defineExtension()` callbacks.
+     */
+    public withExtension(key: string, value: unknown): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            extensions: {
+                ...this.#extensions,
+                [key]: value
+            }
+        });
+    }
+
+    /**
+     * Retrieves extension metadata by key.
+     * @internal Used by extension authors inside `defineExtension()` callbacks.
+     */
+    public getExtension(key: string): unknown {
+        return this.#extensions[key];
+    }
+
     protected constructor(props: SchemaBuilderProps<TResult>) {
         const { type, preprocessors, validators, isRequired } = props;
         this.type = type;
@@ -915,6 +957,10 @@ export abstract class SchemaBuilder<
 
         if (Array.isArray(validators)) {
             this.#validators = [...validators];
+        }
+
+        if (typeof props.extensions === 'object' && props.extensions) {
+            this.#extensions = { ...props.extensions };
         }
 
         this.#requiredErrorMessageProvider =

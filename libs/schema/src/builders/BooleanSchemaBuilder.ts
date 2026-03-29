@@ -43,8 +43,9 @@ export class BooleanSchemaBuilder<
     TResult = boolean,
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    TExtensions = {},
     TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType
-> extends SchemaBuilder<TFinalResult, TRequired> {
+> extends SchemaBuilder<TFinalResult, TRequired, TExtensions> {
     #equalsTo?: boolean;
     #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
         BooleanSchemaBuilder<TResult, TRequired>
@@ -65,7 +66,7 @@ export class BooleanSchemaBuilder<
         });
     }
 
-    private constructor(props: BooleanSchemaBuilderCreateProps<TRequired>) {
+    protected constructor(props: BooleanSchemaBuilderCreateProps<TRequired>) {
         super(props as any);
 
         if (
@@ -101,7 +102,9 @@ export class BooleanSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public hasType<T>(_notUsed?: T): BooleanSchemaBuilder<TResult, true, T> {
+    public hasType<T>(
+        _notUsed?: T
+    ): BooleanSchemaBuilder<TResult, true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -110,7 +113,13 @@ export class BooleanSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): BooleanSchemaBuilder<TResult, TRequired, undefined> {
+    public clearHasType(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        undefined,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -201,14 +210,21 @@ export class BooleanSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): BooleanSchemaBuilder<TResult, true, TExplicitType> {
+    ): BooleanSchemaBuilder<TResult, true, TExplicitType, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): BooleanSchemaBuilder<TResult, false, TExplicitType> {
+    public optional(): BooleanSchemaBuilder<
+        TResult,
+        false,
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
     }
 
@@ -229,7 +245,13 @@ export class BooleanSchemaBuilder<
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
-        } as any) as any as BooleanSchemaBuilder<T, TRequired, TExplicitType>;
+        } as any) as any as BooleanSchemaBuilder<
+            T,
+            TRequired,
+            TExplicitType,
+            TExtensions
+        > &
+            TExtensions;
     }
 
     /**
@@ -238,8 +260,10 @@ export class BooleanSchemaBuilder<
     public clearEquals(): BooleanSchemaBuilder<
         boolean,
         TRequired,
-        TExplicitType
-    > {
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: undefined

@@ -38,10 +38,11 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class FunctionSchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    TExtensions = {},
     TResult = TExplicitType extends undefined
         ? (...args: any[]) => any
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired> {
+> extends SchemaBuilder<TResult, TRequired, TExtensions> {
     /**
      * @hidden
      */
@@ -52,14 +53,16 @@ export class FunctionSchemaBuilder<
         });
     }
 
-    private constructor(props: FunctionSchemaBuilderCreateProps<TRequired>) {
+    protected constructor(props: FunctionSchemaBuilderCreateProps<TRequired>) {
         super(props as any);
     }
 
     /**
      * @hidden
      */
-    public hasType<T>(_notUsed?: T): FunctionSchemaBuilder<true, T> {
+    public hasType<T>(
+        _notUsed?: T
+    ): FunctionSchemaBuilder<true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -68,7 +71,12 @@ export class FunctionSchemaBuilder<
     /**
      * @hidden
      */
-    public clearHasType(): FunctionSchemaBuilder<TRequired, undefined> {
+    public clearHasType(): FunctionSchemaBuilder<
+        TRequired,
+        undefined,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -140,14 +148,19 @@ export class FunctionSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): FunctionSchemaBuilder<true, TExplicitType> {
+    ): FunctionSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): FunctionSchemaBuilder<false, TExplicitType> {
+    public optional(): FunctionSchemaBuilder<
+        false,
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
     }
 }

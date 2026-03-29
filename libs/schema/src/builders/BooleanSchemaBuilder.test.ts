@@ -135,7 +135,7 @@ test('equals - 1', async () => {
 });
 
 test('equals - 2', async () => {
-    expect(() => boolean().equals('213' as any)).toThrowError();
+    expect(() => boolean().equals('213' as any)).toThrow();
 });
 
 test('equals - 2', async () => {

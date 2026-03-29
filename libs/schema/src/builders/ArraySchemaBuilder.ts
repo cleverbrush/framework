@@ -26,15 +26,15 @@ import type {
  * other types get `ValidationResult`.
  */
 export type ElementValidationResult<
-    TElementSchema extends SchemaBuilder<any, any>
+    TElementSchema extends SchemaBuilder<any, any, any>
 > =
     TElementSchema extends UnionSchemaBuilder<
-        infer UOptions extends readonly SchemaBuilder<any, any>[],
+        infer UOptions extends readonly SchemaBuilder<any, any, any>[],
         any,
         any
     >
         ? UnionSchemaValidationResult<InferType<TElementSchema>, UOptions>
-        : TElementSchema extends ObjectSchemaBuilder<any, any, any>
+        : TElementSchema extends ObjectSchemaBuilder<any, any, any, any>
           ? ObjectSchemaValidationResult<
                 InferType<TElementSchema>,
                 TElementSchema
@@ -48,7 +48,7 @@ export type ElementValidationResult<
  */
 export type ArraySchemaValidationResult<
     TResult,
-    TElementSchema extends SchemaBuilder<any, any>
+    TElementSchema extends SchemaBuilder<any, any, any>
 > = ValidationResult<TResult> & {
     /**
      * Returns root-level array validation errors combined with
@@ -62,7 +62,7 @@ export type ArraySchemaValidationResult<
 };
 
 type ArraySchemaBuilderCreateProps<
-    TElementSchema extends SchemaBuilder<any, any>,
+    TElementSchema extends SchemaBuilder<any, any, any>,
     R extends boolean = true
 > = Partial<ReturnType<ArraySchemaBuilder<TElementSchema, R>['introspect']>>;
 
@@ -85,9 +85,10 @@ type ArraySchemaBuilderCreateProps<
  * @see {@link array}
  */
 export class ArraySchemaBuilder<
-    TElementSchema extends SchemaBuilder<any, any>,
+    TElementSchema extends SchemaBuilder<any, any, any>,
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    TExtensions = {},
     TResult = TExplicitType extends undefined
         ? TElementSchema extends undefined
             ? Array<any>
@@ -95,7 +96,7 @@ export class ArraySchemaBuilder<
               ? Array<InferType<SchemaBuilder<T1, T2>>>
               : never
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired> {
+> extends SchemaBuilder<TResult, TRequired, TExtensions> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
@@ -128,7 +129,7 @@ export class ArraySchemaBuilder<
         } as any);
     }
 
-    private constructor(
+    protected constructor(
         props: ArraySchemaBuilderCreateProps<TElementSchema, TRequired>
     ) {
         super(props as any);
@@ -163,7 +164,7 @@ export class ArraySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): ArraySchemaBuilder<TElementSchema, true, T> {
+    ): ArraySchemaBuilder<TElementSchema, true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -175,8 +176,10 @@ export class ArraySchemaBuilder<
     public clearHasType(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
-        undefined
-    > {
+        undefined,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -394,7 +397,8 @@ export class ArraySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType> {
+    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
@@ -404,8 +408,10 @@ export class ArraySchemaBuilder<
     public optional(): ArraySchemaBuilder<
         TElementSchema,
         false,
-        TExplicitType
-    > {
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
     }
 
@@ -447,9 +453,10 @@ export class ArraySchemaBuilder<
      * Item of any type is allowed.
      * @param schema Schema that every array item has to satisfy
      */
-    public of<TSchema extends SchemaBuilder<any, any>>(
+    public of<TSchema extends SchemaBuilder<any, any, any>>(
         schema: TSchema
-    ): ArraySchemaBuilder<TSchema, TRequired, TExplicitType> {
+    ): ArraySchemaBuilder<TSchema, TRequired, TExplicitType, TExtensions> &
+        TExtensions {
         return ArraySchemaBuilder.create({
             ...this.introspect(),
             elementSchema: schema
@@ -460,7 +467,13 @@ export class ArraySchemaBuilder<
      * Clears the element schema set by `of()`. After this call,
      * array items of any type will be accepted.
      */
-    public clearOf(): ArraySchemaBuilder<any, TRequired, TExplicitType> {
+    public clearOf(): ArraySchemaBuilder<
+        any,
+        TRequired,
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         return ArraySchemaBuilder.create({
             ...this.introspect(),
             elementSchema: undefined
@@ -478,7 +491,13 @@ export class ArraySchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
         >
-    ): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType> {
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
         return ArraySchemaBuilder.create({
@@ -494,8 +513,10 @@ export class ArraySchemaBuilder<
     public clearMinLength(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
-        TExplicitType
-    > {
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         const schema = this.introspect();
         delete schema.minLength;
         return this.createFromProps({
@@ -514,7 +535,13 @@ export class ArraySchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
         >
-    ): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType> {
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
         return ArraySchemaBuilder.create({
@@ -530,8 +557,10 @@ export class ArraySchemaBuilder<
     public clearMaxLength(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
-        TExplicitType
-    > {
+        TExplicitType,
+        TExtensions
+    > &
+        TExtensions {
         const schema = this.introspect();
         delete schema.maxLength;
         return this.createFromProps({
@@ -556,7 +585,7 @@ export class ArraySchemaBuilder<
  *  // undefined - invalid
  * ```
  */
-export const array = <TElementSchema extends SchemaBuilder<any, any>>(
+export const array = <TElementSchema extends SchemaBuilder<any, any, any>>(
     elementSchema?: TElementSchema
 ) =>
     ArraySchemaBuilder.create({

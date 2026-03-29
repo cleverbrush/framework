@@ -8,11 +8,11 @@ import {
 import { string } from './StringSchemaBuilder.js';
 
 test('Throws with not ObjectSchemaBuilder instance', async () => {
-    expect(() => (object as any).getPropertiesFor()).toThrowError();
-    expect(() => (object as any).getPropertiesFor(undefined)).toThrowError();
-    expect(() => (object as any).getPropertiesFor(null)).toThrowError();
-    expect(() => (object as any).getPropertiesFor(10)).toThrowError();
-    expect(() => (object as any).getPropertiesFor(number())).toThrowError();
+    expect(() => (object as any).getPropertiesFor()).toThrow();
+    expect(() => (object as any).getPropertiesFor(undefined)).toThrow();
+    expect(() => (object as any).getPropertiesFor(null)).toThrow();
+    expect(() => (object as any).getPropertiesFor(10)).toThrow();
+    expect(() => (object as any).getPropertiesFor(number())).toThrow();
 });
 
 test('Returns empty object for empty schema', async () => {

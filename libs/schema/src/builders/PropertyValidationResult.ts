@@ -17,16 +17,18 @@ import {
  * a tree of per-property validation results.
  */
 export class PropertyValidationResult<
-    TSchema extends ObjectSchemaBuilder<any, any, any> = ObjectSchemaBuilder<
+    TSchema extends ObjectSchemaBuilder<
+        any,
         any,
         any,
         any
-    >,
+    > = ObjectSchemaBuilder<any, any, any, any>,
     TRootSchema extends ObjectSchemaBuilder<
         any,
         any,
+        any,
         any
-    > = ObjectSchemaBuilder<any, any, any>,
+    > = ObjectSchemaBuilder<any, any, any, any>,
     TParentPropertyDescriptor = any
 > implements
         NestedValidationResult<TSchema, TRootSchema, TParentPropertyDescriptor>
