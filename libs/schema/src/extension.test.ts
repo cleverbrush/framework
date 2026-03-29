@@ -23,12 +23,10 @@ const emailExt = defineExtension({
     string: {
         email(this: StringSchemaBuilder, opts?: { domains?: string[] }) {
             return this.withExtension('email', opts ?? true).addValidator(
-                (val: any) => {
-                    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-                        val as string
-                    );
+                (val) => {
+                    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
                     if (valid && opts?.domains && opts.domains.length > 0) {
-                        const domain = (val as string).split('@')[1];
+                        const domain = val.split('@')[1];
                         const domainValid = opts.domains.includes(domain);
                         return {
                             valid: domainValid,
@@ -56,9 +54,9 @@ const urlExt = defineExtension({
         url(this: StringSchemaBuilder, opts?: { protocols?: string[] }) {
             const protocols = opts?.protocols ?? ['http', 'https'];
             return this.withExtension('url', { protocols }).addValidator(
-                (val: any) => {
+                (val) => {
                     try {
-                        const parsed = new URL(val as string);
+                        const parsed = new URL(val);
                         const protoOk = protocols.includes(
                             parsed.protocol.replace(':', '')
                         );
@@ -87,8 +85,8 @@ const urlExt = defineExtension({
 const trimmedExt = defineExtension({
     string: {
         trimmed(this: StringSchemaBuilder) {
-            return this.withExtension('trimmed', true).addPreprocessor(
-                (val: any) => (typeof val === 'string' ? val.trim() : val)
+            return this.withExtension('trimmed', true).addPreprocessor((val) =>
+                typeof val === 'string' ? val.trim() : val
             );
         }
     }
@@ -97,8 +95,8 @@ const trimmedExt = defineExtension({
 const slugExt = defineExtension({
     string: {
         slug(this: StringSchemaBuilder) {
-            return this.withExtension('slug', true).addValidator((val: any) => {
-                const valid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(val as string);
+            return this.withExtension('slug', true).addValidator((val) => {
+                const valid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(val);
                 return {
                     valid,
                     errors: valid
@@ -114,8 +112,8 @@ const rangeExt = defineExtension({
     number: {
         range(this: NumberSchemaBuilder, min: number, max: number) {
             return this.withExtension('range', { min, max }).addValidator(
-                (val: any) => {
-                    const n = val as number;
+                (val) => {
+                    const n = val;
                     const valid = n >= min && n <= max;
                     return {
                         valid,
@@ -146,7 +144,7 @@ const currencyExt = defineExtension({
             return this.withExtension('currency', { maxDecimals: maxDec })
                 .clearIsInteger()
                 .min(0)
-                .addValidator((val: any) => {
+                .addValidator((val) => {
                     const parts = String(val).split('.');
                     const decimals = parts[1]?.length ?? 0;
                     const valid = decimals <= maxDec;
@@ -198,24 +196,22 @@ const consentExt = defineExtension({
 const ageExt = defineExtension({
     date: {
         minAge(this: DateSchemaBuilder, years: number) {
-            return this.withExtension('minAge', years).addValidator(
-                (val: any) => {
-                    const d = val as Date;
-                    const now = new Date();
-                    const age = now.getFullYear() - d.getFullYear();
-                    const valid = age >= years;
-                    return {
-                        valid,
-                        errors: valid
-                            ? []
-                            : [
-                                  {
-                                      message: `must be at least ${years} years old`
-                                  }
-                              ]
-                    };
-                }
-            );
+            return this.withExtension('minAge', years).addValidator((val) => {
+                const d = val;
+                const now = new Date();
+                const age = now.getFullYear() - d.getFullYear();
+                const valid = age >= years;
+                return {
+                    valid,
+                    errors: valid
+                        ? []
+                        : [
+                              {
+                                  message: `must be at least ${years} years old`
+                              }
+                          ]
+                };
+            });
         }
     }
 });
@@ -224,8 +220,8 @@ const businessDayExt = defineExtension({
     date: {
         businessDay(this: DateSchemaBuilder) {
             return this.withExtension('businessDay', true).addValidator(
-                (val: any) => {
-                    const d = val as Date;
+                (val) => {
+                    const d = val;
                     const day = d.getDay();
                     const valid = day !== 0 && day !== 6;
                     return {
@@ -263,18 +259,16 @@ const softDeleteExt = defineExtension({
 const uniqueExt = defineExtension({
     array: {
         unique(this: ArraySchemaBuilder<any, any, any, any, any>) {
-            return this.withExtension('unique', true).addValidator(
-                (val: any) => {
-                    const arr = val as any[];
-                    const unique = new Set(arr).size === arr.length;
-                    return {
-                        valid: unique,
-                        errors: unique
-                            ? []
-                            : [{ message: 'elements must be unique' }]
-                    };
-                }
-            );
+            return this.withExtension('unique', true).addValidator((val) => {
+                const arr = val;
+                const unique = new Set(arr).size === arr.length;
+                return {
+                    valid: unique,
+                    errors: unique
+                        ? []
+                        : [{ message: 'elements must be unique' }]
+                };
+            });
         }
     }
 });
@@ -395,17 +389,17 @@ describe('withExtensions', () => {
     test('extended builder has extension methods', () => {
         const s = withExtensions(emailExt);
         const schema = s.string();
-        expect(typeof (schema as any).email).toBe('function');
+        expect(typeof schema.email).toBe('function');
     });
 
     test('basic extension method works', async () => {
         const s = withExtensions(emailExt);
         const schema = s.string().email();
 
-        const validResult = await schema.validate('test@example.com' as any);
+        const validResult = await schema.validate('test@example.com');
         expect(validResult.valid).toBe(true);
 
-        const invalidResult = await schema.validate('not-an-email' as any);
+        const invalidResult = await schema.validate('not-an-email');
         expect(invalidResult.valid).toBe(false);
     });
 
@@ -413,10 +407,10 @@ describe('withExtensions', () => {
         const s = withExtensions(emailExt);
         const schema = s.string().email({ domains: ['example.com'] });
 
-        const validResult = await schema.validate('test@example.com' as any);
+        const validResult = await schema.validate('test@example.com');
         expect(validResult.valid).toBe(true);
 
-        const invalidResult = await schema.validate('test@other.com' as any);
+        const invalidResult = await schema.validate('test@other.com');
         expect(invalidResult.valid).toBe(false);
         expect(invalidResult.errors?.[0]?.message).toContain('domain must be');
     });
@@ -440,15 +434,15 @@ describe('withExtensions', () => {
         // Extension state should still be present
         expect(schema.introspect().extensions.email).toBe(true);
         // Extension method should still be accessible
-        expect(typeof (schema as any).email).toBe('function');
+        expect(typeof schema.email).toBe('function');
     });
 
     test('multiple extensions stack', () => {
         const s = withExtensions(emailExt, slugExt);
         const schema = s.string();
 
-        expect(typeof (schema as any).email).toBe('function');
-        expect(typeof (schema as any).slug).toBe('function');
+        expect(typeof schema.email).toBe('function');
+        expect(typeof schema.slug).toBe('function');
     });
 
     test('multiple extensions target different builders', async () => {
@@ -457,13 +451,13 @@ describe('withExtensions', () => {
         const emailSchema = s.string().email();
         const rangeSchema = s.number().range(0, 100);
 
-        const emailResult = await emailSchema.validate('test@test.com' as any);
+        const emailResult = await emailSchema.validate('test@test.com');
         expect(emailResult.valid).toBe(true);
 
-        const rangeValidResult = await rangeSchema.validate(50 as any);
+        const rangeValidResult = await rangeSchema.validate(50);
         expect(rangeValidResult.valid).toBe(true);
 
-        const rangeInvalidResult = await rangeSchema.validate(150 as any);
+        const rangeInvalidResult = await rangeSchema.validate(150);
         expect(rangeInvalidResult.valid).toBe(false);
     });
 
@@ -473,15 +467,13 @@ describe('withExtensions', () => {
         const emailSchema = s.string().email();
         const slugSchema = s.string().slug();
 
-        const emailResult = await emailSchema.validate('test@test.com' as any);
+        const emailResult = await emailSchema.validate('test@test.com');
         expect(emailResult.valid).toBe(true);
 
-        const slugResult = await slugSchema.validate('my-cool-slug' as any);
+        const slugResult = await slugSchema.validate('my-cool-slug');
         expect(slugResult.valid).toBe(true);
 
-        const invalidSlugResult = await slugSchema.validate(
-            'Not A Slug!' as any
-        );
+        const invalidSlugResult = await slugSchema.validate('Not A Slug!');
         expect(invalidSlugResult.valid).toBe(false);
     });
 
@@ -511,7 +503,7 @@ describe('withExtensions', () => {
 
         // number() has no extensions from emailExt
         const numSchema = s.number();
-        const result = await numSchema.validate(42 as any);
+        const result = await numSchema.validate(42);
         expect(result.valid).toBe(true);
     });
 });
@@ -579,51 +571,41 @@ describe('string extensions', () => {
     test('email validates correct format', async () => {
         const s = withExtensions(emailExt);
         const schema = s.string().email();
-        expect((await schema.validate('user@test.com' as any)).valid).toBe(
-            true
-        );
-        expect((await schema.validate('bad' as any)).valid).toBe(false);
+        expect((await schema.validate('user@test.com')).valid).toBe(true);
+        expect((await schema.validate('bad')).valid).toBe(false);
     });
 
     test('url validates with default protocols', async () => {
         const s = withExtensions(urlExt);
         const schema = s.string().url();
-        expect(
-            (await schema.validate('https://example.com' as any)).valid
-        ).toBe(true);
-        expect((await schema.validate('ftp://example.com' as any)).valid).toBe(
-            false
-        );
+        expect((await schema.validate('https://example.com')).valid).toBe(true);
+        expect((await schema.validate('ftp://example.com')).valid).toBe(false);
     });
 
     test('url validates with custom protocols', async () => {
         const s = withExtensions(urlExt);
         const schema = s.string().url({ protocols: ['ftp', 'https'] });
-        expect(
-            (await schema.validate('ftp://files.example.com' as any)).valid
-        ).toBe(true);
-        expect((await schema.validate('http://example.com' as any)).valid).toBe(
-            false
+        expect((await schema.validate('ftp://files.example.com')).valid).toBe(
+            true
         );
+        expect((await schema.validate('http://example.com')).valid).toBe(false);
     });
 
     test('trimmed preprocessor strips whitespace', async () => {
         const s = withExtensions(trimmedExt);
         const schema = s.string().trimmed().minLength(3);
         // "  ab  " trims to "ab" which is < 3
-        expect((await schema.validate('  ab  ' as any)).valid).toBe(false);
+        expect((await schema.validate('  ab  ')).valid).toBe(false);
         // "  abc  " trims to "abc" which is 3
-        expect((await schema.validate('  abc  ' as any)).valid).toBe(true);
+        expect((await schema.validate('  abc  ')).valid).toBe(true);
     });
 
     test('slug validates hyphenated lowercase strings', async () => {
         const s = withExtensions(slugExt);
         const schema = s.string().slug();
-        expect((await schema.validate('my-cool-post' as any)).valid).toBe(true);
-        expect((await schema.validate('My Cool Post' as any)).valid).toBe(
-            false
-        );
-        expect((await schema.validate('trailing-' as any)).valid).toBe(false);
+        expect((await schema.validate('my-cool-post')).valid).toBe(true);
+        expect((await schema.validate('My Cool Post')).valid).toBe(false);
+        expect((await schema.validate('trailing-')).valid).toBe(false);
     });
 });
 
@@ -631,27 +613,27 @@ describe('number extensions', () => {
     test('percentage constrains to 0-100', async () => {
         const s = withExtensions(percentageExt);
         const schema = s.number().percentage();
-        expect((await schema.validate(50 as any)).valid).toBe(true);
-        expect((await schema.validate(0 as any)).valid).toBe(true);
-        expect((await schema.validate(100 as any)).valid).toBe(true);
-        expect((await schema.validate(-1 as any)).valid).toBe(false);
-        expect((await schema.validate(101 as any)).valid).toBe(false);
+        expect((await schema.validate(50)).valid).toBe(true);
+        expect((await schema.validate(0)).valid).toBe(true);
+        expect((await schema.validate(100)).valid).toBe(true);
+        expect((await schema.validate(-1)).valid).toBe(false);
+        expect((await schema.validate(101)).valid).toBe(false);
     });
 
     test('currency validates decimal places', async () => {
         const s = withExtensions(currencyExt);
         const schema = s.number().currency();
-        expect((await schema.validate(19.99 as any)).valid).toBe(true);
-        expect((await schema.validate(19.999 as any)).valid).toBe(false);
-        expect((await schema.validate(-5 as any)).valid).toBe(false);
+        expect((await schema.validate(19.99)).valid).toBe(true);
+        expect((await schema.validate(19.999)).valid).toBe(false);
+        expect((await schema.validate(-5)).valid).toBe(false);
     });
 
     test('port validates port range and integer', async () => {
         const s = withExtensions(portExt);
         const schema = s.number().port();
-        expect((await schema.validate(8080 as any)).valid).toBe(true);
-        expect((await schema.validate(0 as any)).valid).toBe(false);
-        expect((await schema.validate(70000 as any)).valid).toBe(false);
+        expect((await schema.validate(8080)).valid).toBe(true);
+        expect((await schema.validate(0)).valid).toBe(false);
+        expect((await schema.validate(70000)).valid).toBe(false);
     });
 });
 
@@ -667,8 +649,8 @@ describe('boolean extensions', () => {
     test('consent requires true', async () => {
         const s = withExtensions(consentExt);
         const schema = s.boolean().consent('I agree to the terms');
-        expect((await schema.validate(true as any)).valid).toBe(true);
-        expect((await schema.validate(false as any)).valid).toBe(false);
+        expect((await schema.validate(true)).valid).toBe(true);
+        expect((await schema.validate(false)).valid).toBe(false);
     });
 });
 
@@ -678,8 +660,8 @@ describe('date extensions', () => {
         const schema = s.date().minAge(18);
         const old = new Date(1990, 0, 1);
         const young = new Date(new Date().getFullYear() - 5, 0, 1);
-        expect((await schema.validate(old as any)).valid).toBe(true);
-        expect((await schema.validate(young as any)).valid).toBe(false);
+        expect((await schema.validate(old)).valid).toBe(true);
+        expect((await schema.validate(young)).valid).toBe(false);
     });
 
     test('businessDay rejects weekends', async () => {
@@ -688,8 +670,8 @@ describe('date extensions', () => {
         // Find next Monday
         const monday = new Date(2024, 0, 1); // Jan 1, 2024 is a Monday
         const sunday = new Date(2024, 0, 7); // Jan 7, 2024 is a Sunday
-        expect((await schema.validate(monday as any)).valid).toBe(true);
-        expect((await schema.validate(sunday as any)).valid).toBe(false);
+        expect((await schema.validate(monday)).valid).toBe(true);
+        expect((await schema.validate(sunday)).valid).toBe(false);
     });
 });
 
@@ -711,15 +693,15 @@ describe('array extensions', () => {
     test('unique rejects duplicate elements', async () => {
         const s = withExtensions(uniqueExt);
         const schema = s.array(number()).unique();
-        expect((await schema.validate([1, 2, 3] as any)).valid).toBe(true);
-        expect((await schema.validate([1, 2, 2] as any)).valid).toBe(false);
+        expect((await schema.validate([1, 2, 3])).valid).toBe(true);
+        expect((await schema.validate([1, 2, 2])).valid).toBe(false);
     });
 
     test('nonEmpty rejects empty arrays', async () => {
         const s = withExtensions(nonEmptyExt);
         const schema = s.array(string()).nonEmpty();
-        expect((await schema.validate(['a'] as any)).valid).toBe(true);
-        expect((await schema.validate([] as any)).valid).toBe(false);
+        expect((await schema.validate(['a'])).valid).toBe(true);
+        expect((await schema.validate([])).valid).toBe(false);
     });
 });
 
@@ -763,9 +745,9 @@ describe('cross-builder extension combinations', () => {
         const emailSchema = s.string().email();
         const pctSchema = s.number().percentage();
 
-        expect((await emailSchema.validate('a@b.co' as any)).valid).toBe(true);
-        expect((await pctSchema.validate(50 as any)).valid).toBe(true);
-        expect((await pctSchema.validate(200 as any)).valid).toBe(false);
+        expect((await emailSchema.validate('a@b.co')).valid).toBe(true);
+        expect((await pctSchema.validate(50)).valid).toBe(true);
+        expect((await pctSchema.validate(200)).valid).toBe(false);
     });
 
     test('all builder types in one withExtensions call', () => {
@@ -793,15 +775,15 @@ describe('cross-builder extension combinations', () => {
         expect(typeof s.any).toBe('function');
 
         // Extension methods exist on each builder
-        expect(typeof (s.string() as any).email).toBe('function');
-        expect(typeof (s.number() as any).percentage).toBe('function');
-        expect(typeof (s.boolean() as any).toggle).toBe('function');
-        expect(typeof (s.date() as any).minAge).toBe('function');
-        expect(typeof (s.object({}) as any).timestamps).toBe('function');
-        expect(typeof (s.array() as any).unique).toBe('function');
-        expect(typeof (s.union(string()) as any).labeled).toBe('function');
-        expect(typeof (s.func() as any).debounced).toBe('function');
-        expect(typeof (s.any() as any).meta).toBe('function');
+        expect(typeof s.string().email).toBe('function');
+        expect(typeof s.number().percentage).toBe('function');
+        expect(typeof s.boolean().toggle).toBe('function');
+        expect(typeof s.date().minAge).toBe('function');
+        expect(typeof s.object({}).timestamps).toBe('function');
+        expect(typeof s.array().unique).toBe('function');
+        expect(typeof s.union(string()).labeled).toBe('function');
+        expect(typeof s.func().debounced).toBe('function');
+        expect(typeof s.any().meta).toBe('function');
     });
 });
 
@@ -814,35 +796,35 @@ describe('stacking multiple extensions on the same builder', () => {
         const s = withExtensions(emailExt, slugExt, urlExt, trimmedExt);
         const schema = s.string();
 
-        expect(typeof (schema as any).email).toBe('function');
-        expect(typeof (schema as any).slug).toBe('function');
-        expect(typeof (schema as any).url).toBe('function');
-        expect(typeof (schema as any).trimmed).toBe('function');
+        expect(typeof schema.email).toBe('function');
+        expect(typeof schema.slug).toBe('function');
+        expect(typeof schema.url).toBe('function');
+        expect(typeof schema.trimmed).toBe('function');
     });
 
     test('percentage + currency + port all exist on number', () => {
         const s = withExtensions(percentageExt, currencyExt, portExt);
         const schema = s.number();
 
-        expect(typeof (schema as any).percentage).toBe('function');
-        expect(typeof (schema as any).currency).toBe('function');
-        expect(typeof (schema as any).port).toBe('function');
+        expect(typeof schema.percentage).toBe('function');
+        expect(typeof schema.currency).toBe('function');
+        expect(typeof schema.port).toBe('function');
     });
 
     test('toggle + consent both exist on boolean', () => {
         const s = withExtensions(toggleExt, consentExt);
         const schema = s.boolean();
 
-        expect(typeof (schema as any).toggle).toBe('function');
-        expect(typeof (schema as any).consent).toBe('function');
+        expect(typeof schema.toggle).toBe('function');
+        expect(typeof schema.consent).toBe('function');
     });
 
     test('unique + nonEmpty both exist on array', () => {
         const s = withExtensions(uniqueExt, nonEmptyExt);
         const schema = s.array(number());
 
-        expect(typeof (schema as any).unique).toBe('function');
-        expect(typeof (schema as any).nonEmpty).toBe('function');
+        expect(typeof schema.unique).toBe('function');
+        expect(typeof schema.nonEmpty).toBe('function');
     });
 
     test('stacked string extensions validate independently', async () => {
@@ -851,15 +833,11 @@ describe('stacking multiple extensions on the same builder', () => {
         const emailSchema = s.string().email();
         const slugSchema = s.string().slug();
 
-        expect((await emailSchema.validate('a@b.com' as any)).valid).toBe(true);
-        expect((await emailSchema.validate('not-a-slug' as any)).valid).toBe(
-            false
-        );
+        expect((await emailSchema.validate('a@b.com')).valid).toBe(true);
+        expect((await emailSchema.validate('not-a-slug')).valid).toBe(false);
 
-        expect((await slugSchema.validate('valid-slug' as any)).valid).toBe(
-            true
-        );
-        expect((await slugSchema.validate('a@b.com' as any)).valid).toBe(false);
+        expect((await slugSchema.validate('valid-slug')).valid).toBe(true);
+        expect((await slugSchema.validate('a@b.com')).valid).toBe(false);
     });
 
     test('stacked number extensions validate independently', async () => {
@@ -869,16 +847,16 @@ describe('stacking multiple extensions on the same builder', () => {
         const portSchema = s.number().port();
 
         // 50 is a valid percentage but a valid port too
-        expect((await pctSchema.validate(50 as any)).valid).toBe(true);
-        expect((await portSchema.validate(50 as any)).valid).toBe(true);
+        expect((await pctSchema.validate(50)).valid).toBe(true);
+        expect((await portSchema.validate(50)).valid).toBe(true);
 
         // 200 fails percentage but passes port
-        expect((await pctSchema.validate(200 as any)).valid).toBe(false);
-        expect((await portSchema.validate(200 as any)).valid).toBe(true);
+        expect((await pctSchema.validate(200)).valid).toBe(false);
+        expect((await portSchema.validate(200)).valid).toBe(true);
 
         // 70000 fails both
-        expect((await pctSchema.validate(70000 as any)).valid).toBe(false);
-        expect((await portSchema.validate(70000 as any)).valid).toBe(false);
+        expect((await pctSchema.validate(70000)).valid).toBe(false);
+        expect((await portSchema.validate(70000)).valid).toBe(false);
     });
 });
 
@@ -892,23 +870,19 @@ describe('extension methods interleaved with built-in methods', () => {
         const schema = s.string().email().minLength(10).required();
 
         // Short but valid email format
-        expect((await schema.validate('a@b.co' as any)).valid).toBe(false); // too short
-        expect((await schema.validate('user@example.com' as any)).valid).toBe(
-            true
-        );
+        expect((await schema.validate('a@b.co')).valid).toBe(false); // too short
+        expect((await schema.validate('user@example.com')).valid).toBe(true);
     });
 
     test('required → email → maxLength', async () => {
         const s = withExtensions(emailExt);
         const schema = s.string().required().email().maxLength(20);
 
-        expect((await schema.validate('user@example.com' as any)).valid).toBe(
-            true
-        );
+        expect((await schema.validate('user@example.com')).valid).toBe(true);
         expect(
             (
                 await schema.validate(
-                    'very.long.user.name@very.long.domain.example.com' as any
+                    'very.long.user.name@very.long.domain.example.com'
                 )
             ).valid
         ).toBe(false);
@@ -918,9 +892,9 @@ describe('extension methods interleaved with built-in methods', () => {
         const s = withExtensions(percentageExt);
         const schema = s.number().percentage().notNaN().isFinite();
 
-        expect((await schema.validate(50 as any)).valid).toBe(true);
-        expect((await schema.validate(NaN as any)).valid).toBe(false);
-        expect((await schema.validate(Infinity as any)).valid).toBe(false);
+        expect((await schema.validate(50)).valid).toBe(true);
+        expect((await schema.validate(NaN)).valid).toBe(false);
+        expect((await schema.validate(Infinity)).valid).toBe(false);
     });
 
     test('trimmed → slug validates correctly end-to-end', async () => {
@@ -928,21 +902,19 @@ describe('extension methods interleaved with built-in methods', () => {
         const schema = s.string().trimmed().slug();
 
         // Trimming " my-slug " → "my-slug" which is a valid slug
-        expect((await schema.validate(' my-slug ' as any)).valid).toBe(true);
+        expect((await schema.validate(' my-slug ')).valid).toBe(true);
         // Trimming " My Slug " → "My Slug" which is NOT a valid slug
-        expect((await schema.validate(' My Slug ' as any)).valid).toBe(false);
+        expect((await schema.validate(' My Slug ')).valid).toBe(false);
     });
 
     test('unique → minLength → maxLength on array', async () => {
         const s = withExtensions(uniqueExt);
         const schema = s.array(number()).unique().minLength(2).maxLength(5);
 
-        expect((await schema.validate([1, 2, 3] as any)).valid).toBe(true);
-        expect((await schema.validate([1] as any)).valid).toBe(false); // too short
-        expect((await schema.validate([1, 1, 2] as any)).valid).toBe(false); // not unique
-        expect((await schema.validate([1, 2, 3, 4, 5, 6] as any)).valid).toBe(
-            false
-        ); // too long
+        expect((await schema.validate([1, 2, 3])).valid).toBe(true);
+        expect((await schema.validate([1])).valid).toBe(false); // too short
+        expect((await schema.validate([1, 1, 2])).valid).toBe(false); // not unique
+        expect((await schema.validate([1, 2, 3, 4, 5, 6])).valid).toBe(false); // too long
     });
 
     test('minAge → isInPast on date', async () => {
@@ -950,10 +922,10 @@ describe('extension methods interleaved with built-in methods', () => {
         const schema = s.date().minAge(18).isInPast();
 
         const adult = new Date(1990, 0, 1);
-        expect((await schema.validate(adult as any)).valid).toBe(true);
+        expect((await schema.validate(adult)).valid).toBe(true);
 
         const future = new Date(3000, 0, 1);
-        expect((await schema.validate(future as any)).valid).toBe(false);
+        expect((await schema.validate(future)).valid).toBe(false);
     });
 
     test('businessDay → min → max on date', async () => {
@@ -963,10 +935,10 @@ describe('extension methods interleaved with built-in methods', () => {
         const schema = s.date().businessDay().min(minDate).max(maxDate);
 
         const wednesday = new Date(2024, 5, 12); // Jun 12, 2024 (Wednesday)
-        expect((await schema.validate(wednesday as any)).valid).toBe(true);
+        expect((await schema.validate(wednesday)).valid).toBe(true);
 
         const outOfRange = new Date(2025, 0, 6); // Jan 6, 2025 (Monday but out of range)
-        expect((await schema.validate(outOfRange as any)).valid).toBe(false);
+        expect((await schema.validate(outOfRange)).valid).toBe(false);
     });
 });
 
@@ -982,10 +954,10 @@ describe('extension application order independence', () => {
         const b1 = s1.string();
         const b2 = s2.string();
 
-        expect(typeof (b1 as any).email).toBe('function');
-        expect(typeof (b1 as any).slug).toBe('function');
-        expect(typeof (b2 as any).email).toBe('function');
-        expect(typeof (b2 as any).slug).toBe('function');
+        expect(typeof b1.email).toBe('function');
+        expect(typeof b1.slug).toBe('function');
+        expect(typeof b2.email).toBe('function');
+        expect(typeof b2.slug).toBe('function');
     });
 
     test('email+slug vs slug+email yield same validation', async () => {
@@ -993,25 +965,13 @@ describe('extension application order independence', () => {
         const s2 = withExtensions(slugExt, emailExt);
 
         // Both should validate email the same way
-        const v1 = await s1
-            .string()
-            .email()
-            .validate('a@b.co' as any);
-        const v2 = await s2
-            .string()
-            .email()
-            .validate('a@b.co' as any);
+        const v1 = await s1.string().email().validate('a@b.co');
+        const v2 = await s2.string().email().validate('a@b.co');
         expect(v1.valid).toBe(v2.valid);
 
         // Both should validate slug the same way
-        const v3 = await s1
-            .string()
-            .slug()
-            .validate('ok-slug' as any);
-        const v4 = await s2
-            .string()
-            .slug()
-            .validate('ok-slug' as any);
+        const v3 = await s1.string().slug().validate('ok-slug');
+        const v4 = await s2.string().slug().validate('ok-slug');
         expect(v3.valid).toBe(v4.valid);
     });
 
@@ -1019,14 +979,8 @@ describe('extension application order independence', () => {
         const s1 = withExtensions(percentageExt, portExt);
         const s2 = withExtensions(portExt, percentageExt);
 
-        const v1 = await s1
-            .number()
-            .port()
-            .validate(80 as any);
-        const v2 = await s2
-            .number()
-            .port()
-            .validate(80 as any);
+        const v1 = await s1.number().port().validate(80);
+        const v2 = await s2.number().port().validate(80);
         expect(v1.valid).toBe(v2.valid);
     });
 });
@@ -1064,7 +1018,7 @@ describe('realistic object schemas with extensions', () => {
             tosAccepted: true
         };
 
-        const result = await userSchema.validate(validUser as any);
+        const result = await userSchema.validate(validUser);
         expect(result.valid).toBe(true);
     });
 
@@ -1109,7 +1063,7 @@ describe('realistic object schemas with extensions', () => {
             slug: 'my-first-post',
             tags: ['javascript', 'typescript']
         };
-        const result = await postSchema.validate(validPost as any);
+        const result = await postSchema.validate(validPost);
         expect(result.valid).toBe(true);
 
         const invalidPost = {
@@ -1117,7 +1071,7 @@ describe('realistic object schemas with extensions', () => {
             slug: 'my-first-post',
             tags: ['js', 'js'] // duplicate
         };
-        const result2 = await postSchema.validate(invalidPost as any);
+        const result2 = await postSchema.validate(invalidPost);
         expect(result2.valid).toBe(false);
     });
 
@@ -1137,7 +1091,7 @@ describe('realistic object schemas with extensions', () => {
             imageUrl: 'https://cdn.example.com/img.png',
             categories: ['gadgets']
         };
-        expect((await productSchema.validate(valid as any)).valid).toBe(true);
+        expect((await productSchema.validate(valid)).valid).toBe(true);
     });
 });
 
@@ -1377,8 +1331,8 @@ describe('edge cases', () => {
         const s = withExtensions(emailExt);
         // number has no email extension
         const schema = s.number().min(0).max(10);
-        expect((await schema.validate(5 as any)).valid).toBe(true);
-        expect((await schema.validate(15 as any)).valid).toBe(false);
+        expect((await schema.validate(5)).valid).toBe(true);
+        expect((await schema.validate(15)).valid).toBe(false);
     });
 
     test('withExtensions with single extension', () => {
@@ -1397,7 +1351,7 @@ describe('edge cases', () => {
         const result = await schema.validate({
             notification: 'a@b.com',
             progress: 50
-        } as any);
+        });
         expect(result.valid).toBe(true);
     });
 
@@ -1449,8 +1403,8 @@ describe('edge cases', () => {
         const schema = s.array(string()).unique().of(number());
 
         expect(schema.introspect().extensions.unique).toBe(true);
-        expect((await schema.validate([1, 2, 3] as any)).valid).toBe(true);
-        expect((await schema.validate([1, 1, 2] as any)).valid).toBe(false);
+        expect((await schema.validate([1, 2, 3])).valid).toBe(true);
+        expect((await schema.validate([1, 1, 2])).valid).toBe(false);
     });
 
     test('union with or() preserves extensions', () => {
@@ -1478,24 +1432,20 @@ describe('realistic validation pipelines', () => {
             .minLength(10);
 
         // Valid email with correct domain and length
-        expect((await schema.validate('admin@corp.io' as any)).valid).toBe(
-            true
-        );
+        expect((await schema.validate('admin@corp.io')).valid).toBe(true);
         // Valid format but wrong domain
-        expect((await schema.validate('admin@gmail.com' as any)).valid).toBe(
-            false
-        );
+        expect((await schema.validate('admin@gmail.com')).valid).toBe(false);
         // Correct domain but too short
-        expect((await schema.validate('a@corp.io' as any)).valid).toBe(false);
+        expect((await schema.validate('a@corp.io')).valid).toBe(false);
     });
 
     test('currency amount in range', async () => {
         const s = withExtensions(currencyExt);
         const schema = s.number().currency().max(999.99);
 
-        expect((await schema.validate(19.99 as any)).valid).toBe(true);
-        expect((await schema.validate(1000 as any)).valid).toBe(false);
-        expect((await schema.validate(9.999 as any)).valid).toBe(false);
+        expect((await schema.validate(19.99)).valid).toBe(true);
+        expect((await schema.validate(1000)).valid).toBe(false);
+        expect((await schema.validate(9.999)).valid).toBe(false);
     });
 
     test('unique tags with individual string validation', async () => {
@@ -1504,15 +1454,15 @@ describe('realistic validation pipelines', () => {
         // Each tag must be a slug, and the list must be unique
         const tagsSchema = s.array(s.string().slug()).unique();
 
-        expect(
-            (await tagsSchema.validate(['web-dev', 'node-js'] as any)).valid
-        ).toBe(true);
-        expect(
-            (await tagsSchema.validate(['web-dev', 'web-dev'] as any)).valid
-        ).toBe(false);
-        expect(
-            (await tagsSchema.validate(['web-dev', 'Bad Tag!'] as any)).valid
-        ).toBe(false);
+        expect((await tagsSchema.validate(['web-dev', 'node-js'])).valid).toBe(
+            true
+        );
+        expect((await tagsSchema.validate(['web-dev', 'web-dev'])).valid).toBe(
+            false
+        );
+        expect((await tagsSchema.validate(['web-dev', 'Bad Tag!'])).valid).toBe(
+            false
+        );
     });
 
     test('contact form with trimmed fields', async () => {
@@ -1530,7 +1480,7 @@ describe('realistic validation pipelines', () => {
             message: '  Hello, this is my message to you!  '
         };
 
-        const result = await contactSchema.validate(validForm as any);
+        const result = await contactSchema.validate(validForm);
         expect(result.valid).toBe(true);
     });
 });
