@@ -22,8 +22,9 @@ export class PropertyValidationResult<
         any,
         any,
         any
-    > = ObjectSchemaBuilder<any, any, any>,
+    > = ObjectSchemaBuilder<any, any, any, any>,
     TRootSchema extends ObjectSchemaBuilder<
+        any,
         any,
         any,
         any
