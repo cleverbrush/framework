@@ -2,6 +2,11 @@ import { type Transaction, transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
+/** @internal Symbol used as the key for the type brand on schema builders. */
+declare const __type: unique symbol;
+/** @internal */
+export type SchemaTypeBrand = typeof __type;
+
 /**
  * Infers the TypeScript type that a `SchemaBuilder` instance validates.
  * Takes into account type optimizations (via `optimize()`) and whether the schema is optional.
@@ -14,10 +19,12 @@ import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
  * ```
  */
 export type InferType<T> = T extends {
-    optimize: (...args: any[]) => { readonly _type: infer TOptimized };
+    optimize: (...args: any[]) => {
+        readonly [K in SchemaTypeBrand]: infer TOptimized;
+    };
 }
     ? TOptimized
-    : T extends { readonly _type: infer TType }
+    : T extends { readonly [K in SchemaTypeBrand]: infer TType }
       ? TType
       : T;
 
@@ -495,7 +502,7 @@ export abstract class SchemaBuilder<
      * Not emitted at runtime — used only by {@link InferType}.
      * @internal
      */
-    declare readonly _type: TRequired extends true
+    declare readonly [__type]: TRequired extends true
         ? TResult
         : MakeOptional<TResult>;
 
