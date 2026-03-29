@@ -197,7 +197,9 @@ export class UnionSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public hasType<T>(_notUsed?: T): UnionSchemaBuilder<TOptions, true, T> {
+    public hasType<T>(
+        _notUsed?: T
+    ): UnionSchemaBuilder<TOptions, true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
