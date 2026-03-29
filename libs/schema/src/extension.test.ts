@@ -139,6 +139,12 @@ const percentageExt = defineExtension({
 
 const currencyExt = defineExtension({
     number: {
+        /**
+         * Validates that a number is a valid currency amount with an optional maximum number of decimal places (default 2).
+         * @param this
+         * @param opts
+         * @returns
+         */
         currency(this: NumberSchemaBuilder, opts?: { maxDecimals?: number }) {
             const maxDec = opts?.maxDecimals ?? 2;
             return this.withExtension('currency', { maxDecimals: maxDec })
@@ -250,6 +256,52 @@ const softDeleteExt = defineExtension({
     object: {
         softDelete(this: ObjectSchemaBuilder) {
             return this.withExtension('softDelete', true);
+        }
+    }
+});
+
+const maxPropsExt = defineExtension({
+    object: {
+        maxProps(this: ObjectSchemaBuilder, max = 10) {
+            return this.withExtension('maxProps', max).addValidator((val) => {
+                const count = Object.keys(val).length;
+                const valid = count <= max;
+                return {
+                    valid,
+                    errors: valid
+                        ? []
+                        : [
+                              {
+                                  message: `object must have at most ${max} properties, got ${count}`
+                              }
+                          ]
+                };
+            });
+        }
+    }
+});
+
+const gettersOnlyExt = defineExtension({
+    object: {
+        gettersOnly(this: ObjectSchemaBuilder) {
+            return this.withExtension('gettersOnly', true).addValidator(
+                (val) => {
+                    const entries = Object.entries(val);
+                    const errors: { message: string }[] = [];
+                    for (const [key, value] of entries) {
+                        if (typeof value !== 'function') {
+                            errors.push({
+                                message: `property "${key}" must be a function`
+                            });
+                        } else if (!key.startsWith('get')) {
+                            errors.push({
+                                message: `property "${key}" must start with "get"`
+                            });
+                        }
+                    }
+                    return { valid: errors.length === 0, errors };
+                }
+            );
         }
     }
 });
@@ -686,6 +738,85 @@ describe('object extensions', () => {
         const s = withExtensions(softDeleteExt);
         const schema = s.object({ id: number() }).softDelete();
         expect(schema.introspect().extensions.softDelete).toBe(true);
+    });
+
+    test('maxProps rejects objects with too many properties', async () => {
+        const s = withExtensions(maxPropsExt);
+        const schema = s.object({}).acceptUnknownProps().maxProps(3);
+
+        const small = { a: 1, b: 2 };
+        expect((await schema.validate(small)).valid).toBe(true);
+
+        const exact = { a: 1, b: 2, c: 3 };
+        expect((await schema.validate(exact)).valid).toBe(true);
+
+        const tooMany = { a: 1, b: 2, c: 3, d: 4 };
+        const result = await schema.validate(tooMany);
+        expect(result.valid).toBe(false);
+        expect(result.errors?.[0]?.message).toContain('at most 3');
+    });
+
+    test('maxProps defaults to 10', async () => {
+        const s = withExtensions(maxPropsExt);
+        const schema = s.object({}).acceptUnknownProps().maxProps();
+
+        expect(schema.introspect().extensions.maxProps).toBe(10);
+
+        const obj: Record<string, number> = {};
+        for (let i = 0; i < 10; i++) obj[`k${i}`] = i;
+        expect((await schema.validate(obj)).valid).toBe(true);
+
+        obj.k10 = 10;
+        expect((await schema.validate(obj)).valid).toBe(false);
+    });
+
+    test('gettersOnly accepts object where all props are get-prefixed functions', async () => {
+        const s = withExtensions(gettersOnlyExt);
+        const schema = s.object({}).acceptUnknownProps().gettersOnly();
+
+        const valid = { getName: () => 'Alice', getAge: () => 30 };
+        expect((await schema.validate(valid)).valid).toBe(true);
+    });
+
+    test('gettersOnly rejects non-function properties', async () => {
+        const s = withExtensions(gettersOnlyExt);
+        const schema = s.object({}).acceptUnknownProps().gettersOnly();
+
+        const invalid = { getName: () => 'Alice', age: 30 };
+        const result = await schema.validate(invalid);
+        expect(result.valid).toBe(false);
+        expect(result.errors?.[0]?.message).toContain(
+            '"age" must be a function'
+        );
+    });
+
+    test('gettersOnly rejects functions without get prefix', async () => {
+        const s = withExtensions(gettersOnlyExt);
+        const schema = s.object({}).acceptUnknownProps().gettersOnly();
+
+        const invalid = { getName: () => 'Alice', fetchAge: () => 30 };
+        const result = await schema.validate(invalid);
+        expect(result.valid).toBe(false);
+        expect(result.errors?.[0]?.message).toContain(
+            '"fetchAge" must start with "get"'
+        );
+    });
+
+    test('gettersOnly reports multiple errors', async () => {
+        const s = withExtensions(gettersOnlyExt);
+        const schema = s.object({}).acceptUnknownProps().gettersOnly();
+
+        const invalid = { name: 'Alice', fetchAge: () => 30 };
+        const result = await schema.validate(invalid);
+        expect(result.valid).toBe(false);
+        expect(result.errors!.length).toBeGreaterThanOrEqual(1);
+    });
+
+    test('gettersOnly accepts empty object', async () => {
+        const s = withExtensions(gettersOnlyExt);
+        const schema = s.object({}).acceptUnknownProps().gettersOnly();
+
+        expect((await schema.validate({})).valid).toBe(true);
     });
 });
 
