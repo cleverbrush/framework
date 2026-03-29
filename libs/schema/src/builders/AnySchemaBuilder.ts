@@ -29,8 +29,9 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class AnySchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
-    TResult = TExplicitType extends undefined ? any : TExplicitType
-> extends SchemaBuilder<TResult, TRequired> {
+    TResult = TExplicitType extends undefined ? any : TExplicitType,
+    TExtensions = {}
+> extends SchemaBuilder<TResult, TRequired, TExtensions> {
     /**
      * @hidden
      */
@@ -41,14 +42,16 @@ export class AnySchemaBuilder<
         });
     }
 
-    private constructor(props: AnySchemaBuilderCreateProps<TRequired>) {
+    protected constructor(props: AnySchemaBuilderCreateProps<TRequired>) {
         super(props as any);
     }
 
     /**
      * @inheritdoc
      */
-    public hasType<T>(_notUsed?: T): AnySchemaBuilder<true, T> {
+    public hasType<T>(
+        _notUsed?: T
+    ): AnySchemaBuilder<true, T, undefined, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -57,7 +60,13 @@ export class AnySchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): AnySchemaBuilder<TRequired, undefined> {
+    public clearHasType(): AnySchemaBuilder<
+        TRequired,
+        undefined,
+        undefined,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -108,14 +117,21 @@ export class AnySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): AnySchemaBuilder<true, TExplicitType> {
+    ): AnySchemaBuilder<true, TExplicitType, undefined, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): AnySchemaBuilder<false, TExplicitType> {
+    public optional(): AnySchemaBuilder<
+        false,
+        TExplicitType,
+        undefined,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
     }
 }

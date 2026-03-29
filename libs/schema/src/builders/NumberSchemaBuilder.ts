@@ -51,8 +51,9 @@ type NumberSchemaBuilderCreateProps<
  */
 export class NumberSchemaBuilder<
     TResult = number,
-    TRequired extends boolean = true
-> extends SchemaBuilder<TResult, TRequired> {
+    TRequired extends boolean = true,
+    TExtensions = {}
+> extends SchemaBuilder<TResult, TRequired, TExtensions> {
     #min?: number;
     #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
         NumberSchemaBuilder<TResult, TRequired>
@@ -123,7 +124,7 @@ export class NumberSchemaBuilder<
         });
     }
 
-    private constructor(props: NumberSchemaBuilderCreateProps) {
+    protected constructor(props: NumberSchemaBuilderCreateProps) {
         super(props as any);
 
         if (typeof props.min === 'number') {
@@ -271,7 +272,9 @@ export class NumberSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public hasType<T>(_notUsed?: T): NumberSchemaBuilder<T, true> {
+    public hasType<T>(
+        _notUsed?: T
+    ): NumberSchemaBuilder<T, true, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -280,7 +283,8 @@ export class NumberSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): NumberSchemaBuilder<number, TRequired> {
+    public clearHasType(): NumberSchemaBuilder<number, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -470,13 +474,15 @@ export class NumberSchemaBuilder<
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
-        }) as any as NumberSchemaBuilder<T, TRequired>;
+        }) as any as NumberSchemaBuilder<T, TRequired, TExtensions> &
+            TExtensions;
     }
 
     /**
      * Clear `equals()` call.
      */
-    public clearEquals(): NumberSchemaBuilder<number, TRequired> {
+    public clearEquals(): NumberSchemaBuilder<number, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: undefined
@@ -487,7 +493,8 @@ export class NumberSchemaBuilder<
      * @deprecated Use {@link clearIsInteger} instead.
      * Float values will be considered as valid after this call.
      */
-    public isFloat(): NumberSchemaBuilder<TResult, TRequired> {
+    public isFloat(): NumberSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             isInteger: false,
@@ -499,7 +506,12 @@ export class NumberSchemaBuilder<
     /**
      * Clear `isInteger()` call.
      */
-    public clearIsInteger(): NumberSchemaBuilder<TResult, TRequired> {
+    public clearIsInteger(): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             isInteger: false,
@@ -518,7 +530,7 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired> {
+    ): NumberSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             isInteger: true,
@@ -531,14 +543,15 @@ export class NumberSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): NumberSchemaBuilder<TResult, true> {
+    ): NumberSchemaBuilder<TResult, true, TExtensions> & TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): NumberSchemaBuilder<TResult, false> {
+    public optional(): NumberSchemaBuilder<TResult, false, TExtensions> &
+        TExtensions {
         return super.optional();
     }
 
@@ -552,24 +565,25 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired> {
+    ): NumberSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureNotNaN: true,
             ensureNotNaNErrorMessageProvider: errorMessage
-        });
+        }) as any;
     }
 
     /**
      * Consider NaN value as valid
      */
-    public canBeNaN(): NumberSchemaBuilder<TResult, TRequired> {
+    public canBeNaN(): NumberSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureNotNaN: false,
             ensureNotNaNErrorMessageProvider:
                 this.#defaultEnsureNotNaNErrorMessageProvider
-        });
+        }) as any;
     }
 
     /**
@@ -582,24 +596,29 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired> {
+    ): NumberSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsFinite: true,
             ensureIsFiniteErrorMessageProvider: errorMessage
-        });
+        }) as any;
     }
 
     /**
      * Consider `Infinity` as valid.
      */
-    public canBeInfinite(): NumberSchemaBuilder<TResult, TRequired> {
+    public canBeInfinite(): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsFinite: false,
             ensureIsFiniteErrorMessageProvider:
                 this.#defaultEnsureIsFiniteErrorMessageProvider
-        });
+        }) as any;
     }
 
     /**
@@ -613,7 +632,7 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired> {
+    ): NumberSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         if (typeof minValue !== 'number')
             throw new Error('minValue must be a number');
         return this.createFromProps({
@@ -626,7 +645,8 @@ export class NumberSchemaBuilder<
     /**
      * Clear `min()` call.
      */
-    public clearMin(): NumberSchemaBuilder<TResult, TRequired> {
+    public clearMin(): NumberSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         const schema = this.introspect();
         delete schema.min;
         return this.createFromProps({
@@ -645,7 +665,7 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired> {
+    ): NumberSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         if (typeof maxValue !== 'number')
             throw new Error('maxValue must be a number');
         return this.createFromProps({
@@ -658,7 +678,8 @@ export class NumberSchemaBuilder<
     /**
      * Clear `max()` call.
      */
-    public clearMax(): NumberSchemaBuilder<TResult, TRequired> {
+    public clearMax(): NumberSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         const schema = this.introspect();
         delete schema.max;
         return this.createFromProps({

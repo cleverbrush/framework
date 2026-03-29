@@ -74,8 +74,9 @@ const parseFromEpochPreprocessor = (value: any) => {
  */
 export class DateSchemaBuilder<
     TResult = Date,
-    TRequired extends boolean = true
-> extends SchemaBuilder<TResult, TRequired> {
+    TRequired extends boolean = true,
+    TExtensions = {}
+> extends SchemaBuilder<TResult, TRequired, TExtensions> {
     #min?: Date;
     #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
         DateSchemaBuilder<TResult, TRequired>
@@ -139,7 +140,7 @@ export class DateSchemaBuilder<
         });
     }
 
-    private constructor(props: DateSchemaBuilderCreateProps) {
+    protected constructor(props: DateSchemaBuilderCreateProps) {
         super(props as any);
 
         if (props.min instanceof Date) {
@@ -289,7 +290,9 @@ export class DateSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public hasType<T>(_notUsed?: T): DateSchemaBuilder<T, true> {
+    public hasType<T>(
+        _notUsed?: T
+    ): DateSchemaBuilder<T, true, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -298,7 +301,8 @@ export class DateSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): DateSchemaBuilder<Date, TRequired> {
+    public clearHasType(): DateSchemaBuilder<Date, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -473,19 +477,20 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<T, TRequired> {
+    ): DateSchemaBuilder<T, TRequired, TExtensions> & TExtensions {
         if (!(value instanceof Date)) throw new Error('Date expected');
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
-        }) as any as DateSchemaBuilder<T, TRequired>;
+        }) as any as DateSchemaBuilder<T, TRequired, TExtensions> & TExtensions;
     }
 
     /**
      * Clears `equals()` call.
      */
-    public clearEquals(): DateSchemaBuilder<Date, TRequired> {
+    public clearEquals(): DateSchemaBuilder<Date, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: undefined
@@ -497,14 +502,15 @@ export class DateSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): DateSchemaBuilder<TResult, true> {
+    ): DateSchemaBuilder<TResult, true, TExtensions> & TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): DateSchemaBuilder<TResult, false> {
+    public optional(): DateSchemaBuilder<TResult, false, TExtensions> &
+        TExtensions {
         return super.optional();
     }
 
@@ -518,22 +524,27 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired> {
+    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsInFuture: true,
             ensureIsInFutureValidationErrorMessageProvider: errorMessage
-        });
+        }) as any;
     }
 
     /**
      * Cancel `isInFuture()` call.
      */
-    public clearIsInFuture(): DateSchemaBuilder<TResult, TRequired> {
+    public clearIsInFuture(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsInFuture: false
-        });
+        }) as any;
     }
 
     /**
@@ -546,22 +557,23 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired> {
+    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsInPast: true,
             ensureIsInPastValidationErrorMessageProvider: errorMessage
-        });
+        }) as any;
     }
 
     /**
      * Cancel `isInPast()` call.
      */
-    public clearIsInPast(): DateSchemaBuilder<TResult, TRequired> {
+    public clearIsInPast(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsInPast: false
-        });
+        }) as any;
     }
 
     /**
@@ -575,7 +587,7 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired> {
+    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         if (!(minValue instanceof Date))
             throw new Error('minValue must be a Date');
         return this.createFromProps({
@@ -588,7 +600,8 @@ export class DateSchemaBuilder<
     /**
      * Clear `min()` call.
      */
-    public clearMin(): DateSchemaBuilder<TResult, TRequired> {
+    public clearMin(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         const schema = this.introspect();
         delete schema.min;
         return this.createFromProps({
@@ -607,7 +620,7 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired> {
+    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
         if (!(maxValue instanceof Date))
             throw new Error('maxValue must be a Date');
         return this.createFromProps({
@@ -620,7 +633,8 @@ export class DateSchemaBuilder<
     /**
      * Clear `max()` call.
      */
-    public clearMax(): DateSchemaBuilder<TResult, TRequired> {
+    public clearMax(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         const schema = this.introspect();
         delete schema.max;
         return this.createFromProps({
@@ -632,42 +646,58 @@ export class DateSchemaBuilder<
      * Accepts JSON string as a valid Date.
      * String must be in ISO format and will be parsed using `JSON.parse()`.
      */
-    public acceptJsonString(): DateSchemaBuilder<TResult, TRequired> {
+    public acceptJsonString(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             parseFromJson: true
-        });
+        }) as any;
     }
 
     /**
      * Cancel `acceptJsonString()` call.
      */
-    public doNotAcceptJsonString(): DateSchemaBuilder<TResult, TRequired> {
+    public doNotAcceptJsonString(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             parseFromJson: false
-        });
+        }) as any;
     }
 
     /**
      * Accepts epoch number as a valid Date.
      * Epoch number will be parsed using `new Date(epoch)`.
      */
-    public acceptEpoch(): DateSchemaBuilder<TResult, TRequired> {
+    public acceptEpoch(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             parseFromEpoch: true
-        });
+        }) as any;
     }
 
     /**
      * Cancel `acceptEpoch()` call.
      */
-    public doNotAcceptEpoch(): DateSchemaBuilder<TResult, TRequired> {
+    public doNotAcceptEpoch(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             parseFromEpoch: false
-        });
+        }) as any;
     }
 }
 
