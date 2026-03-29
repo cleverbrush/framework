@@ -205,9 +205,9 @@ test('Min Length - 1', async () => {
     const schema1 = array();
     const schema2 = schema1.minLength(3);
 
-    expect(() => (schema1 as any).minLength()).toThrowError();
-    expect(() => schema1.minLength(-1)).toThrowError();
-    expect(() => schema1.minLength(undefined as any)).toThrowError();
+    expect(() => (schema1 as any).minLength()).toThrow();
+    expect(() => schema1.minLength(-1)).toThrow();
+    expect(() => schema1.minLength(undefined as any)).toThrow();
 
     expect(schema1 === (schema2 as any)).toEqual(false);
 
@@ -289,9 +289,9 @@ test('Max Length - 1', async () => {
     const schema1 = array();
     const schema2 = schema1.maxLength(3);
 
-    expect(() => (schema1 as any).maxLength()).toThrowError();
-    expect(() => schema1.maxLength(-1)).toThrowError();
-    expect(() => schema1.maxLength(undefined as any)).toThrowError();
+    expect(() => (schema1 as any).maxLength()).toThrow();
+    expect(() => schema1.maxLength(-1)).toThrow();
+    expect(() => schema1.maxLength(undefined as any)).toThrow();
 
     expect(schema1 === (schema2 as any)).toEqual(false);
 

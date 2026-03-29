@@ -320,23 +320,23 @@ test('addProps - 3', async () => {
 
     expect(() => {
         (schema1 as any).addProps();
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         (schema1 as any).addProps(null);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.addProps({
             first: string()
         });
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.addProps({
             second: 'not SchemaBuilder'
         } as any);
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('addProps - nested Optional', async () => {
@@ -781,23 +781,23 @@ test('omit - 4', async () => {
 
     expect(() => {
         (schema1 as any).omit();
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.omit('');
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.omit([]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.omit([1 as any]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.omit(['first', 'fff']);
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('Preprocessors - 1', async () => {
@@ -1301,28 +1301,28 @@ test('modifyPropSchema - 2', () => {
             first: string(),
             second: number()
         }).modifyPropSchema({} as any, () => string());
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         object({
             first: string(),
             second: number()
         }).modifyPropSchema('third' as any, () => string());
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         object({
             first: string(),
             second: number()
         }).modifyPropSchema('second', 'string' as any);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         object({
             first: string(),
             second: number()
         }).modifyPropSchema('second' as any, () => 'some str' as any);
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('Partial - 1', async () => {
@@ -1512,19 +1512,19 @@ test('Partial - 4', async () => {
 
     expect(() => {
         schema1.partial([]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.partial([1 as any]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.partial(['first', 'sss' as any]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.partial(123 as any);
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('makePropOptional - 1', async () => {
@@ -1769,31 +1769,31 @@ test('pick - 4', async () => {
 
     expect(() => {
         (schema1 as any).pick();
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.pick('' as any);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.pick('ssss' as any);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.pick([]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.pick([1 as any]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.pick(['first', 'sss' as any]);
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.pick(object({ fff: number() }));
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('big schema - 1', async () => {
@@ -2408,13 +2408,13 @@ test('named preprocessor throws', async () => {
 test('preprocessor not function', async () => {
     expect(() => {
         object({ a: string() }).addPreprocessor('some str' as any);
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('validator not function', async () => {
     expect(() => {
         object({ a: string() }).addValidator('some str' as any);
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('intersect - 1', async () => {
@@ -2441,7 +2441,7 @@ test('intersect - 1', async () => {
 
     expect(() => {
         schema2.intersect({} as any);
-    }).toThrowError();
+    }).toThrow();
 
     expect(schema3 !== (schema2 as any)).toEqual(true);
 
@@ -2477,15 +2477,15 @@ test('addProp - 1', async () => {
 
     expect(() => {
         (schema1 as any).addProp();
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.addProp('first', number());
-    }).toThrowError();
+    }).toThrow();
 
     expect(() => {
         schema1.addProp('second', 'sss' as any);
-    }).toThrowError();
+    }).toThrow();
 });
 
 test('Custom path', async () => {

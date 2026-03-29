@@ -74,26 +74,22 @@ test('deepFlatten - 6', () => {
     const obj2 = { b: 2, c: obj1 };
     const obj3 = { c: 3, d: obj2 };
     obj1.e = obj3;
-    expect(() => deepFlatten(obj3)).toThrowError('circular reference detected');
+    expect(() => deepFlatten(obj3)).toThrow('circular reference detected');
 });
 
 test('deepFlatten - 7', () => {
     const customObj = new (class {})();
-    expect(() => deepFlatten(customObj)).toThrowError(
-        'cannot flatten this object'
-    );
+    expect(() => deepFlatten(customObj)).toThrow('cannot flatten this object');
 });
 
 test('deepFlatten - 8', () => {
-    expect(() => deepFlatten(null as any)).toThrowError(
+    expect(() => deepFlatten(null as any)).toThrow(
         'cannot flatten this object'
     );
 });
 
 test('deepFlatten - 9', () => {
-    expect(() => deepFlatten(10 as any)).toThrowError(
-        'cannot flatten this object'
-    );
+    expect(() => deepFlatten(10 as any)).toThrow('cannot flatten this object');
 });
 
 test('deepFlatten - 10', () => {

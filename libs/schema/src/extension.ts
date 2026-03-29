@@ -117,6 +117,19 @@ type MergeExtensionMethods<
 // ---------------------------------------------------------------------------
 
 /**
+ * Intersected onto consumer-facing builder types to make `withExtension`
+ * and `getExtension` uncallable (`never`). Using an intersection instead
+ * of `Omit` preserves the class identity so extended builders remain
+ * assignable to `SchemaBuilder<any, any, any>`.
+ */
+type HiddenExtensionMethods = {
+    /** @internal Extension-author only — use inside `defineExtension()`. */
+    withExtension: never;
+    /** @internal Extension-author only — use inside `defineExtension()`. */
+    getExtension: never;
+};
+
+/**
  * Overrides extension method return types so they always return the full
  * extended builder type. This ensures extension methods preserve all other
  * extension methods through chaining (e.g. `s.string().email().slug()`).
@@ -130,72 +143,76 @@ type FixedMethods<TRawMethods, TBase> = {
         this: any,
         ...args: infer A
     ) => any
-        ? (...args: A) => TBase & FixedMethods<TRawMethods, TBase>
+        ? (
+              ...args: A
+          ) => TBase & FixedMethods<TRawMethods, TBase> & HiddenExtensionMethods
         : TRawMethods[K];
 };
+
+/**
+ * Produces the consumer-facing type for an extended builder: the base
+ * builder intersected with its fixed extension methods, with
+ * `withExtension` / `getExtension` overridden to `never` so they
+ * don't appear as callable in consumer code.
+ */
+type CleanExtended<TBuilder, TExt> = TBuilder &
+    FixedMethods<TExt, TBuilder> &
+    HiddenExtensionMethods;
 
 // -- Factory types that return builders with corrected extension methods ------
 
 type ExtendedStringFactory<TExt> = {
-    (): StringSchemaBuilder<string, true, TExt> &
-        FixedMethods<TExt, StringSchemaBuilder<string, true, TExt>>;
+    (): CleanExtended<StringSchemaBuilder<string, true, TExt>, TExt>;
     <T extends string>(
         equals: T
-    ): StringSchemaBuilder<T, true, TExt> &
-        FixedMethods<TExt, StringSchemaBuilder<T, true, TExt>>;
+    ): CleanExtended<StringSchemaBuilder<T, true, TExt>, TExt>;
 };
 
 type ExtendedNumberFactory<TExt> = {
-    (): NumberSchemaBuilder<number, true, TExt> &
-        FixedMethods<TExt, NumberSchemaBuilder<number, true, TExt>>;
+    (): CleanExtended<NumberSchemaBuilder<number, true, TExt>, TExt>;
     <T extends number>(
         equals: T
-    ): NumberSchemaBuilder<T, true, TExt> &
-        FixedMethods<TExt, NumberSchemaBuilder<T, true, TExt>>;
+    ): CleanExtended<NumberSchemaBuilder<T, true, TExt>, TExt>;
 };
 
-type ExtendedBooleanFactory<TExt> = () => BooleanSchemaBuilder<
-    boolean,
-    true,
-    undefined,
+type ExtendedBooleanFactory<TExt> = () => CleanExtended<
+    BooleanSchemaBuilder<boolean, true, undefined, TExt>,
     TExt
-> &
-    FixedMethods<TExt, BooleanSchemaBuilder<boolean, true, undefined, TExt>>;
+>;
 
-type ExtendedDateFactory<TExt> = () => DateSchemaBuilder<Date, true, TExt> &
-    FixedMethods<TExt, DateSchemaBuilder<Date, true, TExt>>;
+type ExtendedDateFactory<TExt> = () => CleanExtended<
+    DateSchemaBuilder<Date, true, TExt>,
+    TExt
+>;
 
 type ExtendedObjectFactory<TExt> = <
     P extends Record<string, SchemaBuilder<any, any, any>>
 >(
     properties?: P
-) => ObjectSchemaBuilder<P, true, undefined, TExt> &
-    FixedMethods<TExt, ObjectSchemaBuilder<P, true, undefined, TExt>>;
+) => CleanExtended<ObjectSchemaBuilder<P, true, undefined, TExt>, TExt>;
 
 type ExtendedArrayFactory<TExt> = <
     TElementSchema extends SchemaBuilder<any, any, any>
 >(
     elementSchema?: TElementSchema
-) => ArraySchemaBuilder<TElementSchema, true, undefined, TExt> &
-    FixedMethods<
-        TExt,
-        ArraySchemaBuilder<TElementSchema, true, undefined, TExt>
-    >;
+) => CleanExtended<
+    ArraySchemaBuilder<TElementSchema, true, undefined, TExt>,
+    TExt
+>;
 
 type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any>>(
     schema: T
-) => UnionSchemaBuilder<[T], true, undefined, TExt> &
-    FixedMethods<TExt, UnionSchemaBuilder<[T], true, undefined, TExt>>;
+) => CleanExtended<UnionSchemaBuilder<[T], true, undefined, TExt>, TExt>;
 
-type ExtendedFuncFactory<TExt> = () => FunctionSchemaBuilder<
-    true,
-    undefined,
+type ExtendedFuncFactory<TExt> = () => CleanExtended<
+    FunctionSchemaBuilder<true, undefined, TExt>,
     TExt
-> &
-    FixedMethods<TExt, FunctionSchemaBuilder<true, undefined, TExt>>;
+>;
 
-type ExtendedAnyFactory<TExt> = () => AnySchemaBuilder<true, undefined, TExt> &
-    FixedMethods<TExt, AnySchemaBuilder<true, undefined, TExt>>;
+type ExtendedAnyFactory<TExt> = () => CleanExtended<
+    AnySchemaBuilder<true, undefined, TExt>,
+    TExt
+>;
 
 /** The return type of `withExtensions()` with properly merged extension types. */
 type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {

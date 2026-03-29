@@ -13,24 +13,13 @@ import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
  * // { name: string; age?: number }
  * ```
  */
-export type InferType<T> =
-    T extends SchemaBuilder<infer TResult, infer TRequired, any>
-        ? T extends {
-              optimize: (
-                  ...args: any[]
-              ) => SchemaBuilder<
-                  infer TOptimizedType,
-                  infer TOptimizedRequired,
-                  any
-              >;
-          }
-            ? TOptimizedRequired extends true
-                ? TOptimizedType
-                : MakeOptional<TOptimizedType>
-            : TRequired extends true
-              ? TResult
-              : MakeOptional<TResult>
-        : T;
+export type InferType<T> = T extends {
+    optimize: (...args: any[]) => { readonly _type: infer TOptimized };
+}
+    ? TOptimized
+    : T extends { readonly _type: infer TType }
+      ? TType
+      : T;
 
 /**
  * Represents a single validation error with the path to the invalid field
@@ -502,6 +491,15 @@ export abstract class SchemaBuilder<
         'is required';
 
     /**
+     * Type-level brand encoding the inferred type of this schema.
+     * Not emitted at runtime — used only by {@link InferType}.
+     * @internal
+     */
+    declare readonly _type: TRequired extends true
+        ? TResult
+        : MakeOptional<TResult>;
+
+    /**
      * Set type of schema explicitly. `notUsed` param is needed only for case when JS is used. E.g. when you
      * can't call method like `schema.hasType<Date>()`, so instead you can call `schema.hasType(new Date())`
      * with the same result.
@@ -922,6 +920,7 @@ export abstract class SchemaBuilder<
     /**
      * Sets extension metadata by key. Returns a new schema instance with the
      * extension data stored. The data survives fluent chaining.
+     * @internal Used by extension authors inside `defineExtension()` callbacks.
      */
     public withExtension(key: string, value: unknown): this {
         return this.createFromProps({
@@ -935,6 +934,7 @@ export abstract class SchemaBuilder<
 
     /**
      * Retrieves extension metadata by key.
+     * @internal Used by extension authors inside `defineExtension()` callbacks.
      */
     public getExtension(key: string): unknown {
         return this.#extensions[key];

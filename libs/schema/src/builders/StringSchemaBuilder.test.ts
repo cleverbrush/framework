@@ -198,7 +198,7 @@ test('equals - 2', async () => {
 });
 
 test('equals - 3', () => {
-    expect(() => string().equals(2342 as any)).toThrowError();
+    expect(() => string().equals(2342 as any)).toThrow();
 });
 
 test('minLength - 1', async () => {
@@ -274,7 +274,7 @@ test('minLength - 2', async () => {
 });
 
 test('minLength - 3', () => {
-    expect(() => string().minLength('some str' as any)).toThrowError();
+    expect(() => string().minLength('some str' as any)).toThrow();
 });
 
 test('maxLength - 1', async () => {
@@ -350,7 +350,7 @@ test('maxLength - 2', async () => {
 });
 
 test('maxLength - 3', () => {
-    expect(() => string().maxLength('some str' as any)).toThrowError();
+    expect(() => string().maxLength('some str' as any)).toThrow();
 });
 
 test('hasType - 1', () => {
@@ -379,7 +379,7 @@ test('startsWith - 1', async () => {
         const schema2 = schema1.clearStartsWith();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-    expect(() => string().startsWith(123 as any)).toThrowError();
+    expect(() => string().startsWith(123 as any)).toThrow();
 
     {
         const schema = string().startsWith('abc');
@@ -454,7 +454,7 @@ test('endsWith - 1', async () => {
         const schema2 = schema1.clearEndsWith();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-    expect(() => string().endsWith(123 as any)).toThrowError();
+    expect(() => string().endsWith(123 as any)).toThrow();
 
     {
         const schema = string().endsWith('abc');
@@ -529,7 +529,7 @@ test('matches - 1', async () => {
         const schema2 = schema1.clearMatches();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-    expect(() => string().matches(123 as any)).toThrowError();
+    expect(() => string().matches(123 as any)).toThrow();
 
     {
         const schema = string().matches(/^abc\d+/);
