@@ -651,7 +651,8 @@ describe('number extensions', () => {
 
     test('currency validates decimal places', async () => {
         const s = withExtensions(currencyExt);
-        const schema = s.number().currency();
+        const schema = s.number().currency({ maxDecimals: 5 });
+
         expect((await schema.validate(19.99)).valid).toBe(true);
         expect((await schema.validate(19.999)).valid).toBe(false);
         expect((await schema.validate(-5)).valid).toBe(false);
@@ -677,7 +678,7 @@ describe('boolean extensions', () => {
 
     test('consent requires true', async () => {
         const s = withExtensions(consentExt);
-        const schema = s.boolean().consent('I agree to the terms');
+        const schema = s.boolean().consent();
         expect((await schema.validate(true)).valid).toBe(true);
         expect((await schema.validate(false)).valid).toBe(false);
     });
@@ -753,9 +754,7 @@ describe('function extensions', () => {
 describe('any extensions', () => {
     test('meta stores arbitrary metadata', () => {
         const s = withExtensions(metadataExt);
-        const schema = s
-            .any()
-            .meta({ description: 'A flexible field', deprecated: true });
+        const schema = s.any().meta();
         expect(schema.introspect().extensions.meta).toEqual({
             description: 'A flexible field',
             deprecated: true
@@ -1036,7 +1035,7 @@ describe('realistic object schemas with extensions', () => {
             displayName: s.string().trimmed().minLength(2).maxLength(50),
             age: s.number().percentage(), // using 0-100 as age range
             birthDate: s.date().minAge(18),
-            tosAccepted: s.boolean().consent('Terms of Service')
+            tosAccepted: s.boolean().consent()
         });
 
         const validUser = {
@@ -1167,7 +1166,7 @@ describe('type inference with extensions', () => {
 
     test('InferType on extended boolean builder', () => {
         const s = withExtensions(consentExt);
-        const schema = s.boolean().consent('agree');
+        const schema = s.boolean().consent();
         type T = InferType<typeof schema>;
         expectTypeOf<T>().toEqualTypeOf<boolean>();
     });
@@ -1288,7 +1287,7 @@ describe('instanceof checks for all builder types', () => {
 
     test('extended any instanceof AnySchemaBuilder', () => {
         const s = withExtensions(metadataExt);
-        expect(s.any().meta({ x: 1 })).toBeInstanceOf(AnySchemaBuilder);
+        expect(s.any().meta()).toBeInstanceOf(AnySchemaBuilder);
     });
 });
 
