@@ -239,8 +239,11 @@ export type JobSchedulerProps = {
     persistRepository?: IJobRepository;
 };
 
+/** Lifecycle status of a job definition. */
 export type JobStatus = 'active' | 'disabled' | 'finished';
+/** Runtime status of the scheduler itself. */
 export type SchedulerStatus = 'started' | 'stopped';
+/** Status of a single job execution instance. */
 export type JobInstanceStatus =
     | 'running'
     | 'errored'
@@ -249,6 +252,10 @@ export type JobInstanceStatus =
     | 'timedout'
     | 'canceled';
 
+/**
+ * Pre-built `@cleverbrush/schema` schemas used internally by the scheduler.
+ * Exported for consumers who need to validate schedule/job payloads manually.
+ */
 export const Schemas = {
     ScheduleSchemaBase,
     ScheduleSchema,
