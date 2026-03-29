@@ -38,10 +38,10 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class FunctionSchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    TExtensions = {},
     TResult = TExplicitType extends undefined
         ? (...args: any[]) => any
-        : TExplicitType,
-    TExtensions = {}
+        : TExplicitType
 > extends SchemaBuilder<TResult, TRequired, TExtensions> {
     /**
      * @hidden
@@ -62,7 +62,7 @@ export class FunctionSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): FunctionSchemaBuilder<true, T, undefined, TExtensions> & TExtensions {
+    ): FunctionSchemaBuilder<true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -73,7 +73,6 @@ export class FunctionSchemaBuilder<
      */
     public clearHasType(): FunctionSchemaBuilder<
         TRequired,
-        undefined,
         undefined,
         TExtensions
     > &
@@ -149,8 +148,7 @@ export class FunctionSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): FunctionSchemaBuilder<true, TExplicitType, undefined, TExtensions> &
-        TExtensions {
+    ): FunctionSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
         return super.required(errorMessage);
     }
 
@@ -160,7 +158,6 @@ export class FunctionSchemaBuilder<
     public optional(): FunctionSchemaBuilder<
         false,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {

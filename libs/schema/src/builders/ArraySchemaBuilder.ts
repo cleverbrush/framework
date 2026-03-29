@@ -88,14 +88,14 @@ export class ArraySchemaBuilder<
     TElementSchema extends SchemaBuilder<any, any, any>,
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    TExtensions = {},
     TResult = TExplicitType extends undefined
         ? TElementSchema extends undefined
             ? Array<any>
             : TElementSchema extends SchemaBuilder<infer T1, infer T2>
               ? Array<InferType<SchemaBuilder<T1, T2>>>
               : never
-        : TExplicitType,
-    TExtensions = {}
+        : TExplicitType
 > extends SchemaBuilder<TResult, TRequired, TExtensions> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
@@ -164,8 +164,7 @@ export class ArraySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): ArraySchemaBuilder<TElementSchema, true, T, undefined, TExtensions> &
-        TExtensions {
+    ): ArraySchemaBuilder<TElementSchema, true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -177,7 +176,6 @@ export class ArraySchemaBuilder<
     public clearHasType(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
-        undefined,
         undefined,
         TExtensions
     > &
@@ -399,13 +397,7 @@ export class ArraySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): ArraySchemaBuilder<
-        TElementSchema,
-        true,
-        TExplicitType,
-        undefined,
-        TExtensions
-    > &
+    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType, TExtensions> &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -417,7 +409,6 @@ export class ArraySchemaBuilder<
         TElementSchema,
         false,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {
@@ -464,13 +455,7 @@ export class ArraySchemaBuilder<
      */
     public of<TSchema extends SchemaBuilder<any, any, any>>(
         schema: TSchema
-    ): ArraySchemaBuilder<
-        TSchema,
-        TRequired,
-        TExplicitType,
-        undefined,
-        TExtensions
-    > &
+    ): ArraySchemaBuilder<TSchema, TRequired, TExplicitType, TExtensions> &
         TExtensions {
         return ArraySchemaBuilder.create({
             ...this.introspect(),
@@ -486,7 +471,6 @@ export class ArraySchemaBuilder<
         any,
         TRequired,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {
@@ -511,7 +495,6 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {
@@ -531,7 +514,6 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {
@@ -557,7 +539,6 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {
@@ -577,7 +558,6 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {

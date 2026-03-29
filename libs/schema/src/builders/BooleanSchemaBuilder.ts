@@ -43,8 +43,8 @@ export class BooleanSchemaBuilder<
     TResult = boolean,
     TRequired extends boolean = true,
     TExplicitType = undefined,
-    TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType,
-    TExtensions = {}
+    TExtensions = {},
+    TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType
 > extends SchemaBuilder<TFinalResult, TRequired, TExtensions> {
     #equalsTo?: boolean;
     #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
@@ -104,8 +104,7 @@ export class BooleanSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): BooleanSchemaBuilder<TResult, true, T, undefined, TExtensions> &
-        TExtensions {
+    ): BooleanSchemaBuilder<TResult, true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -117,7 +116,6 @@ export class BooleanSchemaBuilder<
     public clearHasType(): BooleanSchemaBuilder<
         TResult,
         TRequired,
-        undefined,
         undefined,
         TExtensions
     > &
@@ -212,13 +210,7 @@ export class BooleanSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): BooleanSchemaBuilder<
-        TResult,
-        true,
-        TExplicitType,
-        undefined,
-        TExtensions
-    > &
+    ): BooleanSchemaBuilder<TResult, true, TExplicitType, TExtensions> &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -230,7 +222,6 @@ export class BooleanSchemaBuilder<
         TResult,
         false,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {
@@ -258,7 +249,6 @@ export class BooleanSchemaBuilder<
             T,
             TRequired,
             TExplicitType,
-            undefined,
             TExtensions
         > &
             TExtensions;
@@ -271,7 +261,6 @@ export class BooleanSchemaBuilder<
         boolean,
         TRequired,
         TExplicitType,
-        undefined,
         TExtensions
     > &
         TExtensions {

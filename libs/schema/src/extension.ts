@@ -158,13 +158,9 @@ type ExtendedBooleanFactory<TExt> = () => BooleanSchemaBuilder<
     boolean,
     true,
     undefined,
-    boolean,
     TExt
 > &
-    FixedMethods<
-        TExt,
-        BooleanSchemaBuilder<boolean, true, undefined, boolean, TExt>
-    >;
+    FixedMethods<TExt, BooleanSchemaBuilder<boolean, true, undefined, TExt>>;
 
 type ExtendedDateFactory<TExt> = () => DateSchemaBuilder<Date, true, TExt> &
     FixedMethods<TExt, DateSchemaBuilder<Date, true, TExt>>;
@@ -180,10 +176,10 @@ type ExtendedArrayFactory<TExt> = <
     TElementSchema extends SchemaBuilder<any, any, any>
 >(
     elementSchema?: TElementSchema
-) => ArraySchemaBuilder<TElementSchema, true, undefined, undefined, TExt> &
+) => ArraySchemaBuilder<TElementSchema, true, undefined, TExt> &
     FixedMethods<
         TExt,
-        ArraySchemaBuilder<TElementSchema, true, undefined, undefined, TExt>
+        ArraySchemaBuilder<TElementSchema, true, undefined, TExt>
     >;
 
 type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any>>(
@@ -194,21 +190,12 @@ type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any>>(
 type ExtendedFuncFactory<TExt> = () => FunctionSchemaBuilder<
     true,
     undefined,
-    (...args: any[]) => any,
     TExt
 > &
-    FixedMethods<
-        TExt,
-        FunctionSchemaBuilder<true, undefined, (...args: any[]) => any, TExt>
-    >;
+    FixedMethods<TExt, FunctionSchemaBuilder<true, undefined, TExt>>;
 
-type ExtendedAnyFactory<TExt> = () => AnySchemaBuilder<
-    true,
-    undefined,
-    any,
-    TExt
-> &
-    FixedMethods<TExt, AnySchemaBuilder<true, undefined, any, TExt>>;
+type ExtendedAnyFactory<TExt> = () => AnySchemaBuilder<true, undefined, TExt> &
+    FixedMethods<TExt, AnySchemaBuilder<true, undefined, TExt>>;
 
 /** The return type of `withExtensions()` with properly merged extension types. */
 type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {

@@ -29,8 +29,8 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class AnySchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
-    TResult = TExplicitType extends undefined ? any : TExplicitType,
-    TExtensions = {}
+    TExtensions = {},
+    TResult = TExplicitType extends undefined ? any : TExplicitType
 > extends SchemaBuilder<TResult, TRequired, TExtensions> {
     /**
      * @hidden
@@ -51,7 +51,7 @@ export class AnySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): AnySchemaBuilder<true, T, undefined, TExtensions> & TExtensions {
+    ): AnySchemaBuilder<true, T, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -60,12 +60,7 @@ export class AnySchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): AnySchemaBuilder<
-        TRequired,
-        undefined,
-        undefined,
-        TExtensions
-    > &
+    public clearHasType(): AnySchemaBuilder<TRequired, undefined, TExtensions> &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -117,20 +112,14 @@ export class AnySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): AnySchemaBuilder<true, TExplicitType, undefined, TExtensions> &
-        TExtensions {
+    ): AnySchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): AnySchemaBuilder<
-        false,
-        TExplicitType,
-        undefined,
-        TExtensions
-    > &
+    public optional(): AnySchemaBuilder<false, TExplicitType, TExtensions> &
         TExtensions {
         return super.optional();
     }
