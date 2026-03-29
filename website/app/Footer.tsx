@@ -41,12 +41,8 @@ export function Footer() {
                     >
                         GitHub Repository
                     </a>
-                    <a
-                        href="https://docs.cleverbrush.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        Documentation
+                    <a href="/api-docs">
+                        API Reference
                     </a>
                     <a
                         href="https://cleverbrush.com/editor"
