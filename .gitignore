@@ -3,3 +3,4 @@ dist
 /coverage
 *.tsbuildinfo
 .turbo
+/website/public/api-docs/latest

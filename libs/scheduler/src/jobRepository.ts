@@ -8,6 +8,13 @@ import type {
 type AddJobRequest = Omit<Job, 'status'>;
 type AddJobInstanceRequest = Omit<JobInstance, 'id' | 'jobId'>;
 
+/**
+ * Persistence contract for jobs and their running instances.
+ *
+ * Implement this interface to store jobs in a database, file system, or
+ * any other persistent backend. See {@link InMemoryJobRepository} for a
+ * reference implementation.
+ */
 export interface IJobRepository {
     getJobs(): Promise<Job[]>;
     getJobById(jobId: string): Promise<Job>;
@@ -29,6 +36,11 @@ export interface IJobRepository {
     saveInstance(instance: JobInstance): Promise<JobInstance>;
 }
 
+/**
+ * In-memory {@link IJobRepository} implementation.
+ *
+ * Useful for tests and development. All data is lost when the process exits.
+ */
 export class InMemoryJobRepository implements IJobRepository {
     private _jobs: Array<Job> = [];
     private _jobInstances: Array<JobInstance> = [];

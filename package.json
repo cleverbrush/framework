@@ -8,7 +8,8 @@
         "build": "turbo run build",
         "clean": "turbo run clean",
         "watch": "tsc --build --watch tsconfig.build.json",
-        "docs": "typedoc",
+        "docs": "typedoc && ./scripts/inject-gtm.sh website/public/api-docs/latest",
+        "docs:snapshot": "./scripts/snapshot-docs.sh",
         "lint": "biome check ./libs",
         "lint:fix": "biome check --write ./libs",
         "format": "biome format --write ./libs",
@@ -33,6 +34,7 @@
         "jsdom": "^29.0.1",
         "tsup": "^8.5.1",
         "turbo": "^2.8.21",
+        "typedoc": "^0.28.18",
         "typescript": "^6.0.2",
         "vitest": "^4.1.2"
     }

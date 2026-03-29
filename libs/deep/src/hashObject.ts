@@ -31,6 +31,16 @@ function objectHash(
     return stringHash(hash, true);
 }
 
+/**
+ * Computes a 32-bit numeric hash for any value.
+ *
+ * Objects are hashed by recursively hashing their sorted keys and values;
+ * circular references are detected via an internal exclusion list.
+ *
+ * @param unkType - The value to hash (object, string, number, etc.).
+ * @param exclude - Internal array used for circular-reference detection.
+ * @returns A 32-bit integer hash code.
+ */
 export function HashObject(unkType: any, exclude?: any[]): number {
     let ex = exclude;
     if (ex === undefined) {
