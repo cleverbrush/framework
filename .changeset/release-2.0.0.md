@@ -23,7 +23,17 @@
 - **Custom error messages on `required()`** — all schema builders (`string`, `number`, `boolean`, `date`, `array`, `object`, `any`, `function`, `union`) now accept an optional `errorMessage` parameter on `.required()` for custom required-field messages.
 - **Custom error messages on validation constraints** — `minLength`, `maxLength`, `min`, `max`, `equals`, and other constraint methods across builders now accept optional custom error message providers.
 - **Sub-path exports** — individual schema builders can now be imported directly (e.g. `import { string } from '@cleverbrush/schema/string'`).
+- **Extension system** — new `defineExtension(config)` and `withExtensions(...descriptors)` API for adding custom fluent methods to any schema builder type. Extensions support auto-inferred metadata, introspection via `schema.introspect().extensions`, method name collision detection, and full compatibility with `InferType`. Extension metadata survives all fluent operations (`.optional()`, `.required()`, `.addProp()`, `.partial()`, etc.). Extended builders remain `instanceof` their base class.
+- **Low-level extension API** — `withExtension(key, value)` / `getExtension(key)` methods available on all `SchemaBuilder` instances for manual metadata management.
+- **Enhanced schema type branding** — improved type branding and inference for `SchemaBuilder` to enable better compile-time type safety.
 - **Removed default export** from `@cleverbrush/deep` (used internally) — named exports only.
+
+### JSDoc Improvements
+
+- Comprehensive JSDoc annotations added across all schema builders (`SchemaBuilder`, `StringSchemaBuilder`, `NumberSchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `ArraySchemaBuilder`, `ObjectSchemaBuilder`, `UnionSchemaBuilder`, `AnySchemaBuilder`, `FunctionSchemaBuilder`).
+- Added `@example` blocks with usage snippets for `InferType`, validation types, and error message providers.
+- Documented `PropertyValidationResult` class methods and internal validation types.
+- Added JSDoc to `transaction.ts` utility functions.
 
 ### Build & Tooling
 
@@ -124,6 +134,15 @@ A headless, schema-driven form system for React based on `@cleverbrush/schema`.
 - Added `exports` field in `package.json`.
 - Migrated tests from Jest to Vitest.
 - Updated `@cleverbrush/schema` dependency to `^2.0.0`.
+- Added `@types/node@^25.4.0` as dev dependency.
+
+---
+
+## @cleverbrush/mapper
+
+### Dependency Updates
+
+- Replaced `__unmapped` property with `SYMBOL_UNMAPPED` for better type tracking in mapping registry.
 
 ---
 
@@ -137,3 +156,20 @@ A headless, schema-driven form system for React based on `@cleverbrush/schema`.
 - Sourcemap generation enabled across all packages.
 - Test runner migrated from Jest to Vitest with type checking.
 - Added Turbo integration for build orchestration.
+
+### Dependency Updates
+
+- **TypeScript** upgraded from `^5.5.4` to `^6.0.2`.
+- **Vitest** `^4.1.2` replaced Jest `^29.7.0` and `ts-jest` as the test runner.
+- **@vitest/coverage-v8** `^4.1.2` added for code coverage.
+- **Biome** `^2.4.9` replaced ESLint + Prettier for linting and formatting.
+- **tsup** `^8.5.1` added as the bundler (replaces plain `tsc` builds).
+- **turbo** `^2.8.21` added for monorepo build orchestration.
+- **typedoc** upgraded from earlier version to `^0.28.18`.
+- **@changesets/cli** `^2.30.0` added for release management.
+- **@testing-library/react** `^16.3.2` added for React component testing.
+- **jsdom** `^29.0.1` added for DOM testing environment.
+- **@types/node** upgraded from `^20.11.30` to `^25.4.0` (in async, scheduler).
+- **@clickhouse/client** upgraded from `^1.7.0` to `^1.18.2` (in knex-clickhouse).
+- **@types/react** `^19.0.0` and **react** `^19.0.0` added as dev dependencies (in react-form).
+- Removed: `@types/jest`, `@typescript-eslint/eslint-plugin`, `@typescript-eslint/parser`, `eslint-config-airbnb`, `prettier`, `tsd`.
