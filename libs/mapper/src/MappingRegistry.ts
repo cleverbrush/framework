@@ -14,6 +14,12 @@ import {
  */
 const SYMBOL_TARGET_PROPERTY_KEY: unique symbol = Symbol('targetPropertyKey');
 
+/**
+ * Internal symbol used as a phantom property key on Mapper to track
+ * unmapped target properties. Using a symbol keeps it out of IntelliSense.
+ */
+const SYMBOL_UNMAPPED: unique symbol = Symbol('unmapped');
+
 // ── Helper Types ──────────────────────────────────────────────────────
 
 /**
@@ -570,7 +576,7 @@ export class Mapper<
     TRegistered = never
 > {
     /** Phantom property for structural type-checking of TUnmapped. */
-    declare readonly __unmapped: TUnmapped;
+    declare readonly [SYMBOL_UNMAPPED]: TUnmapped;
 
     private readonly _fromSchema: TFromSchema;
     private readonly _toSchema: TToSchema;

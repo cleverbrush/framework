@@ -103,7 +103,7 @@ mapper().configure(
             .from((f) => f.address.city)
     // TS Error: Type 'Mapper<..., "fullAddress", ...>' is not assignable to
     // type 'Mapper<..., never, ...>'.
-    //   Types of property '__unmapped' are incompatible.
+    //   Types of property '[SYMBOL_UNMAPPED]' are incompatible.
     //     Type '"fullAddress"' is not assignable to type 'never'.
 );
 ```
