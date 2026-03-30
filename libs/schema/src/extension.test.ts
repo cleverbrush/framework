@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, test } from 'vitest';
-import { AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
 import { ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
 import { BooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
 import { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
