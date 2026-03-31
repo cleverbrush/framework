@@ -1,4 +1,5 @@
 import {
+    type BRAND,
     type Preprocessor,
     SchemaBuilder,
     type ValidationContext,
@@ -564,6 +565,20 @@ export class NumberSchemaBuilder<
     public optional(): NumberSchemaBuilder<TResult, false, TExtensions> &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): NumberSchemaBuilder<
+        TResult & { readonly [K in BRAND]: TBrand },
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
     }
 
     /**

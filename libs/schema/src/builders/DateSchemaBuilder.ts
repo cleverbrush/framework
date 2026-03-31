@@ -1,5 +1,6 @@
 import { transaction } from '../utils/transaction.js';
 import {
+    type BRAND,
     type Preprocessor,
     SchemaBuilder,
     type ValidationContext,
@@ -531,6 +532,20 @@ export class DateSchemaBuilder<
     public optional(): DateSchemaBuilder<TResult, false, TExtensions> &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): DateSchemaBuilder<
+        TResult & { readonly [K in BRAND]: TBrand },
+        TRequired,
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
     }
 
     /**

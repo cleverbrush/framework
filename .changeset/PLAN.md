@@ -24,9 +24,9 @@ This **demonstrates the extension system** while closing the biggest API gap vs 
 
 Add `.transform(fn)` (post-validation value transformation) and `.pipe(otherSchema)` for chaining. Preprocessors exist but transforms are semantically different and widely used in zod.
 
-### 1.4 Sync Parse API
+### 1.4 Sync Parse API - DONE
 
-Add `.parse(value)` (throws) and `.safeParse(value)` (returns result object) for schemas without async validators. Current async-only API is a friction point — most zod users expect synchronous validation.
+Add `.validate()` (sync) and `.validateAsync()` (async). Current async-only API is a friction point — most zod users expect synchronous validation.
 
 ### 1.5 Branded/Opaque Types
 

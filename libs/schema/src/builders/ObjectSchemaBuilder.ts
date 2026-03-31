@@ -1,5 +1,6 @@
 import { PropertyValidationResult } from './PropertyValidationResult.js';
 import {
+    type BRAND,
     type InferType,
     type NestedValidationResult,
     type PreValidationResult,
@@ -302,6 +303,23 @@ export class ObjectSchemaBuilder<
     > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        (undefined extends TExplicitType
+            ? RespectPropsOptionality<TProperties>
+            : TExplicitType) & { readonly [K in BRAND]: TBrand },
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
     }
 
     #applyPropertyDescriptors(

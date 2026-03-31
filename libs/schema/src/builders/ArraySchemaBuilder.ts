@@ -3,6 +3,7 @@ import type {
     ObjectSchemaValidationResult
 } from './ObjectSchemaBuilder.js';
 import {
+    type BRAND,
     createHybridErrorArray,
     type InferType,
     type NestedValidationResult,
@@ -552,6 +553,21 @@ export class ArraySchemaBuilder<
     > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TResult & { readonly [K in BRAND]: TBrand },
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
     }
 
     public introspect() {

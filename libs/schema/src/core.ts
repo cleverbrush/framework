@@ -27,6 +27,8 @@ export type {
     ValidationErrorMessageProvider
 } from './builders/SchemaBuilder.js';
 export {
+    BRAND,
+    Brand,
     InferType,
     MakeOptional,
     SchemaBuilder,

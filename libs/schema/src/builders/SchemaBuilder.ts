@@ -7,6 +7,25 @@ declare const __type: unique symbol;
 /** @internal */
 export type SchemaTypeBrand = typeof __type;
 
+/** Symbol used as the key for branded/opaque types. */
+declare const __brand: unique symbol;
+/** Symbol used as the key for branded/opaque types. */
+export type BRAND = typeof __brand;
+
+/**
+ * Intersects a base type with a phantom brand tag.
+ * The brand exists only at the type level — zero runtime cost.
+ *
+ * @example
+ * ```ts
+ * type Email = Brand<string, 'Email'>;
+ * type UserId = Brand<number, 'UserId'>;
+ * ```
+ */
+export type Brand<T, TBrand extends string | symbol> = T & {
+    readonly [K in BRAND]: TBrand;
+};
+
 /**
  * Infers the TypeScript type that a `SchemaBuilder` instance validates.
  * Takes into account type optimizations (via `optimize()`) and whether the schema is optional.
@@ -991,6 +1010,28 @@ export abstract class SchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             isRequired: false
+        }) as any;
+    }
+
+    /**
+     * Brands the schema with a phantom type tag, preventing structural mixing
+     * of semantically different values at the type level. Zero runtime cost.
+     *
+     * The optional `_name` parameter is only needed when using plain JavaScript
+     * (where generic type parameters are unavailable). In TypeScript, prefer
+     * the generic form: `schema.brand<'Email'>()`.
+     *
+     * @example
+     * ```ts
+     * const Email = string().brand<'Email'>();
+     * const Username = string().brand<'Username'>();
+     * type Email = InferType<typeof Email>;     // string & { readonly [BRAND]: 'Email' }
+     * type Username = InferType<typeof Username>; // string & { readonly [BRAND]: 'Username' }
+     * ```
+     */
+    public brand<TBrand extends string | symbol>(_name?: TBrand) {
+        return this.createFromProps({
+            ...this.introspect()
         }) as any;
     }
 

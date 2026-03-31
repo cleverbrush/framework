@@ -1,4 +1,5 @@
 import {
+    type BRAND,
     SchemaBuilder,
     type ValidationContext,
     type ValidationErrorMessageProvider,
@@ -132,6 +133,20 @@ export class AnySchemaBuilder<
     public optional(): AnySchemaBuilder<false, TExplicitType, TExtensions> &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): AnySchemaBuilder<
+        TRequired,
+        TResult & { readonly [K in BRAND]: TBrand },
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
     }
 }
 
