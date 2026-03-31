@@ -9,6 +9,7 @@ import type { InferType } from './builders/SchemaBuilder.js';
 import { SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
 import { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
+import { string as plainString } from './core.js';
 import { defineExtension, withExtensions } from './extension.js';
 import { boolean, number, object, string } from './index.js';
 
@@ -532,7 +533,7 @@ describe('withExtensions', () => {
 
 describe('extension metadata', () => {
     test('withExtension stores data that survives chaining', () => {
-        const schema = string()
+        const schema = plainString()
             .withExtension('customKey', { data: 42 })
             .minLength(3);
 
@@ -541,12 +542,12 @@ describe('extension metadata', () => {
     });
 
     test('getExtension returns undefined for missing keys', () => {
-        const schema = string();
+        const schema = plainString();
         expect(schema.getExtension('nonexistent')).toBeUndefined();
     });
 
     test('multiple extension keys coexist', () => {
-        const schema = string()
+        const schema = plainString()
             .withExtension('key1', 'value1')
             .withExtension('key2', 'value2');
 
