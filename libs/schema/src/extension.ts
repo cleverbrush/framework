@@ -243,7 +243,7 @@ type MergeExtensionMethods<
  * of `Omit` preserves the class identity so extended builders remain
  * assignable to `SchemaBuilder<any, any, any>`.
  */
-type HiddenExtensionMethods = {
+export type HiddenExtensionMethods = {
     /** @internal Extension-author only — use inside `defineExtension()`. */
     withExtension: never;
     /** @internal Extension-author only — use inside `defineExtension()`. */
@@ -259,7 +259,7 @@ type HiddenExtensionMethods = {
  * types) is resolved lazily by TypeScript because the recursion sits
  * inside a function-return position within a conditional mapped type.
  */
-type FixedMethods<TRawMethods, TBase> = {
+export type FixedMethods<TRawMethods, TBase> = {
     [K in keyof TRawMethods]: TRawMethods[K] extends (
         this: any,
         ...args: infer A
@@ -276,7 +276,7 @@ type FixedMethods<TRawMethods, TBase> = {
  * `withExtension` / `getExtension` overridden to `never` so they
  * don't appear as callable in consumer code.
  */
-type CleanExtended<TBuilder, TExt> = TBuilder &
+export type CleanExtended<TBuilder, TExt> = TBuilder &
     FixedMethods<TExt, TBuilder> &
     HiddenExtensionMethods;
 
