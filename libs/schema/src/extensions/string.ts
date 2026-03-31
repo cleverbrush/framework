@@ -247,6 +247,15 @@ export const stringExtensions = defineExtension({
             opts?: { protocols?: string[] },
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
+            if (
+                opts?.protocols !== undefined &&
+                (opts.protocols.length === 0 ||
+                    opts.protocols.some((p) => !p || p.trim() === ''))
+            ) {
+                throw new Error(
+                    'url: opts.protocols must be a non-empty array of non-empty strings'
+                );
+            }
             const protocols = opts?.protocols ?? ['http', 'https'];
             const meta = opts?.protocols ? { protocols: opts.protocols } : true;
 

@@ -102,6 +102,24 @@ describe('string extensions', () => {
             expect(result.valid).toBe(false);
             expect(result.errors?.[0].message).toBe('Enter a valid URL');
         });
+
+        test('throws for empty protocols array', () => {
+            expect(() => string().url({ protocols: [] })).toThrow(
+                'url: opts.protocols must be a non-empty array of non-empty strings'
+            );
+        });
+
+        test('throws for protocols containing an empty string', () => {
+            expect(() => string().url({ protocols: [''] })).toThrow(
+                'url: opts.protocols must be a non-empty array of non-empty strings'
+            );
+        });
+
+        test('throws for protocols containing a whitespace-only string', () => {
+            expect(() => string().url({ protocols: ['  '] })).toThrow(
+                'url: opts.protocols must be a non-empty array of non-empty strings'
+            );
+        });
     });
 
     // -----------------------------------------------------------------------
