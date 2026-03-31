@@ -144,19 +144,17 @@ export const numberExtensions = defineExtension({
             this: NumberSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
-            return this.withExtension('positive', true).addValidator(
-                async (val) => {
-                    const valid = val > 0;
-                    if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
-                        errorMessage,
-                        'must be a positive number',
-                        val,
-                        this
-                    );
-                    return { valid: false, errors: [{ message: msg }] };
-                }
-            );
+            return this.withExtension('positive', true).addValidator((val) => {
+                const valid = val > 0;
+                if (valid) return { valid: true, errors: [] };
+                const msg = resolveErrorMessage(
+                    errorMessage,
+                    'must be a positive number',
+                    val,
+                    this
+                );
+                return { valid: false, errors: [{ message: msg }] };
+            });
         },
 
         /**
@@ -175,19 +173,17 @@ export const numberExtensions = defineExtension({
             this: NumberSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
-            return this.withExtension('negative', true).addValidator(
-                async (val) => {
-                    const valid = val < 0;
-                    if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
-                        errorMessage,
-                        'must be a negative number',
-                        val,
-                        this
-                    );
-                    return { valid: false, errors: [{ message: msg }] };
-                }
-            );
+            return this.withExtension('negative', true).addValidator((val) => {
+                const valid = val < 0;
+                if (valid) return { valid: true, errors: [] };
+                const msg = resolveErrorMessage(
+                    errorMessage,
+                    'must be a negative number',
+                    val,
+                    this
+                );
+                return { valid: false, errors: [{ message: msg }] };
+            });
         },
 
         /**
@@ -206,19 +202,17 @@ export const numberExtensions = defineExtension({
             this: NumberSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
-            return this.withExtension('finite', true).addValidator(
-                async (val) => {
-                    const valid = Number.isFinite(val);
-                    if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
-                        errorMessage,
-                        'must be a finite number',
-                        val,
-                        this
-                    );
-                    return { valid: false, errors: [{ message: msg }] };
-                }
-            );
+            return this.withExtension('finite', true).addValidator((val) => {
+                const valid = Number.isFinite(val);
+                if (valid) return { valid: true, errors: [] };
+                const msg = resolveErrorMessage(
+                    errorMessage,
+                    'must be a finite number',
+                    val,
+                    this
+                );
+                return { valid: false, errors: [{ message: msg }] };
+            });
         },
 
         /**
@@ -246,23 +240,21 @@ export const numberExtensions = defineExtension({
                     'multipleOf: n must be a finite, non-zero number'
                 );
             }
-            return this.withExtension('multipleOf', n).addValidator(
-                async (val) => {
-                    const remainder = Math.abs(val % n);
-                    const tolerance = Math.abs(n) * 1e-10;
-                    const valid =
-                        remainder < tolerance ||
-                        Math.abs(remainder - Math.abs(n)) < tolerance;
-                    if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
-                        errorMessage,
-                        `must be a multiple of ${n}`,
-                        val,
-                        this
-                    );
-                    return { valid: false, errors: [{ message: msg }] };
-                }
-            );
+            return this.withExtension('multipleOf', n).addValidator((val) => {
+                const remainder = Math.abs(val % n);
+                const tolerance = Math.abs(n) * 1e-10;
+                const valid =
+                    remainder < tolerance ||
+                    Math.abs(remainder - Math.abs(n)) < tolerance;
+                if (valid) return { valid: true, errors: [] };
+                const msg = resolveErrorMessage(
+                    errorMessage,
+                    `must be a multiple of ${n}`,
+                    val,
+                    this
+                );
+                return { valid: false, errors: [{ message: msg }] };
+            });
         }
     }
 });

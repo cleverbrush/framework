@@ -107,8 +107,10 @@ export default function SchemaPage() {
                         </li>
                         <li>
                             <strong>Validate data</strong> with{' '}
-                            <code>await schema.validate(data)</code> — get typed
-                            results with per-property errors
+                            <code>schema.validate(data)</code> — get typed
+                            results with per-property errors (or{' '}
+                            <code>schema.validateAsync(data)</code> for async
+                            validators)
                         </li>
                         <li>
                             <strong>Compose and extend</strong> — every method
@@ -148,8 +150,8 @@ const UserSchema = object({
 type User = InferType<typeof UserSchema>;
 // Equivalent to: { name: string; email: string; age: number; isActive: boolean }
 
-// Validate data at runtime using the same schema
-const result = await UserSchema.validate({
+// Validate data at runtime — synchronous by default
+const result = UserSchema.validate({
   name: 'Alice',
   email: 'alice@example.com',
   age: 30,
@@ -159,8 +161,11 @@ const result = await UserSchema.validate({
 console.log(result.valid);  // true
 console.log(result.object); // the validated object
 
+// Or use validateAsync() when you have async validators/preprocessors
+// const result = await UserSchema.validateAsync({ ... });
+
 // Invalid data produces structured errors
-const bad = await UserSchema.validate(
+const bad = UserSchema.validate(
   { name: 'A', email: '', age: -5, isActive: true },
   { doNotStopOnFirstError: true }
 );
@@ -291,6 +296,7 @@ console.log(bad.errors);
                                     </td>
                                     <td>
                                         <code>.validate(data)</code>,{' '}
+                                        <code>.validateAsync(data)</code>,{' '}
                                         <code>.addProps({'{...}'})</code>,{' '}
                                         <code>.optional()</code>
                                     </td>
@@ -321,6 +327,7 @@ console.log(bad.errors);
                                     </td>
                                     <td>
                                         <code>.validate(data)</code>,{' '}
+                                        <code>.validateAsync(data)</code>,{' '}
                                         <code>.optional()</code>
                                     </td>
                                 </tr>
@@ -505,7 +512,7 @@ type Shape = InferType<typeof ShapeSchema>;
 //   | { type: 'triangle';  base: number;  height: number }
 
 // Validation picks the matching branch by the literal field
-const result = await ShapeSchema.validate({ type: 'circle', radius: 5 });`)
+const result = ShapeSchema.validate({ type: 'circle', radius: 5 });`)
                             }}
                         />
                     </pre>
@@ -581,10 +588,15 @@ type Schedule = InferType<typeof ScheduleSchema>;
 
                     <h3>Basic Validation</h3>
                     <p>
-                        Call <code>.validate(data)</code> on any schema. It
-                        returns a promise with <code>valid</code>,{' '}
+                        Every schema has two validation methods:{' '}
+                        <code>.validate(data)</code> (synchronous) and{' '}
+                        <code>.validateAsync(data)</code> (asynchronous).
+                        Use <code>.validate()</code> by default — it returns
+                        a result with <code>valid</code>,{' '}
                         <code>errors</code>, and the cleaned <code>object</code>
-                        . For object schemas, the result also includes a{' '}
+                        . Switch to <code>.validateAsync()</code> only when your
+                        schema includes async validators or preprocessors.
+                        For object schemas, the result also includes a{' '}
                         <code>getErrorsFor()</code> method for per-property
                         error inspection — the flat <code>errors</code> array is{' '}
                         <strong>deprecated</strong> on object schema results and
@@ -593,7 +605,7 @@ type Schedule = InferType<typeof ScheduleSchema>;
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const result = await UserSchema.validate({
+                                __html: highlightTS(`const result = UserSchema.validate({
   name: 'Alice',
   email: 'alice@example.com',
   age: 30,
@@ -606,7 +618,10 @@ if (result.valid) {
   // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
   console.log('Errors:', result.errors);
   // errors is deprecated on object schemas — Array of { path: string; message: string }
-}`)
+}
+
+// Use validateAsync() when your schema has async validators/preprocessors
+// const asyncResult = await UserSchema.validateAsync({ ... });`)
                             }}
                         />
                     </pre>
@@ -635,7 +650,7 @@ if (result.valid) {
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const result = await UserSchema.validate(
+                                __html: highlightTS(`const result = UserSchema.validate(
   { name: 'A', email: '', age: -5, isActive: true },
   { doNotStopOnFirstError: true }
 );
@@ -710,7 +725,8 @@ const TagsSchema = array(string())
     return { valid: true };
   });
 
-const result = await EmailSchema.validate('taken@example.com');
+// Use validateAsync() because the validator is async
+const result = await EmailSchema.validateAsync('taken@example.com');
 console.log(result.valid);  // false
 console.log(result.errors); // [{ path: '$($validators[0])', message: 'This email is already registered' }]`)
                             }}
@@ -1171,7 +1187,7 @@ const s = withExtensions(myCustomExtension);`)
                                     <td className="partial">~</td>
                                 </tr>
                                 <tr>
-                                    <td>Async validation</td>
+                                    <td>Sync + async validation</td>
                                     <td className="check">✓</td>
                                     <td className="check">✓</td>
                                     <td className="check">✓</td>
@@ -1288,6 +1304,7 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>Object schema with named properties</td>
                                     <td>
                                         <code>.validate(data)</code>,{' '}
+                                        <code>.validateAsync(data)</code>,{' '}
                                         <code>.addProps({'{...}'})</code>
                                     </td>
                                 </tr>
@@ -1310,7 +1327,8 @@ const s = withExtensions(myCustomExtension);`)
                                     </td>
                                     <td>Union of schemas</td>
                                     <td>
-                                        <code>.validate(data)</code>
+                                        <code>.validate(data)</code>,{' '}
+                                        <code>.validateAsync(data)</code>
                                     </td>
                                 </tr>
                             </tbody>

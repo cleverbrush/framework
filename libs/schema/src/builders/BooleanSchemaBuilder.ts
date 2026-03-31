@@ -20,19 +20,19 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  *
  * @example ```ts
  * const schema = boolean().equals(true);
- * const result = await schema.validate(true);
+ * const result = schema.validate(true);
  * // result.valid === true
  * // result.object === true
  * ```
  * @example ```ts
  * const schema = boolean().equals(false);
- * const result = await schema.validate(true);
+ * const result = schema.validate(true);
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be equal to 'false''
  * ```
  * @example ```ts
  * const schema = boolean().equals(true).optional();
- * const result = await schema.validate(undefined);
+ * const result = schema.validate(undefined);
  * // result.valid === true
  * // result.object === undefined
  * ```
@@ -125,17 +125,33 @@ export class BooleanSchemaBuilder<
         } as any) as any;
     }
 
-    /**
-     * Performs validation of the schema over `object`. Basically runs
-     * validators, preprocessors and checks for required (if schema is not optional).
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
-        object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
+    #getConstraintViolation(
+        objToValidate: any
+    ): { message: string } | { provider: any } | null {
+        if (typeof objToValidate !== 'boolean') {
+            return { message: 'expected to be boolean' };
+        }
 
+        if (
+            typeof this.#equalsTo !== 'undefined' &&
+            objToValidate !== this.#equalsTo
+        ) {
+            return { provider: this.#equalsToErrorMessageProvider };
+        }
+
+        return null;
+    }
+
+    #buildResult(
+        superResult: ReturnType<BooleanSchemaBuilder['preValidateSync']>
+    ):
+        | { done: true; result: ValidationResult<TResult> }
+        | {
+              done: false;
+              provider: any;
+              objToValidate: any;
+              path: string;
+          } {
         const {
             valid,
             context: prevalidationContext,
@@ -146,7 +162,7 @@ export class BooleanSchemaBuilder<
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return { valid, errors };
+            return { done: true, result: { valid, errors } };
         }
 
         const {
@@ -158,44 +174,89 @@ export class BooleanSchemaBuilder<
             this.isRequired === false
         ) {
             return {
-                valid: true,
-                object: objToValidate
+                done: true,
+                result: { valid: true, object: objToValidate }
             };
         }
 
-        if (typeof objToValidate !== 'boolean') {
+        const violation = this.#getConstraintViolation(objToValidate);
+
+        if (!violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: 'expected to be boolean',
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: { valid: true, object: objToValidate as TResult }
             };
         }
 
-        if (
-            typeof this.#equalsTo !== 'undefined' &&
-            objToValidate !== this.#equalsTo
-        ) {
+        if ('message' in violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#equalsToErrorMessageProvider,
-                            objToValidate as TFinalResult
-                        ),
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: {
+                    valid: false,
+                    errors: [
+                        { message: violation.message, path: path as string }
+                    ]
+                }
             };
         }
 
         return {
-            valid: true,
-            object: objToValidate as TResult
+            done: false,
+            provider: violation.provider,
+            objToValidate,
+            path: path as string
+        };
+    }
+
+    /**
+     * Performs synchronous validation of the schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        const r = this.#buildResult(this.preValidateSync(object, context));
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: this.getValidationErrorMessageSync(
+                        r.provider,
+                        r.objToValidate as TFinalResult
+                    ),
+                    path: r.path
+                }
+            ]
+        };
+    }
+
+    /**
+     * Performs async validation of the schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        const r = this.#buildResult(
+            await super.preValidateAsync(object, context)
+        );
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: await this.getValidationErrorMessage(
+                        r.provider,
+                        r.objToValidate as TFinalResult
+                    ),
+                    path: r.path
+                }
+            ]
         };
     }
 

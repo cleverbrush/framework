@@ -122,8 +122,8 @@ const UserSchema = object({
 type User = InferType<typeof UserSchema>;
 // { name: string; email: string; age: number }
 
-// 2. Validate data at runtime
-const result = await UserSchema.validate(someData);
+// 2. Validate data at runtime (synchronous)
+const result = UserSchema.validate(someData);
 if (result.valid) {
   console.log(result.object); // typed as User
 }
@@ -220,7 +220,7 @@ type Product = InferType<typeof ProductSchema>;
                         <pre>
                             <code
                                 dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`const result = await ProductSchema.validate({
+                                    __html: highlightTS(`const result = ProductSchema.validate({
   name: 'Widget',
   price: 9.99,
   sku: 'WDG-001'

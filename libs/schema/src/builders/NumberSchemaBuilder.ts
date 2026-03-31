@@ -23,26 +23,26 @@ type NumberSchemaBuilderCreateProps<
  *
  * @example ```ts
  * const schema = number().equals(42);
- * const result = await schema.validate(42);
+ * const result = schema.validate(42);
  * // result.valid === true
  * // result.object === 42
  * ```
  * @example ```ts
  * const schema = number();
- * const result = await schema.validate('42');
+ * const result = schema.validate('42');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be a number'
  * ```
  * @example ```ts
  * const schema = number().min(0).max(100);
- * const result = await schema.validate(42);
+ * const result = schema.validate(42);
  * // result.valid === true
  * // result.object === 42
  * ```
  *
  * @example ```ts
  * const schema = number().min(0).max(100);
- * const result = await schema.validate(142.5);
+ * const result = schema.validate(142.5);
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be less than or equal to 100'
  * ```
@@ -290,16 +290,67 @@ export class NumberSchemaBuilder<
         } as any) as any;
     }
 
-    /**
-     * Performs validation of number schema over `object`.
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
-        object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
+    #getConstraintViolation(
+        objToValidate: any
+    ): { message: string } | { provider: any } | null {
+        if (typeof objToValidate !== 'number') {
+            return {
+                message: `expected type number, but saw ${typeof objToValidate}`
+            };
+        }
 
+        if (
+            typeof this.#equalsTo !== 'undefined' &&
+            objToValidate !== this.#equalsTo
+        ) {
+            return { provider: this.#equalsToErrorMessageProvider };
+        }
+
+        if (this.#ensureNotNaN && Number.isNaN(objToValidate)) {
+            return { provider: this.#ensureNotNaNErrorMessageProvider };
+        }
+
+        if (
+            this.#ensureIsFinite &&
+            !Number.isFinite(objToValidate) &&
+            this.#ensureNotNaN &&
+            !Number.isNaN(objToValidate)
+        ) {
+            return { provider: this.#ensureIsFiniteErrorMessageProvider };
+        }
+
+        if (
+            this.#isInteger &&
+            !Number.isNaN(objToValidate) &&
+            Number.isFinite(objToValidate) &&
+            !Number.isInteger(objToValidate)
+        ) {
+            return { provider: this.#ensureIsIntegerErrorMessageProvider };
+        }
+
+        if (typeof this.#min !== 'undefined') {
+            if (objToValidate < this.#min)
+                return { provider: this.#minErrorMessageProvider };
+        }
+
+        if (typeof this.#max !== 'undefined') {
+            if (objToValidate > this.#max)
+                return { provider: this.#maxErrorMessageProvider };
+        }
+
+        return null;
+    }
+
+    #buildResult(
+        superResult: ReturnType<NumberSchemaBuilder['preValidateSync']>
+    ):
+        | { done: true; result: ValidationResult<TResult> }
+        | {
+              done: false;
+              provider: any;
+              objToValidate: any;
+              path: string;
+          } {
         const {
             valid,
             context: prevalidationContext,
@@ -310,10 +361,7 @@ export class NumberSchemaBuilder<
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return {
-                valid,
-                errors
-            };
+            return { done: true, result: { valid, errors } };
         }
 
         const {
@@ -325,129 +373,92 @@ export class NumberSchemaBuilder<
             this.isRequired === false
         ) {
             return {
-                valid: true,
-                object: objToValidate
-            };
-        }
-        if (typeof objToValidate !== 'number')
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: `expected type number, but saw ${typeof objToValidate}`,
-                        path: path as string
-                    }
-                ]
-            };
-
-        if (
-            typeof this.#equalsTo !== 'undefined' &&
-            objToValidate !== this.#equalsTo
-        ) {
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#equalsToErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: { valid: true, object: objToValidate }
             };
         }
 
-        if (this.#ensureNotNaN && Number.isNaN(objToValidate)) {
+        const violation = this.#getConstraintViolation(objToValidate);
+
+        if (!violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#ensureNotNaNErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: {
+                    valid: true,
+                    object: preValidationTransaction!.commit().validatedObject
+                }
             };
         }
 
-        if (
-            this.#ensureIsFinite &&
-            !Number.isFinite(objToValidate) &&
-            this.#ensureNotNaN &&
-            !Number.isNaN(objToValidate)
-        ) {
+        if ('message' in violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#ensureIsFiniteErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
-            };
-        }
-
-        if (
-            this.#isInteger &&
-            !Number.isNaN(objToValidate) &&
-            Number.isFinite(objToValidate) &&
-            !Number.isInteger(objToValidate)
-        ) {
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#ensureIsIntegerErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
-            };
-        }
-
-        if (typeof this.#min !== 'undefined') {
-            if (objToValidate < this.#min)
-                return {
+                done: true,
+                result: {
                     valid: false,
                     errors: [
-                        {
-                            message: await this.getValidationErrorMessage(
-                                this.#minErrorMessageProvider,
-                                objToValidate as TResult
-                            ),
-                            path: path as string
-                        }
+                        { message: violation.message, path: path as string }
                     ]
-                };
-        }
-
-        if (typeof this.#max !== 'undefined') {
-            if (objToValidate > this.#max)
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: await this.getValidationErrorMessage(
-                                this.#maxErrorMessageProvider,
-                                objToValidate as TResult
-                            ),
-                            path: path as string
-                        }
-                    ]
-                };
+                }
+            };
         }
 
         return {
-            valid: true,
-            object: preValidationTransaction!.commit().validatedObject
+            done: false,
+            provider: violation.provider,
+            objToValidate,
+            path: path as string
+        };
+    }
+
+    /**
+     * Performs synchronous validation of number schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        const r = this.#buildResult(this.preValidateSync(object, context));
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: this.getValidationErrorMessageSync(
+                        r.provider,
+                        r.objToValidate as TResult
+                    ),
+                    path: r.path
+                }
+            ]
+        };
+    }
+
+    /**
+     * Performs async validation of number schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        const r = this.#buildResult(
+            await super.preValidateAsync(object, context)
+        );
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: await this.getValidationErrorMessage(
+                        r.provider,
+                        r.objToValidate as TResult
+                    ),
+                    path: r.path
+                }
+            ]
         };
     }
 

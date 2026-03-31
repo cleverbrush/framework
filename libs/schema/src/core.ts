@@ -30,6 +30,7 @@ export {
     InferType,
     MakeOptional,
     SchemaBuilder,
+    SchemaValidationError,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     ValidationError,
     ValidationResult

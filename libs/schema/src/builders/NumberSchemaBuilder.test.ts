@@ -937,7 +937,7 @@ test('custom error message notNaN()', async () => {
     );
 
     {
-        const { valid, errors } = await schema5.validate(0 / 0);
+        const { valid, errors } = await schema5.validateAsync(0 / 0);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.length).toEqual(1);
@@ -995,7 +995,7 @@ test('custom error message isFinite()', async () => {
     );
 
     {
-        const { valid, errors } = await schema5.validate(Infinity);
+        const { valid, errors } = await schema5.validateAsync(Infinity);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.length).toEqual(1);
@@ -1051,7 +1051,7 @@ test('custom error message isInteger()', async () => {
     );
 
     {
-        const { valid, errors } = await schema5.validate(Math.E);
+        const { valid, errors } = await schema5.validateAsync(Math.E);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.length).toEqual(1);

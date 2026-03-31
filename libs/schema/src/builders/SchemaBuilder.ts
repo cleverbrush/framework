@@ -95,6 +95,25 @@ export type ValidationResult<T> = {
 };
 
 /**
+ * Error thrown by {@link SchemaBuilder.parse | parse()} and
+ * {@link SchemaBuilder.parseAsync | parseAsync()} when validation fails.
+ * Carries the full array of {@link ValidationError | validation errors}.
+ */
+export class SchemaValidationError extends Error {
+    public readonly errors: ValidationError[];
+
+    constructor(errors: ValidationError[]) {
+        const message =
+            errors.length > 0
+                ? errors.map((e) => `${e.path}: ${e.message}`).join('; ')
+                : 'Validation failed';
+        super(message);
+        this.name = 'SchemaValidationError';
+        this.errors = errors;
+    }
+}
+
+/**
  * Internal result returned by the `preValidate` step of `SchemaBuilder`.
  * Contains the validation context, any early errors, and the transaction
  * wrapping the (possibly preprocessed) value.
@@ -576,29 +595,17 @@ export abstract class SchemaBuilder<
     }
 
     /**
-     * Runs preprocessors, validators, and the required/optional check on `object`.
-     * Subclasses call this at the start of their `validate()` implementation to get
-     * a preprocessed value wrapped in a transaction, along with any early errors.
-     *
-     * @param object - the value to pre-validate
-     * @param context - optional validation context settings
-     * @returns a `PreValidationResult` containing the preprocessed transaction, context, and any errors
+     * Shared setup for both {@link preValidateSync} and {@link preValidateAsync}.
+     * Builds the validation context, creates the initial transaction, and
+     * returns mutable state for the caller to drive.
      */
-    protected async preValidate(
-        /**
-         * Object to validate
-         */
-        object: any,
-        context?: ValidationContext
-    ): Promise<PreValidationResult<any, { validatedObject: any }>> {
-        const { doNotStopOnFirstError } = context || {
-            doNotStopOnFirstError: false
-        };
+    #initPreValidation(object: any, context?: ValidationContext) {
+        const doNotStopOnFirstError = context?.doNotStopOnFirstError ?? false;
 
-        let path = '$';
-
-        if (typeof context?.path === 'string' && context.path)
-            path = context.path;
+        const path =
+            typeof context?.path === 'string' && context.path
+                ? context.path
+                : '$';
 
         const resultingContext: ValidationContext = {
             path,
@@ -607,14 +614,235 @@ export abstract class SchemaBuilder<
             currentPropertyDescriptor: context?.currentPropertyDescriptor
         };
 
-        let preprocessingTransaction = transaction({
-            validatedObject: object
-        });
+        return {
+            path,
+            doNotStopOnFirstError,
+            resultingContext,
+            transaction: transaction({ validatedObject: object }),
+            errors: [] as ValidationError[]
+        };
+    }
 
+    /**
+     * Builds the failed early-return result used when
+     * `doNotStopOnFirstError` is false.
+     */
+    #earlyFailResult(
+        errors: ValidationError[],
+        resultingContext: ValidationContext
+    ): PreValidationResult<any, { validatedObject: any }> {
+        return {
+            valid: false,
+            errors: [errors[0]].filter((e) => e),
+            context: resultingContext
+        };
+    }
+
+    /**
+     * Builds the error entries for a validator that reported `valid: false`.
+     */
+    #validatorFailureErrors(
+        index: number,
+        name: string | undefined,
+        validatorErrors: Omit<ValidationError, 'path'>[] | undefined,
+        path: string
+    ): ValidationError[] {
+        if (Array.isArray(validatorErrors) && validatorErrors.length) {
+            return validatorErrors.map((err) => ({
+                message: err.message,
+                path: `${path}($validators[${index}])`
+            }));
+        }
+        return [
+            {
+                message: `Validator #${index}${
+                    name ? ` (${name})` : ''
+                } didn't pass.`,
+                path: `${path}($validators[${index}])`
+            }
+        ];
+    }
+
+    /**
+     * Assembles the final {@link PreValidationResult} after all preprocessors,
+     * validators, and the required check have run.
+     */
+    #buildPreValidationResult(
+        errors: ValidationError[],
+        doNotStopOnFirstError: boolean,
+        resultingContext: ValidationContext,
+        trans: Transaction<{ validatedObject: any }>
+    ): PreValidationResult<any, { validatedObject: any }> {
+        if (errors.length > 0) {
+            return {
+                valid: false,
+                errors: errors
+                    .filter((e) => e)
+                    .filter((_e, i) =>
+                        doNotStopOnFirstError ? true : i === 0
+                    ),
+                context: resultingContext,
+                transaction: trans
+            };
+        }
+
+        return {
+            valid: true,
+            context: resultingContext,
+            transaction: trans
+        };
+    }
+
+    /**
+     * Synchronous version of {@link preValidateAsync}.
+     * Throws at runtime if any preprocessor or validator returns a Promise.
+     *
+     * @param object - the value to pre-validate
+     * @param context - optional validation context settings
+     * @returns a `PreValidationResult` containing the preprocessed transaction, context, and any errors
+     * @throws Error if a preprocessor or validator returns a Promise (use {@link preValidateAsync} instead)
+     */
+    protected preValidateSync(
+        object: any,
+        context?: ValidationContext
+    ): PreValidationResult<any, { validatedObject: any }> {
+        const state = this.#initPreValidation(object, context);
+        const { path, doNotStopOnFirstError, resultingContext, errors } = state;
+        let preprocessingTransaction = state.transaction;
         let preprocessedObject =
             preprocessingTransaction.object.validatedObject;
 
-        let errors: ValidationError[] = [];
+        if (Array.isArray(this.preprocessors)) {
+            let currentPrepropIndex = 0;
+            for (const preprocessor of this.preprocessors) {
+                try {
+                    const result = preprocessor(preprocessedObject);
+                    if (result instanceof Promise) {
+                        throw new Error(
+                            `Preprocessor #${currentPrepropIndex}${preprocessor.name ? ` (${preprocessor.name})` : ''} returned a Promise. Use validateAsync() for schemas with async preprocessors.`
+                        );
+                    }
+                    preprocessingTransaction = transaction({
+                        validatedObject: result
+                    });
+                    preprocessedObject =
+                        preprocessingTransaction.object.validatedObject;
+                } catch (err) {
+                    if (
+                        (err as Error).message?.includes('Use validateAsync()')
+                    ) {
+                        throw err;
+                    }
+                    errors.push({
+                        message: `Preprocessor #${currentPrepropIndex}${
+                            preprocessor.name ? ` (${preprocessor.name})` : ''
+                        } thrown an error: ${(err as Error).message}`,
+                        path: `${path}($preprocessors[${currentPrepropIndex}])`
+                    });
+                    if (!doNotStopOnFirstError) {
+                        preprocessingTransaction.rollback();
+                        return this.#earlyFailResult(errors, resultingContext);
+                    }
+                } finally {
+                    currentPrepropIndex++;
+                }
+            }
+        }
+
+        if (Array.isArray(this.validators)) {
+            let currentValidatorIndex = 0;
+            for (const validator of this.validators) {
+                try {
+                    const validatorResult = validator(preprocessedObject);
+                    if (validatorResult instanceof Promise) {
+                        throw new Error(
+                            `Validator #${currentValidatorIndex}${validator.name ? ` (${validator.name})` : ''} returned a Promise. Use validateAsync() for schemas with async validators.`
+                        );
+                    }
+                    const { valid, errors: validatorErrors } = validatorResult;
+                    if (!valid) {
+                        errors.push(
+                            ...this.#validatorFailureErrors(
+                                currentValidatorIndex,
+                                validator.name,
+                                validatorErrors,
+                                path
+                            )
+                        );
+                        if (!doNotStopOnFirstError) {
+                            preprocessingTransaction.rollback();
+                            return this.#earlyFailResult(
+                                errors,
+                                resultingContext
+                            );
+                        }
+                    }
+                } catch (err) {
+                    if (
+                        (err as Error).message?.includes('Use validateAsync()')
+                    ) {
+                        throw err;
+                    }
+                    errors.push({
+                        message: `Validator #${currentValidatorIndex}${
+                            validator.name ? ` (${validator.name})` : ''
+                        } thrown an error: ${(err as Error).message}`,
+                        path: `${path}($validators[${currentValidatorIndex}])`
+                    });
+                    if (!doNotStopOnFirstError) {
+                        preprocessingTransaction.rollback();
+                        return this.#earlyFailResult(errors, resultingContext);
+                    }
+                } finally {
+                    currentValidatorIndex++;
+                }
+            }
+        }
+
+        if (
+            this.isRequired &&
+            (typeof preprocessedObject === 'undefined' ||
+                preprocessedObject === null)
+        ) {
+            errors.push({
+                message: this.getValidationErrorMessageSync(
+                    this.#requiredErrorMessageProvider,
+                    preprocessedObject
+                ),
+                path
+            });
+            if (!doNotStopOnFirstError) {
+                preprocessingTransaction.rollback();
+                return this.#earlyFailResult(errors, resultingContext);
+            }
+        }
+
+        return this.#buildPreValidationResult(
+            errors,
+            doNotStopOnFirstError,
+            resultingContext,
+            preprocessingTransaction
+        );
+    }
+
+    /**
+     * Async version of pre-validation. Runs preprocessors, validators, and the
+     * required/optional check on `object`. Supports async preprocessors,
+     * validators, and error message providers.
+     *
+     * @param object - the value to pre-validate
+     * @param context - optional validation context settings
+     * @returns a `PreValidationResult` containing the preprocessed transaction, context, and any errors
+     */
+    protected async preValidateAsync(
+        object: any,
+        context?: ValidationContext
+    ): Promise<PreValidationResult<any, { validatedObject: any }>> {
+        const state = this.#initPreValidation(object, context);
+        const { path, doNotStopOnFirstError, resultingContext, errors } = state;
+        let preprocessingTransaction = state.transaction;
+        let preprocessedObject =
+            preprocessingTransaction.object.validatedObject;
 
         if (Array.isArray(this.preprocessors)) {
             let currentPrepropIndex = 0;
@@ -636,11 +864,7 @@ export abstract class SchemaBuilder<
                     });
                     if (!doNotStopOnFirstError) {
                         preprocessingTransaction.rollback();
-                        return {
-                            valid: false,
-                            errors: [errors[0]].filter((e) => e),
-                            context: resultingContext
-                        };
+                        return this.#earlyFailResult(errors, resultingContext);
                     }
                 } finally {
                     currentPrepropIndex++;
@@ -655,32 +879,20 @@ export abstract class SchemaBuilder<
                     const { valid, errors: validatorErrors } =
                         await Promise.resolve(validator(preprocessedObject));
                     if (!valid) {
-                        errors = [
-                            ...errors,
-                            ...(Array.isArray(validatorErrors) &&
-                            validatorErrors.length
-                                ? validatorErrors.map((err) => ({
-                                      message: err.message,
-                                      path: `${path}($validators[${currentValidatorIndex}])`
-                                  }))
-                                : [
-                                      {
-                                          message: `Validator #${currentValidatorIndex}${
-                                              validator.name
-                                                  ? ` (${validator.name})`
-                                                  : ''
-                                          } didn't pass.`,
-                                          path: `${path}($validators[${currentValidatorIndex}])`
-                                      }
-                                  ])
-                        ];
+                        errors.push(
+                            ...this.#validatorFailureErrors(
+                                currentValidatorIndex,
+                                validator.name,
+                                validatorErrors,
+                                path
+                            )
+                        );
                         if (!doNotStopOnFirstError) {
                             preprocessingTransaction.rollback();
-                            return {
-                                valid: false,
-                                errors: [errors[0]].filter((e) => e),
-                                context: resultingContext
-                            };
+                            return this.#earlyFailResult(
+                                errors,
+                                resultingContext
+                            );
                         }
                     }
                 } catch (err) {
@@ -692,11 +904,7 @@ export abstract class SchemaBuilder<
                     });
                     if (!doNotStopOnFirstError) {
                         preprocessingTransaction.rollback();
-                        return {
-                            valid: false,
-                            errors: [errors[0]].filter((e) => e),
-                            context: resultingContext
-                        };
+                        return this.#earlyFailResult(errors, resultingContext);
                     }
                 } finally {
                     currentValidatorIndex++;
@@ -718,32 +926,26 @@ export abstract class SchemaBuilder<
             });
             if (!doNotStopOnFirstError) {
                 preprocessingTransaction.rollback();
-                return {
-                    valid: false,
-                    errors: [errors[0]],
-                    context: resultingContext
-                };
+                return this.#earlyFailResult(errors, resultingContext);
             }
         }
 
-        if (errors.length > 0) {
-            return {
-                valid: false,
-                errors: errors
-                    .filter((e) => e)
-                    .filter((_e, i) =>
-                        doNotStopOnFirstError ? true : i === 0
-                    ),
-                context: resultingContext,
-                transaction: preprocessingTransaction
-            };
-        }
+        return this.#buildPreValidationResult(
+            errors,
+            doNotStopOnFirstError,
+            resultingContext,
+            preprocessingTransaction
+        );
+    }
 
-        return {
-            valid: true,
-            context: resultingContext,
-            transaction: preprocessingTransaction
-        };
+    /**
+     * @deprecated Use {@link preValidateAsync} instead. This alias will be removed in a future version.
+     */
+    protected preValidate(
+        object: any,
+        context?: ValidationContext
+    ): Promise<PreValidationResult<any, { validatedObject: any }>> {
+        return this.preValidateAsync(object, context);
     }
 
     /**
@@ -859,7 +1061,9 @@ export abstract class SchemaBuilder<
     }
 
     /**
-     * Perform schema validation on `object`.
+     * Perform synchronous schema validation on `object`.
+     * Throws at runtime if any preprocessor, validator, or error message
+     * provider returns a Promise — use {@link validateAsync} instead.
      */
     public abstract validate(
         /**
@@ -870,7 +1074,54 @@ export abstract class SchemaBuilder<
          * Optional `ValidationContext` settings
          */
         context?: ValidationContext
+    ): ValidationResult<any>;
+
+    /**
+     * Perform asynchronous schema validation on `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     */
+    public abstract validateAsync(
+        /**
+         * Object to validate
+         */
+        object: any,
+        /**
+         * Optional `ValidationContext` settings
+         */
+        context?: ValidationContext
     ): Promise<ValidationResult<any>>;
+
+    /**
+     * Synchronously resolves a `ValidationErrorMessageProvider` to a string.
+     * Throws if the provider function returns a Promise.
+     *
+     * @param provider - the error message provider (string or sync function)
+     * @param seenValue - the value that caused the validation error
+     * @returns the resolved error message string
+     * @throws Error if the provider returns a Promise (use {@link getValidationErrorMessage} with {@link validateAsync})
+     */
+    protected getValidationErrorMessageSync(
+        provider: ValidationErrorMessageProvider<any>,
+        seenValue: TResult
+    ): string {
+        if (typeof provider === 'string') {
+            return provider;
+        }
+
+        if (typeof provider === 'function') {
+            const result = provider(seenValue, this);
+            if (result instanceof Promise) {
+                throw new Error(
+                    'Async error message providers require validateAsync(). Use a string or sync function instead.'
+                );
+            }
+            return result;
+        }
+
+        throw new Error(
+            'Invalid error message provider must be a string or a function returning a string'
+        );
+    }
 
     /**
      * Resolves a `ValidationErrorMessageProvider` to a string error message.
@@ -945,6 +1196,68 @@ export abstract class SchemaBuilder<
      */
     public getExtension(key: string): unknown {
         return this.#extensions[key];
+    }
+
+    /**
+     * Synchronously validates the value and returns it if valid.
+     * Throws a {@link SchemaValidationError} if validation fails.
+     *
+     * @param object - the value to parse
+     * @param context - optional validation context
+     * @returns the validated value
+     * @throws SchemaValidationError if validation fails
+     * @throws Error if the schema contains async preprocessors, validators, or error message providers
+     */
+    public parse(object: any, context?: ValidationContext): TResult {
+        const result = this.validate(object, context);
+        if (!result.valid) {
+            throw new SchemaValidationError(result.errors || []);
+        }
+        return result.object as TResult;
+    }
+
+    /**
+     * Asynchronously validates the value and returns it if valid.
+     * Throws a {@link SchemaValidationError} if validation fails.
+     *
+     * @param object - the value to parse
+     * @param context - optional validation context
+     * @returns the validated value
+     * @throws SchemaValidationError if validation fails
+     */
+    public async parseAsync(
+        object: any,
+        context?: ValidationContext
+    ): Promise<TResult> {
+        const result = await this.validateAsync(object, context);
+        if (!result.valid) {
+            throw new SchemaValidationError(result.errors || []);
+        }
+        return result.object as TResult;
+    }
+
+    /**
+     * Alias for {@link validate}. Synchronously validates and returns a result object.
+     * Provided for familiarity with the zod API.
+     */
+    public safeParse(
+        object: any,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        return this.validate(object, context) as ValidationResult<TResult>;
+    }
+
+    /**
+     * Alias for {@link validateAsync}. Asynchronously validates and returns a result object.
+     * Provided for familiarity with the zod API.
+     */
+    public safeParseAsync(
+        object: any,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        return this.validateAsync(object, context) as Promise<
+            ValidationResult<TResult>
+        >;
     }
 
     protected constructor(props: SchemaBuilderProps<TResult>) {

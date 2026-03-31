@@ -21,7 +21,7 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<
  * @example
  * ```ts
  * const schema = any();
- * const result = await schema.validate(123);
+ * const result = schema.validate(123);
  * // result.valid === true
  * // result.object === 123
  * ```
@@ -67,17 +67,9 @@ export class AnySchemaBuilder<
         } as any) as any;
     }
 
-    /**
-     * Performs validation of the schema over `object`. Basically runs
-     * validators, preprocessors and checks for required (if schema is not optional).
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
-        object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
-
+    #buildResult(
+        superResult: ReturnType<AnySchemaBuilder['preValidateSync']>
+    ): ValidationResult<TResult> {
         const {
             valid,
             transaction: preValidationTransaction,
@@ -85,20 +77,38 @@ export class AnySchemaBuilder<
         } = superResult;
 
         if (!valid) {
-            return {
-                valid,
-                errors
-            };
+            return { valid, errors };
         }
 
         const {
             object: { validatedObject: objToValidate }
         } = preValidationTransaction!;
 
-        return {
-            valid: true,
-            object: objToValidate
-        };
+        return { valid: true, object: objToValidate };
+    }
+
+    /**
+     * Performs synchronous validation of the schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        return this.#buildResult(this.preValidateSync(object, context));
+    }
+
+    /**
+     * Performs async validation of the schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        return this.#buildResult(await super.preValidateAsync(object, context));
     }
 
     protected createFromProps<TReq extends boolean>(

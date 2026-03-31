@@ -23,7 +23,7 @@ A schema definition and validation library for TypeScript. Define object schemas
 | PropertyDescriptors           | ✓                   | ✗   | ✗   | ~   |
 | JSDoc preservation            | ✓                   | ✗   | ✗   | ✗   |
 | Zero dependencies             | ✓                   | ✓   | ✗   | ✗   |
-| Async validation              | ✓                   | ✓   | ✓   | ✓   |
+| Sync + async validation       | ✓                   | ✓   | ✓   | ✓   |
 | Per-property error inspection | ✓                   | ~   | ~   | ~   |
 | Extension / plugin system     | ✓                   | ~   | ✗   | ~   |
 | Built-in validators (email…)  | ✓                   | ✓   | ✓   | ✓   |
@@ -57,13 +57,16 @@ const UserSchema = object({
 type User = InferType<typeof UserSchema>;
 // Equivalent to: { name: string; email: string; age: number; isActive: boolean }
 
-// 3. Validate data at runtime using the same schema
-const result = await UserSchema.validate({
+// 3. Validate data at runtime — synchronous by default
+const result = UserSchema.validate({
     name: 'Alice',
     email: 'alice@example.com',
     age: 30,
     isActive: true
 });
+
+// Or use validateAsync() when you have async validators/preprocessors
+// const result = await UserSchema.validateAsync({ ... });
 
 if (result.valid) {
     console.log('Validated:', result.object); // typed as User
@@ -198,7 +201,7 @@ type Shape = InferType<typeof ShapeSchema>;
 //   | { type: 'triangle';  base: number;  height: number }
 
 // Validation picks the matching branch by the literal field
-const result = await ShapeSchema.validate({ type: 'circle', radius: 5 });
+const result = ShapeSchema.validate({ type: 'circle', radius: 5 });
 ```
 
 ### Real-World Example: Job Scheduler
@@ -273,10 +276,16 @@ type User = InferType<typeof UserSchema>;
 
 ## Validation
 
-Every schema builder has an async `validate()` method:
+Every schema builder has two validation methods:
+
+- **`validate(data)`** — synchronous. Returns a `ValidationResult` directly. Throws if any preprocessor, validator, or error message provider returns a Promise.
+- **`validateAsync(data)`** — asynchronous. Returns a `Promise<ValidationResult>`. Supports async preprocessors, validators, and error message providers.
+
+Use `validate()` by default for the best performance. Switch to `validateAsync()` only when your schema includes async operations (e.g. database lookups, API calls in validators).
 
 ```typescript
-const result = await UserSchema.validate(someObject);
+// Synchronous validation (default — use when all validators are sync)
+const result = UserSchema.validate(someObject);
 
 if (result.valid) {
     console.log(result.object); // typed as InferType<typeof UserSchema>
@@ -284,6 +293,9 @@ if (result.valid) {
     // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
     console.log(result.errors); // deprecated for object schemas — Array of { path: string; message: string }
 }
+
+// Async validation (use when validators/preprocessors are async)
+const asyncResult = await UserSchema.validateAsync(someObject);
 ```
 
 ### Collecting All Errors
@@ -291,7 +303,7 @@ if (result.valid) {
 By default, validation stops at the first error. Pass `{ doNotStopOnFirstError: true }` to collect all errors at once:
 
 ```typescript
-const result = await UserSchema.validate(
+const result = UserSchema.validate(
     { name: 'A', email: '', age: -5, isActive: true },
     { doNotStopOnFirstError: true }
 );
@@ -366,7 +378,7 @@ const PersonSchema = object({
     })
 });
 
-const result = await PersonSchema.validate(person, {
+const result = PersonSchema.validate(person, {
     doNotStopOnFirstError: true
 });
 
@@ -498,7 +510,7 @@ const ServerConfig = s.object({
 });
 
 // Validate as usual
-const result = await ServerConfig.validate({
+const result = ServerConfig.validate({
     adminEmail: 'admin@example.com',
     port: 8080,
     slug: 'my-server',

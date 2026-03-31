@@ -749,7 +749,9 @@ test('euqalsTo with custom error message - 1', async () => {
         );
 
     {
-        const { valid, errors } = await schema4.validate(new Date(2022, 0, 2));
+        const { valid, errors } = await schema4.validateAsync(
+            new Date(2022, 0, 2)
+        );
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.[0].message).toEqual('Custom error message');
@@ -805,7 +807,7 @@ test('min with custom error message - 1', async () => {
         .min(date2, () => Promise.resolve('Custom error message'));
 
     {
-        const { valid, errors } = await schema4.validate(date3);
+        const { valid, errors } = await schema4.validateAsync(date3);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.[0].message).toEqual('Custom error message');
@@ -861,7 +863,7 @@ test('max with custom error message - 1', async () => {
         .max(date2, () => Promise.resolve('Custom error message'));
 
     {
-        const { valid, errors } = await schema4.validate(date3);
+        const { valid, errors } = await schema4.validateAsync(date3);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.[0].message).toEqual('Custom error message');
@@ -922,7 +924,9 @@ test('isInFuture with custom error message - 1', async () => {
         .isInFuture(() => Promise.resolve('Custom error message'));
 
     {
-        const { valid, errors } = await schema4.validate(new Date(2021, 0, 2));
+        const { valid, errors } = await schema4.validateAsync(
+            new Date(2021, 0, 2)
+        );
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.[0].message).toEqual('Custom error message');
@@ -987,7 +991,7 @@ test('isInPast with custom error message - 1', async () => {
         .isInPast(() => Promise.resolve('Custom error message'));
 
     {
-        const { valid, errors } = await schema4.validate(
+        const { valid, errors } = await schema4.validateAsync(
             new Date(thisYear + 1, thisMonth, thisDay)
         );
         expect(valid).toEqual(false);

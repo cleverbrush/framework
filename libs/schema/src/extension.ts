@@ -372,6 +372,11 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
  */
 const RESERVED_METHODS = new Set([
     'validate',
+    'validateAsync',
+    'parse',
+    'parseAsync',
+    'safeParse',
+    'safeParseAsync',
     'introspect',
     'optional',
     'required',
@@ -383,7 +388,10 @@ const RESERVED_METHODS = new Set([
     'clearHasType',
     'createFromProps',
     'preValidate',
+    'preValidateSync',
+    'preValidateAsync',
     'getValidationErrorMessage',
+    'getValidationErrorMessageSync',
     'assureValidationErrorMessageProvider',
     'withExtension',
     'getExtension'

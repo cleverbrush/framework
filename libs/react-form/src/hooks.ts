@@ -127,15 +127,15 @@ export function useSchemaForm<
             const gen = ++validationGenRef.current;
             const values = store.getValues();
             // Ensure all nested object structures exist to prevent
-            // ObjectSchemaBuilder.validate() from throwing on undefined nested objects
+            // ObjectSchemaBuilder.validateAsync() from throwing on undefined nested objects
             const safeValues = ensureNestedStructure(values, schemaRef.current);
             let result: ValidationResult<InferType<TSchema>>;
             try {
-                result = (await schemaRef.current.validate(safeValues, {
+                result = (await schemaRef.current.validateAsync(safeValues, {
                     doNotStopOnFirstError: true
                 })) as ValidationResult<InferType<TSchema>>;
             } catch {
-                // If validation itself throws, treat as no errors
+                // If validation itself throws, treat as invalid
                 return { valid: false } as ValidationResult<InferType<TSchema>>;
             }
 

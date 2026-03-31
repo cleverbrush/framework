@@ -553,7 +553,7 @@ test('Min Length With Custom Validation Error Message', async () => {
             object: result,
             errors,
             valid
-        } = await schema4.validate([1, 2]);
+        } = await schema4.validateAsync([1, 2]);
         expect(valid).toEqual(false);
         expect(result).toBeUndefined();
         expect(Array.isArray(errors)).toEqual(true);
@@ -616,7 +616,7 @@ test('Max Length With Custom Validation Error Message', async () => {
             object: result,
             errors,
             valid
-        } = await schema4.validate([1, 2]);
+        } = await schema4.validateAsync([1, 2]);
         expect(valid).toEqual(false);
         expect(result).toBeUndefined();
         expect(Array.isArray(errors)).toEqual(true);

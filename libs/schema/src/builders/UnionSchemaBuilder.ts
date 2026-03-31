@@ -117,7 +117,7 @@ type TakeExceptIndex<
  * @example
  * ```ts
  * const schema = union(string('foo')).or(string('bar'));
- * const result = await schema.validate('foo');
+ * const result = schema.validate('foo');
  * // result.valid === true
  * // result.object === 'foo'
  * ```
@@ -125,7 +125,7 @@ type TakeExceptIndex<
  * @example
  * ```ts
  * const schema = union(string('foo')).or(string('bar'));
- * const result = await schema.validate('baz');
+ * const result = schema.validate('baz');
  * // result.valid === false
  * ```
  *
@@ -133,18 +133,18 @@ type TakeExceptIndex<
  * ```ts
  * const schema = union(string('yes')).or(string('no')).or(number(0)).or(number(1));
  * // equals to 'yes' | 'no' | 0 | 1 in TS
- * const result = await schema.validate('yes');
+ * const result = schema.validate('yes');
  * // result.valid === true
  * // result.object === 'yes'
  *
- * const result2 = await schema.validate(0);
+ * const result2 = schema.validate(0);
  * // result2.valid === true
  * // result2.object === 0
  *
- * const result3 = await schema.validate('baz');
+ * const result3 = schema.validate('baz');
  * // result3.valid === false
  *
- * const result4 = await schema.validate(2);
+ * const result4 = schema.validate(2);
  * // result4.valid === false
  * ```
  *
@@ -220,25 +220,10 @@ export class UnionSchemaBuilder<
         } as any) as any;
     }
 
-    /**
-     * Performs validation of the union schema over `object`.
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
-        object: TExplicitType extends undefined
-            ? SchemaArrayToUnion<TOptions>
-            : TExplicitType,
-        context?: ValidationContext
-    ): Promise<
-        UnionSchemaValidationResult<
-            TExplicitType extends undefined
-                ? SchemaArrayToUnion<TOptions>
-                : TExplicitType,
-            TOptions
-        >
-    > {
-        const superResult = await super.preValidate(object, context);
-
+    #createValidationSetup(
+        object: any,
+        superResult: ReturnType<UnionSchemaBuilder<any>['preValidateSync']>
+    ) {
         const {
             valid,
             transaction: preValidationTransaction,
@@ -278,13 +263,12 @@ export class UnionSchemaBuilder<
                 ...(errors || []).map((e: any) => e.message || String(e))
             );
             return {
-                valid,
-                errors,
-                getNestedErrors
+                needsOptionValidation: false as const,
+                result: { valid, errors, getNestedErrors } as any
             };
         }
 
-        let {
+        const {
             object: { validatedObject: objToValidate }
         } = preValidationTransaction!;
 
@@ -293,18 +277,105 @@ export class UnionSchemaBuilder<
             (typeof objToValidate === 'undefined' || objToValidate === null)
         ) {
             return {
+                needsOptionValidation: false as const,
+                result: {
+                    valid: true,
+                    object: objToValidate,
+                    getNestedErrors
+                } as any
+            };
+        }
+
+        return {
+            needsOptionValidation: true as const,
+            objToValidate,
+            prevalidationContext,
+            preValidationTransaction: preValidationTransaction!,
+            path: path as string,
+            getNestedErrors,
+            optionResults,
+            rootErrors
+        };
+    }
+
+    #processOptionResult(
+        optionResult: any,
+        index: number,
+        optionResults: any,
+        preValidationTransaction: any,
+        state: {
+            objToValidate: any;
+            minErrorsCount: number;
+            resultingErrors: any[];
+        },
+        getNestedErrors: any
+    ): any | null {
+        optionResults[index] = optionResult;
+
+        if (optionResult.valid) {
+            return {
                 valid: true,
-                object: objToValidate,
+                object: optionResult.object as any,
                 getNestedErrors
             };
         }
 
-        let minErrorsCount = Number.MAX_SAFE_INTEGER;
-        let resultingErrors: any[] = [];
+        const optErrors = optionResult.errors;
+        if (
+            Array.isArray(optErrors) &&
+            optErrors.length > 0 &&
+            optErrors.length < state.minErrorsCount
+        ) {
+            state.resultingErrors = optErrors as any;
+            state.minErrorsCount = optErrors.length;
+        }
+
+        state.objToValidate =
+            preValidationTransaction.rollback().validatedObject;
+        return null;
+    }
+
+    /**
+     * Performs synchronous validation of the union schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: TExplicitType extends undefined
+            ? SchemaArrayToUnion<TOptions>
+            : TExplicitType,
+        context?: ValidationContext
+    ): UnionSchemaValidationResult<
+        TExplicitType extends undefined
+            ? SchemaArrayToUnion<TOptions>
+            : TExplicitType,
+        TOptions
+    > {
+        const setup = this.#createValidationSetup(
+            object,
+            this.preValidateSync(object, context)
+        );
+
+        if (!setup.needsOptionValidation) return setup.result;
+
+        const {
+            prevalidationContext,
+            preValidationTransaction,
+            path,
+            getNestedErrors,
+            optionResults,
+            rootErrors
+        } = setup;
+
+        const state = {
+            objToValidate: setup.objToValidate,
+            minErrorsCount: Number.MAX_SAFE_INTEGER,
+            resultingErrors: [] as any[]
+        };
 
         for (let i = 0; i < this.#options.length; i++) {
-            const optionResult = await this.#options[i].validate(
-                objToValidate,
+            const optionResult = this.#options[i].validate(
+                state.objToValidate,
                 {
                     ...prevalidationContext,
                     path: `${path}[option ${i}]`,
@@ -313,35 +384,93 @@ export class UnionSchemaBuilder<
                 } as any
             );
 
-            optionResults[i] = optionResult;
-
-            if (optionResult.valid) {
-                return {
-                    valid: true,
-                    object: optionResult.object as any,
-                    getNestedErrors
-                };
-            } else {
-                const optErrors = optionResult.errors;
-                if (
-                    Array.isArray(optErrors) &&
-                    optErrors.length > 0 &&
-                    optErrors.length < minErrorsCount
-                ) {
-                    resultingErrors = optErrors as any;
-                    minErrorsCount = optErrors.length;
-                }
-
-                objToValidate =
-                    preValidationTransaction!.rollback().validatedObject;
-            }
+            const earlyReturn = this.#processOptionResult(
+                optionResult,
+                i,
+                optionResults,
+                preValidationTransaction,
+                state,
+                getNestedErrors
+            );
+            if (earlyReturn) return earlyReturn;
         }
 
         rootErrors.push("value doesn't match any option in union schema");
 
         return {
             valid: false,
-            errors: resultingErrors,
+            errors: state.resultingErrors,
+            getNestedErrors
+        };
+    }
+
+    /**
+     * Performs async validation of the union schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: TExplicitType extends undefined
+            ? SchemaArrayToUnion<TOptions>
+            : TExplicitType,
+        context?: ValidationContext
+    ): Promise<
+        UnionSchemaValidationResult<
+            TExplicitType extends undefined
+                ? SchemaArrayToUnion<TOptions>
+                : TExplicitType,
+            TOptions
+        >
+    > {
+        const setup = this.#createValidationSetup(
+            object,
+            await super.preValidateAsync(object, context)
+        );
+
+        if (!setup.needsOptionValidation) return setup.result;
+
+        const {
+            prevalidationContext,
+            preValidationTransaction,
+            path,
+            getNestedErrors,
+            optionResults,
+            rootErrors
+        } = setup;
+
+        const state = {
+            objToValidate: setup.objToValidate,
+            minErrorsCount: Number.MAX_SAFE_INTEGER,
+            resultingErrors: [] as any[]
+        };
+
+        for (let i = 0; i < this.#options.length; i++) {
+            const optionResult = await this.#options[i].validateAsync(
+                state.objToValidate,
+                {
+                    ...prevalidationContext,
+                    path: `${path}[option ${i}]`,
+                    currentPropertyDescriptor: undefined,
+                    rootPropertyDescriptor: undefined
+                } as any
+            );
+
+            const earlyReturn = this.#processOptionResult(
+                optionResult,
+                i,
+                optionResults,
+                preValidationTransaction,
+                state,
+                getNestedErrors
+            );
+            if (earlyReturn) return earlyReturn;
+        }
+
+        rootErrors.push("value doesn't match any option in union schema");
+
+        return {
+            valid: false,
+            errors: state.resultingErrors,
             getNestedErrors
         };
     }

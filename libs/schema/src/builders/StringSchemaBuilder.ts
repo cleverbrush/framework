@@ -24,42 +24,42 @@ type StringSchemaBuilderCreateProps<
  *
  * @example ```ts
  * const schema = string().equals('hello');
- * const result = await schema.validate('hello');
+ * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * ```
  *
  * @example ```ts
  * const schema = string().equals('hello');
- * const result = await schema.validate('world');
+ * const result = schema.validate('world');
  * // result.valid === false
  * // result.errors[0].message === "is expected to be equal to 'hello'"
  * ```
  *
  * @example ```ts
  * const schema = string().minLength(5);
- * const result = await schema.validate('hello');
+ * const result = schema.validate('hello');
  * // result.valid === true
  * // result.object === 'hello'
  * ```
  *
  * @example ```ts
  * const schema = string().minLength(5);
- * const result = await schema.validate('hi');
+ * const result = schema.validate('hi');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to have a length of at least 5'
  * ```
  *
  * @example ```ts
  * const schema = string().minLength(2).maxLength(5);
- * const result = await schema.validate('yes');
+ * const result = schema.validate('yes');
  * // result.valid === true
  * // result.object === 'yes'
  * ```
  *
  * @example ```ts
  * const schema = string('no');
- * const result = await schema.validate('yes');
+ * const result = schema.validate('yes');
  * // result.valid === false
  * // result.errors[0].message === "is expected to be equal to 'no'"
  * ```
@@ -319,16 +319,67 @@ export class StringSchemaBuilder<
         } as any) as any;
     }
 
-    /**
-     * Performs validation of string schema over `object`.
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
-        object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
+    #getConstraintViolation(
+        objToValidate: any
+    ): { message: string } | { provider: any } | null {
+        if (typeof objToValidate !== 'string') {
+            return {
+                message: `expected type string, but saw ${typeof objToValidate}`
+            };
+        }
 
+        if (
+            typeof this.#equalsTo !== 'undefined' &&
+            objToValidate !== this.#equalsTo
+        ) {
+            return { provider: this.#equalsToErrorMessageProvider };
+        }
+
+        if (
+            typeof this.#startsWith === 'string' &&
+            this.#startsWith.length > 0 &&
+            !objToValidate.startsWith(this.#startsWith)
+        ) {
+            return { provider: this.#startsWithErrorMessageProvider };
+        }
+
+        if (
+            typeof this.#endsWith === 'string' &&
+            this.#endsWith.length > 0 &&
+            !objToValidate.endsWith(this.#endsWith)
+        ) {
+            return { provider: this.#endsWithErrorMessageProvider };
+        }
+
+        if (typeof this.#minLength !== 'undefined') {
+            if (objToValidate.length < this.#minLength)
+                return { provider: this.#minLengthErrorMessageProvider };
+        }
+
+        if (typeof this.#maxLength !== 'undefined') {
+            if (objToValidate.length > this.#maxLength)
+                return { provider: this.#maxLengthErrorMessageProvider };
+        }
+
+        if (this.#matches instanceof RegExp) {
+            if (!this.#matches.test(objToValidate)) {
+                return { provider: this.#matchesErrorMessageProvider };
+            }
+        }
+
+        return null;
+    }
+
+    #buildResult(
+        superResult: ReturnType<StringSchemaBuilder['preValidateSync']>
+    ):
+        | { done: true; result: ValidationResult<TResult> }
+        | {
+              done: false;
+              provider: any;
+              objToValidate: any;
+              path: string;
+          } {
         const {
             valid,
             context: prevalidationContext,
@@ -339,10 +390,7 @@ export class StringSchemaBuilder<
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return {
-                valid,
-                errors
-            };
+            return { done: true, result: { valid, errors } };
         }
 
         const {
@@ -354,129 +402,89 @@ export class StringSchemaBuilder<
             this.isRequired === false
         ) {
             return {
-                valid: true,
-                object: objToValidate
-            };
-        }
-        if (typeof objToValidate !== 'string')
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: `expected type string, but saw ${typeof objToValidate}`,
-                        path: path as string
-                    }
-                ]
-            };
-
-        if (
-            typeof this.#equalsTo !== 'undefined' &&
-            objToValidate !== this.#equalsTo
-        ) {
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#equalsToErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: { valid: true, object: objToValidate }
             };
         }
 
-        if (
-            typeof this.#startsWith === 'string' &&
-            this.#startsWith.length > 0 &&
-            !objToValidate.startsWith(this.#startsWith)
-        ) {
+        const violation = this.#getConstraintViolation(objToValidate);
+
+        if (!violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#startsWithErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: { valid: true, object: objToValidate as TResult }
             };
         }
 
-        if (
-            typeof this.#endsWith === 'string' &&
-            this.#endsWith.length > 0 &&
-            !objToValidate.endsWith(this.#endsWith)
-        ) {
+        if ('message' in violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#endsWithErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
-            };
-        }
-
-        if (typeof this.#minLength !== 'undefined') {
-            if (objToValidate.length < this.#minLength)
-                return {
+                done: true,
+                result: {
                     valid: false,
                     errors: [
-                        {
-                            message: await this.getValidationErrorMessage(
-                                this.#minLengthErrorMessageProvider,
-                                objToValidate as TResult
-                            ),
-                            path: path as string
-                        }
+                        { message: violation.message, path: path as string }
                     ]
-                };
-        }
-
-        if (typeof this.#maxLength !== 'undefined') {
-            if (objToValidate.length > this.#maxLength)
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: await this.getValidationErrorMessage(
-                                this.#maxLengthErrorMessageProvider,
-                                objToValidate as TResult
-                            ),
-                            path: path as string
-                        }
-                    ]
-                };
-        }
-
-        if (this.#matches instanceof RegExp) {
-            if (!this.#matches.test(objToValidate)) {
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: await this.getValidationErrorMessage(
-                                this.#matchesErrorMessageProvider,
-                                objToValidate as TResult
-                            ),
-                            path: path as string
-                        }
-                    ]
-                };
-            }
+                }
+            };
         }
 
         return {
-            valid: true,
-            object: objToValidate as TResult
+            done: false,
+            provider: violation.provider,
+            objToValidate,
+            path: path as string
+        };
+    }
+
+    /**
+     * Performs synchronous validation of string schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        const r = this.#buildResult(this.preValidateSync(object, context));
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: this.getValidationErrorMessageSync(
+                        r.provider,
+                        r.objToValidate as TResult
+                    ),
+                    path: r.path
+                }
+            ]
+        };
+    }
+
+    /**
+     * Performs async validation of string schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        const r = this.#buildResult(
+            await super.preValidateAsync(object, context)
+        );
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: await this.getValidationErrorMessage(
+                        r.provider,
+                        r.objToValidate as TResult
+                    ),
+                    path: r.path
+                }
+            ]
         };
     }
 

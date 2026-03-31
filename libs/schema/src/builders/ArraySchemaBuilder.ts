@@ -185,17 +185,10 @@ export class ArraySchemaBuilder<
         } as any) as any;
     }
 
-    /**
-     * Performs validation of the schema over `object`. Basically runs
-     * validators, preprocessors and checks for required (if schema is not optional).
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
+    #createValidationSetup(
         object: TResult,
-        context?: ValidationContext
-    ): Promise<ArraySchemaValidationResult<TResult, TElementSchema>> {
-        const superResult = await super.preValidate(object, context);
-
+        superResult: ReturnType<ArraySchemaBuilder<any, any>['preValidateSync']>
+    ) {
         const {
             valid,
             context: prevalidationContext,
@@ -233,9 +226,12 @@ export class ArraySchemaBuilder<
                 ...(errors || []).map((e: any) => e.message || String(e))
             );
             return {
-                valid,
-                errors,
-                getNestedErrors
+                needsElementValidation: false as const,
+                result: {
+                    valid,
+                    errors,
+                    getNestedErrors
+                } as ArraySchemaValidationResult<TResult, TElementSchema>
             };
         }
 
@@ -248,59 +244,227 @@ export class ArraySchemaBuilder<
             this.isRequired === false
         ) {
             return {
-                valid: true,
-                object: objToValidate,
-                getNestedErrors
+                needsElementValidation: false as const,
+                result: {
+                    valid: true,
+                    object: objToValidate,
+                    getNestedErrors
+                } as ArraySchemaValidationResult<TResult, TElementSchema>
             };
         }
 
         if (!Array.isArray(objToValidate)) {
             rootErrors.push('array expected');
             return {
-                valid: false,
-                errors: [{ message: 'array expected', path: path as string }],
-                getNestedErrors
+                needsElementValidation: false as const,
+                result: {
+                    valid: false,
+                    errors: [
+                        { message: 'array expected', path: path as string }
+                    ],
+                    getNestedErrors
+                } as ArraySchemaValidationResult<TResult, TElementSchema>
             };
         }
 
+        return {
+            needsElementValidation: true as const,
+            objToValidate,
+            prevalidationContext,
+            path: path as string,
+            getNestedErrors,
+            elementResults,
+            rootErrors
+        };
+    }
+
+    #getLengthViolation(objToValidate: any[]): { provider: any } | null {
         if (
             typeof this.#maxLength === 'number' &&
             objToValidate.length > this.#maxLength
         ) {
-            const msg = await this.getValidationErrorMessage(
-                this.#maxLengthErrorMessageProvider,
-                objToValidate as TResult
-            );
-            rootErrors.push(msg);
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: msg,
-                        path: path as string
-                    }
-                ],
-                getNestedErrors
-            };
+            return { provider: this.#maxLengthErrorMessageProvider };
         }
 
         if (
             typeof this.#minLength === 'number' &&
             objToValidate.length < this.#minLength
         ) {
-            const msg = await this.getValidationErrorMessage(
-                this.#minLengthErrorMessageProvider,
+            return { provider: this.#minLengthErrorMessageProvider };
+        }
+
+        return null;
+    }
+
+    #assembleDoNotStopResults(
+        results: any[],
+        elementResults: any,
+        getNestedErrors: any
+    ) {
+        let allValid = true;
+
+        for (let i = 0; i < results.length; i++) {
+            if (!results[i]?.valid) {
+                allValid = false;
+            }
+            elementResults[i] = results[i] as any;
+        }
+
+        return Object.assign(
+            {
+                valid: allValid,
+                getNestedErrors
+            },
+            allValid
+                ? {}
+                : {
+                      errors: results
+                          .map((r) => r?.errors)
+                          .filter((r) => r)
+                          .flatMap((e) =>
+                              e?.map((r: any, index: number) => ({
+                                  ...r,
+                                  path: `${r.path}[${index}]`
+                              }))
+                          ) as any
+                  },
+            allValid
+                ? {
+                      object: results.map((r) => r?.object)
+                  }
+                : {}
+        ) as any;
+    }
+
+    /**
+     * Performs synchronous validation of the schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ArraySchemaValidationResult<TResult, TElementSchema> {
+        const setup = this.#createValidationSetup(
+            object,
+            this.preValidateSync(object, context)
+        );
+
+        if (!setup.needsElementValidation) return setup.result;
+
+        const {
+            objToValidate,
+            prevalidationContext,
+            path,
+            getNestedErrors,
+            elementResults,
+            rootErrors
+        } = setup;
+
+        const lengthViolation = this.#getLengthViolation(objToValidate);
+        if (lengthViolation) {
+            const msg = this.getValidationErrorMessageSync(
+                lengthViolation.provider,
                 objToValidate as TResult
             );
             rootErrors.push(msg);
             return {
                 valid: false,
-                errors: [
-                    {
-                        message: msg,
-                        path: path as string
+                errors: [{ message: msg, path }],
+                getNestedErrors
+            };
+        }
+
+        if (
+            objToValidate.length > 0 &&
+            this.#elementSchema instanceof SchemaBuilder
+        ) {
+            if (prevalidationContext.doNotStopOnFirstError) {
+                const results: any[] = [];
+
+                for (let i = 0; i < objToValidate.length; i++) {
+                    results.push(
+                        this.#elementSchema.validate(objToValidate[i], {
+                            ...prevalidationContext,
+                            path: `${path}[${i}]`
+                        })
+                    );
+                }
+
+                return this.#assembleDoNotStopResults(
+                    results,
+                    elementResults,
+                    getNestedErrors
+                );
+            } else {
+                for (let i = 0; i < objToValidate.length; i++) {
+                    const result = this.#elementSchema.validate(
+                        objToValidate[i],
+                        {
+                            ...prevalidationContext,
+                            path: `${path}[${i}]`
+                        }
+                    );
+                    elementResults[i] = result as any;
+                    if (result.valid) {
+                        objToValidate[i] = result.object;
+                    } else {
+                        return {
+                            valid: false,
+                            errors:
+                                Array.isArray(result.errors) &&
+                                result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getNestedErrors
+                        };
                     }
-                ],
+                }
+            }
+        }
+
+        return {
+            valid: true,
+            object: objToValidate as TResult,
+            getNestedErrors
+        };
+    }
+
+    /**
+     * Performs async validation of the schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ArraySchemaValidationResult<TResult, TElementSchema>> {
+        const setup = this.#createValidationSetup(
+            object,
+            await super.preValidateAsync(object, context)
+        );
+
+        if (!setup.needsElementValidation) return setup.result;
+
+        const {
+            objToValidate,
+            prevalidationContext,
+            path,
+            getNestedErrors,
+            elementResults,
+            rootErrors
+        } = setup;
+
+        const lengthViolation = this.#getLengthViolation(objToValidate);
+        if (lengthViolation) {
+            const msg = await this.getValidationErrorMessage(
+                lengthViolation.provider,
+                objToValidate as TResult
+            );
+            rootErrors.push(msg);
+            return {
+                valid: false,
+                errors: [{ message: msg, path }],
                 getNestedErrors
             };
         }
@@ -312,46 +476,21 @@ export class ArraySchemaBuilder<
             if (prevalidationContext.doNotStopOnFirstError) {
                 const results = await Promise.all(
                     objToValidate.map((o) =>
-                        this.#elementSchema?.validate(o, prevalidationContext)
+                        this.#elementSchema?.validateAsync(
+                            o,
+                            prevalidationContext
+                        )
                     )
                 );
 
-                let valid = true;
-
-                for (let i = 0; i < results.length; i++) {
-                    if (!results[i]?.valid) {
-                        valid = false;
-                    }
-                    elementResults[i] = results[i] as any;
-                }
-
-                return Object.assign(
-                    {
-                        valid,
-                        getNestedErrors
-                    },
-                    valid
-                        ? {}
-                        : {
-                              errors: results
-                                  .map((r) => r?.errors)
-                                  .filter((r) => r)
-                                  .flatMap((e) =>
-                                      e?.map((r, index) => ({
-                                          ...r,
-                                          path: `${r.path}[${index}]`
-                                      }))
-                                  ) as any
-                          },
-                    valid
-                        ? {
-                              object: results.map((r) => r?.object)
-                          }
-                        : {}
-                ) as any;
+                return this.#assembleDoNotStopResults(
+                    results,
+                    elementResults,
+                    getNestedErrors
+                );
             } else {
                 for (let i = 0; i < objToValidate.length; i++) {
-                    const result = await this.#elementSchema.validate(
+                    const result = await this.#elementSchema.validateAsync(
                         objToValidate[i],
                         {
                             ...prevalidationContext,

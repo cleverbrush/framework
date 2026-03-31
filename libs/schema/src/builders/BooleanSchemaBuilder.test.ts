@@ -221,7 +221,7 @@ test('euqalsTo with custom error message - 1', async () => {
         .equals(true, () => Promise.resolve('Custom error message'));
 
     {
-        const { valid, errors } = await schema4.validate(false as any);
+        const { valid, errors } = await schema4.validateAsync(false as any);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors)).toEqual(true);
         expect(errors?.[0].message).toEqual('Custom error message');

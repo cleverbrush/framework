@@ -44,28 +44,28 @@ const parseFromEpochPreprocessor = (value: any) => {
  * @example ```ts
  * const date = new Date(2020, 0, 2);
  * const schema = date().min(new Date(2020, 0, 1));
- * const result = await schema.validate(date);
+ * const result = schema.validate(date);
  * // result.valid === true
  * // result.object === date
  * ```
  *
  * @example ```ts
  * const schema = date();
- * const result = await schema.validate('2020-01-01');
+ * const result = schema.validate('2020-01-01');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be a date'
  * ```
  *
  * @example ```ts
  * const schema = date().parseFromJson();
- * const result = await schema.validate('2020-01-01T00:00:00.000Z');
+ * const result = schema.validate('2020-01-01T00:00:00.000Z');
  * // result.valid === true
  * // result.object is equal to corresponding Date object
  * ```
  *
  * @example ```ts
  * const schema = date().parseFromEpoch();
- * const result = await schema.validate(1577836800000);
+ * const result = schema.validate(1577836800000);
  * // result.valid === true
  * // result.object is equal to corresponding Date object
  * ```
@@ -308,25 +308,57 @@ export class DateSchemaBuilder<
         } as any) as any;
     }
 
-    /**
-     * Performs validation of Date schema over `object`.
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
-        object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
+    #getConstraintViolation(
+        objToValidate: any
+    ): { message: string } | { provider: any } | null {
+        if (!(objToValidate instanceof Date)) {
+            return {
+                message: `expected instance of Date, but saw ${typeof objToValidate}`
+            };
+        }
 
+        if (
+            typeof this.#equalsTo !== 'undefined' &&
+            objToValidate.getTime() !== this.#equalsTo.getTime()
+        ) {
+            return { provider: this.#equalsToErrorMessageProvider };
+        }
+
+        if (this.#ensureIsInFuture && objToValidate <= new Date()) {
+            return { provider: this.#ensureIsInFutureErrorMessageProvider };
+        }
+
+        if (this.#ensureIsInPast && objToValidate >= new Date()) {
+            return { provider: this.#ensureIsInPastErrorMessageProvider };
+        }
+
+        if (typeof this.#min !== 'undefined') {
+            if (objToValidate < this.#min)
+                return { provider: this.#minErrorMessageProvider };
+        }
+
+        if (typeof this.#max !== 'undefined') {
+            if (objToValidate > this.#max)
+                return { provider: this.#maxErrorMessageProvider };
+        }
+
+        return null;
+    }
+
+    #buildResult(superResult: ReturnType<DateSchemaBuilder['preValidateSync']>):
+        | { done: true; result: ValidationResult<TResult> }
+        | {
+              done: false;
+              provider: any;
+              objToValidate: any;
+              path: string;
+          } {
         const { valid, context: prevalidationContext, errors } = superResult;
 
         const { path } = prevalidationContext;
 
         if (!valid) {
-            return {
-                valid,
-                errors
-            };
+            return { done: true, result: { valid, errors } };
         }
 
         let { transaction: preValidationTransaction } = superResult;
@@ -340,8 +372,8 @@ export class DateSchemaBuilder<
             this.isRequired === false
         ) {
             return {
-                valid: true,
-                object: objToValidate
+                done: true,
+                result: { valid: true, object: objToValidate }
             };
         }
 
@@ -359,101 +391,88 @@ export class DateSchemaBuilder<
             objToValidate = preValidationTransaction.object.validatedObject;
         }
 
-        if (!(objToValidate instanceof Date))
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: `expected instance of Date, but saw ${typeof objToValidate}`,
-                        path: path as string
-                    }
-                ]
-            };
+        const violation = this.#getConstraintViolation(objToValidate);
 
-        if (
-            typeof this.#equalsTo !== 'undefined' &&
-            objToValidate.getTime() !== this.#equalsTo.getTime()
-        ) {
+        if (!violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#equalsToErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: {
+                    valid: true,
+                    object: preValidationTransaction!.commit()
+                        .validatedObject as TResult
+                }
             };
         }
 
-        if (this.#ensureIsInFuture && objToValidate <= new Date()) {
+        if ('message' in violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#ensureIsInFutureErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
-            };
-        }
-
-        if (this.#ensureIsInPast && objToValidate >= new Date()) {
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: await this.getValidationErrorMessage(
-                            this.#ensureIsInPastErrorMessageProvider,
-                            objToValidate as TResult
-                        ),
-                        path: path as string
-                    }
-                ]
-            };
-        }
-
-        if (typeof this.#min !== 'undefined') {
-            if (objToValidate < this.#min)
-                return {
+                done: true,
+                result: {
                     valid: false,
                     errors: [
-                        {
-                            message: await this.getValidationErrorMessage(
-                                this.#minErrorMessageProvider,
-                                objToValidate as TResult
-                            ),
-                            path: path as string
-                        }
+                        { message: violation.message, path: path as string }
                     ]
-                };
-        }
-
-        if (typeof this.#max !== 'undefined') {
-            if (objToValidate > this.#max)
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: await this.getValidationErrorMessage(
-                                this.#maxErrorMessageProvider,
-                                objToValidate as TResult
-                            ),
-                            path: path as string
-                        }
-                    ]
-                };
+                }
+            };
         }
 
         return {
-            valid: true,
-            object: preValidationTransaction!.commit()
-                .validatedObject as TResult
+            done: false,
+            provider: violation.provider,
+            objToValidate,
+            path: path as string
+        };
+    }
+
+    /**
+     * Performs synchronous validation of Date schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        const r = this.#buildResult(this.preValidateSync(object, context));
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: this.getValidationErrorMessageSync(
+                        r.provider,
+                        r.objToValidate as TResult
+                    ),
+                    path: r.path
+                }
+            ]
+        };
+    }
+
+    /**
+     * Performs async validation of Date schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        const r = this.#buildResult(
+            await super.preValidateAsync(object, context)
+        );
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: await this.getValidationErrorMessage(
+                        r.provider,
+                        r.objToValidate as TResult
+                    ),
+                    path: r.path
+                }
+            ]
         };
     }
 

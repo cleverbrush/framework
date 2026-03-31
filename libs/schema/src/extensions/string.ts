@@ -209,19 +209,17 @@ export const stringExtensions = defineExtension({
             this: StringSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
-            return this.withExtension('email', true).addValidator(
-                async (val) => {
-                    const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
-                    if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
-                        errorMessage,
-                        'must be a valid email',
-                        val,
-                        this
-                    );
-                    return { valid: false, errors: [{ message: msg }] };
-                }
-            );
+            return this.withExtension('email', true).addValidator((val) => {
+                const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                if (valid) return { valid: true, errors: [] };
+                const msg = resolveErrorMessage(
+                    errorMessage,
+                    'must be a valid email',
+                    val,
+                    this
+                );
+                return { valid: false, errors: [{ message: msg }] };
+            });
         },
 
         /**
@@ -259,7 +257,7 @@ export const stringExtensions = defineExtension({
             const protocols = opts?.protocols ?? ['http', 'https'];
             const meta = opts?.protocols ? { protocols: opts.protocols } : true;
 
-            return this.withExtension('url', meta).addValidator(async (val) => {
+            return this.withExtension('url', meta).addValidator((val) => {
                 let valid = false;
                 let defaultMsg = 'must be a valid URL';
                 try {
@@ -272,7 +270,7 @@ export const stringExtensions = defineExtension({
                     /* invalid URL */
                 }
                 if (valid) return { valid: true, errors: [] };
-                const msg = await resolveErrorMessage(
+                const msg = resolveErrorMessage(
                     errorMessage,
                     defaultMsg,
                     val,
@@ -298,19 +296,17 @@ export const stringExtensions = defineExtension({
             this: StringSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
-            return this.withExtension('uuid', true).addValidator(
-                async (val) => {
-                    const valid = UUID_RE.test(val);
-                    if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
-                        errorMessage,
-                        'must be a valid UUID',
-                        val,
-                        this
-                    );
-                    return { valid: false, errors: [{ message: msg }] };
-                }
-            );
+            return this.withExtension('uuid', true).addValidator((val) => {
+                const valid = UUID_RE.test(val);
+                if (valid) return { valid: true, errors: [] };
+                const msg = resolveErrorMessage(
+                    errorMessage,
+                    'must be a valid UUID',
+                    val,
+                    this
+                );
+                return { valid: false, errors: [{ message: msg }] };
+            });
         },
 
         /**
@@ -338,7 +334,7 @@ export const stringExtensions = defineExtension({
             const version = opts?.version;
             const meta = version ? { version } : true;
 
-            return this.withExtension('ip', meta).addValidator(async (val) => {
+            return this.withExtension('ip', meta).addValidator((val) => {
                 let valid: boolean;
                 if (version === 'v4') {
                     valid = IPV4_RE.test(val);
@@ -348,7 +344,7 @@ export const stringExtensions = defineExtension({
                     valid = IPV4_RE.test(val) || IPV6_RE.test(val);
                 }
                 if (valid) return { valid: true, errors: [] };
-                const msg = await resolveErrorMessage(
+                const msg = resolveErrorMessage(
                     errorMessage,
                     version
                         ? `must be a valid ${version} IP address`
@@ -404,19 +400,17 @@ export const stringExtensions = defineExtension({
             this: StringSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
-            return this.withExtension('nonempty', true).addValidator(
-                async (val) => {
-                    const valid = val.length > 0;
-                    if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
-                        errorMessage,
-                        'must not be empty',
-                        val,
-                        this
-                    );
-                    return { valid: false, errors: [{ message: msg }] };
-                }
-            );
+            return this.withExtension('nonempty', true).addValidator((val) => {
+                const valid = val.length > 0;
+                if (valid) return { valid: true, errors: [] };
+                const msg = resolveErrorMessage(
+                    errorMessage,
+                    'must not be empty',
+                    val,
+                    this
+                );
+                return { valid: false, errors: [{ message: msg }] };
+            });
         }
     }
 });

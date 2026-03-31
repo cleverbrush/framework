@@ -505,8 +505,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
      * @param job {CreateJobRequest} - job to add
      */
     public async addJob(job: CreateJobRequest) {
-        const validationResult =
-            await Schemas.CreateJobRequestSchema.validate(job);
+        const validationResult = Schemas.CreateJobRequestSchema.validate(job);
         if (!validationResult.valid) {
             throw new Error(
                 `Invalid CreateJobRequest: ${validationResult.errors?.join(

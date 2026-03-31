@@ -637,7 +637,9 @@ test('equals with custom validation error message', async () => {
         );
 
     {
-        const { valid, errors, object } = await schema4.validate('abcd' as any);
+        const { valid, errors, object } = await schema4.validateAsync(
+            'abcd' as any
+        );
         expect(valid).toEqual(false);
         expect(errors).toBeDefined();
         expect(Array.isArray(errors)).toEqual(true);
@@ -695,7 +697,9 @@ test('minLength with custom validation error message', async () => {
         );
 
     {
-        const { valid, errors, object } = await schema4.validate('abcd' as any);
+        const { valid, errors, object } = await schema4.validateAsync(
+            'abcd' as any
+        );
         expect(valid).toEqual(false);
         expect(errors).toBeDefined();
         expect(Array.isArray(errors)).toEqual(true);
@@ -759,7 +763,7 @@ test('maxLength with custom validation error message', async () => {
         );
 
     {
-        const { valid, errors, object } = await schema4.validate(
+        const { valid, errors, object } = await schema4.validateAsync(
             'abcdxyz' as any
         );
         expect(valid).toEqual(false);
@@ -823,7 +827,7 @@ test('startsWith with custom validation error message', async () => {
         );
 
     {
-        const { valid, errors, object } = await schema4.validate(
+        const { valid, errors, object } = await schema4.validateAsync(
             'abcdxyz' as any
         );
         expect(valid).toEqual(false);
@@ -887,7 +891,7 @@ test('endsWith with custom validation error message', async () => {
         );
 
     {
-        const { valid, errors, object } = await schema4.validate(
+        const { valid, errors, object } = await schema4.validateAsync(
             'abcdxyzabc' as any
         );
         expect(valid).toEqual(false);
@@ -950,7 +954,8 @@ test('matches with custom validation error message', async () => {
         );
 
     {
-        const { valid, errors, object } = await schema4.validate('abcdxyzabc');
+        const { valid, errors, object } =
+            await schema4.validateAsync('abcdxyzabc');
         expect(valid).toEqual(false);
         expect(errors).toBeDefined();
         expect(Array.isArray(errors)).toEqual(true);
@@ -1037,7 +1042,7 @@ test('required with async function error message', async () => {
         Promise.resolve('Async required message')
     );
 
-    const { valid, errors } = await schema.validate(undefined as any);
+    const { valid, errors } = await schema.validateAsync(undefined as any);
     expect(valid).toEqual(false);
     expect(errors).toBeDefined();
     expect(errors?.length).toEqual(1);

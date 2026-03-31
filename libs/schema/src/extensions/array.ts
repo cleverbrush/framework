@@ -132,10 +132,10 @@ export const arrayExtensions = defineExtension({
             >
         ) {
             return this.withExtension('nonempty', true).addValidator(
-                async (val: unknown[]) => {
+                (val: unknown[]) => {
                     const valid = val.length > 0;
                     if (valid) return { valid: true, errors: [] };
-                    const msg = await resolveErrorMessage(
+                    const msg = resolveErrorMessage(
                         errorMessage,
                         'must not be empty',
                         val,
@@ -173,12 +173,12 @@ export const arrayExtensions = defineExtension({
             const meta = keyFn ?? true;
 
             return this.withExtension('unique', meta).addValidator(
-                async (val: unknown[]) => {
+                (val: unknown[]) => {
                     const seen = new Set();
                     for (const item of val) {
                         const key = keyFn ? keyFn(item) : item;
                         if (seen.has(key)) {
-                            const msg = await resolveErrorMessage(
+                            const msg = resolveErrorMessage(
                                 errorMessage,
                                 'must contain unique elements',
                                 val,

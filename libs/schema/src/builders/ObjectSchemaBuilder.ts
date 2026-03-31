@@ -150,7 +150,7 @@ export type ObjectSchemaValidationResult<
  *    age: number()
  * });
  *
- * const result = await schema.validate({
+ * const result = schema.validate({
  *   name: 'John',
  *   age: 30
  * });
@@ -166,7 +166,7 @@ export type ObjectSchemaValidationResult<
  *   age: number().optional()
  * });
  *
- * const result = await schema.validate({
+ * const result = schema.validate({
  *  name: 'John'
  * });
  * // result.valid === true
@@ -179,7 +179,7 @@ export type ObjectSchemaValidationResult<
  *  name: string(),
  *  age: number();
  * });
- * const result = await schema.validate({
+ * const result = schema.validate({
  *  name: 'John'
  * });
  *
@@ -197,7 +197,7 @@ export type ObjectSchemaValidationResult<
  *     country: string()
  *   })
  * });
- * const result = await schema.validate({
+ * const result = schema.validate({
  * name: 'John',
  * address: {
  *    city: 'New York',
@@ -304,26 +304,9 @@ export class ObjectSchemaBuilder<
         return super.optional();
     }
 
-    protected async preValidate(
-        /**
-         * Object to validate
-         */
-        object: any,
-        context?: ValidationContext<this>
-    ): Promise<
-        PreValidationResult<
-            InferType<
-                SchemaBuilder<
-                    undefined extends TExplicitType
-                        ? Id<RespectPropsOptionality<TProperties>>
-                        : TExplicitType,
-                    TRequired
-                >
-            >,
-            { validatedObject: any }
-        >
-    > {
-        const result = await super.preValidate(object, context);
+    #applyPropertyDescriptors(
+        result: PreValidationResult<any, { validatedObject: any }>
+    ): void {
         if (
             !ObjectSchemaBuilder.isValidPropertyDescriptor(
                 result?.context?.rootPropertyDescriptor as any
@@ -349,48 +332,57 @@ export class ObjectSchemaBuilder<
             result.context.rootValidationObject =
                 result.transaction.object.validatedObject;
         }
+    }
 
+    protected preValidateSync(
+        object: any,
+        context?: ValidationContext<this>
+    ): PreValidationResult<
+        InferType<
+            SchemaBuilder<
+                undefined extends TExplicitType
+                    ? Id<RespectPropsOptionality<TProperties>>
+                    : TExplicitType,
+                TRequired
+            >
+        >,
+        { validatedObject: any }
+    > {
+        const result = super.preValidateSync(object, context);
+        this.#applyPropertyDescriptors(result);
+        return result;
+    }
+
+    protected async preValidateAsync(
+        object: any,
+        context?: ValidationContext<this>
+    ): Promise<
+        PreValidationResult<
+            InferType<
+                SchemaBuilder<
+                    undefined extends TExplicitType
+                        ? Id<RespectPropsOptionality<TProperties>>
+                        : TExplicitType,
+                    TRequired
+                >
+            >,
+            { validatedObject: any }
+        >
+    > {
+        const result = await super.preValidateAsync(object, context);
+        this.#applyPropertyDescriptors(result);
         return result;
     }
 
     /**
-     * Performs validation of object schema over the `object`.
-     *
-     * The returned result includes a `getErrorsFor()` method for type-safe,
-     * per-property error inspection. The flat `errors` array is **deprecated**
-     * and will be removed in a future major version — use `getErrorsFor()` instead.
-     *
-     * @param object The object to validate against this schema.
-     * @param context Optional `ValidationContext` settings.
+     * Shared pre-property-validation setup for both `validate` and
+     * `validateAsync`.  Handles destructuring the prevalidated result,
+     * building the `addErrorFor` / `getErrorsFor` closures, and all early
+     * returns that happen before per-property validation.
      */
-    public async validate(
-        object: undefined extends TExplicitType
-            ? InferType<
-                  SchemaBuilder<
-                      undefined extends TExplicitType
-                          ? Id<RespectPropsOptionality<TProperties>>
-                          : TExplicitType,
-                      TRequired
-                  >
-              >
-            : TExplicitType,
-        context?: ValidationContext<this>
-    ): Promise<
-        ObjectSchemaValidationResult<
-            undefined extends TExplicitType
-                ? InferType<
-                      SchemaBuilder<
-                          undefined extends TExplicitType
-                              ? Id<RespectPropsOptionality<TProperties>>
-                              : TExplicitType,
-                          TRequired
-                      >
-                  >
-                : TExplicitType,
-            this
-        >
-    > {
-        const prevalidatedResult = await this.preValidate(object, context);
+    #setupValidation(
+        prevalidatedResult: PreValidationResult<any, { validatedObject: any }>
+    ) {
         const {
             valid,
             context: prevalidationContext,
@@ -505,13 +497,16 @@ export class ObjectSchemaBuilder<
             return propertyDescriptorToErrorMap.get(descriptor);
         }) as any;
 
-        let errors = prevalidatedResult.errors || [];
+        const errors = prevalidatedResult.errors || [];
 
         if (!valid && !doNotStopOnFirstError) {
             return {
-                valid,
-                errors: preValidationErrors,
-                getErrorsFor
+                earlyReturn: true as const,
+                result: {
+                    valid,
+                    errors: preValidationErrors,
+                    getErrorsFor
+                }
             };
         }
 
@@ -524,9 +519,12 @@ export class ObjectSchemaBuilder<
             (typeof objToValidate === 'undefined' || objToValidate === null)
         ) {
             return {
-                valid: true,
-                object: validationTransaction!.commit().validatedObject,
-                getErrorsFor
+                earlyReturn: true as const,
+                result: {
+                    valid: true,
+                    object: validationTransaction!.commit().validatedObject,
+                    getErrorsFor
+                }
             };
         }
 
@@ -545,9 +543,12 @@ export class ObjectSchemaBuilder<
                     validationTransaction.rollback();
                 }
                 return {
-                    valid: false,
-                    errors: [errors[0]],
-                    getErrorsFor
+                    earlyReturn: true as const,
+                    result: {
+                        valid: false,
+                        errors: [errors[0]],
+                        getErrorsFor
+                    }
                 };
             }
         }
@@ -559,38 +560,81 @@ export class ObjectSchemaBuilder<
             if (objKeys.length === 0) {
                 if (doNotStopOnFirstError && errors.length > 0) {
                     return {
-                        valid: false,
-                        errors,
-                        getErrorsFor
+                        earlyReturn: true as const,
+                        result: {
+                            valid: false,
+                            errors,
+                            getErrorsFor
+                        }
                     };
                 }
                 if (validationTransaction) {
                     validationTransaction.commit().validatedObject;
                 }
                 return {
-                    valid: true,
-                    object: {} as any,
-                    getErrorsFor
+                    earlyReturn: true as const,
+                    result: {
+                        valid: true,
+                        object: {} as any,
+                        getErrorsFor
+                    }
                 };
             }
         }
 
-        const validationResults = await Promise.all(
-            propKeys.map(async (key) => ({
-                key,
-                result: await this.#properties[key].validate(
-                    objToValidate[key],
-                    {
-                        ...context,
-                        path: `${path}.${key}`,
-                        rootPropertyDescriptor: rootPropertyDescriptor as any,
-                        currentPropertyDescriptor: (
-                            currentPropertyDescriptor as any
-                        )[key]
-                    }
-                )
-            }))
-        );
+        return {
+            earlyReturn: false as const,
+            errors,
+            objToValidate,
+            propKeys,
+            objKeys,
+            addErrorFor,
+            getErrorsFor,
+            path: path as string,
+            doNotStopOnFirstError: !!doNotStopOnFirstError,
+            rootPropertyDescriptor,
+            currentPropertyDescriptor,
+            validationTransaction: validationTransaction!
+        };
+    }
+
+    /**
+     * Shared post-property-validation processing for both `validate` and
+     * `validateAsync`.  Handles unknown-property checks, error aggregation,
+     * commit/rollback, and the final result construction.
+     */
+    #processResults(
+        setup: {
+            errors: any[];
+            objToValidate: any;
+            propKeys: string[];
+            objKeys: string[];
+            addErrorFor: (
+                propertyDescriptor: PropertyDescriptor<any, any, any>,
+                message: string,
+                parentPropertyDescriptor?: PropertyDescriptor<any, any, any>
+            ) => void;
+            getErrorsFor: any;
+            path: string;
+            doNotStopOnFirstError: boolean;
+            rootPropertyDescriptor: any;
+            currentPropertyDescriptor: any;
+            validationTransaction: any;
+        },
+        validationResults: { key: string; result: ValidationResult<any> }[]
+    ): ObjectSchemaValidationResult<any, any> {
+        const {
+            objToValidate,
+            objKeys,
+            addErrorFor,
+            getErrorsFor,
+            path,
+            doNotStopOnFirstError,
+            currentPropertyDescriptor,
+            validationTransaction
+        } = setup;
+
+        let errors = setup.errors;
 
         const notValidResults = validationResults.filter(
             (res) => !res.result.valid
@@ -689,6 +733,142 @@ export class ObjectSchemaBuilder<
                   : [],
             getErrorsFor
         };
+    }
+
+    /**
+     * Performs synchronous validation of object schema over the `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     *
+     * The returned result includes a `getErrorsFor()` method for type-safe,
+     * per-property error inspection.
+     *
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionality<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): ObjectSchemaValidationResult<
+        undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionality<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        this
+    > {
+        const setup = this.#setupValidation(
+            this.preValidateSync(object, context)
+        );
+        if (setup.earlyReturn) return setup.result as any;
+
+        const {
+            propKeys,
+            objToValidate,
+            path,
+            rootPropertyDescriptor,
+            currentPropertyDescriptor
+        } = setup;
+
+        const validationResults: {
+            key: string;
+            result: ValidationResult<any>;
+        }[] = [];
+        for (const key of propKeys) {
+            validationResults.push({
+                key,
+                result: this.#properties[key].validate(objToValidate[key], {
+                    ...context,
+                    path: `${path}.${key}`,
+                    rootPropertyDescriptor: rootPropertyDescriptor as any,
+                    currentPropertyDescriptor: (
+                        currentPropertyDescriptor as any
+                    )[key]
+                })
+            });
+        }
+
+        return this.#processResults(setup, validationResults) as any;
+    }
+
+    /**
+     * Performs async validation of object schema over the `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     *
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionality<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): Promise<
+        ObjectSchemaValidationResult<
+            undefined extends TExplicitType
+                ? InferType<
+                      SchemaBuilder<
+                          undefined extends TExplicitType
+                              ? Id<RespectPropsOptionality<TProperties>>
+                              : TExplicitType,
+                          TRequired
+                      >
+                  >
+                : TExplicitType,
+            this
+        >
+    > {
+        const setup = this.#setupValidation(
+            await this.preValidateAsync(object, context)
+        );
+        if (setup.earlyReturn) return setup.result as any;
+
+        const {
+            propKeys,
+            objToValidate,
+            path,
+            rootPropertyDescriptor,
+            currentPropertyDescriptor
+        } = setup;
+
+        const validationResults = await Promise.all(
+            propKeys.map(async (key) => ({
+                key,
+                result: await this.#properties[key].validateAsync(
+                    objToValidate[key],
+                    {
+                        ...context,
+                        path: `${path}.${key}`,
+                        rootPropertyDescriptor: rootPropertyDescriptor as any,
+                        currentPropertyDescriptor: (
+                            currentPropertyDescriptor as any
+                        )[key]
+                    }
+                )
+            }))
+        );
+
+        return this.#processResults(setup, validationResults) as any;
     }
 
     /**
