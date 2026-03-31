@@ -1,43 +1,25 @@
-export { AnySchemaBuilder, any } from './builders/AnySchemaBuilder.js';
-export type {
-    ArraySchemaValidationResult,
-    ElementValidationResult
-} from './builders/ArraySchemaBuilder.js';
-export { ArraySchemaBuilder, array } from './builders/ArraySchemaBuilder.js';
+// Re-export all types, classes, and extension system from core
+export * from './core.js';
+// Override bare factory functions with augmented versions (extensions pre-applied).
+// Named re-exports shadow the identically-named exports from `export *` above.
+// Export extension descriptors for composition
 export {
-    BooleanSchemaBuilder,
-    boolean
-} from './builders/BooleanSchemaBuilder.js';
-export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
-export {
-    FunctionSchemaBuilder,
-    func
-} from './builders/FunctionSchemaBuilder.js';
-export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
-export {
-    ObjectSchemaBuilder,
+    type ArrayBuiltinExtensions,
+    any,
+    array,
+    arrayExtensions,
+    boolean,
+    date,
+    type ExtendedArray,
+    type ExtendedNumber,
+    type ExtendedString,
+    func,
+    type NumberBuiltinExtensions,
+    number,
+    numberExtensions,
     object,
-    SchemaPropertySelector
-} from './builders/ObjectSchemaBuilder.js';
-export type {
-    PropertyDescriptor,
-    PropertyDescriptorInner,
-    PropertyDescriptorTree,
-    PropertySetterOptions
-} from './builders/SchemaBuilder.js';
-export {
-    InferType,
-    MakeOptional,
-    SchemaBuilder,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
-    ValidationError,
-    ValidationResult
-} from './builders/SchemaBuilder.js';
-export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
-export type {
-    OptionValidationResults,
-    UnionSchemaValidationResult
-} from './builders/UnionSchemaBuilder.js';
-export { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
-export type { ExtensionConfig, ExtensionDescriptor } from './extension.js';
-export { defineExtension, withExtensions } from './extension.js';
+    type StringBuiltinExtensions,
+    string,
+    stringExtensions,
+    union
+} from './extensions/index.js';

@@ -4,5 +4,6 @@
         "npx vitest": true,
         "npx tsc": true,
         "npx changeset": true
-    }
+    },
+    "editor.defaultFormatter": "biomejs.biome"
 }

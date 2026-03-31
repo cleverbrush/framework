@@ -12,6 +12,7 @@ A schema definition and validation library for TypeScript. Define object schemas
 
 - **PropertyDescriptors** — a runtime descriptor tree that other tools can introspect. The [`@cleverbrush/mapper`](../mapper) uses it for type-safe property selectors. The [`@cleverbrush/react-form`](../react-form) uses it to auto-generate form fields with correct validation. This makes the schema library a **foundation** for an entire ecosystem — not just a standalone validation tool.
 - **Extension system** — add custom methods to any builder type (`string`, `number`, `date`, …) via `defineExtension()` + `withExtensions()`. Extensions are fully typed, chainable, and composable. No other popular schema library offers a comparable type-safe plugin system.
+- **Built-in extension pack** — common validators like `email()`, `url()`, `uuid()`, `ip()`, `trim()`, `positive()`, `negative()`, `nonempty()`, `unique()`, and more are included out of the box. The default import has them pre-applied; import from `@cleverbrush/schema/core` to get bare builders without extensions.
 - **JSDoc comment preservation** — JSDoc comments on schema properties carry through to the inferred TypeScript type, so IDE tooltips and autocomplete descriptions come from the schema definition itself.
 - **Zero dependencies** — no runtime dependencies at all.
 
@@ -25,6 +26,7 @@ A schema definition and validation library for TypeScript. Define object schemas
 | Async validation              | ✓                   | ✓   | ✓   | ✓   |
 | Per-property error inspection | ✓                   | ~   | ~   | ~   |
 | Extension / plugin system     | ✓                   | ~   | ✗   | ~   |
+| Built-in validators (email…)  | ✓                   | ✓   | ✓   | ✓   |
 
 ## Installation
 
@@ -45,9 +47,9 @@ import {
 
 // 1. Define a schema with fluent constraints
 const UserSchema = object({
-    name: string().minLength(2, 'Name must be at least 2 characters'),
-    email: string().minLength(5, 'Please enter a valid email'),
-    age: number().min(0, 'Age cannot be negative').max(150),
+    name: string().nonempty('Name is required').minLength(2, 'Name must be at least 2 characters'),
+    email: string().email('Please enter a valid email'),
+    age: number().min(0, 'Age cannot be negative').max(150).positive(),
     isActive: boolean()
 });
 
@@ -95,13 +97,13 @@ The following builder functions are available:
 | Function        | Description                                       | Key Methods                                                     |
 | --------------- | ------------------------------------------------- | --------------------------------------------------------------- |
 | `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.addValidator(fn)`                              |
-| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.optional()` |
-| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.optional()`               |
+| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()` |
+| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)` |
 | `boolean()`     | Boolean value.                                    | `.optional()`                                                   |
 | `date()`        | JavaScript `Date` instance.                       | `.optional()`                                                   |
 | `func()`        | Function value.                                   | `.optional()`                                                   |
 | `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`            |
-| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.optional()`  |
+| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()` |
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`                 |
 
 ## Immutability
@@ -560,6 +562,67 @@ defineExtension({ string: { validate() { return this; } } });
 | `ExtensionConfig`              | Type for the configuration object passed to `defineExtension`. Maps builder type names to method records. |
 | `ExtensionDescriptor`          | Branded type returned by `defineExtension`. Pass to `withExtensions()` to apply.                         |
 
+## Built-in Extensions
+
+The default import from `@cleverbrush/schema` includes a pre-applied extension pack with common validators. You get these methods automatically — no extra setup required:
+
+### String Extensions
+
+| Method | Description | Metadata |
+| --- | --- | --- |
+| `.email(errorMessage?)` | Validates email format | `true` |
+| `.url(opts?, errorMessage?)` | Validates URL format. `opts.protocols` narrows allowed schemes (default: `http`, `https`) | `true` or `{ protocols }` |
+| `.uuid(errorMessage?)` | Validates RFC 4122 UUID format (versions 1–5) | `true` |
+| `.ip(opts?, errorMessage?)` | Validates IPv4 or IPv6 address. `opts.version` narrows to `'v4'` or `'v6'` | `true` or `{ version }` |
+| `.trim()` | Preprocessor — trims whitespace before validation | `true` |
+| `.toLowerCase()` | Preprocessor — lowercases value before validation | `true` |
+| `.nonempty(errorMessage?)` | Rejects empty strings | `true` |
+
+### Number Extensions
+
+| Method | Description | Metadata |
+| --- | --- | --- |
+| `.positive(errorMessage?)` | Value must be > 0 | `true` |
+| `.negative(errorMessage?)` | Value must be < 0 | `true` |
+| `.finite(errorMessage?)` | Value must be finite (not `Infinity` / `-Infinity`) | `true` |
+| `.multipleOf(n, errorMessage?)` | Value must be an exact multiple of `n` (float-safe) | `n` |
+
+### Array Extensions
+
+| Method | Description | Metadata |
+| --- | --- | --- |
+| `.nonempty(errorMessage?)` | Array must have at least one element | `true` |
+| `.unique(keyFn?, errorMessage?)` | All elements must be unique. Optional `keyFn` extracts comparison key for objects | `true` or `keyFn` |
+
+All validator extensions accept an optional error message as the last parameter — either a string or a function (matching the same `ValidationErrorMessageProvider` pattern used by built-in constraints like `.minLength()`):
+
+```typescript
+import { string, number, array } from '@cleverbrush/schema';
+
+// String error messages
+const email = string().email('Please enter a valid email');
+const age = number().positive('Age must be positive');
+const tags = array().of(string()).nonempty('At least one tag required');
+
+// Function error messages — receive the invalid value
+const name = string().nonempty((val) => `"${val}" is not allowed`);
+const score = number().multipleOf(5, (val) => `${val} is not a multiple of 5`);
+```
+
+### The `/core` Sub-path
+
+If you need bare builders **without** the built-in extensions (e.g. to apply only your own custom extensions), import from the `/core` sub-path:
+
+```typescript
+// Bare builders — no built-in extensions
+import { string, number, array, withExtensions } from '@cleverbrush/schema/core';
+
+// Apply only your own extensions
+const s = withExtensions(myCustomExtension);
+```
+
+The default import (`@cleverbrush/schema`) re-exports everything from `/core` and overrides the nine factory functions (`string`, `number`, `boolean`, `date`, `object`, `array`, `union`, `func`, `any`) with pre-extended versions. The extension descriptors themselves are also exported (`stringExtensions`, `numberExtensions`, `arrayExtensions`) so you can compose them with your own.
+
 ## Part of the Cleverbrush Ecosystem
 
 `@cleverbrush/schema` is the foundation of a three-library ecosystem:
@@ -580,7 +643,9 @@ Define a schema once and use it for runtime validation, object mapping between d
 
 **Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
 
-**Extension system:** `defineExtension`, `withExtensions`
+**Extension system:** `defineExtension`, `withExtensions`, `stringExtensions`, `numberExtensions`, `arrayExtensions`
+
+**Sub-path exports:** `@cleverbrush/schema/core` — bare builders without built-in extensions
 
 **Types:** `InferType`, `ValidationResult`, `ValidationError`, `MakeOptional`, `SchemaPropertySelector`, `PropertyDescriptor`, `PropertyDescriptorTree`, `ExtensionConfig`, `ExtensionDescriptor`
 
