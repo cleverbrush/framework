@@ -235,7 +235,7 @@ describe('string extensions', () => {
 
         test('works before equals validation', async () => {
             const schema = string().toLowerCase().equals('hello');
-            const result = await schema.validate('HELLO');
+            const result = await schema.validate('HELLO' as 'hello');
             expect(result.valid).toBe(true);
             expect(result.object).toBe('hello');
         });
