@@ -342,3 +342,444 @@ describe('sync validate() works for all builder types', () => {
         expect(result.valid).toBe(true);
     });
 });
+
+// ---------- validateAsync() works for all builder types ----------
+
+describe('validateAsync() works for all builder types', () => {
+    test('string', async () => {
+        const result = await string().validateAsync('hello');
+        expect(result.valid).toBe(true);
+        expect(result.object).toBe('hello');
+    });
+
+    test('number', async () => {
+        const result = await number().validateAsync(42);
+        expect(result.valid).toBe(true);
+        expect(result.object).toBe(42);
+    });
+
+    test('boolean', async () => {
+        const result = await boolean().validateAsync(true);
+        expect(result.valid).toBe(true);
+        expect(result.object).toBe(true);
+    });
+
+    test('date', async () => {
+        const d = new Date();
+        const result = await date().validateAsync(d);
+        expect(result.valid).toBe(true);
+    });
+
+    test('func', async () => {
+        const fn = () => {};
+        const result = await func().validateAsync(fn);
+        expect(result.valid).toBe(true);
+    });
+
+    test('any', async () => {
+        const result = await any().validateAsync('anything');
+        expect(result.valid).toBe(true);
+    });
+
+    test('object', async () => {
+        const schema = object({ name: string(), age: number() });
+        const result = await schema.validateAsync({ name: 'John', age: 30 });
+        expect(result.valid).toBe(true);
+        expect(result.object?.name).toBe('John');
+    });
+
+    test('array', async () => {
+        const schema = array().of(number());
+        const result = await schema.validateAsync([1, 2, 3]);
+        expect(result.valid).toBe(true);
+    });
+
+    test('union', async () => {
+        const schema = union(string()).or(number());
+        const result = await schema.validateAsync('hello');
+        expect(result.valid).toBe(true);
+
+        const result2 = await schema.validateAsync(42);
+        expect(result2.valid).toBe(true);
+    });
+
+    test('nested object', async () => {
+        const schema = object({
+            user: object({
+                name: string(),
+                tags: array().of(string())
+            })
+        });
+        const result = await schema.validateAsync({
+            user: { name: 'John', tags: ['dev', 'admin'] }
+        });
+        expect(result.valid).toBe(true);
+    });
+});
+
+// ---------- validateAsync() returns errors for invalid values ----------
+
+describe('validateAsync() returns errors for invalid values', () => {
+    test('required string rejects undefined', async () => {
+        const result = await string().validateAsync(undefined as any);
+        expect(result.valid).toBe(false);
+        expect(result.errors).toBeDefined();
+        expect(result.errors!.length).toBeGreaterThan(0);
+    });
+
+    test('number.min() rejects below minimum', async () => {
+        const result = await number().min(10).validateAsync(5);
+        expect(result.valid).toBe(false);
+        expect(result.errors!.length).toBeGreaterThan(0);
+    });
+
+    test('string.minLength() rejects short strings', async () => {
+        const result = await string().minLength(5).validateAsync('hi');
+        expect(result.valid).toBe(false);
+    });
+
+    test('object rejects missing required properties', async () => {
+        const schema = object({ name: string(), email: string() });
+        const result = await schema.validateAsync({} as any);
+        expect(result.valid).toBe(false);
+        expect(result.errors).toBeDefined();
+    });
+
+    test('object rejects unknown properties when configured', async () => {
+        const schema = object({ name: string() }).notAcceptUnknownProps();
+        const result = await schema.validateAsync({
+            name: 'John',
+            extra: 'nope'
+        } as any);
+        expect(result.valid).toBe(false);
+    });
+});
+
+// ---------- validateAsync() with doNotStopOnFirstError ----------
+
+describe('validateAsync() with doNotStopOnFirstError', () => {
+    test('collects all errors from object properties', async () => {
+        const schema = object({
+            name: string(),
+            email: string(),
+            age: number()
+        });
+        const result = await schema.validateAsync({} as any, {
+            doNotStopOnFirstError: true
+        });
+        expect(result.valid).toBe(false);
+        expect(result.errors!.length).toBeGreaterThanOrEqual(3);
+    });
+
+    test('collects multiple validator errors on a single field', async () => {
+        const schema = string()
+            .addValidator(async () => ({
+                valid: false,
+                errors: [{ message: 'error one', path: '' }]
+            }))
+            .addValidator(async () => ({
+                valid: false,
+                errors: [{ message: 'error two', path: '' }]
+            }));
+        const result = await schema.validateAsync('test', {
+            doNotStopOnFirstError: true
+        });
+        expect(result.valid).toBe(false);
+        expect(result.errors!.length).toBe(2);
+    });
+
+    test('stops on first error without doNotStopOnFirstError', async () => {
+        const schema = string()
+            .addValidator(async () => ({
+                valid: false,
+                errors: [{ message: 'first', path: '' }]
+            }))
+            .addValidator(async () => ({
+                valid: false,
+                errors: [{ message: 'second', path: '' }]
+            }));
+        const result = await schema.validateAsync('test');
+        expect(result.valid).toBe(false);
+        expect(result.errors!.length).toBe(1);
+        expect(result.errors![0].message).toBe('first');
+    });
+});
+
+// ---------- validateAsync() with async preprocessors ----------
+
+describe('validateAsync() with async preprocessors', () => {
+    test('transforms value before validation', async () => {
+        const schema = number()
+            .addPreprocessor(async (val) => val * 2)
+            .min(10);
+        const result = await schema.validateAsync(6);
+        expect(result.valid).toBe(true);
+        expect(result.object).toBe(12);
+    });
+
+    test('chained async preprocessors run in order', async () => {
+        const schema = string()
+            .addPreprocessor(async (val) => val.trim())
+            .addPreprocessor(async (val) => val.toUpperCase())
+            .minLength(3);
+        const result = await schema.validateAsync('  hello  ');
+        expect(result.valid).toBe(true);
+        expect(result.object).toBe('HELLO');
+    });
+
+    test('failing preprocessor produces error', async () => {
+        const schema = string().addPreprocessor(async () => {
+            throw new Error('preprocessor failed');
+        });
+        const result = await schema.validateAsync('test');
+        expect(result.valid).toBe(false);
+        expect(result.errors![0].message).toContain('preprocessor failed');
+    });
+
+    test('object with async preprocessors on nested properties', async () => {
+        const schema = object({
+            name: string().addPreprocessor(async (val) => val.trim()),
+            score: number().addPreprocessor(async (val) => Math.round(val))
+        });
+        const result = await schema.validateAsync({
+            name: '  Alice  ',
+            score: 9.7
+        });
+        expect(result.valid).toBe(true);
+        expect(result.object?.name).toBe('Alice');
+        expect(result.object?.score).toBe(10);
+    });
+});
+
+// ---------- validateAsync() with deeply nested objects ----------
+
+describe('validateAsync() with deeply nested objects', () => {
+    test('validates deeply nested schema', async () => {
+        const schema = object({
+            level1: object({
+                level2: object({
+                    value: string()
+                })
+            })
+        });
+        const result = await schema.validateAsync({
+            level1: { level2: { value: 'deep' } }
+        });
+        expect(result.valid).toBe(true);
+        expect(result.object?.level1.level2.value).toBe('deep');
+    });
+
+    test('error paths include full nesting', async () => {
+        const schema = object({
+            user: object({
+                profile: object({
+                    email: string()
+                })
+            })
+        });
+        const result = await schema.validateAsync(
+            {
+                user: { profile: {} }
+            } as any,
+            { doNotStopOnFirstError: true }
+        );
+        expect(result.valid).toBe(false);
+        const emailError = result.errors!.find((e) =>
+            e.path?.includes('email')
+        );
+        expect(emailError).toBeDefined();
+        expect(emailError!.path).toBe('$.user.profile.email');
+    });
+
+    test('async validators on nested properties', async () => {
+        const schema = object({
+            user: object({
+                username: string().addValidator(async (val) => {
+                    await new Promise((r) => setTimeout(r, 5));
+                    return {
+                        valid: val !== 'admin',
+                        errors:
+                            val !== 'admin'
+                                ? []
+                                : [{ message: 'reserved username', path: '' }]
+                    };
+                })
+            })
+        });
+
+        const good = await schema.validateAsync({
+            user: { username: 'alice' }
+        });
+        expect(good.valid).toBe(true);
+
+        const bad = await schema.validateAsync({
+            user: { username: 'admin' }
+        });
+        expect(bad.valid).toBe(false);
+    });
+});
+
+// ---------- validateAsync() error path correctness ----------
+
+describe('validateAsync() error path correctness', () => {
+    test('root-level field error has correct path', async () => {
+        const result = await string().validateAsync(undefined as any);
+        expect(result.errors![0].path).toBe('$');
+    });
+
+    test('object property error has correct path', async () => {
+        const schema = object({ name: string() });
+        const result = await schema.validateAsync({} as any);
+        expect(result.errors![0].path).toBe('$.name');
+    });
+
+    test('async validator error has correct path', async () => {
+        const schema = object({
+            email: string().addValidator(async () => ({
+                valid: false,
+                errors: [{ message: 'invalid email', path: '' }]
+            }))
+        });
+        const result = await schema.validateAsync({ email: 'bad' });
+        expect(result.valid).toBe(false);
+        expect(result.errors![0].path).toContain('email');
+    });
+
+    test('array element error has correct path', async () => {
+        const schema = array().of(number());
+        const result = await schema.validateAsync([1, 'not a number'] as any, {
+            doNotStopOnFirstError: true
+        });
+        expect(result.valid).toBe(false);
+        const errPath = result.errors![0].path;
+        expect(errPath).toContain('[');
+    });
+});
+
+// ---------- validateAsync() with mixed sync+async validators ----------
+
+describe('validateAsync() with mixed sync and async validators', () => {
+    test('sync validators work when called via validateAsync', async () => {
+        const schema = string().minLength(3).maxLength(10);
+        const result = await schema.validateAsync('hello');
+        expect(result.valid).toBe(true);
+    });
+
+    test('mixed sync preprocessor + async validator', async () => {
+        const schema = string()
+            .addPreprocessor((val) => val.trim())
+            .addValidator(async (val) => ({
+                valid: val.length >= 3,
+                errors:
+                    val.length >= 3
+                        ? []
+                        : [{ message: 'too short after trim', path: '' }]
+            }));
+
+        const good = await schema.validateAsync('   hello   ');
+        expect(good.valid).toBe(true);
+        expect(good.object).toBe('hello');
+
+        const bad = await schema.validateAsync('   ab   ');
+        expect(bad.valid).toBe(false);
+    });
+
+    test('async preprocessor + sync built-in constraint', async () => {
+        const schema = number()
+            .addPreprocessor(async (val) => val + 10)
+            .min(15);
+        const result = await schema.validateAsync(6);
+        expect(result.valid).toBe(true);
+        expect(result.object).toBe(16);
+
+        const bad = await schema.validateAsync(2);
+        expect(bad.valid).toBe(false);
+    });
+});
+
+// ---------- validateAsync() with async required error messages ----------
+
+describe('validateAsync() with async error message providers', () => {
+    test('async required error message', async () => {
+        const schema = string().required(async () => 'name is mandatory');
+        const result = await schema.validateAsync(undefined as any);
+        expect(result.valid).toBe(false);
+        expect(result.errors![0].message).toBe('name is mandatory');
+    });
+
+    test('async min error message on number', async () => {
+        const schema = number().min(10, async () => 'must be at least ten');
+        const result = await schema.validateAsync(5);
+        expect(result.valid).toBe(false);
+        expect(result.errors![0].message).toBe('must be at least ten');
+    });
+});
+
+// ---------- validateAsync() with optional fields ----------
+
+describe('validateAsync() with optional fields', () => {
+    test('optional string accepts undefined', async () => {
+        const result = await string()
+            .optional()
+            .validateAsync(undefined as any);
+        expect(result.valid).toBe(true);
+    });
+
+    test('optional number accepts undefined', async () => {
+        const result = await number()
+            .optional()
+            .validateAsync(undefined as any);
+        expect(result.valid).toBe(true);
+    });
+
+    test('object with all optional fields accepts empty object', async () => {
+        const schema = object({
+            name: string().optional(),
+            age: number().optional()
+        });
+        const result = await schema.validateAsync({});
+        expect(result.valid).toBe(true);
+    });
+
+    test('object with mix of required and optional fields', async () => {
+        const schema = object({
+            name: string(),
+            nickname: string().optional(),
+            age: number().optional()
+        });
+        const result = await schema.validateAsync({ name: 'Alice' });
+        expect(result.valid).toBe(true);
+
+        const bad = await schema.validateAsync({} as any);
+        expect(bad.valid).toBe(false);
+    });
+});
+
+// ---------- validateAsync() getErrorsFor on object results ----------
+
+describe('validateAsync() getErrorsFor on object results', () => {
+    test('getErrorsFor returns per-field errors', async () => {
+        const schema = object({ name: string(), email: string() });
+        const result = await schema.validateAsync({} as any, {
+            doNotStopOnFirstError: true
+        });
+        expect(result.valid).toBe(false);
+        expect(typeof result.getErrorsFor).toBe('function');
+
+        const nameErrors = result.getErrorsFor((t) => t.name);
+        expect(nameErrors.errors.length).toBeGreaterThan(0);
+
+        const emailErrors = result.getErrorsFor((t) => t.email);
+        expect(emailErrors.errors.length).toBeGreaterThan(0);
+    });
+
+    test('getErrorsFor returns valid for present fields', async () => {
+        const schema = object({ name: string(), email: string() });
+        const result = await schema.validateAsync({ name: 'John' } as any, {
+            doNotStopOnFirstError: true
+        });
+
+        const nameErrors = result.getErrorsFor((t) => t.name);
+        expect(nameErrors.errors.length).toBe(0);
+    });
+});
