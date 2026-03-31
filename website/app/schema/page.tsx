@@ -845,7 +845,7 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                                 </tr>
                                 <tr>
                                     <td><code>.uuid(errorMessage?)</code></td>
-                                    <td>Validates UUID v4 format</td>
+                                    <td>Validates UUID (versions 1–5) format</td>
                                 </tr>
                                 <tr>
                                     <td><code>.ip(opts?, errorMessage?)</code></td>

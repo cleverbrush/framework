@@ -33,7 +33,7 @@ export { type StringBuiltinExtensions, stringExtensions } from './string.js';
 // WORKAROUND: TypeScript strips JSDoc when signatures pass through the
 // FixedMethods mapped type (conditional `infer` loses comments). These
 // explicit type aliases + factory annotations bypass FixedMethods so that
-// JSDoc from the *BuildtinExtensions interfaces reaches consumers.
+// JSDoc from the *BuiltinExtensions interfaces reaches consumers.
 // Remove once TypeScript preserves JSDoc through mapped types.
 // See: https://github.com/microsoft/TypeScript/issues/50715
 // ---------------------------------------------------------------------------

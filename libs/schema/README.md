@@ -572,7 +572,7 @@ The default import from `@cleverbrush/schema` includes a pre-applied extension p
 | --- | --- | --- |
 | `.email(errorMessage?)` | Validates email format | `true` |
 | `.url(opts?, errorMessage?)` | Validates URL format. `opts.protocols` narrows allowed schemes (default: `http`, `https`) | `true` or `{ protocols }` |
-| `.uuid(errorMessage?)` | Validates UUID v4 format | `true` |
+| `.uuid(errorMessage?)` | Validates RFC 4122 UUID format (versions 1–5) | `true` |
 | `.ip(opts?, errorMessage?)` | Validates IPv4 or IPv6 address. `opts.version` narrows to `'v4'` or `'v6'` | `true` or `{ version }` |
 | `.trim()` | Preprocessor — trims whitespace before validation | `true` |
 | `.toLowerCase()` | Preprocessor — lowercases value before validation | `true` |
