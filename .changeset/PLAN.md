@@ -6,7 +6,7 @@ The framework has strong foundations — immutable builders, type-safe extension
 
 ## Phase 1: Pre-Merge Feature Parity (High Impact)
 
-### 1.1 Official Extension Pack
+### 1.1 Official Extension Pack (DONE)
 
 Ship common validators zod has built-in:
 
@@ -16,9 +16,9 @@ Ship common validators zod has built-in:
 
 This **demonstrates the extension system** while closing the biggest API gap vs zod. Could live as `@cleverbrush/schema/extensions` sub-path export.
 
-### 1.2 Discriminated Unions
+### 1.2 Discriminated Unions (NOT NEEDED — documented)
 
-Add `.discriminator('type')` to `union()` for efficient tagged union matching. This is a heavily-used zod feature people will expect.
+~~Add `.discriminator('type')` to `union()` for efficient tagged union matching.~~ Not implementing — `union()` + `string('literal')` already covers this pattern naturally with full type inference. A "Discriminated Unions" section has been added to the website docs showing how to do it, including a real-world example from `@cleverbrush/scheduler`.
 
 ### 1.3 Transform/Pipe Support
 

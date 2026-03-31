@@ -161,6 +161,95 @@ const IdOrEmail = union(string().minLength(1)).or(
 );
 ```
 
+## Discriminated Unions
+
+Some libraries ship a dedicated `.discriminator()` API for tagged unions. With `@cleverbrush/schema` you don't need one — `union()` combined with **string-literal schemas** gives you the same pattern naturally, with full type inference.
+
+Use `string('literal')` for the discriminator field. Each branch of the union gets its own object schema whose discriminator can only match one exact value. TypeScript narrows the inferred type automatically:
+
+```typescript
+import { object, string, number, union, type InferType } from '@cleverbrush/schema';
+
+// Each variant has a literal "type" field acting as the discriminator
+const Circle = object({
+    type:   string('circle'),
+    radius: number().min(0)
+});
+
+const Rectangle = object({
+    type:   string('rectangle'),
+    width:  number().min(0),
+    height: number().min(0)
+});
+
+const Triangle = object({
+    type:   string('triangle'),
+    base:   number().min(0),
+    height: number().min(0)
+});
+
+// Combine with union() — no special .discriminator() call needed
+const ShapeSchema = union(Circle).or(Rectangle).or(Triangle);
+
+type Shape = InferType<typeof ShapeSchema>;
+// Shape is automatically:
+//   | { type: 'circle';    radius: number }
+//   | { type: 'rectangle'; width: number; height: number }
+//   | { type: 'triangle';  base: number;  height: number }
+
+// Validation picks the matching branch by the literal field
+const result = await ShapeSchema.validate({ type: 'circle', radius: 5 });
+```
+
+### Real-World Example: Job Scheduler
+
+The `@cleverbrush/scheduler` library uses this exact pattern to validate job schedules. The `every` field acts as the discriminator, and each variant adds its own set of allowed properties:
+
+```typescript
+import { object, string, number, array, date, union, type InferType } from '@cleverbrush/schema';
+
+// Shared base with common schedule fields
+const ScheduleBase = object({
+    interval: number().min(1).max(356),
+    hour:     number().min(0).max(23).optional(),
+    minute:   number().min(0).max(59).optional(),
+    startsOn: date().acceptJsonString().optional(),
+    endsOn:   date().acceptJsonString().optional()
+});
+
+// Minute schedule — omit hour/minute (they don't apply)
+const EveryMinute = ScheduleBase
+    .omit('hour').omit('minute')
+    .addProps({ every: string('minute') });
+
+// Day schedule
+const EveryDay = ScheduleBase
+    .addProps({ every: string('day') });
+
+// Week schedule — adds dayOfWeek array
+const EveryWeek = ScheduleBase.addProps({
+    every:     string('week'),
+    dayOfWeek: array().of(number().min(1).max(7)).minLength(1).maxLength(7)
+});
+
+// Month schedule — adds day (number or 'last')
+const EveryMonth = ScheduleBase.addProps({
+    every: string('month'),
+    day:   union(string('last')).or(number().min(1).max(28))
+});
+
+// Combine all variants in a single union
+const ScheduleSchema = union(EveryMinute)
+    .or(EveryDay)
+    .or(EveryWeek)
+    .or(EveryMonth);
+
+type Schedule = InferType<typeof ScheduleSchema>;
+// TypeScript infers a proper discriminated union on "every"
+```
+
+Because each branch uses a string literal (`string('minute')`, `string('day')`, etc.) for the `every` field, TypeScript can narrow the full union based on that single property — exactly like zod's `z.discriminatedUnion()`, but without any extra API surface.
+
 ## JSDoc Comment Preservation
 
 When you define an object schema, JSDoc comments on properties are preserved in the inferred TypeScript type. This means your IDE tooltips, hover documentation, and autocomplete descriptions all carry through from the schema definition — no need to maintain separate documentation:
