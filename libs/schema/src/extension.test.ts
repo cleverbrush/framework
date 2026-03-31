@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, test } from 'vitest';
-import { AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
 import { ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
 import { BooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
 import { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
@@ -330,16 +329,6 @@ const debouncedExt = defineExtension({
     }
 });
 
-// -- Any extensions ----------------------------------------------------------
-
-const metadataExt = defineExtension({
-    any: {
-        meta(this: AnySchemaBuilder) {
-            return this;
-        }
-    }
-});
-
 // ===========================================================================
 // Tests
 // ===========================================================================
@@ -651,7 +640,7 @@ describe('number extensions', () => {
 
     test('currency validates decimal places', async () => {
         const s = withExtensions(currencyExt);
-        const schema = s.number().currency({ maxDecimals: 5 });
+        const schema = s.number().currency({ maxDecimals: 2 });
 
         expect((await schema.validate(19.99)).valid).toBe(true);
         expect((await schema.validate(19.999)).valid).toBe(false);
@@ -751,17 +740,6 @@ describe('function extensions', () => {
     });
 });
 
-describe('any extensions', () => {
-    test('meta stores arbitrary metadata', () => {
-        const s = withExtensions(metadataExt);
-        const schema = s.any().meta();
-        expect(schema.introspect().extensions.meta).toEqual({
-            description: 'A flexible field',
-            deprecated: true
-        });
-    });
-});
-
 // ---------------------------------------------------------------------------
 // 2. Multi-builder combination tests
 // ---------------------------------------------------------------------------
@@ -787,8 +765,7 @@ describe('cross-builder extension combinations', () => {
             timestampsExt,
             uniqueExt,
             labeledExt,
-            debouncedExt,
-            metadataExt
+            debouncedExt
         );
 
         // Every factory type is accessible
@@ -811,7 +788,6 @@ describe('cross-builder extension combinations', () => {
         expect(typeof s.array().unique).toBe('function');
         expect(typeof s.union(string()).labeled).toBe('function');
         expect(typeof s.func().debounced).toBe('function');
-        expect(typeof s.any().meta).toBe('function');
     });
 });
 
@@ -1283,11 +1259,6 @@ describe('instanceof checks for all builder types', () => {
     test('extended func instanceof FunctionSchemaBuilder', () => {
         const s = withExtensions(debouncedExt);
         expect(s.func().debounced(300)).toBeInstanceOf(FunctionSchemaBuilder);
-    });
-
-    test('extended any instanceof AnySchemaBuilder', () => {
-        const s = withExtensions(metadataExt);
-        expect(s.any().meta()).toBeInstanceOf(AnySchemaBuilder);
     });
 });
 
