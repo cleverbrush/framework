@@ -241,6 +241,11 @@ export const numberExtensions = defineExtension({
             n: number,
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
+            if (n === 0 || !Number.isFinite(n)) {
+                throw new Error(
+                    'multipleOf: n must be a finite, non-zero number'
+                );
+            }
             return this.withExtension('multipleOf', n).addValidator(
                 async (val) => {
                     const remainder = Math.abs(val % n);

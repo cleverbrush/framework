@@ -156,6 +156,30 @@ describe('number extensions', () => {
             expect(result.valid).toBe(false);
             expect(result.errors?.[0].message).toBe('Must be divisible by 3');
         });
+
+        test('throws for n === 0', () => {
+            expect(() => number().multipleOf(0)).toThrow(
+                'multipleOf: n must be a finite, non-zero number'
+            );
+        });
+
+        test('throws for n === NaN', () => {
+            expect(() => number().multipleOf(NaN)).toThrow(
+                'multipleOf: n must be a finite, non-zero number'
+            );
+        });
+
+        test('throws for n === Infinity', () => {
+            expect(() => number().multipleOf(Infinity)).toThrow(
+                'multipleOf: n must be a finite, non-zero number'
+            );
+        });
+
+        test('throws for n === -Infinity', () => {
+            expect(() => number().multipleOf(-Infinity)).toThrow(
+                'multipleOf: n must be a finite, non-zero number'
+            );
+        });
     });
 
     // -----------------------------------------------------------------------
