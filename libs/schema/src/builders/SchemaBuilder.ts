@@ -452,19 +452,36 @@ export type PropertyDescriptorTree<
                         >
                     >
                   : TProperties[K] extends ArraySchemaBuilder<
-                          ObjectSchemaBuilder<any, any, any, any>,
+                          infer TArrayElement,
                           any,
                           any
                       >
-                    ? PropertyDescriptor<
-                          TRootSchema,
-                          TProperties[K],
-                          PropertyDescriptor<
-                              TRootSchema,
-                              TSchema,
-                              TParentPropertyDescriptor
-                          >
+                    ? TArrayElement extends ObjectSchemaBuilder<
+                          any,
+                          any,
+                          any,
+                          any
                       >
+                        ? PropertyDescriptor<
+                              TRootSchema,
+                              TProperties[K],
+                              PropertyDescriptor<
+                                  TRootSchema,
+                                  TSchema,
+                                  TParentPropertyDescriptor
+                              >
+                          >
+                        : InferType<TProperties[K]> extends TAssignableTo
+                          ? PropertyDescriptor<
+                                TRootSchema,
+                                TProperties[K],
+                                PropertyDescriptor<
+                                    TRootSchema,
+                                    TSchema,
+                                    TParentPropertyDescriptor
+                                >
+                            >
+                          : never
                     : InferType<TProperties[K]> extends TAssignableTo
                       ? PropertyDescriptor<
                             TRootSchema,
