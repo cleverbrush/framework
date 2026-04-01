@@ -21,7 +21,7 @@ describe('brand - type inference', () => {
         const schema = string().brand<'Email'>();
         type Result = InferType<typeof schema>;
         expectTypeOf<Result>().toExtend<string>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Email';
         }>();
     });
@@ -29,8 +29,8 @@ describe('brand - type inference', () => {
     test('number().brand<T>() produces branded number', () => {
         const schema = number().brand<'UserId'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<number>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<number>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'UserId';
         }>();
     });
@@ -38,8 +38,8 @@ describe('brand - type inference', () => {
     test('boolean().brand<T>() produces branded boolean', () => {
         const schema = boolean().brand<'Flag'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<boolean>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<boolean>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Flag';
         }>();
     });
@@ -47,8 +47,8 @@ describe('brand - type inference', () => {
     test('date().brand<T>() produces branded date', () => {
         const schema = date().brand<'Timestamp'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<Date>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<Date>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Timestamp';
         }>();
     });
@@ -56,8 +56,8 @@ describe('brand - type inference', () => {
     test('func().brand<T>() produces branded function', () => {
         const schema = func().brand<'Handler'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<(...args: any[]) => any>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<(...args: any[]) => any>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Handler';
         }>();
     });
@@ -65,7 +65,7 @@ describe('brand - type inference', () => {
     test('any().brand<T>() produces branded any', () => {
         const schema = any().brand<'Payload'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Payload';
         }>();
     });
@@ -76,8 +76,8 @@ describe('brand - type inference', () => {
             age: number()
         }).brand<'User'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<{ name: string; age: number }>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<{ name: string; age: number }>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'User';
         }>();
     });
@@ -85,8 +85,8 @@ describe('brand - type inference', () => {
     test('array().brand<T>() produces branded array', () => {
         const schema = array(string()).brand<'Tags'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<string[]>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<string[]>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Tags';
         }>();
     });
@@ -94,7 +94,7 @@ describe('brand - type inference', () => {
     test('union().brand<T>() produces branded union', () => {
         const schema = union(string()).or(number()).brand<'Id'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<{ readonly [K in BRAND]: 'Id' }>();
+        expectTypeOf<Result>().toExtend<{ readonly [K in BRAND]: 'Id' }>();
     });
 
     test('two differently branded strings are not assignable to each other', () => {
@@ -104,8 +104,8 @@ describe('brand - type inference', () => {
         type Username = InferType<typeof usernameSchema>;
 
         // Each is assignable to string
-        expectTypeOf<Email>().toMatchTypeOf<string>();
-        expectTypeOf<Username>().toMatchTypeOf<string>();
+        expectTypeOf<Email>().toExtend<string>();
+        expectTypeOf<Username>().toExtend<string>();
 
         // But not to each other
         expectTypeOf<Email>().not.toEqualTypeOf<Username>();
@@ -132,8 +132,8 @@ describe('brand - type inference', () => {
     test('brand preserved through builder chaining', () => {
         const schema = string().minLength(5).brand<'Email'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<string>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<string>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Email';
         }>();
     });
@@ -148,8 +148,8 @@ describe('brand - type inference', () => {
         type Email = Brand<string, 'Email'>;
         type UserId = Brand<number, 'UserId'>;
 
-        expectTypeOf<Email>().toMatchTypeOf<string>();
-        expectTypeOf<UserId>().toMatchTypeOf<number>();
+        expectTypeOf<Email>().toExtend<string>();
+        expectTypeOf<UserId>().toExtend<number>();
         expectTypeOf<Email>().not.toEqualTypeOf<string>();
         expectTypeOf<UserId>().not.toEqualTypeOf<number>();
     });
@@ -217,8 +217,8 @@ describe('brand - runtime behavior', () => {
     test('brand() with runtime argument (JS compat)', () => {
         const schema = string().brand('Email');
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<string>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<string>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Email';
         }>();
 
@@ -245,8 +245,8 @@ describe('brand - extension integration', () => {
         const { string: s } = withExtensions(trimExt);
         const schema = s().trim().brand<'Trimmed'>();
         type Result = InferType<typeof schema>;
-        expectTypeOf<Result>().toMatchTypeOf<string>();
-        expectTypeOf<Result>().toMatchTypeOf<{
+        expectTypeOf<Result>().toExtend<string>();
+        expectTypeOf<Result>().toExtend<{
             readonly [K in BRAND]: 'Trimmed';
         }>();
 
