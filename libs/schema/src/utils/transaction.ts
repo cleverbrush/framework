@@ -266,6 +266,21 @@ export const transaction = <T extends {}>(
 };
 
 /**
+ * Creates a lightweight no-op transaction that wraps the `initial` value
+ * without any Proxy or copy-on-write overhead.  `commit()` and `rollback()`
+ * simply return the original object, and `isDirty()` is always `false`.
+ *
+ * Use this when no preprocessors or validators are defined — there is no
+ * risk of mutation, so the full transaction machinery can be skipped.
+ */
+export const noopTransaction = <T extends {}>(initial: T): Transaction<T> => ({
+    object: initial,
+    commit: () => initial,
+    rollback: () => initial,
+    isDirty: () => false
+});
+
+/**
  * Checks if `obj` is an instance of a transaction.
  * @param obj object to check if it's a transaction
  * @returns `true` if `obj` is a transaction, `false` otherwise

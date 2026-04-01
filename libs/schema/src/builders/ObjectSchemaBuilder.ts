@@ -658,12 +658,6 @@ export class ObjectSchemaBuilder<
             (res) => !res.result.valid
         );
 
-        validationResults
-            .filter((res) => res.result.valid)
-            .forEach(({ key, result }) => {
-                objToValidate[key] = result.object;
-            });
-
         const nestedErrors = notValidResults.reduce((acc, val) => {
             const currentErrors = val?.result?.errors;
             if (Array.isArray(currentErrors)) {
@@ -699,10 +693,20 @@ export class ObjectSchemaBuilder<
         }
 
         if (notValidResults.length === 0 && errors.length === 0) {
-            const commited = validationTransaction!.commit();
+            const resultObject: Record<string, any> = {};
+            for (const { key, result } of validationResults) {
+                resultObject[key] = result.object;
+            }
+            if (this.#acceptUnknownProps) {
+                for (const key of objKeys) {
+                    if (!(key in this.#properties)) {
+                        resultObject[key] = objToValidate[key];
+                    }
+                }
+            }
             return {
                 valid: true,
-                object: commited.validatedObject,
+                object: resultObject,
                 getErrorsFor
             };
         }

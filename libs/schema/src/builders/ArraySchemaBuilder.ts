@@ -398,6 +398,7 @@ export class ArraySchemaBuilder<
                     getNestedErrors
                 );
             } else {
+                const resultArray = new Array(objToValidate.length);
                 for (let i = 0; i < objToValidate.length; i++) {
                     const result = this.#elementSchema.validate(
                         objToValidate[i],
@@ -408,7 +409,7 @@ export class ArraySchemaBuilder<
                     );
                     elementResults[i] = result as any;
                     if (result.valid) {
-                        objToValidate[i] = result.object;
+                        resultArray[i] = result.object;
                     } else {
                         return {
                             valid: false,
@@ -421,6 +422,12 @@ export class ArraySchemaBuilder<
                         };
                     }
                 }
+
+                return {
+                    valid: true,
+                    object: resultArray as TResult,
+                    getNestedErrors
+                };
             }
         }
 
@@ -490,6 +497,7 @@ export class ArraySchemaBuilder<
                     getNestedErrors
                 );
             } else {
+                const resultArray = new Array(objToValidate.length);
                 for (let i = 0; i < objToValidate.length; i++) {
                     const result = await this.#elementSchema.validateAsync(
                         objToValidate[i],
@@ -500,7 +508,7 @@ export class ArraySchemaBuilder<
                     );
                     elementResults[i] = result as any;
                     if (result.valid) {
-                        objToValidate[i] = result.object;
+                        resultArray[i] = result.object;
                     } else {
                         return {
                             valid: false,
@@ -513,6 +521,12 @@ export class ArraySchemaBuilder<
                         };
                     }
                 }
+
+                return {
+                    valid: true,
+                    object: resultArray as TResult,
+                    getNestedErrors
+                };
             }
         }
 

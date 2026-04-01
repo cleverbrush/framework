@@ -1,4 +1,8 @@
-import { type Transaction, transaction } from '../utils/transaction.js';
+import {
+    noopTransaction,
+    type Transaction,
+    transaction
+} from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
@@ -650,11 +654,16 @@ export abstract class SchemaBuilder<
             currentPropertyDescriptor: context?.currentPropertyDescriptor
         };
 
+        const needsTransaction =
+            this.#preprocessors.length > 0 || this.#validators.length > 0;
+
         return {
             path,
             doNotStopOnFirstError,
             resultingContext,
-            transaction: transaction({ validatedObject: object }),
+            transaction: needsTransaction
+                ? transaction({ validatedObject: object })
+                : noopTransaction({ validatedObject: object }),
             errors: [] as ValidationError[]
         };
     }
