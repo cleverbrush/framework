@@ -46,7 +46,7 @@ Only library with zero test coverage. Add basic tests before publishing a major 
 - `.github/workflows/release.yml` — changeset publish on merge to master
 - Matrix: Node 20 + 22
 
-### 2.2 Community Files
+### 2.2 Community Files - DONE
 
 - `CONTRIBUTING.md` — how to add extensions, new builders, PR process
 - `CODE_OF_CONDUCT.md` — Contributor Covenant
