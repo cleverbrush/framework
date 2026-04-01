@@ -31,6 +31,7 @@ const result = UserSchema.validate({
 `;
 
 type PanelTab = 'validation' | 'type' | 'introspection';
+const SHARED_CODE_PREVIEW_LENGTH = 300;
 
 function loadCompleted(): Set<string> {
     if (typeof window === 'undefined') return new Set();
@@ -78,6 +79,7 @@ export default function PlaygroundPage() {
     const [navCollapsed, setNavCollapsed] = useState(false);
     const [showWelcome, setShowWelcome] = useState(false);
     const [shareToast, setShareToast] = useState(false);
+    const [pendingShared, setPendingShared] = useState<{ code: string; challengeId: string | null } | null>(null);
 
     const { result, execute, isRunning } = useSchemaExecution();
     const { typeInfo, setEditor, extractType } = useTypeInference();
@@ -91,20 +93,12 @@ export default function PlaygroundPage() {
         const completed = loadCompleted();
         setCompletedIds(completed);
 
-        // Check URL hash for shared state
+        // Check URL hash for shared state — require user confirmation before running
         const hash = window.location.hash.slice(1);
         if (hash) {
             const { code: sharedCode, challengeId } = decodeShare(hash);
             if (sharedCode) {
-                setCode(sharedCode);
-                setCurrentChallengeId(challengeId ?? null);
-                if (challengeId) {
-                    const ch = getChallengeById(challengeId);
-                    if (ch) {
-                        setTestData(ch.testData);
-                        setActivePanel(ch.activePanel);
-                    }
-                }
+                setPendingShared({ code: sharedCode, challengeId: challengeId ?? null });
                 return;
             }
         }
@@ -114,6 +108,26 @@ export default function PlaygroundPage() {
             setShowWelcome(true);
             localStorage.setItem('pg-visited', '1');
         }
+    }, []);
+
+    const handleAcceptShared = useCallback(() => {
+        if (!pendingShared) return;
+        const { code: sharedCode, challengeId } = pendingShared;
+        setCode(sharedCode);
+        setCurrentChallengeId(challengeId);
+        if (challengeId) {
+            const ch = getChallengeById(challengeId);
+            if (ch) {
+                setTestData(ch.testData);
+                setActivePanel(ch.activePanel);
+            }
+        }
+        setPendingShared(null);
+    }, [pendingShared]);
+
+    const handleDeclineShared = useCallback(() => {
+        setPendingShared(null);
+        window.location.hash = '';
     }, []);
 
     // Run code on change
@@ -239,6 +253,28 @@ export default function PlaygroundPage() {
                         <p className="pg-welcome-shortcuts">
                             <kbd>Ctrl+Enter</kbd> Check &nbsp; <kbd>Ctrl+→</kbd> Next Challenge
                         </p>
+                    </div>
+                </div>
+            )}
+
+            {/* Shared-code confirmation banner */}
+            {pendingShared && (
+                <div className="pg-welcome-overlay">
+                    <div className="pg-welcome" onClick={e => e.stopPropagation()}>
+                        <h2>Run shared code?</h2>
+                        <p>
+                            This link contains code that will be executed in the playground.
+                            Only run code from sources you trust.
+                        </p>
+                        <pre className="pg-shared-preview">{pendingShared.code.slice(0, SHARED_CODE_PREVIEW_LENGTH)}{pendingShared.code.length > SHARED_CODE_PREVIEW_LENGTH ? '\n…' : ''}</pre>
+                        <div className="pg-welcome-buttons">
+                            <button className="pg-btn pg-btn-check" onClick={handleAcceptShared}>
+                                ▶ Run Code
+                            </button>
+                            <button className="pg-btn pg-btn-solution" onClick={handleDeclineShared}>
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

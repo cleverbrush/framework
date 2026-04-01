@@ -60,11 +60,15 @@ export function useTypeInference() {
             if (schemaVarMatch.length > 0) {
                 const lastMatch = schemaVarMatch[schemaVarMatch.length - 1];
                 const varName = lastMatch[1];
-                const varPos = code.indexOf(`const ${varName}`) !== -1
-                    ? code.indexOf(`const ${varName}`) + 'const '.length
-                    : code.indexOf(`let ${varName}`) + 'let '.length;
+                const constIdx = code.indexOf(`const ${varName}`);
+                const letIdx = code.indexOf(`let ${varName}`);
+                const varPos = constIdx !== -1
+                    ? constIdx + 'const '.length
+                    : letIdx !== -1
+                        ? letIdx + 'let '.length
+                        : -1;
 
-                if (varPos >= 0) {
+                if (varPos !== -1) {
                     const info = await client.getQuickInfoAtPosition(model.uri.toString(), varPos);
                     if (info?.displayParts) {
                         const fullType = info.displayParts.map((p: { text: string }) => p.text).join('');
@@ -77,8 +81,9 @@ export function useTypeInference() {
             if (resultVarMatch.length > 0 && !typeStr) {
                 const lastMatch = resultVarMatch[resultVarMatch.length - 1];
                 const varName = lastMatch[1];
-                const varPos = code.indexOf(`const ${varName}`) + 'const '.length;
-                if (varPos >= 0) {
+                const constIdx = code.indexOf(`const ${varName}`);
+                const varPos = constIdx !== -1 ? constIdx + 'const '.length : -1;
+                if (varPos !== -1) {
                     const info = await client.getQuickInfoAtPosition(model.uri.toString(), varPos);
                     if (info?.displayParts) {
                         const fullType = info.displayParts.map((p: { text: string }) => p.text).join('');

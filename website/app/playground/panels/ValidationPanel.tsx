@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import type { KeyboardEvent } from 'react';
 import type { ExecutionResult } from '../useSchemaExecution';
 
 interface Props {
@@ -23,7 +24,7 @@ export function ValidationPanel({ result, testData, onTestDataChange }: Props) {
         onTestDataChange(draft);
     }, [draft, onTestDataChange]);
 
-    const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    const handleKeyDown = useCallback((e: KeyboardEvent) => {
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             handleApply();
         }

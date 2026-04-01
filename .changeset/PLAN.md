@@ -53,7 +53,7 @@ Only library with zero test coverage. Add basic tests before publishing a major 
 - `.github/ISSUE_TEMPLATE/bug_report.yml` + `feature_request.yml`
 - `.github/PULL_REQUEST_TEMPLATE.md`
 
-### 2.3 Benchmarks - BENCHMARKS ARE DONE. But resutls are not very good, we don't have stable first place and in some cases we have much worst results than competitors. Have to improve it.
+### 2.3 Benchmarks - BENCHMARKS ARE DONE, but results are not very good; we don't have a stable first place and in some cases we have much worse results than competitors. We have to improve this.
 
 Add `vitest.bench` comparing validation throughput vs zod/yup/joi. If schema is faster (likely due to simpler validator chains), publish results on the website as a selling point.
 

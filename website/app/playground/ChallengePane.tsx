@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { Challenge } from './challenges';
 
 interface Props {
@@ -37,13 +37,11 @@ export function ChallengePane({ challenge, onCheck, onShowSolution, onNext, isCo
     }, [onNext]);
 
     // Reset state when challenge changes
-    const [prevId, setPrevId] = useState(challenge.id);
-    if (challenge.id !== prevId) {
-        setPrevId(challenge.id);
+    useEffect(() => {
         setHints(0);
         setFeedback(null);
         setShowExplanation(false);
-    }
+    }, [challenge.id]);
 
     return (
         <div className="pg-challenge">
