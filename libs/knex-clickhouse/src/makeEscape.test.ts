@@ -1,90 +1,90 @@
 import { describe, expect, test } from 'vitest';
 import { makeEscape } from './makeEscape.js';
 
-const escape = makeEscape();
+const escapeFn = makeEscape();
 
 describe('makeEscape', () => {
     describe('null and undefined', () => {
         test('null returns NULL', () => {
-            expect(escape(null)).toBe('NULL');
+            expect(escapeFn(null)).toBe('NULL');
         });
 
         test('undefined returns NULL', () => {
-            expect(escape(undefined)).toBe('NULL');
+            expect(escapeFn(undefined)).toBe('NULL');
         });
     });
 
     describe('booleans', () => {
         test('true returns "true"', () => {
-            expect(escape(true)).toBe('true');
+            expect(escapeFn(true)).toBe('true');
         });
 
         test('false returns "false"', () => {
-            expect(escape(false)).toBe('false');
+            expect(escapeFn(false)).toBe('false');
         });
     });
 
     describe('numbers', () => {
         test('integer', () => {
-            expect(escape(42)).toBe('42');
+            expect(escapeFn(42)).toBe('42');
         });
 
         test('negative number', () => {
-            expect(escape(-7)).toBe('-7');
+            expect(escapeFn(-7)).toBe('-7');
         });
 
         test('float', () => {
-            expect(escape(3.14)).toBe('3.14');
+            expect(escapeFn(3.14)).toBe('3.14');
         });
 
         test('zero', () => {
-            expect(escape(0)).toBe('0');
+            expect(escapeFn(0)).toBe('0');
         });
 
         test('NaN', () => {
-            expect(escape(NaN)).toBe('NaN');
+            expect(escapeFn(NaN)).toBe('NaN');
         });
 
         test('Infinity', () => {
-            expect(escape(Infinity)).toBe('Infinity');
+            expect(escapeFn(Infinity)).toBe('Infinity');
         });
     });
 
     describe('strings', () => {
         test('simple string', () => {
-            expect(escape('hello')).toBe("'hello'");
+            expect(escapeFn('hello')).toBe("'hello'");
         });
 
         test('empty string', () => {
-            expect(escape('')).toBe("''");
+            expect(escapeFn('')).toBe("''");
         });
 
         test('string with single quotes', () => {
-            expect(escape("it's")).toBe("'it\\'s'");
+            expect(escapeFn("it's")).toBe("'it\\'s'");
         });
 
         test('string with backslash', () => {
-            expect(escape('back\\slash')).toBe("'back\\\\slash'");
+            expect(escapeFn('back\\slash')).toBe("'back\\\\slash'");
         });
 
         test('string with double quotes', () => {
-            expect(escape('say "hello"')).toBe('\'say \\"hello\\"\'');
+            expect(escapeFn('say "hello"')).toBe('\'say \\"hello\\"\'');
         });
 
         test('string with newline', () => {
-            expect(escape('line1\nline2')).toBe("'line1\\nline2'");
+            expect(escapeFn('line1\nline2')).toBe("'line1\\nline2'");
         });
 
         test('string with tab', () => {
-            expect(escape('col1\tcol2')).toBe("'col1\\tcol2'");
+            expect(escapeFn('col1\tcol2')).toBe("'col1\\tcol2'");
         });
 
         test('string with null byte', () => {
-            expect(escape('null\0byte')).toBe("'null\\0byte'");
+            expect(escapeFn('null\0byte')).toBe("'null\\0byte'");
         });
 
         test('SQL injection attempt — single quote is escaped', () => {
-            const result = escape("'; DROP TABLE users; --");
+            const result = escapeFn("'; DROP TABLE users; --");
             // The leading single quote is backslash-escaped, preventing string breakout
             expect(result).toMatch(/^'\\'/);
         });
@@ -92,14 +92,14 @@ describe('makeEscape', () => {
 
     describe('dates', () => {
         test('formats a UTC date', () => {
-            const result = escape(new Date('2024-06-15T12:30:45.123Z'), {
+            const result = escapeFn(new Date('2024-06-15T12:30:45.123Z'), {
                 timeZone: 'Z'
             });
             expect(result).toBe("'2024-06-15 12:30:45.123'");
         });
 
         test('formats epoch date', () => {
-            const result = escape(new Date('1970-01-01T00:00:00.000Z'), {
+            const result = escapeFn(new Date('1970-01-01T00:00:00.000Z'), {
                 timeZone: 'Z'
             });
             expect(result).toBe("'1970-01-01 00:00:00.000'");
@@ -108,20 +108,22 @@ describe('makeEscape', () => {
 
     describe('arrays', () => {
         test('simple number array', () => {
-            expect(escape([1, 2, 3])).toBe('1, 2, 3');
+            expect(escapeFn([1, 2, 3])).toBe('1, 2, 3');
         });
 
         test('string array', () => {
-            expect(escape(['a', 'b'])).toBe("'a', 'b'");
+            expect(escapeFn(['a', 'b'])).toBe("'a', 'b'");
         });
 
         test('mixed array', () => {
-            expect(escape([1, 'two', null, true])).toBe("1, 'two', NULL, true");
+            expect(escapeFn([1, 'two', null, true])).toBe(
+                "1, 'two', NULL, true"
+            );
         });
 
         test('nested array', () => {
             expect(
-                escape([
+                escapeFn([
                     [1, 2],
                     [3, 4]
                 ])
@@ -129,31 +131,31 @@ describe('makeEscape', () => {
         });
 
         test('empty array', () => {
-            expect(escape([])).toBe('');
+            expect(escapeFn([])).toBe('');
         });
     });
 
     describe('buffers', () => {
         test('buffer to hex string', () => {
             const buf = Buffer.from([0xde, 0xad, 0xbe, 0xef]);
-            expect(escape(buf)).toBe("X'deadbeef'");
+            expect(escapeFn(buf)).toBe("X'deadbeef'");
         });
 
         test('empty buffer', () => {
-            expect(escape(Buffer.from([]))).toBe("X''");
+            expect(escapeFn(Buffer.from([]))).toBe("X''");
         });
     });
 
     describe('objects', () => {
         test('plain object serialized as JSON', () => {
-            expect(escape({ a: 1 })).toBe('{"a":1}');
+            expect(escapeFn({ a: 1 })).toBe('{"a":1}');
         });
 
         test('object with toSQL method', () => {
             const obj = {
                 toSQL: () => 'custom_sql_expression'
             };
-            expect(escape(obj)).toBe('custom_sql_expression');
+            expect(escapeFn(obj)).toBe('custom_sql_expression');
         });
     });
 
