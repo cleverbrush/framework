@@ -734,9 +734,11 @@ export class ObjectSchemaBuilder<
                     }
                 }
             } else if (Array.isArray(result.errors)) {
-                result.errors.forEach((error) => {
-                    addErrorFor(descriptor, error.message);
-                });
+                if (ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)) {
+                    result.errors.forEach((error) => {
+                        addErrorFor(descriptor, error.message);
+                    });
+                }
             }
         });
 

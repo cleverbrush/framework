@@ -18,7 +18,9 @@
         "release": "npm run clean && npm run build && changeset publish",
         "publish:beta": "npm run clean && npm run build && changeset publish --tag beta",
         "run_scheduler": "node ./libs/scheduler/dist/index.js",
-        "test": "vitest --run --typecheck"
+        "test": "vitest --run --typecheck",
+        "bench": "vitest bench --run",
+        "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks"
     },
     "workspaces": [
         "./libs/*"

@@ -734,3 +734,65 @@ test('getNestedErrors - optional null returns valid', async () => {
     const rootErrors = getNestedErrors();
     expect(rootErrors.errors.length).toEqual(0);
 });
+
+test('object with array of objects - invalid elements should not throw', () => {
+    const schema = object({
+        items: array().of(
+            object({
+                sku: string().minLength(3),
+                quantity: number().min(1),
+                price: number().min(0).clearIsInteger()
+            })
+        )
+    });
+
+    // Sync: invalid element must return {valid: false}, not throw
+    const result = schema.validate({
+        items: [{ sku: 'AB', quantity: 0, price: -5 }]
+    } as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('object with array of objects - invalid elements should not throw (async)', async () => {
+    const schema = object({
+        items: array().of(
+            object({
+                sku: string().minLength(3),
+                quantity: number().min(1),
+                price: number().min(0).clearIsInteger()
+            })
+        )
+    });
+
+    // Async: invalid element must return {valid: false}, not throw
+    const result = await schema.validateAsync({
+        items: [{ sku: 'Ab', quantity: 0, price: -5 }]
+    } as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('deeply nested object > array > object with invalid data returns valid:false', () => {
+    const schema = object({
+        order: object({
+            items: array().of(
+                object({
+                    name: string().minLength(1),
+                    qty: number().min(1)
+                })
+            )
+        })
+    });
+
+    const result = schema.validate({
+        order: {
+            items: [
+                { name: '', qty: 0 },
+                { name: 'ok', qty: 1 }
+            ]
+        }
+    } as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});

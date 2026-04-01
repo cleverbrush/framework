@@ -1,0 +1,17 @@
+{
+    "name": "@cleverbrush/benchmarks",
+    "private": true,
+    "version": "1.0.0",
+    "description": "Validation throughput benchmarks — @cleverbrush/schema vs zod, yup, joi",
+    "type": "module",
+    "scripts": {
+        "bench": "vitest bench --run",
+        "bench:json": "vitest bench --run --reporter=json"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^2.0.0",
+        "joi": "^17.13.3",
+        "yup": "^1.6.1",
+        "zod": "^3.24.4"
+    }
+}

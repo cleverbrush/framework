@@ -5,6 +5,11 @@ export default defineConfig({
     test: {
         // Use simple glob pattern for auto-discovery
         projects: ['libs/*'],
+        benchmark: {
+            ...(process.env.BENCH_JSON
+                ? { outputJson: process.env.BENCH_JSON }
+                : {})
+        },
         include: [
             'libs/**/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
         ],

@@ -1,6 +1,6 @@
-import { describe, expect, test, vi, beforeEach } from 'vitest';
 import knex from 'knex';
-import { ClickhouseKnexClient, getClickhouseConnection } from './index.js';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { ClickhouseKnexClient } from './index.js';
 
 const TEST_CONFIG = {
     connection: {
