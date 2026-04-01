@@ -28,11 +28,11 @@ Add `.transform(fn)` (post-validation value transformation) and `.pipe(otherSche
 
 Add `.validate()` (sync) and `.validateAsync()` (async). Current async-only API is a friction point — most zod users expect synchronous validation.
 
-### 1.5 Branded/Opaque Types
+### 1.5 Branded/Opaque Types - DONE
 
 `string().brand<'Email'>()` → prevents mixing semantically different strings at type level. Popular zod feature, relatively simple to implement.
 
-### 1.6 knex-clickhouse Tests
+### 1.6 knex-clickhouse Tests - DONE
 
 Only library with zero test coverage. Add basic tests before publishing a major release.
 
