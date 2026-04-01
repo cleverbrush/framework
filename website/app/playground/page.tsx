@@ -81,8 +81,8 @@ export default function PlaygroundPage() {
     const [shareToast, setShareToast] = useState(false);
     const [pendingShared, setPendingShared] = useState<{ code: string; challengeId: string | null } | null>(null);
 
-    const { result, execute, isRunning } = useSchemaExecution();
-    const { typeInfo, setEditor, extractType } = useTypeInference();
+    const { result, execute, isRunning, setEditor: setExecutionEditor } = useSchemaExecution();
+    const { typeInfo, setEditor: setTypeEditor, extractType } = useTypeInference();
     const initDone = useRef(false);
 
     // Load state from localStorage and URL hash on mount
@@ -197,8 +197,9 @@ export default function PlaygroundPage() {
 
     // Editor mount
     const handleEditorMount = useCallback((editor: unknown, monaco: unknown) => {
-        setEditor(editor, monaco);
-    }, [setEditor]);
+        setExecutionEditor(editor, monaco);
+        setTypeEditor(editor, monaco);
+    }, [setExecutionEditor, setTypeEditor]);
 
     // Test data change
     const handleTestDataChange = useCallback((data: string) => {

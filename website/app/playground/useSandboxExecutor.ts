@@ -1,0 +1,272 @@
+'use client';
+
+import { useCallback, useEffect, useRef } from 'react';
+
+export interface ExecutionResult {
+    validationResult?: {
+        valid: boolean;
+        object?: unknown;
+        errors?: { path: string; message: string }[];
+    };
+    introspection?: Record<string, unknown>;
+    error?: string;
+}
+
+const EXECUTION_TIMEOUT = 5000;
+
+/**
+ * Escapes `</` to `<\/` so inlined JS doesn't prematurely close a <script> tag.
+ */
+function escapeScriptClose(code: string): string {
+    return code.replace(/<\//g, '<\\/');
+}
+
+function buildSrcdoc(bundle: string): string {
+    const escaped = escapeScriptClose(bundle);
+
+    // The JavaScript below runs inside the sandboxed iframe (opaque origin).
+    // It receives transpiled JS via postMessage, executes it with the schema
+    // library injected, and posts results back.
+    return `<!DOCTYPE html><html><head><script>
+${escaped}
+;(function() {
+    var schema = typeof __schema !== 'undefined' ? __schema : {};
+
+    function sanitize(obj) {
+        if (obj === null || obj === undefined || typeof obj !== 'object') return {};
+        var result = {};
+        var keys = Object.keys(obj);
+        for (var i = 0; i < keys.length; i++) {
+            var key = keys[i];
+            var value = obj[key];
+            if (typeof value === 'function') {
+                result[key] = '[Function]';
+            } else if (Array.isArray(value)) {
+                result[key] = value.map(function(item) {
+                    if (typeof item === 'function') return '[Function]';
+                    if (typeof item === 'object' && item !== null) {
+                        var summary = {};
+                        var ks = Object.keys(item);
+                        for (var j = 0; j < ks.length; j++) {
+                            summary[ks[j]] = typeof item[ks[j]] === 'function' ? '[Function]' : item[ks[j]];
+                        }
+                        return summary;
+                    }
+                    return item;
+                });
+            } else if (typeof value === 'object') {
+                result[key] = sanitize(value);
+            } else {
+                result[key] = value;
+            }
+        }
+        return result;
+    }
+
+    function formatValidation(vr) {
+        return {
+            valid: vr.valid,
+            object: vr.object,
+            errors: vr.errors ? vr.errors.map(function(e) {
+                return { path: e.path || '$', message: e.message || 'Validation failed' };
+            }) : undefined
+        };
+    }
+
+    self.addEventListener('message', function(event) {
+        var data = event.data;
+        if (!data || !data.id) return;
+        var id = data.id;
+        var code = data.code || '';
+        var testData = data.testData;
+
+        try {
+            // Strip import/export statements from transpiled JS
+            var strippedCode = code.replace(
+                /import\\s+\\{[^}]+\\}\\s+from\\s+['"][^'"]+['"]\\s*;?/g, ''
+            );
+            strippedCode = strippedCode.replace(
+                /import\\s+\\*\\s+as\\s+\\w+\\s+from\\s+['"][^'"]+['"]\\s*;?/g, ''
+            );
+            strippedCode = strippedCode.replace(
+                /import\\s+\\w+\\s+from\\s+['"][^'"]+['"]\\s*;?/g, ''
+            );
+            strippedCode = strippedCode.replace(
+                /export\\s*\\{[^}]*\\}\\s*;?/g, ''
+            );
+            strippedCode = strippedCode.replace(
+                /export\\s+default\\s+/g, ''
+            );
+
+            // Destructure all schema exports into scope
+            var allExports = Object.keys(schema);
+            var destructure = allExports.map(function(k) {
+                return 'var ' + k + ' = __schema["' + k + '"];';
+            }).join('\\n');
+
+            var wrappedCode = destructure + '\\n'
+                + 'var __lastSchema, __lastResult;\\n'
+                + strippedCode + '\\n';
+
+            // Build variable detection code
+            var varRegex = /(?:const|let|var)\\s+(\\w+)\\s*=/g;
+            var match;
+            var varNames = [];
+            while ((match = varRegex.exec(strippedCode)) !== null) {
+                varNames.push(match[1]);
+            }
+            for (var i = 0; i < varNames.length; i++) {
+                var name = varNames[i];
+                wrappedCode += 'try { if (typeof ' + name + ' !== "undefined" && ' + name + ' !== null) {'
+                    + 'if (typeof ' + name + '.validate === "function" || typeof ' + name + '.introspect === "function") __lastSchema = ' + name + ';'
+                    + 'if (typeof ' + name + ' === "object" && "valid" in ' + name + ') __lastResult = ' + name + ';'
+                    + '}} catch(__e) {}\\n';
+            }
+
+            wrappedCode += 'return { __lastSchema: __lastSchema, __lastResult: __lastResult };';
+
+            var fn = new Function('__schema', wrappedCode);
+            var execResult = fn(schema);
+
+            var output = {};
+
+            if (execResult.__lastSchema && typeof execResult.__lastSchema.introspect === 'function') {
+                try { output.introspection = sanitize(execResult.__lastSchema.introspect()); } catch(e) {}
+            }
+
+            if (execResult.__lastResult && typeof execResult.__lastResult === 'object' && 'valid' in execResult.__lastResult) {
+                output.validationResult = formatValidation(execResult.__lastResult);
+            } else if (execResult.__lastSchema && typeof execResult.__lastSchema.validate === 'function' && testData) {
+                try {
+                    var parsed = JSON.parse(testData);
+                    var vr = execResult.__lastSchema.validate(parsed);
+                    output.validationResult = formatValidation(vr);
+                } catch(e) {}
+            }
+
+            parent.postMessage({ id: id, type: 'result', result: output }, '*');
+        } catch(err) {
+            parent.postMessage({ id: id, type: 'result', error: err && err.message ? err.message : String(err) }, '*');
+        }
+    });
+
+    parent.postMessage({ type: 'ready' }, '*');
+})();
+</script></head><body></body></html>`;
+}
+
+/**
+ * Manages a sandboxed iframe for executing user code.
+ * The iframe has `sandbox="allow-scripts"` (no `allow-same-origin`),
+ * giving it an opaque origin that cannot access the parent page's
+ * cookies, localStorage, or same-origin APIs.
+ */
+export function useSandboxExecutor() {
+    const iframeRef = useRef<HTMLIFrameElement | null>(null);
+    const bundleRef = useRef<string>('');
+    const readyRef = useRef(false);
+    const pendingRef = useRef<
+        Map<string, { resolve: (r: ExecutionResult) => void; timer: ReturnType<typeof setTimeout> }>
+    >(new Map());
+    const readyQueueRef = useRef<Array<() => void>>([]);
+
+    useEffect(() => {
+        function createIframe(bundle: string) {
+            destroyIframe();
+            const iframe = document.createElement('iframe');
+            iframe.setAttribute('sandbox', 'allow-scripts');
+            iframe.style.display = 'none';
+            iframe.srcdoc = buildSrcdoc(bundle);
+            document.body.appendChild(iframe);
+            iframeRef.current = iframe;
+        }
+
+        function destroyIframe() {
+            if (iframeRef.current) {
+                iframeRef.current.remove();
+                iframeRef.current = null;
+                readyRef.current = false;
+            }
+        }
+
+        function handleMessage(e: MessageEvent) {
+            if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
+
+            const { id, type, result, error } = e.data ?? {};
+
+            if (type === 'ready') {
+                readyRef.current = true;
+                const queue = readyQueueRef.current.splice(0);
+                for (const cb of queue) cb();
+                return;
+            }
+
+            if (type === 'result' && id) {
+                const pending = pendingRef.current.get(id);
+                if (pending) {
+                    clearTimeout(pending.timer);
+                    pendingRef.current.delete(id);
+                    pending.resolve(error ? { error } : (result ?? {}));
+                }
+            }
+        }
+
+        window.addEventListener('message', handleMessage);
+
+        fetch('/playground/schema-bundle.js')
+            .then((r) => r.text())
+            .then((text) => {
+                bundleRef.current = text;
+                createIframe(text);
+            })
+            .catch(() => {
+                // Bundle fetch failed — sandbox won't be available
+            });
+
+        return () => {
+            window.removeEventListener('message', handleMessage);
+            destroyIframe();
+            for (const [, p] of pendingRef.current) clearTimeout(p.timer);
+            pendingRef.current.clear();
+            readyQueueRef.current.length = 0;
+        };
+    }, []);
+
+    const execute = useCallback(
+        (jsCode: string, testDataJson?: string): Promise<ExecutionResult> => {
+            return new Promise((resolve) => {
+                function send() {
+                    const win = iframeRef.current?.contentWindow;
+                    if (!win) {
+                        resolve({ error: 'Sandbox not available' });
+                        return;
+                    }
+                    const id = crypto.randomUUID();
+                    const timer = setTimeout(() => {
+                        pendingRef.current.delete(id);
+                        resolve({ error: 'Execution timed out' });
+                    }, EXECUTION_TIMEOUT);
+
+                    pendingRef.current.set(id, { resolve, timer });
+                    win.postMessage({ id, code: jsCode, testData: testDataJson }, '*');
+                }
+
+                if (readyRef.current) {
+                    send();
+                } else {
+                    // Queue until iframe is ready
+                    const waitTimer = setTimeout(() => {
+                        resolve({ error: 'Sandbox initialization timed out' });
+                    }, 10_000);
+                    readyQueueRef.current.push(() => {
+                        clearTimeout(waitTimer);
+                        send();
+                    });
+                }
+            });
+        },
+        []
+    );
+
+    return { execute };
+}
