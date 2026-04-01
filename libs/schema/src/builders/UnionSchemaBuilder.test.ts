@@ -459,10 +459,13 @@ test('getNestedErrors - object branch with property navigation', async () => {
         })
     );
 
-    const { valid, getNestedErrors } = await schema.validate({
-        from: 'not-a-date',
-        to: 'not-a-date'
-    } as any);
+    const { valid, getNestedErrors } = await schema.validate(
+        {
+            from: 'not-a-date',
+            to: 'not-a-date'
+        } as any,
+        { doNotStopOnFirstError: true }
+    );
 
     expect(valid).toEqual(false);
 

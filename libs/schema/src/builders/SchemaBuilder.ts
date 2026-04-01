@@ -175,6 +175,18 @@ export type Validator<T> = (
 ) => Promise<ValidatorResult<T>> | ValidatorResult<T>;
 
 /**
+ * Internal wrapper that pairs a preprocessor function with metadata
+ * indicating whether it may mutate the value.
+ */
+export type PreprocessorEntry<T> = { fn: Preprocessor<T>; mutates: boolean };
+
+/**
+ * Internal wrapper that pairs a validator function with metadata
+ * indicating whether it may mutate the value.
+ */
+export type ValidatorEntry<T> = { fn: Validator<T>; mutates: boolean };
+
+/**
  * Configuration properties used to construct a `SchemaBuilder` instance.
  * Contains the schema type identifier, requirement flag, and lists of
  * preprocessors and validators.
@@ -182,8 +194,8 @@ export type Validator<T> = (
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
-    preprocessors: Preprocessor<T>[];
-    validators: Validator<T>[];
+    preprocessors: PreprocessorEntry<T>[];
+    validators: ValidatorEntry<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
 };
@@ -547,8 +559,9 @@ export abstract class SchemaBuilder<
     TExtensions = {}
 > {
     #isRequired = true;
-    #preprocessors: Preprocessor<TResult>[] = [];
-    #validators: Validator<TResult>[] = [];
+    #preprocessors: PreprocessorEntry<TResult>[] = [];
+    #validators: ValidatorEntry<TResult>[] = [];
+    #hasMutating = false;
     #extensions: Record<string, unknown> = {};
     #type = 'base';
     #defaultRequiredErrorMessageProvider: ValidationErrorMessageProvider =
@@ -654,8 +667,7 @@ export abstract class SchemaBuilder<
             currentPropertyDescriptor: context?.currentPropertyDescriptor
         };
 
-        const needsTransaction =
-            this.#preprocessors.length > 0 || this.#validators.length > 0;
+        const needsTransaction = this.#hasMutating;
 
         return {
             path,
@@ -757,21 +769,17 @@ export abstract class SchemaBuilder<
         let preprocessedObject =
             preprocessingTransaction.object.validatedObject;
 
-        if (Array.isArray(this.preprocessors)) {
+        if (this.#preprocessors.length > 0) {
             let currentPrepropIndex = 0;
-            for (const preprocessor of this.preprocessors) {
+            for (const entry of this.#preprocessors) {
                 try {
-                    const result = preprocessor(preprocessedObject);
+                    const result = entry.fn(preprocessedObject);
                     if (result instanceof Promise) {
                         throw new Error(
-                            `Preprocessor #${currentPrepropIndex}${preprocessor.name ? ` (${preprocessor.name})` : ''} returned a Promise. Use validateAsync() for schemas with async preprocessors.`
+                            `Preprocessor #${currentPrepropIndex}${entry.fn.name ? ` (${entry.fn.name})` : ''} returned a Promise. Use validateAsync() for schemas with async preprocessors.`
                         );
                     }
-                    preprocessingTransaction = transaction({
-                        validatedObject: result
-                    });
-                    preprocessedObject =
-                        preprocessingTransaction.object.validatedObject;
+                    preprocessedObject = result;
                 } catch (err) {
                     if (
                         (err as Error).message?.includes('Use validateAsync()')
@@ -780,28 +788,30 @@ export abstract class SchemaBuilder<
                     }
                     errors.push({
                         message: `Preprocessor #${currentPrepropIndex}${
-                            preprocessor.name ? ` (${preprocessor.name})` : ''
+                            entry.fn.name ? ` (${entry.fn.name})` : ''
                         } thrown an error: ${(err as Error).message}`,
                         path: `${path}($preprocessors[${currentPrepropIndex}])`
                     });
                     if (!doNotStopOnFirstError) {
-                        preprocessingTransaction.rollback();
                         return this.#earlyFailResult(errors, resultingContext);
                     }
                 } finally {
                     currentPrepropIndex++;
                 }
             }
+            preprocessingTransaction = this.#hasMutating
+                ? transaction({ validatedObject: preprocessedObject })
+                : noopTransaction({ validatedObject: preprocessedObject });
         }
 
-        if (Array.isArray(this.validators)) {
+        if (this.#validators.length > 0) {
             let currentValidatorIndex = 0;
-            for (const validator of this.validators) {
+            for (const entry of this.#validators) {
                 try {
-                    const validatorResult = validator(preprocessedObject);
+                    const validatorResult = entry.fn(preprocessedObject);
                     if (validatorResult instanceof Promise) {
                         throw new Error(
-                            `Validator #${currentValidatorIndex}${validator.name ? ` (${validator.name})` : ''} returned a Promise. Use validateAsync() for schemas with async validators.`
+                            `Validator #${currentValidatorIndex}${entry.fn.name ? ` (${entry.fn.name})` : ''} returned a Promise. Use validateAsync() for schemas with async validators.`
                         );
                     }
                     const { valid, errors: validatorErrors } = validatorResult;
@@ -809,13 +819,12 @@ export abstract class SchemaBuilder<
                         errors.push(
                             ...this.#validatorFailureErrors(
                                 currentValidatorIndex,
-                                validator.name,
+                                entry.fn.name,
                                 validatorErrors,
                                 path
                             )
                         );
                         if (!doNotStopOnFirstError) {
-                            preprocessingTransaction.rollback();
                             return this.#earlyFailResult(
                                 errors,
                                 resultingContext
@@ -830,12 +839,11 @@ export abstract class SchemaBuilder<
                     }
                     errors.push({
                         message: `Validator #${currentValidatorIndex}${
-                            validator.name ? ` (${validator.name})` : ''
+                            entry.fn.name ? ` (${entry.fn.name})` : ''
                         } thrown an error: ${(err as Error).message}`,
                         path: `${path}($validators[${currentValidatorIndex}])`
                     });
                     if (!doNotStopOnFirstError) {
-                        preprocessingTransaction.rollback();
                         return this.#earlyFailResult(errors, resultingContext);
                     }
                 } finally {
@@ -889,51 +897,48 @@ export abstract class SchemaBuilder<
         let preprocessedObject =
             preprocessingTransaction.object.validatedObject;
 
-        if (Array.isArray(this.preprocessors)) {
+        if (this.#preprocessors.length > 0) {
             let currentPrepropIndex = 0;
-            for (const preprocessor of this.preprocessors) {
+            for (const entry of this.#preprocessors) {
                 try {
-                    preprocessingTransaction = transaction({
-                        validatedObject: await Promise.resolve(
-                            preprocessor(preprocessedObject)
-                        )
-                    });
-                    preprocessedObject =
-                        preprocessingTransaction.object.validatedObject;
+                    preprocessedObject = await Promise.resolve(
+                        entry.fn(preprocessedObject)
+                    );
                 } catch (err) {
                     errors.push({
                         message: `Preprocessor #${currentPrepropIndex}${
-                            preprocessor.name ? ` (${preprocessor.name})` : ''
+                            entry.fn.name ? ` (${entry.fn.name})` : ''
                         } thrown an error: ${(err as Error).message}`,
                         path: `${path}($preprocessors[${currentPrepropIndex}])`
                     });
                     if (!doNotStopOnFirstError) {
-                        preprocessingTransaction.rollback();
                         return this.#earlyFailResult(errors, resultingContext);
                     }
                 } finally {
                     currentPrepropIndex++;
                 }
             }
+            preprocessingTransaction = this.#hasMutating
+                ? transaction({ validatedObject: preprocessedObject })
+                : noopTransaction({ validatedObject: preprocessedObject });
         }
 
-        if (Array.isArray(this.validators)) {
+        if (this.#validators.length > 0) {
             let currentValidatorIndex = 0;
-            for (const validator of this.validators) {
+            for (const entry of this.#validators) {
                 try {
                     const { valid, errors: validatorErrors } =
-                        await Promise.resolve(validator(preprocessedObject));
+                        await Promise.resolve(entry.fn(preprocessedObject));
                     if (!valid) {
                         errors.push(
                             ...this.#validatorFailureErrors(
                                 currentValidatorIndex,
-                                validator.name,
+                                entry.fn.name,
                                 validatorErrors,
                                 path
                             )
                         );
                         if (!doNotStopOnFirstError) {
-                            preprocessingTransaction.rollback();
                             return this.#earlyFailResult(
                                 errors,
                                 resultingContext
@@ -943,12 +948,11 @@ export abstract class SchemaBuilder<
                 } catch (err) {
                     errors.push({
                         message: `Validator #${currentValidatorIndex}${
-                            validator.name ? ` (${validator.name})` : ''
+                            entry.fn.name ? ` (${entry.fn.name})` : ''
                         } thrown an error: ${(err as Error).message}`,
                         path: `${path}($validators[${currentValidatorIndex}])`
                     });
                     if (!doNotStopOnFirstError) {
-                        preprocessingTransaction.rollback();
                         return this.#earlyFailResult(errors, resultingContext);
                     }
                 } finally {
@@ -1012,11 +1016,13 @@ export abstract class SchemaBuilder<
              */
             preprocessors: [
                 ...this.preprocessors
-            ] as readonly Preprocessor<TResult>[],
+            ] as readonly PreprocessorEntry<TResult>[],
             /**
              * Array of validator functions
              */
-            validators: [...this.validators] as readonly Validator<TResult>[],
+            validators: [
+                ...this.validators
+            ] as readonly ValidatorEntry<TResult>[],
             /**
              * Custom error message provider for the 'is required' validation error.
              */
@@ -1084,13 +1090,19 @@ export abstract class SchemaBuilder<
     /**
      * Adds a `preprocessor` to a preprocessors list
      */
-    public addPreprocessor(preprocessor: Preprocessor<TResult>): this {
+    public addPreprocessor(
+        preprocessor: Preprocessor<TResult>,
+        options?: { mutates?: boolean }
+    ): this {
         if (typeof preprocessor !== 'function') {
             throw new Error('preprocessor must be a function');
         }
         return this.createFromProps({
             ...this.introspect(),
-            preprocessors: [...this.preprocessors, preprocessor]
+            preprocessors: [
+                ...this.preprocessors,
+                { fn: preprocessor, mutates: options?.mutates ?? true }
+            ]
         });
     }
 
@@ -1107,13 +1119,19 @@ export abstract class SchemaBuilder<
     /**
      * Adds a `validator` to validators list.
      */
-    public addValidator(validator: Validator<TResult>): this {
+    public addValidator(
+        validator: Validator<TResult>,
+        options?: { mutates?: boolean }
+    ): this {
         if (typeof validator !== 'function') {
             throw new Error('validator must be a function');
         }
         return this.createFromProps({
             ...this.introspect(),
-            validators: [...this.validators, validator]
+            validators: [
+                ...this.validators,
+                { fn: validator, mutates: options?.mutates ?? false }
+            ]
         });
     }
 
@@ -1338,6 +1356,10 @@ export abstract class SchemaBuilder<
         if (Array.isArray(validators)) {
             this.#validators = [...validators];
         }
+
+        this.#hasMutating =
+            this.#preprocessors.some((p) => p.mutates) ||
+            this.#validators.some((v) => v.mutates);
 
         if (typeof props.extensions === 'object' && props.extensions) {
             this.#extensions = { ...props.extensions };

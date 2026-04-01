@@ -164,6 +164,11 @@ export class UnionSchemaBuilder<
     TExtensions
 > {
     #options!: TOptions;
+    #discriminatorKey: string | null = null;
+    #discriminatorMap: Map<
+        string | number,
+        SchemaBuilder<any, any, any>
+    > | null = null;
 
     /**
      * @hidden
@@ -182,6 +187,88 @@ export class UnionSchemaBuilder<
 
         if (Array.isArray(props.options)) {
             this.#options = props.options;
+            this.#detectDiscriminator();
+        }
+    }
+
+    /**
+     * Attempts to detect a discriminator property shared by all union options.
+     * If all options are object schemas with a common required string/number
+     * property that uses `equalsTo` with unique literal values, builds a Map
+     * for O(1) dispatch.
+     */
+    #detectDiscriminator() {
+        const options = this.#options;
+        if (!options || options.length < 2) return;
+
+        // All options must be object schemas
+        const introspected: Array<{
+            type: string;
+            isRequired: boolean;
+            properties?: Record<string, SchemaBuilder<any, any, any>>;
+            [k: string]: any;
+        }> = [];
+        for (const option of options) {
+            const info = option.introspect();
+            if (info.type !== 'object') return;
+            introspected.push(info);
+        }
+
+        // Find common property keys
+        const firstProps = introspected[0].properties;
+        if (!firstProps) return;
+
+        for (const key of Object.keys(firstProps)) {
+            const map = new Map<
+                string | number,
+                SchemaBuilder<any, any, any>
+            >();
+            let isDiscriminator = true;
+
+            for (let i = 0; i < introspected.length; i++) {
+                const props = introspected[i].properties;
+                if (!props || !(key in props)) {
+                    isDiscriminator = false;
+                    break;
+                }
+
+                const propSchema = props[key];
+                const propInfo = propSchema.introspect();
+
+                // Must be a required string or number with equalsTo
+                if (propInfo.isRequired !== true) {
+                    isDiscriminator = false;
+                    break;
+                }
+
+                const equalsTo = (propInfo as any).equalsTo;
+                if (equalsTo === undefined || equalsTo === null) {
+                    isDiscriminator = false;
+                    break;
+                }
+
+                if (
+                    typeof equalsTo !== 'string' &&
+                    typeof equalsTo !== 'number'
+                ) {
+                    isDiscriminator = false;
+                    break;
+                }
+
+                // Check for duplicate discriminator values
+                if (map.has(equalsTo)) {
+                    isDiscriminator = false;
+                    break;
+                }
+
+                map.set(equalsTo, options[i]);
+            }
+
+            if (isDiscriminator && map.size === options.length) {
+                this.#discriminatorKey = key;
+                this.#discriminatorMap = map;
+                return;
+            }
         }
     }
 
@@ -368,6 +455,30 @@ export class UnionSchemaBuilder<
             rootErrors
         } = setup;
 
+        // Fast path: discriminated union with O(1) lookup
+        if (this.#discriminatorKey && this.#discriminatorMap) {
+            const obj = setup.objToValidate;
+            if (typeof obj === 'object' && obj !== null) {
+                const discriminatorValue = obj[this.#discriminatorKey];
+                const matchedSchema =
+                    this.#discriminatorMap.get(discriminatorValue);
+                if (matchedSchema) {
+                    const optionResult = matchedSchema.validate(obj, {
+                        ...prevalidationContext,
+                        currentPropertyDescriptor: undefined,
+                        rootPropertyDescriptor: undefined
+                    } as any);
+                    if (optionResult.valid) {
+                        return {
+                            valid: true,
+                            object: optionResult.object as any,
+                            getNestedErrors
+                        };
+                    }
+                }
+            }
+        }
+
         const state = {
             objToValidate: setup.objToValidate,
             minErrorsCount: Number.MAX_SAFE_INTEGER,
@@ -438,6 +549,33 @@ export class UnionSchemaBuilder<
             optionResults,
             rootErrors
         } = setup;
+
+        // Fast path: discriminated union with O(1) lookup
+        if (this.#discriminatorKey && this.#discriminatorMap) {
+            const obj = setup.objToValidate;
+            if (typeof obj === 'object' && obj !== null) {
+                const discriminatorValue = obj[this.#discriminatorKey];
+                const matchedSchema =
+                    this.#discriminatorMap.get(discriminatorValue);
+                if (matchedSchema) {
+                    const optionResult = await matchedSchema.validateAsync(
+                        obj,
+                        {
+                            ...prevalidationContext,
+                            currentPropertyDescriptor: undefined,
+                            rootPropertyDescriptor: undefined
+                        } as any
+                    );
+                    if (optionResult.valid) {
+                        return {
+                            valid: true,
+                            object: optionResult.object as any,
+                            getNestedErrors
+                        };
+                    }
+                }
+            }
+        }
 
         const state = {
             objToValidate: setup.objToValidate,

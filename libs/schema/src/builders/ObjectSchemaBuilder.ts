@@ -652,23 +652,19 @@ export class ObjectSchemaBuilder<
             validationTransaction
         } = setup;
 
-        let errors = setup.errors;
+        const errors = setup.errors;
 
-        const notValidResults = validationResults.filter(
-            (res) => !res.result.valid
-        );
-
-        const nestedErrors = notValidResults.reduce((acc, val) => {
-            const currentErrors = val?.result?.errors;
-            if (Array.isArray(currentErrors)) {
-                for (const error of currentErrors) {
-                    acc.push(error);
+        let hasInvalid = false;
+        for (const { result } of validationResults) {
+            if (!result.valid) {
+                hasInvalid = true;
+                if (Array.isArray(result.errors)) {
+                    for (const error of result.errors) {
+                        errors.push(error);
+                    }
                 }
             }
-            return acc;
-        }, [] as any[]);
-
-        errors = errors.concat(nestedErrors);
+        }
 
         for (let i = 0; i < objKeys.length; i++) {
             const key = objKeys[i];
@@ -692,7 +688,7 @@ export class ObjectSchemaBuilder<
             }
         }
 
-        if (notValidResults.length === 0 && errors.length === 0) {
+        if (!hasInvalid && errors.length === 0) {
             const resultObject: Record<string, any> = {};
             for (const { key, result } of validationResults) {
                 resultObject[key] = result.object;
@@ -711,40 +707,46 @@ export class ObjectSchemaBuilder<
             };
         }
 
-        notValidResults.forEach(({ key, result }) => {
-            const descriptor = (currentPropertyDescriptor as any)[key];
-            if (
-                typeof (result as any).getErrorsFor === 'function' &&
-                ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
-            ) {
-                for (const nestedPropertyName in (
-                    ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(
-                        descriptor
-                    ).introspect() as any
-                ).properties) {
-                    const nestedPropertyDescriptor =
-                        descriptor[nestedPropertyName];
-                    const nestedValidationError = (result as any).getErrorsFor(
-                        () => nestedPropertyDescriptor
-                    );
-                    if (!nestedValidationError.isValid) {
-                        for (const validationError of nestedValidationError.errors) {
-                            addErrorFor(
-                                nestedPropertyDescriptor,
-                                validationError,
-                                descriptor
-                            );
+        for (const { key, result } of validationResults) {
+            if (!result.valid) {
+                const descriptor = (currentPropertyDescriptor as any)[key];
+                if (
+                    typeof (result as any).getErrorsFor === 'function' &&
+                    ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
+                ) {
+                    for (const nestedPropertyName in (
+                        ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(
+                            descriptor
+                        ).introspect() as any
+                    ).properties) {
+                        const nestedPropertyDescriptor =
+                            descriptor[nestedPropertyName];
+                        const nestedValidationError = (
+                            result as any
+                        ).getErrorsFor(() => nestedPropertyDescriptor);
+                        if (!nestedValidationError.isValid) {
+                            for (const validationError of nestedValidationError.errors) {
+                                addErrorFor(
+                                    nestedPropertyDescriptor,
+                                    validationError,
+                                    descriptor
+                                );
+                            }
+                        }
+                    }
+                } else if (Array.isArray(result.errors)) {
+                    if (
+                        ObjectSchemaBuilder.isValidPropertyDescriptor(
+                            descriptor
+                        )
+                    ) {
+                        for (const error of result.errors) {
+                            addErrorFor(descriptor, error.message);
                         }
                     }
                 }
-            } else if (Array.isArray(result.errors)) {
-                if (ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)) {
-                    result.errors.forEach((error) => {
-                        addErrorFor(descriptor, error.message);
-                    });
-                }
             }
-        });
+        }
 
         validationTransaction!.rollback();
 
@@ -803,6 +805,7 @@ export class ObjectSchemaBuilder<
             propKeys,
             objToValidate,
             path,
+            doNotStopOnFirstError,
             rootPropertyDescriptor,
             currentPropertyDescriptor
         } = setup;
@@ -812,17 +815,25 @@ export class ObjectSchemaBuilder<
             result: ValidationResult<any>;
         }[] = [];
         for (const key of propKeys) {
-            validationResults.push({
-                key,
-                result: this.#properties[key].validate(objToValidate[key], {
-                    ...context,
-                    path: `${path}.${key}`,
-                    rootPropertyDescriptor: rootPropertyDescriptor as any,
-                    currentPropertyDescriptor: (
-                        currentPropertyDescriptor as any
-                    )[key]
-                })
+            const result = this.#properties[key].validate(objToValidate[key], {
+                ...context,
+                path: '$',
+                rootPropertyDescriptor: rootPropertyDescriptor as any,
+                currentPropertyDescriptor: (currentPropertyDescriptor as any)[
+                    key
+                ]
             });
+            if (!result.valid && result.errors) {
+                const fullPath = `${path}.${key}`;
+                for (const err of result.errors) {
+                    err.path =
+                        err.path === '$'
+                            ? fullPath
+                            : fullPath + err.path.slice(1);
+                }
+            }
+            validationResults.push({ key, result });
+            if (!result.valid && !doNotStopOnFirstError) break;
         }
 
         return this.#processResults(setup, validationResults) as any;
@@ -871,26 +882,70 @@ export class ObjectSchemaBuilder<
             propKeys,
             objToValidate,
             path,
+            doNotStopOnFirstError,
             rootPropertyDescriptor,
             currentPropertyDescriptor
         } = setup;
 
-        const validationResults = await Promise.all(
-            propKeys.map(async (key) => ({
-                key,
-                result: await this.#properties[key].validateAsync(
+        const validationResults: {
+            key: string;
+            result: ValidationResult<any>;
+        }[] = [];
+
+        if (doNotStopOnFirstError) {
+            const results = await Promise.all(
+                propKeys.map(async (key) => {
+                    const result = await this.#properties[key].validateAsync(
+                        objToValidate[key],
+                        {
+                            ...context,
+                            path: '$',
+                            rootPropertyDescriptor:
+                                rootPropertyDescriptor as any,
+                            currentPropertyDescriptor: (
+                                currentPropertyDescriptor as any
+                            )[key]
+                        }
+                    );
+                    if (!result.valid && result.errors) {
+                        const fullPath = `${path}.${key}`;
+                        for (const err of result.errors) {
+                            err.path =
+                                err.path === '$'
+                                    ? fullPath
+                                    : fullPath + err.path.slice(1);
+                        }
+                    }
+                    return { key, result };
+                })
+            );
+            validationResults.push(...results);
+        } else {
+            for (const key of propKeys) {
+                const result = await this.#properties[key].validateAsync(
                     objToValidate[key],
                     {
                         ...context,
-                        path: `${path}.${key}`,
+                        path: '$',
                         rootPropertyDescriptor: rootPropertyDescriptor as any,
                         currentPropertyDescriptor: (
                             currentPropertyDescriptor as any
                         )[key]
                     }
-                )
-            }))
-        );
+                );
+                if (!result.valid && result.errors) {
+                    const fullPath = `${path}.${key}`;
+                    for (const err of result.errors) {
+                        err.path =
+                            err.path === '$'
+                                ? fullPath
+                                : fullPath + err.path.slice(1);
+                    }
+                }
+                validationResults.push({ key, result });
+                if (!result.valid) break;
+            }
+        }
 
         return this.#processResults(setup, validationResults) as any;
     }

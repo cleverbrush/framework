@@ -1,11 +1,11 @@
 import {
     type BRAND,
-    type Preprocessor,
+    type PreprocessorEntry,
     SchemaBuilder,
     type ValidationContext,
     type ValidationErrorMessageProvider,
     type ValidationResult,
-    type Validator
+    type ValidatorEntry
 } from './SchemaBuilder.js';
 
 type StringSchemaBuilderCreateProps<
@@ -290,12 +290,12 @@ export class StringSchemaBuilder<
             /**
              * Array of preprocessor functions
              */
-            preprocessors: this.preprocessors as Preprocessor<TResult>[],
+            preprocessors: this.preprocessors as PreprocessorEntry<TResult>[],
 
             /**
              * Array of validator functions
              */
-            validators: this.validators as Validator<TResult>[]
+            validators: this.validators as ValidatorEntry<TResult>[]
         };
     }
 
