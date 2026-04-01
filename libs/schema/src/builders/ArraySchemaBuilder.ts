@@ -563,4 +563,4 @@ export const array = <TElementSchema extends SchemaBuilder<any, any>>(
     ArraySchemaBuilder.create({
         isRequired: true,
         elementSchema
-    }) as ArraySchemaBuilder<TElementSchema, true>;
+    }) as unknown as ArraySchemaBuilder<TElementSchema, true>;

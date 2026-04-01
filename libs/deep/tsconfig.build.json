@@ -6,16 +6,11 @@
         "target": "ES2022",
         "module": "ES2022",
         "esModuleInterop": true,
+        "moduleResolution": "bundler",
         "allowSyntheticDefaultImports": true,
-        "moduleResolution": "Node",
-        "ignoreDeprecations": "6.0",
-        "strictNullChecks": true,
-        "noImplicitThis": true,
         "sourceMap": false,
         "declarationMap": false
     },
-    "files": ["./src/index.ts"],
-    "watchOptions": {
-        "excludeDirectories": ["./dist"]
-    }
+    "include": ["src/**/*.ts"],
+    "exclude": ["src/**/*.test.ts"]
 }
