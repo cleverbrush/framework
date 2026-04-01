@@ -27,7 +27,7 @@ declare module '@cleverbrush/schema' {
         required(message?: string): this;
         optional(): this;
         addJSDoc(description: string): this;
-        addValidator(fn: (value: T, path: string, context?: unknown) => string | void): this;
+        addValidator(fn: (value: T) => { valid: boolean; errors?: { message: string }[] } | Promise<{ valid: boolean; errors?: { message: string }[] }>): this;
         addPreprocessor(fn: (value: unknown) => unknown): this;
         validate(value: unknown, context?: unknown): ValidationResult<T>;
         validateAsync(value: unknown, context?: unknown): Promise<ValidationResult<T>>;
@@ -105,8 +105,17 @@ declare module '@cleverbrush/schema' {
 
     export type InferType<T extends BaseSchemaBuilder<any>> = T extends BaseSchemaBuilder<infer U> ? U : never;
 
+    export type ExtensionMethod<TBuilder extends BaseSchemaBuilder<any> = BaseSchemaBuilder<any>> =
+        (this: TBuilder, ...args: any[]) => TBuilder;
+
+    export interface ExtensionConfig {
+        [builderName: string]: {
+            [methodName: string]: ExtensionMethod<any>;
+        };
+    }
+
     export interface ExtensionDescriptor {}
-    export function defineExtension(config: Record<string, Record<string, (...args: any[]) => { validators?: any[]; preprocessors?: any[] }>>): ExtensionDescriptor;
+    export function defineExtension(config: ExtensionConfig): ExtensionDescriptor;
     export function withExtensions(...descriptors: ExtensionDescriptor[]): {
         string: typeof string;
         number: typeof number;

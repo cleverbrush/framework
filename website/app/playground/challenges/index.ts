@@ -90,34 +90,34 @@ const result = username.validate("ab");
     },
     {
         id: 'required-fields',
-        title: 'Required Fields',
-        description: 'By default schemas are optional (accept <code>undefined</code>). Make a schema required and see what happens when you validate <code>undefined</code>.',
-        concept: '.required() vs optional',
+        title: 'Optional Fields',
+        description: 'By default schemas are <strong>required</strong> (reject <code>undefined</code>). Make a schema optional and see what happens when you validate <code>undefined</code>.',
+        concept: '.optional() vs required',
         startingCode: `import { string } from '@cleverbrush/schema';
 
-// Make this required so undefined is rejected
+// Make this optional so undefined is accepted
 const name = string();
 
 const result = name.validate(undefined);
 `,
         testData: 'undefined',
         hints: [
-            'Chain .required() on the schema.',
-            'You can pass a custom message: .required("Name is required").',
-            'Without .required(), undefined passes validation.'
+            'Chain .optional() on the schema.',
+            'You can pass a custom message: .optional("Name is optional").',
+            'By default, undefined fails validation — .optional() allows it.'
         ],
         solution: `import { string } from '@cleverbrush/schema';
 
-const name = string().required("Name is required");
+const name = string().optional();
 const result = name.validate(undefined);
 `,
         activePanel: 'validation',
-        explanation: 'All schemas are <strong>optional by default</strong> — <code>undefined</code> passes validation. Calling <code>.required()</code> adds a validator that rejects <code>undefined</code>. You can pass a custom error message as an argument.',
+        explanation: 'All schemas are <strong>required by default</strong> — <code>undefined</code> fails validation. Calling <code>.optional()</code> changes the schema so <code>undefined</code> is allowed. You can pass a custom message as an argument.',
         validate: ({ validationResult }) => {
-            if (validationResult && !validationResult.valid) {
-                return { passed: true, feedback: 'The schema correctly rejects undefined!' };
+            if (validationResult && validationResult.valid) {
+                return { passed: true, feedback: 'The schema correctly accepts undefined as optional!' };
             }
-            return { passed: false, feedback: 'Add .required() so undefined is rejected.' };
+            return { passed: false, feedback: 'Add .optional() so undefined is accepted.' };
         }
     },
     {
@@ -374,8 +374,8 @@ const result = mustMentionSchema.validate("I love TypeScript");
 `,
         testData: '"I love TypeScript"',
         hints: [
-            'Use .addValidator(fn) where fn receives (value, path, context).',
-            'Return a string error message to fail, or nothing to pass.',
+            'Use .addValidator(fn) where fn receives the value.',
+            'Return { valid: false, errors: [{ message: "..." }] } to fail, or { valid: true } to pass.',
             'value.toLowerCase().includes("schema") checks for the word.'
         ],
         solution: `import { string } from '@cleverbrush/schema';
@@ -383,15 +383,17 @@ const result = mustMentionSchema.validate("I love TypeScript");
 const mustMentionSchema = string()
     .required()
     .addValidator((value) => {
-        if (!value.toLowerCase().includes("schema")) {
-            return 'Must mention "schema"';
-        }
+        const valid = value.toLowerCase().includes("schema");
+        return {
+            valid,
+            errors: valid ? [] : [{ message: 'Must mention "schema"' }]
+        };
     });
 
 const result = mustMentionSchema.validate("I love TypeScript");
 `,
         activePanel: 'validation',
-        explanation: '<code>.addValidator(fn)</code> accepts a function that receives the value, path, and context. Return a string to signal an error, or return nothing (undefined) to pass. This is how you add any validation logic.',
+        explanation: '<code>.addValidator(fn)</code> accepts a function that receives the value and must return <code>{ valid: boolean, errors?: [{ message: string }] }</code>. Return <code>{ valid: false, errors: [...] }</code> to fail or <code>{ valid: true }</code> to pass. This is how you add any custom validation logic.',
         validate: ({ validationResult }) => {
             if (validationResult && !validationResult.valid) {
                 return { passed: true, feedback: 'Custom validator correctly rejects the value!' };
@@ -593,11 +595,12 @@ const usernameResult = Username.validate("alice");
         description: 'Define your own reusable extension using <code>defineExtension()</code> and <code>withExtensions()</code> — the ultimate power feature.',
         concept: 'The extension system — build & share validators',
         startingCode: `import {
-    string, number, object,
+    string,
     defineExtension, withExtensions
 } from '@cleverbrush/schema';
 
-// Define a custom "hexColor" extension for strings
+// Define a custom "hexColor" extension for strings.
+// Extension methods receive 'this' (the builder) and must return a builder.
 const colorExtension = defineExtension({
     // Your extension here!
 });
@@ -609,8 +612,9 @@ const colorExtension = defineExtension({
         testData: '"#ff00aa"',
         hints: [
             'defineExtension() takes an object with string/number/array/object keys.',
-            'Each key maps to an object of methods. Each method returns { validators, preprocessors }.',
-            'Example: string: { hexColor: () => ({ validators: [{ ... }] }) }',
+            'Each key maps to an object of methods. Methods receive "this" (the builder) and return a builder.',
+            'Inside a method, call this.addValidator(...) to add validation logic.',
+            'Validators must return { valid: boolean, errors?: [{ message: string }] }.',
             'Use withExtensions(ext) to get new factory functions with the extension applied.'
         ],
         solution: `import {
@@ -619,15 +623,15 @@ const colorExtension = defineExtension({
 
 const colorExtension = defineExtension({
     string: {
-        hexColor: () => ({
-            validators: [{
-                validate: (value) => {
-                    if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
-                        return 'Must be a valid hex color (e.g. #ff00aa)';
-                    }
-                }
-            }]
-        })
+        hexColor() {
+            return this.addValidator((value) => {
+                const valid = /^#[0-9a-fA-F]{6}$/.test(value);
+                return {
+                    valid,
+                    errors: valid ? [] : [{ message: 'Must be a valid hex color (e.g. #ff00aa)' }]
+                };
+            });
+        }
     }
 });
 
@@ -636,7 +640,7 @@ const color = xstring().hexColor();
 const result = color.validate("#ff00aa");
 `,
         activePanel: 'introspection',
-        explanation: '<code>defineExtension()</code> + <code>withExtensions()</code> is the library\'s <strong>power feature</strong>. Extensions add methods to schema builders, and their metadata is automatically captured in PropertyDescriptors. You can publish extensions as npm packages. This is how the entire built-in extension pack works — it\'s extensions all the way down.',
+        explanation: '<code>defineExtension()</code> + <code>withExtensions()</code> is the library\'s <strong>power feature</strong>. Extension methods are regular functions with <code>this</code> bound to the builder — call <code>this.addValidator()</code> or other builder methods and return the result for fluent chaining. Extensions add methods to schema builders, and their metadata is automatically captured in PropertyDescriptors. You can publish extensions as npm packages.',
         validate: ({ validationResult }) => {
             if (validationResult?.valid) {
                 return { passed: true, feedback: 'Your custom extension works! You\'ve completed the advanced tour.' };
