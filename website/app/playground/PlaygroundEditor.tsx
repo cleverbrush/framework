@@ -2,133 +2,12 @@
 
 import { useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { schemaDeclarations } from './schemaDeclarations';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
     ssr: false,
     loading: () => <div className="pg-editor-loading">Loading editor...</div>
 });
-
-// Hand-written ambient type declarations for Monaco's TypeScript service.
-// Covers the playground API surface without needing the full .d.ts chain.
-const SCHEMA_DECLARATIONS = `
-declare module '@cleverbrush/schema' {
-    export interface ValidationError {
-        path: string;
-        message: string;
-    }
-
-    export interface ValidationResult<T> {
-        valid: boolean;
-        object?: T;
-        errors?: ValidationError[];
-    }
-
-    interface BaseSchemaBuilder<T> {
-        required(message?: string): this;
-        optional(): this;
-        addJSDoc(description: string): this;
-        addValidator(fn: (value: T) => { valid: boolean; errors?: { message: string }[] } | Promise<{ valid: boolean; errors?: { message: string }[] }>): this;
-        addPreprocessor(fn: (value: unknown) => unknown): this;
-        validate(value: unknown, context?: unknown): ValidationResult<T>;
-        validateAsync(value: unknown, context?: unknown): Promise<ValidationResult<T>>;
-        parse(value: unknown, context?: unknown): T;
-        safeParse(value: unknown, context?: unknown): ValidationResult<T>;
-        introspect(): Record<string, unknown>;
-        brand<B extends string>(brand?: B): this;
-    }
-
-    export interface StringSchemaBuilder<T extends string = string> extends BaseSchemaBuilder<T> {
-        minLength(length: number, message?: string): StringSchemaBuilder<T>;
-        maxLength(length: number, message?: string): StringSchemaBuilder<T>;
-        matches(regex: RegExp, message?: string): StringSchemaBuilder<T>;
-        startsWith(prefix: string, message?: string): StringSchemaBuilder<T>;
-        endsWith(suffix: string, message?: string): StringSchemaBuilder<T>;
-        equals<V extends string>(value: V, message?: string): StringSchemaBuilder<V>;
-        email(message?: string): StringSchemaBuilder<T>;
-        url(message?: string): StringSchemaBuilder<T>;
-        uuid(message?: string): StringSchemaBuilder<T>;
-        ip(message?: string): StringSchemaBuilder<T>;
-        trim(): StringSchemaBuilder<T>;
-        toLowerCase(): StringSchemaBuilder<T>;
-        nonempty(message?: string): StringSchemaBuilder<T>;
-        brand<B extends string>(brand?: B): StringSchemaBuilder<T>;
-    }
-
-    export interface NumberSchemaBuilder<T extends number = number> extends BaseSchemaBuilder<T> {
-        min(value: number, message?: string): NumberSchemaBuilder<T>;
-        max(value: number, message?: string): NumberSchemaBuilder<T>;
-        isInteger(message?: string): NumberSchemaBuilder<T>;
-        isFloat(message?: string): NumberSchemaBuilder<T>;
-        equals<V extends number>(value: V, message?: string): NumberSchemaBuilder<V>;
-        positive(message?: string): NumberSchemaBuilder<T>;
-        negative(message?: string): NumberSchemaBuilder<T>;
-        finite(message?: string): NumberSchemaBuilder<T>;
-        multipleOf(value: number, message?: string): NumberSchemaBuilder<T>;
-        brand<B extends string>(brand?: B): NumberSchemaBuilder<T>;
-    }
-
-    export interface BooleanSchemaBuilder extends BaseSchemaBuilder<boolean> {}
-    export interface DateSchemaBuilder extends BaseSchemaBuilder<Date> {
-        min(date: Date, message?: string): DateSchemaBuilder;
-        max(date: Date, message?: string): DateSchemaBuilder;
-    }
-    export interface FunctionSchemaBuilder extends BaseSchemaBuilder<(...args: any[]) => any> {}
-    export interface AnySchemaBuilder extends BaseSchemaBuilder<any> {}
-
-    export interface ObjectSchemaBuilder<P extends Record<string, BaseSchemaBuilder<any>>> extends BaseSchemaBuilder<{ [K in keyof P]: P[K] extends BaseSchemaBuilder<infer T> ? T : never }> {
-        minLength(n: number, message?: string): this;
-        maxLength(n: number, message?: string): this;
-    }
-
-    export interface ArraySchemaBuilder<E extends BaseSchemaBuilder<any>> extends BaseSchemaBuilder<Array<E extends BaseSchemaBuilder<infer T> ? T : never>> {
-        minLength(n: number, message?: string): this;
-        maxLength(n: number, message?: string): this;
-        nonempty(message?: string): this;
-        unique(keyFn?: (item: unknown) => unknown, message?: string): this;
-    }
-
-    export interface UnionSchemaBuilder<T extends BaseSchemaBuilder<any>> extends BaseSchemaBuilder<T extends BaseSchemaBuilder<infer U> ? U : never> {
-        or<U extends BaseSchemaBuilder<any>>(schema: U): UnionSchemaBuilder<T | U>;
-    }
-
-    export function string(): StringSchemaBuilder;
-    export function string<T extends string>(equals: T): StringSchemaBuilder<T>;
-    export function number(): NumberSchemaBuilder;
-    export function number<T extends number>(equals: T): NumberSchemaBuilder<T>;
-    export function boolean(): BooleanSchemaBuilder;
-    export function date(): DateSchemaBuilder;
-    export function func(): FunctionSchemaBuilder;
-    export function any(): AnySchemaBuilder;
-    export function object<P extends Record<string, BaseSchemaBuilder<any>>>(properties?: P): ObjectSchemaBuilder<P>;
-    export function array<E extends BaseSchemaBuilder<any>>(elementSchema?: E): ArraySchemaBuilder<E>;
-    export function union<T extends BaseSchemaBuilder<any>>(schema: T): UnionSchemaBuilder<T>;
-
-    export type InferType<T extends BaseSchemaBuilder<any>> = T extends BaseSchemaBuilder<infer U> ? U : never;
-
-    export type ExtensionMethod<TBuilder extends BaseSchemaBuilder<any> = BaseSchemaBuilder<any>> =
-        (this: TBuilder, ...args: any[]) => TBuilder;
-
-    export interface ExtensionConfig {
-        [builderName: string]: {
-            [methodName: string]: ExtensionMethod<any>;
-        };
-    }
-
-    export interface ExtensionDescriptor {}
-    export function defineExtension(config: ExtensionConfig): ExtensionDescriptor;
-    export function withExtensions(...descriptors: ExtensionDescriptor[]): {
-        string: typeof string;
-        number: typeof number;
-        boolean: typeof boolean;
-        date: typeof date;
-        func: typeof func;
-        any: typeof any;
-        object: typeof object;
-        array: typeof array;
-        union: typeof union;
-    };
-}
-`;
 
 interface Props {
     code: string;
@@ -169,6 +48,7 @@ export function PlaygroundEditor({ code, onChange, onMount }: Props) {
                 height="100%"
                 language="typescript"
                 theme="playground-dark"
+                path="file:///playground.ts"
                 value={code}
                 onChange={handleChange}
                 onMount={handleMount}
@@ -245,19 +125,17 @@ function configureMonaco(monaco: MonacoInstance) {
     // TypeScript compiler options
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
         target: 99, // ESNext
-        module: 99,
-        moduleResolution: 2,
+        module: 99, // ESNext
+        moduleResolution: 100, // Bundler — resolves .js imports to .d.ts
         strict: true,
         esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        noEmit: true
+        allowSyntheticDefaultImports: true
     });
 
-    // Add schema type declarations
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        SCHEMA_DECLARATIONS,
-        'file:///node_modules/@cleverbrush/schema/index.d.ts'
-    );
+    // Register real .d.ts files from @cleverbrush/schema dist
+    for (const [filePath, content] of Object.entries(schemaDeclarations)) {
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(content, filePath);
+    }
 
     // Relax diagnostics — playground code doesn't need perfect types
     monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({

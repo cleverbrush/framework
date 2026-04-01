@@ -19,7 +19,8 @@ mkdirSync(outDir, { recursive: true });
 await build({
     entryPoints: [resolve(root, 'libs/schema/src/index.ts')],
     bundle: true,
-    format: 'esm',
+    format: 'iife',
+    globalName: '__schema',
     target: 'es2022',
     outfile: resolve(outDir, 'schema-bundle.js'),
     sourcemap: false,
