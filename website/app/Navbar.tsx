@@ -9,6 +9,7 @@ const NAV_ITEMS = [
     { href: '/schema', label: 'Schema' },
     { href: '/mapper', label: 'Mapper' },
     { href: '/react-form', label: 'React Form' },
+    { href: '/playground', label: 'Playground', highlight: true },
     { href: '/api-docs', label: 'API Docs' }
 ];
 
@@ -97,7 +98,7 @@ export function Navbar() {
                     <Link
                         key={item.href}
                         href={item.href}
-                        className={isActive(item.href) ? 'active' : ''}
+                        className={`${isActive(item.href) ? 'active' : ''}${'highlight' in item && item.highlight ? ' navbar-playground' : ''}`}
                     >
                         {item.label}
                     </Link>
