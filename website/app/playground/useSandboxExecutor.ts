@@ -270,7 +270,13 @@ export function useSandboxExecutor() {
     const bundleRef = useRef<string>('');
     const readyRef = useRef(false);
     const pendingRef = useRef<
-        Map<string, { resolve: (r: ExecutionResult) => void; timer: ReturnType<typeof setTimeout> }>
+        Map<
+            string,
+            {
+                resolve: (r: ExecutionResult) => void;
+                timer: ReturnType<typeof setTimeout>;
+            }
+        >
     >(new Map());
     const readyQueueRef = useRef<Array<() => void>>([]);
 
@@ -294,7 +300,11 @@ export function useSandboxExecutor() {
         }
 
         function handleMessage(e: MessageEvent) {
-            if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
+            if (
+                !iframeRef.current ||
+                e.source !== iframeRef.current.contentWindow
+            )
+                return;
 
             const { id, type, result, error } = e.data ?? {};
 
@@ -318,8 +328,8 @@ export function useSandboxExecutor() {
         window.addEventListener('message', handleMessage);
 
         fetch('/playground/schema-bundle.js')
-            .then((r) => r.text())
-            .then((text) => {
+            .then(r => r.text())
+            .then(text => {
                 bundleRef.current = text;
                 createIframe(text);
             })
@@ -338,7 +348,7 @@ export function useSandboxExecutor() {
 
     const execute = useCallback(
         (jsCode: string, testDataJson?: string): Promise<ExecutionResult> => {
-            return new Promise((resolve) => {
+            return new Promise(resolve => {
                 function send() {
                     const win = iframeRef.current?.contentWindow;
                     if (!win) {
@@ -352,7 +362,10 @@ export function useSandboxExecutor() {
                     }, EXECUTION_TIMEOUT);
 
                     pendingRef.current.set(id, { resolve, timer });
-                    win.postMessage({ id, code: jsCode, testData: testDataJson }, '*');
+                    win.postMessage(
+                        { id, code: jsCode, testData: testDataJson },
+                        '*'
+                    );
                 }
 
                 if (readyRef.current) {

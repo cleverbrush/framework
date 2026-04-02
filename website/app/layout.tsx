@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import './globals.css';
-import { Navbar } from './Navbar';
 import { Footer } from './Footer';
+import { Navbar } from './Navbar';
 
 const GTM_ID = 'GTM-WRLXDMG';
 
@@ -44,6 +44,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
                         height="0"
                         width="0"
+                        title="Google Tag Manager"
                         style={{ display: 'none', visibility: 'hidden' }}
                     />
                 </noscript>

@@ -40,8 +40,8 @@ export default function MapperPage() {
                         responses to domain models, domain models to DTOs,
                         database rows to view models — is tedious and
                         error-prone. You write manual mapping functions full of{' '}
-                        <code>destination.x = source.y</code> assignments. Add
-                        a new property to a schema and nothing tells you the
+                        <code>destination.x = source.y</code> assignments. Add a
+                        new property to a schema and nothing tells you the
                         mapper is incomplete. The bug shows up at runtime, not
                         at compile time.
                     </p>
@@ -52,10 +52,8 @@ export default function MapperPage() {
                         <strong>PropertyDescriptor-based selectors</strong>{' '}
                         (similar to C# expression trees) for type-safe property
                         mapping. The TypeScript compiler enforces that{' '}
-                        <strong>
-                            every target property is mapped
-                        </strong>{' '}
-                        — unmapped properties cause a compile-time error. You
+                        <strong>every target property is mapped</strong> —
+                        unmapped properties cause a compile-time error. You
                         literally cannot forget a field.
                     </p>
 
@@ -65,22 +63,22 @@ export default function MapperPage() {
                             <strong>
                                 <code>.from()</code>
                             </strong>{' '}
-                            — copy a value directly from a source property
-                            (with nested path support)
+                            — copy a value directly from a source property (with
+                            nested path support)
                         </li>
                         <li>
                             <strong>
                                 <code>.compute()</code>
                             </strong>{' '}
-                            — transform or derive a value from the entire
-                            source object
+                            — transform or derive a value from the entire source
+                            object
                         </li>
                         <li>
                             <strong>
                                 <code>.ignore()</code>
                             </strong>{' '}
-                            — explicitly exclude a property (tells the
-                            compiler you intentionally skipped it)
+                            — explicitly exclude a property (tells the compiler
+                            you intentionally skipped it)
                         </li>
                     </ul>
 
@@ -89,8 +87,8 @@ export default function MapperPage() {
                         Properties with the same name and compatible type are
                         automatically mapped — no configuration needed.
                         Registered nested schema mappings are applied
-                        recursively. You only write mappings for properties
-                        that differ between source and target.
+                        recursively. You only write mappings for properties that
+                        differ between source and target.
                     </p>
 
                     <h3>Immutable Registry</h3>
@@ -112,11 +110,10 @@ export default function MapperPage() {
                         >
                             cleverbrush.com/editor
                         </a>{' '}
-                        is mapped through{' '}
-                        <code>@cleverbrush/mapper</code> registries. It handles
-                        dozens of schema-to-schema mappings in production every
-                        day, including deeply nested objects and computed
-                        properties.
+                        is mapped through <code>@cleverbrush/mapper</code>{' '}
+                        registries. It handles dozens of schema-to-schema
+                        mappings in production every day, including deeply
+                        nested objects and computed properties.
                     </p>
                 </div>
 
@@ -157,8 +154,8 @@ export default function MapperPage() {
                             <strong>TypeScript enforces completeness</strong> —
                             if any target property is unmapped, you get a
                             compile-time type error (a type-assignability
-                            mismatch that includes the unmapped property
-                            names in the type parameters)
+                            mismatch that includes the unmapped property names
+                            in the type parameters)
                         </li>
                     </ol>
                 </div>
@@ -218,15 +215,14 @@ const user = await mapFn({
                     <p>
                         One of the most powerful features of{' '}
                         <code>@cleverbrush/mapper</code> is that the TypeScript
-                        compiler catches mapping mistakes before your code
-                        runs. Here are three examples:
+                        compiler catches mapping mistakes before your code runs.
+                        Here are three examples:
                     </p>
 
                     <h3>1. Unmapped Properties Error</h3>
                     <p>
                         If you forget to map a property, calling{' '}
-                        <code>.getMapper()</code> produces a compile-time
-                        error:
+                        <code>.getMapper()</code> produces a compile-time error:
                     </p>
                     <pre>
                         <code
@@ -266,9 +262,9 @@ m.for((t) => t.age)
 
                     <h3>3. Unregistered Nested Mapping Error</h3>
                     <p>
-                        If your target has a nested object schema and no
-                        mapping is registered for it, you get a compile-time
-                        error when the inner schema cannot be auto-mapped:
+                        If your target has a nested object schema and no mapping
+                        is registered for it, you get a compile-time error when
+                        the inner schema cannot be auto-mapped:
                     </p>
                     <pre>
                         <code
@@ -288,9 +284,9 @@ const Target = object({ address: TargetAddress });
                 <div className="card">
                     <h2>Auto-Mapping</h2>
                     <p>
-                        When source and target schemas share properties with
-                        the same name and compatible types, those properties
-                        are mapped automatically. You only need to configure
+                        When source and target schemas share properties with the
+                        same name and compatible types, those properties are
+                        mapped automatically. You only need to configure
                         properties that differ:
                     </p>
                     <pre>
@@ -390,10 +386,10 @@ const registry = mapper()
                                         </code>
                                     </td>
                                     <td>
-                                        Compute the target value from the
-                                        entire source object. Can be sync or
-                                        async. Use for transformations,
-                                        concatenation, lookups, etc.
+                                        Compute the target value from the entire
+                                        source object. Can be sync or async. Use
+                                        for transformations, concatenation,
+                                        lookups, etc.
                                     </td>
                                 </tr>
                                 <tr>
@@ -418,9 +414,8 @@ const registry = mapper()
                                     <td>(implicit)</td>
                                     <td>
                                         Same-name, same-type properties are
-                                        automatically copied. Registered
-                                        nested schema mappings are applied
-                                        recursively.
+                                        automatically copied. Registered nested
+                                        schema mappings are applied recursively.
                                     </td>
                                 </tr>
                             </tbody>
@@ -565,8 +560,7 @@ const registry = mapper()
                                     </td>
                                     <td>
                                         <code>
-                                            (from, to, fn) =&gt;
-                                            MappingRegistry
+                                            (from, to, fn) =&gt; MappingRegistry
                                         </code>
                                     </td>
                                 </tr>
@@ -605,8 +599,8 @@ const registry = mapper()
                                         <code>.from(selector)</code>
                                     </td>
                                     <td>
-                                        Copy value from a source property.
-                                        Types must be compatible.
+                                        Copy value from a source property. Types
+                                        must be compatible.
                                     </td>
                                     <td>
                                         <code>
@@ -619,8 +613,8 @@ const registry = mapper()
                                         <code>.compute(fn)</code>
                                     </td>
                                     <td>
-                                        Compute target value from source
-                                        object. Sync or async.
+                                        Compute target value from source object.
+                                        Sync or async.
                                     </td>
                                     <td>
                                         <code>
@@ -633,8 +627,7 @@ const registry = mapper()
                                         <code>.ignore()</code>
                                     </td>
                                     <td>
-                                        Explicitly exclude this target
-                                        property.
+                                        Explicitly exclude this target property.
                                     </td>
                                     <td>
                                         <code>() =&gt; Mapper</code>
@@ -658,14 +651,11 @@ const registry = mapper()
                                 </tr>
                                 <tr>
                                     <td>
-                                        <code>
-                                            MapperConfigurationError
-                                        </code>
+                                        <code>MapperConfigurationError</code>
                                     </td>
                                     <td>
                                         Thrown at runtime when a mapping
-                                        configuration is incomplete or
-                                        invalid.
+                                        configuration is incomplete or invalid.
                                     </td>
                                     <td>
                                         <code>extends Error</code>

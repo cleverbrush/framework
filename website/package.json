@@ -1,27 +1,28 @@
 {
-  "name": "website",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "predev": "node ../scripts/build-playground-bundle.js && node ../scripts/generate-playground-declarations.js",
-    "dev": "next dev",
-    "prebuild": "node ../scripts/build-playground-bundle.js && node ../scripts/generate-playground-declarations.js",
-    "build": "next build",
-    "start": "next start"
-  },
-  "dependencies": {
-    "@cleverbrush/mapper": "file:../../libs/mapper",
-    "@cleverbrush/react-form": "file:../../libs/react-form",
-    "@cleverbrush/schema": "file:../../libs/schema",
-    "@monaco-editor/react": "^4.7.0",
-    "next": "^16.2.1",
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4"
-  },
-  "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "typescript": "^6.0.2"
-  }
+    "name": "website",
+    "version": "0.1.0",
+    "private": true,
+    "scripts": {
+        "predev": "node ../scripts/build-playground-bundle.js && node ../scripts/generate-playground-declarations.js",
+        "dev": "next dev",
+        "prebuild": "node ../scripts/build-playground-bundle.js && node ../scripts/generate-playground-declarations.js",
+        "build": "next build",
+        "start": "next start",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@cleverbrush/mapper": "file:../../libs/mapper",
+        "@cleverbrush/react-form": "file:../../libs/react-form",
+        "@cleverbrush/schema": "file:../../libs/schema",
+        "@monaco-editor/react": "^4.7.0",
+        "next": "^16.2.1",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4"
+    },
+    "devDependencies": {
+        "@types/node": "^20",
+        "@types/react": "^19",
+        "@types/react-dom": "^19",
+        "typescript": "^6.0.2"
+    }
 }

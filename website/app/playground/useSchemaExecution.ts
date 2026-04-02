@@ -50,14 +50,23 @@ export function useSchemaExecution() {
                 setIsRunning(true);
                 try {
                     // Transpile TS → JS via Monaco's TypeScript worker
-                    const jsCode = await transpile(editorRef.current, monacoRef.current);
+                    const jsCode = await transpile(
+                        editorRef.current,
+                        monacoRef.current
+                    );
                     if (jsCode === null) {
                         // Fallback: send the raw code (imports will be stripped in sandbox)
-                        const fallbackResult = await sandboxExecute(code, testDataJson);
+                        const fallbackResult = await sandboxExecute(
+                            code,
+                            testDataJson
+                        );
                         setResult(fallbackResult);
                         return;
                     }
-                    const execResult = await sandboxExecute(jsCode, testDataJson);
+                    const execResult = await sandboxExecute(
+                        jsCode,
+                        testDataJson
+                    );
                     setResult(execResult);
                 } catch {
                     setResult({ error: 'Unexpected execution error' });
