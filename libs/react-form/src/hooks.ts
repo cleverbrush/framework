@@ -396,13 +396,22 @@ export function useFieldFromContext(
 }
 
 /**
- * Resolves renderer from the FormSystem config based on schema type.
+ * Resolves a renderer from the FormSystem config based on schema type and optional variant.
+ *
+ * When `variant` is provided the registry is checked for `"type:variant"` first
+ * (e.g. `"string:password"`). If no match is found it falls back to the base
+ * `"type"` key (e.g. `"string"`).
  */
 export function resolveRenderer(
     config: FormSystemConfig | null,
-    schema: SchemaBuilder<any, any>
+    schema: SchemaBuilder<any, any>,
+    variant?: string
 ): FieldRenderer | undefined {
     if (!config?.renderers) return undefined;
     const type = getSchemaType(schema);
+    if (variant) {
+        const variantRenderer = config.renderers[`${type}:${variant}`];
+        if (variantRenderer) return variantRenderer;
+    }
     return config.renderers[type];
 }

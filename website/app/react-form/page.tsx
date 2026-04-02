@@ -463,6 +463,9 @@ const { register } = useForm<User>();
                                     <td>
                                         Renders a field using the registered
                                         renderer for its schema type.
+                                        Supports <code>variant</code> for
+                                        type-specific rendering (e.g.{' '}
+                                        <code>&quot;password&quot;</code>).
                                         Declarative API.
                                     </td>
                                     <td>
@@ -492,38 +495,47 @@ const { register } = useForm<User>();
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const htmlRenderers = {
-  string: ({ value, onChange, onBlur, error, dirty }) => (
+  string: ({ value, onChange, onBlur, error, dirty, label, name, fieldProps }) => (
     <div className="field">
+      {label && <label>{label}</label>}
       <input
         type="text"
+        name={name}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         className={error ? 'input-error' : ''}
+        {...fieldProps}
       />
       {dirty && <span className="dirty-indicator">*</span>}
       {error && <span className="error">{error}</span>}
     </div>
   ),
-  number: ({ value, onChange, onBlur, error }) => (
+  number: ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
     <div className="field">
+      {label && <label>{label}</label>}
       <input
         type="number"
+        name={name}
         value={value ?? ''}
         onChange={(e) => onChange(Number(e.target.value))}
         onBlur={onBlur}
+        {...fieldProps}
       />
       {error && <span className="error">{error}</span>}
     </div>
   ),
-  boolean: ({ value, onChange, onBlur }) => (
+  boolean: ({ value, onChange, onBlur, label }) => (
     <div className="field">
-      <input
-        type="checkbox"
-        checked={value ?? false}
-        onChange={(e) => onChange(e.target.checked)}
-        onBlur={onBlur}
-      />
+      <label>
+        <input
+          type="checkbox"
+          checked={value ?? false}
+          onChange={(e) => onChange(e.target.checked)}
+          onBlur={onBlur}
+        />
+        {label}
+      </label>
     </div>
   )
 };`)
@@ -564,6 +576,63 @@ const muiRenderers = {
 <FormSystemProvider renderers={muiRenderers}>
   {/* All Field components now render Material UI inputs */}
 </FormSystemProvider>`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Variant Renderers</h3>
+                    <p>
+                        Register variant-specific renderers with a{' '}
+                        <code>&quot;type:variant&quot;</code> key. When{' '}
+                        <code>&lt;Field variant=&quot;password&quot; /&gt;</code>{' '}
+                        is rendered on a <code>string</code> field, the registry
+                        is checked for <code>&quot;string:password&quot;</code>{' '}
+                        first, then falls back to <code>&quot;string&quot;</code>:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const renderers = {
+  // Default string renderer
+  string: ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
+    <div>
+      {label && <label>{label}</label>}
+      <input type="text" name={name} value={value ?? ''}
+             onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+             {...fieldProps} />
+      {error && <span className="error">{error}</span>}
+    </div>
+  ),
+  // Password variant — used when <Field variant="password" />
+  'string:password': ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
+    <div>
+      {label && <label>{label}</label>}
+      <input type="password" name={name} value={value ?? ''}
+             onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+             {...fieldProps} />
+      {error && <span className="error">{error}</span>}
+    </div>
+  ),
+  // Textarea variant
+  'string:textarea': ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
+    <div>
+      {label && <label>{label}</label>}
+      <textarea name={name} value={value ?? ''}
+                onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                {...fieldProps} />
+      {error && <span className="error">{error}</span>}
+    </div>
+  )
+};
+
+// Usage:
+<Field selector={(t) => t.name} form={form} label="Name" />
+<Field selector={(t) => t.password} form={form}
+       variant="password" label="Password"
+       fieldProps={{ placeholder: 'Enter password', autoComplete: 'current-password' }} />
+<Field selector={(t) => t.bio} form={form}
+       variant="textarea" label="Bio"
+       fieldProps={{ rows: 4 }} />`)
                             }}
                         />
                     </pre>
@@ -892,13 +961,28 @@ function App() {
                         The <code>Field</code> component is a declarative way
                         to render form fields. It looks up the registered
                         renderer for the field&apos;s schema type and passes the
-                        field state to it:
+                        field state to it. Use <code>variant</code> for
+                        type-specific rendering, and <code>label</code>,{' '}
+                        <code>name</code>, <code>fieldProps</code> to forward
+                        additional rendering hints:
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// Uses the renderer registered for "string" schema type
 <Field selector={(t) => t.name} form={form} />
+
+// Variant-based resolution: looks up "string:password", falls back to "string"
+<Field selector={(t) => t.password} form={form} variant="password" />
+
+// With label, name, and extra props for the renderer
+<Field
+  selector={(t) => t.email}
+  form={form}
+  label="Email address"
+  name="email"
+  fieldProps={{ placeholder: 'you@example.com', autoComplete: 'email' }}
+/>
 
 // Override the renderer for a specific field
 <Field
@@ -962,6 +1046,63 @@ function App() {
                                     <td>
                                         Optional override renderer for this
                                         specific field
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>variant</code>
+                                    </td>
+                                    <td>
+                                        <code>string</code>
+                                    </td>
+                                    <td>
+                                        Variant hint for renderer resolution
+                                        (e.g. <code>&quot;password&quot;</code>,{' '}
+                                        <code>&quot;textarea&quot;</code>).
+                                        Checked as{' '}
+                                        <code>&quot;type:variant&quot;</code>{' '}
+                                        in the registry, falls back to base type.
+                                        Also forwarded to the renderer.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>label</code>
+                                    </td>
+                                    <td>
+                                        <code>string</code>
+                                    </td>
+                                    <td>
+                                        Visible label text forwarded to the
+                                        renderer
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>name</code>
+                                    </td>
+                                    <td>
+                                        <code>string</code>
+                                    </td>
+                                    <td>
+                                        HTML <code>name</code> attribute
+                                        forwarded to the renderer for
+                                        FormData submission
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>fieldProps</code>
+                                    </td>
+                                    <td>
+                                        <code>
+                                            Record&lt;string, unknown&gt;
+                                        </code>
+                                    </td>
+                                    <td>
+                                        Extra renderer-specific props
+                                        (e.g. <code>placeholder</code>,{' '}
+                                        <code>autoComplete</code>)
                                     </td>
                                 </tr>
                             </tbody>
@@ -1315,7 +1456,8 @@ function UserForm() {
                                     <td>
                                         Props passed to renderer functions:
                                         value, onChange, onBlur, error, dirty,
-                                        touched, validating, setValue, schema.
+                                        touched, validating, setValue, schema,
+                                        variant, label, name, fieldProps.
                                     </td>
                                 </tr>
                                 <tr>
@@ -1358,6 +1500,8 @@ function UserForm() {
                                     <td>
                                         Configuration object for
                                         FormSystemProvider: renderers record.
+                                        Keys can be <code>&quot;type&quot;</code>{' '}
+                                        or <code>&quot;type:variant&quot;</code>.
                                     </td>
                                 </tr>
                             </tbody>
