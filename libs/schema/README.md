@@ -36,6 +36,8 @@ npm install @cleverbrush/schema
 
 ## Quick Start
 
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/quick-start)
+
 ```typescript
 import {
     object,
@@ -95,6 +97,8 @@ const user = {
 
 ## Schema Types
 
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/schema-types)
+
 The following builder functions are available:
 
 | Function        | Description                                       | Key Methods                                                     |
@@ -110,6 +114,8 @@ The following builder functions are available:
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`                 |
 
 ## Immutability
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/immutability)
 
 All schema builders are immutable. Every method call returns a **new** schema builder instance, so existing schemas are never modified:
 
@@ -135,6 +141,8 @@ const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
 ```
 
 ## Composing Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/composing-schemas)
 
 Schemas can be extended with additional properties, combined with unions, or nested inside arrays and objects:
 
@@ -165,6 +173,8 @@ const IdOrEmail = union(string().minLength(1)).or(
 ```
 
 ## Discriminated Unions
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/discriminated-unions)
 
 Some libraries ship a dedicated `.discriminator()` API for tagged unions. With `@cleverbrush/schema` you don't need one — `union()` combined with **string-literal schemas** gives you the same pattern naturally, with full type inference.
 
@@ -276,6 +286,8 @@ type User = InferType<typeof UserSchema>;
 
 ## Validation
 
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/validation-errors)
+
 Every schema builder has two validation methods:
 
 - **`validate(data)`** — synchronous. Returns a `ValidationResult` directly. Throws if any preprocessor, validator, or error message provider returns a Promise.
@@ -318,6 +330,8 @@ console.log(result.errors);
 
 ### Custom Error Messages
 
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/custom-error-messages)
+
 Every constraint accepts an optional error message — either a plain string or a function:
 
 ```typescript
@@ -331,6 +345,8 @@ const Age = number()
 ```
 
 ### Custom Validators
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/custom-validators)
 
 Add custom synchronous or asynchronous validators to any schema:
 
@@ -427,6 +443,8 @@ const tree = ObjectSchemaBuilder.getPropertiesFor(UserSchema);
 ```
 
 ## Extensions
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/custom-extensions)
 
 The extension system lets you add **custom methods** to any schema builder type without modifying the core library. Define an extension once, apply it with `withExtensions()`, and every builder produced by the returned factories includes your new methods — fully typed and chainable.
 
@@ -664,6 +682,8 @@ defineExtension({ string: { validate() { return this; } } });
 | `ExtensionDescriptor`          | Branded type returned by `defineExtension`. Pass to `withExtensions()` to apply.                         |
 
 ## Built-in Extensions
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/builtin-extensions)
 
 The default import from `@cleverbrush/schema` includes a pre-applied extension pack with common validators. You get these methods automatically — no extra setup required:
 

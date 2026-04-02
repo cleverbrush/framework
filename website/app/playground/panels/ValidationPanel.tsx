@@ -1,37 +1,12 @@
 'use client';
 
-import { useState, useCallback } from 'react';
-import type { KeyboardEvent } from 'react';
 import type { ExecutionResult } from '../useSchemaExecution';
 
 interface Props {
     result: ExecutionResult;
-    testData: string;
-    onTestDataChange: (data: string) => void;
 }
 
-export function ValidationPanel({ result, testData, onTestDataChange }: Props) {
-    const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState(testData);
-
-    const handleEdit = useCallback(() => {
-        setDraft(testData);
-        setEditing(true);
-    }, [testData]);
-
-    const handleApply = useCallback(() => {
-        setEditing(false);
-        onTestDataChange(draft);
-    }, [draft, onTestDataChange]);
-
-    const handleKeyDown = useCallback((e: KeyboardEvent) => {
-        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-            handleApply();
-        }
-        if (e.key === 'Escape') {
-            setEditing(false);
-        }
-    }, [handleApply]);
+export function ValidationPanel({ result }: Props) {
 
     if (result.error) {
         return (
@@ -64,29 +39,12 @@ export function ValidationPanel({ result, testData, onTestDataChange }: Props) {
                 )}
             </div>
 
-            {/* Test Data Editor */}
-            <div className="pg-test-data">
-                <div className="pg-test-data-header">
-                    <span className="pg-label">Test Data</span>
-                    {!editing ? (
-                        <button className="pg-btn-small" onClick={handleEdit}>Edit</button>
-                    ) : (
-                        <button className="pg-btn-small pg-btn-apply" onClick={handleApply}>Apply (Ctrl+Enter)</button>
-                    )}
+            {!vr && !result.error && (
+                <div className="pg-hint-box">
+                    Assign a validation result to a variable to see output here, e.g.{' '}
+                    <code>const result = schema.validate(data)</code>
                 </div>
-                {editing ? (
-                    <textarea
-                        className="pg-test-data-editor"
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        spellCheck={false}
-                        autoFocus
-                    />
-                ) : (
-                    <pre className="pg-test-data-display"><code>{testData}</code></pre>
-                )}
-            </div>
+            )}
 
             {/* Validation Result */}
             {vr?.valid && vr.object !== undefined && (

@@ -20,6 +20,10 @@ export function PlaygroundEditor({ code, onChange, onMount }: Props) {
     const monacoRef = useRef<unknown>(null);
     const initDone = useRef(false);
 
+    const handleBeforeMount = useCallback((monaco: unknown) => {
+        defineTheme(monaco as MonacoInstance);
+    }, []);
+
     const handleMount = useCallback(
         (editor: unknown, monaco: unknown) => {
             editorRef.current = editor;
@@ -51,6 +55,7 @@ export function PlaygroundEditor({ code, onChange, onMount }: Props) {
                 path="file:///playground.ts"
                 value={code}
                 onChange={handleChange}
+                beforeMount={handleBeforeMount}
                 onMount={handleMount}
                 options={{
                     minimap: { enabled: false },
@@ -91,8 +96,7 @@ type MonacoInstance = {
     };
 };
 
-function configureMonaco(monaco: MonacoInstance) {
-    // Define custom dark theme matching the website
+function defineTheme(monaco: MonacoInstance) {
     monaco.editor.defineTheme('playground-dark', {
         base: 'vs-dark',
         inherit: true,
@@ -121,8 +125,9 @@ function configureMonaco(monaco: MonacoInstance) {
             'editorSuggestWidget.selectedBackground': '#818cf833'
         }
     });
+}
 
-    // TypeScript compiler options
+function configureMonaco(monaco: MonacoInstance) {
     monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
         target: 99, // ESNext
         module: 99, // ESNext

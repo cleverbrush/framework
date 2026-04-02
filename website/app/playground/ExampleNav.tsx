@@ -1,18 +1,23 @@
 'use client';
 
-import { useCallback } from 'react';
-import { challenges, CHALLENGE_GROUPS } from './challenges';
+import { useEffect, useRef } from 'react';
+import Link from 'next/link';
+import { EXAMPLE_GROUPS, examples, type Example } from './examples';
 
 interface Props {
     currentId: string | null;
-    completedIds: Set<string>;
-    onSelect: (id: string | null) => void;
     collapsed: boolean;
     onToggle: () => void;
 }
 
-export function ChallengeNav({ currentId, completedIds, onSelect, collapsed, onToggle }: Props) {
-    const handleFreePlay = useCallback(() => onSelect(null), [onSelect]);
+export function ExampleNav({ currentId, collapsed, onToggle }: Props) {
+    const activeRef = useRef<HTMLAnchorElement>(null);
+
+    useEffect(() => {
+        if (activeRef.current) {
+            activeRef.current.scrollIntoView({ block: 'nearest' });
+        }
+    }, [currentId]);
 
     return (
         <aside className={`pg-nav ${collapsed ? 'pg-nav-collapsed' : ''}`}>
@@ -27,7 +32,7 @@ export function ChallengeNav({ currentId, completedIds, onSelect, collapsed, onT
                             </linearGradient>
                         </defs>
                     </svg>
-                    Challenges
+                    Examples
                 </h2>
                 <button className="pg-nav-toggle" onClick={onToggle} aria-label="Toggle sidebar">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -39,47 +44,31 @@ export function ChallengeNav({ currentId, completedIds, onSelect, collapsed, onT
             {!collapsed && (
                 <>
                     {/* Free Play */}
-                    <button
+                    <Link
+                        href="/playground"
                         className={`pg-nav-item pg-nav-freeplay ${currentId === null ? 'pg-nav-active' : ''}`}
-                        onClick={handleFreePlay}
                     >
                         <span className="pg-nav-icon">⚡</span>
                         Free Play
-                    </button>
+                    </Link>
 
-                    {/* Challenge Progress */}
-                    <div className="pg-nav-progress">
-                        <div className="pg-nav-progress-bar">
-                            <div
-                                className="pg-nav-progress-fill"
-                                style={{ width: `${(completedIds.size / challenges.length) * 100}%` }}
-                            />
-                        </div>
-                        <span className="pg-nav-progress-text">{completedIds.size}/{challenges.length}</span>
-                    </div>
-
-                    {/* Grouped Challenges */}
-                    {CHALLENGE_GROUPS.map(group => (
+                    {/* Grouped Examples */}
+                    {EXAMPLE_GROUPS.map(group => (
                         <div key={group.label} className="pg-nav-group">
                             <h3 className="pg-nav-group-label">{group.label}</h3>
                             {group.ids.map(id => {
-                                const challenge = challenges.find(c => c.id === id);
-                                if (!challenge) return null;
-                                const isCompleted = completedIds.has(id);
+                                const example = examples.find((e: Example) => e.id === id);
+                                if (!example) return null;
                                 const isCurrent = currentId === id;
                                 return (
-                                    <button
+                                    <Link
                                         key={id}
-                                        className={`pg-nav-item ${isCurrent ? 'pg-nav-active' : ''} ${isCompleted ? 'pg-nav-completed' : ''}`}
-                                        onClick={() => onSelect(id)}
+                                        href={`/playground/${id}`}
+                                        className={`pg-nav-item ${isCurrent ? 'pg-nav-active' : ''}`}
+                                        ref={isCurrent ? activeRef : undefined}
                                     >
                                         <span className="pg-nav-icon">
-                                            {isCompleted ? (
-                                                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                                                    <circle cx="8" cy="8" r="7" fill="#22c55e" opacity="0.15" />
-                                                    <path d="M5 8l2 2 4-4" stroke="#22c55e" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                                </svg>
-                                            ) : isCurrent ? (
+                                            {isCurrent ? (
                                                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                                                     <circle cx="8" cy="8" r="5" fill="#818cf8" opacity="0.3" />
                                                     <circle cx="8" cy="8" r="3" fill="#818cf8" />
@@ -90,8 +79,8 @@ export function ChallengeNav({ currentId, completedIds, onSelect, collapsed, onT
                                                 </svg>
                                             )}
                                         </span>
-                                        <span className="pg-nav-item-title">{challenge.title}</span>
-                                    </button>
+                                        <span className="pg-nav-item-title">{example.title}</span>
+                                    </Link>
                                 );
                             })}
                         </div>
