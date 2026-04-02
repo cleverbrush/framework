@@ -151,9 +151,9 @@ function UserForm() {
   const form = useSchemaForm(UserSchema);
   return (
     <div>
-      <Field selector={(t) => t.name} form={form} />
-      <Field selector={(t) => t.email} form={form} />
-      <Field selector={(t) => t.age} form={form} />
+      <Field forProperty={(t) => t.name} form={form} />
+      <Field forProperty={(t) => t.email} form={form} />
+      <Field forProperty={(t) => t.age} form={form} />
       <button onClick={() => form.submit()}>Submit</button>
     </div>
   );
@@ -273,11 +273,11 @@ function ProductForm() {
   return (
     <div>
       <label>Name</label>
-      <Field selector={(t) => t.name} form={form} />
+      <Field forProperty={(t) => t.name} form={form} />
       <label>Price</label>
-      <Field selector={(t) => t.price} form={form} />
+      <Field forProperty={(t) => t.price} form={form} />
       <label>SKU</label>
-      <Field selector={(t) => t.sku} form={form} />
+      <Field forProperty={(t) => t.sku} form={form} />
       <button onClick={() => form.submit()}>Save</button>
     </div>
   );

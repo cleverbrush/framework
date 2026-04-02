@@ -20,9 +20,9 @@ const { register } = useForm<User>();
 
 ```tsx
 // @cleverbrush/react-form — fully type-safe selectors
-<Field selector={(t) => t.name} form={form} />           // ✓ checked at compile time
-<Field selector={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
-<Field selector={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist
+<Field forProperty={(t) => t.name} form={form} />           // ✓ checked at compile time
+<Field forProperty={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
+<Field forProperty={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist
 ```
 
 **What makes it different:**
@@ -98,9 +98,9 @@ function ContactForm() {
 
     return (
         <div>
-            <Field selector={(t) => t.name} form={form} />
-            <Field selector={(t) => t.email} form={form} />
-            <Field selector={(t) => t.age} form={form} />
+            <Field forProperty={(t) => t.name} form={form} />
+            <Field forProperty={(t) => t.email} form={form} />
+            <Field forProperty={(t) => t.age} form={form} />
             <button onClick={handleSubmit}>Submit</button>
         </div>
     );
@@ -121,7 +121,7 @@ function App() {
 1. **Define a schema** using `@cleverbrush/schema` — this is your single source of truth for types, validation rules, and field metadata
 2. **Register renderers** via `FormSystemProvider` — plain functions that map schema types (`"string"`, `"number"`, `"boolean"`) to your UI components (plain HTML, MUI, Ant Design, etc.)
 3. **Create a form instance** via `useSchemaForm(schema)` — returns state management, validation, submit/reset lifecycle
-4. **Render fields** via `<Field selector={(t) => t.name} form={form} />` — the component looks up the registered renderer for the field's schema type
+4. **Render fields** via `<Field forProperty={(t) => t.name} form={form} />` — the component looks up the registered renderer for the field's schema type
 5. **Submit** — `form.submit()` runs the schema's full validation and returns a typed result
 
 ## Core Concepts
@@ -307,7 +307,7 @@ const form = useSchemaForm(UserSchema, {
 
 | Method | Description |
 |--------|-------------|
-| `form.useField(selector)` | Bind a field by PropertyDescriptor selector |
+| `form.useField(forProperty)` | Bind a field by PropertyDescriptor selector |
 | `form.submit()` | Validate and return `ValidationResult` (includes `result.object` on success) |
 | `form.validate()` | Run validation, propagate errors to fields |
 | `form.reset(values?)` | Reset all fields; optionally set new initial values |
@@ -348,14 +348,14 @@ Resolves the renderer from the `FormSystemProvider` registry by schema type (and
 
 ```tsx
 // Auto-resolved from FormSystemProvider (string schema → string renderer)
-<Field selector={(t) => t.name} form={form} />
+<Field forProperty={(t) => t.name} form={form} />
 
 // Variant-based resolution: looks up "string:password", falls back to "string"
-<Field selector={(t) => t.password} form={form} variant="password" />
+<Field forProperty={(t) => t.password} form={form} variant="password" />
 
 // With label, name, and extra props for the renderer
 <Field
-    selector={(t) => t.email}
+    forProperty={(t) => t.email}
     form={form}
     label="Email address"
     name="email"
@@ -363,14 +363,14 @@ Resolves the renderer from the `FormSystemProvider` registry by schema type (and
 />
 
 // Explicit renderer override
-<Field selector={(t) => t.name} form={form} renderer={customRenderer} />
+<Field forProperty={(t) => t.name} form={form} renderer={customRenderer} />
 ```
 
 ### Props
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `selector` | `(tree) => PropertyDescriptor` | PropertyDescriptor selector for the field |
+| `forProperty` | `(tree) => PropertyDescriptor` | PropertyDescriptor selector for the field |
 | `form` | `SchemaFormInstance` | Form instance from `useSchemaForm` |
 | `renderer?` | `FieldRenderer` | Optional explicit renderer (overrides provider) |
 | `variant?` | `string` | Variant hint for renderer resolution and forwarded to the renderer |
@@ -449,9 +449,9 @@ function UserForm() {
 
     return (
         <>
-            <Field selector={(t) => t.name} form={form} />
-            <Field selector={(t) => t.address.city} form={form} />
-            <Field selector={(t) => t.address.zip} form={form} />
+            <Field forProperty={(t) => t.name} form={form} />
+            <Field forProperty={(t) => t.address.city} form={form} />
+            <Field forProperty={(t) => t.address.zip} form={form} />
         </>
     );
 }
@@ -480,8 +480,8 @@ function SignupForm() {
 
     return (
         <FormSystemProvider renderers={htmlRenderers}>
-            <Field selector={(t) => t.username} form={form} />
-            <Field selector={(t) => t.email} form={form} />
+            <Field forProperty={(t) => t.username} form={form} />
+            <Field forProperty={(t) => t.email} form={form} />
             <button onClick={async () => {
                 const result = await form.submit();
                 if (result.valid) {
@@ -553,11 +553,11 @@ function RegistrationForm() {
 
     return (
         <div>
-            <Field selector={(t) => t.name} form={form} />
-            <Field selector={(t) => t.email} form={form} />
-            <Field selector={(t) => t.age} form={form} />
-            <Field selector={(t) => t.address.city} form={form} />
-            <Field selector={(t) => t.address.zip} form={form} />
+            <Field forProperty={(t) => t.name} form={form} />
+            <Field forProperty={(t) => t.email} form={form} />
+            <Field forProperty={(t) => t.age} form={form} />
+            <Field forProperty={(t) => t.address.city} form={form} />
+            <Field forProperty={(t) => t.address.zip} form={form} />
             <button onClick={async () => {
                 const result = await form.submit();
                 if (result.valid) {

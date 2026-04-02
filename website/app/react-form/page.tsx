@@ -91,15 +91,15 @@ function ContactFormDemo() {
         <div className="demo-form">
             <div className="demo-form-row">
                 <label>Name</label>
-                <Field selector={(t) => t.name} form={form} />
+                <Field forProperty={(t) => t.name} form={form} />
             </div>
             <div className="demo-form-row">
                 <label>Email</label>
-                <Field selector={(t) => t.email} form={form} />
+                <Field forProperty={(t) => t.email} form={form} />
             </div>
             <div className="demo-form-row">
                 <label>Age</label>
-                <Field selector={(t) => t.age} form={form} />
+                <Field forProperty={(t) => t.age} form={form} />
             </div>
             <button className="demo-submit" onClick={handleSubmit}>
                 Submit
@@ -230,9 +230,9 @@ function ContactForm() {
 
   return (
     <div>
-      <Field selector={(t) => t.name} form={form} />
-      <Field selector={(t) => t.email} form={form} />
-      <Field selector={(t) => t.age} form={form} />
+      <Field forProperty={(t) => t.name} form={form} />
+      <Field forProperty={(t) => t.email} form={form} />
+      <Field forProperty={(t) => t.age} form={form} />
       <button onClick={handleSubmit}>Submit</button>
     </div>
   );
@@ -315,9 +315,9 @@ const { register } = useForm<User>();
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// @cleverbrush/react-form — fully type-safe selectors
-<Field selector={(t) => t.name} form={form} />           // ✓ checked at compile time
-<Field selector={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
-<Field selector={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist`)
+<Field forProperty={(t) => t.name} form={form} />           // ✓ checked at compile time
+<Field forProperty={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
+<Field forProperty={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist`)
                             }}
                         />
                     </pre>
@@ -386,7 +386,7 @@ const { register } = useForm<User>();
                         <li>
                             <strong>Render fields</strong> via{' '}
                             <code>
-                                &lt;Field selector={'{(t) => t.name}'}
+                                &lt;Field forProperty={'{(t) => t.name}'}
                                 form={'{form}'} /&gt;
                             </code>{' '}
                             — the component looks up the registered renderer
@@ -626,11 +626,11 @@ const muiRenderers = {
 };
 
 // Usage:
-<Field selector={(t) => t.name} form={form} label="Name" />
-<Field selector={(t) => t.password} form={form}
+<Field forProperty={(t) => t.name} form={form} label="Name" />
+<Field forProperty={(t) => t.password} form={form}
        variant="password" label="Password"
        fieldProps={{ placeholder: 'Enter password', autoComplete: 'current-password' }} />
-<Field selector={(t) => t.bio} form={form}
+<Field forProperty={(t) => t.bio} form={form}
        variant="textarea" label="Bio"
        fieldProps={{ rows: 4 }} />`)
                             }}
@@ -750,7 +750,7 @@ function App() {
                                 <tr>
                                     <td>
                                         <code>
-                                            form.useField(selector)
+                                            form.useField(forProperty)
                                         </code>
                                     </td>
                                     <td>
@@ -769,8 +769,8 @@ function App() {
                     <h2>useField</h2>
                     <p>
                         Access individual field state and handlers. Can be used
-                        via <code>form.useField(selector)</code> directly or
-                        via the context-based <code>useField(selector)</code>{' '}
+                        via <code>form.useField(forProperty)</code> directly or
+                        via the context-based <code>useField(forProperty)</code>{' '}
                         inside a <code>FormProvider</code>.
                     </p>
 
@@ -972,14 +972,14 @@ function App() {
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// Uses the renderer registered for "string" schema type
-<Field selector={(t) => t.name} form={form} />
+<Field forProperty={(t) => t.name} form={form} />
 
 // Variant-based resolution: looks up "string:password", falls back to "string"
-<Field selector={(t) => t.password} form={form} variant="password" />
+<Field forProperty={(t) => t.password} form={form} variant="password" />
 
 // With label, name, and extra props for the renderer
 <Field
-  selector={(t) => t.email}
+  forProperty={(t) => t.email}
   form={form}
   label="Email address"
   name="email"
@@ -988,7 +988,7 @@ function App() {
 
 // Override the renderer for a specific field
 <Field
-  selector={(t) => t.email}
+  forProperty={(t) => t.email}
   form={form}
   renderer={({ value, onChange, error }) => (
     <div>
@@ -1014,7 +1014,7 @@ function App() {
                             <tbody>
                                 <tr>
                                     <td>
-                                        <code>selector</code>
+                                        <code>forProperty</code>
                                     </td>
                                     <td>
                                         <code>
@@ -1158,7 +1158,7 @@ function MyForm() {
                     <p>
                         PropertyDescriptor selectors support nested paths.
                         Access deeply nested fields with dot notation in the
-                        selector:
+                        forProperty accessor:
                     </p>
                     <pre>
                         <code
@@ -1179,10 +1179,10 @@ function UserForm() {
 
   return (
     <div>
-      <Field selector={(t) => t.name} form={form} />
-      <Field selector={(t) => t.address.city} form={form} />
-      <Field selector={(t) => t.address.street} form={form} />
-      <Field selector={(t) => t.address.zip} form={form} />
+      <Field forProperty={(t) => t.name} form={form} />
+      <Field forProperty={(t) => t.address.city} form={form} />
+      <Field forProperty={(t) => t.address.street} form={form} />
+      <Field forProperty={(t) => t.address.zip} form={form} />
     </div>
   );
 }`)
@@ -1375,7 +1375,7 @@ function UserForm() {
                                 </tr>
                                 <tr>
                                     <td>
-                                        <code>useField(selector)</code>
+                                        <code>useField(forProperty)</code>
                                     </td>
                                     <td>
                                         Access a single field&apos;s state and

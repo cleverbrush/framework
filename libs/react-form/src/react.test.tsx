@@ -709,7 +709,7 @@ describe('Field component', () => {
 
         function TestComponent() {
             return React.createElement(Field, {
-                selector: (t: any) => t.name,
+                forProperty: (t: any) => t.name,
                 form: formResult.current,
                 renderer: mockRenderer
             });
@@ -743,7 +743,7 @@ describe('Field component', () => {
                 FormSystemProvider,
                 { renderers: { string: mockStringRenderer } },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current
                 })
             );
@@ -764,7 +764,7 @@ describe('Field component', () => {
 
         function TestComponent() {
             return React.createElement(Field, {
-                selector: (t: any) => t.name,
+                forProperty: (t: any) => t.name,
                 form: formResult.current
             });
         }
@@ -793,7 +793,7 @@ describe('Field component', () => {
                 FormSystemProvider,
                 { renderers: { string: systemRenderer } },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current,
                     renderer: explicitRenderer
                 })
@@ -818,7 +818,7 @@ describe('Field component', () => {
 
         function TestComponent() {
             return React.createElement(Field, {
-                selector: (t: any) => t.name,
+                forProperty: (t: any) => t.name,
                 form: formResult.current,
                 renderer: mockRenderer,
                 variant: 'password',
@@ -865,7 +865,7 @@ describe('Field component', () => {
                     }
                 },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current,
                     variant: 'password'
                 })
@@ -896,7 +896,7 @@ describe('Field component', () => {
                 FormSystemProvider,
                 { renderers: { string: baseStringRenderer } },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current,
                     variant: 'password'
                 })
@@ -927,7 +927,7 @@ describe('Field component', () => {
                 FormSystemProvider,
                 { renderers: { 'string:password': passwordRenderer } },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current,
                     renderer: explicitRenderer,
                     variant: 'password'
@@ -956,7 +956,7 @@ describe('Field component', () => {
 
         function TestComponent() {
             return React.createElement(Field, {
-                selector: (t: any) => t.name,
+                forProperty: (t: any) => t.name,
                 form: formResult.current,
                 renderer: mockRenderer
             });
@@ -1183,15 +1183,15 @@ describe('integration', () => {
                 { renderers: htmlRenderers },
                 // 3. Field auto-resolves renderer by schema type
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current
                 }),
                 React.createElement(Field, {
-                    selector: (t: any) => t.email,
+                    forProperty: (t: any) => t.email,
                     form: formResult.current
                 }),
                 React.createElement(Field, {
-                    selector: (t: any) => t.age,
+                    forProperty: (t: any) => t.age,
                     form: formResult.current
                 })
             );
@@ -1248,7 +1248,7 @@ describe('integration', () => {
                 FormSystemProvider,
                 { renderers: htmlRenderers },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current
                 })
             );
