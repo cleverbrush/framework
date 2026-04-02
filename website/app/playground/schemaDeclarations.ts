@@ -208,8 +208,8 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
         maxLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, {}, TExplicitType extends undefined ? TElementSchema extends undefined ? any[] : TElementSchema extends SchemaBuilder<infer T1, infer T2 extends boolean, {}> ? (T2 extends true ? T1 : T1 | undefined)[] : never : TExplicitType>>;
         type: string;
         isRequired: boolean;
-        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
-        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        preprocessors: readonly import("./SchemaBuilder.js").Preprocessor<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").Validator<TResult>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
         extensions: {
             [x: string]: unknown;
@@ -321,8 +321,8 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired, undefined, {}, TResult>>;
         type: string;
         isRequired: boolean;
-        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TFinalResult>[];
-        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TFinalResult>[];
+        preprocessors: readonly import("./SchemaBuilder.js").Preprocessor<TFinalResult>[];
+        validators: readonly import("./SchemaBuilder.js").Validator<TFinalResult>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
         extensions: {
             [x: string]: unknown;
@@ -382,7 +382,7 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
 export declare const boolean: () => BooleanSchemaBuilder<boolean, true>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/builders/DateSchemaBuilder.d.ts": `import { type BRAND, type PreprocessorEntry, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult, type ValidatorEntry } from './SchemaBuilder.js';
+    "file:///node_modules/@cleverbrush/schema/builders/DateSchemaBuilder.d.ts": `import { type BRAND, type Preprocessor, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult, type Validator } from './SchemaBuilder.js';
 type DateSchemaBuilderCreateProps<T = Date, R extends boolean = true> = Partial<ReturnType<DateSchemaBuilder<T, R>['introspect']>>;
 /**
  * Allows to create Date schema. It can be required or optional.
@@ -490,11 +490,11 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         /**
          * Array of preprocessor functions
          */
-        preprocessors: PreprocessorEntry<TResult>[];
+        preprocessors: Preprocessor<TResult>[];
         /**
          * Array of validator functions
          */
-        validators: ValidatorEntry<TResult>[];
+        validators: Validator<TResult>[];
         type: string;
         isRequired: boolean;
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
@@ -703,7 +703,7 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TEx
 export declare const func: () => FunctionSchemaBuilder<true>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/builders/NumberSchemaBuilder.d.ts": `import { type BRAND, type PreprocessorEntry, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult, type ValidatorEntry } from './SchemaBuilder.js';
+    "file:///node_modules/@cleverbrush/schema/builders/NumberSchemaBuilder.d.ts": `import { type BRAND, type Preprocessor, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult, type Validator } from './SchemaBuilder.js';
 type NumberSchemaBuilderCreateProps<T = number, R extends boolean = true> = Partial<ReturnType<NumberSchemaBuilder<T, R>['introspect']>>;
 /**
  * Number schema builder class. Allows to create Number schemas.
@@ -806,11 +806,11 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         /**
          * Array of preprocessor functions
          */
-        preprocessors: PreprocessorEntry<TResult>[];
+        preprocessors: Preprocessor<TResult>[];
         /**
          * Array of validator functions
          */
-        validators: ValidatorEntry<TResult>[];
+        validators: Validator<TResult>[];
         type: string;
         isRequired: boolean;
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
@@ -1104,8 +1104,8 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         acceptUnknownProps: boolean;
         type: string;
         isRequired: boolean;
-        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
-        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
+        preprocessors: readonly import("./SchemaBuilder.js").Preprocessor<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
+        validators: readonly import("./SchemaBuilder.js").Validator<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
         extensions: {
             [x: string]: unknown;
@@ -1531,22 +1531,6 @@ export type Preprocessor<T> = (object: T) => Promise<T> | T;
  */
 export type Validator<T> = (object: T) => Promise<ValidatorResult<T>> | ValidatorResult<T>;
 /**
- * Internal wrapper that pairs a preprocessor function with metadata
- * indicating whether it may mutate the value.
- */
-export type PreprocessorEntry<T> = {
-    fn: Preprocessor<T>;
-    mutates: boolean;
-};
-/**
- * Internal wrapper that pairs a validator function with metadata
- * indicating whether it may mutate the value.
- */
-export type ValidatorEntry<T> = {
-    fn: Validator<T>;
-    mutates: boolean;
-};
-/**
  * Configuration properties used to construct a \`SchemaBuilder\` instance.
  * Contains the schema type identifier, requirement flag, and lists of
  * preprocessors and validators.
@@ -1554,8 +1538,8 @@ export type ValidatorEntry<T> = {
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
-    preprocessors: PreprocessorEntry<T>[];
-    validators: ValidatorEntry<T>[];
+    preprocessors: Preprocessor<T>[];
+    validators: Validator<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
 };
@@ -1796,12 +1780,12 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * A list of preprocessors associated with
      * the Builder
      */
-    protected get preprocessors(): PreprocessorEntry<TResult>[];
+    protected get preprocessors(): Preprocessor<TResult>[];
     /**
      * A list of validators associated with
      * the Builder
      */
-    protected get validators(): ValidatorEntry<TResult>[];
+    protected get validators(): Validator<TResult>[];
     /**
      * Whether the schema requires a non-null/non-undefined value.
      */
@@ -1856,11 +1840,11 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
         /**
          * Array of preprocessor functions
          */
-        preprocessors: readonly PreprocessorEntry<TResult>[];
+        preprocessors: readonly Preprocessor<TResult>[];
         /**
          * Array of validator functions
          */
-        validators: readonly ValidatorEntry<TResult>[];
+        validators: readonly Validator<TResult>[];
         /**
          * Custom error message provider for the 'is required' validation error.
          */
@@ -1901,9 +1885,7 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
     /**
      * Adds a \`preprocessor\` to a preprocessors list
      */
-    addPreprocessor(preprocessor: Preprocessor<TResult>, options?: {
-        mutates?: boolean;
-    }): this;
+    addPreprocessor(preprocessor: Preprocessor<TResult>): this;
     /**
      * Remove all preprocessors for this schema.
      */
@@ -1911,9 +1893,7 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
     /**
      * Adds a \`validator\` to validators list.
      */
-    addValidator(validator: Validator<TResult>, options?: {
-        mutates?: boolean;
-    }): this;
+    addValidator(validator: Validator<TResult>): this;
     /**
      * Remove all validators for this schema.
      */
@@ -2020,7 +2000,7 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
 }
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/builders/StringSchemaBuilder.d.ts": `import { type BRAND, type PreprocessorEntry, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult, type ValidatorEntry } from './SchemaBuilder.js';
+    "file:///node_modules/@cleverbrush/schema/builders/StringSchemaBuilder.d.ts": `import { type BRAND, type Preprocessor, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult, type Validator } from './SchemaBuilder.js';
 type StringSchemaBuilderCreateProps<T = string, R extends boolean = true> = Partial<ReturnType<StringSchemaBuilder<T, R>['introspect']>>;
 /**
  * Allows to define a schema for a string. It can be: required or optional,
@@ -2141,11 +2121,11 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         /**
          * Array of preprocessor functions
          */
-        preprocessors: PreprocessorEntry<TResult>[];
+        preprocessors: Preprocessor<TResult>[];
         /**
          * Array of validator functions
          */
-        validators: ValidatorEntry<TResult>[];
+        validators: Validator<TResult>[];
         type: string;
         isRequired: boolean;
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
@@ -2382,8 +2362,8 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         options: TOptions;
         type: string;
         isRequired: boolean;
-        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
-        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
+        preprocessors: readonly import("./SchemaBuilder.js").Preprocessor<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
+        validators: readonly import("./SchemaBuilder.js").Validator<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
         extensions: {
             [x: string]: unknown;
