@@ -517,7 +517,17 @@ export class ObjectSchemaBuilder<
 
         const errors = prevalidatedResult.errors || [];
 
-        if (!valid && !doNotStopOnFirstError) {
+        if (!valid && !doNotStopOnFirstError && preValidationErrors) {
+            if (
+                ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    currentPropertyDescriptor
+                )
+            ) {
+                for (const error of preValidationErrors) {
+                    addErrorFor(currentPropertyDescriptor, error.message);
+                }
+            }
+
             return {
                 earlyReturn: true as const,
                 result: {

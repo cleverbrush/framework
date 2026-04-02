@@ -2654,3 +2654,44 @@ test('getErrorsFor - union', async () => {
         Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1
     ).toEqual(true);
 });
+
+test('getErrorsFor - root errors from validator', () => {
+    const ChangePasswordSchema = object({
+        currentPassword: string(),
+        newPassword: string().minLength(
+            6,
+            'Пароль має містити щонайменше 6 символів'
+        ),
+        confirmPassword: string().minLength(
+            6,
+            'Пароль має містити щонайменше 6 символів'
+        )
+    }).addValidator((value) => {
+        if (value.newPassword !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match'
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const { getErrorsFor, valid } = ChangePasswordSchema.validate({
+        currentPassword: 'oldPass',
+        newPassword: 'newPass',
+        confirmPassword: 'newPass2'
+    });
+
+    expect(valid).toEqual(false);
+
+    const rootErrors = getErrorsFor();
+    expect(rootErrors).toBeDefined();
+    expect(
+        Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1
+    ).toEqual(true);
+    expect(rootErrors.errors[0]).toEqual('Passwords do not match');
+});
