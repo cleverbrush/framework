@@ -427,6 +427,156 @@ describe('validation', () => {
     });
 });
 
+// ─── validateOnMount ─────────────────────────────────────────────────────────
+
+describe('validateOnMount', () => {
+    test('shows errors on required fields immediately when validateOnMount is true', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema, {
+                validateOnMount: true
+            });
+            const nameField = form.useField((t) => t.name);
+            const emailField = form.useField((t) => t.email);
+            const ageField = form.useField((t) => t.age);
+            return { form, nameField, emailField, ageField };
+        });
+
+        // Wait for the async validation triggered by the mount effect
+        await act(async () => {});
+
+        // Required fields should have errors and be touched
+        expect(result.current.nameField.error).toBeDefined();
+        expect(result.current.nameField.touched).toBe(true);
+        expect(result.current.emailField.error).toBeDefined();
+        expect(result.current.emailField.touched).toBe(true);
+        // age is optional — should NOT have an error
+        expect(result.current.ageField.error).toBeUndefined();
+    });
+
+    test('does not validate on mount by default', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema);
+            const nameField = form.useField((t) => t.name);
+            return { form, nameField };
+        });
+
+        await act(async () => {});
+
+        // Without validateOnMount, fields start clean
+        expect(result.current.nameField.error).toBeUndefined();
+        expect(result.current.nameField.touched).toBe(false);
+    });
+
+    test('validateOnMount errors clear after setting valid values', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema, {
+                validateOnMount: true
+            });
+            const nameField = form.useField((t) => t.name);
+            const emailField = form.useField((t) => t.email);
+            return { form, nameField, emailField };
+        });
+
+        // Wait for mount validation
+        await act(async () => {});
+        expect(result.current.nameField.error).toBeDefined();
+
+        // Fix the values
+        act(() => {
+            result.current.nameField.onChange('John');
+            result.current.emailField.onChange('john@test.com');
+        });
+
+        // Validation runs on each onChange — wait for it
+        await act(async () => {});
+
+        expect(result.current.nameField.error).toBeUndefined();
+        expect(result.current.emailField.error).toBeUndefined();
+    });
+});
+
+// ─── validationDebounceMs ────────────────────────────────────────────────────
+
+describe('validationDebounceMs', () => {
+    test('debounces onChange validation by the specified delay', async () => {
+        vi.useFakeTimers();
+        try {
+            const { result } = renderHook(() => {
+                const form = useSchemaForm(UserSchema, {
+                    validationDebounceMs: 200
+                });
+                const nameField = form.useField((t) => t.name);
+                const emailField = form.useField((t) => t.email);
+                return { form, nameField, emailField };
+            });
+
+            // Typing in name triggers debounced validation; email is still
+            // undefined (required) but no error should appear yet
+            act(() => {
+                result.current.nameField.onChange('J');
+            });
+            act(() => {
+                result.current.nameField.onChange('Jo');
+            });
+
+            // Error should not appear before debounce fires
+            expect(result.current.emailField.error).toBeUndefined();
+
+            // Advance timer past 200ms and flush async validation
+            await act(async () => {
+                vi.advanceTimersByTime(250);
+            });
+
+            // Now validation has run — email is required and still empty
+            expect(result.current.emailField.error).toBeDefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    test('explicit validate() is NOT debounced', async () => {
+        vi.useFakeTimers();
+        try {
+            const { result } = renderHook(() => {
+                const form = useSchemaForm(UserSchema, {
+                    validationDebounceMs: 500
+                });
+                const nameField = form.useField((t) => t.name);
+                return { form, nameField };
+            });
+
+            // Explicit validate should resolve immediately
+            await act(async () => {
+                await result.current.form.validate();
+            });
+
+            expect(result.current.nameField.error).toBeDefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    test('without validationDebounceMs, onChange validates immediately', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema);
+            const nameField = form.useField((t) => t.name);
+            const emailField = form.useField((t) => t.email);
+            return { form, nameField, emailField };
+        });
+
+        // Typing in name triggers validation immediately (no debounce)
+        act(() => {
+            result.current.nameField.onChange('John');
+        });
+
+        // Flush async validation
+        await act(async () => {});
+
+        // email is required and still empty — error should be set
+        expect(result.current.emailField.error).toBeDefined();
+    });
+});
+
 // ─── FormSystemProvider tests ────────────────────────────────────────────────
 
 describe('FormSystemProvider', () => {

@@ -297,7 +297,9 @@ Creates a form instance bound to a schema. Returns field binding and form lifecy
 
 ```tsx
 const form = useSchemaForm(UserSchema, {
-    createMissingStructure: true  // default: true — auto-create parent objects when setting nested values
+    createMissingStructure: true,  // default: true — auto-create parent objects when setting nested values
+    validateOnMount: false,        // default: false — set to true to show errors immediately on mount
+    validationDebounceMs: 300      // optional — debounce onChange validation (ms); validate()/submit() are always immediate
 });
 ```
 
@@ -598,7 +600,7 @@ function App() {
 | `FormSystemConfig` | `{ renderers?: Record<string, FieldRenderer> }` — keys can be `"type"` or `"type:variant"` |
 | `FieldState` | `{ value, initialValue, dirty, touched, error, validating }` |
 | `UseFieldResult` | `FieldState & { onChange, onBlur, setValue, schema }` |
-| `UseSchemaFormOptions` | `{ createMissingStructure?: boolean }` |
+| `UseSchemaFormOptions` | `{ createMissingStructure?: boolean; validateOnMount?: boolean; validationDebounceMs?: number }` |
 | `SchemaFormInstance` | Return type of `useSchemaForm` |
 | `FormSystemProviderProps` | Props for `FormSystemProvider` |
 | `FormProviderProps` | Props for `FormProvider` |

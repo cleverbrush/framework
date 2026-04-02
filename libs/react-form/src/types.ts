@@ -113,4 +113,26 @@ export type UseFieldResult<T = any> = {
  */
 export type UseSchemaFormOptions = {
     createMissingStructure?: boolean;
+    /**
+     * When `true`, runs full schema validation on mount and marks all fields
+     * as touched so that error messages (e.g. for required fields) are visible
+     * immediately without waiting for user interaction.
+     *
+     * @default false
+     */
+    validateOnMount?: boolean;
+    /**
+     * Debounce delay in milliseconds for onChange-triggered validation.
+     * When set, rapid field changes only trigger one validation run after
+     * the user stops typing for the specified duration.
+     *
+     * Explicit calls to `form.validate()`, `form.submit()`, and
+     * `validateOnMount` are **not** debounced — they always run immediately.
+     *
+     * @example
+     * ```tsx
+     * const form = useSchemaForm(Schema, { validationDebounceMs: 300 });
+     * ```
+     */
+    validationDebounceMs?: number;
 };
