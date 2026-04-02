@@ -27,6 +27,7 @@ jobs:
           cache: npm
 
       - run: npm ci
+      - run: cd website && npm ci
 
       - name: Lint
         run: npm run lint
