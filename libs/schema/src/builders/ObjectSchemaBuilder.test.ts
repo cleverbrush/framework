@@ -558,6 +558,14 @@ test('no unknown fields - 4', async () => {
     expect(objResult).toBeUndefined();
 });
 
+test('no unknown fields - 5', () => {
+    // Build a User schema with name (required string) and age (number)
+    const User = object({});
+
+    const result = User.validate({ name: 'Alice', age: 30 });
+    expect(result.valid).toEqual(false);
+});
+
 test('multiple errors - 1', async () => {
     const schema = object({
         first: number().max(10),
