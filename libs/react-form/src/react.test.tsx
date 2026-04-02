@@ -203,7 +203,7 @@ describe('form.useField', () => {
     test('reads initial value from form state', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -217,7 +217,7 @@ describe('form.useField', () => {
     test('onChange updates field value', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -232,7 +232,7 @@ describe('form.useField', () => {
     test('onBlur sets touched', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -248,7 +248,7 @@ describe('form.useField', () => {
     test('setValue works same as onChange', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -263,7 +263,7 @@ describe('form.useField', () => {
     test('returns schema for the field', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { nameField };
         });
 
@@ -275,7 +275,7 @@ describe('form.useField', () => {
     test('onChange updates the underlying object via PropertyDescriptor', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -290,8 +290,8 @@ describe('form.useField', () => {
     test('multiple fields can be used independently', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -318,7 +318,7 @@ describe('nested fields', () => {
     test('useField works with nested selectors', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(NestedSchema);
-            const cityField = form.useField((t) => t.user.address.city);
+            const cityField = form.useField(t => t.user.address.city);
             return { form, cityField };
         });
 
@@ -328,7 +328,7 @@ describe('nested fields', () => {
     test('onChange creates missing nested structure', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(NestedSchema);
-            const cityField = form.useField((t) => t.user.address.city);
+            const cityField = form.useField(t => t.user.address.city);
             return { form, cityField };
         });
 
@@ -349,7 +349,7 @@ describe('nested fields', () => {
             const form = useSchemaForm(NestedSchema, {
                 createMissingStructure: false
             });
-            const cityField = form.useField((t) => t.user.address.city);
+            const cityField = form.useField(t => t.user.address.city);
             return { form, cityField };
         });
 
@@ -368,8 +368,8 @@ describe('validation', () => {
     test('validate sets errors on fields', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -385,8 +385,8 @@ describe('validation', () => {
     test('validate clears errors when values are valid', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -424,6 +424,156 @@ describe('validation', () => {
         });
 
         expect(submitResult.valid).toBe(true);
+    });
+});
+
+// ─── validateOnMount ─────────────────────────────────────────────────────────
+
+describe('validateOnMount', () => {
+    test('shows errors on required fields immediately when validateOnMount is true', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema, {
+                validateOnMount: true
+            });
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
+            const ageField = form.useField(t => t.age);
+            return { form, nameField, emailField, ageField };
+        });
+
+        // Wait for the async validation triggered by the mount effect
+        await act(async () => {});
+
+        // Required fields should have errors and be touched
+        expect(result.current.nameField.error).toBeDefined();
+        expect(result.current.nameField.touched).toBe(true);
+        expect(result.current.emailField.error).toBeDefined();
+        expect(result.current.emailField.touched).toBe(true);
+        // age is optional — should NOT have an error
+        expect(result.current.ageField.error).toBeUndefined();
+    });
+
+    test('does not validate on mount by default', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema);
+            const nameField = form.useField(t => t.name);
+            return { form, nameField };
+        });
+
+        await act(async () => {});
+
+        // Without validateOnMount, fields start clean
+        expect(result.current.nameField.error).toBeUndefined();
+        expect(result.current.nameField.touched).toBe(false);
+    });
+
+    test('validateOnMount errors clear after setting valid values', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema, {
+                validateOnMount: true
+            });
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
+            return { form, nameField, emailField };
+        });
+
+        // Wait for mount validation
+        await act(async () => {});
+        expect(result.current.nameField.error).toBeDefined();
+
+        // Fix the values
+        act(() => {
+            result.current.nameField.onChange('John');
+            result.current.emailField.onChange('john@test.com');
+        });
+
+        // Validation runs on each onChange — wait for it
+        await act(async () => {});
+
+        expect(result.current.nameField.error).toBeUndefined();
+        expect(result.current.emailField.error).toBeUndefined();
+    });
+});
+
+// ─── validationDebounceMs ────────────────────────────────────────────────────
+
+describe('validationDebounceMs', () => {
+    test('debounces onChange validation by the specified delay', async () => {
+        vi.useFakeTimers();
+        try {
+            const { result } = renderHook(() => {
+                const form = useSchemaForm(UserSchema, {
+                    validationDebounceMs: 200
+                });
+                const nameField = form.useField(t => t.name);
+                const emailField = form.useField(t => t.email);
+                return { form, nameField, emailField };
+            });
+
+            // Typing in name triggers debounced validation; email is still
+            // undefined (required) but no error should appear yet
+            act(() => {
+                result.current.nameField.onChange('J');
+            });
+            act(() => {
+                result.current.nameField.onChange('Jo');
+            });
+
+            // Error should not appear before debounce fires
+            expect(result.current.emailField.error).toBeUndefined();
+
+            // Advance timer past 200ms and flush async validation
+            await act(async () => {
+                vi.advanceTimersByTime(250);
+            });
+
+            // Now validation has run — email is required and still empty
+            expect(result.current.emailField.error).toBeDefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    test('explicit validate() is NOT debounced', async () => {
+        vi.useFakeTimers();
+        try {
+            const { result } = renderHook(() => {
+                const form = useSchemaForm(UserSchema, {
+                    validationDebounceMs: 500
+                });
+                const nameField = form.useField(t => t.name);
+                return { form, nameField };
+            });
+
+            // Explicit validate should resolve immediately
+            await act(async () => {
+                await result.current.form.validate();
+            });
+
+            expect(result.current.nameField.error).toBeDefined();
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    test('without validationDebounceMs, onChange validates immediately', async () => {
+        const { result } = renderHook(() => {
+            const form = useSchemaForm(UserSchema);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
+            return { form, nameField, emailField };
+        });
+
+        // Typing in name triggers validation immediately (no debounce)
+        act(() => {
+            result.current.nameField.onChange('John');
+        });
+
+        // Flush async validation
+        await act(async () => {});
+
+        // email is required and still empty — error should be set
+        expect(result.current.emailField.error).toBeDefined();
     });
 });
 
@@ -538,7 +688,7 @@ describe('context-based useField', () => {
         const wrapper = createFormWrapper(formResult.current);
 
         const { result } = renderHook(
-            () => useField<typeof UserSchema, any>((t) => t.name),
+            () => useField<typeof UserSchema, any>(t => t.name),
             { wrapper }
         );
 
@@ -559,7 +709,7 @@ describe('Field component', () => {
 
         function TestComponent() {
             return React.createElement(Field, {
-                selector: (t: any) => t.name,
+                forProperty: (t: any) => t.name,
                 form: formResult.current,
                 renderer: mockRenderer
             });
@@ -593,7 +743,7 @@ describe('Field component', () => {
                 FormSystemProvider,
                 { renderers: { string: mockStringRenderer } },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current
                 })
             );
@@ -614,7 +764,7 @@ describe('Field component', () => {
 
         function TestComponent() {
             return React.createElement(Field, {
-                selector: (t: any) => t.name,
+                forProperty: (t: any) => t.name,
                 form: formResult.current
             });
         }
@@ -643,7 +793,7 @@ describe('Field component', () => {
                 FormSystemProvider,
                 { renderers: { string: systemRenderer } },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current,
                     renderer: explicitRenderer
                 })
@@ -658,6 +808,171 @@ describe('Field component', () => {
 
         unmount();
     });
+
+    test('Field forwards variant, label, name, and fieldProps to renderer', () => {
+        const mockRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(Field, {
+                forProperty: (t: any) => t.name,
+                form: formResult.current,
+                renderer: mockRenderer,
+                variant: 'password',
+                label: 'Password',
+                name: 'password',
+                fieldProps: {
+                    placeholder: 'Enter password',
+                    autoComplete: 'current-password'
+                }
+            });
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(mockRenderer).toHaveBeenCalledTimes(1);
+        const props = mockRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+        expect(props.label).toBe('Password');
+        expect(props.name).toBe('password');
+        expect(props.fieldProps).toEqual({
+            placeholder: 'Enter password',
+            autoComplete: 'current-password'
+        });
+
+        unmount();
+    });
+
+    test('variant-based renderer resolution selects type:variant key', () => {
+        const baseStringRenderer = vi.fn(() => 'base' as any);
+        const passwordRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(
+                FormSystemProvider,
+                {
+                    renderers: {
+                        string: baseStringRenderer,
+                        'string:password': passwordRenderer
+                    }
+                },
+                React.createElement(Field, {
+                    forProperty: (t: any) => t.name,
+                    form: formResult.current,
+                    variant: 'password'
+                })
+            );
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(passwordRenderer).toHaveBeenCalled();
+        expect(baseStringRenderer).not.toHaveBeenCalled();
+        // variant is still forwarded in props
+        const props = passwordRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+
+        unmount();
+    });
+
+    test('variant falls back to base type when no type:variant renderer exists', () => {
+        const baseStringRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(
+                FormSystemProvider,
+                { renderers: { string: baseStringRenderer } },
+                React.createElement(Field, {
+                    forProperty: (t: any) => t.name,
+                    form: formResult.current,
+                    variant: 'password'
+                })
+            );
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(baseStringRenderer).toHaveBeenCalled();
+        // variant is still forwarded even with fallback renderer
+        const props = baseStringRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+
+        unmount();
+    });
+
+    test('explicit renderer takes precedence over variant resolution', () => {
+        const passwordRenderer = vi.fn(() => 'variant' as any);
+        const explicitRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(
+                FormSystemProvider,
+                { renderers: { 'string:password': passwordRenderer } },
+                React.createElement(Field, {
+                    forProperty: (t: any) => t.name,
+                    form: formResult.current,
+                    renderer: explicitRenderer,
+                    variant: 'password'
+                })
+            );
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(explicitRenderer).toHaveBeenCalled();
+        expect(passwordRenderer).not.toHaveBeenCalled();
+        // variant still forwarded to explicit renderer
+        const props = explicitRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+
+        unmount();
+    });
+
+    test('Field omits variant/label/name/fieldProps when not provided', () => {
+        const mockRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(Field, {
+                forProperty: (t: any) => t.name,
+                form: formResult.current,
+                renderer: mockRenderer
+            });
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        const props = mockRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBeUndefined();
+        expect(props.label).toBeUndefined();
+        expect(props.name).toBeUndefined();
+        expect(props.fieldProps).toBeUndefined();
+
+        unmount();
+    });
 });
 
 // ─── Reset / dirty tracking ─────────────────────────────────────────────────
@@ -666,7 +981,7 @@ describe('reset and dirty tracking', () => {
     test('reset clears field values and dirty state', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -687,7 +1002,7 @@ describe('reset and dirty tracking', () => {
     test('field tracks dirty based on initial value comparison', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -707,9 +1022,9 @@ describe('reset and dirty tracking', () => {
 describe('async validation', () => {
     test('supports schemas with async validators', async () => {
         const asyncSchema = object({
-            username: string().addValidator(async (val) => {
+            username: string().addValidator(async val => {
                 // Simulate async check
-                await new Promise((resolve) => setTimeout(resolve, 10));
+                await new Promise(resolve => setTimeout(resolve, 10));
                 if (val === 'taken') {
                     return {
                         valid: false,
@@ -722,7 +1037,7 @@ describe('async validation', () => {
 
         const { result } = renderHook(() => {
             const form = useSchemaForm(asyncSchema);
-            const usernameField = form.useField((t) => t.username);
+            const usernameField = form.useField(t => t.username);
             return { form, usernameField };
         });
 
@@ -745,9 +1060,9 @@ describe('integration', () => {
     test('full form lifecycle: init, fill, validate, submit, reset', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
-            const ageField = form.useField((t) => t.age);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
+            const ageField = form.useField(t => t.age);
             return { form, nameField, emailField, ageField };
         });
 
@@ -798,8 +1113,8 @@ describe('integration', () => {
         const { result } = renderHook(() => {
             const form1 = useSchemaForm(UserSchema);
             const form2 = useSchemaForm(AddressSchema);
-            const name = form1.useField((t) => t.name);
-            const city = form2.useField((t) => t.city);
+            const name = form1.useField(t => t.name);
+            const city = form2.useField(t => t.city);
             return { form1, form2, name, city };
         });
 
@@ -868,15 +1183,15 @@ describe('integration', () => {
                 { renderers: htmlRenderers },
                 // 3. Field auto-resolves renderer by schema type
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current
                 }),
                 React.createElement(Field, {
-                    selector: (t: any) => t.email,
+                    forProperty: (t: any) => t.email,
                     form: formResult.current
                 }),
                 React.createElement(Field, {
-                    selector: (t: any) => t.age,
+                    forProperty: (t: any) => t.age,
                     form: formResult.current
                 })
             );
@@ -933,7 +1248,7 @@ describe('integration', () => {
                 FormSystemProvider,
                 { renderers: htmlRenderers },
                 React.createElement(Field, {
-                    selector: (t: any) => t.name,
+                    forProperty: (t: any) => t.name,
                     form: formResult.current
                 })
             );
@@ -1044,9 +1359,9 @@ describe('nested form validation', () => {
     test('nested fields show errors after validate', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(NestedSchema);
-            const city = form.useField((t) => t.user.address.city);
-            const zip = form.useField((t) => t.user.address.zip);
-            const name = form.useField((t) => t.user.name);
+            const city = form.useField(t => t.user.address.city);
+            const zip = form.useField(t => t.user.address.zip);
+            const name = form.useField(t => t.user.name);
             return { form, city, zip, name };
         });
 

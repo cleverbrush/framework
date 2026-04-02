@@ -20,9 +20,9 @@ const { register } = useForm<User>();
 
 ```tsx
 // @cleverbrush/react-form — fully type-safe selectors
-<Field selector={(t) => t.name} form={form} />           // ✓ checked at compile time
-<Field selector={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
-<Field selector={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist
+<Field forProperty={(t) => t.name} form={form} />           // ✓ checked at compile time
+<Field forProperty={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
+<Field forProperty={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist
 ```
 
 **What makes it different:**
@@ -34,7 +34,7 @@ const { register } = useForm<User>();
 | Type-safe field selectors | ✓ | ~ | ✗ | ✗ |
 | Headless / UI-agnostic | ✓ | ✓ | ~ | ✓ |
 | Global renderer system | ✓ | ✗ | ✗ | ✗ |
-| Auto-field rendering by type | ✓ | ✗ | ✗ | ✗ |
+| Auto-field rendering by type + variant | ✓ | ✗ | ✗ | ✗ |
 | Nested objects | ✓ | ✓ | ✓ | ✓ |
 | Async validation | ✓ | ✓ | ✓ | ✓ |
 
@@ -98,9 +98,9 @@ function ContactForm() {
 
     return (
         <div>
-            <Field selector={(t) => t.name} form={form} />
-            <Field selector={(t) => t.email} form={form} />
-            <Field selector={(t) => t.age} form={form} />
+            <Field forProperty={(t) => t.name} form={form} />
+            <Field forProperty={(t) => t.email} form={form} />
+            <Field forProperty={(t) => t.age} form={form} />
             <button onClick={handleSubmit}>Submit</button>
         </div>
     );
@@ -121,7 +121,7 @@ function App() {
 1. **Define a schema** using `@cleverbrush/schema` — this is your single source of truth for types, validation rules, and field metadata
 2. **Register renderers** via `FormSystemProvider` — plain functions that map schema types (`"string"`, `"number"`, `"boolean"`) to your UI components (plain HTML, MUI, Ant Design, etc.)
 3. **Create a form instance** via `useSchemaForm(schema)` — returns state management, validation, submit/reset lifecycle
-4. **Render fields** via `<Field selector={(t) => t.name} form={form} />` — the component looks up the registered renderer for the field's schema type
+4. **Render fields** via `<Field forProperty={(t) => t.name} form={form} />` — the component looks up the registered renderer for the field's schema type
 5. **Submit** — `form.submit()` runs the schema's full validation and returns a typed result
 
 ## Core Concepts
@@ -143,34 +143,84 @@ Renderers are plain functions that receive field state and return React nodes. D
 import { FieldRenderProps } from '@cleverbrush/react-form';
 
 const htmlRenderers = {
-    string: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) => (
+    string: ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
         <div>
+            {label && <label>{label}</label>}
             <input
                 type="text"
+                name={name}
                 value={value ?? ''}
                 onChange={(e) => onChange(e.target.value)}
                 onBlur={onBlur}
+                {...fieldProps}
             />
             {touched && error && <span className="error">{error}</span>}
         </div>
     ),
-    number: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) => (
+    number: ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
         <div>
+            {label && <label>{label}</label>}
             <input
                 type="number"
+                name={name}
                 value={value ?? ''}
                 onChange={(e) => onChange(Number(e.target.value))}
                 onBlur={onBlur}
+                {...fieldProps}
             />
             {touched && error && <span className="error">{error}</span>}
         </div>
     ),
-    boolean: ({ value, onChange }: FieldRenderProps) => (
-        <input
-            type="checkbox"
-            checked={value ?? false}
-            onChange={(e) => onChange(e.target.checked)}
-        />
+    boolean: ({ value, onChange, label }: FieldRenderProps) => (
+        <label>
+            <input
+                type="checkbox"
+                checked={value ?? false}
+                onChange={(e) => onChange(e.target.checked)}
+            />
+            {label}
+        </label>
+    )
+};
+```
+
+### Variant Renderers
+
+You can register renderers for specific variants using a `"type:variant"` key.
+When `<Field variant="password" />` is rendered on a `string` field, the
+registry is checked for `"string:password"` first, then falls back to `"string"`:
+
+```tsx
+const renderers = {
+    // Default string renderer
+    string: ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
+        <div>
+            {label && <label>{label}</label>}
+            <input type="text" name={name} value={value ?? ''}
+                   onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                   {...fieldProps} />
+            {touched && error && <span className="error">{error}</span>}
+        </div>
+    ),
+    // Password variant — rendered when <Field variant="password" /> is used on a string field
+    'string:password': ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
+        <div>
+            {label && <label>{label}</label>}
+            <input type="password" name={name} value={value ?? ''}
+                   onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                   {...fieldProps} />
+            {touched && error && <span className="error">{error}</span>}
+        </div>
+    ),
+    // Textarea variant
+    'string:textarea': ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
+        <div>
+            {label && <label>{label}</label>}
+            <textarea name={name} value={value ?? ''}
+                      onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                      {...(fieldProps as any)} />
+            {touched && error && <span className="error">{error}</span>}
+        </div>
     )
 };
 ```
@@ -247,7 +297,9 @@ Creates a form instance bound to a schema. Returns field binding and form lifecy
 
 ```tsx
 const form = useSchemaForm(UserSchema, {
-    createMissingStructure: true  // default: true — auto-create parent objects when setting nested values
+    createMissingStructure: true,  // default: true — auto-create parent objects when setting nested values
+    validateOnMount: false,        // default: false — set to true to show errors immediately on mount
+    validationDebounceMs: 300      // optional — debounce onChange validation (ms); validate()/submit() are always immediate
 });
 ```
 
@@ -255,7 +307,7 @@ const form = useSchemaForm(UserSchema, {
 
 | Method | Description |
 |--------|-------------|
-| `form.useField(selector)` | Bind a field by PropertyDescriptor selector |
+| `form.useField(forProperty)` | Bind a field by PropertyDescriptor selector |
 | `form.submit()` | Validate and return `ValidationResult` (includes `result.object` on success) |
 | `form.validate()` | Run validation, propagate errors to fields |
 | `form.reset(values?)` | Reset all fields; optionally set new initial values |
@@ -292,23 +344,39 @@ const name = useField((t) => t.name);
 
 ## Field Component
 
-Resolves the renderer from the `FormSystemProvider` registry by schema type, or uses an explicit `renderer` prop:
+Resolves the renderer from the `FormSystemProvider` registry by schema type (and optional variant), or uses an explicit `renderer` prop:
 
 ```tsx
 // Auto-resolved from FormSystemProvider (string schema → string renderer)
-<Field selector={(t) => t.name} form={form} />
+<Field forProperty={(t) => t.name} form={form} />
+
+// Variant-based resolution: looks up "string:password", falls back to "string"
+<Field forProperty={(t) => t.password} form={form} variant="password" />
+
+// With label, name, and extra props for the renderer
+<Field
+    forProperty={(t) => t.email}
+    form={form}
+    label="Email address"
+    name="email"
+    fieldProps={{ placeholder: 'you@example.com', autoComplete: 'email' }}
+/>
 
 // Explicit renderer override
-<Field selector={(t) => t.name} form={form} renderer={customRenderer} />
+<Field forProperty={(t) => t.name} form={form} renderer={customRenderer} />
 ```
 
 ### Props
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `selector` | `(tree) => PropertyDescriptor` | PropertyDescriptor selector for the field |
+| `forProperty` | `(tree) => PropertyDescriptor` | PropertyDescriptor selector for the field |
 | `form` | `SchemaFormInstance` | Form instance from `useSchemaForm` |
 | `renderer?` | `FieldRenderer` | Optional explicit renderer (overrides provider) |
+| `variant?` | `string` | Variant hint for renderer resolution and forwarded to the renderer |
+| `label?` | `string` | Visible label text forwarded to the renderer |
+| `name?` | `string` | HTML `name` attribute forwarded to the renderer |
+| `fieldProps?` | `Record<string, unknown>` | Extra renderer-specific props (e.g. `placeholder`, `autoComplete`) |
 
 ## Headless Usage (without Field component)
 
@@ -381,9 +449,9 @@ function UserForm() {
 
     return (
         <>
-            <Field selector={(t) => t.name} form={form} />
-            <Field selector={(t) => t.address.city} form={form} />
-            <Field selector={(t) => t.address.zip} form={form} />
+            <Field forProperty={(t) => t.name} form={form} />
+            <Field forProperty={(t) => t.address.city} form={form} />
+            <Field forProperty={(t) => t.address.zip} form={form} />
         </>
     );
 }
@@ -412,8 +480,8 @@ function SignupForm() {
 
     return (
         <FormSystemProvider renderers={htmlRenderers}>
-            <Field selector={(t) => t.username} form={form} />
-            <Field selector={(t) => t.email} form={form} />
+            <Field forProperty={(t) => t.username} form={form} />
+            <Field forProperty={(t) => t.email} form={form} />
             <button onClick={async () => {
                 const result = await form.submit();
                 if (result.valid) {
@@ -485,11 +553,11 @@ function RegistrationForm() {
 
     return (
         <div>
-            <Field selector={(t) => t.name} form={form} />
-            <Field selector={(t) => t.email} form={form} />
-            <Field selector={(t) => t.age} form={form} />
-            <Field selector={(t) => t.address.city} form={form} />
-            <Field selector={(t) => t.address.zip} form={form} />
+            <Field forProperty={(t) => t.name} form={form} />
+            <Field forProperty={(t) => t.email} form={form} />
+            <Field forProperty={(t) => t.age} form={form} />
+            <Field forProperty={(t) => t.address.city} form={form} />
+            <Field forProperty={(t) => t.address.zip} form={form} />
             <button onClick={async () => {
                 const result = await form.submit();
                 if (result.valid) {
@@ -528,11 +596,11 @@ function App() {
 | Type | Description |
 |------|-------------|
 | `FieldRenderer` | `(props: FieldRenderProps) => ReactNode` |
-| `FieldRenderProps` | Props passed to renderers: `value`, `initialValue`, `dirty`, `touched`, `error`, `validating`, `onChange`, `onBlur`, `setValue`, `schema` |
-| `FormSystemConfig` | `{ renderers?: Record<string, FieldRenderer> }` |
+| `FieldRenderProps` | Props passed to renderers: `value`, `initialValue`, `dirty`, `touched`, `error`, `validating`, `onChange`, `onBlur`, `setValue`, `schema`, `variant?`, `label?`, `name?`, `fieldProps?` |
+| `FormSystemConfig` | `{ renderers?: Record<string, FieldRenderer> }` — keys can be `"type"` or `"type:variant"` |
 | `FieldState` | `{ value, initialValue, dirty, touched, error, validating }` |
 | `UseFieldResult` | `FieldState & { onChange, onBlur, setValue, schema }` |
-| `UseSchemaFormOptions` | `{ createMissingStructure?: boolean }` |
+| `UseSchemaFormOptions` | `{ createMissingStructure?: boolean; validateOnMount?: boolean; validationDebounceMs?: number }` |
 | `SchemaFormInstance` | Return type of `useSchemaForm` |
 | `FormSystemProviderProps` | Props for `FormSystemProvider` |
 | `FormProviderProps` | Props for `FormProvider` |

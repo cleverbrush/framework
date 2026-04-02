@@ -116,7 +116,7 @@ export function useField<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
     TPropertySchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
 >(
-    selector: (
+    forProperty: (
         tree: PropertyDescriptorTree<TSchema, TSchema>
     ) => PropertyDescriptor<TSchema, TPropertySchema, any>
 ): UseFieldResult<InferType<TPropertySchema>> {
@@ -127,7 +127,7 @@ export function useField<
                 'Wrap your component tree with <FormProvider form={form}>.'
         );
     }
-    return useFieldFromContext(formContext, selector) as UseFieldResult<
+    return useFieldFromContext(formContext, forProperty) as UseFieldResult<
         InferType<TPropertySchema>
     >;
 }
@@ -150,33 +150,69 @@ export function useFormSystem(): FormSystemConfig {
 // ─── Field Component ─────────────────────────────────────────────────────────
 
 export type FieldProps<TSchema extends ObjectSchemaBuilder<any, any, any>> = {
-    selector: (
+    forProperty: (
         tree: PropertyDescriptorTree<TSchema, TSchema>
     ) => PropertyDescriptor<TSchema, any, any>;
     form: SchemaFormInstance<TSchema>;
     renderer?: FieldRenderer;
+    /**
+     * Rendering variant hint. Participates in renderer resolution:
+     * the registry is checked for `"type:variant"` (e.g. `"string:password"`)
+     * before falling back to the base `"type"` key.
+     * Also forwarded to the renderer via `FieldRenderProps.variant`.
+     */
+    variant?: string;
+    /** Visible label text forwarded to the renderer via `FieldRenderProps.label`. */
+    label?: string;
+    /** HTML `name` attribute forwarded to the renderer via `FieldRenderProps.name`. */
+    name?: string;
+    /**
+     * Bag of extra renderer-specific props forwarded to the renderer via
+     * `FieldRenderProps.fieldProps` (e.g. `placeholder`, `autoComplete`).
+     */
+    fieldProps?: Record<string, unknown>;
 };
 
 /**
  * UI-agnostic Field component.
- * Resolves renderer from:
- * 1. Explicit renderer prop
- * 2. FormSystemProvider registry (by schema type)
+ *
+ * Resolves a renderer from:
+ * 1. Explicit `renderer` prop
+ * 2. FormSystemProvider registry — checked for `"type:variant"` first,
+ *    then for the base `"type"`
+ *
+ * All rendering hints (`variant`, `label`, `name`, `fieldProps`) are
+ * forwarded to the resolved renderer via `FieldRenderProps`.
+ *
+ * @example
+ * ```tsx
+ * <Field forProperty={(t) => t.password} form={form}
+ *        variant="password" label="Password"
+ *        fieldProps={{ placeholder: "Enter password", autoComplete: "current-password" }} />
+ * ```
  */
 export function Field<TSchema extends ObjectSchemaBuilder<any, any, any>>({
-    selector,
+    forProperty,
     form,
-    renderer
+    renderer,
+    variant,
+    label,
+    name,
+    fieldProps
 }: FieldProps<TSchema>): React.ReactNode {
-    const fieldResult = form.useField(selector);
+    const fieldResult = form.useField(forProperty);
     const systemConfig = useContext(FormSystemContext);
 
     const resolvedRenderer =
-        renderer ?? resolveRenderer(systemConfig, fieldResult.schema);
+        renderer ?? resolveRenderer(systemConfig, fieldResult.schema, variant);
 
     if (!resolvedRenderer) {
+        const schemaType = getSchemaType(fieldResult.schema);
+        const tried = variant
+            ? `"${schemaType}:${variant}" or "${schemaType}"`
+            : `"${schemaType}"`;
         throw new Error(
-            `No renderer found for schema type "${getSchemaType(fieldResult.schema)}". ` +
+            `No renderer found for schema type ${tried}. ` +
                 'Provide a renderer prop or configure one in FormSystemProvider.'
         );
     }
@@ -191,6 +227,10 @@ export function Field<TSchema extends ObjectSchemaBuilder<any, any, any>>({
         onChange: fieldResult.onChange,
         onBlur: fieldResult.onBlur,
         setValue: fieldResult.setValue,
-        schema: fieldResult.schema
+        schema: fieldResult.schema,
+        variant,
+        label,
+        name,
+        fieldProps
     });
 }

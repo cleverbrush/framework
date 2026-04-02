@@ -313,7 +313,7 @@ test('shouldNotWrapWithTransaction - 1', () => {
     };
 
     const { object } = transaction(initial, {
-        shouldNotWrapWithTransaction: (item) => item instanceof customErr
+        shouldNotWrapWithTransaction: item => item instanceof customErr
     });
 
     expect(object.err === initial.err).toEqual(false);

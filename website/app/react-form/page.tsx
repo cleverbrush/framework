@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, type ReactNode } from 'react';
-import { object, string, number } from '@cleverbrush/schema';
-import {
-    useSchemaForm,
-    Field,
-    FormSystemProvider
-} from '@cleverbrush/react-form';
 import type { FieldRenderProps } from '@cleverbrush/react-form';
+import {
+    Field,
+    FormSystemProvider,
+    useSchemaForm
+} from '@cleverbrush/react-form';
+import { number, object, string } from '@cleverbrush/schema';
+import { type ReactNode, useState } from 'react';
 import { highlightTS } from '@/lib/highlight';
 
 /* ── Live Quick-Start form ──────────────────────────────────────── */
@@ -35,7 +35,7 @@ function DemoStringRenderer(props: FieldRenderProps): ReactNode {
             <input
                 type="text"
                 value={(props.value as string) ?? ''}
-                onChange={(e) => props.onChange(e.target.value)}
+                onChange={e => props.onChange(e.target.value)}
                 onBlur={props.onBlur}
                 className={props.touched && props.error ? 'has-error' : ''}
                 placeholder={props.touched ? '' : 'Type here…'}
@@ -53,9 +53,11 @@ function DemoNumberRenderer(props: FieldRenderProps): ReactNode {
             <input
                 type="number"
                 value={props.value != null ? String(props.value) : ''}
-                onChange={(e) =>
+                onChange={e =>
                     props.onChange(
-                        e.target.value === '' ? undefined : Number(e.target.value)
+                        e.target.value === ''
+                            ? undefined
+                            : Number(e.target.value)
                     )
                 }
                 onBlur={props.onBlur}
@@ -90,18 +92,34 @@ function ContactFormDemo() {
     return (
         <div className="demo-form">
             <div className="demo-form-row">
-                <label>Name</label>
-                <Field selector={(t) => t.name} form={form} />
+                <label htmlFor="name">Name</label>
+                <Field
+                    forProperty={t => t.name}
+                    form={form}
+                    fieldProps={{ id: 'name' }}
+                />
             </div>
             <div className="demo-form-row">
-                <label>Email</label>
-                <Field selector={(t) => t.email} form={form} />
+                <label htmlFor="email">Email</label>
+                <Field
+                    forProperty={t => t.email}
+                    form={form}
+                    fieldProps={{ id: 'email' }}
+                />
             </div>
             <div className="demo-form-row">
-                <label>Age</label>
-                <Field selector={(t) => t.age} form={form} />
+                <label htmlFor="age">Age</label>
+                <Field
+                    forProperty={t => t.age}
+                    form={form}
+                    fieldProps={{ id: 'age' }}
+                />
             </div>
-            <button className="demo-submit" onClick={handleSubmit}>
+            <button
+                type="submit"
+                className="demo-submit"
+                onClick={handleSubmit}
+            >
                 Submit
             </button>
             {result && (
@@ -140,6 +158,7 @@ export default function ReactFormPage() {
                     <h2>Installation</h2>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(
                                     `npm install @cleverbrush/react-form`
@@ -157,16 +176,16 @@ export default function ReactFormPage() {
                 <div className="card">
                     <h2>Quick Start</h2>
                     <p>
-                        Define a schema, register renderers, create a form,
-                        and render fields — all type-safe.
-                        The <strong>schema</strong> and{' '}
-                        <strong>renderers</strong> are defined{' '}
-                        <strong>once per app</strong> and reused by every
-                        form — individual form components only declare
+                        Define a schema, register renderers, create a form, and
+                        render fields — all type-safe. The{' '}
+                        <strong>schema</strong> and <strong>renderers</strong>{' '}
+                        are defined <strong>once per app</strong> and reused by
+                        every form — individual form components only declare
                         which fields to show:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
 import {
@@ -230,9 +249,9 @@ function ContactForm() {
 
   return (
     <div>
-      <Field selector={(t) => t.name} form={form} />
-      <Field selector={(t) => t.email} form={form} />
-      <Field selector={(t) => t.age} form={form} />
+      <Field forProperty={(t) => t.name} form={form} />
+      <Field forProperty={(t) => t.email} form={form} />
+      <Field forProperty={(t) => t.age} form={form} />
       <button onClick={handleSubmit}>Submit</button>
     </div>
   );
@@ -254,8 +273,8 @@ function App() {
                     <p>
                         This is the exact form described above, rendered with
                         <code> @cleverbrush/react-form</code>. Try submitting
-                        with empty fields, a short name, an invalid email, or
-                        an out-of-range age to see validation in action:
+                        with empty fields, a short name, an invalid email, or an
+                        out-of-range age to see validation in action:
                     </p>
                     <QuickStartLiveDemo />
                 </div>
@@ -273,16 +292,17 @@ function App() {
                         <code>
                             &lt;Field name=&quot;address.city&quot; /&gt;
                         </code>
-                        . The moment you pass a field name as a string, you
-                        lose TypeScript&apos;s type safety. Rename a property
-                        in your data model and the compiler stays silent —
-                        your form just silently breaks at runtime. The larger
-                        your codebase, the more of these invisible string
-                        references you accumulate, and the more fragile every
-                        refactor becomes.
+                        . The moment you pass a field name as a string, you lose
+                        TypeScript&apos;s type safety. Rename a property in your
+                        data model and the compiler stays silent — your form
+                        just silently breaks at runtime. The larger your
+                        codebase, the more of these invisible string references
+                        you accumulate, and the more fragile every refactor
+                        becomes.
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// React Hook Form — field names are plain strings
 const { register } = useForm<User>();
@@ -304,20 +324,21 @@ const { register } = useForm<User>();
                         strings. The compiler knows the exact shape of your
                         schema, so a renamed or mistyped property is a{' '}
                         <strong>compile-time error</strong>, not a runtime
-                        surprise. On top of that the schema{' '}
-                        <strong>IS</strong> the validation, the type
-                        definition, <strong>AND</strong> the form field
-                        configuration. One source of truth. Change the schema
-                        and everything updates — types, validation rules,
-                        and form field behavior.
+                        surprise. On top of that the schema <strong>IS</strong>{' '}
+                        the validation, the type definition,{' '}
+                        <strong>AND</strong> the form field configuration. One
+                        source of truth. Change the schema and everything
+                        updates — types, validation rules, and form field
+                        behavior.
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// @cleverbrush/react-form — fully type-safe selectors
-<Field selector={(t) => t.name} form={form} />           // ✓ checked at compile time
-<Field selector={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
-<Field selector={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist`)
+<Field forProperty={(t) => t.name} form={form} />           // ✓ checked at compile time
+<Field forProperty={(t) => t.address.city} form={form} />   // ✓ rename "city" → compiler error
+<Field forProperty={(t) => t.emial} form={form} />          // ✗ compile error: "emial" doesn't exist`)
                             }}
                         />
                     </pre>
@@ -337,10 +358,10 @@ const { register } = useForm<User>();
                     <h3>PropertyDescriptor Selectors</h3>
                     <p>
                         Fields are bound via type-safe selectors like{' '}
-                        <code>(t) =&gt; t.address.city</code>, not string
-                        paths like <code>&quot;address.city&quot;</code>. This
-                        means refactoring is safe — rename a property and the
-                        compiler tells you everywhere that needs updating.
+                        <code>(t) =&gt; t.address.city</code>, not string paths
+                        like <code>&quot;address.city&quot;</code>. This means
+                        refactoring is safe — rename a property and the compiler
+                        tells you everywhere that needs updating.
                     </p>
 
                     <h3>Production Tested</h3>
@@ -353,11 +374,10 @@ const { register } = useForm<User>();
                         >
                             cleverbrush.com/editor
                         </a>{' '}
-                        is rendered through{' '}
-                        <code>@cleverbrush/react-form</code>. It handles
-                        dozens of complex forms with nested objects, async
-                        validation, and dynamic field visibility in production
-                        every day.
+                        is rendered through <code>@cleverbrush/react-form</code>
+                        . It handles dozens of complex forms with nested
+                        objects, async validation, and dynamic field visibility
+                        in production every day.
                     </p>
                 </div>
 
@@ -374,7 +394,8 @@ const { register } = useForm<User>();
                         <li>
                             <strong>Register renderers</strong> via{' '}
                             <code>FormSystemProvider</code> — plain functions
-                            that map schema types (<code>&quot;string&quot;</code>,{' '}
+                            that map schema types (
+                            <code>&quot;string&quot;</code>,{' '}
                             <code>&quot;number&quot;</code>) to your UI
                             components (plain HTML, MUI, Ant Design, etc.)
                         </li>
@@ -386,17 +407,16 @@ const { register } = useForm<User>();
                         <li>
                             <strong>Render fields</strong> via{' '}
                             <code>
-                                &lt;Field selector={'{(t) => t.name}'}
+                                &lt;Field forProperty={'{(t) => t.name}'}
                                 form={'{form}'} /&gt;
                             </code>{' '}
-                            — the component looks up the registered renderer
-                            for the field&apos;s schema type automatically
+                            — the component looks up the registered renderer for
+                            the field&apos;s schema type automatically
                         </li>
                         <li>
-                            <strong>Submit</strong> —{' '}
-                            <code>form.submit()</code> runs the schema&apos;s
-                            full validation and returns a typed result with
-                            per-field errors
+                            <strong>Submit</strong> — <code>form.submit()</code>{' '}
+                            runs the schema&apos;s full validation and returns a
+                            typed result with per-field errors
                         </li>
                     </ol>
                 </div>
@@ -421,8 +441,7 @@ const { register } = useForm<User>();
                                     <td>
                                         Registers renderers globally (maps
                                         schema types like &quot;string&quot;,
-                                        &quot;number&quot; to React
-                                        components).
+                                        &quot;number&quot; to React components).
                                     </td>
                                     <td>
                                         Once at the app root. All forms
@@ -447,13 +466,13 @@ const { register } = useForm<User>();
                                         <code>useField</code>
                                     </td>
                                     <td>
-                                        Accesses a single field&apos;s state
-                                        and handlers. Works inside a{' '}
+                                        Accesses a single field&apos;s state and
+                                        handlers. Works inside a{' '}
                                         <code>FormProvider</code> context.
                                     </td>
                                     <td>
-                                        When you want fine-grained control
-                                        over individual fields.
+                                        When you want fine-grained control over
+                                        individual fields.
                                     </td>
                                 </tr>
                                 <tr>
@@ -462,7 +481,10 @@ const { register } = useForm<User>();
                                     </td>
                                     <td>
                                         Renders a field using the registered
-                                        renderer for its schema type.
+                                        renderer for its schema type. Supports{' '}
+                                        <code>variant</code> for type-specific
+                                        rendering (e.g.{' '}
+                                        <code>&quot;password&quot;</code>).
                                         Declarative API.
                                     </td>
                                     <td>
@@ -480,8 +502,8 @@ const { register } = useForm<User>();
                     <h2>Registering Renderers</h2>
                     <p>
                         Renderers are plain functions that receive field state
-                        and return React nodes. They map schema type names
-                        (like <code>&quot;string&quot;</code>,{' '}
+                        and return React nodes. They map schema type names (like{' '}
+                        <code>&quot;string&quot;</code>,{' '}
                         <code>&quot;number&quot;</code>,{' '}
                         <code>&quot;boolean&quot;</code>) to UI components. Here
                         are two examples:
@@ -490,40 +512,50 @@ const { register } = useForm<User>();
                     <h3>Plain HTML Renderers</h3>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const htmlRenderers = {
-  string: ({ value, onChange, onBlur, error, dirty }) => (
+  string: ({ value, onChange, onBlur, error, dirty, label, name, fieldProps }) => (
     <div className="field">
+      {label && <label>{label}</label>}
       <input
         type="text"
+        name={name}
         value={value ?? ''}
         onChange={(e) => onChange(e.target.value)}
         onBlur={onBlur}
         className={error ? 'input-error' : ''}
+        {...fieldProps}
       />
       {dirty && <span className="dirty-indicator">*</span>}
       {error && <span className="error">{error}</span>}
     </div>
   ),
-  number: ({ value, onChange, onBlur, error }) => (
+  number: ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
     <div className="field">
+      {label && <label>{label}</label>}
       <input
         type="number"
+        name={name}
         value={value ?? ''}
         onChange={(e) => onChange(Number(e.target.value))}
         onBlur={onBlur}
+        {...fieldProps}
       />
       {error && <span className="error">{error}</span>}
     </div>
   ),
-  boolean: ({ value, onChange, onBlur }) => (
+  boolean: ({ value, onChange, onBlur, label }) => (
     <div className="field">
-      <input
-        type="checkbox"
-        checked={value ?? false}
-        onChange={(e) => onChange(e.target.checked)}
-        onBlur={onBlur}
-      />
+      <label>
+        <input
+          type="checkbox"
+          checked={value ?? false}
+          onChange={(e) => onChange(e.target.checked)}
+          onBlur={onBlur}
+        />
+        {label}
+      </label>
     </div>
   )
 };`)
@@ -534,6 +566,7 @@ const { register } = useForm<User>();
                     <h3>Material UI Renderers (Example)</h3>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// Example — requires @mui/material (not included in this demo)
 const muiRenderers = {
@@ -567,6 +600,67 @@ const muiRenderers = {
                             }}
                         />
                     </pre>
+
+                    <h3>Variant Renderers</h3>
+                    <p>
+                        Register variant-specific renderers with a{' '}
+                        <code>&quot;type:variant&quot;</code> key. When{' '}
+                        <code>
+                            &lt;Field variant=&quot;password&quot; /&gt;
+                        </code>{' '}
+                        is rendered on a <code>string</code> field, the registry
+                        is checked for <code>&quot;string:password&quot;</code>{' '}
+                        first, then falls back to{' '}
+                        <code>&quot;string&quot;</code>:
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const renderers = {
+  // Default string renderer
+  string: ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
+    <div>
+      {label && <label>{label}</label>}
+      <input type="text" name={name} value={value ?? ''}
+             onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+             {...fieldProps} />
+      {error && <span className="error">{error}</span>}
+    </div>
+  ),
+  // Password variant — used when <Field variant="password" />
+  'string:password': ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
+    <div>
+      {label && <label>{label}</label>}
+      <input type="password" name={name} value={value ?? ''}
+             onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+             {...fieldProps} />
+      {error && <span className="error">{error}</span>}
+    </div>
+  ),
+  // Textarea variant
+  'string:textarea': ({ value, onChange, onBlur, error, label, name, fieldProps }) => (
+    <div>
+      {label && <label>{label}</label>}
+      <textarea name={name} value={value ?? ''}
+                onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                {...fieldProps} />
+      {error && <span className="error">{error}</span>}
+    </div>
+  )
+};
+
+// Usage:
+<Field forProperty={(t) => t.name} form={form} label="Name" />
+<Field forProperty={(t) => t.password} form={form}
+       variant="password" label="Password"
+       fieldProps={{ placeholder: 'Enter password', autoComplete: 'current-password' }} />
+<Field forProperty={(t) => t.bio} form={form}
+       variant="textarea" label="Bio"
+       fieldProps={{ rows: 4 }} />`)
+                            }}
+                        />
+                    </pre>
                 </div>
 
                 {/* ── FormSystemProvider ───────────────────────────── */}
@@ -580,6 +674,7 @@ const muiRenderers = {
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { FormSystemProvider } from '@cleverbrush/react-form';
 
@@ -594,10 +689,9 @@ function App() {
                         />
                     </pre>
                     <p>
-                        You can nest providers to override renderers in
-                        specific parts of your app. Child providers merge with
-                        parent renderers, so you only need to specify the
-                        overrides.
+                        You can nest providers to override renderers in specific
+                        parts of your app. Child providers merge with parent
+                        renderers, so you only need to specify the overrides.
                     </p>
                 </div>
 
@@ -610,9 +704,12 @@ function App() {
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const form = useSchemaForm(MySchema, {
-  createMissingStructure: true  // default: true
+  createMissingStructure: true,  // default: true
+  validateOnMount: false,        // default: false — set to true to show errors on mount
+  validationDebounceMs: 300      // optional — debounce onChange validation (ms)
 });`)
                             }}
                         />
@@ -634,8 +731,8 @@ function App() {
                                     </td>
                                     <td>
                                         Validates and returns{' '}
-                                        <code>ValidationResult</code>. Call
-                                        this on form submission.
+                                        <code>ValidationResult</code>. Call this
+                                        on form submission.
                                     </td>
                                 </tr>
                                 <tr>
@@ -678,9 +775,7 @@ function App() {
                                 </tr>
                                 <tr>
                                     <td>
-                                        <code>
-                                            form.useField(selector)
-                                        </code>
+                                        <code>form.useField(forProperty)</code>
                                     </td>
                                     <td>
                                         Hook to access a specific field&apos;s
@@ -698,8 +793,8 @@ function App() {
                     <h2>useField</h2>
                     <p>
                         Access individual field state and handlers. Can be used
-                        via <code>form.useField(selector)</code> directly or
-                        via the context-based <code>useField(selector)</code>{' '}
+                        via <code>form.useField(forProperty)</code> directly or
+                        via the context-based <code>useField(forProperty)</code>{' '}
                         inside a <code>FormProvider</code>.
                     </p>
 
@@ -730,9 +825,7 @@ function App() {
                                     <td>
                                         <code>T | undefined</code>
                                     </td>
-                                    <td>
-                                        Value at form creation / last reset
-                                    </td>
+                                    <td>Value at form creation / last reset</td>
                                 </tr>
                                 <tr>
                                     <td>
@@ -742,8 +835,7 @@ function App() {
                                         <code>boolean</code>
                                     </td>
                                     <td>
-                                        True if value differs from
-                                        initialValue
+                                        True if value differs from initialValue
                                     </td>
                                 </tr>
                                 <tr>
@@ -777,8 +869,7 @@ function App() {
                                         <code>boolean</code>
                                     </td>
                                     <td>
-                                        True while async validation is
-                                        running
+                                        True while async validation is running
                                     </td>
                                 </tr>
                                 <tr>
@@ -813,8 +904,8 @@ function App() {
                                         <code>(T) =&gt; void</code>
                                     </td>
                                     <td>
-                                        Programmatically set the value
-                                        (alias for onChange)
+                                        Programmatically set the value (alias
+                                        for onChange)
                                     </td>
                                 </tr>
                                 <tr>
@@ -825,8 +916,8 @@ function App() {
                                         <code>SchemaBuilder</code>
                                     </td>
                                     <td>
-                                        The schema builder for this field
-                                        (for introspection)
+                                        The schema builder for this field (for
+                                        introspection)
                                     </td>
                                 </tr>
                             </tbody>
@@ -838,13 +929,13 @@ function App() {
                 <div className="card">
                     <h2>Headless Usage</h2>
                     <p>
-                        You don&apos;t have to use the{' '}
-                        <code>Field</code> component at all. Use{' '}
-                        <code>form.useField()</code> directly for full control
-                        over rendering:
+                        You don&apos;t have to use the <code>Field</code>{' '}
+                        component at all. Use <code>form.useField()</code>{' '}
+                        directly for full control over rendering:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`function MyForm() {
   const form = useSchemaForm(ContactSchema);
@@ -889,20 +980,36 @@ function App() {
                 <div className="card">
                     <h2>Field Component</h2>
                     <p>
-                        The <code>Field</code> component is a declarative way
-                        to render form fields. It looks up the registered
-                        renderer for the field&apos;s schema type and passes the
-                        field state to it:
+                        The <code>Field</code> component is a declarative way to
+                        render form fields. It looks up the registered renderer
+                        for the field&apos;s schema type and passes the field
+                        state to it. Use <code>variant</code> for type-specific
+                        rendering, and <code>label</code>, <code>name</code>,{' '}
+                        <code>fieldProps</code> to forward additional rendering
+                        hints:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// Uses the renderer registered for "string" schema type
-<Field selector={(t) => t.name} form={form} />
+<Field forProperty={(t) => t.name} form={form} />
+
+// Variant-based resolution: looks up "string:password", falls back to "string"
+<Field forProperty={(t) => t.password} form={form} variant="password" />
+
+// With label, name, and extra props for the renderer
+<Field
+  forProperty={(t) => t.email}
+  form={form}
+  label="Email address"
+  name="email"
+  fieldProps={{ placeholder: 'you@example.com', autoComplete: 'email' }}
+/>
 
 // Override the renderer for a specific field
 <Field
-  selector={(t) => t.email}
+  forProperty={(t) => t.email}
   form={form}
   renderer={({ value, onChange, error }) => (
     <div>
@@ -928,7 +1035,7 @@ function App() {
                             <tbody>
                                 <tr>
                                     <td>
-                                        <code>selector</code>
+                                        <code>forProperty</code>
                                     </td>
                                     <td>
                                         <code>
@@ -964,6 +1071,63 @@ function App() {
                                         specific field
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td>
+                                        <code>variant</code>
+                                    </td>
+                                    <td>
+                                        <code>string</code>
+                                    </td>
+                                    <td>
+                                        Variant hint for renderer resolution
+                                        (e.g. <code>&quot;password&quot;</code>,{' '}
+                                        <code>&quot;textarea&quot;</code>).
+                                        Checked as{' '}
+                                        <code>&quot;type:variant&quot;</code> in
+                                        the registry, falls back to base type.
+                                        Also forwarded to the renderer.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>label</code>
+                                    </td>
+                                    <td>
+                                        <code>string</code>
+                                    </td>
+                                    <td>
+                                        Visible label text forwarded to the
+                                        renderer
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>name</code>
+                                    </td>
+                                    <td>
+                                        <code>string</code>
+                                    </td>
+                                    <td>
+                                        HTML <code>name</code> attribute
+                                        forwarded to the renderer for FormData
+                                        submission
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>fieldProps</code>
+                                    </td>
+                                    <td>
+                                        <code>
+                                            Record&lt;string, unknown&gt;
+                                        </code>
+                                    </td>
+                                    <td>
+                                        Extra renderer-specific props (e.g.{' '}
+                                        <code>placeholder</code>,{' '}
+                                        <code>autoComplete</code>)
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -975,11 +1139,12 @@ function App() {
                     <p>
                         <code>FormProvider</code> puts a form instance into
                         React context, allowing child components to use the
-                        context-based <code>useField</code> hook without
-                        passing the form prop explicitly:
+                        context-based <code>useField</code> hook without passing
+                        the form prop explicitly:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { FormProvider, useField } from '@cleverbrush/react-form';
 
@@ -1015,10 +1180,11 @@ function MyForm() {
                     <p>
                         PropertyDescriptor selectors support nested paths.
                         Access deeply nested fields with dot notation in the
-                        selector:
+                        forProperty accessor:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const AddressSchema = object({
   city:   string().minLength(1),
@@ -1036,10 +1202,10 @@ function UserForm() {
 
   return (
     <div>
-      <Field selector={(t) => t.name} form={form} />
-      <Field selector={(t) => t.address.city} form={form} />
-      <Field selector={(t) => t.address.street} form={form} />
-      <Field selector={(t) => t.address.zip} form={form} />
+      <Field forProperty={(t) => t.name} form={form} />
+      <Field forProperty={(t) => t.address.city} form={form} />
+      <Field forProperty={(t) => t.address.street} form={form} />
+      <Field forProperty={(t) => t.address.zip} form={form} />
     </div>
   );
 }`)
@@ -1053,8 +1219,8 @@ function UserForm() {
                     <h2>Validation</h2>
                     <p>
                         Validation is built into the schema — you don&apos;t
-                        configure it separately. Here&apos;s how it works
-                        step by step:
+                        configure it separately. Here&apos;s how it works step
+                        by step:
                     </p>
                     <ol>
                         <li>
@@ -1063,13 +1229,11 @@ function UserForm() {
                         </li>
                         <li>
                             <strong>Custom validators</strong> added via{' '}
-                            <code>.addValidator()</code> run next (can be
-                            async)
+                            <code>.addValidator()</code> run next (can be async)
                         </li>
                         <li>
-                            <strong>Per-field errors</strong> are extracted
-                            and made available via{' '}
-                            <code>useField().error</code>
+                            <strong>Per-field errors</strong> are extracted and
+                            made available via <code>useField().error</code>
                         </li>
                         <li>
                             <strong>form.submit()</strong> triggers full
@@ -1080,6 +1244,7 @@ function UserForm() {
                     <h3>Custom Validator Example</h3>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const RegistrationSchema = object({
   username: string().minLength(3).maxLength(20).addValidator(async (value) => {
@@ -1232,7 +1397,7 @@ function UserForm() {
                                 </tr>
                                 <tr>
                                     <td>
-                                        <code>useField(selector)</code>
+                                        <code>useField(forProperty)</code>
                                     </td>
                                     <td>
                                         Access a single field&apos;s state and
@@ -1265,9 +1430,7 @@ function UserForm() {
                             <tbody>
                                 <tr>
                                     <td>
-                                        <code>
-                                            &lt;FormSystemProvider&gt;
-                                        </code>
+                                        <code>&lt;FormSystemProvider&gt;</code>
                                     </td>
                                     <td>
                                         Top-level provider for shared form
@@ -1290,8 +1453,7 @@ function UserForm() {
                                     </td>
                                     <td>
                                         Renders a form field using the
-                                        registered renderer for its schema
-                                        type.
+                                        registered renderer for its schema type.
                                     </td>
                                 </tr>
                             </tbody>
@@ -1315,7 +1477,8 @@ function UserForm() {
                                     <td>
                                         Props passed to renderer functions:
                                         value, onChange, onBlur, error, dirty,
-                                        touched, validating, setValue, schema.
+                                        touched, validating, setValue, schema,
+                                        variant, label, name, fieldProps.
                                     </td>
                                 </tr>
                                 <tr>
@@ -1345,10 +1508,9 @@ function UserForm() {
                                         <code>UseFieldResult</code>
                                     </td>
                                     <td>
-                                        Return type of useField. Contains
-                                        value, error, dirty, touched,
-                                        validating, onChange, onBlur, setValue,
-                                        schema.
+                                        Return type of useField. Contains value,
+                                        error, dirty, touched, validating,
+                                        onChange, onBlur, setValue, schema.
                                     </td>
                                 </tr>
                                 <tr>
@@ -1358,6 +1520,9 @@ function UserForm() {
                                     <td>
                                         Configuration object for
                                         FormSystemProvider: renderers record.
+                                        Keys can be{' '}
+                                        <code>&quot;type&quot;</code> or{' '}
+                                        <code>&quot;type:variant&quot;</code>.
                                     </td>
                                 </tr>
                             </tbody>

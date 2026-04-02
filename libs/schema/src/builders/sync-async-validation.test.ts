@@ -57,16 +57,14 @@ describe('sync validate() throws on async callbacks', () => {
 
 describe('validateAsync() supports async callbacks', () => {
     test('async preprocessor works', async () => {
-        const schema = string().addPreprocessor(async (val) =>
-            val.toUpperCase()
-        );
+        const schema = string().addPreprocessor(async val => val.toUpperCase());
         const result = await schema.validateAsync('hello');
         expect(result.valid).toBe(true);
         expect(result.object).toBe('HELLO');
     });
 
     test('async validator works', async () => {
-        const schema = string().addValidator(async (val) => ({
+        const schema = string().addValidator(async val => ({
             valid: val.length > 3,
             errors: val.length > 3 ? [] : [{ message: 'too short', path: '' }]
         }));
@@ -88,7 +86,7 @@ describe('validateAsync() supports async callbacks', () => {
 
     test('object with async validator via validateAsync()', async () => {
         const schema = object({
-            name: string().addPreprocessor(async (v) => v.trim()),
+            name: string().addPreprocessor(async v => v.trim()),
             age: number()
         });
         const result = await schema.validateAsync({
@@ -101,7 +99,7 @@ describe('validateAsync() supports async callbacks', () => {
 
     test('array with async element validation via validateAsync()', async () => {
         const schema = array().of(
-            string().addValidator(async (val) => ({
+            string().addValidator(async val => ({
                 valid: val !== 'bad',
                 errors:
                     val !== 'bad' ? [] : [{ message: 'bad value', path: '' }]
@@ -172,9 +170,7 @@ describe('parse() and parseAsync()', () => {
     });
 
     test('parseAsync() works with async validators', async () => {
-        const schema = string().addPreprocessor(async (val) =>
-            val.toUpperCase()
-        );
+        const schema = string().addPreprocessor(async val => val.toUpperCase());
         const result = await schema.parseAsync('hello');
         expect(result).toBe('HELLO');
     });
@@ -198,9 +194,7 @@ describe('safeParse() and safeParseAsync()', () => {
     });
 
     test('safeParseAsync() is an alias for validateAsync()', async () => {
-        const schema = string().addPreprocessor(async (val) =>
-            val.toUpperCase()
-        );
+        const schema = string().addPreprocessor(async val => val.toUpperCase());
         const result = await schema.safeParseAsync('hello');
         expect(result.valid).toBe(true);
         expect(result.object).toBe('HELLO');
@@ -214,7 +208,7 @@ describe('async extension', () => {
     const asyncLookupExt = defineExtension({
         string: {
             asyncLookup(this: StringSchemaBuilder, allowedValues: string[]) {
-                return this.addValidator(async (val) => {
+                return this.addValidator(async val => {
                     // Simulate async lookup (e.g., database or API check)
                     const found = await Promise.resolve(
                         allowedValues.includes(val)
@@ -510,7 +504,7 @@ describe('validateAsync() with doNotStopOnFirstError', () => {
 describe('validateAsync() with async preprocessors', () => {
     test('transforms value before validation', async () => {
         const schema = number()
-            .addPreprocessor(async (val) => val * 2)
+            .addPreprocessor(async val => val * 2)
             .min(10);
         const result = await schema.validateAsync(6);
         expect(result.valid).toBe(true);
@@ -519,8 +513,8 @@ describe('validateAsync() with async preprocessors', () => {
 
     test('chained async preprocessors run in order', async () => {
         const schema = string()
-            .addPreprocessor(async (val) => val.trim())
-            .addPreprocessor(async (val) => val.toUpperCase())
+            .addPreprocessor(async val => val.trim())
+            .addPreprocessor(async val => val.toUpperCase())
             .minLength(3);
         const result = await schema.validateAsync('  hello  ');
         expect(result.valid).toBe(true);
@@ -538,8 +532,8 @@ describe('validateAsync() with async preprocessors', () => {
 
     test('object with async preprocessors on nested properties', async () => {
         const schema = object({
-            name: string().addPreprocessor(async (val) => val.trim()),
-            score: number().addPreprocessor(async (val) => Math.round(val))
+            name: string().addPreprocessor(async val => val.trim()),
+            score: number().addPreprocessor(async val => Math.round(val))
         });
         const result = await schema.validateAsync({
             name: '  Alice  ',
@@ -584,9 +578,7 @@ describe('validateAsync() with deeply nested objects', () => {
             { doNotStopOnFirstError: true }
         );
         expect(result.valid).toBe(false);
-        const emailError = result.errors!.find((e) =>
-            e.path?.includes('email')
-        );
+        const emailError = result.errors!.find(e => e.path?.includes('email'));
         expect(emailError).toBeDefined();
         expect(emailError!.path).toBe('$.user.profile.email');
     });
@@ -594,8 +586,8 @@ describe('validateAsync() with deeply nested objects', () => {
     test('async validators on nested properties', async () => {
         const schema = object({
             user: object({
-                username: string().addValidator(async (val) => {
-                    await new Promise((r) => setTimeout(r, 5));
+                username: string().addValidator(async val => {
+                    await new Promise(r => setTimeout(r, 5));
                     return {
                         valid: val !== 'admin',
                         errors:
@@ -667,8 +659,8 @@ describe('validateAsync() with mixed sync and async validators', () => {
 
     test('mixed sync preprocessor + async validator', async () => {
         const schema = string()
-            .addPreprocessor((val) => val.trim())
-            .addValidator(async (val) => ({
+            .addPreprocessor(val => val.trim())
+            .addValidator(async val => ({
                 valid: val.length >= 3,
                 errors:
                     val.length >= 3
@@ -686,7 +678,7 @@ describe('validateAsync() with mixed sync and async validators', () => {
 
     test('async preprocessor + sync built-in constraint', async () => {
         const schema = number()
-            .addPreprocessor(async (val) => val + 10)
+            .addPreprocessor(async val => val + 10)
             .min(15);
         const result = await schema.validateAsync(6);
         expect(result.valid).toBe(true);
@@ -766,10 +758,10 @@ describe('validateAsync() getErrorsFor on object results', () => {
         expect(result.valid).toBe(false);
         expect(typeof result.getErrorsFor).toBe('function');
 
-        const nameErrors = result.getErrorsFor((t) => t.name);
+        const nameErrors = result.getErrorsFor(t => t.name);
         expect(nameErrors.errors.length).toBeGreaterThan(0);
 
-        const emailErrors = result.getErrorsFor((t) => t.email);
+        const emailErrors = result.getErrorsFor(t => t.email);
         expect(emailErrors.errors.length).toBeGreaterThan(0);
     });
 
@@ -779,7 +771,7 @@ describe('validateAsync() getErrorsFor on object results', () => {
             doNotStopOnFirstError: true
         });
 
-        const nameErrors = result.getErrorsFor((t) => t.name);
+        const nameErrors = result.getErrorsFor(t => t.name);
         expect(nameErrors.errors.length).toBe(0);
     });
 });

@@ -9,6 +9,7 @@ export function Footer() {
                             height="16"
                             viewBox="0 0 24 24"
                             fill="none"
+                            aria-hidden="true"
                             style={{
                                 marginRight: '0.4rem',
                                 verticalAlign: 'middle',
@@ -28,8 +29,8 @@ export function Footer() {
                         Cleverbrush
                     </h4>
                     <p>
-                        Strongly typed libraries for full-stack web
-                        development. Open source &amp; community-driven.
+                        Strongly typed libraries for full-stack web development.
+                        Open source &amp; community-driven.
                     </p>
                 </div>
                 <div className="footer-section">
@@ -41,9 +42,7 @@ export function Footer() {
                     >
                         GitHub Repository
                     </a>
-                    <a href="/api-docs">
-                        API Reference
-                    </a>
+                    <a href="/api-docs">API Reference</a>
                     <a
                         href="https://cleverbrush.com/editor"
                         target="_blank"

@@ -26,25 +26,25 @@ describe('MappingRegistry', () => {
     test('throws on null schemas', () => {
         const registry = new MappingRegistry();
         expect(() =>
-            registry.configure(null as any, null as any, (m) => m as any)
+            registry.configure(null as any, null as any, m => m as any)
         ).toThrow();
         expect(() =>
-            registry.configure(null as any, UserDtoSchema, (m) => m as any)
+            registry.configure(null as any, UserDtoSchema, m => m as any)
         ).toThrow();
         expect(() =>
-            registry.configure(UserSchema, null as any, (m) => m as any)
+            registry.configure(UserSchema, null as any, m => m as any)
         ).toThrow();
     });
 
     test('throws on non-ObjectSchemaBuilder schemas', () => {
         const registry = new MappingRegistry();
         expect(() =>
-            registry.configure(string() as any, UserDtoSchema, (m) => m as any)
+            registry.configure(string() as any, UserDtoSchema, m => m as any)
         ).toThrow(
             'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
         );
         expect(() =>
-            registry.configure(UserSchema, number() as any, (m) => m as any)
+            registry.configure(UserSchema, number() as any, m => m as any)
         ).toThrow(
             'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
         );
@@ -61,15 +61,15 @@ describe('MappingRegistry', () => {
         const registry = new MappingRegistry().configure(
             UserSchema,
             UserDtoSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
@@ -98,10 +98,10 @@ describe('Mapper', () => {
 
         const mapper = new Mapper(UserSchema, TargetSchema);
         const mapFn = mapper
-            .for((t) => t.userName)
-            .from((f) => f.name)
-            .for((t) => t.userCity)
-            .from((f) => f.address.city)
+            .for(t => t.userName)
+            .from(f => f.name)
+            .for(t => t.userCity)
+            .from(f => f.address.city)
             .getMapper();
 
         const result = await mapFn({
@@ -124,10 +124,10 @@ describe('Mapper', () => {
 
         const mapper = new Mapper(UserSchema, TargetSchema);
         const mapFn = mapper
-            .for((t) => t.city)
-            .from((f) => f.address.city)
-            .for((t) => t.houseNr)
-            .from((f) => f.address.houseNr)
+            .for(t => t.city)
+            .from(f => f.address.city)
+            .for(t => t.houseNr)
+            .from(f => f.address.houseNr)
             .getMapper();
 
         const result = await mapFn({
@@ -142,12 +142,12 @@ describe('Mapper', () => {
     test('maps with compute using sync function', async () => {
         const mapper = new Mapper(UserSchema, UserDtoSchema);
         const mapFn = mapper
-            .for((t) => t.name)
-            .from((f) => f.name)
-            .for((t) => t.cityName)
-            .compute((user) => user.address.city)
-            .for((t) => t.fullAddress)
-            .compute((user) => `${user.address.city} ${user.address.houseNr}`)
+            .for(t => t.name)
+            .from(f => f.name)
+            .for(t => t.cityName)
+            .compute(user => user.address.city)
+            .for(t => t.fullAddress)
+            .compute(user => `${user.address.city} ${user.address.houseNr}`)
             .getMapper();
 
         const result = await mapFn({
@@ -166,14 +166,14 @@ describe('Mapper', () => {
     test('maps with compute using async function', async () => {
         const mapper = new Mapper(UserSchema, UserDtoSchema);
         const mapFn = mapper
-            .for((t) => t.name)
-            .from((f) => f.name)
-            .for((t) => t.cityName)
-            .compute(async (user) => {
+            .for(t => t.name)
+            .from(f => f.name)
+            .for(t => t.cityName)
+            .compute(async user => {
                 return user.address.city;
             })
-            .for((t) => t.fullAddress)
-            .compute(async (user) => {
+            .for(t => t.fullAddress)
+            .compute(async user => {
                 return `${user.address.city} ${user.address.houseNr}`;
             })
             .getMapper();
@@ -203,9 +203,9 @@ describe('Mapper', () => {
 
         const mapper = new Mapper(SourceSchema, TargetSchema);
         const mapFn = mapper
-            .for((t) => t.name)
-            .from((f) => f.name)
-            .for((t) => t.extra)
+            .for(t => t.name)
+            .from(f => f.name)
+            .for(t => t.extra)
             .ignore()
             .getMapper();
 
@@ -259,15 +259,15 @@ describe('Mapper', () => {
         const registry = new MappingRegistry().configure(
             UserSchema,
             UserDtoSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
@@ -310,17 +310,17 @@ describe('Mapper', () => {
         const registry = new MappingRegistry().configure(
             UserSchema,
             ExtendedDtoSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
-                    .for((t) => t.internalField)
+                    .for(t => t.internalField)
                     .ignore()
         );
 
@@ -345,16 +345,14 @@ describe('Mapper', () => {
 describe('MappingRegistry.configure', () => {
     test('configure defines one mapping and returns a new registry', async () => {
         const original = new MappingRegistry();
-        const result = original.configure(UserSchema, UserDtoSchema, (m) =>
+        const result = original.configure(UserSchema, UserDtoSchema, m =>
             m
-                .for((t) => t.name)
-                .from((f) => f.name)
-                .for((t) => t.cityName)
-                .from((f) => f.address.city)
-                .for((t) => t.fullAddress)
-                .compute(
-                    (user) => `${user.address.city} ${user.address.houseNr}`
-                )
+                .for(t => t.name)
+                .from(f => f.name)
+                .for(t => t.cityName)
+                .from(f => f.address.city)
+                .for(t => t.fullAddress)
+                .compute(user => `${user.address.city} ${user.address.houseNr}`)
         );
 
         expect(result).toBeInstanceOf(MappingRegistry);
@@ -365,15 +363,15 @@ describe('MappingRegistry.configure', () => {
         const registry = new MappingRegistry().configure(
             UserSchema,
             UserDtoSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
@@ -393,16 +391,14 @@ describe('MappingRegistry.configure', () => {
 
     test('original registry is immutable after configure', () => {
         const original = new MappingRegistry();
-        original.configure(UserSchema, UserDtoSchema, (m) =>
+        original.configure(UserSchema, UserDtoSchema, m =>
             m
-                .for((t) => t.name)
-                .from((f) => f.name)
-                .for((t) => t.cityName)
-                .from((f) => f.address.city)
-                .for((t) => t.fullAddress)
-                .compute(
-                    (user) => `${user.address.city} ${user.address.houseNr}`
-                )
+                .for(t => t.name)
+                .from(f => f.name)
+                .for(t => t.cityName)
+                .from(f => f.address.city)
+                .for(t => t.fullAddress)
+                .compute(user => `${user.address.city} ${user.address.houseNr}`)
         );
 
         // Original registry should NOT have the mapping
@@ -423,22 +419,22 @@ describe('MappingRegistry.configure', () => {
         });
 
         const registry = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
+            .configure(AddressSchema, AddressDtoSchema, m =>
                 m
-                    .for((t) => t.city)
-                    .from((f) => f.city)
-                    .for((t) => t.houseNr)
-                    .from((f) => f.houseNr)
+                    .for(t => t.city)
+                    .from(f => f.city)
+                    .for(t => t.houseNr)
+                    .from(f => f.houseNr)
             )
-            .configure(UserSchema, UserDtoSchema, (m) =>
+            .configure(UserSchema, UserDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
             );
 
@@ -463,28 +459,28 @@ describe('MappingRegistry.configure', () => {
         const registry = new MappingRegistry().configure(
             UserSchema,
             UserDtoSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
         );
 
         expect(() =>
-            registry.configure(UserSchema, UserDtoSchema, (m) =>
+            registry.configure(UserSchema, UserDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
             )
         ).toThrow('Duplicate mapping');
@@ -493,19 +489,19 @@ describe('MappingRegistry.configure', () => {
     test('throws on invalid schemas', () => {
         const registry = new MappingRegistry();
         expect(() =>
-            registry.configure(null as any, UserDtoSchema, (m) => m as any)
+            registry.configure(null as any, UserDtoSchema, m => m as any)
         ).toThrow();
         expect(() =>
-            registry.configure(string() as any, UserDtoSchema, (m) => m as any)
+            registry.configure(string() as any, UserDtoSchema, m => m as any)
         ).toThrow();
     });
 
     test('throws when unmapped properties remain', () => {
         const registry = new MappingRegistry();
         expect(() =>
-            registry.configure(UserSchema, UserDtoSchema, (m) =>
+            registry.configure(UserSchema, UserDtoSchema, m =>
                 // @ts-expect-error - intentionally leaving cityName and fullAddress unmapped
-                m.for((t) => t.name).from((f) => f.name)
+                m.for(t => t.name).from(f => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -523,11 +519,11 @@ describe('MappingRegistry.configure', () => {
         const registry = new MappingRegistry().configure(
             SourceSchema,
             TargetSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.extra)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.extra)
                     .ignore()
         );
 
@@ -563,15 +559,15 @@ describe('Auto-mapping of nested schemas', () => {
 
     test('auto-maps nested object property when mapping is registered', async () => {
         const registry = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
+            .configure(AddressSchema, AddressDtoSchema, m =>
                 m
-                    .for((t) => t.city)
-                    .from((f) => f.city)
-                    .for((t) => t.houseNr)
-                    .from((f) => f.houseNr)
+                    .for(t => t.city)
+                    .from(f => f.city)
+                    .for(t => t.houseNr)
+                    .from(f => f.houseNr)
             )
-            .configure(PersonSchema, PersonDtoSchema, (m) =>
-                m.for((t) => t.name).from((f) => f.name)
+            .configure(PersonSchema, PersonDtoSchema, m =>
+                m.for(t => t.name).from(f => f.name)
             );
 
         const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
@@ -614,26 +610,26 @@ describe('Auto-mapping of nested schemas', () => {
                 PersonWithAddrSchema,
                 PersonDtoWithAddrSchema,
                 // @ts-expect-error - address not registered yet and InferTypes differ
-                (m) => m.for((t) => t.name).from((f) => f.name)
+                m => m.for(t => t.name).from(f => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
 
     test('explicit mapping takes priority over auto-mapping', async () => {
         const registry = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
+            .configure(AddressSchema, AddressDtoSchema, m =>
                 m
-                    .for((t) => t.city)
-                    .from((f) => f.city)
-                    .for((t) => t.houseNr)
-                    .from((f) => f.houseNr)
+                    .for(t => t.city)
+                    .from(f => f.city)
+                    .for(t => t.houseNr)
+                    .from(f => f.houseNr)
             )
-            .configure(PersonSchema, PersonDtoSchema, (m) =>
+            .configure(PersonSchema, PersonDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.address)
-                    .compute((p) => ({
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.address)
+                    .compute(p => ({
                         city: p.address.city.toUpperCase(),
                         houseNr: p.address.houseNr
                     }))
@@ -653,18 +649,18 @@ describe('Auto-mapping of nested schemas', () => {
 
     test('ignore takes priority over auto-mapping', async () => {
         const registry = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
+            .configure(AddressSchema, AddressDtoSchema, m =>
                 m
-                    .for((t) => t.city)
-                    .from((f) => f.city)
-                    .for((t) => t.houseNr)
-                    .from((f) => f.houseNr)
+                    .for(t => t.city)
+                    .from(f => f.city)
+                    .for(t => t.houseNr)
+                    .from(f => f.houseNr)
             )
-            .configure(PersonSchema, PersonDtoSchema, (m) =>
+            .configure(PersonSchema, PersonDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.address)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.address)
                     .ignore()
             );
 
@@ -694,7 +690,7 @@ describe('Auto-mapping of nested schemas', () => {
         const registry = new MappingRegistry().configure(
             SourceSchema,
             TargetSchema,
-            (m) => m
+            m => m
         );
 
         const mapFn = registry.getMapper(SourceSchema, TargetSchema);
@@ -730,14 +726,14 @@ describe('Auto-mapping of nested schemas', () => {
         });
 
         const registry = new MappingRegistry()
-            .configure(InnerSchema, InnerDtoSchema, (m) =>
-                m.for((t) => t.value).from((f) => f.value)
+            .configure(InnerSchema, InnerDtoSchema, m =>
+                m.for(t => t.value).from(f => f.value)
             )
-            .configure(MiddleSchema, MiddleDtoSchema, (m) =>
-                m.for((t) => t.inner).ignore()
+            .configure(MiddleSchema, MiddleDtoSchema, m =>
+                m.for(t => t.inner).ignore()
             )
-            .configure(OuterSchema, OuterDtoSchema, (m) =>
-                m.for((t) => t.name).from((f) => f.name)
+            .configure(OuterSchema, OuterDtoSchema, m =>
+                m.for(t => t.name).from(f => f.name)
             );
 
         const mapFn = registry.getMapper(OuterSchema, OuterDtoSchema);
@@ -757,15 +753,15 @@ describe('Auto-mapping of nested schemas', () => {
     test('optional fields: skips auto-mapping when source value is undefined', async () => {
         // Test that auto-mapped values skip undefined
         const reg = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
+            .configure(AddressSchema, AddressDtoSchema, m =>
                 m
-                    .for((t) => t.city)
-                    .from((f) => f.city)
-                    .for((t) => t.houseNr)
-                    .from((f) => f.houseNr)
+                    .for(t => t.city)
+                    .from(f => f.city)
+                    .for(t => t.houseNr)
+                    .from(f => f.houseNr)
             )
-            .configure(PersonSchema, PersonDtoSchema, (m) =>
-                m.for((t) => t.name).from((f) => f.name)
+            .configure(PersonSchema, PersonDtoSchema, m =>
+                m.for(t => t.name).from(f => f.name)
             );
 
         const mapFn = reg.getMapper(PersonSchema, PersonDtoSchema);
@@ -798,9 +794,9 @@ describe('Auto-mapping of nested schemas', () => {
 
         // 'data' should not be auto-mapped because source 'data' is string, not object
         expect(() =>
-            new MappingRegistry().configure(SourceSchema, TargetSchema, (m) =>
+            new MappingRegistry().configure(SourceSchema, TargetSchema, m =>
                 // @ts-expect-error - data remains unmapped (string vs ObjectSchemaBuilder)
-                m.for((t) => t.name).from((f) => f.name)
+                m.for(t => t.name).from(f => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -832,21 +828,21 @@ describe('Auto-mapping of nested schemas', () => {
         // Without registering AddressSchema→AddressDtoSchema first,
         // from for the address property should be a type error
         const registry = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
+            .configure(AddressSchema, AddressDtoSchema, m =>
                 m
-                    .for((t) => t.city)
-                    .from((f) => f.city)
-                    .for((t) => t.street)
-                    .from((f) => f.street)
-                    .for((t) => t.country)
-                    .from((f) => f.country)
+                    .for(t => t.city)
+                    .from(f => f.city)
+                    .for(t => t.street)
+                    .from(f => f.street)
+                    .for(t => t.country)
+                    .from(f => f.country)
             )
-            .configure(UserSchema, UserDtoSchema, (m) =>
+            .configure(UserSchema, UserDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .compute((u) => `${u.firstName} ${u.lastName}`)
-                    .for((t) => t.address)
-                    .from((f) => f.address)
+                    .for(t => t.name)
+                    .compute(u => `${u.firstName} ${u.lastName}`)
+                    .for(t => t.address)
+                    .from(f => f.address)
             );
 
         expect(registry).toBeInstanceOf(MappingRegistry);
@@ -876,13 +872,13 @@ describe('Auto-mapping of nested schemas', () => {
         // Without registering AddressSchema→AddressDtoSchema,
         // from for address should produce a type error
         // because InferTypes differ ({ city, street } vs { city, street, zipCode })
-        new MappingRegistry().configure(PersonSchema, PersonDtoSchema, (m) =>
+        new MappingRegistry().configure(PersonSchema, PersonDtoSchema, m =>
             m
-                .for((t) => t.name)
-                .from((f) => f.name)
-                .for((t) => t.address)
+                .for(t => t.name)
+                .from(f => f.name)
+                .for(t => t.address)
                 // @ts-expect-error - no mapping registered and InferTypes differ
-                .from((f) => f.address)
+                .from(f => f.address)
         );
     });
 
@@ -908,15 +904,15 @@ describe('Auto-mapping of nested schemas', () => {
 
         // With AddressSchema→AddressDtoSchema registered first, no type error
         const registry = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
-                m.for((t) => t.city).from((f) => f.city)
+            .configure(AddressSchema, AddressDtoSchema, m =>
+                m.for(t => t.city).from(f => f.city)
             )
-            .configure(PersonSchema, PersonDtoSchema, (m) =>
+            .configure(PersonSchema, PersonDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.address)
-                    .from((f) => f.address)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.address)
+                    .from(f => f.address)
             );
 
         const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
@@ -955,21 +951,21 @@ describe('Auto-mapping of nested schemas', () => {
 
         const reg = new MappingRegistry();
 
-        reg.configure(AddressSchema, AddressDtoSchema, (m) =>
+        reg.configure(AddressSchema, AddressDtoSchema, m =>
             m
-                .for((t) => t.city)
+                .for(t => t.city)
                 // @ts-expect-error - houseNr (number) is not assignable to city (string)
-                .from((t) => t.houseNr)
+                .from(t => t.houseNr)
         );
 
         // address is not explicitly mapped — auto-mapping picks it up
         // because AddressSchema→AddressDtoSchema is registered
         const registry = new MappingRegistry()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
-                m.for((t) => t.city).from((f) => f.city)
+            .configure(AddressSchema, AddressDtoSchema, m =>
+                m.for(t => t.city).from(f => f.city)
             )
-            .configure(PersonSchema, PersonDtoSchema, (m) =>
-                m.for((t) => t.name).from((f) => f.name)
+            .configure(PersonSchema, PersonDtoSchema, m =>
+                m.for(t => t.name).from(f => f.name)
             );
 
         const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
@@ -999,7 +995,7 @@ describe('Auto-mapping of nested schemas', () => {
         const registry = new MappingRegistry().configure(
             AddressSchema,
             AddressDtoSchema,
-            (m) => m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
+            m => m.for(t => t.houseNr).compute(f => f.houseNr.toString())
         );
 
         const mapFn = registry.getMapper(AddressSchema, AddressDtoSchema);
@@ -1023,9 +1019,9 @@ describe('Auto-mapping of nested schemas', () => {
             new MappingRegistry().configure(
                 AddressSchema,
                 AddressDtoSchema,
-                (m) =>
+                m =>
                     // @ts-expect-error - city2 is not mapped, and it can't be auto-mapped because there is no property with the same name and inferred type in AddressSchema
-                    m.for((t) => t.houseNr).compute((f) => f.houseNr.toString())
+                    m.for(t => t.houseNr).compute(f => f.houseNr.toString())
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -1051,15 +1047,12 @@ describe('Auto-mapping of nested schemas', () => {
             oneMoreProp: string()
         });
 
-        const registry = new MappingRegistry().configure(
-            schemaC,
-            schemaD,
-            (m) =>
-                m
-                    .for((t) => t.oneMoreProp)
-                    .from((f) => f.anotherProp)
-                    .for((t) => t.prop)
-                    .from((f) => f.prop)
+        const registry = new MappingRegistry().configure(schemaC, schemaD, m =>
+            m
+                .for(t => t.oneMoreProp)
+                .from(f => f.anotherProp)
+                .for(t => t.prop)
+                .from(f => f.prop)
         );
 
         const mapFn = registry.getMapper(schemaC, schemaD);
@@ -1096,10 +1089,8 @@ describe('Auto-mapping of nested schemas', () => {
         });
 
         // prop is auto-mapped because SchemaA and SchemaB have the same InferType
-        const registry = new MappingRegistry().configure(
-            schemaC,
-            schemaD,
-            (m) => m.for((t) => t.oneMoreProp).from((f) => f.anotherProp)
+        const registry = new MappingRegistry().configure(schemaC, schemaD, m =>
+            m.for(t => t.oneMoreProp).from(f => f.anotherProp)
         );
 
         const mapFn = registry.getMapper(schemaC, schemaD);
@@ -1140,19 +1131,19 @@ describe('Array mapping', () => {
 
     test('maps array property via from() with registered element mapping', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
-                    .from((f) => f.items)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
+                    .from(f => f.items)
             );
 
         const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
@@ -1175,19 +1166,19 @@ describe('Array mapping', () => {
 
     test('maps empty array to empty array', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
-                    .from((f) => f.items)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
+                    .from(f => f.items)
             );
 
         const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
@@ -1204,19 +1195,19 @@ describe('Array mapping', () => {
 
     test('null array is skipped (treated as undefined)', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
-                    .from((f) => f.items)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
+                    .from(f => f.items)
             );
 
         const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
@@ -1231,19 +1222,19 @@ describe('Array mapping', () => {
 
     test('undefined array is skipped', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
-                    .from((f) => f.items)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
+                    .from(f => f.items)
             );
 
         const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
@@ -1258,19 +1249,19 @@ describe('Array mapping', () => {
 
     test('throws error when non-array value is encountered for array property', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
-                    .from((f) => f.items)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
+                    .from(f => f.items)
             );
 
         const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
@@ -1284,20 +1275,20 @@ describe('Array mapping', () => {
 
     test('compute() overrides array element mapping', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
-                    .compute((src) =>
-                        src.items.map((item) => ({
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
+                    .compute(src =>
+                        src.items.map(item => ({
                             id: item.id * 10,
                             label: item.label.toUpperCase()
                         }))
@@ -1318,18 +1309,18 @@ describe('Array mapping', () => {
 
     test('ignore() skips array property', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
                     .ignore()
             );
 
@@ -1345,15 +1336,15 @@ describe('Array mapping', () => {
 
     test('auto-maps array property when same-name element schemas match', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
-                m.for((t) => t.name).from((f) => f.name)
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
+                m.for(t => t.name).from(f => f.name)
             );
 
         const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
@@ -1386,9 +1377,9 @@ describe('Array mapping', () => {
         });
 
         expect(() =>
-            new MappingRegistry().configure(SourceSchema, TargetSchema, (m) =>
+            new MappingRegistry().configure(SourceSchema, TargetSchema, m =>
                 // @ts-expect-error - labels is not mapped
-                m.for((t) => t.name).from((f) => f.name)
+                m.for(t => t.name).from(f => f.name)
             )
         ).toThrow(MapperConfigurationError);
     });
@@ -1407,7 +1398,7 @@ describe('Array mapping', () => {
         const registry = new MappingRegistry().configure(
             SourceSchema,
             TargetSchema,
-            (m) => m
+            m => m
         );
 
         const mapFn = registry.getMapper(SourceSchema, TargetSchema);
@@ -1424,19 +1415,19 @@ describe('Array mapping', () => {
 
     test('preserves order of array elements during mapping', async () => {
         const registry = new MappingRegistry()
-            .configure(ItemSchema, ItemDtoSchema, (m) =>
+            .configure(ItemSchema, ItemDtoSchema, m =>
                 m
-                    .for((t) => t.id)
-                    .from((f) => f.id)
-                    .for((t) => t.label)
-                    .from((f) => f.label)
+                    .for(t => t.id)
+                    .from(f => f.id)
+                    .for(t => t.label)
+                    .from(f => f.label)
             )
-            .configure(ContainerSchema, ContainerDtoSchema, (m) =>
+            .configure(ContainerSchema, ContainerDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.items)
-                    .from((f) => f.items)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.items)
+                    .from(f => f.items)
             );
 
         const mapFn = registry.getMapper(ContainerSchema, ContainerDtoSchema);
@@ -1470,11 +1461,11 @@ describe('Array mapping', () => {
         });
 
         const registry = new MappingRegistry()
-            .configure(SourceItemSchema, TargetItemSchema, (m) =>
-                m.for((t) => t.doubled).compute(async (src) => src.value * 2)
+            .configure(SourceItemSchema, TargetItemSchema, m =>
+                m.for(t => t.doubled).compute(async src => src.value * 2)
             )
-            .configure(SourceSchema, TargetSchema, (m) =>
-                m.for((t) => t.data).from((f) => f.data)
+            .configure(SourceSchema, TargetSchema, m =>
+                m.for(t => t.data).from(f => f.data)
             );
 
         const mapFn = registry.getMapper(SourceSchema, TargetSchema);
@@ -1502,16 +1493,16 @@ describe('Array mapping', () => {
 
         expect(() =>
             new MappingRegistry()
-                .configure(ItemSchema, ItemDtoSchema, (m) =>
+                .configure(ItemSchema, ItemDtoSchema, m =>
                     m
-                        .for((t) => t.id)
-                        .from((f) => f.id)
-                        .for((t) => t.label)
-                        .from((f) => f.label)
+                        .for(t => t.id)
+                        .from(f => f.id)
+                        .for(t => t.label)
+                        .from(f => f.label)
                 )
-                .configure(SourceSchema, TargetSchema, (m) =>
+                .configure(SourceSchema, TargetSchema, m =>
                     // @ts-expect-error - targetItems not mapped
-                    m.for((t) => t.name).from((f) => f.name)
+                    m.for(t => t.name).from(f => f.name)
                 )
         ).toThrow(MapperConfigurationError);
     });
@@ -1536,15 +1527,15 @@ describe('Array mapping', () => {
         });
 
         const registry = new MappingRegistry()
-            .configure(TagSchema, TagDtoSchema, (m) =>
-                m.for((t) => t.name).from((f) => f.name)
+            .configure(TagSchema, TagDtoSchema, m =>
+                m.for(t => t.name).from(f => f.name)
             )
-            .configure(GroupSchema, GroupDtoSchema, (m) =>
+            .configure(GroupSchema, GroupDtoSchema, m =>
                 m
-                    .for((t) => t.title)
-                    .from((f) => f.title)
-                    .for((t) => t.tags)
-                    .from((f) => f.tags)
+                    .for(t => t.title)
+                    .from(f => f.title)
+                    .for(t => t.tags)
+                    .from(f => f.tags)
             );
 
         const mapFn = registry.getMapper(GroupSchema, GroupDtoSchema);
@@ -1611,19 +1602,18 @@ describe('E-commerce: Product catalog mapping', () => {
 
     test('maps product entity to product listing DTO', async () => {
         const registry = new MappingRegistry()
-            .configure(MoneySchema, MoneyDtoSchema, (m) =>
+            .configure(MoneySchema, MoneyDtoSchema, m =>
                 m
-                    .for((t) => t.displayPrice)
+                    .for(t => t.displayPrice)
                     .compute(
-                        (money) =>
-                            `${money.currency} ${money.amount.toFixed(2)}`
+                        money => `${money.currency} ${money.amount.toFixed(2)}`
                     )
             )
-            .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
-                m.for((t) => t.label).compute((v) => `${v.color} / ${v.size}`)
+            .configure(ProductVariantSchema, VariantDtoSchema, m =>
+                m.for(t => t.label).compute(v => `${v.color} / ${v.size}`)
             )
-            .configure(ProductSchema, ProductListItemSchema, (m) =>
-                m.for((t) => t.categoryName).from((f) => f.category.name)
+            .configure(ProductSchema, ProductListItemSchema, m =>
+                m.for(t => t.categoryName).from(f => f.category.name)
             );
 
         const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
@@ -1672,19 +1662,18 @@ describe('E-commerce: Product catalog mapping', () => {
 
     test('maps product with empty variants array', async () => {
         const registry = new MappingRegistry()
-            .configure(MoneySchema, MoneyDtoSchema, (m) =>
+            .configure(MoneySchema, MoneyDtoSchema, m =>
                 m
-                    .for((t) => t.displayPrice)
+                    .for(t => t.displayPrice)
                     .compute(
-                        (money) =>
-                            `${money.currency} ${money.amount.toFixed(2)}`
+                        money => `${money.currency} ${money.amount.toFixed(2)}`
                     )
             )
-            .configure(ProductVariantSchema, VariantDtoSchema, (m) =>
-                m.for((t) => t.label).compute((v) => `${v.color} / ${v.size}`)
+            .configure(ProductVariantSchema, VariantDtoSchema, m =>
+                m.for(t => t.label).compute(v => `${v.color} / ${v.size}`)
             )
-            .configure(ProductSchema, ProductListItemSchema, (m) =>
-                m.for((t) => t.categoryName).from((f) => f.category.name)
+            .configure(ProductSchema, ProductListItemSchema, m =>
+                m.for(t => t.categoryName).from(f => f.category.name)
             );
 
         const mapFn = registry.getMapper(ProductSchema, ProductListItemSchema);
@@ -1736,12 +1725,12 @@ describe('User management: Profile to public DTO', () => {
         const registry = new MappingRegistry().configure(
             UserProfileSchema,
             PublicProfileSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.displayName)
-                    .compute((u) => `${u.firstName} ${u.lastName}`)
-                    .for((t) => t.location)
-                    .compute((u) => `${u.address.city}, ${u.address.state}`)
+                    .for(t => t.displayName)
+                    .compute(u => `${u.firstName} ${u.lastName}`)
+                    .for(t => t.location)
+                    .compute(u => `${u.address.city}, ${u.address.state}`)
         );
 
         const mapFn = registry.getMapper(
@@ -1787,13 +1776,13 @@ describe('User management: Profile to public DTO', () => {
         const registry = new MappingRegistry().configure(
             UserProfileSchema,
             AdminUserViewSchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.displayName)
-                    .compute((u) => `${u.firstName} ${u.lastName}`)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.displayName)
+                    .compute(u => `${u.firstName} ${u.lastName}`)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (u) =>
+                        u =>
                             `${u.address.street}, ${u.address.city}, ${u.address.state} ${u.address.zipCode}, ${u.address.country}`
                     )
         );
@@ -1886,19 +1875,19 @@ describe('Blog CMS: Post entity to API response', () => {
 
     test('maps blog post entity to API response with computed fields', async () => {
         const registry = new MappingRegistry()
-            .configure(TagSchema, TagDtoSchema, (m) => m)
-            .configure(CommentSchema, CommentDtoSchema, (m) => m)
-            .configure(BlogPostSchema, BlogPostResponseSchema, (m) =>
+            .configure(TagSchema, TagDtoSchema, m => m)
+            .configure(CommentSchema, CommentDtoSchema, m => m)
+            .configure(BlogPostSchema, BlogPostResponseSchema, m =>
                 m
-                    .for((t) => t.excerpt)
-                    .compute((post) => post.body.substring(0, 100))
-                    .for((t) => t.authorName)
+                    .for(t => t.excerpt)
+                    .compute(post => post.body.substring(0, 100))
+                    .for(t => t.authorName)
                     .compute(
-                        (post) =>
+                        post =>
                             `${post.author.firstName} ${post.author.lastName}`
                     )
-                    .for((t) => t.commentCount)
-                    .compute((post) => post.comments.length)
+                    .for(t => t.commentCount)
+                    .compute(post => post.comments.length)
             );
 
         const mapFn = registry.getMapper(
@@ -1956,19 +1945,19 @@ describe('Blog CMS: Post entity to API response', () => {
 
     test('maps blog post with no tags and no comments', async () => {
         const registry = new MappingRegistry()
-            .configure(TagSchema, TagDtoSchema, (m) => m)
-            .configure(CommentSchema, CommentDtoSchema, (m) => m)
-            .configure(BlogPostSchema, BlogPostResponseSchema, (m) =>
+            .configure(TagSchema, TagDtoSchema, m => m)
+            .configure(CommentSchema, CommentDtoSchema, m => m)
+            .configure(BlogPostSchema, BlogPostResponseSchema, m =>
                 m
-                    .for((t) => t.excerpt)
-                    .compute((post) => post.body.substring(0, 100))
-                    .for((t) => t.authorName)
+                    .for(t => t.excerpt)
+                    .compute(post => post.body.substring(0, 100))
+                    .for(t => t.authorName)
                     .compute(
-                        (post) =>
+                        post =>
                             `${post.author.firstName} ${post.author.lastName}`
                     )
-                    .for((t) => t.commentCount)
-                    .compute((post) => post.comments.length)
+                    .for(t => t.commentCount)
+                    .compute(post => post.comments.length)
             );
 
         const mapFn = registry.getMapper(
@@ -2043,19 +2032,19 @@ describe('Invoice billing: Invoice to summary', () => {
 
     test('maps invoice entity to invoice summary with line item totals', async () => {
         const registry = new MappingRegistry()
-            .configure(LineItemSchema, LineItemDtoSchema, (m) =>
+            .configure(LineItemSchema, LineItemDtoSchema, m =>
                 m
-                    .for((t) => t.total)
-                    .compute((item) => item.quantity * item.unitPrice)
+                    .for(t => t.total)
+                    .compute(item => item.quantity * item.unitPrice)
             )
-            .configure(InvoiceSchema, InvoiceSummarySchema, (m) =>
+            .configure(InvoiceSchema, InvoiceSummarySchema, m =>
                 m
-                    .for((t) => t.issuerName)
-                    .from((f) => f.issuer.name)
-                    .for((t) => t.recipientName)
-                    .from((f) => f.recipient.name)
-                    .for((t) => t.totalAmount)
-                    .compute((inv) =>
+                    .for(t => t.issuerName)
+                    .from(f => f.issuer.name)
+                    .for(t => t.recipientName)
+                    .from(f => f.recipient.name)
+                    .for(t => t.totalAmount)
+                    .compute(inv =>
                         inv.lineItems.reduce(
                             (sum, item) => sum + item.quantity * item.unitPrice,
                             0
@@ -2102,19 +2091,19 @@ describe('Invoice billing: Invoice to summary', () => {
 
     test('maps invoice with single line item', async () => {
         const registry = new MappingRegistry()
-            .configure(LineItemSchema, LineItemDtoSchema, (m) =>
+            .configure(LineItemSchema, LineItemDtoSchema, m =>
                 m
-                    .for((t) => t.total)
-                    .compute((item) => item.quantity * item.unitPrice)
+                    .for(t => t.total)
+                    .compute(item => item.quantity * item.unitPrice)
             )
-            .configure(InvoiceSchema, InvoiceSummarySchema, (m) =>
+            .configure(InvoiceSchema, InvoiceSummarySchema, m =>
                 m
-                    .for((t) => t.issuerName)
-                    .from((f) => f.issuer.name)
-                    .for((t) => t.recipientName)
-                    .from((f) => f.recipient.name)
-                    .for((t) => t.totalAmount)
-                    .compute((inv) =>
+                    .for(t => t.issuerName)
+                    .from(f => f.issuer.name)
+                    .for(t => t.recipientName)
+                    .from(f => f.recipient.name)
+                    .for(t => t.totalAmount)
+                    .compute(inv =>
                         inv.lineItems.reduce(
                             (sum, item) => sum + item.quantity * item.unitPrice,
                             0
@@ -2190,19 +2179,19 @@ describe('REST API: Weather response to domain model', () => {
 
     test('maps external API response to internal weather report', async () => {
         const registry = new MappingRegistry()
-            .configure(ApiWeatherConditionSchema, WeatherConditionSchema, (m) =>
-                m.for((t) => t.summary).from((f) => f.main)
+            .configure(ApiWeatherConditionSchema, WeatherConditionSchema, m =>
+                m.for(t => t.summary).from(f => f.main)
             )
-            .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
+            .configure(ApiWeatherResponseSchema, WeatherReportSchema, m =>
                 m
-                    .for((t) => t.cityName)
-                    .from((f) => f.name)
-                    .for((t) => t.latitude)
-                    .from((f) => f.coord.lat)
-                    .for((t) => t.longitude)
-                    .from((f) => f.coord.lon)
-                    .for((t) => t.conditions)
-                    .from((f) => f.weather)
+                    .for(t => t.cityName)
+                    .from(f => f.name)
+                    .for(t => t.latitude)
+                    .from(f => f.coord.lat)
+                    .for(t => t.longitude)
+                    .from(f => f.coord.lon)
+                    .for(t => t.conditions)
+                    .from(f => f.weather)
             );
 
         const mapFn = registry.getMapper(
@@ -2246,19 +2235,19 @@ describe('REST API: Weather response to domain model', () => {
 
     test('maps API response with single weather condition', async () => {
         const registry = new MappingRegistry()
-            .configure(ApiWeatherConditionSchema, WeatherConditionSchema, (m) =>
-                m.for((t) => t.summary).from((f) => f.main)
+            .configure(ApiWeatherConditionSchema, WeatherConditionSchema, m =>
+                m.for(t => t.summary).from(f => f.main)
             )
-            .configure(ApiWeatherResponseSchema, WeatherReportSchema, (m) =>
+            .configure(ApiWeatherResponseSchema, WeatherReportSchema, m =>
                 m
-                    .for((t) => t.cityName)
-                    .from((f) => f.name)
-                    .for((t) => t.latitude)
-                    .from((f) => f.coord.lat)
-                    .for((t) => t.longitude)
-                    .from((f) => f.coord.lon)
-                    .for((t) => t.conditions)
-                    .from((f) => f.weather)
+                    .for(t => t.cityName)
+                    .from(f => f.name)
+                    .for(t => t.latitude)
+                    .from(f => f.coord.lat)
+                    .for(t => t.longitude)
+                    .from(f => f.coord.lon)
+                    .for(t => t.conditions)
+                    .from(f => f.weather)
             );
 
         const mapFn = registry.getMapper(
@@ -2316,12 +2305,12 @@ describe('HR system: Employee to organization chart entry', () => {
         const registry = new MappingRegistry().configure(
             EmployeeSchema,
             OrgChartEntrySchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.fullName)
-                    .compute((e) => `${e.firstName} ${e.lastName}`)
-                    .for((t) => t.departmentName)
-                    .from((f) => f.department.name)
+                    .for(t => t.fullName)
+                    .compute(e => `${e.firstName} ${e.lastName}`)
+                    .for(t => t.departmentName)
+                    .from(f => f.department.name)
         );
 
         const mapFn = registry.getMapper(EmployeeSchema, OrgChartEntrySchema);
@@ -2349,12 +2338,12 @@ describe('HR system: Employee to organization chart entry', () => {
         const registry = new MappingRegistry().configure(
             EmployeeSchema,
             OrgChartEntrySchema,
-            (m) =>
+            m =>
                 m
-                    .for((t) => t.fullName)
-                    .compute((e) => `${e.firstName} ${e.lastName}`)
-                    .for((t) => t.departmentName)
-                    .from((f) => f.department.name)
+                    .for(t => t.fullName)
+                    .compute(e => `${e.firstName} ${e.lastName}`)
+                    .for(t => t.departmentName)
+                    .from(f => f.department.name)
         );
 
         const mapFn = registry.getMapper(EmployeeSchema, OrgChartEntrySchema);
@@ -2428,20 +2417,20 @@ describe('Reservation system: Hotel booking mapping', () => {
 
     test('maps booking to confirmation with computed nights and total', async () => {
         const registry = new MappingRegistry()
-            .configure(GuestSchema, GuestSummarySchema, (m) =>
+            .configure(GuestSchema, GuestSummarySchema, m =>
                 m
-                    .for((t) => t.fullName)
-                    .compute((g) => `${g.firstName} ${g.lastName}`)
-                    .for((t) => t.contactEmail)
-                    .from((f) => f.email)
+                    .for(t => t.fullName)
+                    .compute(g => `${g.firstName} ${g.lastName}`)
+                    .for(t => t.contactEmail)
+                    .from(f => f.email)
             )
-            .configure(RoomSchema, RoomDtoSchema, (m) => m)
-            .configure(BookingSchema, BookingConfirmationSchema, (m) =>
+            .configure(RoomSchema, RoomDtoSchema, m => m)
+            .configure(BookingSchema, BookingConfirmationSchema, m =>
                 m
-                    .for((t) => t.nights)
-                    .compute((b) => calcNights(b.checkInDate, b.checkOutDate))
-                    .for((t) => t.totalCost)
-                    .compute((b) => {
+                    .for(t => t.nights)
+                    .compute(b => calcNights(b.checkInDate, b.checkOutDate))
+                    .for(t => t.totalCost)
+                    .compute(b => {
                         const nights = calcNights(
                             b.checkInDate,
                             b.checkOutDate
@@ -2492,20 +2481,20 @@ describe('Reservation system: Hotel booking mapping', () => {
 
     test('maps single-room booking for one night', async () => {
         const registry = new MappingRegistry()
-            .configure(GuestSchema, GuestSummarySchema, (m) =>
+            .configure(GuestSchema, GuestSummarySchema, m =>
                 m
-                    .for((t) => t.fullName)
-                    .compute((g) => `${g.firstName} ${g.lastName}`)
-                    .for((t) => t.contactEmail)
-                    .from((f) => f.email)
+                    .for(t => t.fullName)
+                    .compute(g => `${g.firstName} ${g.lastName}`)
+                    .for(t => t.contactEmail)
+                    .from(f => f.email)
             )
-            .configure(RoomSchema, RoomDtoSchema, (m) => m)
-            .configure(BookingSchema, BookingConfirmationSchema, (m) =>
+            .configure(RoomSchema, RoomDtoSchema, m => m)
+            .configure(BookingSchema, BookingConfirmationSchema, m =>
                 m
-                    .for((t) => t.nights)
-                    .compute((b) => calcNights(b.checkInDate, b.checkOutDate))
-                    .for((t) => t.totalCost)
-                    .compute((b) => {
+                    .for(t => t.nights)
+                    .compute(b => calcNights(b.checkInDate, b.checkOutDate))
+                    .for(t => t.totalCost)
+                    .compute(b => {
                         const nights = calcNights(
                             b.checkInDate,
                             b.checkOutDate
@@ -2586,15 +2575,15 @@ describe('Healthcare: Patient record to appointment summary', () => {
 
     test('maps patient record to appointment summary, excluding SSN', async () => {
         const registry = new MappingRegistry()
-            .configure(MedicationSchema, MedicationDtoSchema, (m) => m)
-            .configure(PatientSchema, AppointmentSummarySchema, (m) =>
+            .configure(MedicationSchema, MedicationDtoSchema, m => m)
+            .configure(PatientSchema, AppointmentSummarySchema, m =>
                 m
-                    .for((t) => t.patientName)
-                    .compute((p) => `${p.lastName}, ${p.firstName}`)
-                    .for((t) => t.insuranceProvider)
-                    .from((f) => f.insurance.provider)
-                    .for((t) => t.currentMedications)
-                    .from((f) => f.medications)
+                    .for(t => t.patientName)
+                    .compute(p => `${p.lastName}, ${p.firstName}`)
+                    .for(t => t.insuranceProvider)
+                    .from(f => f.insurance.provider)
+                    .for(t => t.currentMedications)
+                    .from(f => f.medications)
             );
 
         const mapFn = registry.getMapper(
@@ -2641,15 +2630,15 @@ describe('Healthcare: Patient record to appointment summary', () => {
 
     test('maps patient with no medications', async () => {
         const registry = new MappingRegistry()
-            .configure(MedicationSchema, MedicationDtoSchema, (m) => m)
-            .configure(PatientSchema, AppointmentSummarySchema, (m) =>
+            .configure(MedicationSchema, MedicationDtoSchema, m => m)
+            .configure(PatientSchema, AppointmentSummarySchema, m =>
                 m
-                    .for((t) => t.patientName)
-                    .compute((p) => `${p.lastName}, ${p.firstName}`)
-                    .for((t) => t.insuranceProvider)
-                    .from((f) => f.insurance.provider)
-                    .for((t) => t.currentMedications)
-                    .from((f) => f.medications)
+                    .for(t => t.patientName)
+                    .compute(p => `${p.lastName}, ${p.firstName}`)
+                    .for(t => t.insuranceProvider)
+                    .from(f => f.insurance.provider)
+                    .for(t => t.currentMedications)
+                    .from(f => f.medications)
             );
 
         const mapFn = registry.getMapper(
@@ -2724,11 +2713,11 @@ describe('Project management: Task board mapping', () => {
 
     test('maps task entity to task card for kanban board', async () => {
         const registry = new MappingRegistry()
-            .configure(LabelSchema, LabelDtoSchema, (m) => m)
-            .configure(TaskSchema, TaskCardSchema, (m) =>
+            .configure(LabelSchema, LabelDtoSchema, m => m)
+            .configure(TaskSchema, TaskCardSchema, m =>
                 m
-                    .for((t) => t.priorityLabel)
-                    .compute((task) => {
+                    .for(t => t.priorityLabel)
+                    .compute(task => {
                         const labels: Record<number, string> = {
                             1: 'Critical',
                             2: 'High',
@@ -2737,8 +2726,8 @@ describe('Project management: Task board mapping', () => {
                         };
                         return labels[task.priority] || 'Unknown';
                     })
-                    .for((t) => t.assigneeUsername)
-                    .from((f) => f.assignee.username)
+                    .for(t => t.assigneeUsername)
+                    .from(f => f.assignee.username)
             );
 
         const mapFn = registry.getMapper(TaskSchema, TaskCardSchema);
@@ -2778,11 +2767,11 @@ describe('Project management: Task board mapping', () => {
 
     test('maps low-priority task with no labels', async () => {
         const registry = new MappingRegistry()
-            .configure(LabelSchema, LabelDtoSchema, (m) => m)
-            .configure(TaskSchema, TaskCardSchema, (m) =>
+            .configure(LabelSchema, LabelDtoSchema, m => m)
+            .configure(TaskSchema, TaskCardSchema, m =>
                 m
-                    .for((t) => t.priorityLabel)
-                    .compute((task) => {
+                    .for(t => t.priorityLabel)
+                    .compute(task => {
                         const labels: Record<number, string> = {
                             1: 'Critical',
                             2: 'High',
@@ -2791,8 +2780,8 @@ describe('Project management: Task board mapping', () => {
                         };
                         return labels[task.priority] || 'Unknown';
                     })
-                    .for((t) => t.assigneeUsername)
-                    .from((f) => f.assignee.username)
+                    .for(t => t.assigneeUsername)
+                    .from(f => f.assignee.username)
             );
 
         const mapFn = registry.getMapper(TaskSchema, TaskCardSchema);
@@ -2831,16 +2820,14 @@ describe('mapper() factory function', () => {
     });
 
     test('supports fluent configure chaining', async () => {
-        const registry = mapper().configure(UserSchema, UserDtoSchema, (m) =>
+        const registry = mapper().configure(UserSchema, UserDtoSchema, m =>
             m
-                .for((t) => t.name)
-                .from((f) => f.name)
-                .for((t) => t.cityName)
-                .from((f) => f.address.city)
-                .for((t) => t.fullAddress)
-                .compute(
-                    (user) => `${user.address.city} ${user.address.houseNr}`
-                )
+                .for(t => t.name)
+                .from(f => f.name)
+                .for(t => t.cityName)
+                .from(f => f.address.city)
+                .for(t => t.fullAddress)
+                .compute(user => `${user.address.city} ${user.address.houseNr}`)
         );
 
         const mapFn = registry.getMapper(UserSchema, UserDtoSchema);
@@ -2868,18 +2855,18 @@ describe('mapper() factory function', () => {
         });
 
         const registry = mapper()
-            .configure(AddressSchema, AddressDtoSchema, (m) =>
-                m.for((t) => t.city).from((f) => f.city)
+            .configure(AddressSchema, AddressDtoSchema, m =>
+                m.for(t => t.city).from(f => f.city)
             )
-            .configure(UserSchema, UserDtoSchema, (m) =>
+            .configure(UserSchema, UserDtoSchema, m =>
                 m
-                    .for((t) => t.name)
-                    .from((f) => f.name)
-                    .for((t) => t.cityName)
-                    .from((f) => f.address.city)
-                    .for((t) => t.fullAddress)
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
                     .compute(
-                        (user) => `${user.address.city} ${user.address.houseNr}`
+                        user => `${user.address.city} ${user.address.houseNr}`
                     )
             );
 
@@ -2921,7 +2908,7 @@ describe('Mapping property not in target schema', () => {
         // 'street' is NOT a property of TargetSchema
         const registry = new MappingRegistry();
         expect(() =>
-            registry.configure(SourceSchema, TargetSchema, (m) =>
+            registry.configure(SourceSchema, TargetSchema, m =>
                 (m as any)
                     .for((t: any) => t.street)
                     .compute(
@@ -2961,6 +2948,6 @@ describe('Mapping property not in target schema', () => {
 
         const mapper = new Mapper(SourceSchema, TargetSchema);
         // Should NOT throw
-        expect(() => mapper.for((t) => t.name)).not.toThrow();
+        expect(() => mapper.for(t => t.name)).not.toThrow();
     });
 });

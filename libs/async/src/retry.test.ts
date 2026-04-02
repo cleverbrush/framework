@@ -71,7 +71,7 @@ test('retry - 4 - should retry', async () => {
         });
 
     await expect(
-        retry(fn, { maxRetries: 5, shouldRetry: (e) => e.message === 'error' })
+        retry(fn, { maxRetries: 5, shouldRetry: e => e.message === 'error' })
     ).rejects.toThrow('error2');
 });
 
@@ -84,7 +84,7 @@ test('retry - 5 - should not retry', async () => {
         });
 
     await expect(
-        retry(fn, { maxRetries: 5, shouldRetry: (e) => e.message === 'error2' })
+        retry(fn, { maxRetries: 5, shouldRetry: e => e.message === 'error2' })
     ).rejects.toThrow('error');
     expect(numCalled).toBe(1);
 });

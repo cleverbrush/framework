@@ -60,7 +60,7 @@ export const retry = <T>(
         const tryPromise = () => {
             fn()
                 .then(resolve)
-                .catch((error) => {
+                .catch(error => {
                     if (
                         retries < maxRetries &&
                         (!options?.shouldRetry || options.shouldRetry(error))

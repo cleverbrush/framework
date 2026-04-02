@@ -320,9 +320,9 @@ export class ArraySchemaBuilder<
                 ? {}
                 : {
                       errors: results
-                          .map((r) => r?.errors)
-                          .filter((r) => r)
-                          .flatMap((e) =>
+                          .map(r => r?.errors)
+                          .filter(r => r)
+                          .flatMap(e =>
                               e?.map((r: any, index: number) => ({
                                   ...r,
                                   path: `${r.path}[${index}]`
@@ -331,7 +331,7 @@ export class ArraySchemaBuilder<
                   },
             allValid
                 ? {
-                      object: results.map((r) => r?.object)
+                      object: results.map(r => r?.object)
                   }
                 : {}
         ) as any;
@@ -483,7 +483,7 @@ export class ArraySchemaBuilder<
         ) {
             if (prevalidationContext.doNotStopOnFirstError) {
                 const results = await Promise.all(
-                    objToValidate.map((o) =>
+                    objToValidate.map(o =>
                         this.#elementSchema?.validateAsync(
                             o,
                             prevalidationContext

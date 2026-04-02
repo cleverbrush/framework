@@ -12,6 +12,7 @@ import {
 } from '@cleverbrush/schema';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormContextValue } from './contexts.js';
+import { debounce } from './debounce.js';
 import type { FormStore } from './FormStore.js';
 import { createFormStore } from './FormStore.js';
 import {
@@ -39,7 +40,7 @@ export type SchemaFormInstance<
     TSchema extends ObjectSchemaBuilder<any, any, any>
 > = {
     useField: <TPropertySchema extends SchemaBuilder<any, any>>(
-        selector: (
+        forProperty: (
             tree: PropertyDescriptorTree<TSchema, TSchema>
         ) => PropertyDescriptor<TSchema, TPropertySchema, any>
     ) => UseFieldResult<InferType<TPropertySchema>>;
@@ -265,19 +266,56 @@ export function useSchemaForm<
 
     const _getFormContext = useCallback(() => formContextRef.current, []);
 
+    // Validate on mount when requested — runs once after first render
+    const validateOnMountRef = useRef(resolvedOptions.validateOnMount);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: We only want to check validateOnMount on the initial mount, ignoring changes to it after that
+    useEffect(() => {
+        if (validateOnMountRef.current) {
+            runValidation(true);
+        }
+    }, []);
+
+    // Create a debounced version of runValidation for onChange triggers.
+    // validate(), submit(), and validateOnMount always use runValidation directly.
+    const debouncedValidationRef = useRef<
+        ((markTouched: boolean) => void) | null
+    >(null);
+    if (
+        resolvedOptions.validationDebounceMs != null &&
+        resolvedOptions.validationDebounceMs > 0 &&
+        !debouncedValidationRef.current
+    ) {
+        debouncedValidationRef.current = debounce((markTouched: boolean) => {
+            runValidation(markTouched);
+        }, resolvedOptions.validationDebounceMs);
+    }
+
+    const triggerValidation = useCallback(
+        (markTouched: boolean) => {
+            if (debouncedValidationRef.current) {
+                debouncedValidationRef.current(markTouched);
+                return Promise.resolve(
+                    undefined as unknown as ValidationResult<InferType<TSchema>>
+                );
+            }
+            return runValidation(markTouched);
+        },
+        [runValidation]
+    );
+
     const useFieldHook = useCallback(
         <TPropertySchema extends SchemaBuilder<any, any>>(
-            selector: (
+            forProperty: (
                 tree: PropertyDescriptorTree<TSchema, TSchema>
             ) => PropertyDescriptor<TSchema, TPropertySchema, any>
         ): UseFieldResult<InferType<TPropertySchema>> => {
             return useFieldFromContext(
                 formContextRef.current,
-                selector,
-                runValidation
+                forProperty,
+                triggerValidation
             ) as UseFieldResult<InferType<TPropertySchema>>;
         },
-        [runValidation]
+        [triggerValidation]
     );
 
     return useMemo(
@@ -310,12 +348,12 @@ export function useSchemaForm<
  */
 export function useFieldFromContext(
     formContext: FormContextValue,
-    selector: (tree: any) => any,
+    forProperty: (tree: any) => any,
     triggerValidation?: (markTouched: boolean) => Promise<any>
 ): UseFieldResult {
     const { store, descriptorTree, options, pathMap } = formContext;
 
-    const descriptor = selector(descriptorTree as any);
+    const descriptor = forProperty(descriptorTree as any);
     const inner = descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
     const path = getDescriptorPath(inner, pathMap);
     const fieldSchema = inner.getSchema();
@@ -343,7 +381,7 @@ export function useFieldFromContext(
     // Subscribe to field changes with proper cleanup on unmount/path change
     useEffect(() => {
         const unsub = store.subscribe(path, () => {
-            setRenderTick((c) => c + 1);
+            setRenderTick(c => c + 1);
         });
         return unsub;
     }, [store, path]);
@@ -396,13 +434,22 @@ export function useFieldFromContext(
 }
 
 /**
- * Resolves renderer from the FormSystem config based on schema type.
+ * Resolves a renderer from the FormSystem config based on schema type and optional variant.
+ *
+ * When `variant` is provided the registry is checked for `"type:variant"` first
+ * (e.g. `"string:password"`). If no match is found it falls back to the base
+ * `"type"` key (e.g. `"string"`).
  */
 export function resolveRenderer(
     config: FormSystemConfig | null,
-    schema: SchemaBuilder<any, any>
+    schema: SchemaBuilder<any, any>,
+    variant?: string
 ): FieldRenderer | undefined {
     if (!config?.renderers) return undefined;
     const type = getSchemaType(schema);
+    if (variant) {
+        const variantRenderer = config.renderers[`${type}:${variant}`];
+        if (variantRenderer) return variantRenderer;
+    }
     return config.renderers[type];
 }

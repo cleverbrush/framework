@@ -69,9 +69,9 @@ export function highlightTS(code: string): string {
     const tokens: Token[] = [];
 
     // Phase 1: Extract comments (highest priority)
-    const commentRe =
-        /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
+    const commentRe = /\/\/[^\n]*|\/\*[\s\S]*?\*\//g;
     let m: RegExpExecArray | null;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = commentRe.exec(code)) !== null) {
         tokens.push({
             start: m.index,
@@ -82,8 +82,8 @@ export function highlightTS(code: string): string {
     }
 
     // Phase 2: Extract strings (single, double, backtick)
-    const stringRe =
-        /`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
+    const stringRe = /`(?:[^`\\]|\\.)*`|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = stringRe.exec(code)) !== null) {
         if (!isInsideToken(tokens, m.index)) {
             tokens.push({
@@ -97,6 +97,7 @@ export function highlightTS(code: string): string {
 
     // Phase 3: Numbers
     const numberRe = /\b\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = numberRe.exec(code)) !== null) {
         if (!isInsideToken(tokens, m.index)) {
             tokens.push({
@@ -111,8 +112,8 @@ export function highlightTS(code: string): string {
     // Phase 4: Type annotations (after : or in generics < >)
     // Match `: TypeName` patterns (type annotations)
     // Uses capture groups instead of lookbehinds for browser compatibility
-    const typeAnnotationRe =
-        /(:\s*)([A-Z][A-Za-z0-9]*(?:<[^>]*>)?)/g;
+    const typeAnnotationRe = /(:\s*)([A-Z][A-Za-z0-9]*(?:<[^>]*>)?)/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = typeAnnotationRe.exec(code)) !== null) {
         const typeStart = m.index + m[1].length;
         if (!isInsideToken(tokens, typeStart)) {
@@ -127,6 +128,7 @@ export function highlightTS(code: string): string {
 
     // Match type keyword usages like `type X = ...`
     const typeDefRe = /\btype\s+([A-Z][A-Za-z0-9]*)/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = typeDefRe.exec(code)) !== null) {
         const nameStart = m.index + m[0].length - m[1].length;
         if (!isInsideToken(tokens, nameStart)) {
@@ -141,6 +143,7 @@ export function highlightTS(code: string): string {
 
     // Match `<TypeName>` in generics like InferType<typeof X>
     const genericRe = /<([A-Z][A-Za-z0-9]*)/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = genericRe.exec(code)) !== null) {
         const typeStart = m.index + 1;
         if (!isInsideToken(tokens, typeStart)) {
@@ -156,6 +159,7 @@ export function highlightTS(code: string): string {
     // Match lowercase type names when used as annotations (`: string`, `: number`, etc.)
     const lowerTypeRe =
         /(:\s*)\b(string|number|boolean|void|any|never|unknown)\b(?!\s*[.(])/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = lowerTypeRe.exec(code)) !== null) {
         const typeStart = m.index + m[1].length;
         if (!isInsideToken(tokens, typeStart)) {
@@ -170,6 +174,7 @@ export function highlightTS(code: string): string {
 
     // Phase 5: Function calls — word followed by (
     const funcCallRe = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\s*(?=\()/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = funcCallRe.exec(code)) !== null) {
         if (
             !isInsideToken(tokens, m.index) &&
@@ -187,6 +192,7 @@ export function highlightTS(code: string): string {
 
     // Phase 6: Keywords
     const kwRe = /\b([a-zA-Z_$][a-zA-Z0-9_$]*)\b/g;
+    // biome-ignore lint/suspicious/noAssignInExpressions: allow assignment in while condition for regex exec loop
     while ((m = kwRe.exec(code)) !== null) {
         if (!isInsideToken(tokens, m.index) && KEYWORDS.has(m[1])) {
             tokens.push({
@@ -220,5 +226,5 @@ export function highlightTS(code: string): string {
 }
 
 function isInsideToken(tokens: Token[], index: number): boolean {
-    return tokens.some((t) => index >= t.start && index < t.end);
+    return tokens.some(t => index >= t.start && index < t.end);
 }

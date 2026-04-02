@@ -614,8 +614,7 @@ test('equals with custom validation error message', async () => {
         .clearEquals()
         .equals(
             'abc',
-            (seenValue) =>
-                `This is a custom error message 2, saw "${seenValue}"`
+            seenValue => `This is a custom error message 2, saw "${seenValue}"`
         );
 
     {
@@ -1027,7 +1026,7 @@ test('required with custom string error message', async () => {
 
 test('required with custom function error message', async () => {
     const schema = string().required(
-        (seenValue) => `Expected a string but saw ${seenValue}`
+        seenValue => `Expected a string but saw ${seenValue}`
     );
 
     const { valid, errors } = await schema.validate(null as any);

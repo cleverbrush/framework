@@ -28,7 +28,7 @@ const ScheduleSchemaBase = object({
     maxOccurences: number().min(1).optional(),
     /** Skip this number of repeats. Min value is 1.  */
     skipFirst: number().min(1).optional()
-}).addValidator((val) => {
+}).addValidator(val => {
     if (
         'endsOn' in val &&
         'maxOccurences' in val &&
@@ -62,7 +62,7 @@ const ScheduleWeekSchema = ScheduleSchemaBase.addProps({
         .of(number().min(1).max(7))
         .minLength(1)
         .maxLength(7)
-        .addValidator((val) => {
+        .addValidator(val => {
             const map: Record<number, boolean> = {};
             for (let i = 0; i < val.length; i++) {
                 if (map[val[i]]) {
