@@ -13,6 +13,7 @@ export function TypePanel({ typeInfo }: Props) {
             <div className="pg-panel pg-type-panel">
                 <div className="pg-panel-header">
                     <span className="pg-label">Inferred Type</span>
+                    {typeInfo.inferring && <span className="pg-spinner" />}
                 </div>
                 <div className="pg-type-placeholder">
                     <p>Define a schema to see its inferred TypeScript type.</p>
@@ -29,7 +30,7 @@ export function TypePanel({ typeInfo }: Props) {
         <div className="pg-panel pg-type-panel">
             <div className="pg-panel-header">
                 <span className="pg-label">Inferred Type</span>
-                <span className="pg-badge">InferType&lt;T&gt;</span>
+                {typeInfo.inferring ? <span className="pg-spinner" /> : <span className="pg-badge">InferType&lt;T&gt;</span>}
             </div>
             <pre className="pg-type-code">
                 <code dangerouslySetInnerHTML={{ __html: highlightTS(typeInfo.typeString) }} />

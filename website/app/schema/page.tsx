@@ -129,6 +129,7 @@ export default function SchemaPage() {
                 {/* ── Quick Start ──────────────────────────────────── */}
                 <div className="card">
                     <h2>Quick Start</h2>
+                    <a href="/playground/quick-start" className="playground-link">▶ Open in Playground</a>
                     <p>
                         Define a schema, infer its TypeScript type, and validate
                         data — all from a single definition:
@@ -185,6 +186,7 @@ console.log(bad.errors);
                 {/* ── Schema Types ─────────────────────────────────── */}
                 <div className="card">
                     <h2>Schema Types</h2>
+                    <a href="/playground/schema-types" className="playground-link">▶ Open in Playground</a>
                     <p>
                         Every builder function returns an immutable schema
                         instance with a fluent API. Here are all available
@@ -339,6 +341,7 @@ console.log(bad.errors);
                 {/* ── Immutability ─────────────────────────────────── */}
                 <div className="card">
                     <h2>Immutability</h2>
+                    <a href="/playground/immutability" className="playground-link">▶ Open in Playground</a>
                     <p>
                         Every method on a schema builder returns a{' '}
                         <strong>new instance</strong>. The original is never
@@ -423,6 +426,7 @@ type User = InferType<typeof UserSchema>;
                 {/* ── Composing Schemas ────────────────────────────── */}
                 <div className="card">
                     <h2>Composing Schemas</h2>
+                    <a href="/playground/composing-schemas" className="playground-link">▶ Open in Playground</a>
                     <p>
                         Schemas can be extended with additional properties,
                         combined with unions, or nested inside arrays and
@@ -463,6 +467,7 @@ const IdOrEmail = union(
                 {/* ── Discriminated Unions ─────────────────────────── */}
                 <div className="card">
                     <h2>Discriminated Unions</h2>
+                    <a href="/playground/discriminated-unions" className="playground-link">▶ Open in Playground</a>
                     <p>
                         Some libraries ship a dedicated{' '}
                         <code>.discriminator()</code> API for tagged unions.
@@ -585,6 +590,7 @@ type Schedule = InferType<typeof ScheduleSchema>;
                 {/* ── Validation ───────────────────────────────────── */}
                 <div className="card">
                     <h2>Validation</h2>
+                    <a href="/playground/validation-errors" className="playground-link">▶ Open in Playground</a>
 
                     <h3>Basic Validation</h3>
                     <p>
@@ -672,6 +678,7 @@ if (result.getErrorsFor) {
                     </pre>
 
                     <h3>Custom Error Messages</h3>
+                    <a href="/playground/custom-error-messages" className="playground-link">▶ Open in Playground</a>
                     <p>
                         Every constraint method accepts an optional second
                         argument for a custom error message. This lets you
@@ -702,6 +709,7 @@ const TagsSchema = array(string())
                     </pre>
 
                     <h3>Custom Validators</h3>
+                    <a href="/playground/custom-validators" className="playground-link">▶ Open in Playground</a>
                     <p>
                         Add custom synchronous or asynchronous validators to any
                         schema. They receive the value and must return an object
@@ -801,6 +809,7 @@ console.log(cityResult.value); // 'NYC'`)
                 {/* ── Extensions ──────────────────────────────────── */}
                 <div className="card">
                     <h2>Extensions</h2>
+                    <a href="/playground/custom-extensions" className="playground-link">▶ Open in Playground</a>
                     <p>
                         The extension system lets you add <strong>custom
                         methods</strong> to any schema builder type without
@@ -956,6 +965,7 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                 {/* ── Built-in Extensions ─────────────────────────────── */}
                 <div className="card">
                     <h2>Built-in Extensions</h2>
+                    <a href="/playground/builtin-extensions" className="playground-link">▶ Open in Playground</a>
                     <p>
                         The default import from <code>@cleverbrush/schema</code>{' '}
                         includes a pre-applied extension pack with common
