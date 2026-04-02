@@ -16,7 +16,7 @@ import type {
 } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
-import { resolveErrorMessage } from './util.js';
+import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
 // Public interface — carries JSDoc into .d.ts for consumers
@@ -133,15 +133,21 @@ export const arrayExtensions = defineExtension({
         ) {
             return this.withExtension('nonempty', true).addValidator(
                 (val: unknown[]) => {
+                    if (!Array.isArray(val))
+                        return validationFail(
+                            errorMessage,
+                            'must not be empty',
+                            val,
+                            this
+                        );
                     const valid = val.length > 0;
                     if (valid) return { valid: true, errors: [] };
-                    const msg = resolveErrorMessage(
+                    return validationFail(
                         errorMessage,
                         'must not be empty',
                         val,
                         this
                     );
-                    return { valid: false, errors: [{ message: msg }] };
                 }
             );
         },
@@ -174,20 +180,23 @@ export const arrayExtensions = defineExtension({
 
             return this.withExtension('unique', meta).addValidator(
                 (val: unknown[]) => {
+                    if (!Array.isArray(val))
+                        return validationFail(
+                            errorMessage,
+                            'must contain unique elements',
+                            val,
+                            this
+                        );
                     const seen = new Set();
                     for (const item of val) {
                         const key = keyFn ? keyFn(item) : item;
                         if (seen.has(key)) {
-                            const msg = resolveErrorMessage(
+                            return validationFail(
                                 errorMessage,
                                 'must contain unique elements',
                                 val,
                                 this
                             );
-                            return {
-                                valid: false,
-                                errors: [{ message: msg }]
-                            };
                         }
                         seen.add(key);
                     }
