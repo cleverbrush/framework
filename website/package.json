@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node ../scripts/build-playground-bundle.js && node ../scripts/generate-playground-declarations.js",
     "dev": "next dev",
-    "prebuild": "node ../scripts/build-playground-bundle.js",
+    "prebuild": "node ../scripts/build-playground-bundle.js && node ../scripts/generate-playground-declarations.js",
     "build": "next build",
     "start": "next start"
   },
