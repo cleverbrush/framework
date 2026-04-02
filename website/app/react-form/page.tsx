@@ -681,7 +681,9 @@ function App() {
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const form = useSchemaForm(MySchema, {
-  createMissingStructure: true  // default: true
+  createMissingStructure: true,  // default: true
+  validateOnMount: false,        // default: false — set to true to show errors on mount
+  validationDebounceMs: 300      // optional — debounce onChange validation (ms)
 });`)
                             }}
                         />

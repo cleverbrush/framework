@@ -1,3 +1,4 @@
+import { debounce } from '@cleverbrush/async';
 import type {
     InferType,
     PropertyDescriptor,
@@ -265,6 +266,43 @@ export function useSchemaForm<
 
     const _getFormContext = useCallback(() => formContextRef.current, []);
 
+    // Validate on mount when requested — runs once after first render
+    const validateOnMountRef = useRef(resolvedOptions.validateOnMount);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: We only want to check validateOnMount on the initial mount, ignoring changes to it after that
+    useEffect(() => {
+        if (validateOnMountRef.current) {
+            runValidation(true);
+        }
+    }, []);
+
+    // Create a debounced version of runValidation for onChange triggers.
+    // validate(), submit(), and validateOnMount always use runValidation directly.
+    const debouncedValidationRef = useRef<
+        ((markTouched: boolean) => void) | null
+    >(null);
+    if (
+        resolvedOptions.validationDebounceMs != null &&
+        resolvedOptions.validationDebounceMs > 0 &&
+        !debouncedValidationRef.current
+    ) {
+        debouncedValidationRef.current = debounce((markTouched: boolean) => {
+            runValidation(markTouched);
+        }, resolvedOptions.validationDebounceMs);
+    }
+
+    const triggerValidation = useCallback(
+        (markTouched: boolean) => {
+            if (debouncedValidationRef.current) {
+                debouncedValidationRef.current(markTouched);
+                return Promise.resolve(
+                    undefined as unknown as ValidationResult<InferType<TSchema>>
+                );
+            }
+            return runValidation(markTouched);
+        },
+        [runValidation]
+    );
+
     const useFieldHook = useCallback(
         <TPropertySchema extends SchemaBuilder<any, any>>(
             selector: (
@@ -274,10 +312,10 @@ export function useSchemaForm<
             return useFieldFromContext(
                 formContextRef.current,
                 selector,
-                runValidation
+                triggerValidation
             ) as UseFieldResult<InferType<TPropertySchema>>;
         },
-        [runValidation]
+        [triggerValidation]
     );
 
     return useMemo(
