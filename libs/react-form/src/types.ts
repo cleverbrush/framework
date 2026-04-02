@@ -31,7 +31,7 @@ export type FieldRenderProps = {
      *
      * @example
      * ```tsx
-     * <Field selector={(t) => t.secret} form={form} variant="password" />
+     * <Field forProperty={(t) => t.secret} form={form} variant="password" />
      * ```
      */
     variant?: string;
@@ -41,7 +41,7 @@ export type FieldRenderProps = {
      *
      * @example
      * ```tsx
-     * <Field selector={(t) => t.name} form={form} label="Full name" />
+     * <Field forProperty={(t) => t.name} form={form} label="Full name" />
      * ```
      */
     label?: string;
@@ -51,7 +51,7 @@ export type FieldRenderProps = {
      *
      * @example
      * ```tsx
-     * <Field selector={(t) => t.email} form={form} name="email" />
+     * <Field forProperty={(t) => t.email} form={form} name="email" />
      * ```
      */
     name?: string;
@@ -63,7 +63,7 @@ export type FieldRenderProps = {
      * @example
      * ```tsx
      * <Field
-     *   selector={(t) => t.email}
+     *   forProperty={(t) => t.email}
      *   form={form}
      *   fieldProps={{ placeholder: "you@example.com", autoComplete: "email" }}
      * />

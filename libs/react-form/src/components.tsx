@@ -116,7 +116,7 @@ export function useField<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
     TPropertySchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
 >(
-    selector: (
+    forProperty: (
         tree: PropertyDescriptorTree<TSchema, TSchema>
     ) => PropertyDescriptor<TSchema, TPropertySchema, any>
 ): UseFieldResult<InferType<TPropertySchema>> {
@@ -127,7 +127,7 @@ export function useField<
                 'Wrap your component tree with <FormProvider form={form}>.'
         );
     }
-    return useFieldFromContext(formContext, selector) as UseFieldResult<
+    return useFieldFromContext(formContext, forProperty) as UseFieldResult<
         InferType<TPropertySchema>
     >;
 }
@@ -150,7 +150,7 @@ export function useFormSystem(): FormSystemConfig {
 // ─── Field Component ─────────────────────────────────────────────────────────
 
 export type FieldProps<TSchema extends ObjectSchemaBuilder<any, any, any>> = {
-    selector: (
+    forProperty: (
         tree: PropertyDescriptorTree<TSchema, TSchema>
     ) => PropertyDescriptor<TSchema, any, any>;
     form: SchemaFormInstance<TSchema>;
@@ -186,13 +186,13 @@ export type FieldProps<TSchema extends ObjectSchemaBuilder<any, any, any>> = {
  *
  * @example
  * ```tsx
- * <Field selector={(t) => t.password} form={form}
+ * <Field forProperty={(t) => t.password} form={form}
  *        variant="password" label="Password"
  *        fieldProps={{ placeholder: "Enter password", autoComplete: "current-password" }} />
  * ```
  */
 export function Field<TSchema extends ObjectSchemaBuilder<any, any, any>>({
-    selector,
+    forProperty,
     form,
     renderer,
     variant,
@@ -200,7 +200,7 @@ export function Field<TSchema extends ObjectSchemaBuilder<any, any, any>>({
     name,
     fieldProps
 }: FieldProps<TSchema>): React.ReactNode {
-    const fieldResult = form.useField(selector);
+    const fieldResult = form.useField(forProperty);
     const systemConfig = useContext(FormSystemContext);
 
     const resolvedRenderer =

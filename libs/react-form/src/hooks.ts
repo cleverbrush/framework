@@ -40,7 +40,7 @@ export type SchemaFormInstance<
     TSchema extends ObjectSchemaBuilder<any, any, any>
 > = {
     useField: <TPropertySchema extends SchemaBuilder<any, any>>(
-        selector: (
+        forProperty: (
             tree: PropertyDescriptorTree<TSchema, TSchema>
         ) => PropertyDescriptor<TSchema, TPropertySchema, any>
     ) => UseFieldResult<InferType<TPropertySchema>>;
@@ -305,13 +305,13 @@ export function useSchemaForm<
 
     const useFieldHook = useCallback(
         <TPropertySchema extends SchemaBuilder<any, any>>(
-            selector: (
+            forProperty: (
                 tree: PropertyDescriptorTree<TSchema, TSchema>
             ) => PropertyDescriptor<TSchema, TPropertySchema, any>
         ): UseFieldResult<InferType<TPropertySchema>> => {
             return useFieldFromContext(
                 formContextRef.current,
-                selector,
+                forProperty,
                 triggerValidation
             ) as UseFieldResult<InferType<TPropertySchema>>;
         },
@@ -348,12 +348,12 @@ export function useSchemaForm<
  */
 export function useFieldFromContext(
     formContext: FormContextValue,
-    selector: (tree: any) => any,
+    forProperty: (tree: any) => any,
     triggerValidation?: (markTouched: boolean) => Promise<any>
 ): UseFieldResult {
     const { store, descriptorTree, options, pathMap } = formContext;
 
-    const descriptor = selector(descriptorTree as any);
+    const descriptor = forProperty(descriptorTree as any);
     const inner = descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
     const path = getDescriptorPath(inner, pathMap);
     const fieldSchema = inner.getSchema();
