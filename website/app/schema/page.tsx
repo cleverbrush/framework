@@ -17,6 +17,7 @@ export default function SchemaPage() {
                     <h2>Installation</h2>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(
                                     `npm install @cleverbrush/schema`
@@ -129,13 +130,19 @@ export default function SchemaPage() {
                 {/* ── Quick Start ──────────────────────────────────── */}
                 <div className="card">
                     <h2>Quick Start</h2>
-                    <a href="/playground/quick-start" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/quick-start"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         Define a schema, infer its TypeScript type, and validate
                         data — all from a single definition:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number, boolean, InferType } from '@cleverbrush/schema';
 
@@ -186,7 +193,12 @@ console.log(bad.errors);
                 {/* ── Schema Types ─────────────────────────────────── */}
                 <div className="card">
                     <h2>Schema Types</h2>
-                    <a href="/playground/schema-types" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/schema-types"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         Every builder function returns an immutable schema
                         instance with a fluent API. Here are all available
@@ -229,9 +241,8 @@ console.log(bad.errors);
                                         <code>.matches(re)</code>,{' '}
                                         <code>.email()</code>,{' '}
                                         <code>.url()</code>,{' '}
-                                        <code>.uuid()</code>,{' '}
-                                        <code>.ip()</code>,{' '}
-                                        <code>.trim()</code>,{' '}
+                                        <code>.uuid()</code>, <code>.ip()</code>
+                                        , <code>.trim()</code>,{' '}
                                         <code>.toLowerCase()</code>,{' '}
                                         <code>.nonempty()</code>
                                     </td>
@@ -341,7 +352,12 @@ console.log(bad.errors);
                 {/* ── Immutability ─────────────────────────────────── */}
                 <div className="card">
                     <h2>Immutability</h2>
-                    <a href="/playground/immutability" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/immutability"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         Every method on a schema builder returns a{' '}
                         <strong>new instance</strong>. The original is never
@@ -350,6 +366,7 @@ console.log(bad.errors);
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { string } from '@cleverbrush/schema';
 
@@ -369,6 +386,7 @@ const loose  = base.optional(); // another new instance
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const Email = string().minLength(5).maxLength(255);
 const Name  = string().minLength(1).maxLength(100);
@@ -394,6 +412,7 @@ const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number, InferType } from '@cleverbrush/schema';
 
@@ -426,7 +445,12 @@ type User = InferType<typeof UserSchema>;
                 {/* ── Composing Schemas ────────────────────────────── */}
                 <div className="card">
                     <h2>Composing Schemas</h2>
-                    <a href="/playground/composing-schemas" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/composing-schemas"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         Schemas can be extended with additional properties,
                         combined with unions, or nested inside arrays and
@@ -434,6 +458,7 @@ type User = InferType<typeof UserSchema>;
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number, array, union } from '@cleverbrush/schema';
 
@@ -467,7 +492,12 @@ const IdOrEmail = union(
                 {/* ── Discriminated Unions ─────────────────────────── */}
                 <div className="card">
                     <h2>Discriminated Unions</h2>
-                    <a href="/playground/discriminated-unions" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/discriminated-unions"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         Some libraries ship a dedicated{' '}
                         <code>.discriminator()</code> API for tagged unions.
@@ -486,6 +516,7 @@ const IdOrEmail = union(
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number, union, type InferType } from '@cleverbrush/schema';
 
@@ -526,12 +557,12 @@ const result = ShapeSchema.validate({ type: 'circle', radius: 5 });`)
                     <p>
                         The <code>@cleverbrush/scheduler</code> library uses
                         this exact pattern to validate job schedules. The{' '}
-                        <code>every</code> field acts as the discriminator,
-                        and each variant adds its own set of allowed
-                        properties:
+                        <code>every</code> field acts as the discriminator, and
+                        each variant adds its own set of allowed properties:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, number, array, union, type InferType } from '@cleverbrush/schema';
 
@@ -580,29 +611,34 @@ type Schedule = InferType<typeof ScheduleSchema>;
                         Because each branch uses a string literal (
                         <code>string(&apos;minute&apos;)</code>,{' '}
                         <code>string(&apos;day&apos;)</code>, etc.) for the{' '}
-                        <code>every</code> field, TypeScript can narrow the
-                        full union based on that single property — exactly
-                        like zod&apos;s <code>z.discriminatedUnion()</code>,
-                        but without any extra API surface.
+                        <code>every</code> field, TypeScript can narrow the full
+                        union based on that single property — exactly like
+                        zod&apos;s <code>z.discriminatedUnion()</code>, but
+                        without any extra API surface.
                     </p>
                 </div>
 
                 {/* ── Validation ───────────────────────────────────── */}
                 <div className="card">
                     <h2>Validation</h2>
-                    <a href="/playground/validation-errors" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/validation-errors"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
 
                     <h3>Basic Validation</h3>
                     <p>
                         Every schema has two validation methods:{' '}
                         <code>.validate(data)</code> (synchronous) and{' '}
-                        <code>.validateAsync(data)</code> (asynchronous).
-                        Use <code>.validate()</code> by default — it returns
-                        a result with <code>valid</code>,{' '}
-                        <code>errors</code>, and the cleaned <code>object</code>
-                        . Switch to <code>.validateAsync()</code> only when your
-                        schema includes async validators or preprocessors.
-                        For object schemas, the result also includes a{' '}
+                        <code>.validateAsync(data)</code> (asynchronous). Use{' '}
+                        <code>.validate()</code> by default — it returns a
+                        result with <code>valid</code>, <code>errors</code>, and
+                        the cleaned <code>object</code>. Switch to{' '}
+                        <code>.validateAsync()</code> only when your schema
+                        includes async validators or preprocessors. For object
+                        schemas, the result also includes a{' '}
                         <code>getErrorsFor()</code> method for per-property
                         error inspection — the flat <code>errors</code> array is{' '}
                         <strong>deprecated</strong> on object schema results and
@@ -610,6 +646,7 @@ type Schedule = InferType<typeof ScheduleSchema>;
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const result = UserSchema.validate({
   name: 'Alice',
@@ -655,6 +692,7 @@ if (result.valid) {
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const result = UserSchema.validate(
   { name: 'A', email: '', age: -5, isActive: true },
@@ -678,7 +716,12 @@ if (result.getErrorsFor) {
                     </pre>
 
                     <h3>Custom Error Messages</h3>
-                    <a href="/playground/custom-error-messages" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/custom-error-messages"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         Every constraint method accepts an optional second
                         argument for a custom error message. This lets you
@@ -687,6 +730,7 @@ if (result.getErrorsFor) {
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { string, number, array } from '@cleverbrush/schema';
 
@@ -709,7 +753,12 @@ const TagsSchema = array(string())
                     </pre>
 
                     <h3>Custom Validators</h3>
-                    <a href="/playground/custom-validators" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/custom-validators"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         Add custom synchronous or asynchronous validators to any
                         schema. They receive the value and must return an object
@@ -719,6 +768,7 @@ const TagsSchema = array(string())
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const EmailSchema = string()
   .minLength(5, 'Email is too short')
@@ -777,6 +827,7 @@ console.log(result.errors); // [{ path: '$($validators[0])', message: 'This emai
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { object, string, ObjectSchemaBuilder } from '@cleverbrush/schema';
 
@@ -809,14 +860,20 @@ console.log(cityResult.value); // 'NYC'`)
                 {/* ── Extensions ──────────────────────────────────── */}
                 <div className="card">
                     <h2>Extensions</h2>
-                    <a href="/playground/custom-extensions" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/custom-extensions"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
-                        The extension system lets you add <strong>custom
-                        methods</strong> to any schema builder type without
-                        modifying the core library. Define an extension once,
-                        apply it with <code>withExtensions()</code>, and every
-                        builder produced by the returned factories includes your
-                        new methods — fully typed and chainable.
+                        The extension system lets you add{' '}
+                        <strong>custom methods</strong> to any schema builder
+                        type without modifying the core library. Define an
+                        extension once, apply it with{' '}
+                        <code>withExtensions()</code>, and every builder
+                        produced by the returned factories includes your new
+                        methods — fully typed and chainable.
                     </p>
 
                     <h3>Defining an Extension</h3>
@@ -828,6 +885,7 @@ console.log(cityResult.value); // 'NYC'`)
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { defineExtension, withExtensions, StringSchemaBuilder, NumberSchemaBuilder } from '@cleverbrush/schema';
 
@@ -859,10 +917,12 @@ const portExt = defineExtension({
                     <p>
                         Pass one or more extension descriptors to{' '}
                         <code>withExtensions()</code> to get augmented factory
-                        functions. All original builder methods remain available:
+                        functions. All original builder methods remain
+                        available:
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const s = withExtensions(emailExt, portExt);
 
@@ -893,6 +953,7 @@ const ServerConfig = s.object({
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const schema = s.string().email();
 const meta = schema.introspect();
@@ -923,6 +984,7 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const currencyExt = defineExtension({
   number: {
@@ -956,8 +1018,8 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                     <p>
                         We encourage the community to create and publish
                         extensions for common use cases — email validation,
-                        currency formatting, URL slugs, phone numbers, and
-                        more. A well-typed extension is just a{' '}
+                        currency formatting, URL slugs, phone numbers, and more.
+                        A well-typed extension is just a{' '}
                         <code>defineExtension()</code> call away.
                     </p>
                 </div>
@@ -965,7 +1027,12 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                 {/* ── Built-in Extensions ─────────────────────────────── */}
                 <div className="card">
                     <h2>Built-in Extensions</h2>
-                    <a href="/playground/builtin-extensions" className="playground-link">▶ Open in Playground</a>
+                    <a
+                        href="/playground/builtin-extensions"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
                     <p>
                         The default import from <code>@cleverbrush/schema</code>{' '}
                         includes a pre-applied extension pack with common
@@ -984,31 +1051,62 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><code>.email(errorMessage?)</code></td>
+                                    <td>
+                                        <code>.email(errorMessage?)</code>
+                                    </td>
                                     <td>Validates email format</td>
                                 </tr>
                                 <tr>
-                                    <td><code>.url(opts?, errorMessage?)</code></td>
-                                    <td>Validates URL format. <code>opts.protocols</code> narrows allowed schemes</td>
+                                    <td>
+                                        <code>.url(opts?, errorMessage?)</code>
+                                    </td>
+                                    <td>
+                                        Validates URL format.{' '}
+                                        <code>opts.protocols</code> narrows
+                                        allowed schemes
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td><code>.uuid(errorMessage?)</code></td>
-                                    <td>Validates UUID (versions 1–5) format</td>
+                                    <td>
+                                        <code>.uuid(errorMessage?)</code>
+                                    </td>
+                                    <td>
+                                        Validates UUID (versions 1–5) format
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td><code>.ip(opts?, errorMessage?)</code></td>
-                                    <td>Validates IPv4 or IPv6. <code>opts.version</code> narrows to <code>&apos;v4&apos;</code> or <code>&apos;v6&apos;</code></td>
+                                    <td>
+                                        <code>.ip(opts?, errorMessage?)</code>
+                                    </td>
+                                    <td>
+                                        Validates IPv4 or IPv6.{' '}
+                                        <code>opts.version</code> narrows to{' '}
+                                        <code>&apos;v4&apos;</code> or{' '}
+                                        <code>&apos;v6&apos;</code>
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td><code>.trim()</code></td>
-                                    <td>Preprocessor — trims whitespace before validation</td>
+                                    <td>
+                                        <code>.trim()</code>
+                                    </td>
+                                    <td>
+                                        Preprocessor — trims whitespace before
+                                        validation
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td><code>.toLowerCase()</code></td>
-                                    <td>Preprocessor — lowercases value before validation</td>
+                                    <td>
+                                        <code>.toLowerCase()</code>
+                                    </td>
+                                    <td>
+                                        Preprocessor — lowercases value before
+                                        validation
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td><code>.nonempty(errorMessage?)</code></td>
+                                    <td>
+                                        <code>.nonempty(errorMessage?)</code>
+                                    </td>
                                     <td>Rejects empty strings</td>
                                 </tr>
                             </tbody>
@@ -1026,20 +1124,33 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><code>.positive(errorMessage?)</code></td>
+                                    <td>
+                                        <code>.positive(errorMessage?)</code>
+                                    </td>
                                     <td>Value must be &gt; 0</td>
                                 </tr>
                                 <tr>
-                                    <td><code>.negative(errorMessage?)</code></td>
+                                    <td>
+                                        <code>.negative(errorMessage?)</code>
+                                    </td>
                                     <td>Value must be &lt; 0</td>
                                 </tr>
                                 <tr>
-                                    <td><code>.finite(errorMessage?)</code></td>
+                                    <td>
+                                        <code>.finite(errorMessage?)</code>
+                                    </td>
                                     <td>Value must be finite</td>
                                 </tr>
                                 <tr>
-                                    <td><code>.multipleOf(n, errorMessage?)</code></td>
-                                    <td>Value must be an exact multiple of <code>n</code> (float-safe)</td>
+                                    <td>
+                                        <code>
+                                            .multipleOf(n, errorMessage?)
+                                        </code>
+                                    </td>
+                                    <td>
+                                        Value must be an exact multiple of{' '}
+                                        <code>n</code> (float-safe)
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1056,12 +1167,24 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                             </thead>
                             <tbody>
                                 <tr>
-                                    <td><code>.nonempty(errorMessage?)</code></td>
-                                    <td>Array must have at least one element</td>
+                                    <td>
+                                        <code>.nonempty(errorMessage?)</code>
+                                    </td>
+                                    <td>
+                                        Array must have at least one element
+                                    </td>
                                 </tr>
                                 <tr>
-                                    <td><code>.unique(keyFn?, errorMessage?)</code></td>
-                                    <td>All elements must be unique. Optional <code>keyFn</code> extracts comparison key</td>
+                                    <td>
+                                        <code>
+                                            .unique(keyFn?, errorMessage?)
+                                        </code>
+                                    </td>
+                                    <td>
+                                        All elements must be unique. Optional{' '}
+                                        <code>keyFn</code> extracts comparison
+                                        key
+                                    </td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1071,12 +1194,12 @@ console.log(rangeSchema.introspect().extensions.range); // [0, 100]`)
                         All validator extensions accept an optional error
                         message as the last parameter — either a string or a
                         function (matching the same{' '}
-                        <code>ValidationErrorMessageProvider</code> pattern
-                        used by built-in constraints like{' '}
-                        <code>.minLength()</code>):
+                        <code>ValidationErrorMessageProvider</code> pattern used
+                        by built-in constraints like <code>.minLength()</code>):
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { string, number, array } from '@cleverbrush/schema';
 
@@ -1092,7 +1215,9 @@ const score = number().multipleOf(5, (val) => \`\${val} is not a multiple of 5\`
                         />
                     </pre>
 
-                    <h3>The <code>/core</code> Sub-path</h3>
+                    <h3>
+                        The <code>/core</code> Sub-path
+                    </h3>
                     <p>
                         If you need bare builders <strong>without</strong> the
                         built-in extensions (e.g. to apply only your own custom
@@ -1101,6 +1226,7 @@ const score = number().multipleOf(5, (val) => \`\${val} is not a multiple of 5\`
                     </p>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// Bare builders — no built-in extensions
 import { string, number, array, withExtensions } from '@cleverbrush/schema/core';
@@ -1258,9 +1384,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.matches(re)</code>,{' '}
                                         <code>.email()</code>,{' '}
                                         <code>.url()</code>,{' '}
-                                        <code>.uuid()</code>,{' '}
-                                        <code>.ip()</code>,{' '}
-                                        <code>.trim()</code>,{' '}
+                                        <code>.uuid()</code>, <code>.ip()</code>
+                                        , <code>.trim()</code>,{' '}
                                         <code>.toLowerCase()</code>,{' '}
                                         <code>.nonempty()</code>
                                     </td>
@@ -1372,7 +1497,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>
                                         Creates augmented builder factories with
                                         extension methods applied. Accepts one
-                                        or more <code>ExtensionDescriptor</code>s.
+                                        or more <code>ExtensionDescriptor</code>
+                                        s.
                                     </td>
                                 </tr>
                             </tbody>
@@ -1470,6 +1596,7 @@ const s = withExtensions(myCustomExtension);`)
                     <h2>Exports</h2>
                     <pre>
                         <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`// Builder functions
 export { any, array, boolean, date, func, number, object, string, union }

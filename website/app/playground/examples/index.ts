@@ -9,12 +9,41 @@ export interface Example {
 
 export const EXAMPLE_GROUPS = [
     { label: 'Getting Started', ids: ['quick-start', 'schema-types'] },
-    { label: 'Constraints', ids: ['string-constraints', 'number-constraints', 'optional-fields', 'custom-error-messages'] },
-    { label: 'Objects & Composition', ids: ['object-schemas', 'nested-objects', 'composing-schemas', 'immutability'] },
-    { label: 'Arrays & Unions', ids: ['arrays', 'union-types', 'discriminated-unions'] },
+    {
+        label: 'Constraints',
+        ids: [
+            'string-constraints',
+            'number-constraints',
+            'optional-fields',
+            'custom-error-messages'
+        ]
+    },
+    {
+        label: 'Objects & Composition',
+        ids: [
+            'object-schemas',
+            'nested-objects',
+            'composing-schemas',
+            'immutability'
+        ]
+    },
+    {
+        label: 'Arrays & Unions',
+        ids: ['arrays', 'union-types', 'discriminated-unions']
+    },
     { label: 'Validation', ids: ['validation-errors', 'custom-validators'] },
-    { label: 'Error Scenarios', ids: ['primitive-errors', 'object-errors', 'nested-object-errors', 'partial-errors', 'array-errors', 'deep-nesting-errors'] },
-    { label: 'Extensions', ids: ['builtin-extensions', 'custom-extensions'] },
+    {
+        label: 'Error Scenarios',
+        ids: [
+            'primitive-errors',
+            'object-errors',
+            'nested-object-errors',
+            'partial-errors',
+            'array-errors',
+            'deep-nesting-errors'
+        ]
+    },
+    { label: 'Extensions', ids: ['builtin-extensions', 'custom-extensions'] }
 ];
 
 export const examples: Example[] = [
@@ -22,7 +51,8 @@ export const examples: Example[] = [
     {
         id: 'quick-start',
         title: 'Quick Start',
-        description: 'Define a schema, infer its TypeScript type, and validate data — all from a single definition.',
+        description:
+            'Define a schema, infer its TypeScript type, and validate data — all from a single definition.',
         group: 'Getting Started',
         code: `import { object, string, number, boolean } from '@cleverbrush/schema';
 
@@ -46,12 +76,14 @@ const result = UserSchema.validate({
     isActive: true
 });
 `,
-        testData: '{ "name": "Alice", "email": "alice@example.com", "age": 30, "isActive": true }'
+        testData:
+            '{ "name": "Alice", "email": "alice@example.com", "age": 30, "isActive": true }'
     },
     {
         id: 'schema-types',
         title: 'Schema Types',
-        description: 'All available schema builder functions: <code>string()</code>, <code>number()</code>, <code>boolean()</code>, <code>object()</code>, <code>array()</code>, <code>union()</code>, and more.',
+        description:
+            'All available schema builder functions: <code>string()</code>, <code>number()</code>, <code>boolean()</code>, <code>object()</code>, <code>array()</code>, <code>union()</code>, and more.',
         group: 'Getting Started',
         code: `import { string, number, boolean, object, array, union } from '@cleverbrush/schema';
 
@@ -93,7 +125,8 @@ const result = UserSchema.validate({
     {
         id: 'string-constraints',
         title: 'String Constraints',
-        description: 'Use <code>.minLength()</code>, <code>.maxLength()</code>, <code>.matches()</code>, <code>.email()</code>, <code>.url()</code>, and more.',
+        description:
+            'Use <code>.minLength()</code>, <code>.maxLength()</code>, <code>.matches()</code>, <code>.email()</code>, <code>.url()</code>, and more.',
         group: 'Constraints',
         code: `import { string } from '@cleverbrush/schema';
 
@@ -116,7 +149,8 @@ const result = username.validate("ab");
     {
         id: 'number-constraints',
         title: 'Number Constraints',
-        description: 'Use <code>.min()</code>, <code>.max()</code>, <code>.isInteger()</code>, <code>.positive()</code>, <code>.negative()</code>, and <code>.multipleOf()</code>.',
+        description:
+            'Use <code>.min()</code>, <code>.max()</code>, <code>.isInteger()</code>, <code>.positive()</code>, <code>.negative()</code>, and <code>.multipleOf()</code>.',
         group: 'Constraints',
         code: `import { number } from '@cleverbrush/schema';
 
@@ -137,7 +171,8 @@ const result = age.validate(25);
     {
         id: 'optional-fields',
         title: 'Optional Fields',
-        description: 'All schemas are required by default. Use <code>.optional()</code> to allow <code>undefined</code>.',
+        description:
+            'All schemas are required by default. Use <code>.optional()</code> to allow <code>undefined</code>.',
         group: 'Constraints',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -160,7 +195,8 @@ const result = UserSchema.validate({
     {
         id: 'custom-error-messages',
         title: 'Custom Error Messages',
-        description: 'Every constraint accepts an optional custom error message as a second argument.',
+        description:
+            'Every constraint accepts an optional custom error message as a second argument.',
         group: 'Constraints',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -193,7 +229,8 @@ const result = UserSchema.validate(
     {
         id: 'object-schemas',
         title: 'Object Schemas',
-        description: 'Compose schemas into an <code>object()</code> to validate structured data with automatic TypeScript type inference.',
+        description:
+            'Compose schemas into an <code>object()</code> to validate structured data with automatic TypeScript type inference.',
         group: 'Objects & Composition',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -218,7 +255,8 @@ const result = UserSchema.validate({
     {
         id: 'nested-objects',
         title: 'Nested Objects',
-        description: 'Nest objects inside objects to model real-world data. Error paths use dot notation like <code>$.address.city</code>.',
+        description:
+            'Nest objects inside objects to model real-world data. Error paths use dot notation like <code>$.address.city</code>.',
         group: 'Objects & Composition',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -243,12 +281,14 @@ const result = UserSchema.validate({
     address: { city: "NYC", street: "5th Ave", zip: "10001" }
 });
 `,
-        testData: '{ "name": "Alice", "address": { "city": "NYC", "street": "5th Ave", "zip": "10001" } }'
+        testData:
+            '{ "name": "Alice", "address": { "city": "NYC", "street": "5th Ave", "zip": "10001" } }'
     },
     {
         id: 'composing-schemas',
         title: 'Composing Schemas',
-        description: 'Extend existing schemas with <code>.addProps()</code>, nest them in arrays, and combine with unions.',
+        description:
+            'Extend existing schemas with <code>.addProps()</code>, nest them in arrays, and combine with unions.',
         group: 'Objects & Composition',
         code: `import { object, string, number, array, union } from '@cleverbrush/schema';
 
@@ -282,12 +322,14 @@ const result = TeamSchema.validate({
     ]
 });
 `,
-        testData: '{ "name": "Engineering", "members": [{ "id": "1", "createdAt": "2024-01-01", "name": "Alice", "email": "alice@test.com" }] }'
+        testData:
+            '{ "name": "Engineering", "members": [{ "id": "1", "createdAt": "2024-01-01", "name": "Alice", "email": "alice@test.com" }] }'
     },
     {
         id: 'immutability',
         title: 'Immutability',
-        description: 'Every method returns a new schema instance. The original is never modified — safe to compose and reuse.',
+        description:
+            'Every method returns a new schema instance. The original is never modified — safe to compose and reuse.',
         group: 'Objects & Composition',
         code: `import { string, object } from '@cleverbrush/schema';
 
@@ -312,7 +354,8 @@ const result = CreateUser.validate({ name: "Alice", email: "alice@test.com" });
     {
         id: 'arrays',
         title: 'Arrays',
-        description: 'Validate arrays with element schemas using <code>array()</code>. Supports <code>.minLength()</code>, <code>.maxLength()</code>, <code>.nonempty()</code>, and <code>.unique()</code>.',
+        description:
+            'Validate arrays with element schemas using <code>array()</code>. Supports <code>.minLength()</code>, <code>.maxLength()</code>, <code>.nonempty()</code>, and <code>.unique()</code>.',
         group: 'Arrays & Unions',
         code: `import { array, string, number, object } from '@cleverbrush/schema';
 
@@ -326,7 +369,8 @@ const result = tags.validate(["typescript", "schema", "validation"]);
     {
         id: 'union-types',
         title: 'Union Types',
-        description: 'Use <code>union()</code> to accept multiple types. <code>InferType</code> correctly infers the union at the type level.',
+        description:
+            'Use <code>union()</code> to accept multiple types. <code>InferType</code> correctly infers the union at the type level.',
         group: 'Arrays & Unions',
         code: `import { union, string, number } from '@cleverbrush/schema';
 
@@ -342,7 +386,8 @@ const result = flexible.validate(42);    // also valid
     {
         id: 'discriminated-unions',
         title: 'Discriminated Unions',
-        description: 'Use <code>string(\'literal\')</code> for the discriminator field. No special API needed — TypeScript narrows the type automatically.',
+        description:
+            "Use <code>string('literal')</code> for the discriminator field. No special API needed — TypeScript narrows the type automatically.",
         group: 'Arrays & Unions',
         code: `import { object, string, number, union } from '@cleverbrush/schema';
 
@@ -384,7 +429,8 @@ const result = ShapeSchema.validate({ type: 'circle', radius: 5 });
     {
         id: 'validation-errors',
         title: 'Validation Errors',
-        description: 'Explore the error structure: each error has a <code>path</code> and <code>message</code>. Use <code>doNotStopOnFirstError</code> to collect all errors.',
+        description:
+            'Explore the error structure: each error has a <code>path</code> and <code>message</code>. Use <code>doNotStopOnFirstError</code> to collect all errors.',
         group: 'Validation',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -412,7 +458,8 @@ const result = UserSchema.validate(
     {
         id: 'custom-validators',
         title: 'Custom Validators',
-        description: 'Add custom validation logic with <code>.addValidator()</code>. Validators return <code>{ valid, errors }</code>.',
+        description:
+            'Add custom validation logic with <code>.addValidator()</code>. Validators return <code>{ valid, errors }</code>.',
         group: 'Validation',
         code: `import { object, string } from '@cleverbrush/schema';
 
@@ -443,7 +490,8 @@ const result = SignupSchema.validate({
     {
         id: 'primitive-errors',
         title: 'Primitive Errors',
-        description: 'Errors from standalone string, number, and boolean schemas — shown as a flat list.',
+        description:
+            'Errors from standalone string, number, and boolean schemas — shown as a flat list.',
         group: 'Error Scenarios',
         code: `import { string, number, boolean } from '@cleverbrush/schema';
 
@@ -467,7 +515,8 @@ const result = emailResult;
     {
         id: 'object-errors',
         title: 'Object Errors',
-        description: 'Per-property errors on a flat object schema, displayed as a tree using <code>getErrorsFor()</code>.',
+        description:
+            'Per-property errors on a flat object schema, displayed as a tree using <code>getErrorsFor()</code>.',
         group: 'Error Scenarios',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -492,12 +541,14 @@ const result = ProfileSchema.validate(
     { doNotStopOnFirstError: true }
 );
 `,
-        testData: '{ "name": "A", "email": "not-an-email", "website": "just some text", "experience": -3 }'
+        testData:
+            '{ "name": "A", "email": "not-an-email", "website": "just some text", "experience": -3 }'
     },
     {
         id: 'nested-object-errors',
         title: 'Nested Object Errors',
-        description: 'Errors on a schema with nested objects — the error tree displays property-level errors at each nesting depth.',
+        description:
+            'Errors on a schema with nested objects — the error tree displays property-level errors at each nesting depth.',
         group: 'Error Scenarios',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -533,12 +584,14 @@ const result = OrderSchema.validate(
     { doNotStopOnFirstError: true }
 );
 `,
-        testData: '{ "orderId": "", "shippingAddress": { "street": "", "city": "A", "zip": "1", "country": "United States" }, "totalCents": 0 }'
+        testData:
+            '{ "orderId": "", "shippingAddress": { "street": "", "city": "A", "zip": "1", "country": "United States" }, "totalCents": 0 }'
     },
     {
         id: 'partial-errors',
         title: 'Partially Valid Object',
-        description: 'Some fields pass and some fail — the error tree only shows properties with problems.',
+        description:
+            'Some fields pass and some fail — the error tree only shows properties with problems.',
         group: 'Error Scenarios',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -566,12 +619,14 @@ const result = ProductSchema.validate(
     { doNotStopOnFirstError: true }
 );
 `,
-        testData: '{ "name": "Widget", "sku": "AB", "price": -10, "stock": 42, "description": "A fine widget" }'
+        testData:
+            '{ "name": "Widget", "sku": "AB", "price": -10, "stock": 42, "description": "A fine widget" }'
     },
     {
         id: 'array-errors',
         title: 'Array & Element Errors',
-        description: 'Validation on array schemas — element-level constraints and min/max length checks.',
+        description:
+            'Validation on array schemas — element-level constraints and min/max length checks.',
         group: 'Error Scenarios',
         code: `import { object, string, number, array } from '@cleverbrush/schema';
 
@@ -599,12 +654,14 @@ const result = TeamSchema.validate(
     { doNotStopOnFirstError: true }
 );
 `,
-        testData: '{ "name": "Alpha Squad", "members": [{ "name": "A", "role": "" }] }'
+        testData:
+            '{ "name": "Alpha Squad", "members": [{ "name": "A", "role": "" }] }'
     },
     {
         id: 'deep-nesting-errors',
         title: 'Deep Nesting Errors',
-        description: 'Three levels of nested objects — errors propagate through the full tree.',
+        description:
+            'Three levels of nested objects — errors propagate through the full tree.',
         group: 'Error Scenarios',
         code: `import { object, string, number } from '@cleverbrush/schema';
 
@@ -648,14 +705,16 @@ const result = CompanySchema.validate(
     { doNotStopOnFirstError: true }
 );
 `,
-        testData: '{ "name": "", "headquarters": { "address": { "street": "", "city": "", "zip": "12" }, "employeeCount": 0 }, "foundedYear": 1750 }'
+        testData:
+            '{ "name": "", "headquarters": { "address": { "street": "", "city": "", "zip": "12" }, "employeeCount": 0 }, "foundedYear": 1750 }'
     },
 
     // ── Extensions ──────────────────────────────────
     {
         id: 'builtin-extensions',
         title: 'Common Validators',
-        description: 'The default import includes ready-to-use validators: <code>.email()</code>, <code>.url()</code>, <code>.uuid()</code>, <code>.positive()</code>, <code>.nonempty()</code>, and more.',
+        description:
+            'The default import includes ready-to-use validators: <code>.email()</code>, <code>.url()</code>, <code>.uuid()</code>, <code>.positive()</code>, <code>.nonempty()</code>, and more.',
         group: 'Extensions',
         code: `import { string, number, array } from '@cleverbrush/schema';
 
@@ -681,7 +740,8 @@ const result = price.validate(-5);
     {
         id: 'custom-extensions',
         title: 'Custom Extensions',
-        description: 'Define reusable extensions with <code>defineExtension()</code> and apply them with <code>withExtensions()</code>.',
+        description:
+            'Define reusable extensions with <code>defineExtension()</code> and apply them with <code>withExtensions()</code>.',
         group: 'Extensions',
         code: `import { defineExtension, withExtensions } from '@cleverbrush/schema';
 
@@ -718,7 +778,8 @@ const result = ThemeSchema.validate({
     name: "Ocean"
 });
 `,
-        testData: '{ "primaryColor": "#ff00aa", "secondaryColor": "#00ff00", "name": "Ocean" }'
+        testData:
+            '{ "primaryColor": "#ff00aa", "secondaryColor": "#00ff00", "name": "Ocean" }'
     }
 ];
 

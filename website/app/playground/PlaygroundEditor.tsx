@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
+import { useCallback, useRef } from 'react';
 import { schemaDeclarations } from './schemaDeclarations';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
@@ -139,7 +139,10 @@ function configureMonaco(monaco: MonacoInstance) {
 
     // Register real .d.ts files from @cleverbrush/schema dist
     for (const [filePath, content] of Object.entries(schemaDeclarations)) {
-        monaco.languages.typescript.typescriptDefaults.addExtraLib(content, filePath);
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(
+            content,
+            filePath
+        );
     }
 
     // Relax diagnostics — playground code doesn't need perfect types
@@ -149,7 +152,7 @@ function configureMonaco(monaco: MonacoInstance) {
         diagnosticCodesToIgnore: [
             2307, // Cannot find module
             1259, // Module can only be default-imported
-            1192, // Module has no default export
+            1192 // Module has no default export
         ]
     });
 }

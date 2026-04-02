@@ -14,7 +14,12 @@ export interface TypeInfo {
  * by resolving InferType<typeof schema> via a temporary hidden model.
  */
 export function useTypeInference() {
-    const [typeInfo, setTypeInfo] = useState<TypeInfo>({ typeString: '', available: false, resultObjectType: '', inferring: false });
+    const [typeInfo, setTypeInfo] = useState<TypeInfo>({
+        typeString: '',
+        available: false,
+        resultObjectType: '',
+        inferring: false
+    });
     const editorRef = useRef<unknown>(null);
     const monacoRef = useRef<unknown>(null);
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -47,7 +52,13 @@ export function useTypeInference() {
             setTypeInfo({ ...fast, inferring: true });
 
             // Phase 2: Enrich with JSDoc (slow, cooperative yielding)
-            const enriched = await doEnrichDocs(code, editorRef, monacoRef, fast, isCurrent);
+            const enriched = await doEnrichDocs(
+                code,
+                editorRef,
+                monacoRef,
+                fast,
+                isCurrent
+            );
             if (!isCurrent()) return;
             setTypeInfo({ ...enriched, inferring: false });
         }, 500);
@@ -84,10 +95,17 @@ async function doExtractFast(
 
     try {
         const model = editor.getModel();
-        if (!model) return { typeString: '', available: false, resultObjectType: '' };
+        if (!model)
+            return { typeString: '', available: false, resultObjectType: '' };
 
-        const schemaVarMatch = [...code.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(?:string|number|boolean|date|func|any|object|array|union)/g)];
-        const resultVarMatch = [...code.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(\w+)\.validate/g)];
+        const schemaVarMatch = [
+            ...code.matchAll(
+                /(?:const|let)\s+(\w+)\s*=\s*(?:string|number|boolean|date|func|any|object|array|union)/g
+            )
+        ];
+        const resultVarMatch = [
+            ...code.matchAll(/(?:const|let)\s+(\w+)\s*=\s*(\w+)\.validate/g)
+        ];
 
         let typeStr = '';
         let resultObjectType = '';
@@ -100,7 +118,11 @@ async function doExtractFast(
             resultVarName = lastMatch[1];
             const calledOnSchema = lastMatch[2];
 
-            const resolved = await resolveResultObjectType(monaco, code, resultVarName);
+            const resolved = await resolveResultObjectType(
+                monaco,
+                code,
+                resultVarName
+            );
             if (resolved) resultObjectType = resolved;
 
             // Use the schema that .validate() was called on
@@ -113,7 +135,11 @@ async function doExtractFast(
         }
 
         if (schemaVarName) {
-            const resolved = await resolveInferType(monaco, code, schemaVarName);
+            const resolved = await resolveInferType(
+                monaco,
+                code,
+                schemaVarName
+            );
             if (resolved) {
                 resolvedType = resolved;
                 typeStr = `// InferType<typeof ${schemaVarName}>\ntype ${schemaVarName}Type = ${resolved};`;
@@ -130,7 +156,11 @@ async function doExtractFast(
             resultVarName
         };
     } catch {
-        return { typeString: 'Type inference unavailable.', available: false, resultObjectType: '' };
+        return {
+            typeString: 'Type inference unavailable.',
+            available: false,
+            resultObjectType: ''
+        };
     }
 }
 
@@ -140,7 +170,7 @@ async function doExtractFast(
  */
 async function doEnrichDocs(
     code: string,
-    editorRef: React.RefObject<unknown>,
+    _editorRef: React.RefObject<unknown>,
     monacoRef: React.RefObject<unknown>,
     fast: FastResult,
     isCurrent: () => boolean
@@ -159,12 +189,21 @@ async function doEnrichDocs(
         if (isUnion) {
             // Union types: completions on the union only return common properties.
             // Resolve docs from each component schema separately and merge.
-            const componentSchemas = extractUnionComponents(code, fast.schemaVarName);
+            const componentSchemas = extractUnionComponents(
+                code,
+                fast.schemaVarName
+            );
             docs = new Map();
             for (const comp of componentSchemas) {
                 if (isCurrent && !isCurrent()) return fast;
                 const compExpr = `${comp}.validate({} as any).object!`;
-                const compDocs = await resolvePropertyDocsRecursive(monaco, code, 0, isCurrent, compExpr);
+                const compDocs = await resolvePropertyDocsRecursive(
+                    monaco,
+                    code,
+                    0,
+                    isCurrent,
+                    compExpr
+                );
                 // Merge into combined tree
                 for (const [key, node] of compDocs) {
                     if (!docs.has(key)) docs.set(key, node);
@@ -172,7 +211,13 @@ async function doEnrichDocs(
             }
             // Also merge any docs from the result expression path (common properties)
             if (fast.resultVarName) {
-                const commonDocs = await resolvePropertyDocsRecursive(monaco, code, 0, isCurrent, `${fast.resultVarName}.object!`);
+                const commonDocs = await resolvePropertyDocsRecursive(
+                    monaco,
+                    code,
+                    0,
+                    isCurrent,
+                    `${fast.resultVarName}.object!`
+                );
                 for (const [key, node] of commonDocs) {
                     if (!docs.has(key)) docs.set(key, node);
                 }
@@ -190,7 +235,14 @@ async function doEnrichDocs(
                 const base = `import('@cleverbrush/schema').InferType<typeof ${fast.schemaVarName}>`;
                 docTypeExpr = isArray ? `(${base})[number]` : base;
             }
-            docs = await resolvePropertyDocsRecursive(monaco, code, 0, isCurrent, exprPath, docTypeExpr);
+            docs = await resolvePropertyDocsRecursive(
+                monaco,
+                code,
+                0,
+                isCurrent,
+                exprPath,
+                docTypeExpr
+            );
         }
 
         if (!isCurrent()) return fast;
@@ -215,28 +267,54 @@ async function doEnrichDocs(
 }
 
 type TsWorkerClient = {
-    getQuickInfoAtPosition(uri: string, offset: number): Promise<{
-        displayParts?: { text: string }[];
-    } | undefined>;
-    getCompletionsAtPosition(uri: string, offset: number, options: unknown): Promise<{
-        entries?: { name: string }[];
-    } | undefined>;
-    getCompletionEntryDetails(uri: string, offset: number, name: string): Promise<{
-        documentation?: { text: string }[];
-    } | undefined>;
+    getQuickInfoAtPosition(
+        uri: string,
+        offset: number
+    ): Promise<
+        | {
+              displayParts?: { text: string }[];
+          }
+        | undefined
+    >;
+    getCompletionsAtPosition(
+        uri: string,
+        offset: number,
+        options: unknown
+    ): Promise<
+        | {
+              entries?: { name: string }[];
+          }
+        | undefined
+    >;
+    getCompletionEntryDetails(
+        uri: string,
+        offset: number,
+        name: string
+    ): Promise<
+        | {
+              documentation?: { text: string }[];
+          }
+        | undefined
+    >;
 };
 
 type MonacoForInference = {
     Uri: { parse(uri: string): unknown };
     editor: {
-        createModel(value: string, language: string, uri: unknown): {
+        createModel(
+            value: string,
+            language: string,
+            uri: unknown
+        ): {
             uri: { toString(): string };
             dispose(): void;
         };
     };
     languages: {
         typescript: {
-            getTypeScriptWorker(): Promise<(uri: unknown) => Promise<TsWorkerClient>>;
+            getTypeScriptWorker(): Promise<
+                (uri: unknown) => Promise<TsWorkerClient>
+            >;
         };
     };
 };
@@ -267,8 +345,14 @@ async function resolveInferType(
 ): Promise<string> {
     const suffix = `${RESOLVE_HELPER}type ${INFER_MARKER} = __Resolve<import('@cleverbrush/schema').InferType<typeof ${varName}>>;`;
     const helperCode = code + suffix;
-    const uri = monaco.Uri.parse(`file:///playground-infer-${++helperCounter}.ts`);
-    const helperModel = monaco.editor.createModel(helperCode, 'typescript', uri);
+    const uri = monaco.Uri.parse(
+        `file:///playground-infer-${++helperCounter}.ts`
+    );
+    const helperModel = monaco.editor.createModel(
+        helperCode,
+        'typescript',
+        uri
+    );
 
     try {
         const worker = await monaco.languages.typescript.getTypeScriptWorker();
@@ -277,10 +361,15 @@ async function resolveInferType(
         const markerOffset = helperCode.indexOf(INFER_MARKER);
         if (markerOffset === -1) return '';
 
-        const info = await client.getQuickInfoAtPosition(helperModel.uri.toString(), markerOffset);
+        const info = await client.getQuickInfoAtPosition(
+            helperModel.uri.toString(),
+            markerOffset
+        );
         if (!info?.displayParts) return '';
 
-        const raw = info.displayParts.map((p: { text: string }) => p.text).join('');
+        const raw = info.displayParts
+            .map((p: { text: string }) => p.text)
+            .join('');
         return cleanResolvedType(raw, INFER_MARKER);
     } finally {
         helperModel.dispose();
@@ -298,8 +387,14 @@ async function resolveResultObjectType(
 ): Promise<string> {
     const suffix = `${RESOLVE_HELPER}type ${RESULT_OBJ_MARKER} = __Resolve<NonNullable<(typeof ${varName})["object"]>>;`;
     const helperCode = code + suffix;
-    const uri = monaco.Uri.parse(`file:///playground-result-${++helperCounter}.ts`);
-    const helperModel = monaco.editor.createModel(helperCode, 'typescript', uri);
+    const uri = monaco.Uri.parse(
+        `file:///playground-result-${++helperCounter}.ts`
+    );
+    const helperModel = monaco.editor.createModel(
+        helperCode,
+        'typescript',
+        uri
+    );
 
     try {
         const worker = await monaco.languages.typescript.getTypeScriptWorker();
@@ -308,10 +403,15 @@ async function resolveResultObjectType(
         const markerOffset = helperCode.indexOf(RESULT_OBJ_MARKER);
         if (markerOffset === -1) return '';
 
-        const info = await client.getQuickInfoAtPosition(helperModel.uri.toString(), markerOffset);
+        const info = await client.getQuickInfoAtPosition(
+            helperModel.uri.toString(),
+            markerOffset
+        );
         if (!info?.displayParts) return '';
 
-        const raw = info.displayParts.map((p: { text: string }) => p.text).join('');
+        const raw = info.displayParts
+            .map((p: { text: string }) => p.text)
+            .join('');
         return cleanResolvedType(raw, RESULT_OBJ_MARKER);
     } finally {
         helperModel.dispose();
@@ -354,15 +454,25 @@ async function resolvePropertyDocsRecursive(
         dotOffset = helperCode.length;
     }
 
-    const uri = monaco.Uri.parse(`file:///playground-docs-${++helperCounter}.ts`);
-    const helperModel = monaco.editor.createModel(helperCode, 'typescript', uri);
+    const uri = monaco.Uri.parse(
+        `file:///playground-docs-${++helperCounter}.ts`
+    );
+    const helperModel = monaco.editor.createModel(
+        helperCode,
+        'typescript',
+        uri
+    );
 
     try {
         const worker = await monaco.languages.typescript.getTypeScriptWorker();
         const client = await worker(helperModel.uri);
         const uriStr = helperModel.uri.toString();
 
-        const completions = await client.getCompletionsAtPosition(uriStr, dotOffset, {});
+        const completions = await client.getCompletionsAtPosition(
+            uriStr,
+            dotOffset,
+            {}
+        );
         if (!completions?.entries) return tree;
 
         for (const entry of completions.entries) {
@@ -372,9 +482,16 @@ async function resolvePropertyDocsRecursive(
             const node: DocNode = {};
 
             // Get JSDoc for this property
-            const details = await client.getCompletionEntryDetails(uriStr, dotOffset, entry.name);
+            const details = await client.getCompletionEntryDetails(
+                uriStr,
+                dotOffset,
+                entry.name
+            );
             if (details?.documentation && details.documentation.length > 0) {
-                const docText = details.documentation.map(d => d.text).join('').trim();
+                const docText = details.documentation
+                    .map(d => d.text)
+                    .join('')
+                    .trim();
                 if (docText) node.doc = docText;
             }
 
@@ -384,28 +501,54 @@ async function resolvePropertyDocsRecursive(
                 ? `\nconst ${propCheckVar} = ${exprPath}.${entry.name};`
                 : `\ndeclare const ${propCheckVar}: (${typeExpr})["${entry.name}"];`;
             const propCheckCode = code + propCheckSuffix;
-            const propCheckUri = monaco.Uri.parse(`file:///playground-pc-${++helperCounter}.ts`);
-            const propCheckModel = monaco.editor.createModel(propCheckCode, 'typescript', propCheckUri);
+            const propCheckUri = monaco.Uri.parse(
+                `file:///playground-pc-${++helperCounter}.ts`
+            );
+            const propCheckModel = monaco.editor.createModel(
+                propCheckCode,
+                'typescript',
+                propCheckUri
+            );
 
             try {
-                const pcClient = await (await monaco.languages.typescript.getTypeScriptWorker())(propCheckModel.uri);
+                const pcClient = await (
+                    await monaco.languages.typescript.getTypeScriptWorker()
+                )(propCheckModel.uri);
                 const pcOffset = propCheckCode.indexOf(propCheckVar);
-                const propInfo = await pcClient.getQuickInfoAtPosition(propCheckModel.uri.toString(), pcOffset);
+                const propInfo = await pcClient.getQuickInfoAtPosition(
+                    propCheckModel.uri.toString(),
+                    pcOffset
+                );
                 if (propInfo?.displayParts) {
-                    const propTypeStr = propInfo.displayParts.map(p => p.text).join('');
+                    const propTypeStr = propInfo.displayParts
+                        .map(p => p.text)
+                        .join('');
                     node._debugTypeStr = propTypeStr;
                     // Detect object-like types: contains `{` but is not a function type
-                    const hasObjectShape = propTypeStr.includes('{') && !propTypeStr.includes('=>');
+                    const hasObjectShape =
+                        propTypeStr.includes('{') &&
+                        !propTypeStr.includes('=>');
                     if (hasObjectShape) {
                         // Detect array: type string contains `[]`
                         const isArrayOfObj = propTypeStr.includes('[]');
                         const childExprPath = exprPath
-                            ? (isArrayOfObj ? `${exprPath}.${entry.name}[0]` : `${exprPath}.${entry.name}`)
+                            ? isArrayOfObj
+                                ? `${exprPath}.${entry.name}[0]`
+                                : `${exprPath}.${entry.name}`
                             : undefined;
                         const childTypeExpr = !exprPath
-                            ? (isArrayOfObj ? `(${typeExpr})["${entry.name}"][number]` : `(${typeExpr})["${entry.name}"]`)
+                            ? isArrayOfObj
+                                ? `(${typeExpr})["${entry.name}"][number]`
+                                : `(${typeExpr})["${entry.name}"]`
                             : undefined;
-                        const children = await resolvePropertyDocsRecursive(monaco, code, depth + 1, isCurrent, childExprPath, childTypeExpr);
+                        const children = await resolvePropertyDocsRecursive(
+                            monaco,
+                            code,
+                            depth + 1,
+                            isCurrent,
+                            childExprPath,
+                            childTypeExpr
+                        );
                         if (children.size > 0) node.children = children;
                     }
                 } else {
@@ -434,7 +577,11 @@ async function resolvePropertyDocsRecursive(
 /**
  * Inserts JSDoc comments into a resolved type string, recursively for nested objects.
  */
-function enrichTypeWithDocs(typeStr: string, docs: DocTree, indent: string): string {
+function enrichTypeWithDocs(
+    typeStr: string,
+    docs: DocTree,
+    indent: string
+): string {
     if (docs.size === 0) return typeStr;
 
     const trimmed = typeStr.trim();
@@ -442,7 +589,9 @@ function enrichTypeWithDocs(typeStr: string, docs: DocTree, indent: string): str
     // Handle union types: split into variants, enrich each separately
     const variants = splitUnionVariants(trimmed);
     if (variants) {
-        return variants.map(v => enrichTypeWithDocs(v, docs, indent)).join(' | ');
+        return variants
+            .map(v => enrichTypeWithDocs(v, docs, indent))
+            .join(' | ');
     }
 
     if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) return typeStr;
@@ -467,11 +616,22 @@ function enrichTypeWithDocs(typeStr: string, docs: DocTree, indent: string): str
             if (nestedObj) {
                 // Check if the nested object is followed by [] (array-of-object)
                 const afterObj = prop.slice(nestedObj.end).trim();
-                const enrichedNested = enrichTypeWithDocs(nestedObj.content, node.children, innerIndent);
+                const enrichedNested = enrichTypeWithDocs(
+                    nestedObj.content,
+                    node.children,
+                    innerIndent
+                );
                 if (afterObj.startsWith('[]')) {
-                    enrichedProp = prop.slice(0, nestedObj.start) + enrichedNested + '[]' + prop.slice(nestedObj.end + afterObj.indexOf('[]') + 2);
+                    enrichedProp =
+                        prop.slice(0, nestedObj.start) +
+                        enrichedNested +
+                        '[]' +
+                        prop.slice(nestedObj.end + afterObj.indexOf('[]') + 2);
                 } else {
-                    enrichedProp = prop.slice(0, nestedObj.start) + enrichedNested + prop.slice(nestedObj.end);
+                    enrichedProp =
+                        prop.slice(0, nestedObj.start) +
+                        enrichedNested +
+                        prop.slice(nestedObj.end);
                 }
             }
         }
@@ -488,7 +648,9 @@ function enrichTypeWithDocs(typeStr: string, docs: DocTree, indent: string): str
 /**
  * Find the top-level `{ ... }` object literal in a property value.
  */
-function findNestedObject(prop: string): { start: number; end: number; content: string } | null {
+function findNestedObject(
+    prop: string
+): { start: number; end: number; content: string } | null {
     const colonIdx = prop.indexOf(':');
     if (colonIdx === -1) return null;
 
@@ -544,8 +706,10 @@ function hasTopLevelUnion(typeStr: string): boolean {
     const trimmed = typeStr.trim();
     let depth = 0;
     for (let i = 0; i < trimmed.length; i++) {
-        if (trimmed[i] === '{' || trimmed[i] === '(' || trimmed[i] === '[') depth++;
-        else if (trimmed[i] === '}' || trimmed[i] === ')' || trimmed[i] === ']') depth--;
+        if (trimmed[i] === '{' || trimmed[i] === '(' || trimmed[i] === '[')
+            depth++;
+        else if (trimmed[i] === '}' || trimmed[i] === ')' || trimmed[i] === ']')
+            depth--;
         else if (trimmed[i] === '|' && depth === 0) return true;
     }
     return false;
@@ -563,8 +727,10 @@ function splitUnionVariants(typeStr: string): string[] | null {
     let depth = 0;
     let start = 0;
     for (let i = 0; i < trimmed.length; i++) {
-        if (trimmed[i] === '{' || trimmed[i] === '(' || trimmed[i] === '[') depth++;
-        else if (trimmed[i] === '}' || trimmed[i] === ')' || trimmed[i] === ']') depth--;
+        if (trimmed[i] === '{' || trimmed[i] === '(' || trimmed[i] === '[')
+            depth++;
+        else if (trimmed[i] === '}' || trimmed[i] === ')' || trimmed[i] === ']')
+            depth--;
         else if (trimmed[i] === '|' && depth === 0) {
             const variant = trimmed.slice(start, i).trim();
             if (variant) variants.push(variant);
@@ -580,7 +746,10 @@ function splitUnionVariants(typeStr: string): string[] | null {
  * Extract component schema names from a union chain like `union(A).or(B).or(C)`.
  */
 function extractUnionComponents(code: string, schemaVarName: string): string[] {
-    const re = new RegExp(`(?:const|let)\\s+${schemaVarName}\\s*=\\s*(.+?)(?:;|$)`, 'm');
+    const re = new RegExp(
+        `(?:const|let)\\s+${schemaVarName}\\s*=\\s*(.+?)(?:;|$)`,
+        'm'
+    );
     const match = code.match(re);
     if (!match) return [];
 
