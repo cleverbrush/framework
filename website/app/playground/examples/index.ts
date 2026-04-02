@@ -13,6 +13,7 @@ export const EXAMPLE_GROUPS = [
     { label: 'Objects & Composition', ids: ['object-schemas', 'nested-objects', 'composing-schemas', 'immutability'] },
     { label: 'Arrays & Unions', ids: ['arrays', 'union-types', 'discriminated-unions'] },
     { label: 'Validation', ids: ['validation-errors', 'custom-validators'] },
+    { label: 'Error Scenarios', ids: ['primitive-errors', 'object-errors', 'nested-object-errors', 'partial-errors', 'array-errors', 'deep-nesting-errors'] },
     { label: 'Extensions', ids: ['builtin-extensions', 'custom-extensions'] },
 ];
 
@@ -436,6 +437,218 @@ const result = SignupSchema.validate({
 });
 `,
         testData: '{ "password": "secret123", "confirmPassword": "secret456" }'
+    },
+
+    // ── Error Scenarios ─────────────────────────────
+    {
+        id: 'primitive-errors',
+        title: 'Primitive Errors',
+        description: 'Errors from standalone string, number, and boolean schemas — shown as a flat list.',
+        group: 'Error Scenarios',
+        code: `import { string, number, boolean } from '@cleverbrush/schema';
+
+// String: expected an email
+const emailResult = string().email('Not a valid email').validate('not-an-email');
+
+// Number: out of range
+const ageResult = number()
+    .min(0, 'Must be non-negative')
+    .max(150, 'Must be realistic')
+    .validate(-5);
+
+// Boolean: wrong type entirely
+const flagResult = boolean().validate('yes' as any);
+
+// Pick one to see in the panel:
+const result = emailResult;
+`,
+        testData: '"not-an-email"'
+    },
+    {
+        id: 'object-errors',
+        title: 'Object Errors',
+        description: 'Per-property errors on a flat object schema, displayed as a tree using <code>getErrorsFor()</code>.',
+        group: 'Error Scenarios',
+        code: `import { object, string, number } from '@cleverbrush/schema';
+
+const ProfileSchema = object({
+    /** Display name (2–50 chars) */
+    name: string().required('Name is required').minLength(2, 'Too short').maxLength(50, 'Too long'),
+    /** Valid email address */
+    email: string().required('Email is required').email('Invalid email'),
+    /** Portfolio or blog URL */
+    website: string().url('Must be a valid URL'),
+    /** Years of experience */
+    experience: number().min(0, 'Cannot be negative').max(60, 'Seems too high')
+});
+
+const result = ProfileSchema.validate(
+    {
+        name: 'A',                   // too short
+        email: 'not-an-email',       // invalid format
+        website: 'just some text',   // not a URL
+        experience: -3               // negative
+    },
+    { doNotStopOnFirstError: true }
+);
+`,
+        testData: '{ "name": "A", "email": "not-an-email", "website": "just some text", "experience": -3 }'
+    },
+    {
+        id: 'nested-object-errors',
+        title: 'Nested Object Errors',
+        description: 'Errors on a schema with nested objects — the error tree displays property-level errors at each nesting depth.',
+        group: 'Error Scenarios',
+        code: `import { object, string, number } from '@cleverbrush/schema';
+
+const OrderSchema = object({
+    /** Order reference */
+    orderId: string().required('Order ID is required'),
+    /** Shipping destination */
+    shippingAddress: object({
+        /** Street line */
+        street: string().required('Street is required'),
+        /** City name */
+        city: string().required('City is required').minLength(2),
+        /** Postal / ZIP code */
+        zip: string().required('ZIP code is required').minLength(4, 'ZIP too short'),
+        /** ISO country code */
+        country: string().required('Country is required').minLength(2).maxLength(2, 'Use 2-letter code')
+    }),
+    /** Total amount in cents */
+    totalCents: number().required().min(1, 'Total must be positive')
+});
+
+const result = OrderSchema.validate(
+    {
+        orderId: '',                    // empty
+        shippingAddress: {
+            street: '',                  // empty
+            city: 'A',                   // too short
+            zip: '1',                    // too short
+            country: 'United States'     // too long
+        },
+        totalCents: 0                   // not positive
+    },
+    { doNotStopOnFirstError: true }
+);
+`,
+        testData: '{ "orderId": "", "shippingAddress": { "street": "", "city": "A", "zip": "1", "country": "United States" }, "totalCents": 0 }'
+    },
+    {
+        id: 'partial-errors',
+        title: 'Partially Valid Object',
+        description: 'Some fields pass and some fail — the error tree only shows properties with problems.',
+        group: 'Error Scenarios',
+        code: `import { object, string, number } from '@cleverbrush/schema';
+
+const ProductSchema = object({
+    /** Product name (required) */
+    name: string().required('Name is required').minLength(2),
+    /** SKU identifier */
+    sku: string().required('SKU is required').minLength(4, 'SKU must be at least 4 chars'),
+    /** Price in dollars */
+    price: number().required('Price is required').positive('Price must be positive'),
+    /** Number in stock */
+    stock: number().min(0, 'Stock cannot be negative'),
+    /** Product description */
+    description: string().maxLength(500)
+});
+
+const result = ProductSchema.validate(
+    {
+        name: 'Widget',              // ✓ valid
+        sku: 'AB',                   // ✗ too short
+        price: -10,                  // ✗ negative
+        stock: 42,                   // ✓ valid
+        description: 'A fine widget' // ✓ valid
+    },
+    { doNotStopOnFirstError: true }
+);
+`,
+        testData: '{ "name": "Widget", "sku": "AB", "price": -10, "stock": 42, "description": "A fine widget" }'
+    },
+    {
+        id: 'array-errors',
+        title: 'Array & Element Errors',
+        description: 'Validation on array schemas — element-level constraints and min/max length checks.',
+        group: 'Error Scenarios',
+        code: `import { object, string, number, array } from '@cleverbrush/schema';
+
+const TeamSchema = object({
+    /** Team name */
+    name: string().required('Team name is required'),
+    /** 2–10 members required */
+    members: array(
+        object({
+            /** Member name */
+            name: string().required('Member name is required').minLength(2),
+            /** Role in team */
+            role: string().required('Role is required')
+        })
+    ).minLength(2, 'Need at least 2 members').maxLength(10)
+});
+
+const result = TeamSchema.validate(
+    {
+        name: 'Alpha Squad',
+        members: [
+            { name: 'A', role: '' }  // name too short, role empty — only 1 member (need 2)
+        ]
+    },
+    { doNotStopOnFirstError: true }
+);
+`,
+        testData: '{ "name": "Alpha Squad", "members": [{ "name": "A", "role": "" }] }'
+    },
+    {
+        id: 'deep-nesting-errors',
+        title: 'Deep Nesting Errors',
+        description: 'Three levels of nested objects — errors propagate through the full tree.',
+        group: 'Error Scenarios',
+        code: `import { object, string, number } from '@cleverbrush/schema';
+
+const CompanySchema = object({
+    /** Company legal name */
+    name: string().required('Company name is required'),
+    /** Primary office */
+    headquarters: object({
+        /** Office address */
+        address: object({
+            /** Street address */
+            street: string().required('Street is required'),
+            /** City name */
+            city: string().required('City is required'),
+            /** 5-digit ZIP */
+            zip: string().required('ZIP is required').minLength(5, 'Need 5 digits')
+        }),
+        /** Number of employees at this office */
+        employeeCount: number().min(1, 'Must have at least 1 employee')
+    }),
+    /** Year company was founded */
+    foundedYear: number()
+        .required('Founded year is required')
+        .min(1800, 'Year must be after 1800')
+        .max(2026, 'Year cannot be in the future')
+});
+
+const result = CompanySchema.validate(
+    {
+        name: '',                         // empty
+        headquarters: {
+            address: {
+                street: '',               // empty
+                city: '',                 // empty
+                zip: '12'                 // too short
+            },
+            employeeCount: 0             // must be >= 1
+        },
+        foundedYear: 1750                // too old
+    },
+    { doNotStopOnFirstError: true }
+);
+`,
+        testData: '{ "name": "", "headquarters": { "address": { "street": "", "city": "", "zip": "12" }, "employeeCount": 0 }, "foundedYear": 1750 }'
     },
 
     // ── Extensions ──────────────────────────────────
