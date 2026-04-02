@@ -394,7 +394,7 @@ test('min - 4', async () => {
 
 test('validator - 1', async () => {
     const builder = number();
-    const newBuilder = builder.addValidator((num) => {
+    const newBuilder = builder.addValidator(num => {
         return num & 1
             ? { valid: true }
             : { valid: false, errors: [{ message: 'value must be odd' }] };
@@ -416,12 +416,12 @@ test('validator - 1', async () => {
 test('validators - 1', async () => {
     const builder = number();
     const newBuilder = builder
-        .addValidator((num) => {
+        .addValidator(num => {
             return num & 1
                 ? { valid: true }
                 : { valid: false, errors: [{ message: 'value must be odd' }] };
         })
-        .addValidator((num) => {
+        .addValidator(num => {
             return num % 3 === 0
                 ? { valid: true }
                 : { valid: false, errors: [{ message: 'error message' }] };
@@ -443,7 +443,7 @@ test('validators - 1', async () => {
 test('preprocessor - 1', async () => {
     const builder = number();
     const newBuilder = builder
-        .addPreprocessor((num) => (num < 0 ? -num : num))
+        .addPreprocessor(num => (num < 0 ? -num : num))
         .min(5);
 
     expect(builder !== newBuilder).toEqual(true);
@@ -461,8 +461,8 @@ test('preprocessor - 1', async () => {
 
 test('preprocessors - 1', async () => {
     const builder = number()
-        .addPreprocessor((num) => (num < 0 ? -num : num))
-        .addPreprocessor((num) => num * num)
+        .addPreprocessor(num => (num < 0 ? -num : num))
+        .addPreprocessor(num => num * num)
         .min(5);
     {
         const { valid, object } = await builder.validate(-10);
@@ -919,7 +919,7 @@ test('custom error message notNaN()', async () => {
     }
 
     const schema4 = schema3.notNaN(
-        (seenValue) => `expected to be not NaN, but got ${seenValue}`
+        seenValue => `expected to be not NaN, but got ${seenValue}`
     );
 
     {
@@ -977,7 +977,7 @@ test('custom error message isFinite()', async () => {
     }
 
     const schema4 = schema3.isFinite(
-        (seenValue) => `expected to be not Infinity, but got ${seenValue}`
+        seenValue => `expected to be not Infinity, but got ${seenValue}`
     );
 
     {
@@ -1033,7 +1033,7 @@ test('custom error message isInteger()', async () => {
     }
 
     const schema4 = schema3.isInteger(
-        (seenValue) => `expected to be an integer, but got ${seenValue}`
+        seenValue => `expected to be an integer, but got ${seenValue}`
     );
 
     {

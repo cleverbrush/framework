@@ -227,7 +227,7 @@ describe('getClickhouseConnection', () => {
                                 const keys = Object.keys(c);
                                 return `[${keys
                                     .map(
-                                        (k) =>
+                                        k =>
                                             `(${instance.raw('?', [k]).toQuery()}, ${instance.raw('?', [c[k]]).toQuery()})`
                                     )
                                     .join(', ')}]`;

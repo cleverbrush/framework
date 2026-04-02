@@ -40,7 +40,7 @@ describe('string extensions', () => {
 
         test('uses function error message', async () => {
             const result = string()
-                .email((val) => `"${val}" is not a valid email`)
+                .email(val => `"${val}" is not a valid email`)
                 .validate('bad');
             expect(result.valid).toBe(false);
             expect(result.errors?.[0].message).toBe(
@@ -111,7 +111,7 @@ describe('string extensions', () => {
 
         test('accepts errorMessage as first argument (function)', async () => {
             const result = await string()
-                .url((val) => `"${val}" is not a URL`)
+                .url(val => `"${val}" is not a URL`)
                 .validate('nope');
             expect(result.valid).toBe(false);
             expect(result.errors?.[0].message).toBe('"nope" is not a URL');

@@ -45,7 +45,7 @@ describe('array extensions', () => {
 
         test('uses function error message', async () => {
             const result = array()
-                .nonempty((val) => `expected items but got ${val.length}`)
+                .nonempty(val => `expected items but got ${val.length}`)
                 .validate([]);
             expect(result.valid).toBe(false);
             expect(result.errors?.[0].message).toBe('expected items but got 0');

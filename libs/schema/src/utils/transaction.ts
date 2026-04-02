@@ -21,8 +21,8 @@ export type TransactionOptions = {
 };
 
 const defaultTransactionOptions: TransactionOptions = {
-    shouldNotWrapWithTransaction: (child) =>
-        !!defaultNonTransactionalTypes.find((t) => child instanceof t)
+    shouldNotWrapWithTransaction: child =>
+        !!defaultNonTransactionalTypes.find(t => child instanceof t)
 };
 
 /**
@@ -75,7 +75,7 @@ export const transaction = <T extends {}>(
         options as Required<TransactionOptions>;
 
     const isDirty = () =>
-        !!Object.keys(newProperties).find((key) => {
+        !!Object.keys(newProperties).find(key => {
             if (newProperties[key]?.[TRANSACTION_SYMBOL]) {
                 return newProperties[key][TRANSACTION_SYMBOL].isDirty();
             }
@@ -84,11 +84,11 @@ export const transaction = <T extends {}>(
 
     const commit = () => {
         const result = {} as Record<string, any>;
-        Object.keys(initial).forEach((key) => {
+        Object.keys(initial).forEach(key => {
             result[key] = (initial as any)[key];
         });
 
-        Object.keys(newProperties).forEach((key) => {
+        Object.keys(newProperties).forEach(key => {
             const value = newProperties[key];
             if (value[TRANSACTION_SYMBOL]) {
                 const { commit: childCommit } = value[TRANSACTION_SYMBOL];
@@ -126,13 +126,13 @@ export const transaction = <T extends {}>(
     };
 
     if (Array.isArray(initial)) {
-        const result = initial.map((el) =>
+        const result = initial.map(el =>
             typeof el === 'object' && el && !shouldNotWrapWithTransaction(el)
                 ? transaction(el).object
                 : el
         );
         const commitArray = () =>
-            result.map((el) =>
+            result.map(el =>
                 el && typeof el[TRANSACTION_SYMBOL] === 'object'
                     ? el[TRANSACTION_SYMBOL].commit()
                     : el
@@ -175,7 +175,7 @@ export const transaction = <T extends {}>(
             deletedProperties.delete(property as any);
             return true;
         },
-        ownKeys: (target) => {
+        ownKeys: target => {
             return [
                 ...Object.keys(target).filter(
                     (k: any) => !deletedProperties.has(k)

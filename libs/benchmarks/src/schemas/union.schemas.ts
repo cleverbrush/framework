@@ -73,7 +73,7 @@ const videoSchema = yup.object({
 
 export const yupUnion = yup
     .mixed()
-    .test('union', 'Must match one of: text, image, video', (value) => {
+    .test('union', 'Must match one of: text, image, video', value => {
         return (
             textSchema.isValidSync(value) ||
             imageSchema.isValidSync(value) ||

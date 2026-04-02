@@ -345,7 +345,7 @@ const registerKnexClickhouseExtensions = (knex: any) => {
                             const keys = Object.keys(c);
                             return `[${keys
                                 .map(
-                                    (k) =>
+                                    k =>
                                         `(${knex.raw('?', [k]).toQuery()}, ${knex
                                             .raw('?', [c[k]])
                                             .toQuery()})`

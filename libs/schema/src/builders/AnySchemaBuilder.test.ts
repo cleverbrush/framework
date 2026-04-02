@@ -254,7 +254,7 @@ test('Preprocessors', async () => {
             }
             return value;
         })
-        .addValidator((value) => {
+        .addValidator(value => {
             if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
                 return {
                     valid: false,

@@ -4,7 +4,7 @@ import Collector from './Collector.js';
 
 test('Collector - 1', async () => {
     const c = new Collector<{ a: number; b: string }>(['a', 'b']);
-    c.on('end', (result) => {
+    c.on('end', result => {
         expect(result).toHaveProperty('a', 10);
         expect(result).toHaveProperty('b', 'abc');
     });
@@ -34,7 +34,7 @@ test('Collector - 3', async () => {
     promise.then(thenFunct);
 
     // wait for 200ms
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 200));
 
     expect(thenFunct).not.toHaveBeenCalled();
 });
@@ -44,7 +44,7 @@ test('Collector - 4', async () => {
     type Obj = { a: number; b: string };
 
     const c = new Collector<Obj>(['a', 'b'], 500);
-    c.on('end', (result) => {
+    c.on('end', result => {
         expect(result).toHaveProperty('a', 10);
         expect(result).toHaveProperty('b', 'abc');
     });

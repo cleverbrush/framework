@@ -106,7 +106,7 @@ export default class Collector<
         if (this.#isTimedOut) return this;
         // if value is Promise - await it and collect its result
         Promise.resolve(value)
-            .then((result) => {
+            .then(result => {
                 if (this.#isTimedOut) return;
                 if (key in this.#collectionResults)
                     throw new Error(
@@ -119,7 +119,7 @@ export default class Collector<
                     this.#onEnd();
                 }
             })
-            .catch((e) => {
+            .catch(e => {
                 if (typeof this.#promiseReject === 'function') {
                     this.#promiseReject({
                         reason: 'error',

@@ -36,7 +36,8 @@
       "jsxQuoteStyle": "double",
       "trailingCommas": "none",
       "semicolons": "always",
-      "bracketSpacing": true
+      "bracketSpacing": true,
+      "arrowParentheses": "asNeeded"
     }
   },
   "files": {

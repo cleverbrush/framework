@@ -103,7 +103,7 @@ test('one prop - 2', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toBeGreaterThan(0);
-    expect(errors?.findIndex((e) => e.path === '$.first')).not.toEqual(-1);
+    expect(errors?.findIndex(e => e.path === '$.first')).not.toEqual(-1);
 
     const typeTest: InferType<typeof schema> = { first: 1 };
     expectTypeOf(typeTest).toEqualTypeOf<{ first: number; second?: number }>();
@@ -138,7 +138,7 @@ test('one prop - 3', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(1);
-    expect(errors?.findIndex((e) => e.path === '$.first')).not.toEqual(-1);
+    expect(errors?.findIndex(e => e.path === '$.first')).not.toEqual(-1);
 });
 
 test('one prop - 4', async () => {
@@ -462,7 +462,7 @@ test('no unknown fields - 1', async () => {
     }
     expect(objResult).toBeUndefined();
 
-    const rootErrors = getErrorsFor((t) => t);
+    const rootErrors = getErrorsFor(t => t);
 
     expect(Array.isArray(rootErrors.errors)).toEqual(true);
     expect(rootErrors.errors.length).toEqual(1);
@@ -584,8 +584,8 @@ test('multiple errors - 1', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(2);
-    expect(errors?.find((e) => e.path === '$.first')).toBeDefined();
-    expect(errors?.find((e) => e.path === '$.second')).toBeDefined();
+    expect(errors?.find(e => e.path === '$.first')).toBeDefined();
+    expect(errors?.find(e => e.path === '$.second')).toBeDefined();
 });
 
 test('multiple errors - 2', async () => {
@@ -617,9 +617,9 @@ test('multiple errors - 2', async () => {
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(3);
     expect(objResult).toBeUndefined();
-    expect(errors?.find((e) => e.path === '$.first')).toBeDefined();
-    expect(errors?.find((e) => e.path === '$.second')).toBeDefined();
-    expect(errors?.find((e) => e.path === '$.nested')).toBeDefined();
+    expect(errors?.find(e => e.path === '$.first')).toBeDefined();
+    expect(errors?.find(e => e.path === '$.second')).toBeDefined();
+    expect(errors?.find(e => e.path === '$.nested')).toBeDefined();
 });
 
 test('multiple errors - 3', async () => {
@@ -814,7 +814,7 @@ test('Preprocessors - 1', async () => {
         second: number()
     });
 
-    const schema2 = schema1.addPreprocessor((input) => ({
+    const schema2 = schema1.addPreprocessor(input => ({
         ...input,
         second: input?.second > 10 ? 10 : input.second
     }));
@@ -925,7 +925,7 @@ test('Validators - 1', async () => {
         second: number()
     });
 
-    const schema2 = schema1.addValidator((input) =>
+    const schema2 = schema1.addValidator(input =>
         input?.second % 3 !== 0
             ? {
                   valid: false,
@@ -966,7 +966,7 @@ test('Validators - 2', async () => {
         second: number()
     });
 
-    const schema2 = schema1.addValidator((input) =>
+    const schema2 = schema1.addValidator(input =>
         input?.second % 3 !== 0
             ? {
                   valid: false,
@@ -1093,11 +1093,11 @@ test('preprocessors run before validators - 1', async () => {
         first: number(),
         second: number().min(10)
     })
-        .addPreprocessor((value) => ({
+        .addPreprocessor(value => ({
             ...value,
             second: value.second < 10 ? value.second + 9 : value.second
         }))
-        .addValidator((value) =>
+        .addValidator(value =>
             value?.second % 3 === 0
                 ? { valid: true }
                 : { valid: false, errors: [{ message: 'must divide by 3' }] }
@@ -1135,8 +1135,8 @@ test("child preprocessor run after parent's - 1", async () => {
         first: number(),
         second: number()
             .min(10)
-            .addPreprocessor((value) => (value % 3 === 0 ? value + 9 : value))
-    }).addPreprocessor((value) => ({
+            .addPreprocessor(value => (value % 3 === 0 ? value + 9 : value))
+    }).addPreprocessor(value => ({
         ...value,
         second: value.second < 10 ? value.second + 9 : value.second
     }));
@@ -1176,7 +1176,7 @@ test("child validator run after parent's - 1", async () => {
         first: number(),
         second: number()
             .min(10)
-            .addValidator((value) =>
+            .addValidator(value =>
                 value % 3 !== 0
                     ? {
                           valid: false,
@@ -1184,7 +1184,7 @@ test("child validator run after parent's - 1", async () => {
                       }
                     : { valid: true }
             )
-    }).addValidator((value) =>
+    }).addValidator(value =>
         value?.second % 5 === 0
             ? { valid: true }
             : { valid: false, errors: [{ message: 'must divide by 5' }] }
@@ -1253,7 +1253,7 @@ test('modifyPropSchema - 1', async () => {
         second: number()
     });
 
-    const schema2 = schema1.modifyPropSchema('first', (first) =>
+    const schema2 = schema1.modifyPropSchema('first', first =>
         /**
          * some new comment
          */
@@ -2186,7 +2186,7 @@ test('big schema - 1', async () => {
 test('Conditional Preprocessors', async () => {
     const schema = object({
         num: number()
-    }).addPreprocessor((obj) =>
+    }).addPreprocessor(obj =>
         obj && obj.num % 2 === 0 ? { num: obj.num + 1 } : { num: 0 }
     );
 
@@ -2216,10 +2216,10 @@ test('Conditional Preprocessors', async () => {
     const schema = object({
         num: number()
     })
-        .addPreprocessor((obj) =>
+        .addPreprocessor(obj =>
             obj && obj.num % 2 === 0 ? { num: obj.num + 1 } : { num: 0 }
         )
-        .addValidator((obj) =>
+        .addValidator(obj =>
             obj?.num === 11
                 ? { valid: false, errors: [{ message: '11 is not valid' }] }
                 : { valid: true }
@@ -2275,7 +2275,7 @@ test('Preprocessors', async () => {
     const schema = object({
         interval: IntervalSchema,
         num: number()
-    }).addPreprocessor((value) => {
+    }).addPreprocessor(value => {
         if (!value || typeof value !== 'object') return value;
         value.interval = preprocessDateInterval(value?.interval);
         return value;
@@ -2353,7 +2353,7 @@ test('Optional Property', async () => {
 });
 
 test('no errors returned from validator', async () => {
-    const schema = object({ a: string() }).addValidator((_val) => ({
+    const schema = object({ a: string() }).addValidator(_val => ({
         valid: false,
         errors: []
     }));
@@ -2531,9 +2531,9 @@ test('getErrorsFor - 1', async () => {
 
     const { getErrorsFor } = await schema.validate(obj as any);
 
-    const ageErrors = getErrorsFor((t) => t.age);
-    const firstErrors = getErrorsFor((t) => t.first);
-    const lastErrors = getErrorsFor((t) => t.last);
+    const ageErrors = getErrorsFor(t => t.age);
+    const firstErrors = getErrorsFor(t => t.first);
+    const lastErrors = getErrorsFor(t => t.last);
 
     expect(ageErrors).toBeDefined();
     expect(firstErrors).toBeDefined();
@@ -2566,7 +2566,7 @@ test('getErrorsFor - self', async () => {
     const { valid, getErrorsFor } = await schema.validate(123 as any);
 
     expect(valid).toEqual(false);
-    const rootErrors = getErrorsFor((t) => t);
+    const rootErrors = getErrorsFor(t => t);
     expect(rootErrors).toBeDefined();
     expect(
         Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1
@@ -2601,12 +2601,12 @@ test('getErrorsFor - nested 1', async () => {
     };
 
     const { getErrorsFor, valid } = await schema.validate(obj as any);
-    const rootErrors = getErrorsFor((t) => t);
+    const rootErrors = getErrorsFor(t => t);
     expect(rootErrors).toBeDefined();
     expect(rootErrors.errors).toBeDefined();
     expect(rootErrors.errors.length).toEqual(0);
 
-    const nestedErrors = getErrorsFor((t) => t.nested);
+    const nestedErrors = getErrorsFor(t => t.nested);
     expect(nestedErrors.isValid).toEqual(false);
     expect(nestedErrors.errors).toBeDefined();
     expect(nestedErrors.errors.length).toEqual(0);
@@ -2617,7 +2617,7 @@ test('getErrorsFor - nested 1', async () => {
         'expected type number, but saw string'
     );
 
-    const nested3Errors = getErrorsFor((t) => t.nested.nested3);
+    const nested3Errors = getErrorsFor(t => t.nested.nested3);
     expect(nested3Errors.errors).toBeDefined();
     expect(nested3Errors.errors.length).toEqual(1);
     expect(nested3Errors.errors[0]).toEqual(
@@ -2626,7 +2626,7 @@ test('getErrorsFor - nested 1', async () => {
     expect(valid).toEqual(false);
 
     const nested4Errors = getErrorsFor(
-        (t) => t.nested.nested2
+        t => t.nested.nested2
     ).descriptor.parent.parent.getSchema();
 
     expect(nested4Errors === schema).toEqual(true);
@@ -2666,7 +2666,7 @@ test('getErrorsFor - root errors from validator', () => {
             6,
             'Пароль має містити щонайменше 6 символів'
         )
-    }).addValidator((value) => {
+    }).addValidator(value => {
         if (value.newPassword !== value.confirmPassword) {
             return {
                 valid: false,
