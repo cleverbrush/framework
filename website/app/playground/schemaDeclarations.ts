@@ -3245,9 +3245,11 @@ export interface StringBuiltinExtensions<T extends string = string> {
      * \`\`\`ts
      * string().url();
      * string().url({ protocols: ['https'] });
-     * string().url(undefined, 'Must be a valid URL');
+     * string().url('Must be a valid URL');
+     * string().url({ protocols: ['https'] }, 'Must be a valid URL');
      * \`\`\`
      */
+    url(errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringExtReturn<T>;
     url(opts?: {
         protocols?: string[];
     }, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringExtReturn<T>;
@@ -3368,12 +3370,13 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * \`\`\`ts
          * string().url();
          * string().url({ protocols: ['https'] });
-         * string().url(undefined, 'Must be a valid URL');
+         * string().url('Must be a valid URL');
+         * string().url({ protocols: ['https'] }, 'Must be a valid URL');
          * \`\`\`
          */
-        url(this: StringSchemaBuilder, opts?: {
+        url(this: StringSchemaBuilder, optsOrError?: {
             protocols?: string[];
-        }, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, {}>;
+        } | ValidationErrorMessageProvider<StringSchemaBuilder>, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, {}>;
         /**
          * Validates that the string is a valid UUID (versions 1–5).
          *
@@ -3447,6 +3450,24 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/util.d.ts": `import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
+/** Validation result returned by validators on failure. */
+interface ValidationFailure {
+    valid: false;
+    errors: {
+        message: string;
+    }[];
+}
+/**
+ * Builds a synchronous validation-failure result, resolving the user-supplied
+ * error-message provider (or falling back to \`defaultMsg\`).
+ *
+ * @param provider - custom error message provider (string, sync function, or \`undefined\`)
+ * @param defaultMsg - fallback message used when \`provider\` is \`undefined\`
+ * @param value - the value that failed validation
+ * @param schema - the schema builder instance
+ * @returns a \`{ valid: false, errors: [{ message }] }\` object
+ */
+export declare function validationFail(provider: ValidationErrorMessageProvider<any> | undefined, defaultMsg: string, value: unknown, schema: unknown): ValidationFailure;
 /**
  * Synchronously resolves a {@link ValidationErrorMessageProvider} to a concrete error message string.
  * Returns the default message when no custom provider is supplied.
@@ -3472,6 +3493,7 @@ export declare function resolveErrorMessage(provider: ValidationErrorMessageProv
  * @returns the resolved error message string
  */
 export declare function resolveErrorMessageAsync(provider: ValidationErrorMessageProvider<any> | undefined, defaultMsg: string, value: unknown, schema: unknown): Promise<string>;
+export {};
 `,
     "file:///node_modules/@cleverbrush/schema/index.d.ts": `export * from './core.js';
 export { type ArrayBuiltinExtensions, any, array, arrayExtensions, boolean, date, type ExtendedArray, type ExtendedNumber, type ExtendedString, func, type NumberBuiltinExtensions, number, numberExtensions, object, type StringBuiltinExtensions, string, stringExtensions, union } from './extensions/index.js';

@@ -103,6 +103,27 @@ describe('string extensions', () => {
             expect(result.errors?.[0].message).toBe('Enter a valid URL');
         });
 
+        test('accepts errorMessage as first argument (string)', async () => {
+            const result = await string().url('Not a URL').validate('bad');
+            expect(result.valid).toBe(false);
+            expect(result.errors?.[0].message).toBe('Not a URL');
+        });
+
+        test('accepts errorMessage as first argument (function)', async () => {
+            const result = await string()
+                .url((val) => `"${val}" is not a URL`)
+                .validate('nope');
+            expect(result.valid).toBe(false);
+            expect(result.errors?.[0].message).toBe('"nope" is not a URL');
+        });
+
+        test('errorMessage-only overload still validates correctly', async () => {
+            const result = await string()
+                .url('bad url')
+                .validate('https://example.com');
+            expect(result.valid).toBe(true);
+        });
+
         test('throws for empty protocols array', () => {
             expect(() => string().url({ protocols: [] })).toThrow(
                 'url: opts.protocols must be a non-empty array of non-empty strings'

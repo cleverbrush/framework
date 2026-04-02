@@ -77,9 +77,13 @@ export interface StringBuiltinExtensions<T extends string = string> {
      * ```ts
      * string().url();
      * string().url({ protocols: ['https'] });
-     * string().url(undefined, 'Must be a valid URL');
+     * string().url('Must be a valid URL');
+     * string().url({ protocols: ['https'] }, 'Must be a valid URL');
      * ```
      */
+    url(
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<T>;
     url(
         opts?: { protocols?: string[] },
         errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
@@ -243,14 +247,27 @@ export const stringExtensions = defineExtension({
          * ```ts
          * string().url();
          * string().url({ protocols: ['https'] });
-         * string().url(undefined, 'Must be a valid URL');
+         * string().url('Must be a valid URL');
+         * string().url({ protocols: ['https'] }, 'Must be a valid URL');
          * ```
          */
         url(
             this: StringSchemaBuilder,
-            opts?: { protocols?: string[] },
+            optsOrError?:
+                | { protocols?: string[] }
+                | ValidationErrorMessageProvider<StringSchemaBuilder>,
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
+            let opts: { protocols?: string[] } | undefined;
+            if (
+                typeof optsOrError === 'string' ||
+                typeof optsOrError === 'function'
+            ) {
+                errorMessage = optsOrError;
+                opts = undefined;
+            } else {
+                opts = optsOrError;
+            }
             if (
                 opts?.protocols !== undefined &&
                 (opts.protocols.length === 0 ||
