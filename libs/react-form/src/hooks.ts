@@ -1,4 +1,3 @@
-import { debounce } from '@cleverbrush/async';
 import type {
     InferType,
     PropertyDescriptor,
@@ -13,6 +12,7 @@ import {
 } from '@cleverbrush/schema';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormContextValue } from './contexts.js';
+import { debounce } from './debounce.js';
 import type { FormStore } from './FormStore.js';
 import { createFormStore } from './FormStore.js';
 import {

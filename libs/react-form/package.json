@@ -5,7 +5,6 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/async": "^2.0.0",
         "@cleverbrush/schema": "^2.0.0"
     },
     "devDependencies": {
