@@ -20,6 +20,56 @@ export type FieldRenderProps = {
     onBlur: () => void;
     setValue: (value: any) => void;
     schema: SchemaBuilder<any, any>;
+    /**
+     * Rendering variant hint passed from the `Field` component.
+     * Used by renderers to select a sub-variant of the base schema type
+     * (e.g. `"password"` for a string field rendered as a password input).
+     *
+     * Also participates in renderer resolution: when set, the renderer
+     * registry is first checked for `"type:variant"` (e.g. `"string:password"`)
+     * before falling back to the base `"type"` key.
+     *
+     * @example
+     * ```tsx
+     * <Field selector={(t) => t.secret} form={form} variant="password" />
+     * ```
+     */
+    variant?: string;
+    /**
+     * Visible label text forwarded from the `Field` component.
+     * Renderers can use this to render a `<label>` element.
+     *
+     * @example
+     * ```tsx
+     * <Field selector={(t) => t.name} form={form} label="Full name" />
+     * ```
+     */
+    label?: string;
+    /**
+     * HTML `name` attribute forwarded from the `Field` component.
+     * Renderers can apply this to the underlying input for `FormData` submission.
+     *
+     * @example
+     * ```tsx
+     * <Field selector={(t) => t.email} form={form} name="email" />
+     * ```
+     */
+    name?: string;
+    /**
+     * Bag of extra renderer-specific props forwarded from the `Field` component.
+     * Useful for passing HTML attributes (`placeholder`, `autoComplete`, `type`)
+     * or UI-library-specific options without extending `FieldRenderProps` itself.
+     *
+     * @example
+     * ```tsx
+     * <Field
+     *   selector={(t) => t.email}
+     *   form={form}
+     *   fieldProps={{ placeholder: "you@example.com", autoComplete: "email" }}
+     * />
+     * ```
+     */
+    fieldProps?: Record<string, unknown>;
 };
 
 /**

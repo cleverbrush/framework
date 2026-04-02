@@ -34,7 +34,7 @@ const { register } = useForm<User>();
 | Type-safe field selectors | ✓ | ~ | ✗ | ✗ |
 | Headless / UI-agnostic | ✓ | ✓ | ~ | ✓ |
 | Global renderer system | ✓ | ✗ | ✗ | ✗ |
-| Auto-field rendering by type | ✓ | ✗ | ✗ | ✗ |
+| Auto-field rendering by type + variant | ✓ | ✗ | ✗ | ✗ |
 | Nested objects | ✓ | ✓ | ✓ | ✓ |
 | Async validation | ✓ | ✓ | ✓ | ✓ |
 
@@ -143,34 +143,84 @@ Renderers are plain functions that receive field state and return React nodes. D
 import { FieldRenderProps } from '@cleverbrush/react-form';
 
 const htmlRenderers = {
-    string: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) => (
+    string: ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
         <div>
+            {label && <label>{label}</label>}
             <input
                 type="text"
+                name={name}
                 value={value ?? ''}
                 onChange={(e) => onChange(e.target.value)}
                 onBlur={onBlur}
+                {...fieldProps}
             />
             {touched && error && <span className="error">{error}</span>}
         </div>
     ),
-    number: ({ value, onChange, onBlur, error, touched }: FieldRenderProps) => (
+    number: ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
         <div>
+            {label && <label>{label}</label>}
             <input
                 type="number"
+                name={name}
                 value={value ?? ''}
                 onChange={(e) => onChange(Number(e.target.value))}
                 onBlur={onBlur}
+                {...fieldProps}
             />
             {touched && error && <span className="error">{error}</span>}
         </div>
     ),
-    boolean: ({ value, onChange }: FieldRenderProps) => (
-        <input
-            type="checkbox"
-            checked={value ?? false}
-            onChange={(e) => onChange(e.target.checked)}
-        />
+    boolean: ({ value, onChange, label }: FieldRenderProps) => (
+        <label>
+            <input
+                type="checkbox"
+                checked={value ?? false}
+                onChange={(e) => onChange(e.target.checked)}
+            />
+            {label}
+        </label>
+    )
+};
+```
+
+### Variant Renderers
+
+You can register renderers for specific variants using a `"type:variant"` key.
+When `<Field variant="password" />` is rendered on a `string` field, the
+registry is checked for `"string:password"` first, then falls back to `"string"`:
+
+```tsx
+const renderers = {
+    // Default string renderer
+    string: ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
+        <div>
+            {label && <label>{label}</label>}
+            <input type="text" name={name} value={value ?? ''}
+                   onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                   {...fieldProps} />
+            {touched && error && <span className="error">{error}</span>}
+        </div>
+    ),
+    // Password variant — rendered when <Field variant="password" /> is used on a string field
+    'string:password': ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
+        <div>
+            {label && <label>{label}</label>}
+            <input type="password" name={name} value={value ?? ''}
+                   onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                   {...fieldProps} />
+            {touched && error && <span className="error">{error}</span>}
+        </div>
+    ),
+    // Textarea variant
+    'string:textarea': ({ value, onChange, onBlur, error, touched, label, name, fieldProps }: FieldRenderProps) => (
+        <div>
+            {label && <label>{label}</label>}
+            <textarea name={name} value={value ?? ''}
+                      onChange={(e) => onChange(e.target.value)} onBlur={onBlur}
+                      {...(fieldProps as any)} />
+            {touched && error && <span className="error">{error}</span>}
+        </div>
     )
 };
 ```
@@ -292,11 +342,23 @@ const name = useField((t) => t.name);
 
 ## Field Component
 
-Resolves the renderer from the `FormSystemProvider` registry by schema type, or uses an explicit `renderer` prop:
+Resolves the renderer from the `FormSystemProvider` registry by schema type (and optional variant), or uses an explicit `renderer` prop:
 
 ```tsx
 // Auto-resolved from FormSystemProvider (string schema → string renderer)
 <Field selector={(t) => t.name} form={form} />
+
+// Variant-based resolution: looks up "string:password", falls back to "string"
+<Field selector={(t) => t.password} form={form} variant="password" />
+
+// With label, name, and extra props for the renderer
+<Field
+    selector={(t) => t.email}
+    form={form}
+    label="Email address"
+    name="email"
+    fieldProps={{ placeholder: 'you@example.com', autoComplete: 'email' }}
+/>
 
 // Explicit renderer override
 <Field selector={(t) => t.name} form={form} renderer={customRenderer} />
@@ -309,6 +371,10 @@ Resolves the renderer from the `FormSystemProvider` registry by schema type, or 
 | `selector` | `(tree) => PropertyDescriptor` | PropertyDescriptor selector for the field |
 | `form` | `SchemaFormInstance` | Form instance from `useSchemaForm` |
 | `renderer?` | `FieldRenderer` | Optional explicit renderer (overrides provider) |
+| `variant?` | `string` | Variant hint for renderer resolution and forwarded to the renderer |
+| `label?` | `string` | Visible label text forwarded to the renderer |
+| `name?` | `string` | HTML `name` attribute forwarded to the renderer |
+| `fieldProps?` | `Record<string, unknown>` | Extra renderer-specific props (e.g. `placeholder`, `autoComplete`) |
 
 ## Headless Usage (without Field component)
 
@@ -528,8 +594,8 @@ function App() {
 | Type | Description |
 |------|-------------|
 | `FieldRenderer` | `(props: FieldRenderProps) => ReactNode` |
-| `FieldRenderProps` | Props passed to renderers: `value`, `initialValue`, `dirty`, `touched`, `error`, `validating`, `onChange`, `onBlur`, `setValue`, `schema` |
-| `FormSystemConfig` | `{ renderers?: Record<string, FieldRenderer> }` |
+| `FieldRenderProps` | Props passed to renderers: `value`, `initialValue`, `dirty`, `touched`, `error`, `validating`, `onChange`, `onBlur`, `setValue`, `schema`, `variant?`, `label?`, `name?`, `fieldProps?` |
+| `FormSystemConfig` | `{ renderers?: Record<string, FieldRenderer> }` — keys can be `"type"` or `"type:variant"` |
 | `FieldState` | `{ value, initialValue, dirty, touched, error, validating }` |
 | `UseFieldResult` | `FieldState & { onChange, onBlur, setValue, schema }` |
 | `UseSchemaFormOptions` | `{ createMissingStructure?: boolean }` |

@@ -658,6 +658,171 @@ describe('Field component', () => {
 
         unmount();
     });
+
+    test('Field forwards variant, label, name, and fieldProps to renderer', () => {
+        const mockRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(Field, {
+                selector: (t: any) => t.name,
+                form: formResult.current,
+                renderer: mockRenderer,
+                variant: 'password',
+                label: 'Password',
+                name: 'password',
+                fieldProps: {
+                    placeholder: 'Enter password',
+                    autoComplete: 'current-password'
+                }
+            });
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(mockRenderer).toHaveBeenCalledTimes(1);
+        const props = mockRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+        expect(props.label).toBe('Password');
+        expect(props.name).toBe('password');
+        expect(props.fieldProps).toEqual({
+            placeholder: 'Enter password',
+            autoComplete: 'current-password'
+        });
+
+        unmount();
+    });
+
+    test('variant-based renderer resolution selects type:variant key', () => {
+        const baseStringRenderer = vi.fn(() => 'base' as any);
+        const passwordRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(
+                FormSystemProvider,
+                {
+                    renderers: {
+                        string: baseStringRenderer,
+                        'string:password': passwordRenderer
+                    }
+                },
+                React.createElement(Field, {
+                    selector: (t: any) => t.name,
+                    form: formResult.current,
+                    variant: 'password'
+                })
+            );
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(passwordRenderer).toHaveBeenCalled();
+        expect(baseStringRenderer).not.toHaveBeenCalled();
+        // variant is still forwarded in props
+        const props = passwordRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+
+        unmount();
+    });
+
+    test('variant falls back to base type when no type:variant renderer exists', () => {
+        const baseStringRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(
+                FormSystemProvider,
+                { renderers: { string: baseStringRenderer } },
+                React.createElement(Field, {
+                    selector: (t: any) => t.name,
+                    form: formResult.current,
+                    variant: 'password'
+                })
+            );
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(baseStringRenderer).toHaveBeenCalled();
+        // variant is still forwarded even with fallback renderer
+        const props = baseStringRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+
+        unmount();
+    });
+
+    test('explicit renderer takes precedence over variant resolution', () => {
+        const passwordRenderer = vi.fn(() => 'variant' as any);
+        const explicitRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(
+                FormSystemProvider,
+                { renderers: { 'string:password': passwordRenderer } },
+                React.createElement(Field, {
+                    selector: (t: any) => t.name,
+                    form: formResult.current,
+                    renderer: explicitRenderer,
+                    variant: 'password'
+                })
+            );
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        expect(explicitRenderer).toHaveBeenCalled();
+        expect(passwordRenderer).not.toHaveBeenCalled();
+        // variant still forwarded to explicit renderer
+        const props = explicitRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBe('password');
+
+        unmount();
+    });
+
+    test('Field omits variant/label/name/fieldProps when not provided', () => {
+        const mockRenderer = vi.fn(() => null);
+
+        const { result: formResult } = renderHook(() =>
+            useSchemaForm(UserSchema)
+        );
+
+        function TestComponent() {
+            return React.createElement(Field, {
+                selector: (t: any) => t.name,
+                form: formResult.current,
+                renderer: mockRenderer
+            });
+        }
+
+        const { render } = require('@testing-library/react');
+        const { unmount } = render(React.createElement(TestComponent));
+
+        const props = mockRenderer.mock.calls[0][0] as FieldRenderProps;
+        expect(props.variant).toBeUndefined();
+        expect(props.label).toBeUndefined();
+        expect(props.name).toBeUndefined();
+        expect(props.fieldProps).toBeUndefined();
+
+        unmount();
+    });
 });
 
 // ─── Reset / dirty tracking ─────────────────────────────────────────────────
