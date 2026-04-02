@@ -61,7 +61,7 @@ Add `vitest.bench` comparing validation throughput vs zod/yup/joi. If schema is 
 
 ## Phase 3: Documentation & Marketing
 
-### 3.1 Interactive Playground
+### 3.1 Interactive Playground - DONE in the website
 
 Live code editor on the website where users can try schemas without installing.
 

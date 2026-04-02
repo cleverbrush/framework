@@ -1907,9 +1907,71 @@ pre code {
 }
 
 .pg-error-tree-msg {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
     font-size: 0.78rem;
     color: var(--text-secondary);
     line-height: 1.5;
+}
+
+.pg-error-tree-msg-text {
+    flex: 1;
+    min-width: 0;
+}
+
+/* getErrorsFor label + tooltip */
+.pg-getErrors-wrap {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.pg-getErrors-label {
+    font-size: 0.67rem;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--accent-indigo);
+    opacity: 0.5;
+    cursor: help;
+    white-space: nowrap;
+    border-bottom: 1px dashed rgba(129, 140, 248, 0.35);
+    transition: opacity var(--transition-fast);
+    user-select: none;
+}
+
+.pg-getErrors-label:hover {
+    opacity: 1;
+}
+
+.pg-getErrors-tooltip {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 5px);
+    background: #0f1320;
+    color: #94a3b8;
+    border: 1px solid rgba(129, 140, 248, 0.18);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 0.72rem;
+    font-family: "JetBrains Mono", monospace;
+    white-space: pre;
+    z-index: 200;
+    min-width: 180px;
+    max-width: 400px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+    margin: 0;
+    pointer-events: none;
+    line-height: 1.5;
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity var(--transition-fast);
+}
+
+.pg-getErrors-wrap:hover .pg-getErrors-tooltip {
+    visibility: visible;
+    opacity: 1;
 }
 
 .pg-error-tree-node .pg-error-tree {
