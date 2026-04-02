@@ -14,7 +14,7 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
-import { resolveErrorMessage } from './util.js';
+import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
 // Public interface — carries JSDoc into .d.ts for consumers
@@ -145,15 +145,21 @@ export const numberExtensions = defineExtension({
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
             return this.withExtension('positive', true).addValidator((val) => {
+                if (typeof val !== 'number')
+                    return validationFail(
+                        errorMessage,
+                        'must be a positive number',
+                        val,
+                        this
+                    );
                 const valid = val > 0;
                 if (valid) return { valid: true, errors: [] };
-                const msg = resolveErrorMessage(
+                return validationFail(
                     errorMessage,
                     'must be a positive number',
                     val,
                     this
                 );
-                return { valid: false, errors: [{ message: msg }] };
             });
         },
 
@@ -174,15 +180,21 @@ export const numberExtensions = defineExtension({
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
             return this.withExtension('negative', true).addValidator((val) => {
+                if (typeof val !== 'number')
+                    return validationFail(
+                        errorMessage,
+                        'must be a negative number',
+                        val,
+                        this
+                    );
                 const valid = val < 0;
                 if (valid) return { valid: true, errors: [] };
-                const msg = resolveErrorMessage(
+                return validationFail(
                     errorMessage,
                     'must be a negative number',
                     val,
                     this
                 );
-                return { valid: false, errors: [{ message: msg }] };
             });
         },
 
@@ -203,15 +215,21 @@ export const numberExtensions = defineExtension({
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
             return this.withExtension('finite', true).addValidator((val) => {
+                if (typeof val !== 'number')
+                    return validationFail(
+                        errorMessage,
+                        'must be a finite number',
+                        val,
+                        this
+                    );
                 const valid = Number.isFinite(val);
                 if (valid) return { valid: true, errors: [] };
-                const msg = resolveErrorMessage(
+                return validationFail(
                     errorMessage,
                     'must be a finite number',
                     val,
                     this
                 );
-                return { valid: false, errors: [{ message: msg }] };
             });
         },
 
@@ -241,19 +259,25 @@ export const numberExtensions = defineExtension({
                 );
             }
             return this.withExtension('multipleOf', n).addValidator((val) => {
+                if (typeof val !== 'number')
+                    return validationFail(
+                        errorMessage,
+                        `must be a multiple of ${n}`,
+                        val,
+                        this
+                    );
                 const remainder = Math.abs(val % n);
                 const tolerance = Math.abs(n) * 1e-10;
                 const valid =
                     remainder < tolerance ||
                     Math.abs(remainder - Math.abs(n)) < tolerance;
                 if (valid) return { valid: true, errors: [] };
-                const msg = resolveErrorMessage(
+                return validationFail(
                     errorMessage,
                     `must be a multiple of ${n}`,
                     val,
                     this
                 );
-                return { valid: false, errors: [{ message: msg }] };
             });
         }
     }

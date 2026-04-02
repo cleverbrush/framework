@@ -1,5 +1,31 @@
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 
+/** Validation result returned by validators on failure. */
+interface ValidationFailure {
+    valid: false;
+    errors: { message: string }[];
+}
+
+/**
+ * Builds a synchronous validation-failure result, resolving the user-supplied
+ * error-message provider (or falling back to `defaultMsg`).
+ *
+ * @param provider - custom error message provider (string, sync function, or `undefined`)
+ * @param defaultMsg - fallback message used when `provider` is `undefined`
+ * @param value - the value that failed validation
+ * @param schema - the schema builder instance
+ * @returns a `{ valid: false, errors: [{ message }] }` object
+ */
+export function validationFail(
+    provider: ValidationErrorMessageProvider<any> | undefined,
+    defaultMsg: string,
+    value: unknown,
+    schema: unknown
+): ValidationFailure {
+    const msg = resolveErrorMessage(provider, defaultMsg, value, schema);
+    return { valid: false, errors: [{ message: msg }] };
+}
+
 /**
  * Synchronously resolves a {@link ValidationErrorMessageProvider} to a concrete error message string.
  * Returns the default message when no custom provider is supplied.
