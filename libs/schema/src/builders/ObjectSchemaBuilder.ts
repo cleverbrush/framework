@@ -701,7 +701,7 @@ export class ObjectSchemaBuilder<
         let errors = setup.errors;
 
         const notValidResults = validationResults.filter(
-            (res) => !res.result.valid
+            res => !res.result.valid
         );
 
         const nestedErrors = notValidResults.reduce((acc, val) => {
@@ -785,7 +785,7 @@ export class ObjectSchemaBuilder<
                 }
             } else if (Array.isArray(result.errors)) {
                 if (ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)) {
-                    result.errors.forEach((error) => {
+                    result.errors.forEach(error => {
                         addErrorFor(descriptor, error.message);
                     });
                 }
@@ -922,7 +922,7 @@ export class ObjectSchemaBuilder<
         } = setup;
 
         const validationResults = await Promise.all(
-            propKeys.map(async (key) => ({
+            propKeys.map(async key => ({
                 key,
                 result: await this.#properties[key].validateAsync(
                     objToValidate[key],
@@ -1213,7 +1213,7 @@ export class ObjectSchemaBuilder<
             >;
 
             const distinctKeys = new Map<keyof TProperties, true>();
-            propsArray.forEach((key) => {
+            propsArray.forEach(key => {
                 if (typeof key !== 'string' || !key) {
                     throw new Error('property name must be a string');
                 }
@@ -1374,7 +1374,7 @@ export class ObjectSchemaBuilder<
                 ...this.introspect()
             } as any;
 
-            propsArray.forEach((key) => {
+            propsArray.forEach(key => {
                 if (typeof key !== 'string') {
                     throw new Error(
                         'each propery in property list must be as string value'
@@ -1396,7 +1396,7 @@ export class ObjectSchemaBuilder<
         if (typeof propNameOrArray === 'string') {
             return this.modifyPropSchema(
                 propNameOrArray as keyof TProperties,
-                (schema) => schema.optional()
+                schema => schema.optional()
             );
         }
 
@@ -1500,7 +1500,7 @@ export class ObjectSchemaBuilder<
 
             const props = Object.keys(
                 externalSchema.introspect().properties
-            ).filter((p) => typeof this.#properties[p] !== 'undefined');
+            ).filter(p => typeof this.#properties[p] !== 'undefined');
             if (props.length === 0) {
                 throw new Error(
                     'there are no common properties in provided schemas'
@@ -1578,7 +1578,7 @@ export class ObjectSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.modifyPropSchema(prop, (builder) =>
+        return this.modifyPropSchema(prop, builder =>
             builder.optional()
         ) as any;
     }
@@ -1598,7 +1598,7 @@ export class ObjectSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.modifyPropSchema(prop, (builder) =>
+        return this.modifyPropSchema(prop, builder =>
             builder.required()
         ) as any;
     }
@@ -1680,7 +1680,7 @@ export class ObjectSchemaBuilder<
         }
 
         if (typeof selector !== 'function') {
-            selector = (o) => o;
+            selector = o => o;
         }
         const result = createPropertyDescriptorFor(
             (obj, createMissingStructure) =>
@@ -1823,7 +1823,7 @@ export interface Object {
     ): boolean;
 }
 
-const object = ((props) => {
+const object = (props => {
     return ObjectSchemaBuilder.create({
         isRequired: true,
         properties: props

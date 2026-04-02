@@ -778,7 +778,7 @@ export class Mapper<
         }
 
         const unmapped = targetProperties.filter(
-            (key) => !this._mappings.has(key)
+            key => !this._mappings.has(key)
         );
 
         if (unmapped.length > 0) {

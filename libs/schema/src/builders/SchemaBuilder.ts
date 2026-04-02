@@ -128,7 +128,7 @@ export class SchemaValidationError extends Error {
     constructor(errors: ValidationError[]) {
         const message =
             errors.length > 0
-                ? errors.map((e) => `${e.path}: ${e.message}`).join('; ')
+                ? errors.map(e => `${e.path}: ${e.message}`).join('; ')
                 : 'Validation failed';
         super(message);
         this.name = 'SchemaValidationError';
@@ -678,7 +678,7 @@ export abstract class SchemaBuilder<
     ): PreValidationResult<any, { validatedObject: any }> {
         return {
             valid: false,
-            errors: [errors[0]].filter((e) => e),
+            errors: [errors[0]].filter(e => e),
             context: resultingContext
         };
     }
@@ -693,7 +693,7 @@ export abstract class SchemaBuilder<
         path: string
     ): ValidationError[] {
         if (Array.isArray(validatorErrors) && validatorErrors.length) {
-            return validatorErrors.map((err) => ({
+            return validatorErrors.map(err => ({
                 message: err.message,
                 path: `${path}($validators[${index}])`
             }));
@@ -722,7 +722,7 @@ export abstract class SchemaBuilder<
             return {
                 valid: false,
                 errors: errors
-                    .filter((e) => e)
+                    .filter(e => e)
                     .filter((_e, i) =>
                         doNotStopOnFirstError ? true : i === 0
                     ),

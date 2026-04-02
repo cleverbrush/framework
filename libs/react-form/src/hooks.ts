@@ -381,7 +381,7 @@ export function useFieldFromContext(
     // Subscribe to field changes with proper cleanup on unmount/path change
     useEffect(() => {
         const unsub = store.subscribe(path, () => {
-            setRenderTick((c) => c + 1);
+            setRenderTick(c => c + 1);
         });
         return unsub;
     }, [store, path]);

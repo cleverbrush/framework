@@ -162,7 +162,7 @@ test('validator not interfering - 1', async () => {
     const schema = union(
         object({
             first: number().min(100)
-        }).addPreprocessor((obj) => {
+        }).addPreprocessor(obj => {
             if (typeof obj?.first === 'number') {
                 obj.first += 10;
                 (obj as any).newProp = 100;
@@ -172,7 +172,7 @@ test('validator not interfering - 1', async () => {
     ).or(
         object({
             first: number().min(20)
-        }).addPreprocessor((obj) => {
+        }).addPreprocessor(obj => {
             if (typeof obj?.first === 'number') {
                 obj.first += 5;
             }
@@ -477,11 +477,11 @@ test('getNestedErrors - object branch with property navigation', async () => {
     expect(typeof (option1 as any).getErrorsFor).toEqual('function');
 
     // Drill into the object branch errors
-    const fromErrors = option1.getErrorsFor((t) => t.from);
+    const fromErrors = option1.getErrorsFor(t => t.from);
     expect(fromErrors).toBeDefined();
     expect(fromErrors.errors.length > 0).toEqual(true);
 
-    const toErrors = option1.getErrorsFor((t) => t.to);
+    const toErrors = option1.getErrorsFor(t => t.to);
     expect(toErrors).toBeDefined();
     expect(toErrors.errors.length > 0).toEqual(true);
 });

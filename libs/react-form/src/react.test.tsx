@@ -203,7 +203,7 @@ describe('form.useField', () => {
     test('reads initial value from form state', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -217,7 +217,7 @@ describe('form.useField', () => {
     test('onChange updates field value', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -232,7 +232,7 @@ describe('form.useField', () => {
     test('onBlur sets touched', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -248,7 +248,7 @@ describe('form.useField', () => {
     test('setValue works same as onChange', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -263,7 +263,7 @@ describe('form.useField', () => {
     test('returns schema for the field', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { nameField };
         });
 
@@ -275,7 +275,7 @@ describe('form.useField', () => {
     test('onChange updates the underlying object via PropertyDescriptor', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -290,8 +290,8 @@ describe('form.useField', () => {
     test('multiple fields can be used independently', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -318,7 +318,7 @@ describe('nested fields', () => {
     test('useField works with nested selectors', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(NestedSchema);
-            const cityField = form.useField((t) => t.user.address.city);
+            const cityField = form.useField(t => t.user.address.city);
             return { form, cityField };
         });
 
@@ -328,7 +328,7 @@ describe('nested fields', () => {
     test('onChange creates missing nested structure', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(NestedSchema);
-            const cityField = form.useField((t) => t.user.address.city);
+            const cityField = form.useField(t => t.user.address.city);
             return { form, cityField };
         });
 
@@ -349,7 +349,7 @@ describe('nested fields', () => {
             const form = useSchemaForm(NestedSchema, {
                 createMissingStructure: false
             });
-            const cityField = form.useField((t) => t.user.address.city);
+            const cityField = form.useField(t => t.user.address.city);
             return { form, cityField };
         });
 
@@ -368,8 +368,8 @@ describe('validation', () => {
     test('validate sets errors on fields', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -385,8 +385,8 @@ describe('validation', () => {
     test('validate clears errors when values are valid', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -435,9 +435,9 @@ describe('validateOnMount', () => {
             const form = useSchemaForm(UserSchema, {
                 validateOnMount: true
             });
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
-            const ageField = form.useField((t) => t.age);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
+            const ageField = form.useField(t => t.age);
             return { form, nameField, emailField, ageField };
         });
 
@@ -456,7 +456,7 @@ describe('validateOnMount', () => {
     test('does not validate on mount by default', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -472,8 +472,8 @@ describe('validateOnMount', () => {
             const form = useSchemaForm(UserSchema, {
                 validateOnMount: true
             });
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -505,8 +505,8 @@ describe('validationDebounceMs', () => {
                 const form = useSchemaForm(UserSchema, {
                     validationDebounceMs: 200
                 });
-                const nameField = form.useField((t) => t.name);
-                const emailField = form.useField((t) => t.email);
+                const nameField = form.useField(t => t.name);
+                const emailField = form.useField(t => t.email);
                 return { form, nameField, emailField };
             });
 
@@ -541,7 +541,7 @@ describe('validationDebounceMs', () => {
                 const form = useSchemaForm(UserSchema, {
                     validationDebounceMs: 500
                 });
-                const nameField = form.useField((t) => t.name);
+                const nameField = form.useField(t => t.name);
                 return { form, nameField };
             });
 
@@ -559,8 +559,8 @@ describe('validationDebounceMs', () => {
     test('without validationDebounceMs, onChange validates immediately', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
             return { form, nameField, emailField };
         });
 
@@ -688,7 +688,7 @@ describe('context-based useField', () => {
         const wrapper = createFormWrapper(formResult.current);
 
         const { result } = renderHook(
-            () => useField<typeof UserSchema, any>((t) => t.name),
+            () => useField<typeof UserSchema, any>(t => t.name),
             { wrapper }
         );
 
@@ -981,7 +981,7 @@ describe('reset and dirty tracking', () => {
     test('reset clears field values and dirty state', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -1002,7 +1002,7 @@ describe('reset and dirty tracking', () => {
     test('field tracks dirty based on initial value comparison', () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
+            const nameField = form.useField(t => t.name);
             return { form, nameField };
         });
 
@@ -1022,9 +1022,9 @@ describe('reset and dirty tracking', () => {
 describe('async validation', () => {
     test('supports schemas with async validators', async () => {
         const asyncSchema = object({
-            username: string().addValidator(async (val) => {
+            username: string().addValidator(async val => {
                 // Simulate async check
-                await new Promise((resolve) => setTimeout(resolve, 10));
+                await new Promise(resolve => setTimeout(resolve, 10));
                 if (val === 'taken') {
                     return {
                         valid: false,
@@ -1037,7 +1037,7 @@ describe('async validation', () => {
 
         const { result } = renderHook(() => {
             const form = useSchemaForm(asyncSchema);
-            const usernameField = form.useField((t) => t.username);
+            const usernameField = form.useField(t => t.username);
             return { form, usernameField };
         });
 
@@ -1060,9 +1060,9 @@ describe('integration', () => {
     test('full form lifecycle: init, fill, validate, submit, reset', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(UserSchema);
-            const nameField = form.useField((t) => t.name);
-            const emailField = form.useField((t) => t.email);
-            const ageField = form.useField((t) => t.age);
+            const nameField = form.useField(t => t.name);
+            const emailField = form.useField(t => t.email);
+            const ageField = form.useField(t => t.age);
             return { form, nameField, emailField, ageField };
         });
 
@@ -1113,8 +1113,8 @@ describe('integration', () => {
         const { result } = renderHook(() => {
             const form1 = useSchemaForm(UserSchema);
             const form2 = useSchemaForm(AddressSchema);
-            const name = form1.useField((t) => t.name);
-            const city = form2.useField((t) => t.city);
+            const name = form1.useField(t => t.name);
+            const city = form2.useField(t => t.city);
             return { form1, form2, name, city };
         });
 
@@ -1359,9 +1359,9 @@ describe('nested form validation', () => {
     test('nested fields show errors after validate', async () => {
         const { result } = renderHook(() => {
             const form = useSchemaForm(NestedSchema);
-            const city = form.useField((t) => t.user.address.city);
-            const zip = form.useField((t) => t.user.address.zip);
-            const name = form.useField((t) => t.user.name);
+            const city = form.useField(t => t.user.address.city);
+            const zip = form.useField(t => t.user.address.zip);
+            const name = form.useField(t => t.user.name);
             return { form, city, zip, name };
         });
 

@@ -694,7 +694,7 @@ test('getNestedErrors - object elements with property navigation', async () => {
     expect(first.valid).toEqual(false);
     expect(typeof first.getErrorsFor).toEqual('function');
 
-    const ageErrors = first.getErrorsFor((t) => t.age);
+    const ageErrors = first.getErrorsFor(t => t.age);
     expect(ageErrors.errors.length).toBeGreaterThan(0);
 });
 

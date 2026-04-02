@@ -131,7 +131,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             stderr: true,
             stdout: true
         });
-        const promise = new Promise<WorkerResult>((resolve) => {
+        const promise = new Promise<WorkerResult>(resolve => {
             let timedOut = false;
             let isFinished = false;
             let error: Error | undefined;
@@ -433,7 +433,7 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
                     }
 
                     const alreadyScheduled = scheduledInstances.find(
-                        (i) => i.index === index
+                        i => i.index === index
                     );
                     if (alreadyScheduled) continue;
 

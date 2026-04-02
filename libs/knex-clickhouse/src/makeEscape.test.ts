@@ -170,7 +170,7 @@ describe('makeEscape', () => {
         test('custom escapeArray', () => {
             const customEscape = makeEscape({
                 escapeArray: (arr: any[], esc: any) =>
-                    `[${arr.map((v) => esc(v)).join(';')}]`
+                    `[${arr.map(v => esc(v)).join(';')}]`
             });
             expect(customEscape([1, 2, 3])).toBe('[1;2;3]');
         });

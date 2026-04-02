@@ -381,7 +381,7 @@ test('min - 4', async () => {
 
 test('validator - 1', async () => {
     const builder = date();
-    const newBuilder = builder.addValidator((date) => {
+    const newBuilder = builder.addValidator(date => {
         return date?.getDate() & 1
             ? { valid: true }
             : {
@@ -406,7 +406,7 @@ test('validator - 1', async () => {
 test('preprocessor - 1', async () => {
     const builder = date();
     const newBuilder = builder
-        .addPreprocessor((d) =>
+        .addPreprocessor(d =>
             d < new Date(2022, 0, 1) ? new Date(2022, 0, 1) : d
         )
         .min(new Date(2021, 0, 1));

@@ -144,7 +144,7 @@ export const numberExtensions = defineExtension({
             this: NumberSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
-            return this.withExtension('positive', true).addValidator((val) => {
+            return this.withExtension('positive', true).addValidator(val => {
                 if (typeof val !== 'number')
                     return validationFail(
                         errorMessage,
@@ -179,7 +179,7 @@ export const numberExtensions = defineExtension({
             this: NumberSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
-            return this.withExtension('negative', true).addValidator((val) => {
+            return this.withExtension('negative', true).addValidator(val => {
                 if (typeof val !== 'number')
                     return validationFail(
                         errorMessage,
@@ -214,7 +214,7 @@ export const numberExtensions = defineExtension({
             this: NumberSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
         ) {
-            return this.withExtension('finite', true).addValidator((val) => {
+            return this.withExtension('finite', true).addValidator(val => {
                 if (typeof val !== 'number')
                     return validationFail(
                         errorMessage,
@@ -258,7 +258,7 @@ export const numberExtensions = defineExtension({
                     'multipleOf: n must be a finite, non-zero number'
                 );
             }
-            return this.withExtension('multipleOf', n).addValidator((val) => {
+            return this.withExtension('multipleOf', n).addValidator(val => {
                 if (typeof val !== 'number')
                     return validationFail(
                         errorMessage,

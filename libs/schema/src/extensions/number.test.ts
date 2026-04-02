@@ -38,7 +38,7 @@ describe('number extensions', () => {
 
         test('uses function error message', async () => {
             const result = number()
-                .positive((val) => `${val} is not positive`)
+                .positive(val => `${val} is not positive`)
                 .validate(-3);
             expect(result.valid).toBe(false);
             expect(result.errors?.[0].message).toBe('-3 is not positive');

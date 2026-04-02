@@ -213,7 +213,7 @@ export const stringExtensions = defineExtension({
             this: StringSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
-            return this.withExtension('email', true).addValidator((val) => {
+            return this.withExtension('email', true).addValidator(val => {
                 if (typeof val !== 'string')
                     return validationFail(
                         errorMessage,
@@ -271,7 +271,7 @@ export const stringExtensions = defineExtension({
             if (
                 opts?.protocols !== undefined &&
                 (opts.protocols.length === 0 ||
-                    opts.protocols.some((p) => !p || p.trim() === ''))
+                    opts.protocols.some(p => !p || p.trim() === ''))
             ) {
                 throw new Error(
                     'url: opts.protocols must be a non-empty array of non-empty strings'
@@ -280,7 +280,7 @@ export const stringExtensions = defineExtension({
             const protocols = opts?.protocols ?? ['http', 'https'];
             const meta = opts?.protocols ? { protocols: opts.protocols } : true;
 
-            return this.withExtension('url', meta).addValidator((val) => {
+            return this.withExtension('url', meta).addValidator(val => {
                 if (typeof val !== 'string')
                     return validationFail(
                         errorMessage,
@@ -320,7 +320,7 @@ export const stringExtensions = defineExtension({
             this: StringSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
-            return this.withExtension('uuid', true).addValidator((val) => {
+            return this.withExtension('uuid', true).addValidator(val => {
                 if (typeof val !== 'string')
                     return validationFail(
                         errorMessage,
@@ -364,7 +364,7 @@ export const stringExtensions = defineExtension({
             const version = opts?.version;
             const meta = version ? { version } : true;
 
-            return this.withExtension('ip', meta).addValidator((val) => {
+            return this.withExtension('ip', meta).addValidator(val => {
                 const defaultMsg = version
                     ? `must be a valid ${version} IP address`
                     : 'must be a valid IP address';
@@ -394,7 +394,7 @@ export const stringExtensions = defineExtension({
          * ```
          */
         trim(this: StringSchemaBuilder) {
-            return this.addPreprocessor((val) =>
+            return this.addPreprocessor(val =>
                 typeof val === 'string' ? val.trim() : val
             );
         },
@@ -410,7 +410,7 @@ export const stringExtensions = defineExtension({
          * ```
          */
         toLowerCase(this: StringSchemaBuilder) {
-            return this.addPreprocessor((val) =>
+            return this.addPreprocessor(val =>
                 typeof val === 'string' ? val.toLowerCase() : val
             );
         },
@@ -431,7 +431,7 @@ export const stringExtensions = defineExtension({
             this: StringSchemaBuilder,
             errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
         ) {
-            return this.withExtension('nonempty', true).addValidator((val) => {
+            return this.withExtension('nonempty', true).addValidator(val => {
                 if (typeof val !== 'string')
                     return validationFail(
                         errorMessage,

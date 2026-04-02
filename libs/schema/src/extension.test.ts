@@ -24,7 +24,7 @@ const emailExt = defineExtension({
     string: {
         email(this: StringSchemaBuilder, opts?: { domains?: string[] }) {
             return this.withExtension('email', opts ?? true).addValidator(
-                (val) => {
+                val => {
                     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
                     if (valid && opts?.domains && opts.domains.length > 0) {
                         const domain = val.split('@')[1];
@@ -54,7 +54,7 @@ const urlExt = defineExtension({
     string: {
         url(this: StringSchemaBuilder, opts?: { protocols?: string[] }) {
             const protocols = opts?.protocols ?? ['http', 'https'];
-            return this.addValidator((val) => {
+            return this.addValidator(val => {
                 try {
                     const parsed = new URL(val);
                     const protoOk = protocols.includes(
@@ -84,7 +84,7 @@ const urlExt = defineExtension({
 const trimmedExt = defineExtension({
     string: {
         trimmed(this: StringSchemaBuilder) {
-            return this.addPreprocessor((val) =>
+            return this.addPreprocessor(val =>
                 typeof val === 'string' ? val.trim() : val
             );
         }
@@ -94,7 +94,7 @@ const trimmedExt = defineExtension({
 const slugExt = defineExtension({
     string: {
         slug(this: StringSchemaBuilder) {
-            return this.addValidator((val) => {
+            return this.addValidator(val => {
                 const valid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(val);
                 return {
                     valid,
@@ -110,7 +110,7 @@ const slugExt = defineExtension({
 const rangeExt = defineExtension({
     number: {
         range(this: NumberSchemaBuilder, min: number, max: number) {
-            return this.addValidator((val) => {
+            return this.addValidator(val => {
                 const n = val;
                 const valid = n >= min && n <= max;
                 return {
@@ -148,7 +148,7 @@ const currencyExt = defineExtension({
             return this.withExtension('currency', { maxDecimals: maxDec })
                 .clearIsInteger()
                 .min(0)
-                .addValidator((val) => {
+                .addValidator(val => {
                     const parts = String(val).split('.');
                     const decimals = parts[1]?.length ?? 0;
                     const valid = decimals <= maxDec;
@@ -177,17 +177,15 @@ const toggleExt = defineExtension({
     boolean: {
         toggle(this: BooleanSchemaBuilder, label: string) {
             // Add a validator and set metadata as expected by tests
-            return this.withExtension('toggle', { label }).addValidator(
-                (val) => {
-                    const valid = typeof val === 'boolean';
-                    return {
-                        valid,
-                        errors: valid
-                            ? []
-                            : [{ message: 'must be a boolean toggle' }]
-                    };
-                }
-            );
+            return this.withExtension('toggle', { label }).addValidator(val => {
+                const valid = typeof val === 'boolean';
+                return {
+                    valid,
+                    errors: valid
+                        ? []
+                        : [{ message: 'must be a boolean toggle' }]
+                };
+            });
         }
     }
 });
@@ -205,7 +203,7 @@ const consentExt = defineExtension({
 const ageExt = defineExtension({
     date: {
         minAge(this: DateSchemaBuilder, years: number) {
-            return this.addValidator((val) => {
+            return this.addValidator(val => {
                 const d = val;
                 const now = new Date();
                 const age = now.getFullYear() - d.getFullYear();
@@ -228,7 +226,7 @@ const ageExt = defineExtension({
 const businessDayExt = defineExtension({
     date: {
         businessDay(this: DateSchemaBuilder) {
-            return this.addValidator((val) => {
+            return this.addValidator(val => {
                 const d = val;
                 const day = d.getDay();
                 const valid = day !== 0 && day !== 6;
@@ -266,7 +264,7 @@ const softDeleteExt = defineExtension({
 const uniqueExt = defineExtension({
     array: {
         unique(this: ArraySchemaBuilder<any, any, any, any, any>) {
-            return this.addValidator((val) => {
+            return this.addValidator(val => {
                 const arr = val;
                 const unique = new Set(arr).size === arr.length;
                 return {
@@ -294,7 +292,7 @@ const labeledExt = defineExtension({
     union: {
         labeled(this: UnionSchemaBuilder<any, any, any, any>, label: string) {
             // Attach label metadata and add a dummy validator
-            return this.withExtension('label', label).addValidator((_val) => {
+            return this.withExtension('label', label).addValidator(_val => {
                 // No-op validator, just for demonstration
                 return { valid: true, errors: [] };
             });
@@ -312,7 +310,7 @@ const debouncedExt = defineExtension({
                 let timeout: any;
                 return function (this: any, ...args: any[]) {
                     clearTimeout(timeout);
-                    return new Promise((resolve) => {
+                    return new Promise(resolve => {
                         timeout = setTimeout(
                             () => resolve(fn.apply(this, args)),
                             wait
@@ -321,7 +319,7 @@ const debouncedExt = defineExtension({
                 };
             }
             return this.withExtension('debounced', { ms }).addPreprocessor(
-                (fn) => {
+                fn => {
                     if (typeof fn !== 'function') return fn;
                     return debounce(fn, ms);
                 }
