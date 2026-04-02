@@ -598,6 +598,42 @@ export class ObjectSchemaBuilder<
                     }
                 };
             }
+
+            if (!this.#acceptUnknownProps) {
+                for (let i = 0; i < objKeys.length; i++) {
+                    const message = `unknown property '${objKeys[i]}'`;
+                    errors.push({
+                        message,
+                        path: path as string
+                    });
+                    if (!doNotStopOnFirstError) {
+                        break;
+                    }
+                }
+                if (validationTransaction) {
+                    validationTransaction.rollback();
+                }
+                return {
+                    earlyReturn: true as const,
+                    result: {
+                        valid: false,
+                        errors: doNotStopOnFirstError ? errors : [errors[0]],
+                        getErrorsFor
+                    }
+                };
+            }
+
+            if (validationTransaction) {
+                validationTransaction.commit();
+            }
+            return {
+                earlyReturn: true as const,
+                result: {
+                    valid: true,
+                    object: { ...objToValidate } as any,
+                    getErrorsFor
+                }
+            };
         }
 
         return {
