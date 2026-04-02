@@ -1,9 +1,38 @@
 'use client';
 
-import type { ExecutionResult } from '../useSchemaExecution';
+import type { ExecutionResult, ErrorTreeNode } from '../useSandboxExecutor';
 
 interface Props {
     result: ExecutionResult;
+}
+
+function ErrorTreeView({ tree, depth = 0 }: { tree: Record<string, ErrorTreeNode>; depth?: number }) {
+    return (
+        <ul className="pg-error-tree" style={{ paddingLeft: depth > 0 ? 16 : 0 }}>
+            {Object.entries(tree).map(([name, node]) => (
+                <li key={name} className="pg-error-tree-node">
+                    <div className="pg-error-tree-prop">
+                        <span className="pg-error-tree-name">{name}</span>
+                        {node.seenValue !== undefined && (
+                            <span className="pg-error-tree-seen">
+                                {typeof node.seenValue === 'string'
+                                    ? `"${node.seenValue}"`
+                                    : String(node.seenValue ?? 'undefined')}
+                            </span>
+                        )}
+                    </div>
+                    {node.errors.length > 0 && (
+                        <ul className="pg-error-tree-messages">
+                            {node.errors.map((msg, i) => (
+                                <li key={i} className="pg-error-tree-msg">{msg}</li>
+                            ))}
+                        </ul>
+                    )}
+                    {node.children && <ErrorTreeView tree={node.children} depth={depth + 1} />}
+                </li>
+            ))}
+        </ul>
+    );
 }
 
 export function ValidationPanel({ result }: Props) {
@@ -55,7 +84,15 @@ export function ValidationPanel({ result }: Props) {
             )}
 
             {/* Errors */}
-            {vr?.errors && vr.errors.length > 0 && (
+            {vr?.errorTree && Object.keys(vr.errorTree).length > 0 && (
+                <div className="pg-result-section">
+                    <span className="pg-label">Errors</span>
+                    <ErrorTreeView tree={vr.errorTree} />
+                </div>
+            )}
+
+            {/* Flat errors fallback (non-object schemas) */}
+            {(!vr?.errorTree || Object.keys(vr.errorTree).length === 0) && vr?.errors && vr.errors.length > 0 && (
                 <div className="pg-result-section">
                     <span className="pg-label">Errors ({vr.errors.length})</span>
                     <ul className="pg-error-list">

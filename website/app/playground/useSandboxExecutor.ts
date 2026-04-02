@@ -2,11 +2,18 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 
+export interface ErrorTreeNode {
+    errors: string[];
+    seenValue?: unknown;
+    children?: Record<string, ErrorTreeNode>;
+}
+
 export interface ExecutionResult {
     validationResult?: {
         valid: boolean;
         object?: unknown;
         errors?: { path: string; message: string }[];
+        errorTree?: Record<string, ErrorTreeNode>;
     };
     introspection?: Record<string, unknown>;
     error?: string;
@@ -63,14 +70,111 @@ ${escaped}
         return result;
     }
 
-    function formatValidation(vr) {
-        return {
+    function formatValidation(vr, schemaObj) {
+        var result = {
             valid: vr.valid,
             object: vr.object,
             errors: vr.errors ? vr.errors.map(function(e) {
                 return { path: e.path || '$', message: e.message || 'Validation failed' };
             }) : undefined
         };
+        if (schemaObj && typeof vr.getErrorsFor === 'function') {
+            try {
+                result.errorTree = buildErrorTree(vr, schemaObj);
+            } catch(e) {}
+        }
+        return result;
+    }
+
+    function buildErrorTree(vr, schemaObj) {
+        var tree = {};
+        var intro;
+        try { intro = schemaObj.introspect(); } catch(e) { return tree; }
+        if (!intro || !intro.properties) return tree;
+        var propNames = Object.keys(intro.properties);
+        for (var i = 0; i < propNames.length; i++) {
+            var propName = propNames[i];
+            try {
+                var selector = (function(name) {
+                    return function(t) { return t[name]; };
+                })(propName);
+                var propResult = vr.getErrorsFor(selector);
+                if (!propResult) continue;
+                var node = { errors: [] };
+                if (propResult.errors && propResult.errors.length > 0) {
+                    node.errors = Array.prototype.slice.call(propResult.errors);
+                }
+                if (propResult.seenValue !== undefined) {
+                    node.seenValue = propResult.seenValue;
+                }
+                // Recurse into nested object properties
+                var propSchema = intro.properties[propName];
+                if (propSchema && typeof propSchema.introspect === 'function') {
+                    var propIntro = propSchema.introspect();
+                    if (propIntro && propIntro.type === 'object' && typeof propResult.getChildErrors === 'function') {
+                        var childErrors = propResult.getChildErrors();
+                        if (childErrors && childErrors.length > 0) {
+                            var childResult = buildChildErrorTree(propResult, propSchema);
+                            if (childResult && Object.keys(childResult).length > 0) {
+                                node.children = childResult;
+                            }
+                        }
+                    }
+                }
+                if (node.errors.length > 0 || node.children) {
+                    tree[propName] = node;
+                }
+            } catch(e) {}
+        }
+        return tree;
+    }
+
+    function buildChildErrorTree(parentResult, parentSchema) {
+        var tree = {};
+        var intro;
+        try { intro = parentSchema.introspect(); } catch(e) { return tree; }
+        if (!intro || !intro.properties) return tree;
+        var propNames = Object.keys(intro.properties);
+        var childErrors = parentResult.getChildErrors ? parentResult.getChildErrors() : [];
+        for (var i = 0; i < propNames.length; i++) {
+            var propName = propNames[i];
+            // Find matching child error by checking descriptors
+            for (var j = 0; j < childErrors.length; j++) {
+                var child = childErrors[j];
+                if (!child || !child.descriptor) continue;
+                try {
+                    var childSchema = child.descriptor.getSchema();
+                    var expectedSchema = intro.properties[propName];
+                    if (childSchema === expectedSchema) {
+                        var node = { errors: [] };
+                        if (child.errors && child.errors.length > 0) {
+                            node.errors = Array.prototype.slice.call(child.errors);
+                        }
+                        if (child.seenValue !== undefined) {
+                            node.seenValue = child.seenValue;
+                        }
+                        // Further nesting
+                        if (expectedSchema && typeof expectedSchema.introspect === 'function') {
+                            var nestedIntro = expectedSchema.introspect();
+                            if (nestedIntro && nestedIntro.type === 'object' && typeof child.getChildErrors === 'function') {
+                                var nestedChildren = child.getChildErrors();
+                                if (nestedChildren && nestedChildren.length > 0) {
+                                    var nested = buildChildErrorTree(child, expectedSchema);
+                                    if (nested && Object.keys(nested).length > 0) {
+                                        node.children = nested;
+                                    }
+                                }
+                            }
+                        }
+                        if (node.errors.length > 0 || node.children) {
+                            tree[propName] = node;
+                        }
+                        break;
+                    }
+                } catch(e) {}
+            }
+        }
+        return tree;
     }
 
     self.addEventListener('message', function(event) {
@@ -135,12 +239,12 @@ ${escaped}
             }
 
             if (execResult.__lastResult && typeof execResult.__lastResult === 'object' && 'valid' in execResult.__lastResult) {
-                output.validationResult = formatValidation(execResult.__lastResult);
+                output.validationResult = formatValidation(execResult.__lastResult, execResult.__lastSchema);
             } else if (execResult.__lastSchema && typeof execResult.__lastSchema.validate === 'function' && testData) {
                 try {
                     var parsed = JSON.parse(testData);
                     var vr = execResult.__lastSchema.validate(parsed);
-                    output.validationResult = formatValidation(vr);
+                    output.validationResult = formatValidation(vr, execResult.__lastSchema);
                 } catch(e) {}
             }
 

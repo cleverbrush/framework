@@ -1729,6 +1729,59 @@ pre code {
     color: var(--text-secondary);
 }
 
+/* Error Tree */
+.pg-error-tree {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.pg-error-tree-node {
+    padding: 6px 10px;
+    background: rgba(239, 68, 68, 0.04);
+    border: 1px solid rgba(239, 68, 68, 0.10);
+    border-radius: var(--radius-sm);
+}
+
+.pg-error-tree-prop {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.pg-error-tree-name {
+    font-size: 0.75rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 600;
+    color: #f87171;
+}
+
+.pg-error-tree-seen {
+    font-size: 0.7rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    opacity: 0.7;
+}
+
+.pg-error-tree-messages {
+    list-style: none;
+    margin: 2px 0 0;
+    padding: 0 0 0 12px;
+}
+
+.pg-error-tree-msg {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.pg-error-tree-node .pg-error-tree {
+    margin-top: 4px;
+}
+
 /* Type Panel */
 .pg-type-placeholder {
     color: var(--text-muted);
