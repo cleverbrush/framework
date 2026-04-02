@@ -9,6 +9,7 @@ const NAV_ITEMS = [
     { href: '/schema', label: 'Schema' },
     { href: '/mapper', label: 'Mapper' },
     { href: '/react-form', label: 'React Form' },
+    { href: '/migrating-from-zod', label: 'Migrate from Zod' },
     { href: '/playground', label: 'Playground', highlight: true },
     { href: '/api-docs', label: 'API Docs' }
 ];
