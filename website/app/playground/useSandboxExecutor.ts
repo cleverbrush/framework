@@ -6,6 +6,7 @@ export interface ErrorTreeNode {
     errors: string[];
     seenValue?: unknown;
     children?: Record<string, ErrorTreeNode>;
+    getErrorsForResult?: unknown;
 }
 
 export interface ExecutionResult {
@@ -107,6 +108,18 @@ ${escaped}
                 if (propResult.seenValue !== undefined) {
                     node.seenValue = propResult.seenValue;
                 }
+                // Serialize non-function fields from propResult for tooltip display
+                try {
+                    var serialized = {
+                        isValid: propResult.isValid,
+                        errors: propResult.errors ? Array.prototype.slice.call(propResult.errors) : [],
+                        seenValue: propResult.seenValue
+                    };
+                    if (serialized.seenValue === undefined) {
+                        delete serialized.seenValue;
+                    }
+                    node.getErrorsForResult = serialized;
+                } catch(se) {}
                 // Recurse into nested object properties
                 var propSchema = intro.properties[propName];
                 if (propSchema && typeof propSchema.introspect === 'function') {

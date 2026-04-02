@@ -6,45 +6,83 @@ interface Props {
     result: ExecutionResult;
 }
 
+function GetErrorsForLabel({
+    selectorExpr,
+    tooltipData
+}: {
+    selectorExpr: string;
+    tooltipData: unknown;
+}) {
+    const label = `getErrorsFor(t => t.${selectorExpr})`;
+    const json = JSON.stringify(tooltipData, null, 2);
+
+    return (
+        <span className="pg-getErrors-wrap">
+            <span className="pg-getErrors-label">{label}</span>
+            <pre className="pg-getErrors-tooltip">{json}</pre>
+        </span>
+    );
+}
+
 function ErrorTreeView({
     tree,
-    depth = 0
+    depth = 0,
+    path = ''
 }: {
     tree: Record<string, ErrorTreeNode>;
     depth?: number;
+    path?: string;
 }) {
     return (
         <ul
             className="pg-error-tree"
             style={{ paddingLeft: depth > 0 ? 16 : 0 }}
         >
-            {Object.entries(tree).map(([name, node]) => (
-                <li key={name} className="pg-error-tree-node">
-                    <div className="pg-error-tree-prop">
-                        <span className="pg-error-tree-name">{name}</span>
-                        {node.seenValue !== undefined && (
-                            <span className="pg-error-tree-seen">
-                                {typeof node.seenValue === 'string'
-                                    ? `"${node.seenValue}"`
-                                    : String(node.seenValue ?? 'undefined')}
-                            </span>
+            {Object.entries(tree).map(([name, node]) => {
+                const propPath = path ? `${path}.${name}` : name;
+                return (
+                    <li key={name} className="pg-error-tree-node">
+                        <div className="pg-error-tree-prop">
+                            <span className="pg-error-tree-name">{name}</span>
+                            {node.seenValue !== undefined && (
+                                <span className="pg-error-tree-seen">
+                                    {typeof node.seenValue === 'string'
+                                        ? `"${node.seenValue}"`
+                                        : String(node.seenValue ?? 'undefined')}
+                                </span>
+                            )}
+                        </div>
+                        {node.errors.length > 0 && (
+                            <ul className="pg-error-tree-messages">
+                                {node.errors.map((msg, i) => (
+                                    // biome-ignore lint/suspicious/noArrayIndexKey: error messages may repeat; no stable identifier available
+                                    <li key={i} className="pg-error-tree-msg">
+                                        <span className="pg-error-tree-msg-text">
+                                            {msg}
+                                        </span>
+                                        {node.getErrorsForResult !==
+                                            undefined && (
+                                            <GetErrorsForLabel
+                                                selectorExpr={propPath}
+                                                tooltipData={
+                                                    node.getErrorsForResult
+                                                }
+                                            />
+                                        )}
+                                    </li>
+                                ))}
+                            </ul>
                         )}
-                    </div>
-                    {node.errors.length > 0 && (
-                        <ul className="pg-error-tree-messages">
-                            {node.errors.map((msg, i) => (
-                                // biome-ignore lint/suspicious/noArrayIndexKey: error messages may repeat; no stable identifier available
-                                <li key={i} className="pg-error-tree-msg">
-                                    {msg}
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                    {node.children && (
-                        <ErrorTreeView tree={node.children} depth={depth + 1} />
-                    )}
-                </li>
-            ))}
+                        {node.children && (
+                            <ErrorTreeView
+                                tree={node.children}
+                                depth={depth + 1}
+                                path={propPath}
+                            />
+                        )}
+                    </li>
+                );
+            })}
         </ul>
     );
 }
