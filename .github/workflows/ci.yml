@@ -26,8 +26,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
 
-      - run: npm ci
-      - run: cd website && npm ci
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install website dependencies
+        run: cd website && npm ci
 
       - name: Lint
         run: npm run lint
