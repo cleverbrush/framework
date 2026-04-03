@@ -48,7 +48,10 @@ export function loadBenchmarks(): BenchmarkGroup[] {
     try {
         raw = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
     } catch (err) {
-        console.error('[loadBenchmarks] Failed to read bench-results.json:', err);
+        console.error(
+            '[loadBenchmarks] Failed to read bench-results.json:',
+            err
+        );
         cachedBenchmarks = [];
         return cachedBenchmarks;
     }
@@ -66,7 +69,11 @@ export function loadBenchmarks(): BenchmarkGroup[] {
     const groups: BenchmarkGroup[] = [];
 
     for (const file of (raw as { files: unknown[] }).files) {
-        if (!file || typeof file !== 'object' || !Array.isArray((file as { groups: unknown }).groups)) {
+        if (
+            !file ||
+            typeof file !== 'object' ||
+            !Array.isArray((file as { groups: unknown }).groups)
+        ) {
             continue;
         }
 
@@ -88,13 +95,13 @@ export function loadBenchmarks(): BenchmarkGroup[] {
 
             groups.push({
                 label: GROUP_LABELS[matchedKey],
-                entries: (group as { benchmarks: BenchmarkEntry[] }).benchmarks.map(
-                    (b) => ({
-                        name: b.name,
-                        hz: b.hz,
-                        rank: b.rank
-                    })
-                )
+                entries: (
+                    group as { benchmarks: BenchmarkEntry[] }
+                ).benchmarks.map(b => ({
+                    name: b.name,
+                    hz: b.hz,
+                    rank: b.rank
+                }))
             });
         }
     }
