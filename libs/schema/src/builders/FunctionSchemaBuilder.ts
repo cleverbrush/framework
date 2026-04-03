@@ -88,11 +88,9 @@ export class FunctionSchemaBuilder<
     ): ValidationResult<TResult> {
         const {
             valid,
-            context: prevalidationContext,
             transaction: preValidationTransaction,
             errors
         } = superResult;
-        const { path } = prevalidationContext;
 
         if (!valid) {
             return { valid, errors };
@@ -117,8 +115,7 @@ export class FunctionSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `expected type function, but saw ${typeof objToValidate}`,
-                        path: path as string
+                        message: `expected type function, but saw ${typeof objToValidate}`
                     }
                 ]
             };

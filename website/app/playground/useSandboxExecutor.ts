@@ -13,7 +13,7 @@ export interface ExecutionResult {
     validationResult?: {
         valid: boolean;
         object?: unknown;
-        errors?: { path: string; message: string }[];
+        errors?: { message: string }[];
         errorTree?: Record<string, ErrorTreeNode>;
     };
     introspection?: Record<string, unknown>;
@@ -76,7 +76,7 @@ ${escaped}
             valid: vr.valid,
             object: vr.object,
             errors: vr.errors ? vr.errors.map(function(e) {
-                return { path: e.path || '$', message: e.message || 'Validation failed' };
+                return { message: e.message || 'Validation failed' };
             }) : undefined
         };
         if (schemaObj && typeof vr.getErrorsFor === 'function') {

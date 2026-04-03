@@ -18,6 +18,8 @@
 - **`ObjectSchemaBuilder.getPropertiesFor(schema)`** — new static method to obtain a property descriptor tree for any object schema.
 - **`ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)`** — new static method to validate whether an object is a valid property descriptor.
 - **Enhanced validation error reporting** — `ObjectSchemaValidationResult` now exposes a `getErrorsFor(selector)` method that returns per-property validation results (`PropertyValidationResult`) for any property in the schema tree.
+- **Removed `path` from `ValidationError`** — the `ValidationError` type is now `{ message: string }` instead of `{ path: string; message: string }`. String-based path concatenation was a major performance bottleneck. Use `getErrorsFor()` with PropertyDescriptors for per-property error inspection instead — it is type-safe and zero-cost on the valid path.
+- **Removed `path` from `ValidationContext`** — the `path` field on `ValidationContext` has been removed. It was only used internally to build the now-removed `ValidationError.path` strings.
 - **`ArraySchemaValidationResult.getNestedErrors()`** — returns per-element validation results including element-level errors and root-level array errors.
 - **`PropertyValidationResult` class** — new mutable container for tracking per-property validation errors, child errors, and accumulated error messages during object validation.
 - **Custom error messages on `required()`** — all schema builders (`string`, `number`, `boolean`, `date`, `array`, `object`, `any`, `function`, `union`) now accept an optional `errorMessage` parameter on `.required()` for custom required-field messages.
@@ -77,7 +79,7 @@ A headless, schema-driven form system for React based on `@cleverbrush/schema`.
 - **`Field` component** — declarative component that renders a field using the registered renderer for its schema type.
 - **`useFormSystem()`** — hook to access the current `FormSystemConfig` from context.
 - **Per-field validation** — validates on every field change with concurrent validation handling (generation counter to discard stale results).
-- **Nested object support** — full support for nested object schemas with path-based error matching.
+- **Nested object support** — full support for nested object schemas with PropertyDescriptor-based error reporting.
 - **Headless by default** — no built-in UI; bring your own renderers via `FormSystemProvider`.
 - **Depends on** `@cleverbrush/schema@^2.0.0` and `react@>=18.0.0`.
 

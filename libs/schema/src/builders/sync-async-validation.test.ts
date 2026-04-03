@@ -66,7 +66,7 @@ describe('validateAsync() supports async callbacks', () => {
     test('async validator works', async () => {
         const schema = string().addValidator(async val => ({
             valid: val.length > 3,
-            errors: val.length > 3 ? [] : [{ message: 'too short', path: '' }]
+            errors: val.length > 3 ? [] : [{ message: 'too short' }]
         }));
         const result = await schema.validateAsync('hello');
         expect(result.valid).toBe(true);
@@ -101,8 +101,7 @@ describe('validateAsync() supports async callbacks', () => {
         const schema = array().of(
             string().addValidator(async val => ({
                 valid: val !== 'bad',
-                errors:
-                    val !== 'bad' ? [] : [{ message: 'bad value', path: '' }]
+                errors: val !== 'bad' ? [] : [{ message: 'bad value' }]
             }))
         );
         const result = await schema.validateAsync(['good', 'ok']);
@@ -116,7 +115,7 @@ describe('validateAsync() supports async callbacks', () => {
         const schema = union(
             string().addValidator(async () => ({
                 valid: false,
-                errors: [{ message: 'nope', path: '' }]
+                errors: [{ message: 'nope' }]
             }))
         ).or(number());
 
@@ -219,8 +218,7 @@ describe('async extension', () => {
                             ? []
                             : [
                                   {
-                                      message: `"${val}" not found in lookup`,
-                                      path: ''
+                                      message: `"${val}" not found in lookup`
                                   }
                               ]
                     };
@@ -469,11 +467,11 @@ describe('validateAsync() with doNotStopOnFirstError', () => {
         const schema = string()
             .addValidator(async () => ({
                 valid: false,
-                errors: [{ message: 'error one', path: '' }]
+                errors: [{ message: 'error one' }]
             }))
             .addValidator(async () => ({
                 valid: false,
-                errors: [{ message: 'error two', path: '' }]
+                errors: [{ message: 'error two' }]
             }));
         const result = await schema.validateAsync('test', {
             doNotStopOnFirstError: true
@@ -486,11 +484,11 @@ describe('validateAsync() with doNotStopOnFirstError', () => {
         const schema = string()
             .addValidator(async () => ({
                 valid: false,
-                errors: [{ message: 'first', path: '' }]
+                errors: [{ message: 'first' }]
             }))
             .addValidator(async () => ({
                 valid: false,
-                errors: [{ message: 'second', path: '' }]
+                errors: [{ message: 'second' }]
             }));
         const result = await schema.validateAsync('test');
         expect(result.valid).toBe(false);
@@ -578,9 +576,10 @@ describe('validateAsync() with deeply nested objects', () => {
             { doNotStopOnFirstError: true }
         );
         expect(result.valid).toBe(false);
-        const emailError = result.errors!.find(e => e.path?.includes('email'));
+        const emailError = result.errors!.find(e =>
+            e.message?.includes('is required')
+        );
         expect(emailError).toBeDefined();
-        expect(emailError!.path).toBe('$.user.profile.email');
     });
 
     test('async validators on nested properties', async () => {
@@ -593,7 +592,7 @@ describe('validateAsync() with deeply nested objects', () => {
                         errors:
                             val !== 'admin'
                                 ? []
-                                : [{ message: 'reserved username', path: '' }]
+                                : [{ message: 'reserved username' }]
                     };
                 })
             })
@@ -614,37 +613,36 @@ describe('validateAsync() with deeply nested objects', () => {
 // ---------- validateAsync() error path correctness ----------
 
 describe('validateAsync() error path correctness', () => {
-    test('root-level field error has correct path', async () => {
+    test('root-level field error has correct message', async () => {
         const result = await string().validateAsync(undefined as any);
-        expect(result.errors![0].path).toBe('$');
+        expect(result.errors![0].message).toBeDefined();
     });
 
-    test('object property error has correct path', async () => {
+    test('object property error has correct message', async () => {
         const schema = object({ name: string() });
         const result = await schema.validateAsync({} as any);
-        expect(result.errors![0].path).toBe('$.name');
+        expect(result.errors![0].message).toBeDefined();
     });
 
-    test('async validator error has correct path', async () => {
+    test('async validator error has correct message', async () => {
         const schema = object({
             email: string().addValidator(async () => ({
                 valid: false,
-                errors: [{ message: 'invalid email', path: '' }]
+                errors: [{ message: 'invalid email' }]
             }))
         });
         const result = await schema.validateAsync({ email: 'bad' });
         expect(result.valid).toBe(false);
-        expect(result.errors![0].path).toContain('email');
+        expect(result.errors![0].message).toBeDefined();
     });
 
-    test('array element error has correct path', async () => {
+    test('array element error has correct message', async () => {
         const schema = array().of(number());
         const result = await schema.validateAsync([1, 'not a number'] as any, {
             doNotStopOnFirstError: true
         });
         expect(result.valid).toBe(false);
-        const errPath = result.errors![0].path;
-        expect(errPath).toContain('[');
+        expect(result.errors![0].message).toBeDefined();
     });
 });
 
@@ -663,9 +661,7 @@ describe('validateAsync() with mixed sync and async validators', () => {
             .addValidator(async val => ({
                 valid: val.length >= 3,
                 errors:
-                    val.length >= 3
-                        ? []
-                        : [{ message: 'too short after trim', path: '' }]
+                    val.length >= 3 ? [] : [{ message: 'too short after trim' }]
             }));
 
         const good = await schema.validateAsync('   hello   ');

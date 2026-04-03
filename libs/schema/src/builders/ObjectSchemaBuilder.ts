@@ -230,6 +230,7 @@ export class ObjectSchemaBuilder<
 > {
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
+    #propKeys: string[] = [];
 
     #propertyDescriptorTreeMap: PropertyDescriptorMap = new WeakMap() as any;
 
@@ -258,6 +259,7 @@ export class ObjectSchemaBuilder<
 
         if (typeof props.properties === 'object' && props.properties) {
             this.#properties = props.properties as any;
+            this.#propKeys = Object.keys(props.properties);
         }
 
         if (typeof props.acceptUnknownProps === 'boolean') {
@@ -413,7 +415,7 @@ export class ObjectSchemaBuilder<
             PropertyValidationResult<any, any>
         >() as any;
 
-        const { path, doNotStopOnFirstError, rootValidationObject } =
+        const { doNotStopOnFirstError, rootValidationObject } =
             prevalidationContext;
 
         const rootPropertyDescriptor: PropertyDescriptor<any, any, undefined> =
@@ -558,8 +560,7 @@ export class ObjectSchemaBuilder<
 
         if (typeof objToValidate !== 'object') {
             errors.push({
-                message: MUST_BE_AN_OBJECT_ERROR_MESSSAGE,
-                path: path as string
+                message: MUST_BE_AN_OBJECT_ERROR_MESSSAGE
             });
             addErrorFor(
                 currentPropertyDescriptor,
@@ -581,7 +582,7 @@ export class ObjectSchemaBuilder<
             }
         }
 
-        const propKeys = Object.keys(this.#properties);
+        const propKeys = this.#propKeys;
         const objKeys = Object.keys(objToValidate as Object);
 
         if (propKeys.length === 0) {
@@ -613,8 +614,7 @@ export class ObjectSchemaBuilder<
                 for (let i = 0; i < objKeys.length; i++) {
                     const message = `unknown property '${objKeys[i]}'`;
                     errors.push({
-                        message,
-                        path: path as string
+                        message
                     });
                     if (!doNotStopOnFirstError) {
                         break;
@@ -654,7 +654,6 @@ export class ObjectSchemaBuilder<
             objKeys,
             addErrorFor,
             getErrorsFor,
-            path: path as string,
             doNotStopOnFirstError: !!doNotStopOnFirstError,
             rootPropertyDescriptor,
             currentPropertyDescriptor,
@@ -679,7 +678,6 @@ export class ObjectSchemaBuilder<
                 parentPropertyDescriptor?: PropertyDescriptor<any, any, any>
             ) => void;
             getErrorsFor: any;
-            path: string;
             doNotStopOnFirstError: boolean;
             rootPropertyDescriptor: any;
             currentPropertyDescriptor: any;
@@ -692,7 +690,6 @@ export class ObjectSchemaBuilder<
             objKeys,
             addErrorFor,
             getErrorsFor,
-            path,
             doNotStopOnFirstError,
             currentPropertyDescriptor,
             validationTransaction
@@ -717,8 +714,7 @@ export class ObjectSchemaBuilder<
             if (!(key in this.#properties) && !this.#acceptUnknownProps) {
                 const message = `unknown property '${key}'`;
                 errors.push({
-                    message,
-                    path: path as string
+                    message
                 });
                 addErrorFor(currentPropertyDescriptor, message);
                 if (!doNotStopOnFirstError) {
@@ -760,26 +756,11 @@ export class ObjectSchemaBuilder<
                     typeof (result as any).getErrorsFor === 'function' &&
                     ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
                 ) {
-                    for (const nestedPropertyName in (
-                        ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(
-                            descriptor
-                        ).introspect() as any
-                    ).properties) {
-                        const nestedPropertyDescriptor =
-                            descriptor[nestedPropertyName];
-                        const nestedValidationError = (
-                            result as any
-                        ).getErrorsFor(() => nestedPropertyDescriptor);
-                        if (!nestedValidationError.isValid) {
-                            for (const validationError of nestedValidationError.errors) {
-                                addErrorFor(
-                                    nestedPropertyDescriptor,
-                                    validationError,
-                                    descriptor
-                                );
-                            }
-                        }
-                    }
+                    ObjectSchemaBuilder.#propagateNestedErrors(
+                        result as any,
+                        descriptor,
+                        addErrorFor
+                    );
                 } else if (Array.isArray(result.errors)) {
                     if (
                         ObjectSchemaBuilder.isValidPropertyDescriptor(
@@ -842,6 +823,130 @@ export class ObjectSchemaBuilder<
             : TExplicitType,
         this
     > {
+        // Fast path: skip preValidateSync + setupValidation when no preprocessors/validators
+        if (
+            this.canSkipPreValidation &&
+            !context?.doNotStopOnFirstError &&
+            !context?.rootPropertyDescriptor
+        ) {
+            // Required / optional check
+            if (typeof object === 'undefined' || object === null) {
+                if (!this.isRequired) {
+                    const self = this;
+                    return {
+                        valid: true,
+                        object: object,
+                        getErrorsFor(selector?: any) {
+                            return self
+                                .#validateFull(object, context)
+                                .getErrorsFor(selector);
+                        }
+                    } as any;
+                }
+                const self = this;
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message: this.getValidationErrorMessageSync(
+                                this.requiredErrorMessage,
+                                object as any
+                            )
+                        }
+                    ],
+                    getErrorsFor(selector?: any) {
+                        return self
+                            .#validateFull(object, context)
+                            .getErrorsFor(selector);
+                    }
+                } as any;
+            } else if (typeof object === 'object') {
+                const propKeys = this.#propKeys;
+
+                // Check for unknown properties
+                if (!this.#acceptUnknownProps) {
+                    const objKeys = Object.keys(object as Record<string, any>);
+                    for (let i = 0; i < objKeys.length; i++) {
+                        if (!(objKeys[i] in this.#properties)) {
+                            const self = this;
+                            return {
+                                valid: false,
+                                errors: [
+                                    {
+                                        message: `unknown property '${objKeys[i]}'`
+                                    }
+                                ],
+                                getErrorsFor(selector?: any) {
+                                    return self
+                                        .#validateFull(object, context)
+                                        .getErrorsFor(selector);
+                                }
+                            } as any;
+                        }
+                    }
+                }
+
+                // Validate all properties inline — no path passed to children
+                const resultObject: Record<string, any> = {};
+                for (let i = 0; i < propKeys.length; i++) {
+                    const key = propKeys[i];
+                    const result = this.#properties[key].validate(
+                        (object as any)[key]
+                    );
+                    if (!result.valid) {
+                        const self = this;
+                        return {
+                            valid: false,
+                            errors:
+                                result.errors && result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getErrorsFor(selector?: any) {
+                                return self
+                                    .#validateFull(object, context)
+                                    .getErrorsFor(selector);
+                            }
+                        } as any;
+                    }
+                    resultObject[key] = result.object;
+                }
+
+                // Copy unknown props if accepted
+                if (this.#acceptUnknownProps) {
+                    const objKeys = Object.keys(object as Record<string, any>);
+                    for (let i = 0; i < objKeys.length; i++) {
+                        if (!(objKeys[i] in this.#properties)) {
+                            resultObject[objKeys[i]] = (object as any)[
+                                objKeys[i]
+                            ];
+                        }
+                    }
+                }
+
+                // Lazy getErrorsFor — only builds descriptors if called
+                const self = this;
+                return {
+                    valid: true,
+                    object: resultObject,
+                    getErrorsFor(selector?: any) {
+                        return self
+                            .#validateFull(object, context)
+                            .getErrorsFor(selector);
+                    }
+                } as any;
+            }
+        }
+
+        return this.#validateFull(object, context) as any;
+    }
+
+    /**
+     * Full validation path with complete error handling and property descriptors.
+     */
+    #validateFull(
+        object: any,
+        context?: ValidationContext<this>
+    ): ObjectSchemaValidationResult<any, any> {
         const setup = this.#setupValidation(
             this.preValidateSync(object, context)
         );
@@ -850,7 +955,6 @@ export class ObjectSchemaBuilder<
         const {
             propKeys,
             objToValidate,
-            path,
             doNotStopOnFirstError,
             rootPropertyDescriptor,
             currentPropertyDescriptor
@@ -863,21 +967,11 @@ export class ObjectSchemaBuilder<
         for (const key of propKeys) {
             const result = this.#properties[key].validate(objToValidate[key], {
                 ...context,
-                path: '$',
                 rootPropertyDescriptor: rootPropertyDescriptor as any,
                 currentPropertyDescriptor: (currentPropertyDescriptor as any)[
                     key
                 ]
             });
-            if (!result.valid && result.errors) {
-                const fullPath = `${path}.${key}`;
-                for (const err of result.errors) {
-                    err.path =
-                        err.path === '$'
-                            ? fullPath
-                            : fullPath + err.path.slice(1);
-                }
-            }
             validationResults.push({ key, result });
             if (!result.valid && !doNotStopOnFirstError) break;
         }
@@ -927,7 +1021,6 @@ export class ObjectSchemaBuilder<
         const {
             propKeys,
             objToValidate,
-            path,
             doNotStopOnFirstError,
             rootPropertyDescriptor,
             currentPropertyDescriptor
@@ -945,7 +1038,6 @@ export class ObjectSchemaBuilder<
                         objToValidate[key],
                         {
                             ...context,
-                            path: '$',
                             rootPropertyDescriptor:
                                 rootPropertyDescriptor as any,
                             currentPropertyDescriptor: (
@@ -953,15 +1045,6 @@ export class ObjectSchemaBuilder<
                             )[key]
                         }
                     );
-                    if (!result.valid && result.errors) {
-                        const fullPath = `${path}.${key}`;
-                        for (const err of result.errors) {
-                            err.path =
-                                err.path === '$'
-                                    ? fullPath
-                                    : fullPath + err.path.slice(1);
-                        }
-                    }
                     return { key, result };
                 })
             );
@@ -972,22 +1055,12 @@ export class ObjectSchemaBuilder<
                     objToValidate[key],
                     {
                         ...context,
-                        path: '$',
                         rootPropertyDescriptor: rootPropertyDescriptor as any,
                         currentPropertyDescriptor: (
                             currentPropertyDescriptor as any
                         )[key]
                     }
                 );
-                if (!result.valid && result.errors) {
-                    const fullPath = `${path}.${key}`;
-                    for (const err of result.errors) {
-                        err.path =
-                            err.path === '$'
-                                ? fullPath
-                                : fullPath + err.path.slice(1);
-                    }
-                }
                 validationResults.push({ key, result });
                 if (!result.valid) break;
             }
@@ -1819,6 +1892,52 @@ export class ObjectSchemaBuilder<
             descriptor !== null &&
             typeof descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] === 'object'
         );
+    }
+
+    static #propagateNestedErrors(
+        result: any,
+        descriptor: any,
+        addErrorFor: (
+            descriptor: any,
+            message: string,
+            parentDescriptor?: any
+        ) => void
+    ): void {
+        const schema =
+            ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(descriptor);
+        const properties = (schema.introspect() as any).properties;
+        if (!properties) return;
+
+        for (const nestedPropertyName in properties) {
+            const nestedPropertyDescriptor = descriptor[nestedPropertyName];
+            const nestedValidationError = result.getErrorsFor(
+                () => nestedPropertyDescriptor
+            );
+            if (!nestedValidationError.isValid) {
+                for (const validationError of nestedValidationError.errors) {
+                    addErrorFor(
+                        nestedPropertyDescriptor,
+                        validationError,
+                        descriptor
+                    );
+                }
+            }
+            // Recurse into nested object schemas
+            const nestedSchema = properties[nestedPropertyName];
+            if (
+                nestedSchema instanceof ObjectSchemaBuilder &&
+                typeof result.getErrorsFor === 'function' &&
+                ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    nestedPropertyDescriptor
+                )
+            ) {
+                ObjectSchemaBuilder.#propagateNestedErrors(
+                    result,
+                    nestedPropertyDescriptor,
+                    addErrorFor
+                );
+            }
+        }
     }
 
     static #getSchemaForPropertyDescriptor(

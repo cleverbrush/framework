@@ -319,8 +319,6 @@ export class UnionSchemaBuilder<
             errors
         } = superResult;
 
-        const { path } = prevalidationContext;
-
         // Create a self-referencing property descriptor for the union root
         const selfDescriptor: PropertyDescriptor<any, any, any> = {
             [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
@@ -379,7 +377,6 @@ export class UnionSchemaBuilder<
             objToValidate,
             prevalidationContext,
             preValidationTransaction: preValidationTransaction!,
-            path: path as string,
             getNestedErrors,
             optionResults,
             rootErrors
@@ -449,7 +446,6 @@ export class UnionSchemaBuilder<
         const {
             prevalidationContext,
             preValidationTransaction,
-            path,
             getNestedErrors,
             optionResults,
             rootErrors
@@ -490,7 +486,6 @@ export class UnionSchemaBuilder<
                 state.objToValidate,
                 {
                     ...prevalidationContext,
-                    path: `${path}[option ${i}]`,
                     currentPropertyDescriptor: undefined,
                     rootPropertyDescriptor: undefined
                 } as any
@@ -544,7 +539,6 @@ export class UnionSchemaBuilder<
         const {
             prevalidationContext,
             preValidationTransaction,
-            path,
             getNestedErrors,
             optionResults,
             rootErrors
@@ -588,7 +582,6 @@ export class UnionSchemaBuilder<
                 state.objToValidate,
                 {
                     ...prevalidationContext,
-                    path: `${path}[option ${i}]`,
                     currentPropertyDescriptor: undefined,
                     rootPropertyDescriptor: undefined
                 } as any

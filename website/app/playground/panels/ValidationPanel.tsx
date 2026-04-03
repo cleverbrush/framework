@@ -193,11 +193,8 @@ export function ValidationPanel({ result }: Props) {
                         </span>
                         <ul className="pg-error-list">
                             {vr.errors.map((err, i) => (
-                                // biome-ignore lint/suspicious/noArrayIndexKey: errors may share path/message; no stable identifier available
+                                // biome-ignore lint/suspicious/noArrayIndexKey: errors may share message; no stable identifier available
                                 <li key={i} className="pg-error-item">
-                                    <span className="pg-error-path">
-                                        {err.path}
-                                    </span>
                                     <span className="pg-error-message">
                                         {err.message}
                                     </span>

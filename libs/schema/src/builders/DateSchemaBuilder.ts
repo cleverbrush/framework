@@ -130,6 +130,7 @@ export class DateSchemaBuilder<
 
     #parseFromJson = false;
     #parseFromEpoch = false;
+    #canFastPath = true;
 
     /**
      * @hidden
@@ -204,6 +205,11 @@ export class DateSchemaBuilder<
                 props.equalsToValidationErrorMessageProvider,
                 this.#defaultEqualsToErrorMessageProvider
             );
+
+        this.#canFastPath =
+            this.canSkipPreValidation &&
+            !this.#parseFromJson &&
+            !this.#parseFromEpoch;
     }
 
     public introspect() {
@@ -352,11 +358,8 @@ export class DateSchemaBuilder<
               done: false;
               provider: any;
               objToValidate: any;
-              path: string;
           } {
-        const { valid, context: prevalidationContext, errors } = superResult;
-
-        const { path } = prevalidationContext;
+        const { valid, errors } = superResult;
 
         if (!valid) {
             return { done: true, result: { valid, errors } };
@@ -410,9 +413,7 @@ export class DateSchemaBuilder<
                 done: true,
                 result: {
                     valid: false,
-                    errors: [
-                        { message: violation.message, path: path as string }
-                    ]
+                    errors: [{ message: violation.message }]
                 }
             };
         }
@@ -420,8 +421,7 @@ export class DateSchemaBuilder<
         return {
             done: false,
             provider: violation.provider,
-            objToValidate,
-            path: path as string
+            objToValidate
         };
     }
 
@@ -434,6 +434,51 @@ export class DateSchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): ValidationResult<TResult> {
+        // Fast path: no preprocessors, validators, or parse-from transformations
+        if (this.#canFastPath) {
+            if (typeof object === 'undefined' || object === null) {
+                if (!this.isRequired) {
+                    return { valid: true, object: object };
+                }
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message: this.getValidationErrorMessageSync(
+                                this.requiredErrorMessage,
+                                object
+                            )
+                        }
+                    ]
+                };
+            }
+
+            const violation = this.#getConstraintViolation(object);
+
+            if (!violation) {
+                return { valid: true, object: object as TResult };
+            }
+
+            if ('message' in violation) {
+                return {
+                    valid: false,
+                    errors: [{ message: violation.message }]
+                };
+            }
+
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: this.getValidationErrorMessageSync(
+                            violation.provider,
+                            object as TResult
+                        )
+                    }
+                ]
+            };
+        }
+
         const r = this.#buildResult(this.preValidateSync(object, context));
         if (r.done) return r.result;
         return {
@@ -443,8 +488,7 @@ export class DateSchemaBuilder<
                     message: this.getValidationErrorMessageSync(
                         r.provider,
                         r.objToValidate as TResult
-                    ),
-                    path: r.path
+                    )
                 }
             ]
         };
@@ -470,8 +514,7 @@ export class DateSchemaBuilder<
                     message: await this.getValidationErrorMessage(
                         r.provider,
                         r.objToValidate as TResult
-                    ),
-                    path: r.path
+                    )
                 }
             ]
         };

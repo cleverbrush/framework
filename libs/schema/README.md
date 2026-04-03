@@ -80,7 +80,7 @@ if (result.valid) {
 
     // result.errors on object schemas is deprecated — use getErrorsFor() instead
     console.log('Errors:', result.errors);
-    // Array of { path: string; message: string }
+    // Array of { message: string }
 }
 ```
 
@@ -304,7 +304,7 @@ if (result.valid) {
     console.log(result.object); // typed as InferType<typeof UserSchema>
 } else {
     // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
-    console.log(result.errors); // deprecated for object schemas — Array of { path: string; message: string }
+    console.log(result.errors); // deprecated for object schemas — Array of { message: string }
 }
 
 // Async validation (use when validators/preprocessors are async)
@@ -323,9 +323,9 @@ const result = UserSchema.validate(
 
 console.log(result.errors);
 // [
-//   { path: '$.name', message: 'Name must be at least 2 characters' },
-//   { path: '$.email', message: 'Please enter a valid email' },
-//   { path: '$.age', message: 'Age cannot be negative' }
+//   { message: 'Name must be at least 2 characters' },
+//   { message: 'Please enter a valid email' },
+//   { message: 'Age cannot be negative' }
 // ]
 ```
 

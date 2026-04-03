@@ -181,9 +181,9 @@ const bad = UserSchema.validate(
 console.log(bad.valid);  // false
 console.log(bad.errors);
 // [
-//   { path: '$.name', message: 'Name must be at least 2 characters' },
-//   { path: '$.email', message: 'Please enter a valid email address' },
-//   { path: '$.age', message: 'Age cannot be negative' }
+//   { message: 'Name must be at least 2 characters' },
+//   { message: 'Please enter a valid email address' },
+//   { message: 'Age cannot be negative' }
 // ]`)
                             }}
                         />
@@ -673,7 +673,7 @@ if (result.valid) {
 } else {
   // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
   console.log('Errors:', result.errors);
-  // errors is deprecated on object schemas — Array of { path: string; message: string }
+  // errors is deprecated on object schemas — Array of { message: string }
 }
 
 // Use validateAsync() when your schema has async validators/preprocessors
@@ -799,7 +799,7 @@ const TagsSchema = array(string())
 // Use validateAsync() because the validator is async
 const result = await EmailSchema.validateAsync('taken@example.com');
 console.log(result.valid);  // false
-console.log(result.errors); // [{ path: '$($validators[0])', message: 'This email is already registered' }]`)
+console.log(result.errors); // [{ message: 'This email is already registered' }]`)
                             }}
                         />
                     </pre>
@@ -1563,11 +1563,7 @@ const s = withExtensions(myCustomExtension);`)
                                     </td>
                                     <td>
                                         Individual error:{' '}
-                                        <code>
-                                            {
-                                                '{ path: string; message: string }'
-                                            }
-                                        </code>
+                                        <code>{'{ message: string }'}</code>
                                     </td>
                                 </tr>
                                 <tr>
