@@ -1,9 +1,9 @@
 import type { SchemaBuilder } from '@cleverbrush/schema';
 import {
-    AnySchemaBuilder,
     any,
     array,
     boolean,
+    nul,
     number,
     object,
     string,
@@ -21,32 +21,6 @@ function fail(msg: string) {
 
 function ok() {
     return { valid: true as const, errors: [] };
-}
-
-// Local subclass to handle JSON Schema `type: 'null'`.
-// SchemaBuilder's required-check rejects null even when a custom validator
-// accepts it, so we override validate/validateAsync directly.
-class NullSchemaBuilder extends AnySchemaBuilder {
-    constructor() {
-        super({ type: 'any' } as any);
-    }
-
-    override validate(object: any): any {
-        if (object === null) return { valid: true as const, object: null };
-        return { valid: false as const, errors: [{ message: 'must be null' }] };
-    }
-
-    override async validateAsync(object: any): Promise<any> {
-        return this.validate(object);
-    }
-
-    override introspect(): any {
-        const base = super.introspect() as any;
-        return {
-            ...base,
-            extensions: { ...(base.extensions ?? {}), null: true }
-        };
-    }
 }
 
 function buildNode(s: unknown): SchemaBuilder<any, any, any> {
@@ -72,7 +46,7 @@ function buildNode(s: unknown): SchemaBuilder<any, any, any> {
         case 'boolean':
             return boolean();
         case 'null':
-            return new NullSchemaBuilder();
+            return nul();
         case 'array':
             return buildArray(node);
         case 'object':

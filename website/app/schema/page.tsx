@@ -300,6 +300,19 @@ console.log(bad.errors);
                                 </tr>
                                 <tr>
                                     <td>
+                                        <code>nul()</code>
+                                    </td>
+                                    <td>
+                                        Exactly <code>null</code>. Useful for
+                                        nullable union branches and JSON Schema
+                                        interop.
+                                    </td>
+                                    <td>
+                                        <code>.optional()</code>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>object({'{...}'})</code>
                                     </td>
                                     <td>

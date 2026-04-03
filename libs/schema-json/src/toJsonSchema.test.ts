@@ -3,6 +3,7 @@ import {
     array,
     boolean,
     date,
+    nul,
     number,
     object,
     string,
@@ -283,8 +284,7 @@ test('toJsonSchema - 34: number().isInteger() stays integer', () => {
     expect(result).toEqual({ type: 'integer' });
 });
 
-test('toJsonSchema - 35: null extension round-trips to { type: null }', () => {
-    const schema = (any() as any).withExtension('null', true);
-    const result = toJsonSchema(schema, { $schema: false });
+test('toJsonSchema - 35: nul() round-trips to { type: null }', () => {
+    const result = toJsonSchema(nul(), { $schema: false });
     expect(result).toEqual({ type: 'null' });
 });

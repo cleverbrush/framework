@@ -102,6 +102,9 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
             return out;
         }
 
+        case 'null':
+            return { type: 'null' };
+
         case 'union': {
             const options: SchemaBuilder<any, any, any>[] = info.options ?? [];
             const enumValues: unknown[] = [];
@@ -125,7 +128,6 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         default:
-            if (ext['null'] === true) return { type: 'null' };
             return {};
     }
 }

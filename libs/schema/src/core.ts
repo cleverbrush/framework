@@ -13,6 +13,7 @@ export {
     FunctionSchemaBuilder,
     func
 } from './builders/FunctionSchemaBuilder.js';
+export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 export {
     ObjectSchemaBuilder,

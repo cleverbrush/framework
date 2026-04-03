@@ -109,6 +109,7 @@ The following builder functions are available:
 | `boolean()`     | Boolean value.                                    | `.optional()`                                                   |
 | `date()`        | JavaScript `Date` instance.                       | `.optional()`                                                   |
 | `func()`        | Function value.                                   | `.optional()`                                                   |
+| `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`                                                   |
 | `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`            |
 | `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()` |
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`                 |
