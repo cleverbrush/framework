@@ -785,7 +785,10 @@ describe('optional schema: validators skipped for null/undefined (sync)', () => 
             .optional()
             .addValidator(() => {
                 called = true;
-                return { valid: false, errors: [{ message: 'should not run' }] };
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
             });
         const result = schema.validate(null as any);
         expect(result.valid).toBe(true);
@@ -798,7 +801,10 @@ describe('optional schema: validators skipped for null/undefined (sync)', () => 
             .optional()
             .addValidator(() => {
                 called = true;
-                return { valid: false, errors: [{ message: 'should not run' }] };
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
             });
         const result = schema.validate(undefined as any);
         expect(result.valid).toBe(true);
@@ -826,7 +832,10 @@ describe('optional schema: validators skipped for null/undefined (async)', () =>
             .optional()
             .addValidator(async () => {
                 called = true;
-                return { valid: false, errors: [{ message: 'should not run' }] };
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
             });
         const result = await schema.validateAsync(null as any);
         expect(result.valid).toBe(true);
@@ -839,7 +848,10 @@ describe('optional schema: validators skipped for null/undefined (async)', () =>
             .optional()
             .addValidator(async () => {
                 called = true;
-                return { valid: false, errors: [{ message: 'should not run' }] };
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
             });
         const result = await schema.validateAsync(undefined as any);
         expect(result.valid).toBe(true);

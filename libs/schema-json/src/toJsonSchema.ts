@@ -38,7 +38,7 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
             if (info.matches instanceof RegExp) {
                 if (info.matches.flags !== '') {
                     throw new Error(
-                        `Cannot convert RegExp /${info.matches.source}/${info.matches.flags} to JSON Schema pattern: RegExp flags are not representable in standard JSON Schema.`,
+                        `Cannot convert RegExp /${info.matches.source}/${info.matches.flags} to JSON Schema pattern: RegExp flags are not representable in standard JSON Schema.`
                     );
                 }
                 out['pattern'] = info.matches.source;
@@ -68,9 +68,7 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'date':
-            return info.parseFromJson === true
-                ? { type: 'string', format: 'date-time' }
-                : {};
+            return { type: 'string', format: 'date-time' };
 
         case 'array': {
             const out: Out = { type: 'array' };
