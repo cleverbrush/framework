@@ -117,7 +117,7 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `pattern` | `.matches(regex)` |
 | `minimum` / `maximum` | `.min()` / `.max()` |
 | `exclusiveMinimum` / `exclusiveMaximum` | `.min()` / `.max()` exclusive |
-| `multipleOf` | `.divisibleBy()` |
+| `multipleOf` | `.multipleOf()` |
 | `minItems` / `maxItems` | `.minLength()` / `.maxLength()` on array |
 | `format: 'email'` | `.email()` extension |
 | `format: 'uuid'` | `.uuid()` extension |
