@@ -26,7 +26,7 @@
     "sideEffects": false,
     "name": "@cleverbrush/schema-json",
     "peerDependencies": {
-        "@cleverbrush/schema": "2.0.0"
+        "@cleverbrush/schema": "^2.0.0"
     },
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/schema-json#readme",
     "repository": {
