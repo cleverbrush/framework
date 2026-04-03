@@ -45,13 +45,14 @@ function buildNode(s: unknown): SchemaBuilder<any, any, any> {
         case 'boolean':
             return boolean();
         case 'null':
-            // Use optional() so that null passes the required check.
-            // Validators are skipped for null/undefined when optional,
-            // and called for all other values — which is what we want.
+            // JSON Schema `type: 'null'` must accept only `null`.
+            // Keep the null extension marker and validate exact null
+            // without making the schema optional, so `undefined` is rejected.
             return (any() as any)
                 .withExtension('null', true)
-                .optional()
-                .addValidator((_v: unknown) => fail('must be null'));
+                .addValidator((v: unknown) =>
+                    v === null ? ok() : fail('must be null')
+                );
         case 'array':
             return buildArray(node);
         case 'object':
