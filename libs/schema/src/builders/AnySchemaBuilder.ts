@@ -138,6 +138,15 @@ export class AnySchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value: TResult | (() => TResult)
+    ): AnySchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): AnySchemaBuilder<

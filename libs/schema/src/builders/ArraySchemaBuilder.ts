@@ -658,6 +658,16 @@ export class ArraySchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value: TResult | (() => TResult)
+    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType, TExtensions> &
+        TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): ArraySchemaBuilder<

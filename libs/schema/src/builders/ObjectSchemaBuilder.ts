@@ -310,6 +310,22 @@ export class ObjectSchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value:
+            | (undefined extends TExplicitType
+                  ? RespectPropsOptionality<TProperties>
+                  : TExplicitType)
+            | (() => undefined extends TExplicitType
+                  ? RespectPropsOptionality<TProperties>
+                  : TExplicitType)
+    ): ObjectSchemaBuilder<TProperties, true, TExplicitType, TExtensions> &
+        TExtensions {
+        return super.default(value as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): ObjectSchemaBuilder<

@@ -587,6 +587,15 @@ export class StringSchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value: TResult | (() => TResult)
+    ): StringSchemaBuilder<TResult, true, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): StringSchemaBuilder<

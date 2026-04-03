@@ -181,6 +181,15 @@ export class FunctionSchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value: TResult | (() => TResult)
+    ): FunctionSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): FunctionSchemaBuilder<

@@ -797,6 +797,22 @@ export class UnionSchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value:
+            | (TExplicitType extends undefined
+                  ? SchemaArrayToUnion<TOptions>
+                  : TExplicitType)
+            | (() => TExplicitType extends undefined
+                  ? SchemaArrayToUnion<TOptions>
+                  : TExplicitType)
+    ): UnionSchemaBuilder<TOptions, true, TExplicitType, TExtensions> &
+        TExtensions {
+        return super.default(value as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): UnionSchemaBuilder<

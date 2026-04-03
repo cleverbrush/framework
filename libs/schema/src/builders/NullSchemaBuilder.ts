@@ -178,6 +178,15 @@ export class NullSchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value: null | (() => null)
+    ): NullSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): NullSchemaBuilder<

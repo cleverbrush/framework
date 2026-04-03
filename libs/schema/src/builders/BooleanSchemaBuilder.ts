@@ -332,6 +332,16 @@ export class BooleanSchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value: TFinalResult | (() => TFinalResult)
+    ): BooleanSchemaBuilder<TResult, true, TExplicitType, TExtensions> &
+        TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): BooleanSchemaBuilder<

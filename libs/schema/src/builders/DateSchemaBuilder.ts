@@ -583,6 +583,15 @@ export class DateSchemaBuilder<
     /**
      * @hidden
      */
+    public default(
+        value: TResult | (() => TResult)
+    ): DateSchemaBuilder<TResult, true, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
     ): DateSchemaBuilder<
