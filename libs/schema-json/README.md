@@ -109,7 +109,7 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `type: 'object'` + `properties` | `object({ … })` |
 | `required: […]` | required / optional per property |
 | `additionalProperties: true` | `.acceptUnknownProps()` |
-| `const` | literal builder (`.equalsTo()`) |
+| `const` | literal builder (`.equals(...)`) |
 | `enum` | `union(…)` of const builders |
 | `anyOf` | `union(…)` of sub-builders |
 | `allOf` | `union(…)` (best-effort, no deep merge) |
