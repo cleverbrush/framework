@@ -29,18 +29,57 @@ const GROUP_LABELS: Record<string, string> = {
     'Array of 100 objects (invalid input)': 'Array of 100 (invalid)'
 };
 
-/** Order in which groups should appear */
-const GROUP_ORDER = Object.keys(GROUP_LABELS);
+/** Precomputed map from display label to its sort index for O(1) lookups */
+const LABEL_ORDER: Map<string, number> = new Map(
+    Object.values(GROUP_LABELS).map((label, i) => [label, i])
+);
+
+/** Module-level cache — populated on first call, reused on all subsequent calls */
+let cachedBenchmarks: BenchmarkGroup[] | null = null;
 
 export function loadBenchmarks(): BenchmarkGroup[] {
+    if (cachedBenchmarks !== null) {
+        return cachedBenchmarks;
+    }
+
     const jsonPath = path.resolve(process.cwd(), '..', 'bench-results.json');
-    const raw = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+
+    let raw: unknown;
+    try {
+        raw = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+    } catch {
+        cachedBenchmarks = [];
+        return cachedBenchmarks;
+    }
+
+    if (
+        !raw ||
+        typeof raw !== 'object' ||
+        !('files' in raw) ||
+        !Array.isArray((raw as { files: unknown }).files)
+    ) {
+        cachedBenchmarks = [];
+        return cachedBenchmarks;
+    }
 
     const groups: BenchmarkGroup[] = [];
 
-    for (const file of raw.files) {
-        for (const group of file.groups) {
-            const fullName: string = group.fullName;
+    for (const file of (raw as { files: unknown[] }).files) {
+        if (!file || typeof file !== 'object' || !Array.isArray((file as { groups: unknown }).groups)) {
+            continue;
+        }
+
+        for (const group of (file as { groups: unknown[] }).groups) {
+            if (
+                !group ||
+                typeof group !== 'object' ||
+                typeof (group as { fullName: unknown }).fullName !== 'string' ||
+                !Array.isArray((group as { benchmarks: unknown }).benchmarks)
+            ) {
+                continue;
+            }
+
+            const fullName = (group as { fullName: string }).fullName;
             const matchedKey = Object.keys(GROUP_LABELS).find(k =>
                 fullName.includes(k)
             );
@@ -48,8 +87,8 @@ export function loadBenchmarks(): BenchmarkGroup[] {
 
             groups.push({
                 label: GROUP_LABELS[matchedKey],
-                entries: group.benchmarks.map(
-                    (b: { name: string; hz: number; rank: number }) => ({
+                entries: (group as { benchmarks: { name: string; hz: number; rank: number }[] }).benchmarks.map(
+                    (b) => ({
                         name: b.name,
                         hz: b.hz,
                         rank: b.rank
@@ -59,20 +98,13 @@ export function loadBenchmarks(): BenchmarkGroup[] {
         }
     }
 
-    // Sort by the intended display order
+    // Sort by the intended display order using the precomputed index map
     groups.sort(
         (a, b) =>
-            GROUP_ORDER.indexOf(
-                Object.keys(GROUP_LABELS).find(
-                    k => GROUP_LABELS[k] === a.label
-                )!
-            ) -
-            GROUP_ORDER.indexOf(
-                Object.keys(GROUP_LABELS).find(
-                    k => GROUP_LABELS[k] === b.label
-                )!
-            )
+            (LABEL_ORDER.get(a.label) ?? Infinity) -
+            (LABEL_ORDER.get(b.label) ?? Infinity)
     );
 
-    return groups;
+    cachedBenchmarks = groups;
+    return cachedBenchmarks;
 }
