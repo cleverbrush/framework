@@ -214,20 +214,23 @@ export class BooleanSchemaBuilder<
         // Fast path: no preprocessors or custom validators
         if (this.canSkipPreValidation) {
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue() as typeof object;
+                } else if (!this.isRequired) {
                     return { valid: true, object: object };
+                } else {
+                    return {
+                        valid: false,
+                        errors: [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object as TFinalResult
+                                )
+                            }
+                        ]
+                    };
                 }
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: this.getValidationErrorMessageSync(
-                                this.requiredErrorMessage,
-                                object as TFinalResult
-                            )
-                        }
-                    ]
-                };
             }
 
             const violation = this.#getConstraintViolation(object);
@@ -249,7 +252,7 @@ export class BooleanSchemaBuilder<
                     {
                         message: this.getValidationErrorMessageSync(
                             violation.provider,
-                            object as TFinalResult
+                            object as unknown as TFinalResult
                         )
                     }
                 ]

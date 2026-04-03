@@ -443,20 +443,23 @@ export class StringSchemaBuilder<
         if (this.canSkipPreValidation) {
             // Required / optional check
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue();
+                } else if (!this.isRequired) {
                     return { valid: true, object: object };
+                } else {
+                    return {
+                        valid: false,
+                        errors: [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object
+                                )
+                            }
+                        ]
+                    };
                 }
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: this.getValidationErrorMessageSync(
-                                this.requiredErrorMessage,
-                                object
-                            )
-                        }
-                    ]
-                };
             }
 
             const violation = this.#getConstraintViolation(object);

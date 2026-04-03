@@ -114,6 +114,12 @@ export class NullSchemaBuilder<
     #buildResult(object: any): ValidationResult<null> {
         if (object === null) return { valid: true, object: null };
 
+        if (object === undefined && this.hasDefault) {
+            const defaultVal = this.resolveDefaultValue();
+            if (defaultVal === null) return { valid: true, object: null };
+            return { valid: false, errors: [{ message: 'must be null' }] };
+        }
+
         if (object === undefined && !this.isRequired) {
             return { valid: true, object: undefined as any };
         }

@@ -831,7 +831,9 @@ export class ObjectSchemaBuilder<
         ) {
             // Required / optional check
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue() as typeof object;
+                } else if (!this.isRequired) {
                     const self = this;
                     return {
                         valid: true,
@@ -842,24 +844,25 @@ export class ObjectSchemaBuilder<
                                 .getErrorsFor(selector);
                         }
                     } as any;
-                }
-                const self = this;
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: this.getValidationErrorMessageSync(
-                                this.requiredErrorMessage,
-                                object as any
-                            )
+                } else {
+                    const self = this;
+                    return {
+                        valid: false,
+                        errors: [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object as any
+                                )
+                            }
+                        ],
+                        getErrorsFor(selector?: any) {
+                            return self
+                                .#validateFull(object, context)
+                                .getErrorsFor(selector);
                         }
-                    ],
-                    getErrorsFor(selector?: any) {
-                        return self
-                            .#validateFull(object, context)
-                            .getErrorsFor(selector);
-                    }
-                } as any;
+                    } as any;
+                }
             } else if (typeof object === 'object') {
                 const propKeys = this.#propKeys;
 

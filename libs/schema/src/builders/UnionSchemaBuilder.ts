@@ -445,7 +445,9 @@ export class UnionSchemaBuilder<
         ) {
             // Required / optional check
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue();
+                } else if (!this.isRequired) {
                     return this.#fastResult(
                         true,
                         object,
@@ -453,21 +455,22 @@ export class UnionSchemaBuilder<
                         object,
                         context
                     );
+                } else {
+                    return this.#fastResult(
+                        false,
+                        undefined,
+                        [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object as any
+                                )
+                            }
+                        ],
+                        object,
+                        context
+                    );
                 }
-                return this.#fastResult(
-                    false,
-                    undefined,
-                    [
-                        {
-                            message: this.getValidationErrorMessageSync(
-                                this.requiredErrorMessage,
-                                object as any
-                            )
-                        }
-                    ],
-                    object,
-                    context
-                );
             }
 
             // Discriminated union: O(1) lookup, no setup overhead

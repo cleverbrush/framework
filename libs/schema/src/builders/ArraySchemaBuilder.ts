@@ -349,7 +349,9 @@ export class ArraySchemaBuilder<
         ) {
             // Required / optional check
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue();
+                } else if (!this.isRequired) {
                     const self = this;
                     return {
                         valid: true,
@@ -360,8 +362,9 @@ export class ArraySchemaBuilder<
                                 .getNestedErrors();
                         }
                     } as any;
+                } else {
+                    return this.#validateArrayFull(object, context);
                 }
-                return this.#validateArrayFull(object, context);
             }
 
             if (!Array.isArray(object)) {

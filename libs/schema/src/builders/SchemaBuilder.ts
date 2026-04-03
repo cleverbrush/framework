@@ -197,6 +197,8 @@ export type SchemaBuilderProps<T> = {
     validators: ValidatorEntry<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
+    hasDefault?: boolean;
+    defaultValue?: T | (() => T);
 };
 
 export type ValidationContext<
@@ -563,6 +565,8 @@ export abstract class SchemaBuilder<
         'is required';
     #requiredErrorMessageProvider: ValidationErrorMessageProvider =
         'is required';
+    #hasDefault = false;
+    #defaultValue: TResult | (() => TResult) | undefined = undefined;
 
     /**
      * Type-level brand encoding the inferred type of this schema.
@@ -648,6 +652,24 @@ export abstract class SchemaBuilder<
      */
     protected get requiredErrorMessage(): ValidationErrorMessageProvider {
         return this.#requiredErrorMessageProvider;
+    }
+
+    /**
+     * Whether this schema has a default value configured via `.default()`.
+     * Exposed for fast-path validation in subclasses.
+     */
+    protected get hasDefault(): boolean {
+        return this.#hasDefault;
+    }
+
+    /**
+     * Resolves the default value. If the stored default is a function,
+     * it is called to produce the value (useful for mutable defaults).
+     */
+    protected resolveDefaultValue(): TResult {
+        return typeof this.#defaultValue === 'function'
+            ? (this.#defaultValue as () => TResult)()
+            : (this.#defaultValue as TResult);
     }
 
     /**
@@ -804,6 +826,13 @@ export abstract class SchemaBuilder<
                 : noopTransaction({ validatedObject: preprocessedObject });
         }
 
+        if (typeof preprocessedObject === 'undefined' && this.#hasDefault) {
+            preprocessedObject = this.resolveDefaultValue();
+            preprocessingTransaction = noopTransaction({
+                validatedObject: preprocessedObject
+            });
+        }
+
         if (
             this.#validators.length > 0 &&
             !(preprocessedObject == null && !this.isRequired)
@@ -922,6 +951,13 @@ export abstract class SchemaBuilder<
                 : noopTransaction({ validatedObject: preprocessedObject });
         }
 
+        if (typeof preprocessedObject === 'undefined' && this.#hasDefault) {
+            preprocessedObject = this.resolveDefaultValue();
+            preprocessingTransaction = noopTransaction({
+                validatedObject: preprocessedObject
+            });
+        }
+
         if (
             this.#validators.length > 0 &&
             !(preprocessedObject == null && !this.isRequired)
@@ -1030,7 +1066,15 @@ export abstract class SchemaBuilder<
             /**
              * Extension metadata. Stores custom state set by schema extensions.
              */
-            extensions: { ...this.#extensions }
+            extensions: { ...this.#extensions },
+            /**
+             * Whether this schema has a default value.
+             */
+            hasDefault: this.#hasDefault,
+            /**
+             * The default value or factory function.
+             */
+            defaultValue: this.#defaultValue
         };
     }
 
@@ -1041,6 +1085,35 @@ export abstract class SchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             isRequired: false
+        }) as any;
+    }
+
+    /**
+     * Sets a default value for this schema. When the input is `undefined`,
+     * the default value is used instead. The default is still validated
+     * against the schema's constraints.
+     *
+     * Accepts either a static value or a factory function (useful for
+     * mutable defaults like `() => new Date()` or `() => []`).
+     *
+     * @example
+     * ```ts
+     * const schema = string().default('hello');
+     * schema.validate(undefined); // { valid: true, object: 'hello' }
+     * schema.validate('world');   // { valid: true, object: 'world' }
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Factory function for mutable defaults
+     * const schema = array(string()).default(() => []);
+     * ```
+     */
+    public default(value: TResult | (() => TResult)) {
+        return this.createFromProps({
+            ...this.introspect(),
+            hasDefault: true,
+            defaultValue: value
         }) as any;
     }
 
@@ -1365,6 +1438,11 @@ export abstract class SchemaBuilder<
 
         if (typeof props.extensions === 'object' && props.extensions) {
             this.#extensions = { ...props.extensions };
+        }
+
+        if (props.hasDefault === true) {
+            this.#hasDefault = true;
+            this.#defaultValue = props.defaultValue;
         }
 
         this.#requiredErrorMessageProvider =
