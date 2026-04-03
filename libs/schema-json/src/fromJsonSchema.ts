@@ -144,13 +144,7 @@ function buildNumber(
     if (typeof node['minimum'] === 'number') b = b.min(node['minimum']);
     if (typeof node['maximum'] === 'number') b = b.max(node['maximum']);
     if (typeof node['multipleOf'] === 'number') {
-        const n = node['multipleOf'];
-        b = b.addValidator((v: unknown) =>
-            typeof v === 'number' &&
-            Math.abs(v % n) < 1e-10 * Math.max(Math.abs(v), 1)
-                ? ok()
-                : fail(`must be a multiple of ${n}`)
-        );
+        b = b.multipleOf(node['multipleOf']);
     }
     if (typeof node['exclusiveMinimum'] === 'number') {
         const min = node['exclusiveMinimum'];
