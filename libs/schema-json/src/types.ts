@@ -112,7 +112,9 @@ export type InferFromJsonSchema<S> = S extends { readonly const: infer V }
                         ? Record<string, unknown>
                         : S extends { readonly anyOf: readonly (infer U)[] }
                           ? InferFromJsonSchema<U>
-                          : S extends { readonly allOf: readonly JsonSchemaNode[] }
+                          : S extends {
+                                  readonly allOf: readonly JsonSchemaNode[];
+                              }
                             ? unknown
                             : unknown;
 
