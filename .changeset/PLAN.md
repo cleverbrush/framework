@@ -88,7 +88,7 @@ Highlight unique differentiators:
 
 These leverage PropertyDescriptors and the extension system — areas zod doesn't serve well.
 
-Comment: @clevebrush/schema-json is implemented in a separate library.
+Comment: @cleverbrush/schema-json is implemented in a separate library.
 
 | Package | What | Why It Matters |
 | --- | --- | --- |
