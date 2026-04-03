@@ -1114,7 +1114,7 @@ export abstract class SchemaBuilder<
             ...this.introspect(),
             hasDefault: true,
             defaultValue: value
-        }) as any;
+        }) as this;
     }
 
     /**

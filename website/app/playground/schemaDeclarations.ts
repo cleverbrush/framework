@@ -214,6 +214,8 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
      * Set a schema that every array item has to satisfy. If it is not set,
@@ -327,6 +329,8 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: TFinalResult | (() => TFinalResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -501,6 +505,8 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -768,6 +774,8 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
      * Performs synchronous validation of the schema over \`object\`.
@@ -1089,6 +1097,8 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -1382,6 +1392,8 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | undefined;
     };
     /**
      * @hidden
@@ -1828,6 +1840,8 @@ export type SchemaBuilderProps<T> = {
     validators: ValidatorEntry<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
+    hasDefault?: boolean;
+    defaultValue?: T | (() => T);
 };
 export type ValidationContext<TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = {
     /**
@@ -2082,6 +2096,16 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      */
     protected get requiredErrorMessage(): ValidationErrorMessageProvider;
     /**
+     * Whether this schema has a default value configured via \`.default()\`.
+     * Exposed for fast-path validation in subclasses.
+     */
+    protected get hasDefault(): boolean;
+    /**
+     * Resolves the default value. If the stored default is a function,
+     * it is called to produce the value (useful for mutable defaults).
+     */
+    protected resolveDefaultValue(): TResult;
+    /**
      * Whether \`preValidateSync\` can be skipped entirely.
      * True when there are no preprocessors and no validators,
      * so the only work would be the required check and wrapping
@@ -2149,11 +2173,41 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
         extensions: {
             [x: string]: unknown;
         };
+        /**
+         * Whether this schema has a default value.
+         */
+        hasDefault: boolean;
+        /**
+         * The default value or factory function.
+         */
+        defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
      * Makes schema optional (consider \`null\` and \`undefined\` as valid objects for this schema)
      */
     optional(): any;
+    /**
+     * Sets a default value for this schema. When the input is \`undefined\`,
+     * the default value is used instead. The default is still validated
+     * against the schema's constraints.
+     *
+     * Accepts either a static value or a factory function (useful for
+     * mutable defaults like \`() => new Date()\` or \`() => []\`).
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = string().default('hello');
+     * schema.validate(undefined); // { valid: true, object: 'hello' }
+     * schema.validate('world');   // { valid: true, object: 'world' }
+     * \`\`\`
+     *
+     * @example
+     * \`\`\`ts
+     * // Factory function for mutable defaults
+     * const schema = array(string()).default(() => []);
+     * \`\`\`
+     */
+    default(value: TResult | (() => TResult)): any;
     /**
      * Brands the schema with a phantom type tag, preventing structural mixing
      * of semantically different values at the type level. Zero runtime cost.
@@ -2430,6 +2484,8 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -2666,6 +2722,8 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
+        defaultValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
     };
     /**
      * @inheritdoc

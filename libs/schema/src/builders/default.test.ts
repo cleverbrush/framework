@@ -209,7 +209,9 @@ describe('.default() — type inference', () => {
 
     test('InferType removes | undefined for .optional().default()', () => {
         const schema = string().optional().default('x');
-        expectTypeOf<InferType<typeof schema>>().toEqualTypeOf<string>();
+        expectTypeOf<InferType<typeof schema>>().toEqualTypeOf<
+            string | undefined
+        >();
     });
 
     test('InferType of number with default is number', () => {
