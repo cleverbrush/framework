@@ -47,7 +47,8 @@ export function loadBenchmarks(): BenchmarkGroup[] {
     let raw: unknown;
     try {
         raw = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-    } catch {
+    } catch (err) {
+        console.error('[loadBenchmarks] Failed to read bench-results.json:', err);
         cachedBenchmarks = [];
         return cachedBenchmarks;
     }
@@ -87,7 +88,7 @@ export function loadBenchmarks(): BenchmarkGroup[] {
 
             groups.push({
                 label: GROUP_LABELS[matchedKey],
-                entries: (group as { benchmarks: { name: string; hz: number; rank: number }[] }).benchmarks.map(
+                entries: (group as { benchmarks: BenchmarkEntry[] }).benchmarks.map(
                     (b) => ({
                         name: b.name,
                         hz: b.hz,
