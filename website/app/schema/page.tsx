@@ -998,7 +998,7 @@ console.log(cityResult.value); // 'NYC'`)
                         <code
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { string, number, array, object, InferType } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { string, number, array, date, object, InferType } from '@cleverbrush/schema';
 
 // Static default
 const Name = string().default('Anonymous');
@@ -1008,9 +1008,10 @@ Name.validate('Alice');   // { valid: true, object: 'Alice' }
 // Factory function — useful for mutable defaults like arrays or dates
 const Tags = array(string()).default(() => []);
 
-// Works with .optional() — removes undefined from the type
+// Works with .optional() — provides a runtime fallback for undefined
+// Note: with the current typings, InferType may still include undefined.
 const Port = number().optional().default(3000);
-type Port = InferType<typeof Port>; // number (not number | undefined)`)
+type Port = InferType<typeof Port>; // number | undefined`)
                             }}
                         />
                     </pre>
