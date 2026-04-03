@@ -66,8 +66,9 @@ type NullSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class NullSchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<null, TRequired, TExtensions> {
+> extends SchemaBuilder<null, TRequired, THasDefault, TExtensions> {
     /**
      * @hidden
      */
@@ -87,7 +88,7 @@ export class NullSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): NullSchemaBuilder<true, T, TExtensions> & TExtensions {
+    ): NullSchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -99,6 +100,7 @@ export class NullSchemaBuilder<
     public clearHasType(): NullSchemaBuilder<
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -163,14 +165,20 @@ export class NullSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): NullSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+    ): NullSchemaBuilder<true, TExplicitType, THasDefault, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): NullSchemaBuilder<false, TExplicitType, TExtensions> &
+    public optional(): NullSchemaBuilder<
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.optional();
     }
@@ -180,8 +188,21 @@ export class NullSchemaBuilder<
      */
     public default(
         value: null | (() => null)
-    ): NullSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+    ): NullSchemaBuilder<true, TExplicitType, true, TExtensions> & TExtensions {
         return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): NullSchemaBuilder<
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -192,6 +213,7 @@ export class NullSchemaBuilder<
     ): NullSchemaBuilder<
         TRequired,
         null & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {

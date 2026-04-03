@@ -39,11 +39,12 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class FunctionSchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {},
     TResult = TExplicitType extends undefined
         ? (...args: any[]) => any
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     /**
      * @hidden
      */
@@ -75,6 +76,7 @@ export class FunctionSchemaBuilder<
     public clearHasType(): FunctionSchemaBuilder<
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -162,7 +164,8 @@ export class FunctionSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): FunctionSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+    ): FunctionSchemaBuilder<true, TExplicitType, THasDefault, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
@@ -172,6 +175,7 @@ export class FunctionSchemaBuilder<
     public optional(): FunctionSchemaBuilder<
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -183,8 +187,22 @@ export class FunctionSchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): FunctionSchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+    ): FunctionSchemaBuilder<true, TExplicitType, true, TExtensions> &
+        TExtensions {
         return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): FunctionSchemaBuilder<
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -195,6 +213,7 @@ export class FunctionSchemaBuilder<
     ): FunctionSchemaBuilder<
         TRequired,
         TResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {

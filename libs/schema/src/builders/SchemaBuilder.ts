@@ -197,7 +197,6 @@ export type SchemaBuilderProps<T> = {
     validators: ValidatorEntry<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
-    hasDefault?: boolean;
     defaultValue?: T | (() => T);
 };
 
@@ -551,6 +550,7 @@ export function createHybridErrorArray<T extends any[]>(
 export abstract class SchemaBuilder<
     TResult = any,
     TRequired extends boolean = true,
+    THasDefault extends boolean = false,
     // biome-ignore lint/correctness/noUnusedVariables: used in extensions
     TExtensions = {}
 > {
@@ -565,7 +565,6 @@ export abstract class SchemaBuilder<
         'is required';
     #requiredErrorMessageProvider: ValidationErrorMessageProvider =
         'is required';
-    #hasDefault = false;
     #defaultValue: TResult | (() => TResult) | undefined = undefined;
 
     /**
@@ -659,7 +658,7 @@ export abstract class SchemaBuilder<
      * Exposed for fast-path validation in subclasses.
      */
     protected get hasDefault(): boolean {
-        return this.#hasDefault;
+        return this.#defaultValue !== undefined;
     }
 
     /**
@@ -826,7 +825,7 @@ export abstract class SchemaBuilder<
                 : noopTransaction({ validatedObject: preprocessedObject });
         }
 
-        if (typeof preprocessedObject === 'undefined' && this.#hasDefault) {
+        if (typeof preprocessedObject === 'undefined' && this.hasDefault) {
             preprocessedObject = this.resolveDefaultValue();
             preprocessingTransaction = this.#hasMutating
                 ? transaction({ validatedObject: preprocessedObject })
@@ -951,7 +950,7 @@ export abstract class SchemaBuilder<
                 : noopTransaction({ validatedObject: preprocessedObject });
         }
 
-        if (typeof preprocessedObject === 'undefined' && this.#hasDefault) {
+        if (typeof preprocessedObject === 'undefined' && this.hasDefault) {
             preprocessedObject = this.resolveDefaultValue();
             preprocessingTransaction = this.#hasMutating
                 ? transaction({ validatedObject: preprocessedObject })
@@ -1068,10 +1067,6 @@ export abstract class SchemaBuilder<
              */
             extensions: { ...this.#extensions },
             /**
-             * Whether this schema has a default value.
-             */
-            hasDefault: this.#hasDefault,
-            /**
              * The default value or factory function.
              */
             defaultValue: this.#defaultValue
@@ -1112,8 +1107,17 @@ export abstract class SchemaBuilder<
     public default(value: TResult | (() => TResult)) {
         return this.createFromProps({
             ...this.introspect(),
-            hasDefault: true,
             defaultValue: value
+        }) as any;
+    }
+
+    /**
+     * Removes the default value set by a previous call to `.default()`.
+     */
+    public clearDefault() {
+        return this.createFromProps({
+            ...this.introspect(),
+            defaultValue: undefined
         }) as any;
     }
 
@@ -1440,8 +1444,7 @@ export abstract class SchemaBuilder<
             this.#extensions = { ...props.extensions };
         }
 
-        if (props.hasDefault === true) {
-            this.#hasDefault = true;
+        if (props.defaultValue !== undefined) {
             this.#defaultValue = props.defaultValue;
         }
 

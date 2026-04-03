@@ -44,9 +44,10 @@ export class BooleanSchemaBuilder<
     TResult = boolean,
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {},
     TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType
-> extends SchemaBuilder<TFinalResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TFinalResult, TRequired, THasDefault, TExtensions> {
     #equalsTo?: boolean;
     #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
         BooleanSchemaBuilder<TResult, TRequired>
@@ -118,6 +119,7 @@ export class BooleanSchemaBuilder<
         TResult,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -311,7 +313,13 @@ export class BooleanSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): BooleanSchemaBuilder<TResult, true, TExplicitType, TExtensions> &
+    ): BooleanSchemaBuilder<
+        TResult,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -323,6 +331,7 @@ export class BooleanSchemaBuilder<
         TResult,
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -334,9 +343,23 @@ export class BooleanSchemaBuilder<
      */
     public default(
         value: TFinalResult | (() => TFinalResult)
-    ): BooleanSchemaBuilder<TResult, true, TExplicitType, TExtensions> &
+    ): BooleanSchemaBuilder<TResult, true, TExplicitType, true, TExtensions> &
         TExtensions {
         return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -348,6 +371,7 @@ export class BooleanSchemaBuilder<
         TResult,
         TRequired,
         TFinalResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {

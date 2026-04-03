@@ -155,12 +155,14 @@ export class UnionSchemaBuilder<
     TOptions extends readonly SchemaBuilder<any, any, any>[],
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {}
 > extends SchemaBuilder<
     TExplicitType extends undefined
         ? SchemaArrayToUnion<TOptions>
         : TExplicitType,
     TRequired,
+    THasDefault,
     TExtensions
 > {
     #options!: TOptions;
@@ -287,7 +289,8 @@ export class UnionSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): UnionSchemaBuilder<TOptions, true, T, TExtensions> & TExtensions {
+    ): UnionSchemaBuilder<TOptions, true, T, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -300,6 +303,7 @@ export class UnionSchemaBuilder<
         TOptions,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -776,7 +780,13 @@ export class UnionSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): UnionSchemaBuilder<TOptions, true, TExplicitType, TExtensions> &
+    ): UnionSchemaBuilder<
+        TOptions,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -788,6 +798,7 @@ export class UnionSchemaBuilder<
         TOptions,
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -805,9 +816,23 @@ export class UnionSchemaBuilder<
             | (() => TExplicitType extends undefined
                   ? SchemaArrayToUnion<TOptions>
                   : TExplicitType)
-    ): UnionSchemaBuilder<TOptions, true, TExplicitType, TExtensions> &
+    ): UnionSchemaBuilder<TOptions, true, TExplicitType, true, TExtensions> &
         TExtensions {
         return super.default(value as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): UnionSchemaBuilder<
+        TOptions,
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -821,6 +846,7 @@ export class UnionSchemaBuilder<
         (TExplicitType extends undefined
             ? SchemaArrayToUnion<TOptions>
             : TExplicitType) & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {

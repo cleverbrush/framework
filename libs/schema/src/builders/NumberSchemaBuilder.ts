@@ -53,8 +53,9 @@ type NumberSchemaBuilderCreateProps<
 export class NumberSchemaBuilder<
     TResult = number,
     TRequired extends boolean = true,
+    THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     #min?: number;
     #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
         NumberSchemaBuilder<TResult, TRequired>
@@ -284,7 +285,12 @@ export class NumberSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): NumberSchemaBuilder<number, TRequired, TExtensions> &
+    public clearHasType(): NumberSchemaBuilder<
+        number,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -594,14 +600,20 @@ export class NumberSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): NumberSchemaBuilder<TResult, true, TExtensions> & TExtensions {
+    ): NumberSchemaBuilder<TResult, true, THasDefault, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): NumberSchemaBuilder<TResult, false, TExtensions> &
+    public optional(): NumberSchemaBuilder<
+        TResult,
+        false,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.optional();
     }
@@ -611,8 +623,21 @@ export class NumberSchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): NumberSchemaBuilder<TResult, true, TExtensions> & TExtensions {
+    ): NumberSchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
         return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -623,6 +648,7 @@ export class NumberSchemaBuilder<
     ): NumberSchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

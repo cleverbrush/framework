@@ -57,7 +57,6 @@ describe('.default() — string', () => {
     test('survives chaining', () => {
         const schema = string().default('x').minLength(1);
         const introspected = schema.introspect();
-        expect(introspected.hasDefault).toBe(true);
         expect(introspected.defaultValue).toBe('x');
 
         const result = schema.validate(undefined as any);
@@ -219,18 +218,24 @@ describe('.default() — type inference', () => {
 });
 
 describe('.default() — introspect', () => {
-    test('introspect includes hasDefault and defaultValue', () => {
+    test('introspect includes defaultValue', () => {
         const schema = string().default('test');
         const intro = schema.introspect();
-        expect(intro.hasDefault).toBe(true);
         expect(intro.defaultValue).toBe('test');
     });
 
     test('introspect shows no default by default', () => {
         const schema = string();
         const intro = schema.introspect();
-        expect(intro.hasDefault).toBe(false);
         expect(intro.defaultValue).toBeUndefined();
+    });
+
+    test('hasDefault getter reflects default state', () => {
+        const withDefault = string().default('test');
+        expect(withDefault.hasDefault).toBe(true);
+
+        const withoutDefault = string();
+        expect(withoutDefault.hasDefault).toBe(false);
     });
 });
 
@@ -245,5 +250,25 @@ describe('.default() — parse and safeParse', () => {
         const result = schema.safeParse(undefined as any);
         expect(result.valid).toBe(true);
         expect(result.object).toBe('safe');
+    });
+});
+
+describe('.default() — not required in input, present in output', () => {
+    test('property is not required in input, but default is applied in output', () => {
+        const schema = object({
+            firstName: string().optional().default('John'),
+            lastName: string()
+        });
+        type SchemaType = InferType<typeof schema>;
+        expectTypeOf<SchemaType>().toEqualTypeOf<{
+            firstName: string;
+            lastName: string;
+        }>();
+
+        type ParameterType = Parameters<typeof schema.validate>[0];
+        expectTypeOf<ParameterType>().toEqualTypeOf<{
+            firstName?: string;
+            lastName: string;
+        }>();
     });
 });

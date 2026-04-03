@@ -70,8 +70,9 @@ type StringSchemaBuilderCreateProps<
 export class StringSchemaBuilder<
     TResult = string,
     TRequired extends boolean = true,
+    THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -313,7 +314,12 @@ export class StringSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): StringSchemaBuilder<string, TRequired, TExtensions> &
+    public clearHasType(): StringSchemaBuilder<
+        string,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -572,14 +578,20 @@ export class StringSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): StringSchemaBuilder<TResult, true, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, true, THasDefault, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): StringSchemaBuilder<TResult, false, TExtensions> &
+    public optional(): StringSchemaBuilder<
+        TResult,
+        false,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.optional();
     }
@@ -589,8 +601,21 @@ export class StringSchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): StringSchemaBuilder<TResult, true, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
         return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): StringSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -601,6 +626,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

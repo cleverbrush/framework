@@ -89,6 +89,7 @@ export class ArraySchemaBuilder<
     TElementSchema extends SchemaBuilder<any, any, any>,
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {},
     TResult = TExplicitType extends undefined
         ? TElementSchema extends undefined
@@ -97,7 +98,7 @@ export class ArraySchemaBuilder<
               ? Array<InferType<SchemaBuilder<T1, T2>>>
               : never
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
@@ -178,6 +179,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -637,7 +639,13 @@ export class ArraySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType, TExtensions> &
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -649,6 +657,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -660,9 +669,29 @@ export class ArraySchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType, TExtensions> &
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
         TExtensions {
         return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -674,6 +703,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {

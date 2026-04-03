@@ -53,6 +53,14 @@ export type RespectPropsOptionality<
     [K in NotRequiredProps<T>]?: InferType<T[K]>;
 };
 
+type RespectPropsOptionalityForInput<
+    T extends Record<string, SchemaBuilder<any, any, any>>
+> = {
+    [K in RequiredInputProps<T>]: InferType<T[K]>;
+} & {
+    [K in NotRequiredInputProps<T>]?: InferType<T[K]>;
+};
+
 type MakeChildrenRequired<
     T extends Record<string, SchemaBuilder<any, any, any>>
 > = {
@@ -220,12 +228,14 @@ export class ObjectSchemaBuilder<
     TProperties extends Record<string, SchemaBuilder<any, any, any>> = {},
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {}
 > extends SchemaBuilder<
     undefined extends TExplicitType
         ? RespectPropsOptionality<TProperties>
         : TExplicitType,
     TRequired,
+    THasDefault,
     TExtensions
 > {
     #properties: TProperties = {} as any;
@@ -289,7 +299,13 @@ export class ObjectSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): ObjectSchemaBuilder<TProperties, true, TExplicitType, TExtensions> &
+    ): ObjectSchemaBuilder<
+        TProperties,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -301,6 +317,7 @@ export class ObjectSchemaBuilder<
         TProperties,
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -318,9 +335,29 @@ export class ObjectSchemaBuilder<
             | (() => undefined extends TExplicitType
                   ? RespectPropsOptionality<TProperties>
                   : TExplicitType)
-    ): ObjectSchemaBuilder<TProperties, true, TExplicitType, TExtensions> &
+    ): ObjectSchemaBuilder<
+        TProperties,
+        true,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
         TExtensions {
         return super.default(value as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -334,6 +371,7 @@ export class ObjectSchemaBuilder<
         (undefined extends TExplicitType
             ? RespectPropsOptionality<TProperties>
             : TExplicitType) & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -819,7 +857,7 @@ export class ObjectSchemaBuilder<
             ? InferType<
                   SchemaBuilder<
                       undefined extends TExplicitType
-                          ? Id<RespectPropsOptionality<TProperties>>
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
                           : TExplicitType,
                       TRequired
                   >
@@ -1010,7 +1048,7 @@ export class ObjectSchemaBuilder<
             ? InferType<
                   SchemaBuilder<
                       undefined extends TExplicitType
-                          ? Id<RespectPropsOptionality<TProperties>>
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
                           : TExplicitType,
                       TRequired
                   >
@@ -1127,7 +1165,13 @@ export class ObjectSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): ObjectSchemaBuilder<TProperties, TRequired, T, TExtensions> &
+    ): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        T,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -1141,6 +1185,7 @@ export class ObjectSchemaBuilder<
         TProperties,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -2120,3 +2165,27 @@ type NotRequiredProps<T extends Record<string, SchemaBuilder<any, any, any>>> =
                 : k
             : never]: T[k];
     };
+
+type RequiredInputProps<
+    T extends Record<string, SchemaBuilder<any, any, any>>
+> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, infer THasDef>
+        ? TReq extends true
+            ? THasDef extends true
+                ? never
+                : k
+            : never
+        : never]: T[k];
+};
+
+type NotRequiredInputProps<
+    T extends Record<string, SchemaBuilder<any, any, any>>
+> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, infer THasDef>
+        ? TReq extends true
+            ? THasDef extends true
+                ? k
+                : never
+            : k
+        : never]: T[k];
+};
