@@ -119,7 +119,6 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
             return { anyOf: options.map(convertNode) };
         }
 
-        case 'any':
         default:
             return {};
     }
@@ -128,13 +127,27 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
 /**
  * Converts a `@cleverbrush/schema` builder to a JSON Schema object.
  *
- * Custom validators and preprocessors added via `addValidator` /
- * `addPreprocessor` are not representable in JSON Schema and are silently
- * omitted. All declarative constraints (min, max, format, pattern, required,
- * etc.) round-trip cleanly.
+ * @remarks
+ * **What round-trips cleanly**: all declarative constraints — type, format,
+ * minLength/maxLength, minimum/maximum, exclusiveMinimum/Maximum, multipleOf,
+ * pattern, required/optional per property, additionalProperties, items,
+ * enum/const literals, anyOf/union.
  *
- * @param schema - any `@cleverbrush/schema` builder
- * @param opts   - optional output configuration
+ * **What is silently omitted**:
+ * - Custom validators added via `addValidator` (no JSON Schema equivalent)
+ * - Preprocessors added via `addPreprocessor`
+ * - JSDoc comments on schema properties
+ * - IP format with both v4 _and_ v6 allowed simultaneously (no single
+ *   standard JSON Schema format covers both; the `format` keyword is omitted
+ *   in that case)
+ *
+ * By default the output includes a `$schema` header for JSON Schema Draft
+ * 2020-12. Pass `{ $schema: false }` when embedding the result in an OpenAPI
+ * specification, or `{ draft: '07' }` for Draft 07 compatibility.
+ *
+ * @param schema - Any `@cleverbrush/schema` builder instance.
+ * @param opts   - Optional output configuration (see {@link ToJsonSchemaOptions}).
+ * @returns A plain JSON-serialisable object representing the schema.
  *
  * @example
  * ```ts

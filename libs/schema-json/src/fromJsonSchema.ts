@@ -1,3 +1,4 @@
+import type { SchemaBuilder } from '@cleverbrush/schema';
 import {
     any,
     array,
@@ -7,8 +8,7 @@ import {
     string,
     union
 } from '@cleverbrush/schema';
-import type { SchemaBuilder } from '@cleverbrush/schema';
-import type { InferFromJsonSchema, JsonSchemaNodeToBuilder } from './types.js';
+import type { JsonSchemaNodeToBuilder } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Private regex constants (same patterns as the built-in string extensions)
@@ -121,7 +121,7 @@ function buildString(
         );
     } else if (format === 'date-time') {
         b = b.addValidator((v: unknown) =>
-            typeof v === 'string' && !isNaN(Date.parse(v))
+            typeof v === 'string' && !Number.isNaN(Date.parse(v))
                 ? ok()
                 : fail('must be a valid date-time string')
         );
@@ -223,13 +223,48 @@ function buildAnyOf(options: unknown[]): SchemaBuilder<any, any, any> {
 /**
  * Converts a JSON Schema object into a `@cleverbrush/schema` builder.
  *
- * All declarative JSON Schema keywords (type, format, minLength, minimum,
- * required, items, properties, enum, const, anyOf, etc.) are mapped to
- * equivalent builder constraints. Custom validators are not representable
- * in JSON Schema and cannot be recovered.
+ * @remarks
+ * **`as const` is required for precise TypeScript inference.**  Without it
+ * TypeScript widens string literals to `string` and the inferred builder
+ * type collapses to `SchemaBuilder<unknown>`. Always pass the schema literal
+ * (or the variable holding it) with `as const`.
  *
- * For precise TypeScript type inference on the returned builder, pass the
- * schema literal with `as const`:
+ * **Supported JSON Schema keywords**
+ *
+ * | Keyword                        | Builder equivalent              |
+ * | ------------------------------ | ------------------------------- |
+ * | `type: 'string'`               | `string()`                      |
+ * | `type: 'number'`               | `number()`                      |
+ * | `type: 'integer'`              | `number()` (integer flag)       |
+ * | `type: 'boolean'`              | `boolean()`                     |
+ * | `type: 'null'`                 | `SchemaBuilder<null>`           |
+ * | `type: 'array'` + `items`      | `array(itemBuilder)`            |
+ * | `type: 'object'` + `properties`| `object({ … })`                 |
+ * | `required: […]`                | required / optional per-prop    |
+ * | `additionalProperties: true`   | `.acceptUnknownProps()`         |
+ * | `const`                        | `string/number/boolean eq`      |
+ * | `enum`                         | `union(…)`                      |
+ * | `anyOf` / `allOf`              | `union(…)` / `SchemaBuilder`    |
+ * | `minLength` / `maxLength`      | `.minLength()` / `.maxLength()` |
+ * | `pattern`                      | `.matches(regex)`               |
+ * | `minimum` / `maximum`          | `.min()` / `.max()`             |
+ * | `exclusiveMinimum` / `exclusiveMaximum` | `.min()` / `.max()` (exclusive) |
+ * | `multipleOf`                   | `.divisibleBy()`                |
+ * | `minItems` / `maxItems`        | `.minLength()` / `.maxLength()` |
+ * | `format: 'email'`              | `.email()` extension            |
+ * | `format: 'uuid'`               | `.uuid()` extension             |
+ * | `format: 'uri'` / `'url'`      | `.url()` extension              |
+ * | `format: 'ipv4'`               | `.ip({ version: 'v4' })`        |
+ * | `format: 'ipv6'`               | `.ip({ version: 'v6' })`        |
+ * | `format: 'date-time'`          | `.matches(iso8601 regex)`       |
+ *
+ * Keywords **not** supported: `$ref`, `$defs`, `if/then/else`,
+ * `not`, `contains`, `unevaluatedProperties`, `contentEncoding`.
+ *
+ * @param schema - A JSON Schema literal.  Pass with `as const` for precise
+ *   TypeScript type inference on the returned builder.
+ * @returns A `@cleverbrush/schema` builder whose static type mirrors the
+ *   structure described by the JSON Schema node.
  *
  * @example
  * ```ts
@@ -250,12 +285,22 @@ function buildAnyOf(options: unknown[]): SchemaBuilder<any, any, any> {
  *
  * @example
  * ```ts
- * // Works with enum
+ * // Union types via `enum`
  * const statusSchema = fromJsonSchema({
  *   enum: ['active', 'inactive', 'pending']
  * } as const);
  *
- * statusSchema.parse('active'); // 'active' | 'inactive' | 'pending'
+ * statusSchema.parse('active'); // valid — 'active' | 'inactive' | 'pending'
+ * ```
+ *
+ * @example
+ * ```ts
+ * // Use InferFromJsonSchema to derive the TypeScript type statically
+ * import type { InferFromJsonSchema } from '@cleverbrush/schema-json';
+ *
+ * const S = { type: 'object', properties: { id: { type: 'integer' } }, required: ['id'] } as const;
+ * type Payload = InferFromJsonSchema<typeof S>; // { id: number }
+ * const payloadSchema = fromJsonSchema(S);
  * ```
  */
 export function fromJsonSchema<const S>(schema: S): JsonSchemaNodeToBuilder<S> {

@@ -16,8 +16,9 @@
  *
  * @module
  */
-export { toJsonSchema } from './toJsonSchema.js';
+
 export { fromJsonSchema } from './fromJsonSchema.js';
+export { toJsonSchema } from './toJsonSchema.js';
 export type {
     InferFromJsonSchema,
     JsonSchemaNode,

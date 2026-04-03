@@ -136,7 +136,10 @@ export type ToJsonSchemaOptions = {
 // Builder-level type inference (strong types for fromJsonSchema)
 // ---------------------------------------------------------------------------
 
-/** Maps a JSON Schema `const` value to the narrowest possible builder type. */
+/**
+ * Maps a JSON Schema `const` value to the narrowest possible builder type.
+ * @internal
+ */
 type ConstToBuilder<V, TRequired extends boolean> = V extends string
     ? StringSchemaBuilder<V, TRequired>
     : V extends number
@@ -145,14 +148,22 @@ type ConstToBuilder<V, TRequired extends boolean> = V extends string
         ? BooleanSchemaBuilder<V, TRequired>
         : SchemaBuilder<V, TRequired>;
 
-/** Recursively maps a readonly tuple of `const`/`enum` values to a tuple of builders. */
+/**
+ * Recursively maps a readonly tuple of `const`/`enum` values to a tuple of
+ * builders, preserving the exact literal types of each element.
+ * @internal
+ */
 type EnumTupleToBuilders<T extends readonly unknown[]> = T extends readonly []
     ? []
     : T extends readonly [infer First, ...infer Rest extends readonly unknown[]]
       ? [ConstToBuilder<First, true>, ...EnumTupleToBuilders<Rest>]
       : [SchemaBuilder<any, any, any>];
 
-/** Recursively maps a readonly tuple of JSON Schema nodes to a tuple of builders. */
+/**
+ * Recursively maps a readonly tuple of JSON Schema nodes (e.g. an `anyOf`
+ * array) to a tuple of builders for use with `UnionSchemaBuilder`.
+ * @internal
+ */
 type SchemaNodesTupleToBuilders<T extends readonly unknown[]> =
     T extends readonly []
         ? []
@@ -172,6 +183,7 @@ type SchemaNodesTupleToBuilders<T extends readonly unknown[]> =
  *
  * Properties present in the `required` array get `TRequired = true`;
  * all others get `TRequired = false`.
+ * @internal
  */
 type ObjectPropertiesToBuilders<
     P extends Record<string, unknown>,

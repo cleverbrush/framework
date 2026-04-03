@@ -1,4 +1,3 @@
-import { expect, test } from 'vitest';
 import {
     any,
     array,
@@ -9,6 +8,7 @@ import {
     string,
     union
 } from '@cleverbrush/schema';
+import { expect, test } from 'vitest';
 import { toJsonSchema } from './toJsonSchema.js';
 
 // ---------------------------------------------------------------------------

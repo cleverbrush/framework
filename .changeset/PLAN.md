@@ -88,6 +88,8 @@ Highlight unique differentiators:
 
 These leverage PropertyDescriptors and the extension system — areas zod doesn't serve well.
 
+Comment: @clevebrush/schema-json is implemented in a separate library.
+
 | Package | What | Why It Matters |
 | --- | --- | --- |
 | `@cleverbrush/schema-openapi` | Generate OpenAPI 3.1 from schemas (bidirectional) | PropertyDescriptors make this trivial; drives API-first team adoption |
