@@ -36,6 +36,11 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
             if (ext['nonempty'] === true && out['minLength'] === undefined)
                 out['minLength'] = 1;
             if (info.matches instanceof RegExp) {
+                if (info.matches.flags !== '') {
+                    throw new Error(
+                        `Cannot convert RegExp /${info.matches.source}/${info.matches.flags} to JSON Schema pattern: RegExp flags are not representable in standard JSON Schema.`,
+                    );
+                }
                 out['pattern'] = info.matches.source;
             } else if (info.startsWith !== undefined) {
                 out['pattern'] = `^${escapeRegex(info.startsWith)}`;
