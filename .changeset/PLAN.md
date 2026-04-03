@@ -37,7 +37,7 @@ The framework has matured significantly. The core schema library, extension syst
 | Feature | Zod API | Current workaround | Impact |
 |---------|---------|-------------------|--------|
 | **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` (pre-validation only) | High — transforms are post-validation semantics, widely used |
-| **Default values** | `.default(value)` | None — manual fallback after validation | High — extremely common pattern |
+| **Default values** | `.default(value)` | ✅ `.default(value \| () => value)` | ✅ DONE |
 | **Recursive schemas** | `z.lazy(() => schema)` | ✅ `lazy(() => schema)` — `LazySchemaBuilder` | High — tree structures, comments, menus |
 | **Nullable** | `.nullable()` | `union(schema()).or(nul())` | Medium — convenience, very common ask |
 | **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(string().equals('b'))` | Medium — verbose workaround |
@@ -130,14 +130,18 @@ Add `.transform(fn)` and `.pipe(otherSchema)`:
 - This unlocks `string().transform(Number).pipe(number().positive())` patterns
 - Very common in form handling and API response processing
 
-### 2.3 Default values
+### 2.3 Default values ✅ DONE
 
-Add `.default(value | () => value)`:
+`.default(value | () => value)` is implemented on `SchemaBuilder`:
 
 - Returns the default when the input is `undefined`
 - Changes the type from `T | undefined` to `T`
-- Must work with `.optional()` — `string().optional().default('')` yields `string`
-- Extremely common in configuration parsing, form defaults, env vars
+- Works with `.optional()` — `string().optional().default('')` yields `string`
+- Accepts static values or factory functions (`() => new Date()`, `() => []`)
+- Zero performance cost on the fast-path — default is a dedicated field, not a preprocessor
+- Validated against the schema's constraints (invalid defaults are caught)
+- Exposed via `.introspect()` as `hasDefault` and `defaultValue`
+- 29 tests covering all builders, factory functions, InferType inference, async, parse/safeParse
 
 ### 2.4 Recursive schemas ✅ DONE
 
@@ -346,5 +350,6 @@ The secondary moat is the **extension system**. Zod's only customization is `.re
 2. **Publish to npm** — nothing else matters until people can `npm install` the library
 3. **Deploy the website** — the playground is the best onboarding tool; make it live
 4. **Write launch blog post** — announce on dev.to, Reddit, HN — performance is now a headline feature
-5. **Add .transform() and .default()** — the two most-asked-for features from Zod migrants
+5. ~~**Add .default()**~~ ✅ Done — `.default(value | () => value)` with factory functions, zero perf cost, 29 tests
+6. **Add .transform()** — the other most-asked-for feature from Zod migrants
 6. **Tag "good first issue" items** — prepare for the first wave of visitors to the repo

@@ -27,6 +27,7 @@ A schema definition and validation library for TypeScript. Define object schemas
 | Per-property error inspection | ✓                   | ~   | ~   | ~   |
 | Extension / plugin system     | ✓                   | ~   | ✗   | ~   |
 | Built-in validators (email…)  | ✓                   | ✓   | ✓   | ✓   |
+| Default values                | ✓                   | ✓   | ✓   | ✓   |
 
 ## Installation
 
@@ -103,17 +104,17 @@ The following builder functions are available:
 
 | Function        | Description                                       | Key Methods                                                     |
 | --------------- | ------------------------------------------------- | --------------------------------------------------------------- |
-| `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.addValidator(fn)`                              |
-| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()` |
-| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)` |
-| `boolean()`     | Boolean value.                                    | `.optional()`                                                   |
-| `date()`        | JavaScript `Date` instance.                       | `.optional()`                                                   |
-| `func()`        | Function value.                                   | `.optional()`                                                   |
-| `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`                                                   |
-| `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`            |
-| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()` |
-| `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`                 |
-| `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)` |
+| `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.default(value)`, `.addValidator(fn)`                              |
+| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.default(value)` |
+| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.default(value)` |
+| `boolean()`     | Boolean value.                                    | `.optional()`, `.default(value)`                                                   |
+| `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.default(value)`                                                   |
+| `func()`        | Function value.                                   | `.optional()`, `.default(value)`                                                   |
+| `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`, `.default(value)`                                                   |
+| `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.default(value)`            |
+| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.default(value)` |
+| `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.default(value)`                 |
+| `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 
 ## Immutability
 
@@ -506,6 +507,50 @@ const tree = ObjectSchemaBuilder.getPropertiesFor(UserSchema);
 // Use descriptors as selectors in mapper and react-form:
 // mapper:     .for((t) => t.name).from((s) => s.name)
 // react-form: <Field selector={(t) => t.address.city} form={form} />
+```
+
+## Default Values
+
+Every schema builder supports `.default(value)`. When the input is `undefined`, the default value is used instead — and the result is still validated against the schema's constraints.
+
+```typescript
+import { string, number, array, object, InferType } from '@cleverbrush/schema';
+
+// Static default
+const Name = string().default('Anonymous');
+Name.validate(undefined); // { valid: true, object: 'Anonymous' }
+Name.validate('Alice');   // { valid: true, object: 'Alice' }
+
+// Factory function — useful for mutable defaults
+const Tags = array(string()).default(() => []);
+
+// Works with .optional() — removes undefined from the type
+const Port = number().optional().default(3000);
+type Port = InferType<typeof Port>; // number (not number | undefined)
+```
+
+Use a factory function for mutable values (arrays, objects, dates) to avoid shared references:
+
+```typescript
+const Config = object({
+    host: string().default('localhost'),
+    port: number().default(8080),
+    tags: array(string()).default(() => []),
+    createdAt: date().default(() => new Date())
+});
+
+type Config = InferType<typeof Config>;
+// { host: string; port: number; tags: string[]; createdAt: Date }
+// All fields are non-optional — defaults fill in missing values
+```
+
+Default values are exposed via `.introspect()`:
+
+```typescript
+const schema = string().default('hello');
+const info = schema.introspect();
+console.log(info.hasDefault);    // true
+console.log(info.defaultValue);  // 'hello'
 ```
 
 ## Extensions

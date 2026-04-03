@@ -695,6 +695,39 @@ const LowerEmail = string().toLowerCase().email(); // same thing`
                     </p>
                 </div>
 
+                {/* ── Default Values ──────────────────────────────── */}
+                <div className="card">
+                    <h2>Default Values</h2>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(
+                                    `// Zod
+const Name = z.string().default('Anonymous');
+
+// @cleverbrush/schema  (identical API)
+const Name = string().default('Anonymous');
+
+// Both support factory functions for mutable defaults:
+// Zod:    z.array(z.string()).default(() => []);
+// Schema: array(string()).default(() => []);
+
+// Both remove undefined from the inferred type:
+// type Name = string  (not string | undefined)`
+                                )
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        The <code>.default(value)</code> API is identical to
+                        Zod. It accepts a static value or a factory function,
+                        and the default is validated against the schema&apos;s
+                        constraints. The inferred type automatically unwraps{' '}
+                        <code>undefined</code>.
+                    </p>
+                </div>
+
                 {/* ── Branded Types ────────────────────────────────── */}
                 <div className="card">
                     <h2>Branded Types</h2>
@@ -883,13 +916,10 @@ const PostSlug = SlugString.slug().minLength(3).maxLength(60);`
                                     <td>
                                         <code>.default(value)</code>
                                     </td>
-                                    <td>Not implemented</td>
+                                    <td>✓ Supported</td>
                                     <td>
-                                        Use{' '}
-                                        <code>
-                                            .addPreprocessor(v =&gt; v ??
-                                            defaultValue)
-                                        </code>
+                                        <code>.default(value)</code> or{' '}
+                                        <code>.default(() =&gt; value)</code>
                                     </td>
                                 </tr>
                                 <tr>
