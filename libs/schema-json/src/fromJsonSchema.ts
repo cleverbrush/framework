@@ -204,7 +204,7 @@ function buildAnyOf(options: unknown[]): SchemaBuilder<any, any, any> {
  * | `pattern`                      | `.matches(regex)`               |
  * | `minimum` / `maximum`          | `.min()` / `.max()`             |
  * | `exclusiveMinimum` / `exclusiveMaximum` | `.min()` / `.max()` (exclusive) |
- * | `multipleOf`                   | `.divisibleBy()`                |
+ * | `multipleOf`                   | `.multipleOf()`                 |
  * | `minItems` / `maxItems`        | `.minLength()` / `.maxLength()` |
  * | `format: 'email'`              | `.email()` extension            |
  * | `format: 'uuid'`               | `.uuid()` extension             |
