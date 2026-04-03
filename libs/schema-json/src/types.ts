@@ -4,12 +4,12 @@
  * @module
  */
 import type {
-    ArraySchemaBuilder,
     BooleanSchemaBuilder,
-    NumberSchemaBuilder,
+    ExtendedArray,
+    ExtendedNumber,
+    ExtendedString,
     ObjectSchemaBuilder,
     SchemaBuilder,
-    StringSchemaBuilder,
     UnionSchemaBuilder
 } from '@cleverbrush/schema';
 
@@ -139,13 +139,56 @@ export type ToJsonSchemaOptions = {
 // ---------------------------------------------------------------------------
 
 /**
+ * Required variant: `ExtendedString<T>` (the return type of `string()`).
+ * Optional variant: `ReturnType<ExtendedString<T>['optional']>` (the return
+ * type of `string().optional()`).
+ * @internal
+ */
+type ExtendedStringBuilder<
+    T extends string = string,
+    TRequired extends boolean = true
+> = TRequired extends true
+    ? ExtendedString<T>
+    : ReturnType<ExtendedString<T>['optional']>;
+
+/**
+ * Required variant: `ExtendedNumber<T>` (the return type of `number()`).
+ * Optional variant: `ReturnType<ExtendedNumber<T>['optional']>` (the return
+ * type of `number().optional()`).
+ * @internal
+ */
+type ExtendedNumberBuilder<
+    T extends number = number,
+    TRequired extends boolean = true
+> = TRequired extends true
+    ? ExtendedNumber<T>
+    : ReturnType<ExtendedNumber<T>['optional']>;
+
+/**
+ * Required variant: `ExtendedArray<TElement>` (the return type of `array()`).
+ * Optional variant: `ReturnType<ExtendedArray<TElement>['optional']>` (the
+ * return type of `array().optional()`).
+ * @internal
+ */
+type ExtendedArrayBuilder<
+    TElement extends SchemaBuilder<any, any, any> = SchemaBuilder<
+        any,
+        any,
+        any
+    >,
+    TRequired extends boolean = true
+> = TRequired extends true
+    ? ExtendedArray<TElement>
+    : ReturnType<ExtendedArray<TElement>['optional']>;
+
+/**
  * Maps a JSON Schema `const` value to the narrowest possible builder type.
  * @internal
  */
 type ConstToBuilder<V, TRequired extends boolean> = V extends string
-    ? StringSchemaBuilder<V, TRequired>
+    ? ExtendedStringBuilder<V, TRequired>
     : V extends number
-      ? NumberSchemaBuilder<V, TRequired>
+      ? ExtendedNumberBuilder<V, TRequired>
       : V extends boolean
         ? BooleanSchemaBuilder<V, TRequired>
         : SchemaBuilder<V, TRequired>;
@@ -235,8 +278,8 @@ type ObjectPropertiesToBuilders<
  *
  * type Builder = JsonSchemaNodeToBuilder<typeof S>;
  * // ObjectSchemaBuilder<
- * //   { name: StringSchemaBuilder<string, true> } &
- * //   { score: NumberSchemaBuilder<number, false> }
+ * //   { name: ExtendedStringBuilder<string, true> } &
+ * //   { score: ExtendedNumberBuilder<number, false> }
  * // >
  *
  * const schema = fromJsonSchema(S);
@@ -263,13 +306,13 @@ export type JsonSchemaNodeToBuilder<S, TRequired extends boolean = true> =
               ? SchemaBuilder<unknown, TRequired>
               : // string
                 S extends { readonly type: 'string' }
-                ? StringSchemaBuilder<string, TRequired>
+                ? ExtendedStringBuilder<string, TRequired>
                 : // number
                   S extends { readonly type: 'number' }
-                  ? NumberSchemaBuilder<number, TRequired>
+                  ? ExtendedNumberBuilder<number, TRequired>
                   : // integer
                     S extends { readonly type: 'integer' }
-                    ? NumberSchemaBuilder<number, TRequired>
+                    ? ExtendedNumberBuilder<number, TRequired>
                     : // boolean
                       S extends { readonly type: 'boolean' }
                       ? BooleanSchemaBuilder<boolean, TRequired>
@@ -281,7 +324,7 @@ export type JsonSchemaNodeToBuilder<S, TRequired extends boolean = true> =
                                 readonly type: 'array';
                                 readonly items: infer I;
                             }
-                          ? ArraySchemaBuilder<
+                          ? ExtendedArrayBuilder<
                                 JsonSchemaNodeToBuilder<I, true>,
                                 TRequired
                             >
@@ -289,7 +332,7 @@ export type JsonSchemaNodeToBuilder<S, TRequired extends boolean = true> =
                             S extends {
                                   readonly type: 'array';
                               }
-                            ? ArraySchemaBuilder<
+                            ? ExtendedArrayBuilder<
                                   SchemaBuilder<unknown, true>,
                                   TRequired
                               >
