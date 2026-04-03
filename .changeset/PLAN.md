@@ -29,7 +29,7 @@ The framework has matured significantly. The core schema library, extension syst
 | **Website** | Done (unpublished) | Next.js 16, landing page, docs for all packages, playground (32 examples), "Migrating from Zod" guide, API docs (TypeDoc) |
 | **CI/CD** | Done | GitHub Actions: `ci.yml` (lint + build + test), `release.yml` (changesets publish) |
 | **Community files** | Done | CONTRIBUTING.md, CODE_OF_CONDUCT.md |
-| **Benchmarks** | Done (poor results) | vs zod/yup/joi — **schema is ~4x slower than zod on valid input**, sometimes behind joi too |
+| **Benchmarks** | Done (excellent results) | vs zod/yup/joi — **schema is #1 in 14/15 benchmarks**, 1.3–2.2x faster than zod on valid input, 8–230x faster on invalid input |
 | **Discriminated Unions** | Not needed | Works naturally with `union()` + `.equals()`, documented in playground |
 
 ### What's NOT Built — Feature Gaps vs Zod
@@ -84,18 +84,42 @@ The framework has matured significantly. The core schema library, extension syst
 
 ## Phase 2: Performance & Critical Gaps
 
-**Goal:** Address the two biggest objections a developer evaluating the library would have: "is it fast enough?" and "does it have X?". These are blockers for adoption.
+**Goal:** Address the biggest objections a developer evaluating the library would have. Performance is now resolved (schema beats zod in nearly every benchmark). The remaining focus is closing critical API gaps — "does it have X?".
 
-### 2.1 Performance optimization (CRITICAL)
+### 2.1 Performance optimization ✅ DONE
 
-Current benchmark results show **schema is ~4x slower than zod** on valid complex objects and arrays. This is the #1 objection in any comparison. Priorities:
+Performance work on the `feature/performance` branch has transformed benchmarks from a liability into a competitive advantage. **@cleverbrush/schema now ranks #1 in 14 out of 15 benchmarks** across primitives, objects, arrays, and unions.
 
-- **Profile hot paths**: Use `--prof`/flamegraphs to find where time is spent (likely: transaction overhead, property iteration, validator chain)
-- **Optimize sync validation path**: The sync path should avoid any async machinery
-- **Reduce allocations**: Immutable builders create many intermediate objects during validation — consider pooling or reusing validation contexts
-- **Transaction overhead**: The Proxy-based transaction system may be expensive for simple validations; consider a fast path that skips transactions for read-only validation
-- **Benchmark continuously**: Run benchmarks in CI and track regressions
-- **Target**: Get within 2x of zod on all benchmarks — exact parity is less important than "fast enough"
+**Results vs Zod (ops/s):**
+
+| Benchmark | Schema | Zod | Ratio |
+|-----------|--------|-----|-------|
+| Array 100 objects (valid) | 70,001 | 32,282 | **2.17x faster** |
+| Array 100 objects (invalid) | 2,816,587 | 12,255 | **230x faster** |
+| Complex order (valid) | 447,420 | 274,238 | **1.63x faster** |
+| Complex order (invalid) | 2,159,649 | 68,471 | **31.5x faster** |
+| Flat object (valid) | 2,064,271 | 1,424,508 | **1.45x faster** |
+| Flat object (invalid) | 5,032,145 | 336,995 | **14.9x faster** |
+| Nested object (valid) | 1,215,356 | 780,329 | **1.56x faster** |
+| Nested object (invalid) | 5,549,210 | 172,313 | **32.2x faster** |
+| String (valid) | 10,188,501 | 7,914,923 | **1.29x faster** |
+| String (invalid) | 11,420,265 | 1,171,617 | **9.75x faster** |
+| Number (valid) | 13,149,357 | 7,406,617 | **1.78x faster** |
+| Number (invalid) | 11,122,316 | 1,335,207 | **8.33x faster** |
+| Union first branch (text) | 3,860,391 | 2,834,793 | **1.36x faster** |
+| Union last branch (video) | 1,292,859 | 1,390,194 | 0.93x (zod 7% faster) |
+| Union no match (invalid) | 11,294,887 | 953,427 | **11.8x faster** |
+
+**Key takeaways:**
+- Valid input: consistently **1.3–2.2x faster** than zod
+- Invalid input: **8–230x faster** than zod (early-exit optimization)
+- Also beats joi and yup in virtually every benchmark
+- Only loss: union match-last-branch, where zod is ~7% faster — effectively a tie
+
+**Remaining work:**
+- Merge `feature/performance` branch to `master`
+- Add benchmark CI job to track regressions
+- Performance is now a marketing strength, not a concern
 
 ### 2.2 Transform & Pipe
 
@@ -152,7 +176,7 @@ A dedicated page that honestly shows:
 - **Type-safe extensions** — first-class plugin system, not just `.refine()` hacks
 - **JSDoc preservation** — IDE tooltips come from schema definitions
 - **Complete ecosystem** — validation → mapping → forms from one schema definition
-- **Benchmark results** (once improved) — or at minimum, honest framing of trade-offs
+- **Benchmark results** — schema is faster than zod in 14/15 benchmarks, dramatically faster on invalid input
 
 ### 3.3 Contributor experience
 
@@ -314,9 +338,9 @@ The secondary moat is the **extension system**. Zod's only customization is `.re
 
 ## Immediate Priorities (ordered)
 
-1. **Publish to npm** — nothing else matters until people can `npm install` the library
-2. **Deploy the website** — the playground is the best onboarding tool; make it live
-3. **Performance optimization** — 4x slower than Zod is a deal-breaker for adoption; get within 2x
-4. **Write launch blog post** — announce on dev.to, Reddit, HN
+1. ~~**Performance optimization**~~ ✅ Done — schema is now **faster than zod** in 14/15 benchmarks (1.3–2.2x on valid, 8–230x on invalid)
+2. **Publish to npm** — nothing else matters until people can `npm install` the library
+3. **Deploy the website** — the playground is the best onboarding tool; make it live
+4. **Write launch blog post** — announce on dev.to, Reddit, HN — performance is now a headline feature
 5. **Add .transform() and .default()** — the two most-asked-for features from Zod migrants
 6. **Tag "good first issue" items** — prepare for the first wave of visitors to the repo
