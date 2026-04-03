@@ -11,21 +11,6 @@ import {
 import type { JsonSchemaNodeToBuilder } from './types.js';
 
 // ---------------------------------------------------------------------------
-// Private regex constants (same patterns as the built-in string extensions)
-// ---------------------------------------------------------------------------
-
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const UUID_RE =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const IPV4_RE =
-    /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
-
-const IPV6_RE =
-    /^(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}$|^::(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4}$|^(?:[0-9a-f]{1,4}:){1,6}:[0-9a-f]{1,4}$|^(?:[0-9a-f]{1,4}:){1,5}(?::[0-9a-f]{1,4}){1,2}$|^(?:[0-9a-f]{1,4}:){1,4}(?::[0-9a-f]{1,4}){1,3}$|^(?:[0-9a-f]{1,4}:){1,3}(?::[0-9a-f]{1,4}){1,4}$|^(?:[0-9a-f]{1,4}:){1,2}(?::[0-9a-f]{1,4}){1,5}$|^[0-9a-f]{1,4}:(?::[0-9a-f]{1,4}){1,6}$|^::$/i;
-
-// ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
 
@@ -86,39 +71,15 @@ function buildString(
     const format = node['format'] as string | undefined;
 
     if (format === 'email') {
-        b = b.addValidator((v: unknown) =>
-            typeof v === 'string' && EMAIL_RE.test(v)
-                ? ok()
-                : fail('must be a valid email address')
-        );
+        b = b.email();
     } else if (format === 'uuid') {
-        b = b.addValidator((v: unknown) =>
-            typeof v === 'string' && UUID_RE.test(v)
-                ? ok()
-                : fail('must be a valid UUID')
-        );
+        b = b.uuid();
     } else if (format === 'uri' || format === 'url') {
-        b = b.addValidator((v: unknown) => {
-            if (typeof v !== 'string') return fail('must be a valid URI');
-            try {
-                new URL(v);
-                return ok();
-            } catch {
-                return fail('must be a valid URI');
-            }
-        });
+        b = b.url();
     } else if (format === 'ipv4') {
-        b = b.addValidator((v: unknown) =>
-            typeof v === 'string' && IPV4_RE.test(v)
-                ? ok()
-                : fail('must be a valid IPv4 address')
-        );
+        b = b.ip({ version: 'v4' });
     } else if (format === 'ipv6') {
-        b = b.addValidator((v: unknown) =>
-            typeof v === 'string' && IPV6_RE.test(v)
-                ? ok()
-                : fail('must be a valid IPv6 address')
-        );
+        b = b.ip({ version: 'v6' });
     } else if (format === 'date-time') {
         b = b.addValidator((v: unknown) =>
             typeof v === 'string' && !Number.isNaN(Date.parse(v))
