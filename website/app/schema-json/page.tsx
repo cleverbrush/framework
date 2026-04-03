@@ -273,7 +273,7 @@ const result = UserSchema.parse({
                                         <code>multipleOf</code>
                                     </td>
                                     <td>
-                                        <code>.divisibleBy()</code>
+                                        <code>number().multipleOf(n)</code>
                                     </td>
                                 </tr>
                                 <tr>
