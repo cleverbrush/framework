@@ -20,8 +20,7 @@ import {
     buildSelectorFromPath,
     ensureNestedStructure,
     getDescriptorPath,
-    getSchemaType,
-    isErrorPathMatch
+    getSchemaType
 } from './helpers.js';
 import type {
     FieldRenderer,
@@ -197,30 +196,7 @@ export function useSchemaForm<
                             fieldsWithErrors.add(path);
                         }
                     } catch {
-                        // If getErrorsFor fails for this path, skip — fallback below will handle it
-                    }
-                }
-            }
-
-            // Fallback: for fields not covered by getErrorsFor (e.g., deeply nested fields
-            // where getErrorsFor has a known issue), match errors by path from result.errors
-            if (Array.isArray(resultWithErrors.errors)) {
-                for (const [, path] of pathMap) {
-                    if (fieldsWithErrors.has(path)) continue;
-                    const errorPath = `$.${path}`;
-                    for (const err of resultWithErrors.errors) {
-                        if (isErrorPathMatch(err.path ?? '', errorPath)) {
-                            const patch: Partial<{
-                                error: string | undefined;
-                                touched: boolean;
-                            }> = { error: err.message };
-                            if (markTouched) {
-                                patch.touched = true;
-                            }
-                            store.updateFieldState(path, patch);
-                            fieldsWithErrors.add(path);
-                            break;
-                        }
+                        // If getErrorsFor fails for this path, skip
                     }
                 }
             }

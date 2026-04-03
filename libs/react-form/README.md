@@ -496,7 +496,7 @@ function SignupForm() {
 ### How validation works
 
 1. `form.validate()` or `form.submit()` runs the schema's full validation
-2. Error paths (e.g. `$.username`) are mapped to field paths (e.g. `username`)
+2. Per-property errors are resolved via `getErrorsFor()` using PropertyDescriptors
 3. Each field's `error` state is updated automatically
 4. Renderers receive the `error` string and `touched` boolean to decide how/when to display errors
 

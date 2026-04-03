@@ -117,11 +117,9 @@ test('introspect type is null', () => {
     expect(schema.introspect().type).toEqual('null');
 });
 
-test('error message contains path from context', () => {
+test('error message for invalid value', () => {
     const schema = nul();
-    const { valid, errors } = schema.validate('oops' as any, {
-        path: '$.field'
-    });
+    const { valid, errors } = schema.validate('oops' as any);
     expect(valid).toEqual(false);
-    expect(errors?.[0].path).toEqual('$.field');
+    expect(errors?.[0].message).toEqual('must be null');
 });

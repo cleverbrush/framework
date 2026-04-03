@@ -111,7 +111,7 @@ export class NullSchemaBuilder<
     // null as an invalid value for required schemas, which would prevent null
     // from ever passing validation here. We therefore bypass preValidateSync
     // entirely and implement the full (and simple) validation inline.
-    #buildResult(object: any, path: string): ValidationResult<null> {
+    #buildResult(object: any): ValidationResult<null> {
         if (object === null) return { valid: true, object: null };
 
         if (object === undefined && !this.isRequired) {
@@ -120,7 +120,7 @@ export class NullSchemaBuilder<
 
         return {
             valid: false,
-            errors: [{ message: 'must be null', path }]
+            errors: [{ message: 'must be null' }]
         };
     }
 
@@ -130,9 +130,9 @@ export class NullSchemaBuilder<
      */
     public validate(
         object: null,
-        context?: ValidationContext
+        _context?: ValidationContext
     ): ValidationResult<null> {
-        return this.#buildResult(object, context?.path ?? '$');
+        return this.#buildResult(object);
     }
 
     /**
@@ -141,9 +141,9 @@ export class NullSchemaBuilder<
      */
     public async validateAsync(
         object: null,
-        context?: ValidationContext
+        _context?: ValidationContext
     ): Promise<ValidationResult<null>> {
-        return this.#buildResult(object, context?.path ?? '$');
+        return this.#buildResult(object);
     }
 
     protected createFromProps<TReq extends boolean>(

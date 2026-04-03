@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { highlightTS } from '@/lib/highlight';
+import { BenchmarkSection } from './BenchmarkSection';
 
 export default function HomePage() {
     return (
@@ -323,7 +324,7 @@ if (result.valid) {
   // result.object is typed as Product
   saveToDatabase(result.object);
 } else {
-  // result.errors is an array of { path, message }
+  // result.errors is an array of { message }
   showErrors(result.errors);
 }`)
                                 }}
@@ -393,6 +394,8 @@ function ProductForm() {
                     </p>
                 </div>
             </section>
+
+            <BenchmarkSection />
 
             {/* ── Contribute CTA ──────────────────────────────────── */}
             <section className="section">

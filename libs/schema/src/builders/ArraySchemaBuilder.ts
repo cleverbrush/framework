@@ -196,7 +196,6 @@ export class ArraySchemaBuilder<
             errors,
             transaction: preValidationTransaction
         } = superResult;
-        const { path } = prevalidationContext;
 
         // Self-referencing property descriptor for the array root
         const selfDescriptor: PropertyDescriptor<any, any, any> = {
@@ -260,9 +259,7 @@ export class ArraySchemaBuilder<
                 needsElementValidation: false as const,
                 result: {
                     valid: false,
-                    errors: [
-                        { message: 'array expected', path: path as string }
-                    ],
+                    errors: [{ message: 'array expected' }],
                     getNestedErrors
                 } as ArraySchemaValidationResult<TResult, TElementSchema>
             };
@@ -272,7 +269,6 @@ export class ArraySchemaBuilder<
             needsElementValidation: true as const,
             objToValidate,
             prevalidationContext,
-            path: path as string,
             getNestedErrors,
             elementResults,
             rootErrors
@@ -323,9 +319,8 @@ export class ArraySchemaBuilder<
                           .map(r => r?.errors)
                           .filter(r => r)
                           .flatMap(e =>
-                              e?.map((r: any, index: number) => ({
-                                  ...r,
-                                  path: `${r.path}[${index}]`
+                              e?.map((r: any) => ({
+                                  ...r
                               }))
                           ) as any
                   },
@@ -346,6 +341,99 @@ export class ArraySchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): ArraySchemaValidationResult<TResult, TElementSchema> {
+        // Fast path: no preprocessors/validators, default error mode, has element schema
+        if (
+            this.canSkipPreValidation &&
+            !context?.doNotStopOnFirstError &&
+            this.#elementSchema instanceof SchemaBuilder
+        ) {
+            // Required / optional check
+            if (typeof object === 'undefined' || object === null) {
+                if (!this.isRequired) {
+                    const self = this;
+                    return {
+                        valid: true,
+                        object: object,
+                        getNestedErrors() {
+                            return self
+                                .#validateArrayFull(object, context)
+                                .getNestedErrors();
+                        }
+                    } as any;
+                }
+                return this.#validateArrayFull(object, context);
+            }
+
+            if (!Array.isArray(object)) {
+                return this.#validateArrayFull(object, context);
+            }
+
+            // Length constraints
+            if (this.#getLengthViolation(object as any)) {
+                return this.#validateArrayFull(object, context);
+            }
+
+            // Validate elements inline — no path passed to children
+            const len = (object as any).length;
+            if (len > 0) {
+                const resultArray = new Array(len);
+                for (let i = 0; i < len; i++) {
+                    const result = this.#elementSchema.validate(
+                        (object as any)[i]
+                    );
+                    if (!result.valid) {
+                        const self = this;
+                        return {
+                            valid: false,
+                            errors:
+                                result.errors && result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getNestedErrors() {
+                                return self
+                                    .#validateArrayFull(object, context)
+                                    .getNestedErrors();
+                            }
+                        } as any;
+                    }
+                    resultArray[i] = result.object;
+                }
+
+                // Lazy getNestedErrors
+                const self = this;
+                return {
+                    valid: true,
+                    object: resultArray as TResult,
+                    getNestedErrors() {
+                        return self
+                            .#validateArrayFull(object, context)
+                            .getNestedErrors();
+                    }
+                } as any;
+            }
+
+            const self = this;
+            return {
+                valid: true,
+                object: object as TResult,
+                getNestedErrors() {
+                    return self
+                        .#validateArrayFull(object, context)
+                        .getNestedErrors();
+                }
+            } as any;
+        }
+
+        return this.#validateArrayFull(object, context);
+    }
+
+    /**
+     * Full validation path with complete setup, error handling, and nested error support.
+     */
+    #validateArrayFull(
+        object: TResult,
+        context?: ValidationContext
+    ): ArraySchemaValidationResult<TResult, TElementSchema> {
         const setup = this.#createValidationSetup(
             object,
             this.preValidateSync(object, context)
@@ -356,7 +444,6 @@ export class ArraySchemaBuilder<
         const {
             objToValidate,
             prevalidationContext,
-            path,
             getNestedErrors,
             elementResults,
             rootErrors
@@ -371,7 +458,7 @@ export class ArraySchemaBuilder<
             rootErrors.push(msg);
             return {
                 valid: false,
-                errors: [{ message: msg, path }],
+                errors: [{ message: msg }],
                 getNestedErrors
             };
         }
@@ -386,8 +473,7 @@ export class ArraySchemaBuilder<
                 for (let i = 0; i < objToValidate.length; i++) {
                     results.push(
                         this.#elementSchema.validate(objToValidate[i], {
-                            ...prevalidationContext,
-                            path: `${path}[${i}]`
+                            ...prevalidationContext
                         })
                     );
                 }
@@ -403,8 +489,7 @@ export class ArraySchemaBuilder<
                     const result = this.#elementSchema.validate(
                         objToValidate[i],
                         {
-                            ...prevalidationContext,
-                            path: `${path}[${i}]`
+                            ...prevalidationContext
                         }
                     );
                     elementResults[i] = result as any;
@@ -457,7 +542,6 @@ export class ArraySchemaBuilder<
         const {
             objToValidate,
             prevalidationContext,
-            path,
             getNestedErrors,
             elementResults,
             rootErrors
@@ -472,7 +556,7 @@ export class ArraySchemaBuilder<
             rootErrors.push(msg);
             return {
                 valid: false,
-                errors: [{ message: msg, path }],
+                errors: [{ message: msg }],
                 getNestedErrors
             };
         }
@@ -502,8 +586,7 @@ export class ArraySchemaBuilder<
                     const result = await this.#elementSchema.validateAsync(
                         objToValidate[i],
                         {
-                            ...prevalidationContext,
-                            path: `${path}[${i}]`
+                            ...prevalidationContext
                         }
                     );
                     elementResults[i] = result as any;

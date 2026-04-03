@@ -578,7 +578,7 @@ if (!result.success) console.log(result.error.issues);
 const user = UserSchema.parse(data);           // throws SchemaValidationError on failure
 const result = UserSchema.validate(data);      // { valid, object?, errors? }
 if (!result.valid) console.log(result.errors);
-// errors: [{ path: '$.field', message: '...' }, ...]
+// errors: [{ message: '...' }, ...]
 
 // Async variants
 const user   = await UserSchema.parseAsync(data);

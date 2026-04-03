@@ -319,8 +319,6 @@ export class UnionSchemaBuilder<
             errors
         } = superResult;
 
-        const { path } = prevalidationContext;
-
         // Create a self-referencing property descriptor for the union root
         const selfDescriptor: PropertyDescriptor<any, any, any> = {
             [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
@@ -379,7 +377,6 @@ export class UnionSchemaBuilder<
             objToValidate,
             prevalidationContext,
             preValidationTransaction: preValidationTransaction!,
-            path: path as string,
             getNestedErrors,
             optionResults,
             rootErrors
@@ -439,6 +436,160 @@ export class UnionSchemaBuilder<
             : TExplicitType,
         TOptions
     > {
+        // Fast path: skip preValidateSync + createValidationSetup when
+        // there are no preprocessors/validators and context is default.
+        if (
+            this.canSkipPreValidation &&
+            !context?.doNotStopOnFirstError &&
+            !context?.rootPropertyDescriptor
+        ) {
+            // Required / optional check
+            if (typeof object === 'undefined' || object === null) {
+                if (!this.isRequired) {
+                    return this.#fastResult(
+                        true,
+                        object,
+                        undefined,
+                        object,
+                        context
+                    );
+                }
+                return this.#fastResult(
+                    false,
+                    undefined,
+                    [
+                        {
+                            message: this.getValidationErrorMessageSync(
+                                this.requiredErrorMessage,
+                                object as any
+                            )
+                        }
+                    ],
+                    object,
+                    context
+                );
+            }
+
+            // Discriminated union: O(1) lookup, no setup overhead
+            if (this.#discriminatorKey && this.#discriminatorMap) {
+                if (typeof object === 'object' && object !== null) {
+                    const discriminatorValue = (object as any)[
+                        this.#discriminatorKey
+                    ];
+                    const matchedSchema =
+                        this.#discriminatorMap.get(discriminatorValue);
+                    if (matchedSchema) {
+                        const optionResult = matchedSchema.validate(
+                            object as any
+                        );
+                        return this.#fastResult(
+                            optionResult.valid,
+                            optionResult.valid
+                                ? optionResult.object
+                                : undefined,
+                            optionResult.valid
+                                ? undefined
+                                : optionResult.errors,
+                            object,
+                            context
+                        );
+                    }
+                    // Discriminator value not in map — no option matches
+                    return this.#fastResult(
+                        false,
+                        undefined,
+                        [
+                            {
+                                message:
+                                    "value doesn't match any option in union schema"
+                            }
+                        ],
+                        object,
+                        context
+                    );
+                }
+            }
+
+            // Non-discriminated union: try options sequentially, no transaction overhead
+            if (!this.#discriminatorKey) {
+                const options = this.#options;
+                let minErrorsCount = Number.MAX_SAFE_INTEGER;
+                let resultingErrors: any[] = [];
+
+                for (let i = 0; i < options.length; i++) {
+                    const optionResult = options[i].validate(object as any);
+                    if (optionResult.valid) {
+                        return this.#fastResult(
+                            true,
+                            optionResult.object,
+                            undefined,
+                            object,
+                            context
+                        );
+                    }
+
+                    const optErrors = optionResult.errors;
+                    if (
+                        Array.isArray(optErrors) &&
+                        optErrors.length > 0 &&
+                        optErrors.length < minErrorsCount
+                    ) {
+                        resultingErrors = optErrors as any;
+                        minErrorsCount = optErrors.length;
+                    }
+                }
+
+                return this.#fastResult(
+                    false,
+                    undefined,
+                    resultingErrors,
+                    object,
+                    context
+                );
+            }
+        }
+
+        return this.#validateFull(object, context) as any;
+    }
+
+    /**
+     * Build a fast-path result with a lazy `getNestedErrors` that
+     * defers to the full validation only when actually called.
+     */
+    #fastResult(
+        valid: boolean,
+        obj: any,
+        errors: any[] | undefined,
+        originalObject: any,
+        context: ValidationContext | undefined
+    ): any {
+        const self = this;
+        if (valid) {
+            return {
+                valid: true,
+                object: obj,
+                getNestedErrors() {
+                    return self
+                        .#validateFull(originalObject, context)
+                        .getNestedErrors();
+                }
+            };
+        }
+        return {
+            valid: false,
+            errors,
+            getNestedErrors() {
+                return self
+                    .#validateFull(originalObject, context)
+                    .getNestedErrors();
+            }
+        };
+    }
+
+    #validateFull(
+        object: any,
+        context?: ValidationContext
+    ): UnionSchemaValidationResult<any, any> {
         const setup = this.#createValidationSetup(
             object,
             this.preValidateSync(object, context)
@@ -449,7 +600,6 @@ export class UnionSchemaBuilder<
         const {
             prevalidationContext,
             preValidationTransaction,
-            path,
             getNestedErrors,
             optionResults,
             rootErrors
@@ -490,7 +640,6 @@ export class UnionSchemaBuilder<
                 state.objToValidate,
                 {
                     ...prevalidationContext,
-                    path: `${path}[option ${i}]`,
                     currentPropertyDescriptor: undefined,
                     rootPropertyDescriptor: undefined
                 } as any
@@ -544,7 +693,6 @@ export class UnionSchemaBuilder<
         const {
             prevalidationContext,
             preValidationTransaction,
-            path,
             getNestedErrors,
             optionResults,
             rootErrors
@@ -588,7 +736,6 @@ export class UnionSchemaBuilder<
                 state.objToValidate,
                 {
                     ...prevalidationContext,
-                    path: `${path}[option ${i}]`,
                     currentPropertyDescriptor: undefined,
                     rootPropertyDescriptor: undefined
                 } as any

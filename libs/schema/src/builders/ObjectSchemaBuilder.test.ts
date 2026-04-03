@@ -103,7 +103,7 @@ test('one prop - 2', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toBeGreaterThan(0);
-    expect(errors?.findIndex(e => e.path === '$.first')).not.toEqual(-1);
+    expect(errors?.[0]).toHaveProperty('message');
 
     const typeTest: InferType<typeof schema> = { first: 1 };
     expectTypeOf(typeTest).toEqualTypeOf<{ first: number; second?: number }>();
@@ -138,7 +138,7 @@ test('one prop - 3', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(1);
-    expect(errors?.findIndex(e => e.path === '$.first')).not.toEqual(-1);
+    expect(errors?.[0]).toHaveProperty('message');
 });
 
 test('one prop - 4', async () => {
@@ -430,7 +430,7 @@ test('nested object - 2', async () => {
     expect(Array.isArray(errors)).toEqual(true);
     expect(resultObj).toBeUndefined();
     if (Array.isArray(errors)) {
-        expect(errors[0].path).toEqual('$.nested.num');
+        expect(errors[0]).toHaveProperty('message');
     }
 });
 
@@ -458,7 +458,7 @@ test('no unknown fields - 1', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     if (Array.isArray(errors)) {
-        expect(errors[0].path).toEqual('$');
+        expect(errors[0].message).toContain('unknown property');
     }
     expect(objResult).toBeUndefined();
 
@@ -519,7 +519,7 @@ test('no unknown fields - 3', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     if (Array.isArray(errors)) {
-        expect(errors[0].path).toEqual('$');
+        expect(errors[0].message).toContain('unknown property');
     }
     expect(objResult).toBeUndefined();
 });
@@ -553,11 +553,10 @@ test('no unknown fields - 4', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     if (Array.isArray(errors)) {
-        expect(errors[0].path).toEqual('$.nested');
+        expect(errors[0].message).toContain('unknown property');
     }
     expect(objResult).toBeUndefined();
 });
-
 test('no unknown fields - 5', () => {
     // Build a User schema with name (required string) and age (number)
     const User = object({});
@@ -584,8 +583,6 @@ test('multiple errors - 1', async () => {
     expect(valid).toEqual(false);
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(2);
-    expect(errors?.find(e => e.path === '$.first')).toBeDefined();
-    expect(errors?.find(e => e.path === '$.second')).toBeDefined();
 });
 
 test('multiple errors - 2', async () => {
@@ -617,9 +614,6 @@ test('multiple errors - 2', async () => {
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(3);
     expect(objResult).toBeUndefined();
-    expect(errors?.find(e => e.path === '$.first')).toBeDefined();
-    expect(errors?.find(e => e.path === '$.second')).toBeDefined();
-    expect(errors?.find(e => e.path === '$.nested')).toBeDefined();
 });
 
 test('multiple errors - 3', async () => {
@@ -878,7 +872,7 @@ test('Preprocessors - 2', async () => {
     expect(Array.isArray(errors)).toEqual(true);
     if (Array.isArray(errors)) {
         expect(errors.length).toEqual(1);
-        expect(errors[0].path).toEqual('$($preprocessors[0])');
+        expect(errors[0].message).toContain('Preprocessor');
     }
 });
 
@@ -1006,7 +1000,7 @@ test('Validators - 2', async () => {
     expect(Array.isArray(errors)).toEqual(true);
     expect(errors?.length).toEqual(1);
     if (errors) {
-        expect(errors[0].path).toEqual('$($validators[0])');
+        expect(errors[0].message).toContain('must divide by 3');
     }
 });
 
@@ -1047,7 +1041,7 @@ test('Validators - 3', async () => {
     expect(Array.isArray(errors)).toEqual(true);
     if (Array.isArray(errors)) {
         expect(errors.length).toEqual(1);
-        expect(errors[0]).toHaveProperty('path', '$($validators[0])');
+        expect(errors[0]).toHaveProperty('message');
     }
 });
 
@@ -1217,7 +1211,6 @@ test("child validator run after parent's - 1", async () => {
         expect(Array.isArray(errors)).toEqual(true);
         if (errors) {
             expect(errors[0]).toHaveProperty('message', 'must divide by 5');
-            expect(errors[0]).toHaveProperty('path', '$($validators[0])');
         }
     }
 
@@ -1233,10 +1226,6 @@ test("child validator run after parent's - 1", async () => {
         expect(Array.isArray(errors)).toEqual(true);
         if (errors) {
             expect(errors[0]).toHaveProperty('message', 'must divide by 3');
-            expect(errors[0]).toHaveProperty(
-                'path',
-                '$.second($validators[0])'
-            );
         }
     }
 });
@@ -2506,18 +2495,12 @@ test('Custom path', async () => {
             unk: 123
         } as any,
         {
-            path: '$.sub',
             doNotStopOnFirstError: true
         }
     );
 
     expect(valid).toEqual(false);
-    expect(
-        Array.isArray(errors) &&
-            errors.length === 2 &&
-            errors[0].path === '$.sub.first' &&
-            errors[1].path === '$.sub'
-    ).toEqual(true);
+    expect(Array.isArray(errors) && errors.length === 2).toEqual(true);
 });
 
 test('getErrorsFor - 1', async () => {

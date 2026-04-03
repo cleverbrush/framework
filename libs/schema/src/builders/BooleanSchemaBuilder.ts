@@ -151,16 +151,12 @@ export class BooleanSchemaBuilder<
               done: false;
               provider: any;
               objToValidate: any;
-              path: string;
           } {
         const {
             valid,
-            context: prevalidationContext,
             transaction: preValidationTransaction,
             errors
         } = superResult;
-
-        const { path } = prevalidationContext;
 
         if (!valid) {
             return { done: true, result: { valid, errors } };
@@ -194,9 +190,7 @@ export class BooleanSchemaBuilder<
                 done: true,
                 result: {
                     valid: false,
-                    errors: [
-                        { message: violation.message, path: path as string }
-                    ]
+                    errors: [{ message: violation.message }]
                 }
             };
         }
@@ -204,8 +198,7 @@ export class BooleanSchemaBuilder<
         return {
             done: false,
             provider: violation.provider,
-            objToValidate,
-            path: path as string
+            objToValidate
         };
     }
 
@@ -218,6 +211,51 @@ export class BooleanSchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): ValidationResult<TResult> {
+        // Fast path: no preprocessors or custom validators
+        if (this.canSkipPreValidation) {
+            if (typeof object === 'undefined' || object === null) {
+                if (!this.isRequired) {
+                    return { valid: true, object: object };
+                }
+                return {
+                    valid: false,
+                    errors: [
+                        {
+                            message: this.getValidationErrorMessageSync(
+                                this.requiredErrorMessage,
+                                object as TFinalResult
+                            )
+                        }
+                    ]
+                };
+            }
+
+            const violation = this.#getConstraintViolation(object);
+
+            if (!violation) {
+                return { valid: true, object: object as TResult };
+            }
+
+            if ('message' in violation) {
+                return {
+                    valid: false,
+                    errors: [{ message: violation.message }]
+                };
+            }
+
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: this.getValidationErrorMessageSync(
+                            violation.provider,
+                            object as TFinalResult
+                        )
+                    }
+                ]
+            };
+        }
+
         const r = this.#buildResult(this.preValidateSync(object, context));
         if (r.done) return r.result;
         return {
@@ -227,8 +265,7 @@ export class BooleanSchemaBuilder<
                     message: this.getValidationErrorMessageSync(
                         r.provider,
                         r.objToValidate as TFinalResult
-                    ),
-                    path: r.path
+                    )
                 }
             ]
         };
@@ -254,8 +291,7 @@ export class BooleanSchemaBuilder<
                     message: await this.getValidationErrorMessage(
                         r.provider,
                         r.objToValidate as TFinalResult
-                    ),
-                    path: r.path
+                    )
                 }
             ]
         };

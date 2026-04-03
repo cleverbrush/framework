@@ -777,12 +777,12 @@ export declare class NullSchemaBuilder<TRequired extends boolean = true, TExplic
      * Performs synchronous validation of the schema over \`object\`.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: null, context?: ValidationContext): ValidationResult<null>;
+    validate(object: null, _context?: ValidationContext): ValidationResult<null>;
     /**
      * Performs async validation of the schema over \`object\`.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: null, context?: ValidationContext): Promise<ValidationResult<null>>;
+    validateAsync(object: null, _context?: ValidationContext): Promise<ValidationResult<null>>;
     protected createFromProps<TReq extends boolean>(props: NullSchemaBuilderCreateProps<TReq>): this;
     /**
      * @hidden
@@ -1578,11 +1578,9 @@ export type InferType<T> = T extends {
     readonly [K in SchemaTypeBrand]: infer TType;
 } ? TType : T;
 /**
- * Represents a single validation error with the path to the invalid field
- * and a human-readable error message.
+ * Represents a single validation error with a human-readable error message.
  */
 export type ValidationError = {
-    path: string;
     message: string;
 };
 /**
@@ -1647,7 +1645,7 @@ export type PreValidationResult<T, TTransactionType> = Omit<ValidationResult<T>,
     rootPropertyDescriptor?: PropertyDescriptor<any, any, undefined>;
 };
 type ValidatorResult<T> = Omit<ValidationResult<T>, 'object' | 'errors'> & {
-    errors?: Omit<ValidationError, 'path'>[];
+    errors?: ValidationError[];
 };
 /**
  * A function that transforms the value before validation.
@@ -1695,10 +1693,6 @@ export type SchemaBuilderProps<T> = {
     extensions?: Record<string, unknown>;
 };
 export type ValidationContext<TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = {
-    /**
-     * Path of the field. **Optional**, used to display correct error path in the {@link ValidationError}
-     */
-    path?: string;
     /**
      * Optional. By default validation will stop after the first validation error, in case if
      * you want to receive all validation erors, please set this flag to \`true\`.
@@ -1945,6 +1939,18 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * Sets the requirement flag. Must be a boolean.
      */
     protected set isRequired(value: boolean);
+    /**
+     * The error message provider used for the "is required" error.
+     * Exposed for fast-path validation in subclasses.
+     */
+    protected get requiredErrorMessage(): ValidationErrorMessageProvider;
+    /**
+     * Whether \`preValidateSync\` can be skipped entirely.
+     * True when there are no preprocessors and no validators,
+     * so the only work would be the required check and wrapping
+     * in a noop transaction — which subclasses can do inline.
+     */
+    protected get canSkipPreValidation(): boolean;
     /**
      * Synchronous version of {@link preValidateAsync}.
      * Throws at runtime if any preprocessor or validator returns a Promise.

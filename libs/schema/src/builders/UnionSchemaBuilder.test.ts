@@ -118,9 +118,6 @@ test('Simple Union - 3', async () => {
         });
         expect(valid).toEqual(false);
         expect((errors?.length || 0) > 0).toEqual(true);
-        if (Array.isArray(errors)) {
-            expect(errors[0].path).toEqual('$[option 0]');
-        }
     }
 });
 
@@ -152,9 +149,6 @@ test('Simple Union - 4', async () => {
         );
         expect(valid).toEqual(false);
         expect((errors?.length || 0) > 0).toEqual(true);
-        if (Array.isArray(errors)) {
-            expect(errors[0].path).toEqual('$.second[option 1].thirty');
-        }
     }
 });
 
