@@ -112,11 +112,11 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `const` | literal builder (`.equals(...)`) |
 | `enum` | `union(…)` of const builders |
 | `anyOf` | `union(…)` of sub-builders |
-| `allOf` | `union(…)` (best-effort, no deep merge) |
+| `allOf` | not supported — falls back to `any()` |
 | `minLength` / `maxLength` | `.minLength()` / `.maxLength()` |
-| `pattern` | `.matches(regex)` |
+| `pattern` | `.matches(regex)` (invalid patterns silently ignored) |
 | `minimum` / `maximum` | `.min()` / `.max()` |
-| `exclusiveMinimum` / `exclusiveMaximum` | `.min()` / `.max()` exclusive |
+| `exclusiveMinimum` / `exclusiveMaximum` | custom validator (not round-trippable via `toJsonSchema`) |
 | `multipleOf` | `.multipleOf()` |
 | `minItems` / `maxItems` | `.minLength()` / `.maxLength()` on array |
 | `format: 'email'` | `.email()` extension |
