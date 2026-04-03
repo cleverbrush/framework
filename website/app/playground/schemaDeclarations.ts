@@ -777,12 +777,12 @@ export declare class NullSchemaBuilder<TRequired extends boolean = true, TExplic
      * Performs synchronous validation of the schema over \`object\`.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: null, context?: ValidationContext): ValidationResult<null>;
+    validate(object: null, _context?: ValidationContext): ValidationResult<null>;
     /**
      * Performs async validation of the schema over \`object\`.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: null, context?: ValidationContext): Promise<ValidationResult<null>>;
+    validateAsync(object: null, _context?: ValidationContext): Promise<ValidationResult<null>>;
     protected createFromProps<TReq extends boolean>(props: NullSchemaBuilderCreateProps<TReq>): this;
     /**
      * @hidden
@@ -1939,6 +1939,18 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * Sets the requirement flag. Must be a boolean.
      */
     protected set isRequired(value: boolean);
+    /**
+     * The error message provider used for the "is required" error.
+     * Exposed for fast-path validation in subclasses.
+     */
+    protected get requiredErrorMessage(): ValidationErrorMessageProvider;
+    /**
+     * Whether \`preValidateSync\` can be skipped entirely.
+     * True when there are no preprocessors and no validators,
+     * so the only work would be the required check and wrapping
+     * in a noop transaction — which subclasses can do inline.
+     */
+    protected get canSkipPreValidation(): boolean;
     /**
      * Synchronous version of {@link preValidateAsync}.
      * Throws at runtime if any preprocessor or validator returns a Promise.

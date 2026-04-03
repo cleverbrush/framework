@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { highlightTS } from '@/lib/highlight';
+import { BenchmarkSection } from './BenchmarkSection';
 
 export default function HomePage() {
     return (
@@ -393,6 +394,8 @@ function ProductForm() {
                     </p>
                 </div>
             </section>
+
+            <BenchmarkSection />
 
             {/* ── Contribute CTA ──────────────────────────────────── */}
             <section className="section">

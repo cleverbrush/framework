@@ -642,6 +642,140 @@ li {
     gap: 0.6rem;
 }
 
+/* ── Benchmark Section ────────────────────────────────────────────── */
+
+.bench-intro {
+    text-align: center;
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    max-width: 540px;
+    margin: 0 auto 2rem;
+    line-height: 1.6;
+}
+
+.bench-columns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+.bench-column-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 1rem;
+    letter-spacing: -0.01em;
+}
+
+.bench-group {
+    margin-bottom: 1.5rem;
+}
+
+.bench-group-label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin: 0 0 0.5rem;
+    letter-spacing: 0.01em;
+}
+
+.bench-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.bench-row {
+    display: grid;
+    grid-template-columns: 72px 1fr 100px;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.bench-lib-name {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.bench-row-highlight .bench-lib-name {
+    color: var(--accent-indigo);
+    font-weight: 600;
+}
+
+.bench-bar-track {
+    height: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.bench-group-compact .bench-bar-track {
+    /* same style, just a flag for future tweaks */
+}
+
+.bench-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: rgba(148, 163, 184, 0.25);
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bench-bar-accent {
+    background: linear-gradient(
+        90deg,
+        var(--accent-indigo),
+        var(--accent-cyan)
+    );
+}
+
+.bench-ops {
+    font-size: 0.78rem;
+    font-family: "JetBrains Mono", monospace;
+    color: var(--text-secondary);
+    text-align: right;
+    white-space: nowrap;
+}
+
+.bench-row-highlight .bench-ops {
+    color: var(--accent-indigo);
+    font-weight: 500;
+}
+
+.bench-footnote {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 1.5rem;
+    line-height: 1.5;
+}
+
+.bench-footnote code {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+    .bench-columns {
+        grid-template-columns: 1fr;
+    }
+
+    .bench-row {
+        grid-template-columns: 60px 1fr 80px;
+    }
+
+    .bench-ops {
+        font-size: 0.72rem;
+    }
+
+    .bench-lib-name {
+        font-size: 0.72rem;
+    }
+}
+
 /* ── Contribute Banner ───────────────────────────────────────────── */
 
 .contribute-banner {
