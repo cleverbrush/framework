@@ -254,11 +254,11 @@ export type JsonSchemaNodeToBuilder<S, TRequired extends boolean = true> =
                   readonly anyOf: infer Opts extends readonly unknown[];
               }
             ? UnionSchemaBuilder<SchemaNodesTupleToBuilders<Opts>, TRequired>
-            : // allOf (aligned with runtime conversion to union of schemas)
+            : // allOf (not supported; falls back to any() at runtime)
               S extends {
-                    readonly allOf: infer Opts extends readonly unknown[];
+                    readonly allOf: infer _Opts extends readonly unknown[];
                 }
-              ? UnionSchemaBuilder<SchemaNodesTupleToBuilders<Opts>, TRequired>
+              ? SchemaBuilder<unknown, TRequired>
               : // string
                 S extends { readonly type: 'string' }
                 ? StringSchemaBuilder<string, TRequired>

@@ -31,8 +31,8 @@ function buildNode(s: unknown): SchemaBuilder<any, any, any> {
     if ('const' in node) return buildConst(node['const']);
     if ('anyOf' in node && Array.isArray(node['anyOf']))
         return buildAnyOf(node['anyOf']);
-    if ('allOf' in node && Array.isArray(node['allOf']))
-        return buildAnyOf(node['allOf']);
+    // allOf is not supported (no intersection builder); fall back to any()
+    if ('allOf' in node && Array.isArray(node['allOf'])) return any();
     if (!('type' in node)) return any();
 
     switch (node['type']) {
@@ -45,9 +45,13 @@ function buildNode(s: unknown): SchemaBuilder<any, any, any> {
         case 'boolean':
             return boolean();
         case 'null':
-            return (any() as any).addValidator((v: unknown) =>
-                v === null ? ok() : fail('must be null')
-            );
+            // Use optional() so that null passes the required check.
+            // Validators are skipped for null/undefined when optional,
+            // and called for all other values — which is what we want.
+            return (any() as any)
+                .withExtension('null', true)
+                .optional()
+                .addValidator((_v: unknown) => fail('must be null'));
         case 'array':
             return buildArray(node);
         case 'object':
@@ -92,8 +96,13 @@ function buildString(
         b = b.minLength(node['minLength']);
     if (typeof node['maxLength'] === 'number')
         b = b.maxLength(node['maxLength']);
-    if (typeof node['pattern'] === 'string')
-        b = b.matches(new RegExp(node['pattern']));
+    if (typeof node['pattern'] === 'string') {
+        try {
+            b = b.matches(new RegExp(node['pattern']));
+        } catch {
+            // invalid regex pattern — silently ignore
+        }
+    }
     return b;
 }
 
@@ -199,11 +208,11 @@ function buildAnyOf(options: unknown[]): SchemaBuilder<any, any, any> {
  * | `additionalProperties: true`   | `.acceptUnknownProps()`         |
  * | `const`                        | `string/number/boolean eq`      |
  * | `enum`                         | `union(…)`                      |
- * | `anyOf` / `allOf`              | `union(…)` / `SchemaBuilder`    |
+ * | `anyOf`                        | `union(…)`                      |
  * | `minLength` / `maxLength`      | `.minLength()` / `.maxLength()` |
- * | `pattern`                      | `.matches(regex)`               |
+ * | `pattern`                      | `.matches(regex)` (invalid patterns silently ignored) |
  * | `minimum` / `maximum`          | `.min()` / `.max()`             |
- * | `exclusiveMinimum` / `exclusiveMaximum` | `.min()` / `.max()` (exclusive) |
+ * | `exclusiveMinimum` / `exclusiveMaximum` | custom validator (not round-trippable via `toJsonSchema`) |
  * | `multipleOf`                   | `.multipleOf()`                 |
  * | `minItems` / `maxItems`        | `.minLength()` / `.maxLength()` |
  * | `format: 'email'`              | `.email()` extension            |
@@ -213,8 +222,9 @@ function buildAnyOf(options: unknown[]): SchemaBuilder<any, any, any> {
  * | `format: 'ipv6'`               | `.ip({ version: 'v6' })`        |
  * | `format: 'date-time'`          | `.matches(iso8601 regex)`       |
  *
- * Keywords **not** supported: `$ref`, `$defs`, `if/then/else`,
- * `not`, `contains`, `unevaluatedProperties`, `contentEncoding`.
+ * Keywords **not** supported: `allOf` (falls back to `any()`), `$ref`,
+ * `$defs`, `if/then/else`, `not`, `contains`, `unevaluatedProperties`,
+ * `contentEncoding`.
  *
  * @param schema - A JSON Schema literal.  Pass with `as const` for precise
  *   TypeScript type inference on the returned builder.

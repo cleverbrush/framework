@@ -181,6 +181,32 @@ test('fromJsonSchema - 19: { type: boolean } accepts booleans', () => {
 });
 
 // ---------------------------------------------------------------------------
+// null
+// ---------------------------------------------------------------------------
+
+test('fromJsonSchema - 19b: { type: null } accepts only null', () => {
+    const schema = fromJsonSchema({ type: 'null' } as const);
+    expect(valid(schema, null)).toBe(true);
+    expect(valid(schema, 0)).toBe(false);
+    expect(valid(schema, '')).toBe(false);
+    expect(valid(schema, false)).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// pattern — invalid regex
+// ---------------------------------------------------------------------------
+
+test('fromJsonSchema - 12b: invalid pattern is silently ignored', () => {
+    // '[invalid' is not a valid regex; fromJsonSchema should not throw
+    const schema = fromJsonSchema({
+        type: 'string',
+        pattern: '[invalid'
+    } as const);
+    // pattern is ignored, so any string is valid
+    expect(valid(schema, 'anything')).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
 // array
 // ---------------------------------------------------------------------------
 
@@ -291,6 +317,17 @@ test('fromJsonSchema - 28: anyOf accepts either type', () => {
     expect(valid(schema, 'hello')).toBe(true);
     expect(valid(schema, 42)).toBe(true);
     expect(valid(schema, true)).toBe(false);
+});
+
+test('fromJsonSchema - 28b: allOf falls back to any() (not supported)', () => {
+    const schema = fromJsonSchema({
+        allOf: [{ type: 'string' }, { minLength: 1 }]
+    } as const);
+    // allOf is not supported; falls back to any() which accepts anything
+    expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<unknown>();
+    expect(valid(schema, 'hello')).toBe(true);
+    expect(valid(schema, 42)).toBe(true);
+    expect(valid(schema, null)).toBe(false);
 });
 
 // ---------------------------------------------------------------------------

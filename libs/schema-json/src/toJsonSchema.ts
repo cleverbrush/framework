@@ -120,6 +120,7 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         default:
+            if (ext['null'] === true) return { type: 'null' };
             return {};
     }
 }
@@ -129,14 +130,16 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
  *
  * @remarks
  * **What round-trips cleanly**: all declarative constraints — type, format,
- * minLength/maxLength, minimum/maximum, exclusiveMinimum/Maximum, multipleOf,
- * pattern, required/optional per property, additionalProperties, items,
- * enum/const literals, anyOf/union.
+ * minLength/maxLength, minimum/maximum, multipleOf, pattern, required/optional
+ * per property, additionalProperties, items, enum/const literals, anyOf/union.
  *
  * **What is silently omitted**:
  * - Custom validators added via `addValidator` (no JSON Schema equivalent)
  * - Preprocessors added via `addPreprocessor`
  * - JSDoc comments on schema properties
+ * - `exclusiveMinimum`/`exclusiveMaximum` constraints from `fromJsonSchema`
+ *   (stored as custom validators — not introspectable; only `positive()`/
+ *   `negative()` extension-based exclusives are emitted)
  * - IP format with both v4 _and_ v6 allowed simultaneously (no single
  *   standard JSON Schema format covers both; the `format` keyword is omitted
  *   in that case)
