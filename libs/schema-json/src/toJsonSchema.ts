@@ -68,7 +68,9 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'date':
-            return { type: 'string', format: 'date-time' };
+            return info.parseFromJson === true
+                ? { type: 'string', format: 'date-time' }
+                : {};
 
         case 'array': {
             const out: Out = { type: 'array' };
