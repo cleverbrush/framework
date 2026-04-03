@@ -42,15 +42,30 @@ export function loadBenchmarks(): BenchmarkGroup[] {
         return cachedBenchmarks;
     }
 
-    const jsonPath = path.resolve(process.cwd(), '..', 'bench-results.json');
+    // Try multiple candidate paths so the file is found regardless of which
+    // directory the Next.js server is started from (repo root, website/, etc.).
+    const candidatePaths = [
+        path.resolve(process.cwd(), 'bench-results.json'),
+        path.resolve(process.cwd(), '..', 'bench-results.json'),
+        path.resolve(process.cwd(), '..', '..', 'bench-results.json')
+    ];
 
     let raw: unknown;
-    try {
-        raw = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-    } catch (err) {
+    let found = false;
+    for (const candidate of candidatePaths) {
+        try {
+            raw = JSON.parse(fs.readFileSync(candidate, 'utf-8'));
+            found = true;
+            break;
+        } catch {
+            // try next candidate
+        }
+    }
+
+    if (!found) {
         console.error(
-            '[loadBenchmarks] Failed to read bench-results.json:',
-            err
+            '[loadBenchmarks] bench-results.json not found in any of:',
+            candidatePaths
         );
         cachedBenchmarks = [];
         return cachedBenchmarks;
