@@ -194,7 +194,7 @@ function buildObject(
             );
         }
     }
-    if (node['additionalProperties'] === true) b = b.acceptUnknownProps();
+    if (node['additionalProperties'] !== false) b = b.acceptUnknownProps();
     return b;
 }
 
