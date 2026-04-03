@@ -57,8 +57,15 @@ export function loadBenchmarks(): BenchmarkGroup[] {
             raw = JSON.parse(fs.readFileSync(candidate, 'utf-8'));
             found = true;
             break;
-        } catch {
-            // try next candidate
+        } catch (err) {
+            // Skip file-not-found errors and try the next candidate.
+            // Log anything else (e.g. permission denied, malformed JSON).
+            if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+                console.error(
+                    `[loadBenchmarks] Error reading ${candidate}:`,
+                    err
+                );
+            }
         }
     }
 
