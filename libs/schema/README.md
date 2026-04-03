@@ -529,18 +529,17 @@ const Port = number().optional().default(3000);
 type Port = InferType<typeof Port>; // number (not number | undefined)
 ```
 
-Use a factory function for mutable values (arrays, objects, dates) to avoid shared references:
+Use a factory function for mutable values (arrays, objects) to avoid shared references:
 
 ```typescript
 const Config = object({
     host: string().default('localhost'),
     port: number().default(8080),
-    tags: array(string()).default(() => []),
-    createdAt: date().default(() => new Date())
+    tags: array(string()).default(() => [])
 });
 
 type Config = InferType<typeof Config>;
-// { host: string; port: number; tags: string[]; createdAt: Date }
+// { host: string; port: number; tags: string[] }
 // All fields are non-optional — defaults fill in missing values
 ```
 
