@@ -297,14 +297,15 @@ test('fromJsonSchema - 28: anyOf accepts either type', () => {
 // empty schema
 // ---------------------------------------------------------------------------
 
-test('fromJsonSchema - 29: empty schema {} maps to any() and accepts any non-null value', () => {
+test('fromJsonSchema - 29: empty schema {} currently maps to any() and accepts any non-null value', () => {
     const schema = fromJsonSchema({} as const);
     expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<unknown>();
     expect(valid(schema, 'anything')).toBe(true);
     expect(valid(schema, 42)).toBe(true);
     expect(valid(schema, { key: 'value' })).toBe(true);
-    // Note: null is treated as absent by the schema library's any() builder,
-    // mirroring how JSON Schema {} does not require null acceptance in practice.
+    // Note: this reflects the current schema-library any() behavior, which
+    // rejects null; unlike this implementation, JSON Schema {} matches all
+    // instances, including null.
 });
 
 // ---------------------------------------------------------------------------
