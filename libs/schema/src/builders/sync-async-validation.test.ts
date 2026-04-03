@@ -775,3 +775,99 @@ describe('validateAsync() getErrorsFor on object results', () => {
         expect(nameErrors.errors.length).toBe(0);
     });
 });
+
+// ---------- optional schema: validators skipped for null/undefined ----------
+
+describe('optional schema: validators skipped for null/undefined (sync)', () => {
+    test('optional any() with addValidator skips validator for null', () => {
+        let called = false;
+        const schema = any()
+            .optional()
+            .addValidator(() => {
+                called = true;
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
+            });
+        const result = schema.validate(null as any);
+        expect(result.valid).toBe(true);
+        expect(called).toBe(false);
+    });
+
+    test('optional any() with addValidator skips validator for undefined', () => {
+        let called = false;
+        const schema = any()
+            .optional()
+            .addValidator(() => {
+                called = true;
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
+            });
+        const result = schema.validate(undefined as any);
+        expect(result.valid).toBe(true);
+        expect(called).toBe(false);
+    });
+
+    test('optional any() with addValidator still runs validator for non-null values', () => {
+        let called = false;
+        const schema = any()
+            .optional()
+            .addValidator(() => {
+                called = true;
+                return { valid: false, errors: [{ message: 'always fail' }] };
+            });
+        const result = schema.validate('hello' as any);
+        expect(result.valid).toBe(false);
+        expect(called).toBe(true);
+    });
+});
+
+describe('optional schema: validators skipped for null/undefined (async)', () => {
+    test('optional any() with async addValidator skips validator for null', async () => {
+        let called = false;
+        const schema = any()
+            .optional()
+            .addValidator(async () => {
+                called = true;
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
+            });
+        const result = await schema.validateAsync(null as any);
+        expect(result.valid).toBe(true);
+        expect(called).toBe(false);
+    });
+
+    test('optional any() with async addValidator skips validator for undefined', async () => {
+        let called = false;
+        const schema = any()
+            .optional()
+            .addValidator(async () => {
+                called = true;
+                return {
+                    valid: false,
+                    errors: [{ message: 'should not run' }]
+                };
+            });
+        const result = await schema.validateAsync(undefined as any);
+        expect(result.valid).toBe(true);
+        expect(called).toBe(false);
+    });
+
+    test('optional any() with async addValidator still runs validator for non-null values', async () => {
+        let called = false;
+        const schema = any()
+            .optional()
+            .addValidator(async () => {
+                called = true;
+                return { valid: false, errors: [{ message: 'always fail' }] };
+            });
+        const result = await schema.validateAsync('hello' as any);
+        expect(result.valid).toBe(false);
+        expect(called).toBe(true);
+    });
+});

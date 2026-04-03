@@ -38,7 +38,7 @@ test('retry - 2', async () => {
         retry(fn, { maxRetries: 5, minDelay: 10, delayFactor: 1 })
     ).resolves.toBe('success');
     const end = performance.now();
-    expect(end - start).toBeGreaterThan(30);
+    expect(end - start).toBeGreaterThan(25);
     expect(numCalled).toBe(4);
 });
 

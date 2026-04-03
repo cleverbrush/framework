@@ -804,7 +804,10 @@ export abstract class SchemaBuilder<
                 : noopTransaction({ validatedObject: preprocessedObject });
         }
 
-        if (this.#validators.length > 0) {
+        if (
+            this.#validators.length > 0 &&
+            !(preprocessedObject == null && !this.isRequired)
+        ) {
             let currentValidatorIndex = 0;
             for (const entry of this.#validators) {
                 try {
@@ -923,7 +926,10 @@ export abstract class SchemaBuilder<
                 : noopTransaction({ validatedObject: preprocessedObject });
         }
 
-        if (this.#validators.length > 0) {
+        if (
+            this.#validators.length > 0 &&
+            !(preprocessedObject == null && !this.isRequired)
+        ) {
             let currentValidatorIndex = 0;
             for (const entry of this.#validators) {
                 try {

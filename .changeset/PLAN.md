@@ -65,11 +65,11 @@ Add `vitest.bench` comparing validation throughput vs zod/yup/joi. If schema is 
 
 Live code editor on the website where users can try schemas without installing.
 
-### 3.2 "Migrating from Zod" Guide
+### 3.2 "Migrating from Zod" Guide - DONE
 
 Side-by-side mapping of every zod API to the `@cleverbrush` equivalent. This is how libraries capture users switching.
 
-### 3.3 Cookbook / Recipes
+### 3.3 Cookbook / Recipes - we have a playground for this
 
 Common patterns: nested validation, API request schemas, env var parsing, showing the full ecosystem story (schema → mapper → react-form).
 
@@ -87,6 +87,8 @@ Highlight unique differentiators:
 ## Phase 4: Future Ecosystem Expansion
 
 These leverage PropertyDescriptors and the extension system — areas zod doesn't serve well.
+
+Comment: @cleverbrush/schema-json is implemented in a separate library.
 
 | Package | What | Why It Matters |
 | --- | --- | --- |

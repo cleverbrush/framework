@@ -7,7 +7,8 @@
         "libs/mapper",
         "libs/react-form",
         "libs/scheduler",
-        "libs/schema"
+        "libs/schema",
+        "libs/schema-json"
     ],
     "out": "website/public/api-docs/latest",
     "name": "Libraries",
