@@ -38,7 +38,7 @@ The framework has matured significantly. The core schema library, extension syst
 |---------|---------|-------------------|--------|
 | **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` (pre-validation only) | High — transforms are post-validation semantics, widely used |
 | **Default values** | `.default(value)` | None — manual fallback after validation | High — extremely common pattern |
-| **Recursive schemas** | `z.lazy(() => schema)` | Not possible | High — tree structures, comments, menus |
+| **Recursive schemas** | `z.lazy(() => schema)` | ✅ `lazy(() => schema)` — `LazySchemaBuilder` | High — tree structures, comments, menus |
 | **Nullable** | `.nullable()` | `union(schema()).or(nul())` | Medium — convenience, very common ask |
 | **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(string().equals('b'))` | Medium — verbose workaround |
 | **Tuple** | `z.tuple([str, num])` | Not possible | Medium — fixed-length typed arrays |
@@ -139,13 +139,17 @@ Add `.default(value | () => value)`:
 - Must work with `.optional()` — `string().optional().default('')` yields `string`
 - Extremely common in configuration parsing, form defaults, env vars
 
-### 2.4 Recursive schemas
+### 2.4 Recursive schemas ✅ DONE
 
-Add `lazy(() => schema)`:
+`lazy(() => schema)` is implemented as `LazySchemaBuilder`:
 
-- Enables self-referencing types (trees, comments, menus, org charts)
-- Critical for real-world domain models
-- Must work with `InferType<>` — TypeScript requires explicit type annotation on the lazy call
+- Defers schema resolution to first validation call (getter is cached after first call)
+- Works inside `array()`, `object()`, and `union()` — covers trees, comments, menus, org charts
+- `resolve()` public method lets tooling (schema-json, mapper) access the resolved inner schema
+- `introspect()` returns `{ type: 'lazy', getter }` — plays nicely with `UnionSchemaBuilder` discriminator detection (falls back to O(n) scan, which is correct)
+- Requires explicit TypeScript type annotation on the outer schema variable — same as Zod, because TypeScript fundamentally cannot infer recursive types automatically
+- Full fluent API: `.optional()`, `.required()`, `.addPreprocessor()`, `.addValidator()`, `.brand()`, `hasType()`, `clearHasType()`
+- Sync and async validation paths both supported
 
 ### 2.5 Nullable convenience
 

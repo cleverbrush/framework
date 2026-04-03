@@ -703,6 +703,143 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TEx
 export declare const func: () => FunctionSchemaBuilder<true>;
 export {};
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/LazySchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+type LazySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<LazySchemaBuilder<any, R>['introspect']>>;
+/**
+ * Lazy schema builder class. Allows defining recursive/self-referential schemas
+ * by wrapping a getter function that returns the target schema. The getter is
+ * called once on first validation and the result is cached.
+ *
+ * This is the primary mechanism for building recursive data structures such as
+ * tree nodes, nested menus, and threaded comments.
+ *
+ * **NOTE** TypeScript cannot infer recursive types automatically, so you must
+ * provide an explicit type annotation on the variable holding the schema:
+ *
+ * @example
+ * \`\`\`ts
+ * type TreeNode = { value: number; children: TreeNode[] };
+ *
+ * const treeNode: SchemaBuilder<TreeNode, true> = object({
+ *     value: number(),
+ *     children: array(lazy(() => treeNode))
+ * });
+ *
+ * treeNode.validate({ value: 1, children: [{ value: 2, children: [] }] });
+ * // { valid: true, object: { value: 1, children: [{ value: 2, children: [] }] } }
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * type Comment = { text: string; replies: Comment[] };
+ *
+ * const commentSchema: SchemaBuilder<Comment, true> = object({
+ *     text: string(),
+ *     replies: array(lazy(() => commentSchema))
+ * });
+ * \`\`\`
+ */
+export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean = true, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+    #private;
+    /**
+     * @hidden
+     */
+    static create(props: LazySchemaBuilderCreateProps<any>): LazySchemaBuilder<any, true, {}>;
+    protected constructor(props: LazySchemaBuilderCreateProps<TRequired>);
+    /**
+     * Resolves the lazy schema by calling the getter (once; result is cached).
+     * After the first call subsequent calls return the cached schema instance.
+     */
+    resolve(): SchemaBuilder<TResult, any, any>;
+    /**
+     * @inheritdoc
+     */
+    introspect(): {
+        /**
+         * The getter function that returns the lazily-resolved schema.
+         * Call {@link LazySchemaBuilder.resolve} to obtain the schema instance.
+         */
+        getter: () => SchemaBuilder<TResult, any, any>;
+        type: string;
+        isRequired: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+    };
+    /**
+     * Performs synchronous validation of the schema over \`object\`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /**
+     * Performs async validation of the schema over \`object\`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected createFromProps<TReq extends boolean>(props: LazySchemaBuilderCreateProps<TReq>): this;
+    /**
+     * @inheritdoc
+     */
+    hasType<T>(_notUsed?: T): LazySchemaBuilder<T, true, TExtensions> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    clearHasType(): LazySchemaBuilder<TResult, TRequired, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): LazySchemaBuilder<TResult, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): LazySchemaBuilder<TResult, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): LazySchemaBuilder<TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, TRequired, TExtensions> & TExtensions;
+}
+/**
+ * Creates a lazy schema that defers the schema definition until first validation.
+ * Use this to define recursive/self-referential schemas.
+ *
+ * The getter function is called **once** on first use and the result is cached.
+ * You **must** provide an explicit TypeScript type annotation on the variable
+ * holding the outer schema — TypeScript cannot infer recursive types automatically.
+ *
+ * @param getter - A function that returns the schema to use for validation.
+ *
+ * @example
+ * \`\`\`ts
+ * // Tree structure
+ * type TreeNode = { value: number; children: TreeNode[] };
+ *
+ * const treeNode: SchemaBuilder<TreeNode, true> = object({
+ *     value: number(),
+ *     children: array(lazy(() => treeNode))
+ * });
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Optional recursive field (submenu)
+ * type MenuItem = { label: string; submenu?: MenuItem[] };
+ *
+ * const menuItem: SchemaBuilder<MenuItem, true> = object({
+ *     label: string(),
+ *     submenu: array(lazy(() => menuItem)).optional()
+ * });
+ * \`\`\`
+ */
+export declare function lazy<TResult>(getter: () => SchemaBuilder<TResult, any, any>): LazySchemaBuilder<TResult, true, {}>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/NullSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type NullSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<NullSchemaBuilder<R>['introspect']>>;
 /**
@@ -2607,6 +2744,7 @@ export { ArraySchemaBuilder, array } from './builders/ArraySchemaBuilder.js';
 export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.js';
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
+export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/ObjectSchemaBuilder.js';
@@ -3657,7 +3795,8 @@ export declare function resolveErrorMessage(provider: ValidationErrorMessageProv
 export declare function resolveErrorMessageAsync(provider: ValidationErrorMessageProvider<any> | undefined, defaultMsg: string, value: unknown, schema: unknown): Promise<string>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/index.d.ts": `export * from './core.js';
+    "file:///node_modules/@cleverbrush/schema/index.d.ts": `export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export * from './core.js';
 export { type ArrayBuiltinExtensions, any, array, arrayExtensions, boolean, date, type ExtendedArray, type ExtendedNumber, type ExtendedString, func, type NumberBuiltinExtensions, number, numberExtensions, object, type StringBuiltinExtensions, string, stringExtensions, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**

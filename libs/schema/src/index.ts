@@ -1,4 +1,6 @@
 // Re-export all types, classes, and extension system from core
+
+export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export * from './core.js';
 // Override bare factory functions with augmented versions (extensions pre-applied).
 // Named re-exports shadow the identically-named exports from `export *` above.

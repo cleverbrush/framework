@@ -113,6 +113,7 @@ The following builder functions are available:
 | `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`            |
 | `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()` |
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`                 |
+| `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)` |
 
 ## Immutability
 
@@ -171,6 +172,70 @@ const TeamSchema = object({
 const IdOrEmail = union(string().minLength(1)).or(
     string().matches(/^[^@]+@[^@]+$/)
 );
+```
+
+## Recursive Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/recursive-schemas)
+
+Use `lazy(() => schema)` to define recursive or self-referential schemas — tree structures, comment threads, nested menus, org charts, and any other type that refers to itself.
+
+The getter function is called **once** on first validation, and the resolved schema is cached. Every subsequent call reuses the cache.
+
+> **TypeScript limitation:** TypeScript cannot infer recursive types automatically. You must provide an explicit type annotation on the variable holding the schema.
+
+```typescript
+import {
+    object,
+    string,
+    number,
+    array,
+    lazy,
+    type SchemaBuilder
+} from '@cleverbrush/schema';
+
+// ── Tree structure ───────────────────────────────────────────────
+type TreeNode = { value: number; children: TreeNode[] };
+
+// Explicit annotation required — TypeScript can't infer recursive types
+const treeNode: SchemaBuilder<TreeNode, true> = object({
+    value: number(),
+    children: array(lazy(() => treeNode))
+});
+
+treeNode.validate({
+    value: 1,
+    children: [
+        { value: 2, children: [] },
+        { value: 3, children: [{ value: 4, children: [] }] }
+    ]
+});
+// { valid: true, object: { value: 1, children: [...] } }
+
+// ── Comment thread ───────────────────────────────────────────────
+type Comment = { text: string; replies: Comment[] };
+
+const commentSchema: SchemaBuilder<Comment, true> = object({
+    text: string(),
+    replies: array(lazy(() => commentSchema))
+});
+
+// ── Navigation menu with optional sub-levels ─────────────────────
+type MenuItem = { label: string; submenu?: MenuItem[] };
+
+const menuItem: SchemaBuilder<MenuItem, true> = object({
+    label: string(),
+    submenu: array(lazy(() => menuItem)).optional()
+});
+```
+
+`lazy()` is fully compatible with `.optional()`, `.addPreprocessor()`, `.addValidator()`, and all other fluent methods. The wrapper's own preprocessors and validators run before delegating to the resolved schema.
+
+```typescript
+// Preprocessors and validators work on the lazy wrapper itself
+const schema = lazy(() => string())
+    .addPreprocessor((v) => (typeof v === 'number' ? String(v) : v))
+    .addValidator((v) => ({ valid: v !== 'forbidden' }));
 ```
 
 ## Discriminated Unions
@@ -761,9 +826,9 @@ Define a schema once and use it for runtime validation, object mapping between d
 
 ## Exports
 
-**Builder functions:** `any`, `string`, `number`, `boolean`, `func`, `object`, `date`, `array`, `union`
+**Builder functions:** `any`, `lazy`, `string`, `number`, `boolean`, `func`, `object`, `date`, `array`, `union`
 
-**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
+**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
 
 **Extension system:** `defineExtension`, `withExtensions`, `stringExtensions`, `numberExtensions`, `arrayExtensions`
 

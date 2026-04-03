@@ -24,7 +24,8 @@ export const EXAMPLE_GROUPS = [
             'object-schemas',
             'nested-objects',
             'composing-schemas',
-            'immutability'
+            'immutability',
+            'recursive-schemas'
         ]
     },
     {
@@ -348,6 +349,34 @@ const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
 const result = CreateUser.validate({ name: "Alice", email: "alice@test.com" });
 `,
         testData: '{ "name": "Alice", "email": "alice@test.com" }'
+    },
+    {
+        id: 'recursive-schemas',
+        title: 'Recursive Schemas',
+        description:
+            'Use <code>lazy()</code> to define self-referential schemas for tree structures, comment threads, nested menus, and any type that references itself.',
+        group: 'Objects & Composition',
+        code: `import { object, string, number, array, lazy } from '@cleverbrush/schema';
+import type { SchemaBuilder } from '@cleverbrush/schema';
+
+// TypeScript can't infer recursive types — explicit annotation required
+type TreeNode = { value: number; children: TreeNode[] };
+
+const treeNode: SchemaBuilder<TreeNode, true> = object({
+    value: number(),
+    children: array(lazy(() => treeNode))
+});
+
+const result = treeNode.validate({
+    value: 1,
+    children: [
+        { value: 2, children: [] },
+        { value: 3, children: [{ value: 4, children: [] }] }
+    ]
+});
+`,
+        testData:
+            '{ "value": 1, "children": [{ "value": 2, "children": [] }, { "value": 3, "children": [{ "value": 4, "children": [] }] }] }'
     },
 
     // ── Arrays & Unions ─────────────────────────────
