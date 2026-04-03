@@ -953,9 +953,9 @@ export abstract class SchemaBuilder<
 
         if (typeof preprocessedObject === 'undefined' && this.#hasDefault) {
             preprocessedObject = this.resolveDefaultValue();
-            preprocessingTransaction = noopTransaction({
-                validatedObject: preprocessedObject
-            });
+            preprocessingTransaction = this.#hasMutating
+                ? transaction({ validatedObject: preprocessedObject })
+                : noopTransaction({ validatedObject: preprocessedObject });
         }
 
         if (
