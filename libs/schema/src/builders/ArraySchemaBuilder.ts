@@ -166,7 +166,7 @@ export class ArraySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): ArraySchemaBuilder<TElementSchema, true, T, TExtensions> & TExtensions {
+    ): ArraySchemaBuilder<TElementSchema, true, T, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -750,7 +750,7 @@ export class ArraySchemaBuilder<
      */
     public of<TSchema extends SchemaBuilder<any, any, any>>(
         schema: TSchema
-    ): ArraySchemaBuilder<TSchema, TRequired, TExplicitType, TExtensions> &
+    ): ArraySchemaBuilder<TSchema, TRequired, TExplicitType, THasDefault, TExtensions> &
         TExtensions {
         return ArraySchemaBuilder.create({
             ...this.introspect(),
@@ -766,6 +766,7 @@ export class ArraySchemaBuilder<
         any,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -790,6 +791,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -809,6 +811,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -834,6 +837,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -853,6 +857,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

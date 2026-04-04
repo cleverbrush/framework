@@ -864,6 +864,7 @@ export class UnionSchemaBuilder<
         [...TOptions, T],
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -889,6 +890,7 @@ export class UnionSchemaBuilder<
         TakeExceptIndex<TOptions, T>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -912,7 +914,7 @@ export class UnionSchemaBuilder<
         infer _,
         ...infer TRest extends SchemaBuilder<any, any, any>[]
     ]
-        ? UnionSchemaBuilder<TRest, TRequired, TExplicitType, TExtensions> &
+        ? UnionSchemaBuilder<TRest, TRequired, TExplicitType, THasDefault, TExtensions> &
               TExtensions
         : never {
         return this.removeOption(0) as any;
@@ -925,7 +927,7 @@ export class UnionSchemaBuilder<
      */
     public reset<T extends SchemaBuilder<any, any, any>>(
         schema: T
-    ): UnionSchemaBuilder<[T], TRequired, TExplicitType, TExtensions> &
+    ): UnionSchemaBuilder<[T], TRequired, TExplicitType, THasDefault, TExtensions> &
         TExtensions {
         if (!(schema instanceof SchemaBuilder)) {
             throw new Error(

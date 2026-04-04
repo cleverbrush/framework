@@ -25,6 +25,7 @@ import { validationFail } from './util.js';
 type StringExtReturn<T extends string = string> = StringSchemaBuilder<
     T,
     true,
+    false,
     StringBuiltinExtensions<T>
 > &
     StringBuiltinExtensions<T> &

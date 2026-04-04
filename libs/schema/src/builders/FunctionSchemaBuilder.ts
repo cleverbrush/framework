@@ -64,7 +64,7 @@ export class FunctionSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): FunctionSchemaBuilder<true, T, TExtensions> & TExtensions {
+    ): FunctionSchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;

@@ -97,8 +97,8 @@ type ModifyPropSchema<
 
 export type ObjectSchemaValidationResult<
     T,
-    TRootSchema extends ObjectSchemaBuilder<any, any, any, any>,
-    TSchema extends ObjectSchemaBuilder<any, any, any, any> = TRootSchema
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any> = TRootSchema
 > = Omit<ValidationResult<T>, 'errors'> & {
     /**
      * A flat list of validation errors.
@@ -1134,6 +1134,7 @@ export class ObjectSchemaBuilder<
         TProperties,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -1151,6 +1152,7 @@ export class ObjectSchemaBuilder<
         TProperties,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -1212,6 +1214,7 @@ export class ObjectSchemaBuilder<
         },
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -1255,6 +1258,7 @@ export class ObjectSchemaBuilder<
             ? Id<RespectPropsOptionality<TProperties>>
             : TExplicitType,
         TRequired,
+        THasDefault,
         TExtensions
     > {
         return this.createFromProps({
@@ -1276,6 +1280,7 @@ export class ObjectSchemaBuilder<
         TProperties & TProps,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1291,6 +1296,7 @@ export class ObjectSchemaBuilder<
               Omit<TProperties, keyof TProp> & TProp,
               TRequired,
               TExplicitType,
+              THasDefault,
               TExtensions
           > &
               TExtensions
@@ -1340,6 +1346,7 @@ export class ObjectSchemaBuilder<
         Omit<TProperties, K>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1354,6 +1361,7 @@ export class ObjectSchemaBuilder<
         Omit<TProperties, TProperty>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1374,6 +1382,7 @@ export class ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps>,
               TRequired,
               TExplicitType,
+              THasDefault,
               TExtensions
           > &
               TExtensions
@@ -1468,6 +1477,7 @@ export class ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps> & TProps,
               TRequired,
               TExplType,
+              THasDefault,
               TExtensions
           > &
               TExtensions
@@ -1508,6 +1518,7 @@ export class ObjectSchemaBuilder<
         MakeChildrenOptional<TProperties>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1521,6 +1532,7 @@ export class ObjectSchemaBuilder<
         Omit<TProperties, K> & Pick<MakeChildrenOptional<TProperties>, K>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1535,6 +1547,7 @@ export class ObjectSchemaBuilder<
             Pick<MakeChildrenOptional<TProperties>, TProperty>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1606,6 +1619,7 @@ export class ObjectSchemaBuilder<
         Pick<TProperties, K>,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1622,6 +1636,7 @@ export class ObjectSchemaBuilder<
               Omit<TProperties, keyof Omit<TProperties, keyof TProps>>,
               TRequired,
               undefined,
+              THasDefault,
               TExtensions
           > &
               TExtensions
@@ -1639,6 +1654,7 @@ export class ObjectSchemaBuilder<
         Pick<TProperties, K>,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions;
@@ -1723,6 +1739,7 @@ export class ObjectSchemaBuilder<
         ModifyPropSchema<TProperties, K, R>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -1767,6 +1784,7 @@ export class ObjectSchemaBuilder<
         MakeChildOptional<TProperties, K>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -1787,6 +1805,7 @@ export class ObjectSchemaBuilder<
         MakeChildRequired<TProperties, K>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -1803,6 +1822,7 @@ export class ObjectSchemaBuilder<
         MakeChildrenOptional<TProperties>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -1826,6 +1846,7 @@ export class ObjectSchemaBuilder<
         MakeChildrenRequired<TProperties>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

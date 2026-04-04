@@ -106,7 +106,7 @@ export class BooleanSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): BooleanSchemaBuilder<TResult, true, T, TExtensions> & TExtensions {
+    ): BooleanSchemaBuilder<TResult, true, T, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -399,6 +399,7 @@ export class BooleanSchemaBuilder<
             T,
             TRequired,
             TExplicitType,
+            THasDefault,
             TExtensions
         > &
             TExtensions;
@@ -411,6 +412,7 @@ export class BooleanSchemaBuilder<
         boolean,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
