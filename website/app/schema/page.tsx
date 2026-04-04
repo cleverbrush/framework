@@ -363,6 +363,7 @@ console.log(bad.errors);
                                     <td>
                                         <code>.rest(schema)</code>,{' '}
                                         <code>.optional()</code>,{' '}
+                                        <code>.nullable()</code>,{' '}
                                         <code>.default(value)</code>
                                     </td>
                                 </tr>
