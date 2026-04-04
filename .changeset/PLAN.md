@@ -235,9 +235,17 @@ Show real-world patterns with code examples (playground or blog):
 
 `s.record(string(), number())` — objects with dynamic keys. Needed for dictionaries, lookup tables, i18n bundles.
 
-### 4.4 Deep partial
+### 4.4 Deep partial ✅ DONE
 
-`.deepPartial()` — recursively makes all nested properties optional. Useful for PATCH API bodies and partial form state.
+`.deepPartial()` is implemented on `ObjectSchemaBuilder`:
+
+- **Recursive by design** — descends into every nested `object()` schema at any depth
+- All `object()` properties at every level are made optional
+- Non-object properties (arrays, unions, primitives, `lazy()`) are made optional at the top level but their internals are not modified
+- The original schema is never mutated — returns a new immutable instance (consistent with the fluent API)
+- New `DeepMakeChildrenOptional<T>` recursive type helper drives TypeScript inference so that `InferType<typeof schema.deepPartial()>` produces fully nested optional types
+- Chains naturally with `.required()`, `.optional()`, `.default()`, `.readonly()`, `.brand()`
+- Tests covering: flat objects, nested objects, 3-level depth, arrays, immutability, chaining
 
 ### 4.5 Catch / fallback
 

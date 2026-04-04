@@ -1,4 +1,5 @@
 import { expect, expectTypeOf, test } from 'vitest';
+import { array } from './ArraySchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
@@ -1522,6 +1523,351 @@ test('Partial - 4', async () => {
     expect(() => {
         schema1.partial(123 as any);
     }).toThrow();
+});
+
+test('deepPartial - flat object acts like partial', async () => {
+    const schema1 = object({ first: number(), second: number() });
+    const schema2 = schema1.deepPartial();
+
+    expect((schema1 as any) !== schema2).toEqual(true);
+
+    const spec1 = schema1.introspect();
+    const spec2 = schema2.introspect();
+
+    expect(spec1.properties.first.introspect().isRequired).toEqual(true);
+    expect(spec1.properties.second.introspect().isRequired).toEqual(true);
+    expect(spec2.properties.first.introspect().isRequired).toEqual(false);
+    expect(spec2.properties.second.introspect().isRequired).toEqual(false);
+
+    const typeTest1: InferType<typeof schema1> = {} as any;
+    const typeTest2: InferType<typeof schema2> = {} as any;
+    expectTypeOf(typeTest1).toEqualTypeOf<{ first: number; second: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{
+        first?: number;
+        second?: number;
+    }>();
+
+    {
+        const { valid, object } = schema2.validate({ first: 1, second: 2 });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                first?: number;
+                second?: number;
+            }>();
+        }
+    }
+
+    {
+        const { valid, object, errors } = schema2.validate({});
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                first?: number;
+                second?: number;
+            }>();
+        }
+    }
+});
+
+test('deepPartial - nested object properties become optional', async () => {
+    const schema1 = object({
+        name: string(),
+        address: object({ city: string(), country: string() })
+    });
+    const schema2 = schema1.deepPartial();
+
+    const spec1 = schema1.introspect();
+    const spec2 = schema2.introspect();
+
+    // Top-level required unchanged in original
+    expect(spec1.properties.name.introspect().isRequired).toEqual(true);
+    expect(spec1.properties.address.introspect().isRequired).toEqual(true);
+    const origAddr = spec1.properties.address.introspect() as any;
+    expect(origAddr.properties.city.introspect().isRequired).toEqual(true);
+    expect(origAddr.properties.country.introspect().isRequired).toEqual(true);
+
+    // Top-level optional in deep partial
+    expect(spec2.properties.name.introspect().isRequired).toEqual(false);
+    expect(spec2.properties.address.introspect().isRequired).toEqual(false);
+
+    // Nested properties also optional
+    const deepAddr = spec2.properties.address.introspect() as any;
+    expect(deepAddr.properties.city.introspect().isRequired).toEqual(false);
+    expect(deepAddr.properties.country.introspect().isRequired).toEqual(false);
+
+    const typeTest1: InferType<typeof schema1> = {} as any;
+    const typeTest2: InferType<typeof schema2> = {} as any;
+    expectTypeOf(typeTest1).toEqualTypeOf<{
+        name: string;
+        address: { city: string; country: string };
+    }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{
+        name?: string;
+        address?: { city?: string; country?: string };
+    }>();
+
+    {
+        const { valid, object, errors } = schema2.validate({});
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                name?: string;
+                address?: { city?: string; country?: string };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({ address: {} });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                name?: string;
+                address?: { city?: string; country?: string };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({
+            address: { city: 'Paris' }
+        });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                name?: string;
+                address?: { city?: string; country?: string };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({
+            name: 'Alice',
+            address: { city: 'Paris', country: 'FR' }
+        });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                name?: string;
+                address?: { city?: string; country?: string };
+            }>();
+        }
+    }
+});
+
+test('deepPartial - three levels deep', async () => {
+    const schema1 = object({
+        a: object({
+            b: object({ c: string() })
+        })
+    });
+    const schema2 = schema1.deepPartial();
+
+    const spec2 = schema2.introspect();
+
+    const aSchema = spec2.properties.a.introspect() as any;
+    expect(aSchema.isRequired).toEqual(false);
+    const bSchema = aSchema.properties.b.introspect() as any;
+    expect(bSchema.isRequired).toEqual(false);
+    const cSchema = bSchema.properties.c.introspect() as any;
+    expect(cSchema.isRequired).toEqual(false);
+
+    const typeTest1: InferType<typeof schema1> = {} as any;
+    const typeTest2: InferType<typeof schema2> = {} as any;
+    expectTypeOf(typeTest1).toEqualTypeOf<{ a: { b: { c: string } } }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ a?: { b?: { c?: string } } }>();
+
+    {
+        const { valid, object, errors } = schema2.validate({});
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                a?: { b?: { c?: string } };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({ a: {} });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                a?: { b?: { c?: string } };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({ a: { b: {} } });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                a?: { b?: { c?: string } };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({
+            a: { b: { c: 'hello' } }
+        });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                a?: { b?: { c?: string } };
+            }>();
+        }
+    }
+});
+
+test('deepPartial - array properties become optional (elements unchanged)', async () => {
+    const schema1 = object({
+        tags: array(string()),
+        nested: object({ x: number() })
+    });
+    const schema2 = schema1.deepPartial();
+
+    const spec2 = schema2.introspect();
+
+    // The array property itself is optional
+    expect(spec2.properties.tags.introspect().isRequired).toEqual(false);
+    // The nested object property is optional and recursed
+    expect(spec2.properties.nested.introspect().isRequired).toEqual(false);
+    const nestedSchema = spec2.properties.nested.introspect() as any;
+    expect(nestedSchema.properties.x.introspect().isRequired).toEqual(false);
+
+    const typeTest1: InferType<typeof schema1> = {} as any;
+    const typeTest2: InferType<typeof schema2> = {} as any;
+    expectTypeOf(typeTest1).toEqualTypeOf<{
+        tags: string[];
+        nested: { x: number };
+    }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{
+        tags?: string[];
+        nested?: { x?: number };
+    }>();
+
+    {
+        const { valid, object, errors } = schema2.validate({});
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                tags?: string[];
+                nested?: { x?: number };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({ tags: ['a', 'b'] });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                tags?: string[];
+                nested?: { x?: number };
+            }>();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({ nested: {} });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<{
+                tags?: string[];
+                nested?: { x?: number };
+            }>();
+        }
+    }
+});
+
+test('deepPartial - original schema is not mutated', () => {
+    const schema = object({
+        name: string(),
+        address: object({ city: string() })
+    });
+
+    schema.deepPartial();
+
+    // Original must remain required
+    expect(schema.introspect().properties.name.introspect().isRequired).toEqual(
+        true
+    );
+    expect(
+        schema.introspect().properties.address.introspect().isRequired
+    ).toEqual(true);
+    const addrSchema = schema
+        .introspect()
+        .properties.address.introspect() as any;
+    expect(addrSchema.properties.city.introspect().isRequired).toEqual(true);
+
+    const typeTest: InferType<typeof schema> = {} as any;
+    expectTypeOf(typeTest).toEqualTypeOf<{
+        name: string;
+        address: { city: string };
+    }>();
+});
+
+test('deepPartial - chaining with readonly', () => {
+    const schema1 = object({ name: string(), inner: object({ x: number() }) });
+    const schema2 = schema1.deepPartial().readonly();
+
+    const typeTest1: InferType<typeof schema1> = {} as any;
+    const typeTest2: InferType<typeof schema2> = {} as any;
+    expectTypeOf(typeTest1).toEqualTypeOf<{
+        name: string;
+        inner: { x: number };
+    }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<
+        Readonly<{ name?: string; inner?: { x?: number } }>
+    >();
+
+    {
+        const { valid, object, errors } = schema2.validate({});
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<
+                Readonly<{ name?: string; inner?: { x?: number } }>
+            >();
+        }
+    }
+
+    {
+        const { valid, object } = schema2.validate({
+            name: 'hi',
+            inner: { x: 5 }
+        });
+        expect(valid).toEqual(true);
+        if (object) {
+            expectTypeOf(object).toEqualTypeOf<
+                Readonly<{ name?: string; inner?: { x?: number } }>
+            >();
+        }
+    }
+});
+
+test('deepPartial - chaining with default', () => {
+    const schema1 = object({ count: number() });
+    const schema2 = schema1.deepPartial().default({ count: 42 });
+
+    const typeTest1: InferType<typeof schema1> = {} as any;
+    const typeTest2: InferType<typeof schema2> = {} as any;
+    expectTypeOf(typeTest1).toEqualTypeOf<{ count: number }>();
+    expectTypeOf(typeTest2).toEqualTypeOf<{ count?: number }>();
+
+    const result = schema2.validate(undefined as any);
+    expect(result.valid).toEqual(true);
+    expect((result as any).object).toEqual({ count: 42 });
+    if (result.object) {
+        expectTypeOf(result.object).toEqualTypeOf<{ count?: number }>();
+    }
 });
 
 test('makePropOptional - 1', async () => {

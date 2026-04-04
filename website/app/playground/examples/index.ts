@@ -410,6 +410,41 @@ const result = CreateUser.validate({ name: "Alice", email: "alice@test.com" });
         testData: '{ "name": "Alice", "email": "alice@test.com" }'
     },
     {
+        id: 'deep-partial',
+        title: 'Deep Partial',
+        description:
+            'Use <code>.deepPartial()</code> to make every property optional at every nesting level — ideal for PATCH request bodies and partial form state.',
+        group: 'Objects & Composition',
+        code: `import { object, string, number, type InferType } from '@cleverbrush/schema';
+
+const CreateUser = object({
+    name:    string(),
+    address: object({
+        street: string(),
+        city:   string(),
+        zip:    string()
+    }),
+    settings: object({
+        theme:    string(),
+        language: string()
+    })
+});
+
+// Every property at every level is optional
+const PatchUser = CreateUser.deepPartial();
+
+type PatchPayload = InferType<typeof PatchUser>;
+// { name?: string; address?: { street?: string; city?: string; zip?: string };
+//   settings?: { theme?: string; language?: string } }
+
+// Send only the fields you want to update
+const result = PatchUser.validate({
+    address: { city: 'Paris' }
+});
+`,
+        testData: '{ "address": { "city": "Paris" } }'
+    },
+    {
         id: 'recursive-schemas',
         title: 'Recursive Schemas',
         description:
