@@ -182,10 +182,7 @@ export type Validator<T> = (
  * Internal wrapper that pairs a preprocessor function with metadata
  * indicating whether it may mutate the value.
  */
-export type PreprocessorEntry<T> = {
-    fn(object: T): Promise<T> | T;
-    mutates: boolean;
-};
+export type PreprocessorEntry<T> = { fn: Preprocessor<T>; mutates: boolean };
 
 /**
  * Internal wrapper that pairs a validator function with metadata

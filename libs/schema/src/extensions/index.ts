@@ -30,7 +30,6 @@ import type {
     BooleanBuiltinExtensions,
     DateBuiltinExtensions,
     FuncBuiltinExtensions,
-    NullableMethod,
     ObjectBuiltinExtensions,
     UnionBuiltinExtensions
 } from './nullable.js';
