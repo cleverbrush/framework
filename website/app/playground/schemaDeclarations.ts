@@ -2205,6 +2205,19 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      */
     protected get canSkipPreValidation(): boolean;
     /**
+     * Whether \`null\` should count as a required-constraint violation.
+     *
+     * By default \`null\` is treated the same as \`undefined\` for the purposes
+     * of the required check — i.e. a required schema rejects both.
+     * Subclasses that may legally receive \`null\` as a value (e.g.
+     * \`UnionSchemaBuilder\` when a \`NullSchemaBuilder\` option is present)
+     * can override this to \`false\` so that \`null\` bypasses the required
+     * check and is passed directly to their option-validation logic.
+     *
+     * @protected
+     */
+    protected get isNullRequiredViolation(): boolean;
+    /**
      * Synchronous version of {@link preValidateAsync}.
      * Throws at runtime if any preprocessor or validator returns a Promise.
      *
@@ -2830,6 +2843,14 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         defaultValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
     };
     /**
+     * Null is a legitimate JavaScript value that a union option (e.g.
+     * \`NullSchemaBuilder\`) may accept. Override the base-class behaviour so
+     * that a required union does **not** reject \`null\` during pre-validation;
+     * instead, each option gets the opportunity to validate it.
+     * @override
+     */
+    protected get isNullRequiredViolation(): boolean;
+    /**
      * @inheritdoc
      */
     hasType<T>(_notUsed?: T): UnionSchemaBuilder<TOptions, true, T, THasDefault, TExtensions> & TExtensions;
@@ -3348,8 +3369,9 @@ export {};
 import type { ArraySchemaBuilder } from '../builders/ArraySchemaBuilder.js';
 import type { SchemaBuilder, ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
+import type { NullableMethod, NullableReturn } from './nullable.js';
 /** Return type shared by every method on {@link ArrayBuiltinExtensions}. */
-type ArrayExtReturn<TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & HiddenExtensionMethods;
+type ArrayExtReturn<TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & NullableMethod<ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>>> & HiddenExtensionMethods;
 /**
  * Methods added to \`ArraySchemaBuilder\` by the built-in array extension pack.
  *
@@ -3394,6 +3416,8 @@ export interface ArrayBuiltinExtensions<TElementSchema extends SchemaBuilder<any
      * \`\`\`
      */
     unique(keyFn?: (item: any) => unknown, errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>): ArrayExtReturn<TElementSchema>;
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>>>;
 }
 /**
  * Extension descriptor that adds common array validators
@@ -3450,25 +3474,33 @@ export {};
     "file:///node_modules/@cleverbrush/schema/extensions/index.d.ts": `/**
  * Pre‑wired extension pack for \`@cleverbrush/schema\`.
  *
- * Combines {@link stringExtensions}, {@link numberExtensions}, and
- * {@link arrayExtensions} via \`withExtensions()\` and re‑exports the
- * augmented factory functions.
+ * Combines {@link stringExtensions}, {@link numberExtensions},
+ * {@link arrayExtensions}, and {@link nullableExtension} via
+ * \`withExtensions()\` and re‑exports the augmented factory functions.
  *
  * The default \`@cleverbrush/schema\` entry point re‑exports these
  * augmented factories so that \`email()\`, \`positive()\`, \`nonempty()\`,
- * etc. are available without any setup.
+ * \`.nullable()\`, etc. are available without any setup.
  *
  * @module
  */
+import type { AnySchemaBuilder } from '../builders/AnySchemaBuilder.js';
 import type { ArraySchemaBuilder } from '../builders/ArraySchemaBuilder.js';
+import type { BooleanSchemaBuilder } from '../builders/BooleanSchemaBuilder.js';
+import type { DateSchemaBuilder } from '../builders/DateSchemaBuilder.js';
+import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js';
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
+import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
+import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import type { ArrayBuiltinExtensions } from './array.js';
+import type { AnyBuiltinExtensions, BooleanBuiltinExtensions, DateBuiltinExtensions, FuncBuiltinExtensions, ObjectBuiltinExtensions, UnionBuiltinExtensions } from './nullable.js';
 import type { NumberBuiltinExtensions } from './number.js';
 import type { StringBuiltinExtensions } from './string.js';
 export { type ArrayBuiltinExtensions, arrayExtensions } from './array.js';
+export { type AnyBuiltinExtensions, type BooleanBuiltinExtensions, type DateBuiltinExtensions, type FuncBuiltinExtensions, type NullableMethod, type NullableReturn, nullableExtension, type ObjectBuiltinExtensions, type UnionBuiltinExtensions } from './nullable.js';
 export { type NumberBuiltinExtensions, numberExtensions } from './number.js';
 export { type StringBuiltinExtensions, stringExtensions } from './string.js';
 /** A \`StringSchemaBuilder\` with built-in extension methods. */
@@ -3477,6 +3509,18 @@ export type ExtendedString<T extends string = string> = StringSchemaBuilder<T, t
 export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>> & NumberBuiltinExtensions<T> & HiddenExtensionMethods;
 /** An \`ArraySchemaBuilder\` with built-in extension methods. */
 export type ExtendedArray<TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & HiddenExtensionMethods;
+/** A \`BooleanSchemaBuilder\` with built-in extension methods. */
+export type ExtendedBoolean = BooleanSchemaBuilder<boolean, true, undefined, false, BooleanBuiltinExtensions> & BooleanBuiltinExtensions & HiddenExtensionMethods;
+/** A \`DateSchemaBuilder\` with built-in extension methods. */
+export type ExtendedDate = DateSchemaBuilder<Date, true, false, DateBuiltinExtensions> & DateBuiltinExtensions & HiddenExtensionMethods;
+/** An \`ObjectSchemaBuilder\` with built-in extension methods. */
+export type ExtendedObject<TProps extends Record<string, SchemaBuilder<any, any, any>> = {}> = ObjectSchemaBuilder<TProps, true, undefined, false, ObjectBuiltinExtensions<TProps>> & ObjectBuiltinExtensions<TProps> & HiddenExtensionMethods;
+/** A \`UnionSchemaBuilder\` with built-in extension methods. */
+export type ExtendedUnion<TOptions extends readonly SchemaBuilder<any, any, any>[]> = UnionSchemaBuilder<TOptions, true, undefined, false, UnionBuiltinExtensions> & UnionBuiltinExtensions & HiddenExtensionMethods;
+/** A \`FunctionSchemaBuilder\` with built-in extension methods. */
+export type ExtendedFunc = FunctionSchemaBuilder<true, undefined, false, FuncBuiltinExtensions> & FuncBuiltinExtensions & HiddenExtensionMethods;
+/** An \`AnySchemaBuilder\` with built-in extension methods. */
+export type ExtendedAny = AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions> & AnyBuiltinExtensions & HiddenExtensionMethods;
 export declare const string: {
     (): ExtendedString;
     <T extends string>(equals: T): ExtendedString<T>;
@@ -3486,12 +3530,219 @@ export declare const number: {
     <T extends number>(equals: T): ExtendedNumber<T>;
 };
 export declare const array: <TElementSchema extends SchemaBuilder<any, any, any>>(elementSchema?: TElementSchema) => ExtendedArray<TElementSchema>;
-export declare const boolean: () => import("../extension.js").CleanExtended<import("../core.js").BooleanSchemaBuilder<boolean, true, undefined, false, {}, boolean>, {}>;
-export declare const date: () => import("../extension.js").CleanExtended<import("../core.js").DateSchemaBuilder<Date, true, false, {}>, {}>;
-export declare const object: <P extends Record<string, SchemaBuilder<any, any, any>>>(properties?: P | undefined) => import("../extension.js").CleanExtended<import("../core.js").ObjectSchemaBuilder<P, true, undefined, false, {}>, {}>;
-export declare const union: <T extends SchemaBuilder<any, any, any>>(schema: T) => import("../extension.js").CleanExtended<import("../core.js").UnionSchemaBuilder<[T], true, undefined, false, {}>, {}>;
-export declare const func: () => import("../extension.js").CleanExtended<import("../core.js").FunctionSchemaBuilder<true, undefined, false, {}, (...args: any[]) => any>, {}>;
-export declare const any: () => import("../extension.js").CleanExtended<import("../core.js").AnySchemaBuilder<true, undefined, false, {}, any>, {}>;
+export declare const boolean: () => ExtendedBoolean;
+export declare const date: () => ExtendedDate;
+export declare const object: {
+    (): ExtendedObject<{}>;
+    <TProps extends Record<string, SchemaBuilder<any, any, any>>>(props: TProps): ExtendedObject<TProps>;
+    <TProps extends Record<string, SchemaBuilder<any, any, any>>>(props?: TProps): ExtendedObject<TProps>;
+};
+export declare const union: <TOptions extends SchemaBuilder<any, any, any>>(schema: TOptions) => ExtendedUnion<[TOptions]>;
+export declare const func: () => ExtendedFunc;
+export declare const any: () => ExtendedAny;
+`,
+    "file:///node_modules/@cleverbrush/schema/extensions/nullable.d.ts": `/**
+ * Built-in nullable extension for \`@cleverbrush/schema\`.
+ *
+ * Provides the \`.nullable()\` convenience method on every schema builder type.
+ * It is a shorthand for \`union(schema).or(nul())\` that changes the inferred
+ * type from \`T\` to \`T | null\`.
+ *
+ * This extension is pre-applied in the default \`@cleverbrush/schema\` import.
+ * Import from \`@cleverbrush/schema/core\` to get bare builders without it.
+ *
+ * @module
+ */
+import type { AnySchemaBuilder } from '../builders/AnySchemaBuilder.js';
+import type { ArraySchemaBuilder } from '../builders/ArraySchemaBuilder.js';
+import type { BooleanSchemaBuilder } from '../builders/BooleanSchemaBuilder.js';
+import type { DateSchemaBuilder } from '../builders/DateSchemaBuilder.js';
+import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js';
+import { type NullSchemaBuilder } from '../builders/NullSchemaBuilder.js';
+import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
+import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
+import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
+import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
+import { type UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
+/**
+ * The return type produced by \`.nullable()\` on any schema builder \`TBuilder\`.
+ *
+ * Wraps the builder in a union with \`NullSchemaBuilder\`, giving the inferred
+ * type \`InferType<TBuilder> | null\`.
+ */
+export type NullableReturn<TBuilder extends SchemaBuilder<any, any, any>> = UnionSchemaBuilder<[TBuilder, NullSchemaBuilder<true>]>;
+/**
+ * The \`.nullable()\` method added to every built-in schema builder.
+ *
+ * **WORKAROUND:** This interface duplicates the method signature from
+ * \`nullableExtension\` so that JSDoc survives into the published \`.d.ts\`
+ * files. TypeScript strips JSDoc when method signatures are reconstructed
+ * through the \`FixedMethods\` mapped type (conditional \`infer\` loses
+ * comments). Remove this interface once TypeScript preserves JSDoc
+ * through mapped types / conditional type inference.
+ *
+ * @see https://github.com/microsoft/TypeScript/issues/50715
+ */
+/** Methods threaded through \`TExtensions\` for \`BooleanSchemaBuilder\`. */
+export interface BooleanBuiltinExtensions {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<BooleanSchemaBuilder<boolean, true, undefined, false, BooleanBuiltinExtensions>>;
+}
+/** Methods threaded through \`TExtensions\` for \`DateSchemaBuilder\`. */
+export interface DateBuiltinExtensions {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<DateSchemaBuilder<Date, true, false, DateBuiltinExtensions>>;
+}
+/** Methods threaded through \`TExtensions\` for \`ObjectSchemaBuilder\`. */
+export interface ObjectBuiltinExtensions<TProps extends Record<string, SchemaBuilder<any, any, any>> = {}> {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<ObjectSchemaBuilder<TProps, true, undefined, false, ObjectBuiltinExtensions<TProps>>>;
+}
+/** Methods threaded through \`TExtensions\` for \`UnionSchemaBuilder\`. */
+export interface UnionBuiltinExtensions {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<SchemaBuilder<any, any, any>>;
+}
+/** Methods threaded through \`TExtensions\` for \`FunctionSchemaBuilder\`. */
+export interface FuncBuiltinExtensions {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<FunctionSchemaBuilder<true, undefined, false, FuncBuiltinExtensions>>;
+}
+/** Methods threaded through \`TExtensions\` for \`AnySchemaBuilder\`. */
+export interface AnyBuiltinExtensions {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions>>;
+}
+export interface NullableMethod<TBuilder extends SchemaBuilder<any, any, any>> {
+    /**
+     * Makes this schema nullable by wrapping it in a union with \`null\`.
+     *
+     * Shorthand for \`union(schema).or(nul())\`.
+     *
+     * After calling \`.nullable()\`, the schema accepts the original type **or**
+     * \`null\`. The inferred type changes from \`T\` to \`T | null\`. Builder-specific
+     * methods (e.g. \`.email()\`, \`.positive()\`) are no longer available on the
+     * result — call them before \`.nullable()\`.
+     *
+     * @returns a \`UnionSchemaBuilder\` that accepts the original type or \`null\`
+     *
+     * @example
+     * \`\`\`ts
+     * import { string, number, object, InferType } from '@cleverbrush/schema';
+     *
+     * // Any builder can be made nullable
+     * const name = string().nullable();
+     * type Name = InferType<typeof name>; // string | null
+     *
+     * const age  = number().nullable();
+     * type Age  = InferType<typeof age>;  // number | null
+     *
+     * // Chain validators before .nullable()
+     * const email = string().email().nullable();
+     * email.validate('user@example.com'); // valid
+     * email.validate(null);               // valid
+     * email.validate('not-an-email');     // invalid
+     *
+     * // Useful for optional database columns that can be NULL
+     * const UserSchema = object({
+     *     name:     string().nonempty(),
+     *     bio:      string().nullable(),   // bio can be null
+     *     avatarId: number().nullable(),   // FK can be null
+     * });
+     * \`\`\`
+     */
+    nullable(): NullableReturn<TBuilder>;
+}
+/**
+ * Extension descriptor that adds \`.nullable()\` to every built-in schema
+ * builder type.
+ *
+ * Included on all nine builders: \`string\`, \`number\`, \`boolean\`, \`date\`,
+ * \`object\`, \`array\`, \`union\`, \`func\`, and \`any\`.
+ *
+ * @example
+ * \`\`\`ts
+ * import { withExtensions } from '@cleverbrush/schema/core';
+ * import { nullableExtension } from '@cleverbrush/schema';
+ *
+ * const { string: s } = withExtensions(nullableExtension);
+ * const schema = s().nullable();
+ * \`\`\`
+ */
+export declare const nullableExtension: import("../extension.js").ExtensionDescriptor<{
+    string: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts \`string | null\`
+         */
+        nullable(this: StringSchemaBuilder): UnionSchemaBuilder<[StringSchemaBuilder<string, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[StringSchemaBuilder<string, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    number: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts \`number | null\`
+         */
+        nullable(this: NumberSchemaBuilder): UnionSchemaBuilder<[NumberSchemaBuilder<number, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[NumberSchemaBuilder<number, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    boolean: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts \`boolean | null\`
+         */
+        nullable(this: BooleanSchemaBuilder): UnionSchemaBuilder<[BooleanSchemaBuilder<boolean, true, undefined, false, {}, boolean>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[BooleanSchemaBuilder<boolean, true, undefined, false, {}, boolean>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    date: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts \`Date | null\`
+         */
+        nullable(this: DateSchemaBuilder): UnionSchemaBuilder<[DateSchemaBuilder<Date, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[DateSchemaBuilder<Date, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    object: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts the object type or \`null\`
+         */
+        nullable(this: ObjectSchemaBuilder): UnionSchemaBuilder<[ObjectSchemaBuilder<{}, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[ObjectSchemaBuilder<{}, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    array: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts the array type or \`null\`
+         */
+        nullable(this: ArraySchemaBuilder<any>): UnionSchemaBuilder<[ArraySchemaBuilder<any, true, undefined, false, {}, any[] | unknown[]>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[ArraySchemaBuilder<any, true, undefined, false, {}, any[] | unknown[]>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    union: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that includes \`null\` as an option
+         */
+        nullable(this: UnionSchemaBuilder<any>): UnionSchemaBuilder<[UnionSchemaBuilder<any, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[UnionSchemaBuilder<any, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    func: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts a function or \`null\`
+         */
+        nullable(this: FunctionSchemaBuilder): UnionSchemaBuilder<[FunctionSchemaBuilder<true, undefined, false, {}, (...args: any[]) => any>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[FunctionSchemaBuilder<true, undefined, false, {}, (...args: any[]) => any>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    any: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts any value or \`null\`
+         */
+        nullable(this: AnySchemaBuilder): UnionSchemaBuilder<[AnySchemaBuilder<true, undefined, false, {}, any>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[AnySchemaBuilder<true, undefined, false, {}, any>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+}>;
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/number.d.ts": `/**
  * Built-in number extensions for \`@cleverbrush/schema\`.
@@ -3508,8 +3759,9 @@ export declare const any: () => import("../extension.js").CleanExtended<import("
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
+import type { NullableMethod, NullableReturn } from './nullable.js';
 /** Return type shared by every method on {@link NumberBuiltinExtensions}. */
-type NumberExtReturn<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>> & NumberBuiltinExtensions<T> & HiddenExtensionMethods;
+type NumberExtReturn<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>> & NumberBuiltinExtensions<T> & NullableMethod<NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>> & HiddenExtensionMethods;
 /**
  * Methods added to \`NumberSchemaBuilder\` by the built-in number extension pack.
  *
@@ -3578,6 +3830,8 @@ export interface NumberBuiltinExtensions<T extends number = number> {
      * \`\`\`
      */
     multipleOf(n: number, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberExtReturn<T>;
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>>;
 }
 /**
  * Extension descriptor that adds common number validators
@@ -3671,8 +3925,9 @@ export {};
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
+import type { NullableMethod, NullableReturn } from './nullable.js';
 /** Return type shared by every method on {@link StringBuiltinExtensions}. */
-type StringExtReturn<T extends string = string> = StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>> & StringBuiltinExtensions<T> & HiddenExtensionMethods;
+type StringExtReturn<T extends string = string> = StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>> & StringBuiltinExtensions<T> & NullableMethod<StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>> & HiddenExtensionMethods;
 /**
  * Methods added to \`StringSchemaBuilder\` by the built-in string extension pack.
  *
@@ -3793,6 +4048,8 @@ export interface StringBuiltinExtensions<T extends string = string> {
      * \`\`\`
      */
     nonempty(errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringExtReturn<T>;
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>>;
 }
 /**
  * Extension descriptor that adds common string validators and preprocessors
@@ -3969,7 +4226,7 @@ export {};
 `,
     "file:///node_modules/@cleverbrush/schema/index.d.ts": `export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export * from './core.js';
-export { type ArrayBuiltinExtensions, any, array, arrayExtensions, boolean, date, type ExtendedArray, type ExtendedNumber, type ExtendedString, func, type NumberBuiltinExtensions, number, numberExtensions, object, type StringBuiltinExtensions, string, stringExtensions, union } from './extensions/index.js';
+export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedString, type ExtendedUnion, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type StringBuiltinExtensions, string, stringExtensions, type UnionBuiltinExtensions, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

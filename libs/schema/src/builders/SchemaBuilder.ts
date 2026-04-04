@@ -695,6 +695,22 @@ export abstract class SchemaBuilder<
     }
 
     /**
+     * Whether `null` should count as a required-constraint violation.
+     *
+     * By default `null` is treated the same as `undefined` for the purposes
+     * of the required check — i.e. a required schema rejects both.
+     * Subclasses that may legally receive `null` as a value (e.g.
+     * `UnionSchemaBuilder` when a `NullSchemaBuilder` option is present)
+     * can override this to `false` so that `null` bypasses the required
+     * check and is passed directly to their option-validation logic.
+     *
+     * @protected
+     */
+    protected get isNullRequiredViolation(): boolean {
+        return true;
+    }
+
+    /**
      * Shared setup for both {@link preValidateSync} and {@link preValidateAsync}.
      * Builds the validation context, creates the initial transaction, and
      * returns mutable state for the caller to drive.
@@ -897,7 +913,7 @@ export abstract class SchemaBuilder<
         if (
             this.isRequired &&
             (typeof preprocessedObject === 'undefined' ||
-                preprocessedObject === null)
+                (preprocessedObject === null && this.isNullRequiredViolation))
         ) {
             errors.push({
                 message: this.getValidationErrorMessageSync(
@@ -1012,7 +1028,7 @@ export abstract class SchemaBuilder<
         if (
             this.isRequired &&
             (typeof preprocessedObject === 'undefined' ||
-                preprocessedObject === null)
+                (preprocessedObject === null && this.isNullRequiredViolation))
         ) {
             errors.push({
                 message: await this.getValidationErrorMessage(

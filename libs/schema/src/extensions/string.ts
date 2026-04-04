@@ -15,6 +15,7 @@ import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.j
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
+import type { NullableMethod, NullableReturn } from './nullable.js';
 import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -29,6 +30,9 @@ type StringExtReturn<T extends string = string> = StringSchemaBuilder<
     StringBuiltinExtensions<T>
 > &
     StringBuiltinExtensions<T> &
+    NullableMethod<
+        StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>
+    > &
     HiddenExtensionMethods;
 
 /**
@@ -167,6 +171,11 @@ export interface StringBuiltinExtensions<T extends string = string> {
     nonempty(
         errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
     ): StringExtReturn<T>;
+
+    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
+    nullable(): NullableReturn<
+        StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>
+    >;
 }
 
 const UUID_RE =

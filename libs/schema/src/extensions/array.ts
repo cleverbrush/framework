@@ -16,6 +16,7 @@ import type {
 } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
+import type { NullableMethod, NullableReturn } from './nullable.js';
 import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -37,6 +38,15 @@ type ArrayExtReturn<
     ArrayBuiltinExtensions<TElementSchema>
 > &
     ArrayBuiltinExtensions<TElementSchema> &
+    NullableMethod<
+        ArraySchemaBuilder<
+            TElementSchema,
+            true,
+            undefined,
+            false,
+            ArrayBuiltinExtensions<TElementSchema>
+        >
+    > &
     HiddenExtensionMethods;
 
 /**
@@ -95,6 +105,17 @@ export interface ArrayBuiltinExtensions<
         keyFn?: (item: any) => unknown,
         errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>
     ): ArrayExtReturn<TElementSchema>;
+
+    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
+    nullable(): NullableReturn<
+        ArraySchemaBuilder<
+            TElementSchema,
+            true,
+            undefined,
+            false,
+            ArrayBuiltinExtensions<TElementSchema>
+        >
+    >;
 }
 
 /**
