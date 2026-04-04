@@ -324,7 +324,8 @@ test('toJsonSchema - 38: string().readonly() → readOnly: true', () => {
 test('toJsonSchema - 39: number() without readonly → no readOnly key', () => {
     const result = toJsonSchema(number(), { $schema: false });
     expect(result).not.toHaveProperty('readOnly');
-  
+});
+
 // ---------------------------------------------------------------------------
 // tuple
 // ---------------------------------------------------------------------------

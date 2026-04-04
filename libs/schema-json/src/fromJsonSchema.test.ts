@@ -854,7 +854,8 @@ test('fromJsonSchema - 56: { type: array, readOnly: true } → isReadonly: true'
 test('fromJsonSchema - 57: { type: number } without readOnly → isReadonly: false', () => {
     const schema = fromJsonSchema({ type: 'number' } as const);
     expect((schema.introspect() as any).isReadonly).toBe(false);
-  
+});
+
 // ---------------------------------------------------------------------------
 // tuple (prefixItems)
 // ---------------------------------------------------------------------------
