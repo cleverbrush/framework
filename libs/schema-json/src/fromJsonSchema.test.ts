@@ -831,6 +831,8 @@ test('fromJsonSchema - 54: prefixItems → tuple accepts exact length', () => {
     const schema = fromJsonSchema({
         type: 'array',
         prefixItems: [{ type: 'string' }, { type: 'number' }],
+        minItems: 2,
+        maxItems: 2,
         items: false
     } as const);
     expect(valid(schema, ['hello', 42])).toBe(true);
@@ -840,6 +842,8 @@ test('fromJsonSchema - 55: prefixItems → tuple rejects too short', () => {
     const schema = fromJsonSchema({
         type: 'array',
         prefixItems: [{ type: 'string' }, { type: 'number' }],
+        minItems: 2,
+        maxItems: 2,
         items: false
     } as const);
     expect(valid(schema, ['hello'])).toBe(false);
@@ -849,6 +853,8 @@ test('fromJsonSchema - 56: prefixItems + items:false → rejects extra elements'
     const schema = fromJsonSchema({
         type: 'array',
         prefixItems: [{ type: 'string' }, { type: 'number' }],
+        minItems: 2,
+        maxItems: 2,
         items: false
     } as const);
     expect(valid(schema, ['hello', 42, 'extra'])).toBe(false);
@@ -858,6 +864,7 @@ test('fromJsonSchema - 57: prefixItems + items:schema → accepts rest elements'
     const schema = fromJsonSchema({
         type: 'array',
         prefixItems: [{ type: 'string' }],
+        minItems: 1,
         items: { type: 'number' }
     } as const);
     expect(valid(schema, ['hello', 1, 2, 3])).toBe(true);
@@ -867,6 +874,7 @@ test('fromJsonSchema - 58: prefixItems + items:schema → rejects wrong-typed re
     const schema = fromJsonSchema({
         type: 'array',
         prefixItems: [{ type: 'string' }],
+        minItems: 1,
         items: { type: 'number' }
     } as const);
     expect(valid(schema, ['hello', 'notANumber'])).toBe(false);
@@ -876,6 +884,8 @@ test('fromJsonSchema - 59: empty prefixItems → empty tuple', () => {
     const schema = fromJsonSchema({
         type: 'array',
         prefixItems: [],
+        minItems: 0,
+        maxItems: 0,
         items: false
     } as const);
     expect(valid(schema, [])).toBe(true);

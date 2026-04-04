@@ -301,6 +301,8 @@ test('toJsonSchema - 36: tuple([string(), number()]) → prefixItems + items:fal
     expect(result).toEqual({
         type: 'array',
         prefixItems: [{ type: 'string' }, { type: 'integer' }],
+        minItems: 2,
+        maxItems: 2,
         items: false
     });
 });
@@ -310,6 +312,8 @@ test('toJsonSchema - 37: tuple([]) → empty prefixItems + items:false', () => {
     expect(result).toEqual({
         type: 'array',
         prefixItems: [],
+        minItems: 0,
+        maxItems: 0,
         items: false
     });
 });
@@ -321,6 +325,7 @@ test('toJsonSchema - 38: tuple([string()]).rest(number().isFloat()) → items: {
     expect(result).toEqual({
         type: 'array',
         prefixItems: [{ type: 'string' }],
+        minItems: 1,
         items: { type: 'number' }
     });
 });
@@ -332,6 +337,8 @@ test('toJsonSchema - 39: tuple([boolean(), string()]) → prefixItems order pres
     expect(result).toEqual({
         type: 'array',
         prefixItems: [{ type: 'boolean' }, { type: 'string' }],
+        minItems: 2,
+        maxItems: 2,
         items: false
     });
 });
