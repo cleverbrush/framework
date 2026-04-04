@@ -285,6 +285,17 @@ export class UnionSchemaBuilder<
     }
 
     /**
+     * Null is a legitimate JavaScript value that a union option (e.g.
+     * `NullSchemaBuilder`) may accept. Override the base-class behaviour so
+     * that a required union does **not** reject `null` during pre-validation;
+     * instead, each option gets the opportunity to validate it.
+     * @override
+     */
+    protected override get isNullRequiredViolation(): boolean {
+        return false;
+    }
+
+    /**
      * @inheritdoc
      */
     public hasType<T>(
@@ -447,9 +458,15 @@ export class UnionSchemaBuilder<
             !context?.doNotStopOnFirstError &&
             !context?.rootPropertyDescriptor
         ) {
-            // Required / optional check
-            if (typeof object === 'undefined' || object === null) {
-                if (typeof object === 'undefined' && this.hasDefault) {
+            // Required / optional check.
+            // `undefined` is the canonical "missing value" signal — handle it
+            // exactly as before (default, optional valid, required error).
+            // `null` is a legitimate JavaScript value: for optional unions it is
+            // valid without consulting options (original behaviour); for required
+            // unions we fall through to option-checking so that a
+            // NullSchemaBuilder option can accept it.
+            if (typeof object === 'undefined') {
+                if (this.hasDefault) {
                     object = this.resolveDefaultValue();
                 } else if (!this.isRequired) {
                     return this.#fastResult(
@@ -475,7 +492,17 @@ export class UnionSchemaBuilder<
                         context
                     );
                 }
+            } else if (object === null && !this.isRequired) {
+                // Optional union: null is valid without checking options.
+                return this.#fastResult(
+                    true,
+                    object,
+                    undefined,
+                    object,
+                    context
+                );
             }
+            // null + required union: fall through to option checking below.
 
             // Discriminated union: O(1) lookup, no setup overhead
             if (this.#discriminatorKey && this.#discriminatorMap) {

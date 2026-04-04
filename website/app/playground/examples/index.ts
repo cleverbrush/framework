@@ -30,7 +30,7 @@ export const EXAMPLE_GROUPS = [
     },
     {
         label: 'Arrays & Unions',
-        ids: ['arrays', 'union-types', 'discriminated-unions']
+        ids: ['arrays', 'union-types', 'discriminated-unions', 'nullable']
     },
     { label: 'Validation', ids: ['validation-errors', 'custom-validators'] },
     {
@@ -776,6 +776,38 @@ const r1 = email.validate("not-an-email");
 const result = price.validate(-5);
 `,
         testData: '"not-an-email"'
+    },
+    {
+        id: 'nullable',
+        title: 'Nullable Fields',
+        description:
+            'Use <code>.nullable()</code> to accept the original type <em>or</em> <code>null</code>. Works on every builder. Shorthand for <code>union(schema).or(nul())</code>.',
+        group: 'Arrays & Unions',
+        code: `import { string, number, object, InferType } from '@cleverbrush/schema';
+
+const name = string().nullable();
+type Name = InferType<typeof name>; // string | null
+
+// Validators chain before .nullable()
+const email = string().email().nullable(); // string | null
+
+// .optional().nullable() — accepts string | null | undefined
+const bio = string().optional().nullable();
+
+// Use inside objects
+const User = object({
+    name: string().nonempty(),
+    bio:  string().nullable(),
+    age:  number().nullable(),
+});
+
+const result = User.validate({
+    name: 'Alice',
+    bio:  null,
+    age:  null,
+});
+`,
+        testData: '{ "name": "Alice", "bio": null, "age": null }'
     },
     {
         id: 'custom-extensions',

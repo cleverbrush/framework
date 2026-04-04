@@ -39,7 +39,7 @@ The framework has matured significantly. The core schema library, extension syst
 | **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` + `@cleverbrush/mapper` | Low — mapper handles object reshaping with type-safe `.compute()`, preprocessors handle coercion; only inline single-field type-changing is uncovered |
 | **Default values** | `.default(value)` | ✅ `.default(value \| () => value)` | ✅ DONE |
 | **Recursive schemas** | `z.lazy(() => schema)` | ✅ `lazy(() => schema)` — `LazySchemaBuilder` | High — tree structures, comments, menus |
-| **Nullable** | `.nullable()` | `union(schema()).or(nul())` | Medium — convenience, very common ask |
+| **Nullable** | `.nullable()` | ✅ `.nullable()` — built-in extension on all builders | ✅ DONE |
 | **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(string().equals('b'))` | Medium — verbose workaround |
 | **Tuple** | `z.tuple([str, num])` | Not possible | Medium — fixed-length typed arrays |
 | **Record** | `z.record(keySchema, valSchema)` | Not possible | Medium — dynamic-key objects |
@@ -156,13 +156,19 @@ May revisit post-launch if user demand materializes, but this is not a launch bl
 - Full fluent API: `.optional()`, `.required()`, `.addPreprocessor()`, `.addValidator()`, `.brand()`, `hasType()`, `clearHasType()`
 - Sync and async validation paths both supported
 
-### 2.5 Nullable convenience
+### 2.5 Nullable convenience ✅ DONE
 
-Add `.nullable()` as a first-class method on all builders:
+`.nullable()` is implemented as a built-in extension available on all 9 builder types:
 
-- Shortcut for `union(schema).or(nul())`
-- Changes type to `T | null`
-- Very common ask — nearly every database field can be null
+- Shorthand for `union(schema).or(nul())` — implemented via the extension system, not the base class
+- Changes inferred type from `T` to `T | null`
+- Available on `string`, `number`, `boolean`, `date`, `object`, `array`, `union`, `func`, and `any`
+- Propagates optional-ness: `string().optional().nullable()` accepts `string | null | undefined`
+- Call before `.nullable()` to chain builder-specific methods: `string().email().nullable()`
+- Fixed a pre-existing bug in `UnionSchemaBuilder`: required unions now correctly let options evaluate `null` (required check no longer short-circuits `null` before trying options)
+- All 9 existing `ExtendedX` type aliases updated; 6 new explicit factory exports (`boolean`, `date`, `object`, `union`, `func`, `any`) with proper typed overrides so the IDE shows the correct `UnionSchemaBuilder` return type instead of the wrong same-builder type
+- Exported: `nullableExtension`, `NullableMethod<TBuilder>`, `NullableReturn<TBuilder>` from `@cleverbrush/schema`
+- 45 tests covering all 9 builder types, chaining, async, optional combos, object nesting, and type inference
 
 ---
 

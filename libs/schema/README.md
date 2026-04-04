@@ -12,7 +12,7 @@ A schema definition and validation library for TypeScript. Define object schemas
 
 - **PropertyDescriptors** — a runtime descriptor tree that other tools can introspect. The [`@cleverbrush/mapper`](../mapper) uses it for type-safe property selectors. The [`@cleverbrush/react-form`](../react-form) uses it to auto-generate form fields with correct validation. This makes the schema library a **foundation** for an entire ecosystem — not just a standalone validation tool.
 - **Extension system** — add custom methods to any builder type (`string`, `number`, `date`, …) via `defineExtension()` + `withExtensions()`. Extensions are fully typed, chainable, and composable. No other popular schema library offers a comparable type-safe plugin system.
-- **Built-in extension pack** — common validators like `email()`, `url()`, `uuid()`, `ip()`, `trim()`, `positive()`, `negative()`, `nonempty()`, `unique()`, and more are included out of the box. The default import has them pre-applied; import from `@cleverbrush/schema/core` to get bare builders without extensions.
+- **Built-in extension pack** — common validators like `email()`, `url()`, `uuid()`, `ip()`, `trim()`, `positive()`, `negative()`, `nonempty()`, `unique()`, `nullable()`, and more are included out of the box. The default import has them pre-applied; import from `@cleverbrush/schema/core` to get bare builders without extensions.
 - **JSDoc comment preservation** — JSDoc comments on schema properties carry through to the inferred TypeScript type, so IDE tooltips and autocomplete descriptions come from the schema definition itself.
 - **Zero dependencies** — no runtime dependencies at all.
 
@@ -105,15 +105,15 @@ The following builder functions are available:
 | Function        | Description                                       | Key Methods                                                     |
 | --------------- | ------------------------------------------------- | --------------------------------------------------------------- |
 | `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.default(value)`, `.addValidator(fn)`                              |
-| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.default(value)` |
-| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.default(value)` |
-| `boolean()`     | Boolean value.                                    | `.optional()`, `.default(value)`                                                   |
-| `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.default(value)`                                                   |
-| `func()`        | Function value.                                   | `.optional()`, `.default(value)`                                                   |
+| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.nullable()`, `.default(value)` |
+| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.nullable()`, `.default(value)` |
+| `boolean()`     | Boolean value.                                    | `.optional()`, `.nullable()`, `.default(value)`                                                   |
+| `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.nullable()`, `.default(value)`                                                   |
+| `func()`        | Function value.                                   | `.optional()`, `.nullable()`, `.default(value)`                                                   |
 | `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`, `.default(value)`                                                   |
-| `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.default(value)`            |
-| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.default(value)` |
-| `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.default(value)`                 |
+| `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.nullable()`, `.default(value)`            |
+| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.nullable()`, `.default(value)` |
+| `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.nullable()`, `.default(value)`                 |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 
 ## Immutability
@@ -825,6 +825,37 @@ The default import from `@cleverbrush/schema` includes a pre-applied extension p
 | `.nonempty(errorMessage?)` | Array must have at least one element | `true` |
 | `.unique(keyFn?, errorMessage?)` | All elements must be unique. Optional `keyFn` extracts comparison key for objects | `true` or `keyFn` |
 
+### Nullable Extension
+
+| Method | Availableon | Description |
+| --- | --- | --- |
+| `.nullable()` | all builders | Returns a `union(thisSchema).or(nul())` that accepts the original type **or** `null`. If the source schema is `.optional()`, the resulting union is also optional (accepts `undefined` too). |
+
+```typescript
+import { string, number, object, InferType } from '@cleverbrush/schema';
+
+const name = string().nullable();
+type Name = InferType<typeof name>; // string | null
+
+// Works with any builder
+const score = number().positive().nullable(); // number | null
+
+// Chaining: validators before .nullable()
+const email = string().email().nullable(); // string | null
+
+// Optional + nullable: accepts string | null | undefined
+const bio = string().optional().nullable();
+
+// Nested inside objects
+const User = object({
+    name: string().nonempty(),
+    bio:  string().nullable(),   // string | null
+    age:  number().nullable(),   // number | null
+});
+
+User.validate({ name: 'Alice', bio: null, age: null }); // valid
+```
+
 All validator extensions accept an optional error message as the last parameter — either a string or a function (matching the same `ValidationErrorMessageProvider` pattern used by built-in constraints like `.minLength()`):
 
 ```typescript
@@ -852,7 +883,7 @@ import { string, number, array, withExtensions } from '@cleverbrush/schema/core'
 const s = withExtensions(myCustomExtension);
 ```
 
-The default import (`@cleverbrush/schema`) re-exports everything from `/core` and overrides the nine factory functions (`string`, `number`, `boolean`, `date`, `object`, `array`, `union`, `func`, `any`) with pre-extended versions. The extension descriptors themselves are also exported (`stringExtensions`, `numberExtensions`, `arrayExtensions`) so you can compose them with your own.
+The default import (`@cleverbrush/schema`) re-exports everything from `/core` and overrides the nine factory functions (`string`, `number`, `boolean`, `date`, `object`, `array`, `union`, `func`, `any`) with pre-extended versions. The extension descriptors themselves are also exported (`stringExtensions`, `numberExtensions`, `arrayExtensions`, `nullableExtension`) so you can compose them with your own.
 
 ## Part of the Cleverbrush Ecosystem
 
@@ -874,7 +905,7 @@ Define a schema once and use it for runtime validation, object mapping between d
 
 **Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
 
-**Extension system:** `defineExtension`, `withExtensions`, `stringExtensions`, `numberExtensions`, `arrayExtensions`
+**Extension system:** `defineExtension`, `withExtensions`, `stringExtensions`, `numberExtensions`, `arrayExtensions`, `nullableExtension`
 
 **Sub-path exports:** `@cleverbrush/schema/core` — bare builders without built-in extensions
 
