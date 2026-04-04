@@ -58,6 +58,10 @@
             "types": "./dist/builders/UnionSchemaBuilder.d.ts",
             "import": "./dist/builders/UnionSchemaBuilder.js"
         },
+        "./tuple": {
+            "types": "./dist/builders/TupleSchemaBuilder.d.ts",
+            "import": "./dist/builders/TupleSchemaBuilder.js"
+        },
         "./function": {
             "types": "./dist/builders/FunctionSchemaBuilder.d.ts",
             "import": "./dist/builders/FunctionSchemaBuilder.js"

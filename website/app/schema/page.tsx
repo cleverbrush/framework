@@ -352,6 +352,22 @@ console.log(bad.errors);
                                 </tr>
                                 <tr>
                                     <td>
+                                        <code>tuple([...schemas])</code>
+                                    </td>
+                                    <td>
+                                        Fixed-length array with per-position
+                                        types. Each index is validated against
+                                        its own schema — mirrors TypeScript
+                                        tuple types.
+                                    </td>
+                                    <td>
+                                        <code>.rest(schema)</code>,{' '}
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>union(...schemas)</code>
                                     </td>
                                     <td>

@@ -41,6 +41,11 @@ export {
 } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 export type {
+    TupleElementValidationResults,
+    TupleSchemaValidationResult
+} from './builders/TupleSchemaBuilder.js';
+export { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
+export type {
     OptionValidationResults,
     UnionSchemaValidationResult
 } from './builders/UnionSchemaBuilder.js';

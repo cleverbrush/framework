@@ -100,7 +100,7 @@ async function doExtractFast(
 
         const schemaVarMatch = [
             ...code.matchAll(
-                /(?:const|let)\s+(\w+)\s*=\s*(?:string|number|boolean|date|func|any|object|array|union)/g
+                /(?:const|let)\s+(\w+)\s*=\s*(?:string|number|boolean|date|func|any|object|array|union|tuple)/g
             )
         ];
         const resultVarMatch = [
@@ -329,7 +329,11 @@ type DocTree = Map<string, DocNode>;
 const INFER_MARKER = '__PlaygroundInferred';
 const RESULT_OBJ_MARKER = '__PlaygroundResultObj';
 /** Deep-expand helper injected into temp models to force TS to eagerly resolve mapped/generic types */
-const RESOLVE_HELPER = `\ntype __Resolve<T> = T extends Date ? Date : T extends RegExp ? RegExp : T extends Map<infer K, infer V> ? Map<K, V> : T extends Set<infer V> ? Set<V> : T extends Promise<infer V> ? Promise<V> : T extends Error ? Error : T extends readonly (infer E)[] ? __Resolve<E>[] : T extends object ? { [K in keyof T]: __Resolve<T[K]> } : T;\n`;
+// Tuple-safe resolve helper:
+// Fixed-length tuples: number extends T["length"] is false → return T unchanged.
+// Non-empty variadic tuples ([A, B, ...C[]]): length is number, but T extends readonly [unknown, ...unknown[]] → return T unchanged.
+// Plain arrays (string[], Obj[]): length is number, no guaranteed first element → resolve element type.
+const RESOLVE_HELPER = `\ntype __Resolve<T> = T extends Date ? Date : T extends RegExp ? RegExp : T extends Map<infer K, infer V> ? Map<K, V> : T extends Set<infer V> ? Set<V> : T extends Promise<infer V> ? Promise<V> : T extends Error ? Error : T extends readonly unknown[] ? (number extends T["length"] ? (T extends readonly [unknown, ...unknown[]] ? T : __Resolve<T[number]>[]) : T) : T extends object ? { [K in keyof T]: __Resolve<T[K]> } : T;\n`;
 let helperCounter = 0;
 const MAX_DOC_DEPTH = 4;
 

@@ -30,7 +30,13 @@ export const EXAMPLE_GROUPS = [
     },
     {
         label: 'Arrays & Unions',
-        ids: ['arrays', 'union-types', 'discriminated-unions', 'nullable']
+        ids: [
+            'arrays',
+            'tuples',
+            'union-types',
+            'discriminated-unions',
+            'nullable'
+        ]
     },
     { label: 'Validation', ids: ['validation-errors', 'custom-validators'] },
     {
@@ -808,6 +814,38 @@ const result = User.validate({
 });
 `,
         testData: '{ "name": "Alice", "bio": null, "age": null }'
+    },
+    {
+        id: 'tuples',
+        title: 'Tuples',
+        description:
+            'Use <code>tuple([...schemas])</code> for fixed-length arrays with per-position types — mirrors TypeScript tuple types. Use <code>.rest(schema)</code> for variadic tails.',
+        group: 'Arrays & Unions',
+        code: `import { tuple, string, number, boolean } from '@cleverbrush/schema';
+
+// Fixed-length tuple: [string, number, boolean]
+const entry = tuple([string(), number(), boolean()]);
+
+// Validate a matching tuple
+const result = entry.validate(['hello', 42, true]);
+// result.valid === true, result.object === ['hello', 42, true]
+
+// Wrong type at position 1 → invalid
+const bad = entry.validate(['hello', 'oops', true] as any);
+// bad.valid === false
+
+// 2-D coordinate pair
+const point = tuple([number(), number()]);
+const p = point.validate([10.5, 20.3]);
+// p.object === [10.5, 20.3]
+
+// Variadic tail with .rest()
+const log = tuple([string(), number()]).rest(string());
+// Type: [string, number, ...string[]]
+const l = log.validate(['info', 200, 'request ok', 'extra detail']);
+// l.valid === true
+`,
+        testData: '["hello", 42, true]'
     },
     {
         id: 'custom-extensions',
