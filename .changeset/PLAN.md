@@ -41,9 +41,9 @@ The framework has matured significantly. The core schema library, extension syst
 | **Recursive schemas** | `z.lazy(() => schema)` | ✅ `lazy(() => schema)` — `LazySchemaBuilder` | High — tree structures, comments, menus |
 | **Nullable** | `.nullable()` | ✅ `.nullable()` — built-in extension on all builders | ✅ DONE |
 | **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(string().equals('b'))` | Medium — verbose workaround |
-| **Tuple** | `z.tuple([str, num])` | Not possible | Medium — fixed-length typed arrays |
+| **Tuple** | `z.tuple([str, num])` | ✅ `tuple([str, num])` — `TupleSchemaBuilder` | ✅ DONE |
 | **Record** | `z.record(keySchema, valSchema)` | Not possible | Medium — dynamic-key objects |
-| **Deep partial** | `.deepPartial()` | `.partial()` on top level only | Low-medium — useful for PATCH APIs |
+| **Deep partial** | `.deepPartial()` | ✅ `.deepPartial()` — recurses into nested `object()` schemas | ✅ DONE |
 | **Catch/fallback** | `.catch(fallback)` | None | Low-medium |
 | **Readonly** | `.readonly()` | ✅ `.readonly()` — type-level `Readonly<T>` / `ReadonlyArray<T>` | ✅ DONE |
 | **Describe** | `.describe('...')` | JSDoc on schemas (preserved in types, not at runtime) | Low |
@@ -227,9 +227,9 @@ Show real-world patterns with code examples (playground or blog):
 
 `s.enum(['admin', 'user', 'guest'])` — creates a union of string literals. Currently requires verbose `union(string().equals('admin')).or(string().equals('user')).or(...)`.
 
-### 4.2 Tuple builder
+### 4.2 Tuple builder ✅ DONE
 
-`s.tuple([string(), number(), boolean()])` — fixed-length array with per-position types. Needed for function arguments, CSV rows, coordinate pairs.
+`tuple([string(), number(), boolean()])` — fixed-length array with per-position types. Needed for function arguments, CSV rows, coordinate pairs.
 
 ### 4.3 Record builder
 
