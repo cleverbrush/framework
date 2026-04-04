@@ -114,7 +114,7 @@ export function FormProvider<
  */
 export function useField<
     TSchema extends ObjectSchemaBuilder<any, any, any>,
-    TPropertySchema extends SchemaBuilder<any, any> = SchemaBuilder<any, any>
+    TPropertySchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>
 >(
     forProperty: (
         tree: PropertyDescriptorTree<TSchema, TSchema>

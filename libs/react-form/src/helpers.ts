@@ -59,7 +59,7 @@ export function getDescriptorPath(
 /**
  * Returns the schema type string (e.g. "string", "number", "object").
  */
-export function getSchemaType(schema: SchemaBuilder<any, any>): string {
+export function getSchemaType(schema: SchemaBuilder<any, any, any>): string {
     const introspected = schema.introspect();
     return introspected?.type ?? 'unknown';
 }

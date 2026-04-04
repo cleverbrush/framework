@@ -19,7 +19,7 @@ export type FieldRenderProps = {
     onChange: (value: any) => void;
     onBlur: () => void;
     setValue: (value: any) => void;
-    schema: SchemaBuilder<any, any>;
+    schema: SchemaBuilder<any, any, any>;
     /**
      * Rendering variant hint passed from the `Field` component.
      * Used by renderers to select a sub-variant of the base schema type
@@ -105,7 +105,7 @@ export type UseFieldResult<T = any> = {
     onChange: (value: T) => void;
     onBlur: () => void;
     setValue: (value: T) => void;
-    schema: SchemaBuilder<any, any>;
+    schema: SchemaBuilder<any, any, any>;
 };
 
 /**
