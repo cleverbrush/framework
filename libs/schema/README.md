@@ -580,7 +580,7 @@ type Tags = InferType<typeof TagsSchema>;
 // ReadonlyArray<string>
 
 // Validation behaviour is unchanged
-const result = await UserSchema.validate({ name: 'Alice', age: 30 });
+const result = UserSchema.validate({ name: 'Alice', age: 30 });
 // { valid: true, object: { name: 'Alice', age: 30 } }
 ```
 
