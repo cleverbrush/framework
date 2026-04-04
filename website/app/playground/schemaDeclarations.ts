@@ -230,6 +230,7 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
@@ -344,6 +345,7 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: TFinalResult | (() => TFinalResult) | undefined;
     };
     /**
@@ -527,6 +529,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
@@ -811,6 +814,7 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
@@ -1149,6 +1153,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
@@ -1456,6 +1461,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | undefined;
     };
     /**
@@ -2260,6 +2266,10 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
             [x: string]: unknown;
         };
         /**
+         * Whether a default value (or factory) has been set on this schema.
+         */
+        hasDefault: boolean;
+        /**
          * The default value or factory function.
          */
         defaultValue: TResult | (() => TResult) | undefined;
@@ -2570,6 +2580,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
@@ -2815,6 +2826,7 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         extensions: {
             [x: string]: unknown;
         };
+        hasDefault: boolean;
         defaultValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
     };
     /**
