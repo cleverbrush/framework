@@ -183,6 +183,22 @@ export class AnySchemaBuilder<
         TExtensions {
         return super.brand(_name);
     }
+
+    /**
+     * Marks the inferred type as `Readonly<T>`. Sets the `isReadonly`
+     * introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): AnySchemaBuilder<
+        TRequired,
+        Readonly<TResult>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
 }
 
 /**

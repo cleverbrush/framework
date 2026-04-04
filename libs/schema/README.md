@@ -553,6 +553,54 @@ console.log(info.hasDefault);    // true
 console.log(info.defaultValue);  // 'hello'
 ```
 
+## Readonly Modifier
+
+Every schema builder supports `.readonly()`. This is a **type-level-only** modifier — it marks the inferred TypeScript type as immutable, but does not alter validation behaviour or freeze the validated value at runtime.
+
+| Builder | Effect on `InferType<T>` |
+|---------|--------------------------|
+| `object(…).readonly()` | `Readonly<{ … }>` — all top-level properties become `readonly` |
+| `array(…).readonly()` | `ReadonlyArray<T>` — no `push`, `pop`, etc. at the type level |
+| `string().readonly()` | `string` (identity — primitives are already immutable) |
+| `number().readonly()` | `number` (identity) |
+| `boolean().readonly()` | `boolean` (identity) |
+| `date().readonly()` | `Readonly<Date>` |
+
+```typescript
+import { object, array, string, number, InferType } from '@cleverbrush/schema';
+
+// Readonly object
+const UserSchema = object({ name: string(), age: number() }).readonly();
+type User = InferType<typeof UserSchema>;
+// Readonly<{ name: string; age: number }>
+
+// Readonly array
+const TagsSchema = array(string()).readonly();
+type Tags = InferType<typeof TagsSchema>;
+// ReadonlyArray<string>
+
+// Validation behaviour is unchanged
+const result = UserSchema.validate({ name: 'Alice', age: 30 });
+// { valid: true, object: { name: 'Alice', age: 30 } }
+```
+
+Chains naturally with `.optional()` and `.default()`:
+
+```typescript
+const Schema = object({ id: number() }).readonly().optional();
+type T = InferType<typeof Schema>;
+// Readonly<{ id: number }> | undefined
+```
+
+The `isReadonly` flag is exposed via `.introspect()` for tooling:
+
+```typescript
+const schema = object({ name: string() }).readonly();
+console.log(schema.introspect().isReadonly); // true
+```
+
+> **Note:** `.readonly()` is **shallow** — only top-level object properties or the array itself are marked readonly. For deeply nested immutability consider applying `.readonly()` at each level, or use a `DeepReadonly` utility type post-validation.
+
 ## Extensions
 
 [▶ Open in Playground](https://docs.cleverbrush.com/playground/custom-extensions)

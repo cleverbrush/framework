@@ -219,6 +219,23 @@ export class NullSchemaBuilder<
         TExtensions {
         return super.brand(_name);
     }
+
+    /**
+     * Marks the inferred type as `Readonly<null>`. Since `null` is already
+     * immutable this is an identity operation, but it sets the `isReadonly`
+     * introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): NullSchemaBuilder<
+        TRequired,
+        Readonly<null>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
 }
 
 /**

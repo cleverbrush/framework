@@ -45,7 +45,7 @@ The framework has matured significantly. The core schema library, extension syst
 | **Record** | `z.record(keySchema, valSchema)` | Not possible | Medium — dynamic-key objects |
 | **Deep partial** | `.deepPartial()` | `.partial()` on top level only | Low-medium — useful for PATCH APIs |
 | **Catch/fallback** | `.catch(fallback)` | None | Low-medium |
-| **Readonly** | `.readonly()` | Not possible at type level | Low |
+| **Readonly** | `.readonly()` | ✅ `.readonly()` — type-level `Readonly<T>` / `ReadonlyArray<T>` | ✅ DONE |
 | **Describe** | `.describe('...')` | JSDoc on schemas (preserved in types, not at runtime) | Low |
 | **Coercion namespace** | `z.coerce.string()` | `.addPreprocessor()` | Low — preprocessors cover this |
 | **Literal builder** | `z.literal(42)` | `number().equals(42)` or `string().equals('x')` | Low — equality operators work |
@@ -243,9 +243,20 @@ Show real-world patterns with code examples (playground or blog):
 
 `.catch(fallbackValue)` — use a fallback value when validation fails instead of returning errors. Useful for graceful degradation.
 
-### 4.6 Readonly modifier
+### 4.6 Readonly modifier ✅ DONE
 
-`.readonly()` — marks the inferred type as `Readonly<T>`. Type-level enforcement that the validated object shouldn't be mutated.
+`.readonly()` is implemented on `SchemaBuilder` base class and overridden with precise return types on all 9 concrete builders:
+
+- **Type-level only** — marks the inferred TypeScript type as immutable but does not alter validation behaviour or freeze the value at runtime
+- `object(…).readonly()` → `Readonly<{ … }>` (all top-level properties become `readonly`)
+- `array(…).readonly()` → `ReadonlyArray<T>` (no `push`, `pop`, etc. at the type level)
+- Primitives (`string`, `number`, `boolean`) are identity — already immutable
+- `date().readonly()` → `Readonly<Date>`
+- `isReadonly` flag exposed via `.introspect()` for tooling
+- **Shallow** — only top-level properties are affected; apply `.readonly()` at each nesting level for deep immutability
+- Chains naturally with `.optional()` and `.default()`
+- Bidirectional JSON Schema interop via `@cleverbrush/schema-json`: `readOnly: true` ↔ `.readonly()`
+- Tests covering all builder types, type inference, introspection, chaining with optional/default, async validation
 
 ### 4.7 Describe (runtime)
 

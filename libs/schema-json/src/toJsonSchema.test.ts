@@ -291,6 +291,42 @@ test('toJsonSchema - 35: nul() round-trips to { type: null }', () => {
 });
 
 // ---------------------------------------------------------------------------
+// readOnly
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 36: object().readonly() → readOnly: true', () => {
+    const result = toJsonSchema(object({ name: string() }).readonly(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: 'object',
+        readOnly: true,
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false
+    });
+});
+
+test('toJsonSchema - 37: array(string()).readonly() → readOnly: true', () => {
+    const result = toJsonSchema(array(string()).readonly(), { $schema: false });
+    expect(result).toEqual({
+        type: 'array',
+        readOnly: true,
+        items: { type: 'string' }
+    });
+});
+
+test('toJsonSchema - 38: string().readonly() → readOnly: true', () => {
+    const result = toJsonSchema(string().readonly(), { $schema: false });
+    expect(result).toEqual({ type: 'string', readOnly: true });
+});
+
+test('toJsonSchema - 39: number() without readonly → no readOnly key', () => {
+    const result = toJsonSchema(number(), { $schema: false });
+    expect(result).not.toHaveProperty('readOnly');
+});
+
+// ---------------------------------------------------------------------------
 // tuple
 // ---------------------------------------------------------------------------
 

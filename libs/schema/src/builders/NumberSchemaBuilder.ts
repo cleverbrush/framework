@@ -673,6 +673,23 @@ export class NumberSchemaBuilder<
     }
 
     /**
+     * Marks the inferred type as `Readonly<number>`. Since numbers are
+     * already immutable this is an identity operation, but it sets the
+     * `isReadonly` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): NumberSchemaBuilder<
+        Readonly<TResult>,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    /**
      * Do not accept NaN value
      */
     public notNaN(

@@ -378,6 +378,27 @@ export class ObjectSchemaBuilder<
         return super.brand(_name);
     }
 
+    /**
+     * Marks the inferred type as `Readonly<T>` — all top-level properties
+     * become `readonly` at the type level. Validation behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        Readonly<
+            undefined extends TExplicitType
+                ? RespectPropsOptionality<TProperties>
+                : TExplicitType
+        >,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
     #applyPropertyDescriptors(
         result: PreValidationResult<any, { validatedObject: any }>
     ): void {

@@ -711,6 +711,28 @@ export class ArraySchemaBuilder<
         return super.brand(_name);
     }
 
+    /**
+     * Marks the inferred type as `ReadonlyArray<T>` — disables `push`,
+     * `pop`, and other mutating methods at the type level. Validation
+     * behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        ReadonlyArray<
+            TElementSchema extends SchemaBuilder<infer T1, infer T2>
+                ? InferType<SchemaBuilder<T1, T2>>
+                : any
+        >,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
     public introspect() {
         return {
             ...super.introspect(),

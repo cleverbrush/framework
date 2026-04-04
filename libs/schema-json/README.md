@@ -125,6 +125,7 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `format: 'ipv4'` | `.ip({ version: 'v4' })` |
 | `format: 'ipv6'` | `.ip({ version: 'v6' })` |
 | `format: 'date-time'` | `.matches(iso8601 regex)` |
+| `readOnly: true` | `.readonly()` |
 
 ---
 
