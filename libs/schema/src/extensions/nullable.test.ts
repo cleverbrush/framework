@@ -9,6 +9,7 @@ import {
     number,
     object,
     string,
+    tuple,
     union
 } from '../index.js';
 
@@ -358,6 +359,44 @@ describe('nullable extension', () => {
 
             expect(Schema.validate({ value: 10 }).valid).toBe(true);
             expect(Schema.validate({ value: null as any }).valid).toBe(true);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // tuple().nullable()
+    // -----------------------------------------------------------------------
+    describe('tuple().nullable()', () => {
+        test('accepts a valid tuple', () => {
+            const schema = tuple([string(), number()]).nullable();
+            const result = schema.validate(['hello', 42]);
+            expect(result.valid).toBe(true);
+            expect(result.object).toEqual(['hello', 42]);
+        });
+
+        test('accepts null', () => {
+            const schema = tuple([string(), number()]).nullable();
+            const result = schema.validate(null as any);
+            expect(result.valid).toBe(true);
+            expect(result.object).toBeNull();
+        });
+
+        test('rejects undefined', () => {
+            const schema = tuple([string(), number()]).nullable();
+            const result = schema.validate(undefined as any);
+            expect(result.valid).toBe(false);
+        });
+
+        test('rejects wrong element type', () => {
+            const schema = tuple([string(), number()]).nullable();
+            const result = schema.validate(['hello', 'bad'] as any);
+            expect(result.valid).toBe(false);
+        });
+
+        test('inferred type is [string, number] | null', () => {
+            const schema = tuple([string(), number()]).nullable();
+            type T = InferType<typeof schema>;
+            expectTypeOf<T>().toMatchTypeOf<[string, number] | null>();
+            expectTypeOf<null>().toMatchTypeOf<T>();
         });
     });
 

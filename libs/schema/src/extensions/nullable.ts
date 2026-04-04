@@ -20,6 +20,7 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
+import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import {
     type UnionSchemaBuilder,
     union
@@ -112,6 +113,26 @@ export interface AnyBuiltinExtensions {
     /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
     nullable(): NullableReturn<
         AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions>
+    >;
+}
+
+/** Methods threaded through `TExtensions` for `TupleSchemaBuilder`. */
+export interface TupleBuiltinExtensions<
+    TElements extends readonly SchemaBuilder<
+        any,
+        any,
+        any
+    >[] = readonly SchemaBuilder<any, any, any>[]
+> {
+    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
+    nullable(): NullableReturn<
+        TupleSchemaBuilder<
+            TElements,
+            true,
+            undefined,
+            false,
+            TupleBuiltinExtensions<TElements>
+        >
     >;
 }
 
@@ -272,6 +293,17 @@ export const nullableExtension = defineExtension({
          * @returns a `UnionSchemaBuilder` that accepts any value or `null`
          */
         nullable(this: AnySchemaBuilder) {
+            const u = union(this).or(nul());
+            return this.isRequired ? u : u.optional();
+        }
+    },
+    tuple: {
+        /**
+         * Makes this schema nullable — shorthand for `union(schema).or(nul())`.
+         *
+         * @returns a `UnionSchemaBuilder` that accepts the tuple type or `null`
+         */
+        nullable(this: TupleSchemaBuilder<any>) {
             const u = union(this).or(nul());
             return this.isRequired ? u : u.optional();
         }

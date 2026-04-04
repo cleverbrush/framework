@@ -1,6 +1,11 @@
 // Re-export all types, classes, and extension system from core
 
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export type {
+    TupleElementValidationResults,
+    TupleSchemaValidationResult
+} from './builders/TupleSchemaBuilder.js';
+export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
 // Override bare factory functions with augmented versions (extensions pre-applied).
 // Named re-exports shadow the identically-named exports from `export *` above.
@@ -23,6 +28,7 @@ export {
     type ExtendedNumber,
     type ExtendedObject,
     type ExtendedString,
+    type ExtendedTuple,
     type ExtendedUnion,
     type FuncBuiltinExtensions,
     func,
@@ -37,6 +43,8 @@ export {
     type StringBuiltinExtensions,
     string,
     stringExtensions,
+    type TupleBuiltinExtensions,
+    tuple,
     type UnionBuiltinExtensions,
     union
 } from './extensions/index.js';
