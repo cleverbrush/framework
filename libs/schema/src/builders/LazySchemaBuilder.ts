@@ -185,7 +185,7 @@ export class LazySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): LazySchemaBuilder<T, true, TExtensions> & TExtensions {
+    ): LazySchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -301,7 +301,7 @@ export class LazySchemaBuilder<
  */
 export function lazy<TResult>(
     getter: () => SchemaBuilder<TResult, any, any>
-): LazySchemaBuilder<TResult, true, {}> {
+): LazySchemaBuilder<TResult, true, false, {}> {
     return LazySchemaBuilder.create({
         type: 'lazy',
         isRequired: true,

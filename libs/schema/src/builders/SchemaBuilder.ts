@@ -11,6 +11,11 @@ declare const __type: unique symbol;
 /** @internal */
 export type SchemaTypeBrand = typeof __type;
 
+/** @internal Symbol used as the key for the default-value brand on schema builders. */
+declare const __hasDefault: unique symbol;
+/** @internal */
+export type HasDefaultBrand = typeof __hasDefault;
+
 /** Symbol used as the key for branded/opaque types. */
 declare const __brand: unique symbol;
 /** Symbol used as the key for branded/opaque types. */
@@ -63,7 +68,7 @@ export type ValidationError = { message: string };
  */
 export type NestedValidationResult<
     TSchema,
-    TRootSchema extends ObjectSchemaBuilder<any, any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
     TParentPropertyDescriptor
 > = {
     /**
@@ -347,7 +352,7 @@ export type PropertyDescriptorInnerFromPropertyDescriptor<T> =
         : undefined;
 
 export type PropertyDescriptorInner<
-    TSchema extends ObjectSchemaBuilder<any, any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
     TPropertySchema,
     TParentPropertyDescriptor
 > = {
@@ -424,7 +429,7 @@ export type PropertyDescriptorInner<
  * an object schema. Used to get/set property values on validated objects.
  */
 export type PropertyDescriptor<
-    TRootSchema extends ObjectSchemaBuilder<any, any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
     TPropertySchema,
     TParentPropertyDescriptor
 > = {
@@ -440,8 +445,8 @@ export type PropertyDescriptor<
  * Has a possibility to filter properties by the type (`TAssignableTo` type parameter).
  */
 export type PropertyDescriptorTree<
-    TSchema extends ObjectSchemaBuilder<any, any, any, any>,
-    TRootSchema extends ObjectSchemaBuilder<any, any, any, any> = TSchema,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any> = TSchema,
     TAssignableTo = any,
     TParentPropertyDescriptor = undefined
 > = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> &
@@ -468,6 +473,7 @@ export type PropertyDescriptorTree<
                           any
                       >
                     ? TArrayElement extends ObjectSchemaBuilder<
+                          any,
                           any,
                           any,
                           any,
@@ -575,6 +581,13 @@ export abstract class SchemaBuilder<
     declare readonly [__type]: TRequired extends true
         ? TResult
         : MakeOptional<TResult>;
+
+    /**
+     * Type-level brand encoding whether this schema has a default value.
+     * Not emitted at runtime — used by input type inference.
+     * @internal
+     */
+    declare readonly [__hasDefault]: THasDefault;
 
     /**
      * Set type of schema explicitly. `notUsed` param is needed only for case when JS is used. E.g. when you

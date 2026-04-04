@@ -24,6 +24,7 @@ import { validationFail } from './util.js';
 type NumberExtReturn<T extends number = number> = NumberSchemaBuilder<
     T,
     true,
+    false,
     NumberBuiltinExtensions<T>
 > &
     NumberBuiltinExtensions<T> &

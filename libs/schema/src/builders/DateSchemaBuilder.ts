@@ -10,7 +10,7 @@ import {
 } from './SchemaBuilder.js';
 
 type DateSchemaBuilderCreateProps<T = Date, R extends boolean = true> = Partial<
-    ReturnType<DateSchemaBuilder<T, R>['introspect']>
+    ReturnType<DateSchemaBuilder<T, R, any>['introspect']>
 >;
 
 const parseFromJsonPreprocessor = (value: any) => {
@@ -300,7 +300,7 @@ export class DateSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): DateSchemaBuilder<T, true, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -549,19 +549,25 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<T, TRequired, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<T, TRequired, THasDefault, TExtensions> & TExtensions {
         if (!(value instanceof Date)) throw new Error('Date expected');
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
-        }) as any as DateSchemaBuilder<T, TRequired, TExtensions> & TExtensions;
+        }) as any as DateSchemaBuilder<T, TRequired, THasDefault, TExtensions> &
+            TExtensions;
     }
 
     /**
      * Clears `equals()` call.
      */
-    public clearEquals(): DateSchemaBuilder<Date, TRequired, TExtensions> &
+    public clearEquals(): DateSchemaBuilder<
+        Date,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -639,7 +645,8 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsInFuture: true,
@@ -653,6 +660,7 @@ export class DateSchemaBuilder<
     public clearIsInFuture(): DateSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -672,7 +680,8 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             ensureIsInPast: true,
@@ -683,7 +692,12 @@ export class DateSchemaBuilder<
     /**
      * Cancel `isInPast()` call.
      */
-    public clearIsInPast(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+    public clearIsInPast(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -702,7 +716,8 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (!(minValue instanceof Date))
             throw new Error('minValue must be a Date');
         return this.createFromProps({
@@ -715,7 +730,12 @@ export class DateSchemaBuilder<
     /**
      * Clear `min()` call.
      */
-    public clearMin(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+    public clearMin(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         const schema = this.introspect();
         delete schema.min;
@@ -735,7 +755,8 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (!(maxValue instanceof Date))
             throw new Error('maxValue must be a Date');
         return this.createFromProps({
@@ -748,7 +769,12 @@ export class DateSchemaBuilder<
     /**
      * Clear `max()` call.
      */
-    public clearMax(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+    public clearMax(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         const schema = this.introspect();
         delete schema.max;
@@ -764,6 +790,7 @@ export class DateSchemaBuilder<
     public acceptJsonString(): DateSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -779,6 +806,7 @@ export class DateSchemaBuilder<
     public doNotAcceptJsonString(): DateSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -792,7 +820,12 @@ export class DateSchemaBuilder<
      * Accepts epoch number as a valid Date.
      * Epoch number will be parsed using `new Date(epoch)`.
      */
-    public acceptEpoch(): DateSchemaBuilder<TResult, TRequired, TExtensions> &
+    public acceptEpoch(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -806,6 +839,7 @@ export class DateSchemaBuilder<
     public doNotAcceptEpoch(): DateSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

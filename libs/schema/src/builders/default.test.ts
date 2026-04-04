@@ -232,10 +232,12 @@ describe('.default() — introspect', () => {
 
     test('hasDefault getter reflects default state', () => {
         const withDefault = string().default('test');
-        expect(withDefault.hasDefault).toBe(true);
+        expect(withDefault.introspect().defaultValue !== undefined).toBe(true);
 
         const withoutDefault = string();
-        expect(withoutDefault.hasDefault).toBe(false);
+        expect(withoutDefault.introspect().defaultValue !== undefined).toBe(
+            false
+        );
     });
 });
 

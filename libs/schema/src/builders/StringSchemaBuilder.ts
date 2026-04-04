@@ -305,7 +305,7 @@ export class StringSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): StringSchemaBuilder<T, true, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -558,14 +558,24 @@ export class StringSchemaBuilder<
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
-        }) as any as StringSchemaBuilder<T, TRequired, TExtensions> &
+        }) as any as StringSchemaBuilder<
+            T,
+            TRequired,
+            THasDefault,
+            TExtensions
+        > &
             TExtensions;
     }
 
     /**
      * Cancels `equals()` call.
      */
-    public clearEquals(): StringSchemaBuilder<string, TRequired, TExtensions> &
+    public clearEquals(): StringSchemaBuilder<
+        string,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -645,7 +655,8 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
         return this.createFromProps({
@@ -661,6 +672,7 @@ export class StringSchemaBuilder<
     public clearMinLength(): StringSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -683,7 +695,8 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
         return this.createFromProps({
@@ -699,6 +712,7 @@ export class StringSchemaBuilder<
     public clearMaxLength(): StringSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -723,6 +737,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult extends string ? `${T}${TResult}` : TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -741,6 +756,7 @@ export class StringSchemaBuilder<
     public clearStartsWith(): StringSchemaBuilder<
         string,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -765,6 +781,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult extends string ? `${TResult}${T}` : TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -783,6 +800,7 @@ export class StringSchemaBuilder<
     public clearEndsWith(): StringSchemaBuilder<
         string,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -805,7 +823,8 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (!(regexp instanceof RegExp)) throw new Error('regexp expected');
         return this.createFromProps({
             ...this.introspect(),
@@ -820,6 +839,7 @@ export class StringSchemaBuilder<
     public clearMatches(): StringSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

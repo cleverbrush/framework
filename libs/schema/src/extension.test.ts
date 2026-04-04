@@ -290,7 +290,10 @@ const nonEmptyExt = defineExtension({
 
 const labeledExt = defineExtension({
     union: {
-        labeled(this: UnionSchemaBuilder<any, any, any, any>, label: string) {
+        labeled(
+            this: UnionSchemaBuilder<any, any, any, any, any>,
+            label: string
+        ) {
             // Attach label metadata and add a dummy validator
             return this.withExtension('label', label).addValidator(_val => {
                 // No-op validator, just for demonstration
