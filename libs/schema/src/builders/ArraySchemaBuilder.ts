@@ -712,7 +712,11 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * @hidden
+     * Marks the inferred type as `ReadonlyArray<T>` — disables `push`,
+     * `pop`, and other mutating methods at the type level. Validation
+     * behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
      */
     public readonly(): ArraySchemaBuilder<
         TElementSchema,

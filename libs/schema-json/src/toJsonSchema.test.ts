@@ -294,7 +294,9 @@ test('toJsonSchema - 35: nul() round-trips to { type: null }', () => {
 // ---------------------------------------------------------------------------
 
 test('toJsonSchema - 36: object().readonly() → readOnly: true', () => {
-    const result = toJsonSchema(object({ name: string() }).readonly(), { $schema: false });
+    const result = toJsonSchema(object({ name: string() }).readonly(), {
+        $schema: false
+    });
     expect(result).toEqual({
         type: 'object',
         readOnly: true,
@@ -306,7 +308,11 @@ test('toJsonSchema - 36: object().readonly() → readOnly: true', () => {
 
 test('toJsonSchema - 37: array(string()).readonly() → readOnly: true', () => {
     const result = toJsonSchema(array(string()).readonly(), { $schema: false });
-    expect(result).toEqual({ type: 'array', readOnly: true, items: { type: 'string' } });
+    expect(result).toEqual({
+        type: 'array',
+        readOnly: true,
+        items: { type: 'string' }
+    });
 });
 
 test('toJsonSchema - 38: string().readonly() → readOnly: true', () => {

@@ -644,7 +644,11 @@ export class StringSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * Marks the inferred type as `Readonly<string>`. Since strings are
+     * already immutable this is an identity operation, but it sets the
+     * `isReadonly` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
      */
     public readonly(): StringSchemaBuilder<
         Readonly<TResult>,

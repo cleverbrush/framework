@@ -379,7 +379,10 @@ export class ObjectSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * Marks the inferred type as `Readonly<T>` — all top-level properties
+     * become `readonly` at the type level. Validation behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
      */
     public readonly(): ObjectSchemaBuilder<
         TProperties,

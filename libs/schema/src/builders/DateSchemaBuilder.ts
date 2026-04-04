@@ -636,7 +636,11 @@ export class DateSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * Marks the inferred type as `Readonly<Date>` — prevents mutation of
+     * Date methods like `setFullYear()` at the type level. Validation
+     * behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
      */
     public readonly(): DateSchemaBuilder<
         Readonly<TResult>,

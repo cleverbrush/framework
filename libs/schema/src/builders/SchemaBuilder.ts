@@ -1497,7 +1497,8 @@ export abstract class SchemaBuilder<
         const { type, preprocessors, validators, isRequired } = props;
         this.type = type;
         if (typeof isRequired === 'boolean') this.isRequired = isRequired;
-        if (typeof props.isReadonly === 'boolean') this.#isReadonly = props.isReadonly;
+        if (typeof props.isReadonly === 'boolean')
+            this.#isReadonly = props.isReadonly;
         if (Array.isArray(preprocessors)) {
             this.#preprocessors = [...preprocessors];
         }

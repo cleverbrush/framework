@@ -185,7 +185,10 @@ export class AnySchemaBuilder<
     }
 
     /**
-     * @hidden
+     * Marks the inferred type as `Readonly<T>`. Sets the `isReadonly`
+     * introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
      */
     public readonly(): AnySchemaBuilder<
         TRequired,

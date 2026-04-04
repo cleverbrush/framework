@@ -277,6 +277,15 @@ export default function MigratingFromZodPage() {
                                 </tr>
                                 <tr>
                                     <td>
+                                        <code>.readonly()</code>
+                                    </td>
+                                    <td>
+                                        <code>.readonly()</code>
+                                    </td>
+                                    <td>Identical — type-level only</td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>.email()</code>,{' '}
                                         <code>.url()</code>,{' '}
                                         <code>.uuid()</code>, <code>.ip()</code>
@@ -752,6 +761,44 @@ sendEmail(Email.parse('user@example.com')); // ✓`
                             }}
                         />
                     </pre>
+                </div>
+
+                {/* ── Readonly ─────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Readonly</h2>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(
+                                    `// Zod
+const User = z.object({ name: z.string() }).readonly();
+type User = z.infer<typeof User>; // Readonly<{ name: string }>
+
+// @cleverbrush/schema  (identical)
+const User = object({ name: string() }).readonly();
+type User = InferType<typeof User>; // Readonly<{ name: string }>
+
+// Works on arrays too:
+const Tags = array(string()).readonly();
+type Tags = InferType<typeof Tags>; // ReadonlyArray<string>
+
+// Introspectable:
+console.log(User.introspect().isReadonly); // true`
+                                )
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        The <code>.readonly()</code> API is identical to
+                        Zod&apos;s. It is <strong>type-level only</strong> — it
+                        marks the inferred type as{' '}
+                        <code>Readonly&lt;T&gt;</code> (or{' '}
+                        <code>ReadonlyArray&lt;T&gt;</code> for arrays) but does
+                        not freeze the validated value at runtime. The{' '}
+                        <code>isReadonly</code> flag is exposed via{' '}
+                        <code>.introspect()</code> for tooling.
+                    </p>
                 </div>
 
                 {/* ── Introspection ────────────────────────────────── */}

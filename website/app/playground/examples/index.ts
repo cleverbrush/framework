@@ -15,7 +15,8 @@ export const EXAMPLE_GROUPS = [
             'string-constraints',
             'number-constraints',
             'optional-fields',
-            'custom-error-messages'
+            'custom-error-messages',
+            'readonly-modifier'
         ]
     },
     {
@@ -235,6 +236,47 @@ const result = UserSchema.validate(
 );
 `,
         testData: '{ "name": "A", "email": "invalid", "age": -5 }'
+    },
+    {
+        id: 'readonly-modifier',
+        title: 'Readonly Modifier',
+        description:
+            "Use <code>.readonly()</code> to mark a schema's inferred type as immutable. This is <strong>type-level only</strong> — validation behaviour is unchanged, but TypeScript will enforce immutability.",
+        group: 'Constraints',
+        code: `import { object, array, string, number, InferType } from '@cleverbrush/schema';
+
+// Readonly object — top-level props become readonly
+const UserSchema = object({
+    name: string().required(),
+    age: number()
+}).readonly();
+
+type User = InferType<typeof UserSchema>;
+// Readonly<{ name: string; age: number }>
+// user.name = 'Bob'; // ✗ TypeScript error!
+
+// Readonly array — no push, pop, etc.
+const TagsSchema = array(string()).readonly();
+type Tags = InferType<typeof TagsSchema>;
+// ReadonlyArray<string>
+
+// Chains with .optional() and .default()
+const ConfigSchema = object({
+    host: string().default('localhost'),
+    port: number().default(3000)
+}).readonly().optional();
+
+type Config = InferType<typeof ConfigSchema>;
+// Readonly<{ host: string; port: number }> | undefined
+
+// isReadonly flag via .introspect()
+console.log(UserSchema.introspect().isReadonly); // true
+console.log(TagsSchema.introspect().isReadonly); // true
+
+// Validation works as normal
+const result = UserSchema.validate({ name: 'Alice', age: 30 });
+`,
+        testData: '{ "name": "Alice", "age": 30 }'
     },
 
     // ── Objects & Composition ───────────────────────

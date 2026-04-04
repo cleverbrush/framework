@@ -94,7 +94,9 @@ describe('readonly - type inference', () => {
         const schema = object({ id: number(), name: string() }).readonly();
         type Result = InferType<typeof schema>;
         const value: Result = { id: 1, name: 'Alice' };
-        expectTypeOf(value).toEqualTypeOf<Readonly<{ id: number; name: string }>>();
+        expectTypeOf(value).toEqualTypeOf<
+            Readonly<{ id: number; name: string }>
+        >();
     });
 
     test('readonly array: type is ReadonlyArray (no push/pop at type level)', () => {
@@ -161,10 +163,7 @@ describe('readonly - runtime behavior', () => {
 
     test('readonly() does not change validation behavior (valid array)', async () => {
         const schema = array(string()).readonly();
-        const { valid, object: arr } = await schema.validate([
-            'a',
-            'b'
-        ] as any);
+        const { valid, object: arr } = await schema.validate(['a', 'b'] as any);
         expect(valid).toBe(true);
         expect(arr).toEqual(['a', 'b']);
     });

@@ -337,6 +337,14 @@ const result = UserSchema.parse({
                                         <code>.matches(iso8601 regex)</code>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td>
+                                        <code>readOnly: true</code>
+                                    </td>
+                                    <td>
+                                        <code>.readonly()</code>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>

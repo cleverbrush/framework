@@ -14,7 +14,8 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
 
     switch (info.type) {
         case 'string': {
-            if (info.equalsTo !== undefined) return { ...readOnly, const: info.equalsTo };
+            if (info.equalsTo !== undefined)
+                return { ...readOnly, const: info.equalsTo };
             const out: Out = { ...readOnly, type: 'string' };
             if (ext['email'] === true) {
                 out['format'] = 'email';
@@ -52,8 +53,12 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'number': {
-            if (info.equalsTo !== undefined) return { ...readOnly, const: info.equalsTo };
-            const out: Out = { ...readOnly, type: info.isInteger ? 'integer' : 'number' };
+            if (info.equalsTo !== undefined)
+                return { ...readOnly, const: info.equalsTo };
+            const out: Out = {
+                ...readOnly,
+                type: info.isInteger ? 'integer' : 'number'
+            };
             if (info.min !== undefined) out['minimum'] = info.min;
             if (info.max !== undefined) out['maximum'] = info.max;
             if (ext['multipleOf'] !== undefined)
@@ -64,7 +69,8 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'boolean': {
-            if (info.equalsTo !== undefined) return { ...readOnly, const: info.equalsTo };
+            if (info.equalsTo !== undefined)
+                return { ...readOnly, const: info.equalsTo };
             return { ...readOnly, type: 'boolean' };
         }
 

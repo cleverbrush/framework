@@ -221,7 +221,10 @@ export class FunctionSchemaBuilder<
     }
 
     /**
-     * @hidden
+     * Marks the inferred type as `Readonly<Function>`. Sets the
+     * `isReadonly` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
      */
     public readonly(): FunctionSchemaBuilder<
         TRequired,

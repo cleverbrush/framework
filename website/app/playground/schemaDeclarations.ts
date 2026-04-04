@@ -73,6 +73,13 @@ export declare class AnySchemaBuilder<TRequired extends boolean = true, TExplici
     brand<TBrand extends string | symbol>(_name?: TBrand): AnySchemaBuilder<TRequired, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<T>\`. Sets the \`isReadonly\`
+     * introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): AnySchemaBuilder<TRequired, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a \`any\` schema.
@@ -199,6 +206,14 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
     brand<TBrand extends string | symbol>(_name?: TBrand): ArraySchemaBuilder<TElementSchema, TRequired, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`ReadonlyArray<T>\` — disables \`push\`,
+     * \`pop\`, and other mutating methods at the type level. Validation
+     * behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): ArraySchemaBuilder<TElementSchema, TRequired, ReadonlyArray<TElementSchema extends SchemaBuilder<infer T1, infer T2> ? InferType<SchemaBuilder<T1, T2>> : any>, THasDefault, TExtensions> & TExtensions;
     introspect(): {
         /**
          * Schema of array item (if defined)
@@ -224,6 +239,7 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
         maxLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, false, {}, TExplicitType extends undefined ? TElementSchema extends undefined ? any[] : TElementSchema extends SchemaBuilder<infer T1, infer T2 extends boolean, false, {}> ? (T2 extends true ? T1 : T1 | undefined)[] : never : TExplicitType>>;
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
@@ -339,6 +355,7 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired, undefined, false, {}, TResult>>;
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TFinalResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TFinalResult>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
@@ -391,6 +408,14 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
     brand<TBrand extends string | symbol>(_name?: TBrand): BooleanSchemaBuilder<TResult, TRequired, TFinalResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<boolean>\`. Since booleans are
+     * already immutable this is an identity operation, but it sets the
+     * \`isReadonly\` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): BooleanSchemaBuilder<TResult, TRequired, Readonly<TFinalResult>, THasDefault, TExtensions> & TExtensions;
     /**
      * Restricts object to be equal to \`value\`.
      */
@@ -525,6 +550,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         validators: ValidatorEntry<TResult>[];
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
         extensions: {
             [x: string]: unknown;
@@ -590,6 +616,14 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     brand<TBrand extends string | symbol>(_name?: TBrand): DateSchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
     }, TRequired, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<Date>\` — prevents mutation of
+     * Date methods like \`setFullYear()\` at the type level. Validation
+     * behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): DateSchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
     /**
      * Accept only dates in the future.
      */
@@ -741,6 +775,13 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TEx
     brand<TBrand extends string | symbol>(_name?: TBrand): FunctionSchemaBuilder<TRequired, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<Function>\`. Sets the
+     * \`isReadonly\` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): FunctionSchemaBuilder<TRequired, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a \`function\` schema.
@@ -808,6 +849,7 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         getter: () => SchemaBuilder<TResult, any, any>;
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
@@ -860,6 +902,10 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
     brand<TBrand extends string | symbol>(_name?: TBrand): LazySchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
     }, TRequired, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    readonly(): LazySchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a lazy schema that defers the schema definition until first validation.
@@ -999,6 +1045,14 @@ export declare class NullSchemaBuilder<TRequired extends boolean = true, TExplic
     brand<TBrand extends string | symbol>(_name?: TBrand): NullSchemaBuilder<TRequired, null & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<null>\`. Since \`null\` is already
+     * immutable this is an identity operation, but it sets the \`isReadonly\`
+     * introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): NullSchemaBuilder<TRequired, Readonly<null>, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a schema that validates the value is exactly \`null\`.
@@ -1149,6 +1203,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         validators: ValidatorEntry<TResult>[];
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
         extensions: {
             [x: string]: unknown;
@@ -1228,6 +1283,14 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     brand<TBrand extends string | symbol>(_name?: TBrand): NumberSchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
     }, TRequired, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<number>\`. Since numbers are
+     * already immutable this is an identity operation, but it sets the
+     * \`isReadonly\` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): NumberSchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
     /**
      * Do not accept NaN value
      */
@@ -1455,6 +1518,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         acceptUnknownProps: boolean;
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
@@ -1486,6 +1550,13 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
     brand<TBrand extends string | symbol>(_name?: TBrand): ObjectSchemaBuilder<TProperties, TRequired, (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<T>\` — all top-level properties
+     * become \`readonly\` at the type level. Validation behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): ObjectSchemaBuilder<TProperties, TRequired, Readonly<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
     protected preValidateSync(object: any, context?: ValidationContext<this>): PreValidationResult<InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>>, {
         validatedObject: any;
     }>;
@@ -1923,6 +1994,7 @@ export type ValidatorEntry<T> = {
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
+    isReadonly?: boolean;
     preprocessors: PreprocessorEntry<T>[];
     validators: ValidatorEntry<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
@@ -2193,6 +2265,11 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      */
     protected get hasDefault(): boolean;
     /**
+     * Whether this schema is marked as readonly.
+     * Type-level only — no runtime enforcement.
+     */
+    protected get isReadonly(): boolean;
+    /**
      * Resolves the default value. If the stored default is a function,
      * it is called to produce the value (useful for mutable defaults).
      */
@@ -2260,6 +2337,11 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
          * will be considered as valid).
          */
         isRequired: boolean;
+        /**
+         * If set to \`true\`, the inferred type is marked as readonly.
+         * Type-level only — no runtime enforcement.
+         */
+        isReadonly: boolean;
         /**
          * Array of preprocessor functions
          */
@@ -2334,6 +2416,24 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * \`\`\`
      */
     brand<TBrand extends string | symbol>(_name?: TBrand): any;
+    /**
+     * Marks the inferred type as readonly. For objects, produces \`Readonly<T>\`.
+     * For arrays, produces \`ReadonlyArray<T>\`. Primitives are unchanged.
+     * Type-level only — no runtime enforcement.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = object({ name: string(), age: number() }).readonly();
+     * type T = InferType<typeof schema>; // Readonly<{ name: string; age: number }>
+     * \`\`\`
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = array(string()).readonly();
+     * type T = InferType<typeof schema>; // ReadonlyArray<string>
+     * \`\`\`
+     */
+    readonly(): any;
     /**
      * Makes schema required (consider \`null\` and \`undefined\` as invalid objects for this schema)
      * @param errorMessage - optional custom error message or provider for the 'is required' validation error
@@ -2589,6 +2689,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         validators: ValidatorEntry<TResult>[];
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
         extensions: {
             [x: string]: unknown;
@@ -2651,6 +2752,14 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     brand<TBrand extends string | symbol>(_name?: TBrand): StringSchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
     }, TRequired, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<string>\`. Since strings are
+     * already immutable this is an identity operation, but it sets the
+     * \`isReadonly\` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): StringSchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
     /**
      * Set minimal length of the valid value for schema.
      * @param length minimum string length
@@ -2833,6 +2942,7 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         options: TOptions;
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
@@ -2893,6 +3003,10 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
     brand<TBrand extends string | symbol>(_name?: TBrand): UnionSchemaBuilder<TOptions, TRequired, (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    readonly(): UnionSchemaBuilder<TOptions, TRequired, Readonly<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
     /**
      * Adds a new schema option described by \`schema\`.
      * schema must be an instance of \`SchemaBuilder\` class ancestor.
