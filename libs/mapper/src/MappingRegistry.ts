@@ -262,8 +262,8 @@ type MappingEntry = {
  * Returns null if no valid element mapper can be resolved.
  */
 function resolveElementMapper(
-    sourceElementSchema: SchemaBuilder<any, any>,
-    targetElementSchema: SchemaBuilder<any, any>,
+    sourceElementSchema: SchemaBuilder<any, any, any>,
+    targetElementSchema: SchemaBuilder<any, any, any>,
     registry: MappingRegistry<any> | undefined
 ): ((element: any) => Promise<any>) | null {
     // Both element schemas are ObjectSchemaBuilder: look up registered mapper
@@ -397,7 +397,7 @@ export class PropertyMappingBuilder<
     public from<
         TReturn extends {
             [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
-                getSchema(): SchemaBuilder<any, any>;
+                getSchema(): SchemaBuilder<any, any, any>;
                 setValue: (obj: any, value: any) => any;
                 getValue: (obj: any) => {
                     value?: any;

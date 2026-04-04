@@ -44,9 +44,10 @@ export class BooleanSchemaBuilder<
     TResult = boolean,
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {},
     TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType
-> extends SchemaBuilder<TFinalResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TFinalResult, TRequired, THasDefault, TExtensions> {
     #equalsTo?: boolean;
     #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
         BooleanSchemaBuilder<TResult, TRequired>
@@ -105,7 +106,8 @@ export class BooleanSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): BooleanSchemaBuilder<TResult, true, T, TExtensions> & TExtensions {
+    ): BooleanSchemaBuilder<TResult, true, T, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -118,6 +120,7 @@ export class BooleanSchemaBuilder<
         TResult,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -214,20 +217,23 @@ export class BooleanSchemaBuilder<
         // Fast path: no preprocessors or custom validators
         if (this.canSkipPreValidation) {
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue() as typeof object;
+                } else if (!this.isRequired) {
                     return { valid: true, object: object };
+                } else {
+                    return {
+                        valid: false,
+                        errors: [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object as TFinalResult
+                                )
+                            }
+                        ]
+                    };
                 }
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: this.getValidationErrorMessageSync(
-                                this.requiredErrorMessage,
-                                object as TFinalResult
-                            )
-                        }
-                    ]
-                };
             }
 
             const violation = this.#getConstraintViolation(object);
@@ -249,7 +255,7 @@ export class BooleanSchemaBuilder<
                     {
                         message: this.getValidationErrorMessageSync(
                             violation.provider,
-                            object as TFinalResult
+                            object as unknown as TFinalResult
                         )
                     }
                 ]
@@ -308,7 +314,13 @@ export class BooleanSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): BooleanSchemaBuilder<TResult, true, TExplicitType, TExtensions> &
+    ): BooleanSchemaBuilder<
+        TResult,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -320,10 +332,35 @@ export class BooleanSchemaBuilder<
         TResult,
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TFinalResult | (() => TFinalResult)
+    ): BooleanSchemaBuilder<TResult, true, TExplicitType, true, TExtensions> &
+        TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -335,6 +372,7 @@ export class BooleanSchemaBuilder<
         TResult,
         TRequired,
         TFinalResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -362,6 +400,7 @@ export class BooleanSchemaBuilder<
             T,
             TRequired,
             TExplicitType,
+            THasDefault,
             TExtensions
         > &
             TExtensions;
@@ -374,6 +413,7 @@ export class BooleanSchemaBuilder<
         boolean,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

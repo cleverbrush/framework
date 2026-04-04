@@ -35,7 +35,7 @@ export type ElementValidationResult<
         any
     >
         ? UnionSchemaValidationResult<InferType<TElementSchema>, UOptions>
-        : TElementSchema extends ObjectSchemaBuilder<any, any, any, any>
+        : TElementSchema extends ObjectSchemaBuilder<any, any, any, any, any>
           ? ObjectSchemaValidationResult<
                 InferType<TElementSchema>,
                 TElementSchema
@@ -89,6 +89,7 @@ export class ArraySchemaBuilder<
     TElementSchema extends SchemaBuilder<any, any, any>,
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {},
     TResult = TExplicitType extends undefined
         ? TElementSchema extends undefined
@@ -97,7 +98,7 @@ export class ArraySchemaBuilder<
               ? Array<InferType<SchemaBuilder<T1, T2>>>
               : never
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
@@ -165,7 +166,8 @@ export class ArraySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): ArraySchemaBuilder<TElementSchema, true, T, TExtensions> & TExtensions {
+    ): ArraySchemaBuilder<TElementSchema, true, T, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -178,6 +180,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -349,7 +352,9 @@ export class ArraySchemaBuilder<
         ) {
             // Required / optional check
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue();
+                } else if (!this.isRequired) {
                     const self = this;
                     return {
                         valid: true,
@@ -360,8 +365,9 @@ export class ArraySchemaBuilder<
                                 .getNestedErrors();
                         }
                     } as any;
+                } else {
+                    return this.#validateArrayFull(object, context);
                 }
-                return this.#validateArrayFull(object, context);
             }
 
             if (!Array.isArray(object)) {
@@ -634,7 +640,13 @@ export class ArraySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): ArraySchemaBuilder<TElementSchema, true, TExplicitType, TExtensions> &
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -646,10 +658,41 @@ export class ArraySchemaBuilder<
         TElementSchema,
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TResult | (() => TResult)
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
+        TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -661,6 +704,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -707,7 +751,13 @@ export class ArraySchemaBuilder<
      */
     public of<TSchema extends SchemaBuilder<any, any, any>>(
         schema: TSchema
-    ): ArraySchemaBuilder<TSchema, TRequired, TExplicitType, TExtensions> &
+    ): ArraySchemaBuilder<
+        TSchema,
+        TRequired,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return ArraySchemaBuilder.create({
             ...this.introspect(),
@@ -723,6 +773,7 @@ export class ArraySchemaBuilder<
         any,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -747,6 +798,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -766,6 +818,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -791,6 +844,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -810,6 +864,7 @@ export class ArraySchemaBuilder<
         TElementSchema,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

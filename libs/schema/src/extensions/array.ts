@@ -33,6 +33,7 @@ type ArrayExtReturn<
     TElementSchema,
     true,
     undefined,
+    false,
     ArrayBuiltinExtensions<TElementSchema>
 > &
     ArrayBuiltinExtensions<TElementSchema> &

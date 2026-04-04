@@ -92,15 +92,15 @@ import { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
  * @internal Not exported — used only by the extension type machinery.
  */
 type BuilderMap = {
-    string: StringSchemaBuilder<any, any, any>;
-    number: NumberSchemaBuilder<any, any, any>;
-    boolean: BooleanSchemaBuilder<any, any, any, any, any>;
-    date: DateSchemaBuilder<any, any, any>;
-    object: ObjectSchemaBuilder<any, any, any, any>;
-    array: ArraySchemaBuilder<any, any, any, any, any>;
-    union: UnionSchemaBuilder<any, any, any, any>;
-    func: FunctionSchemaBuilder<any, any, any, any>;
-    any: AnySchemaBuilder<any, any, any, any>;
+    string: StringSchemaBuilder<any, any, any, any>;
+    number: NumberSchemaBuilder<any, any, any, any>;
+    boolean: BooleanSchemaBuilder<any, any, any, any, any, any>;
+    date: DateSchemaBuilder<any, any, any, any>;
+    object: ObjectSchemaBuilder<any, any, any, any, any>;
+    array: ArraySchemaBuilder<any, any, any, any, any, any>;
+    union: UnionSchemaBuilder<any, any, any, any, any>;
+    func: FunctionSchemaBuilder<any, any, any, any, any>;
+    any: AnySchemaBuilder<any, any, any, any, any>;
 };
 
 type BuilderTypeName = keyof BuilderMap;
@@ -283,26 +283,26 @@ export type CleanExtended<TBuilder, TExt> = TBuilder &
 // -- Factory types that return builders with corrected extension methods ------
 
 type ExtendedStringFactory<TExt> = {
-    (): CleanExtended<StringSchemaBuilder<string, true, TExt>, TExt>;
+    (): CleanExtended<StringSchemaBuilder<string, true, false, TExt>, TExt>;
     <T extends string>(
         equals: T
-    ): CleanExtended<StringSchemaBuilder<T, true, TExt>, TExt>;
+    ): CleanExtended<StringSchemaBuilder<T, true, false, TExt>, TExt>;
 };
 
 type ExtendedNumberFactory<TExt> = {
-    (): CleanExtended<NumberSchemaBuilder<number, true, TExt>, TExt>;
+    (): CleanExtended<NumberSchemaBuilder<number, true, false, TExt>, TExt>;
     <T extends number>(
         equals: T
-    ): CleanExtended<NumberSchemaBuilder<T, true, TExt>, TExt>;
+    ): CleanExtended<NumberSchemaBuilder<T, true, false, TExt>, TExt>;
 };
 
 type ExtendedBooleanFactory<TExt> = () => CleanExtended<
-    BooleanSchemaBuilder<boolean, true, undefined, TExt>,
+    BooleanSchemaBuilder<boolean, true, undefined, false, TExt>,
     TExt
 >;
 
 type ExtendedDateFactory<TExt> = () => CleanExtended<
-    DateSchemaBuilder<Date, true, TExt>,
+    DateSchemaBuilder<Date, true, false, TExt>,
     TExt
 >;
 
@@ -310,28 +310,28 @@ type ExtendedObjectFactory<TExt> = <
     P extends Record<string, SchemaBuilder<any, any, any>>
 >(
     properties?: P
-) => CleanExtended<ObjectSchemaBuilder<P, true, undefined, TExt>, TExt>;
+) => CleanExtended<ObjectSchemaBuilder<P, true, undefined, false, TExt>, TExt>;
 
 type ExtendedArrayFactory<TExt> = <
     TElementSchema extends SchemaBuilder<any, any, any>
 >(
     elementSchema?: TElementSchema
 ) => CleanExtended<
-    ArraySchemaBuilder<TElementSchema, true, undefined, TExt>,
+    ArraySchemaBuilder<TElementSchema, true, undefined, false, TExt>,
     TExt
 >;
 
 type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any>>(
     schema: T
-) => CleanExtended<UnionSchemaBuilder<[T], true, undefined, TExt>, TExt>;
+) => CleanExtended<UnionSchemaBuilder<[T], true, undefined, false, TExt>, TExt>;
 
 type ExtendedFuncFactory<TExt> = () => CleanExtended<
-    FunctionSchemaBuilder<true, undefined, TExt>,
+    FunctionSchemaBuilder<true, undefined, false, TExt>,
     TExt
 >;
 
 type ExtendedAnyFactory<TExt> = () => CleanExtended<
-    AnySchemaBuilder<true, undefined, TExt>,
+    AnySchemaBuilder<true, undefined, false, TExt>,
     TExt
 >;
 

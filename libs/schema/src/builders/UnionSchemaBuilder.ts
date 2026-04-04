@@ -155,12 +155,14 @@ export class UnionSchemaBuilder<
     TOptions extends readonly SchemaBuilder<any, any, any>[],
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {}
 > extends SchemaBuilder<
     TExplicitType extends undefined
         ? SchemaArrayToUnion<TOptions>
         : TExplicitType,
     TRequired,
+    THasDefault,
     TExtensions
 > {
     #options!: TOptions;
@@ -287,7 +289,8 @@ export class UnionSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): UnionSchemaBuilder<TOptions, true, T, TExtensions> & TExtensions {
+    ): UnionSchemaBuilder<TOptions, true, T, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -300,6 +303,7 @@ export class UnionSchemaBuilder<
         TOptions,
         TRequired,
         undefined,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -445,7 +449,9 @@ export class UnionSchemaBuilder<
         ) {
             // Required / optional check
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue();
+                } else if (!this.isRequired) {
                     return this.#fastResult(
                         true,
                         object,
@@ -453,21 +459,22 @@ export class UnionSchemaBuilder<
                         object,
                         context
                     );
+                } else {
+                    return this.#fastResult(
+                        false,
+                        undefined,
+                        [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object as any
+                                )
+                            }
+                        ],
+                        object,
+                        context
+                    );
                 }
-                return this.#fastResult(
-                    false,
-                    undefined,
-                    [
-                        {
-                            message: this.getValidationErrorMessageSync(
-                                this.requiredErrorMessage,
-                                object as any
-                            )
-                        }
-                    ],
-                    object,
-                    context
-                );
             }
 
             // Discriminated union: O(1) lookup, no setup overhead
@@ -773,7 +780,13 @@ export class UnionSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): UnionSchemaBuilder<TOptions, true, TExplicitType, TExtensions> &
+    ): UnionSchemaBuilder<
+        TOptions,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -785,10 +798,41 @@ export class UnionSchemaBuilder<
         TOptions,
         false,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value:
+            | (TExplicitType extends undefined
+                  ? SchemaArrayToUnion<TOptions>
+                  : TExplicitType)
+            | (() => TExplicitType extends undefined
+                  ? SchemaArrayToUnion<TOptions>
+                  : TExplicitType)
+    ): UnionSchemaBuilder<TOptions, true, TExplicitType, true, TExtensions> &
+        TExtensions {
+        return super.default(value as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): UnionSchemaBuilder<
+        TOptions,
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -802,6 +846,7 @@ export class UnionSchemaBuilder<
         (TExplicitType extends undefined
             ? SchemaArrayToUnion<TOptions>
             : TExplicitType) & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -819,6 +864,7 @@ export class UnionSchemaBuilder<
         [...TOptions, T],
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -844,6 +890,7 @@ export class UnionSchemaBuilder<
         TakeExceptIndex<TOptions, T>,
         TRequired,
         TExplicitType,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -867,7 +914,13 @@ export class UnionSchemaBuilder<
         infer _,
         ...infer TRest extends SchemaBuilder<any, any, any>[]
     ]
-        ? UnionSchemaBuilder<TRest, TRequired, TExplicitType, TExtensions> &
+        ? UnionSchemaBuilder<
+              TRest,
+              TRequired,
+              TExplicitType,
+              THasDefault,
+              TExtensions
+          > &
               TExtensions
         : never {
         return this.removeOption(0) as any;
@@ -880,7 +933,13 @@ export class UnionSchemaBuilder<
      */
     public reset<T extends SchemaBuilder<any, any, any>>(
         schema: T
-    ): UnionSchemaBuilder<[T], TRequired, TExplicitType, TExtensions> &
+    ): UnionSchemaBuilder<
+        [T],
+        TRequired,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (!(schema instanceof SchemaBuilder)) {
             throw new Error(

@@ -47,8 +47,9 @@ type LazySchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class LazySchemaBuilder<
     TResult = any,
     TRequired extends boolean = true,
+    THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     #getter: () => SchemaBuilder<TResult, any, any>;
     #resolvedSchema: SchemaBuilder<TResult, any, any> | null = null;
 
@@ -184,7 +185,7 @@ export class LazySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): LazySchemaBuilder<T, true, TExtensions> & TExtensions {
+    ): LazySchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -193,7 +194,12 @@ export class LazySchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): LazySchemaBuilder<TResult, TRequired, TExtensions> &
+    public clearHasType(): LazySchemaBuilder<
+        TResult,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -205,16 +211,44 @@ export class LazySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): LazySchemaBuilder<TResult, true, TExtensions> & TExtensions {
+    ): LazySchemaBuilder<TResult, true, THasDefault, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): LazySchemaBuilder<TResult, false, TExtensions> &
+    public optional(): LazySchemaBuilder<
+        TResult,
+        false,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TResult | (() => TResult)
+    ): LazySchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): LazySchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -225,6 +259,7 @@ export class LazySchemaBuilder<
     ): LazySchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -266,7 +301,7 @@ export class LazySchemaBuilder<
  */
 export function lazy<TResult>(
     getter: () => SchemaBuilder<TResult, any, any>
-): LazySchemaBuilder<TResult, true, {}> {
+): LazySchemaBuilder<TResult, true, false, {}> {
     return LazySchemaBuilder.create({
         type: 'lazy',
         isRequired: true,

@@ -30,9 +30,10 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class AnySchemaBuilder<
     TRequired extends boolean = true,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
     TExtensions = {},
     TResult = TExplicitType extends undefined ? any : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     /**
      * @hidden
      */
@@ -52,7 +53,7 @@ export class AnySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): AnySchemaBuilder<true, T, TExtensions> & TExtensions {
+    ): AnySchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -61,7 +62,12 @@ export class AnySchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): AnySchemaBuilder<TRequired, undefined, TExtensions> &
+    public clearHasType(): AnySchemaBuilder<
+        TRequired,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -123,16 +129,44 @@ export class AnySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): AnySchemaBuilder<true, TExplicitType, TExtensions> & TExtensions {
+    ): AnySchemaBuilder<true, TExplicitType, THasDefault, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): AnySchemaBuilder<false, TExplicitType, TExtensions> &
+    public optional(): AnySchemaBuilder<
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TResult | (() => TResult)
+    ): AnySchemaBuilder<true, TExplicitType, true, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): AnySchemaBuilder<
+        TRequired,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -143,6 +177,7 @@ export class AnySchemaBuilder<
     ): AnySchemaBuilder<
         TRequired,
         TResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
         TExtensions
     > &
         TExtensions {

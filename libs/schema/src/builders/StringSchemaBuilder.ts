@@ -70,8 +70,9 @@ type StringSchemaBuilderCreateProps<
 export class StringSchemaBuilder<
     TResult = string,
     TRequired extends boolean = true,
+    THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, TExtensions> {
+> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -304,7 +305,7 @@ export class StringSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): StringSchemaBuilder<T, true, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -313,7 +314,12 @@ export class StringSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): StringSchemaBuilder<string, TRequired, TExtensions> &
+    public clearHasType(): StringSchemaBuilder<
+        string,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -443,20 +449,23 @@ export class StringSchemaBuilder<
         if (this.canSkipPreValidation) {
             // Required / optional check
             if (typeof object === 'undefined' || object === null) {
-                if (!this.isRequired) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue();
+                } else if (!this.isRequired) {
                     return { valid: true, object: object };
+                } else {
+                    return {
+                        valid: false,
+                        errors: [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object
+                                )
+                            }
+                        ]
+                    };
                 }
-                return {
-                    valid: false,
-                    errors: [
-                        {
-                            message: this.getValidationErrorMessageSync(
-                                this.requiredErrorMessage,
-                                object
-                            )
-                        }
-                    ]
-                };
             }
 
             const violation = this.#getConstraintViolation(object);
@@ -549,14 +558,24 @@ export class StringSchemaBuilder<
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
-        }) as any as StringSchemaBuilder<T, TRequired, TExtensions> &
+        }) as any as StringSchemaBuilder<
+            T,
+            TRequired,
+            THasDefault,
+            TExtensions
+        > &
             TExtensions;
     }
 
     /**
      * Cancels `equals()` call.
      */
-    public clearEquals(): StringSchemaBuilder<string, TRequired, TExtensions> &
+    public clearEquals(): StringSchemaBuilder<
+        string,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -569,16 +588,44 @@ export class StringSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): StringSchemaBuilder<TResult, true, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, true, THasDefault, TExtensions> &
+        TExtensions {
         return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): StringSchemaBuilder<TResult, false, TExtensions> &
+    public optional(): StringSchemaBuilder<
+        TResult,
+        false,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TResult | (() => TResult)
+    ): StringSchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): StringSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
     }
 
     /**
@@ -589,6 +636,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -607,7 +655,8 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
         return this.createFromProps({
@@ -623,6 +672,7 @@ export class StringSchemaBuilder<
     public clearMinLength(): StringSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -645,7 +695,8 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
         return this.createFromProps({
@@ -661,6 +712,7 @@ export class StringSchemaBuilder<
     public clearMaxLength(): StringSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -685,6 +737,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult extends string ? `${T}${TResult}` : TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -703,6 +756,7 @@ export class StringSchemaBuilder<
     public clearStartsWith(): StringSchemaBuilder<
         string,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -727,6 +781,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult extends string ? `${TResult}${T}` : TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -745,6 +800,7 @@ export class StringSchemaBuilder<
     public clearEndsWith(): StringSchemaBuilder<
         string,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {
@@ -767,7 +823,8 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+        TExtensions {
         if (!(regexp instanceof RegExp)) throw new Error('regexp expected');
         return this.createFromProps({
             ...this.introspect(),
@@ -782,6 +839,7 @@ export class StringSchemaBuilder<
     public clearMatches(): StringSchemaBuilder<
         TResult,
         TRequired,
+        THasDefault,
         TExtensions
     > &
         TExtensions {

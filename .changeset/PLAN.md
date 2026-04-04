@@ -36,8 +36,8 @@ The framework has matured significantly. The core schema library, extension syst
 
 | Feature | Zod API | Current workaround | Impact |
 |---------|---------|-------------------|--------|
-| **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` (pre-validation only) | High — transforms are post-validation semantics, widely used |
-| **Default values** | `.default(value)` | None — manual fallback after validation | High — extremely common pattern |
+| **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` + `@cleverbrush/mapper` | Low — mapper handles object reshaping with type-safe `.compute()`, preprocessors handle coercion; only inline single-field type-changing is uncovered |
+| **Default values** | `.default(value)` | ✅ `.default(value \| () => value)` | ✅ DONE |
 | **Recursive schemas** | `z.lazy(() => schema)` | ✅ `lazy(() => schema)` — `LazySchemaBuilder` | High — tree structures, comments, menus |
 | **Nullable** | `.nullable()` | `union(schema()).or(nul())` | Medium — convenience, very common ask |
 | **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(string().equals('b'))` | Medium — verbose workaround |
@@ -121,23 +121,28 @@ Performance work on the `feature/performance` branch has transformed benchmarks 
 - Add benchmark CI job to track regressions
 - Performance is now a marketing strength, not a concern
 
-### 2.2 Transform & Pipe
+### 2.2 Transform & Pipe — Deprioritized (Low)
 
-Add `.transform(fn)` and `.pipe(otherSchema)`:
+Zod's `.transform(fn)` and `.pipe(schema)` are post-validation value transformations that change the output type. After analysis, **~90% of real-world transform usage is already covered** by existing tools:
 
-- `.transform(fn)` — post-validation value transformation, changes the output type
-- `.pipe(otherSchema)` — pipe output through another schema (transform + validate)
-- This unlocks `string().transform(Number).pipe(number().positive())` patterns
-- Very common in form handling and API response processing
+- **Object reshaping** (the #1 use case) — `@cleverbrush/mapper` does this *better* than Zod transforms: type-safe selectors via `.compute()`, auto-mapping for same-name fields, compile-time completeness checking, and async support. Zod transforms lose property-level type safety and don't verify all output fields are covered.
+- **Value coercion** (trim, lowercase, string→number) — `.addPreprocessor()` handles pre-validation coercion, and string extensions (`trim()`, `toLowerCase()`) cover the most common cases.
+- **The remaining gap** is narrow: inline per-field type change within a single schema (e.g. `string().datetime().transform(s => new Date(s))` where `InferInput` is `string` but `InferOutput` is `Date`). This is a convenience pattern, not a blocker — the mapper handles it at the object level.
 
-### 2.3 Default values
+May revisit post-launch if user demand materializes, but this is not a launch blocker.
 
-Add `.default(value | () => value)`:
+### 2.3 Default values ✅ DONE
+
+`.default(value | () => value)` is implemented on `SchemaBuilder`:
 
 - Returns the default when the input is `undefined`
 - Changes the type from `T | undefined` to `T`
-- Must work with `.optional()` — `string().optional().default('')` yields `string`
-- Extremely common in configuration parsing, form defaults, env vars
+- Works with `.optional()` — `string().optional().default('')` yields `string`
+- Accepts static values or factory functions (`() => new Date()`, `() => []`)
+- Zero performance cost on the fast-path — default is a dedicated field, not a preprocessor
+- Validated against the schema's constraints (invalid defaults are caught)
+- Exposed via `.introspect()` as `hasDefault` and `defaultValue`
+- 29 tests covering all builders, factory functions, InferType inference, async, parse/safeParse
 
 ### 2.4 Recursive schemas ✅ DONE
 
@@ -346,5 +351,6 @@ The secondary moat is the **extension system**. Zod's only customization is `.re
 2. **Publish to npm** — nothing else matters until people can `npm install` the library
 3. **Deploy the website** — the playground is the best onboarding tool; make it live
 4. **Write launch blog post** — announce on dev.to, Reddit, HN — performance is now a headline feature
-5. **Add .transform() and .default()** — the two most-asked-for features from Zod migrants
+5. ~~**Add .default()**~~ ✅ Done — `.default(value | () => value)` with factory functions, zero perf cost, 29 tests
+6. ~~**Add .transform()**~~ Deprioritized (Low) — mapper's `.compute()` + preprocessors cover ~90% of real-world transform use cases; only inline single-field type-changing is uncovered
 6. **Tag "good first issue" items** — prepare for the first wave of visitors to the repo

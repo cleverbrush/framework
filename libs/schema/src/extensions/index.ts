@@ -42,6 +42,7 @@ export { type StringBuiltinExtensions, stringExtensions } from './string.js';
 export type ExtendedString<T extends string = string> = StringSchemaBuilder<
     T,
     true,
+    false,
     StringBuiltinExtensions<T>
 > &
     StringBuiltinExtensions<T> &
@@ -51,6 +52,7 @@ export type ExtendedString<T extends string = string> = StringSchemaBuilder<
 export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<
     T,
     true,
+    false,
     NumberBuiltinExtensions<T>
 > &
     NumberBuiltinExtensions<T> &
@@ -67,6 +69,7 @@ export type ExtendedArray<
     TElementSchema,
     true,
     undefined,
+    false,
     ArrayBuiltinExtensions<TElementSchema>
 > &
     ArrayBuiltinExtensions<TElementSchema> &

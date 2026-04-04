@@ -44,7 +44,18 @@ export const EXAMPLE_GROUPS = [
             'deep-nesting-errors'
         ]
     },
-    { label: 'Extensions', ids: ['builtin-extensions', 'custom-extensions'] }
+    { label: 'Extensions', ids: ['builtin-extensions', 'custom-extensions'] },
+    {
+        label: 'Default Values',
+        ids: [
+            'default-static',
+            'default-factory',
+            'default-optional',
+            'default-object',
+            'default-validation',
+            'default-introspect'
+        ]
+    }
 ];
 
 export const examples: Example[] = [
@@ -809,6 +820,124 @@ const result = ThemeSchema.validate({
 `,
         testData:
             '{ "primaryColor": "#ff00aa", "secondaryColor": "#00ff00", "name": "Ocean" }'
+    },
+
+    // ── Default Values ──────────────────────────────
+    {
+        id: 'default-static',
+        title: 'Static Defaults',
+        description:
+            'Use <code>.default(value)</code> to provide a fallback when input is <code>undefined</code>. The default value is used during validation.',
+        group: 'Default Values',
+        code: `import { string } from '@cleverbrush/schema';
+
+// When input is undefined, the static default value is used
+const Name = string().default('Anonymous');
+
+// Try changing the test data to {} to see the default kick in
+const result = Name.validate(undefined as any);
+// result.object === 'Anonymous'
+`,
+        testData: '"Alice"'
+    },
+    {
+        id: 'default-factory',
+        title: 'Factory Defaults',
+        description:
+            'Pass a function to <code>.default()</code> for mutable defaults like arrays or dates. A fresh value is created on every validation.',
+        group: 'Default Values',
+        code: `import { array, string } from '@cleverbrush/schema';
+
+// Factory function creates a fresh array each time
+const Tags = array(string()).default(() => ['general']);
+
+// Validate with undefined — the factory produces the default
+const result = Tags.validate(undefined as any);
+// result.object is ['general']
+`,
+        testData: 'null'
+    },
+    {
+        id: 'default-optional',
+        title: 'Optional + Default',
+        description:
+            'Combine <code>.optional()</code> with <code>.default()</code> to accept <code>undefined</code> input while removing it from the output type.',
+        group: 'Default Values',
+        code: `import { number, InferType } from '@cleverbrush/schema';
+
+// .optional() allows undefined, .default() fills it in
+const Port = number().optional().default(3000);
+
+// The inferred type is number — not number | undefined
+type PortType = InferType<typeof Port>;
+
+const result = Port.validate(undefined as any);
+// result.object === 3000
+`,
+        testData: '8080'
+    },
+    {
+        id: 'default-object',
+        title: 'Object with Defaults',
+        description:
+            'Apply <code>.default()</code> to individual object properties to build configuration schemas with sensible fallbacks.',
+        group: 'Default Values',
+        code: `import { object, string, number, array, date, InferType } from '@cleverbrush/schema';
+
+const Config = object({
+    /** Server hostname */
+    host: string().default('localhost'),
+    /** Listening port */
+    port: number().default(8080),
+    /** Tags for categorisation */
+    tags: array(string()).default(() => []),
+    /** When the config was created */
+    createdAt: date().default(() => new Date())
+});
+
+type ConfigType = InferType<typeof Config>;
+// { host: string; port: number; tags: string[]; createdAt: Date }
+
+// Missing fields are filled with their defaults
+const result = Config.validate({});
+`,
+        testData: '{ "host": "0.0.0.0", "port": 3000 }'
+    },
+    {
+        id: 'default-validation',
+        title: 'Default Validation',
+        description:
+            'Default values are validated against the schema constraints. An invalid default produces a validation error.',
+        group: 'Default Values',
+        code: `import { number } from '@cleverbrush/schema';
+
+// The default value -1 violates the .min(0) constraint
+const Bad = number().min(0).default(-1);
+
+// Validation fails because the default itself is invalid
+const result = Bad.validate(undefined as any);
+// result.valid === false
+`,
+        testData: 'null'
+    },
+    {
+        id: 'default-introspect',
+        title: 'Introspecting Defaults',
+        description:
+            'Use <code>.introspect()</code> to inspect whether a schema has a default and what value it holds.',
+        group: 'Default Values',
+        code: `import { string } from '@cleverbrush/schema';
+
+const schema = string().default('hello');
+
+// Introspection reveals the default configuration
+const info = schema.introspect();
+// info.hasDefault === true
+// info.defaultValue === 'hello'
+
+const result = schema.validate(undefined as any);
+`,
+        testData: '"world"'
     }
 ];
 

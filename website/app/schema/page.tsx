@@ -224,6 +224,7 @@ console.log(bad.errors);
                                     </td>
                                     <td>
                                         <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>,{' '}
                                         <code>.addValidator(fn)</code>
                                     </td>
                                 </tr>
@@ -244,7 +245,8 @@ console.log(bad.errors);
                                         <code>.uuid()</code>, <code>.ip()</code>
                                         , <code>.trim()</code>,{' '}
                                         <code>.toLowerCase()</code>,{' '}
-                                        <code>.nonempty()</code>
+                                        <code>.nonempty()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -271,7 +273,8 @@ console.log(bad.errors);
                                     </td>
                                     <td>Boolean values (true / false).</td>
                                     <td>
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -283,7 +286,8 @@ console.log(bad.errors);
                                         a valid Date instance.
                                     </td>
                                     <td>
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -295,7 +299,8 @@ console.log(bad.errors);
                                         props in component schemas.
                                     </td>
                                     <td>
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -308,7 +313,8 @@ console.log(bad.errors);
                                         interop.
                                     </td>
                                     <td>
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -324,7 +330,8 @@ console.log(bad.errors);
                                         <code>.validate(data)</code>,{' '}
                                         <code>.validateAsync(data)</code>,{' '}
                                         <code>.addProps({'{...}'})</code>,{' '}
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -354,7 +361,8 @@ console.log(bad.errors);
                                     <td>
                                         <code>.validate(data)</code>,{' '}
                                         <code>.validateAsync(data)</code>,{' '}
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -372,7 +380,8 @@ console.log(bad.errors);
                                         <code>.resolve()</code>,{' '}
                                         <code>.optional()</code>,{' '}
                                         <code>.addValidator(fn)</code>,{' '}
-                                        <code>.addPreprocessor(fn)</code>
+                                        <code>.addPreprocessor(fn)</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                             </tbody>
@@ -969,6 +978,81 @@ console.log(cityResult.value); // 'NYC'`)
                     </pre>
                 </div>
 
+                {/* ── Default Values ──────────────────────────────── */}
+                <div className="card">
+                    <h2>Default Values</h2>
+                    <a
+                        href="/playground/default-values"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
+                    <p>
+                        Every schema builder supports{' '}
+                        <code>.default(value)</code>. When the input is{' '}
+                        <code>undefined</code>, the default value is used
+                        instead — and the result is still validated against the
+                        schema&apos;s constraints.
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { string, number, array, date, object, InferType } from '@cleverbrush/schema';
+
+// Static default
+const Name = string().default('Anonymous');
+Name.validate(undefined); // { valid: true, object: 'Anonymous' }
+Name.validate('Alice');   // { valid: true, object: 'Alice' }
+
+// Factory function — useful for mutable defaults like arrays or dates
+const Tags = array(string()).default(() => []);
+
+// Works with .optional() — .default() removes undefined from the inferred type
+const Port = number().optional().default(3000);
+type Port = InferType<typeof Port>; // number`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Use a factory function for mutable values (arrays,
+                        objects, dates) to avoid shared references:
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const Config = object({
+  host: string().default('localhost'),
+  port: number().default(8080),
+  tags: array(string()).default(() => []),
+  createdAt: date().default(() => new Date())
+});
+
+type Config = InferType<typeof Config>;
+// { host: string; port: number; tags: string[]; createdAt: Date }
+// All fields are non-optional — defaults fill in missing values`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Default values are exposed via{' '}
+                        <code>.introspect()</code>, making them available for
+                        form generation, serialization, and other tooling:
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const schema = string().default('hello');
+const info = schema.introspect();
+console.log(info.hasDefault);    // true
+console.log(info.defaultValue);  // 'hello'`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
                 {/* ── Extensions ──────────────────────────────────── */}
                 <div className="card">
                     <h2>Extensions</h2>
@@ -1455,6 +1539,13 @@ const s = withExtensions(myCustomExtension);`)
                                     <td className="check">✓</td>
                                     <td className="check">✓</td>
                                 </tr>
+                                <tr>
+                                    <td>Default values</td>
+                                    <td className="check">✓</td>
+                                    <td className="check">✓</td>
+                                    <td className="check">✓</td>
+                                    <td className="check">✓</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -1482,6 +1573,7 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>Accepts any value</td>
                                     <td>
                                         <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>,{' '}
                                         <code>.addValidator(fn)</code>
                                     </td>
                                 </tr>
@@ -1499,7 +1591,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.uuid()</code>, <code>.ip()</code>
                                         , <code>.trim()</code>,{' '}
                                         <code>.toLowerCase()</code>,{' '}
-                                        <code>.nonempty()</code>
+                                        <code>.nonempty()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1514,7 +1607,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.positive()</code>,{' '}
                                         <code>.negative()</code>,{' '}
                                         <code>.finite()</code>,{' '}
-                                        <code>.multipleOf(n)</code>
+                                        <code>.multipleOf(n)</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1523,7 +1617,8 @@ const s = withExtensions(myCustomExtension);`)
                                     </td>
                                     <td>Boolean schema builder</td>
                                     <td>
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1532,7 +1627,8 @@ const s = withExtensions(myCustomExtension);`)
                                     </td>
                                     <td>Date schema builder</td>
                                     <td>
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1541,7 +1637,8 @@ const s = withExtensions(myCustomExtension);`)
                                     </td>
                                     <td>Function schema builder</td>
                                     <td>
-                                        <code>.optional()</code>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1552,7 +1649,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>
                                         <code>.validate(data)</code>,{' '}
                                         <code>.validateAsync(data)</code>,{' '}
-                                        <code>.addProps({'{...}'})</code>
+                                        <code>.addProps({'{...}'})</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1565,7 +1663,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.maxLength(n)</code>,{' '}
                                         <code>.of(schema)</code>,{' '}
                                         <code>.nonempty()</code>,{' '}
-                                        <code>.unique()</code>
+                                        <code>.unique()</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1575,7 +1674,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>Union of schemas</td>
                                     <td>
                                         <code>.validate(data)</code>,{' '}
-                                        <code>.validateAsync(data)</code>
+                                        <code>.validateAsync(data)</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1589,7 +1689,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>
                                         <code>.resolve()</code>,{' '}
                                         <code>.optional()</code>,{' '}
-                                        <code>.addValidator(fn)</code>
+                                        <code>.addValidator(fn)</code>,{' '}
+                                        <code>.default(value)</code>
                                     </td>
                                 </tr>
                             </tbody>
