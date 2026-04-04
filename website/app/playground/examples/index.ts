@@ -825,21 +825,21 @@ const result = ThemeSchema.validate({
 const Name = string().default('Anonymous');
 
 console.log('--- Static default ---');
-console.log(Name.validate(undefined)); // valid: true, object: 'Anonymous'
+console.log(Name.validate(undefined as any)); // valid: true, object: 'Anonymous'
 console.log(Name.validate('Alice'));   // valid: true, object: 'Alice'
 
 // Factory function — useful for mutable defaults (arrays, dates)
 const Tags = array(string()).default(() => []);
 
 console.log('\\n--- Factory default ---');
-console.log(Tags.validate(undefined)); // valid: true, object: []
+console.log(Tags.validate(undefined as any)); // valid: true, object: []
 
 // Works with .optional() — removes undefined from the type
 const Port = number().optional().default(3000);
 type Port = InferType<typeof Port>; // number (not number | undefined)
 
 console.log('\\n--- Optional + default ---');
-console.log(Port.validate(undefined)); // valid: true, object: 3000
+console.log(Port.validate(undefined as any)); // valid: true, object: 3000
 console.log(Port.validate(8080));      // valid: true, object: 8080
 
 // Object with defaults — great for configuration
@@ -865,7 +865,7 @@ console.log(result);
 // Defaults are validated — invalid defaults are caught
 const Bad = number().min(0).default(-1);
 console.log('\\n--- Invalid default caught ---');
-console.log(Bad.validate(undefined)); // valid: false
+console.log(Bad.validate(undefined as any)); // valid: false
 
 // Introspection — defaults are visible via .introspect()
 const schema = string().default('hello');

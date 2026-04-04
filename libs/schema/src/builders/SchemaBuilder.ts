@@ -1080,6 +1080,10 @@ export abstract class SchemaBuilder<
              */
             extensions: { ...this.#extensions },
             /**
+             * Whether a default value (or factory) has been set on this schema.
+             */
+            hasDefault: this.#defaultValue !== undefined,
+            /**
              * The default value or factory function.
              */
             defaultValue: this.#defaultValue

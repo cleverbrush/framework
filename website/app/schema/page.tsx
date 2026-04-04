@@ -1008,10 +1008,9 @@ Name.validate('Alice');   // { valid: true, object: 'Alice' }
 // Factory function — useful for mutable defaults like arrays or dates
 const Tags = array(string()).default(() => []);
 
-// Works with .optional() — provides a runtime fallback for undefined
-// Note: with the current typings, InferType may still include undefined.
+// Works with .optional() — .default() removes undefined from the inferred type
 const Port = number().optional().default(3000);
-type Port = InferType<typeof Port>; // number | undefined`)
+type Port = InferType<typeof Port>; // number`)
                             }}
                         />
                     </pre>
