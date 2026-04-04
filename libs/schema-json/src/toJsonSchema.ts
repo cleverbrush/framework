@@ -86,12 +86,14 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
                 info.elements ?? [];
             const out: Out = {
                 type: 'array',
-                prefixItems: elements.map(convertNode)
+                prefixItems: elements.map(convertNode),
+                minItems: elements.length
             };
             if (info.restSchema) {
                 out['items'] = convertNode(info.restSchema);
             } else {
                 out['items'] = false;
+                out['maxItems'] = elements.length;
             }
             return out;
         }
