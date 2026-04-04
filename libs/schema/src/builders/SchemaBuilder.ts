@@ -53,6 +53,7 @@ export type Validator<T> = (
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
+    isReadonly?: boolean;
     preprocessors: Preprocessor<T>[];
     validators: Validator<T>[];
 };
@@ -83,6 +84,7 @@ export abstract class SchemaBuilder<
     TRequired extends boolean = true
 > {
     #isRequired = true;
+    #isReadonly = false;
     #preprocessors: Preprocessor<TResult>[] = [];
     #validators: Validator<TResult>[] = [];
     #type = 'base';
@@ -314,6 +316,10 @@ export abstract class SchemaBuilder<
              */
             isRequired: this.#isRequired,
             /**
+             * If set to `true`, the inferred TypeScript type will be wrapped in `Readonly<>`.
+             */
+            isReadonly: this.#isReadonly,
+            /**
              * Array of preprocessor functions
              */
             preprocessors: [
@@ -407,9 +413,10 @@ export abstract class SchemaBuilder<
     ): Promise<ValidationResult<any>>;
 
     protected constructor(props: SchemaBuilderProps<TResult>) {
-        const { type, preprocessors, validators, isRequired } = props;
+        const { type, preprocessors, validators, isRequired, isReadonly } = props;
         this.type = type;
         if (typeof isRequired === 'boolean') this.isRequired = isRequired;
+        if (typeof isReadonly === 'boolean') this.#isReadonly = isReadonly;
         if (Array.isArray(preprocessors)) {
             this.#preprocessors = [...preprocessors];
         }

@@ -6,6 +6,7 @@ export { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
 export { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 export { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 export { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
+export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
 export { SchemaBuilder } from './builders/SchemaBuilder.js';
 
@@ -23,4 +24,5 @@ export { func } from './builders/FunctionSchemaBuilder.js';
 export { number } from './builders/NumberSchemaBuilder.js';
 export { object } from './builders/ObjectSchemaBuilder.js';
 export { string } from './builders/StringSchemaBuilder.js';
+export { tuple } from './builders/TupleSchemaBuilder.js';
 export { union } from './builders/UnionSchemaBuilder.js';

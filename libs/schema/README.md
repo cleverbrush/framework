@@ -66,6 +66,7 @@ There are several schema types available out of the box:
 -   `object` - object schema (you can define list of properties, along with schemas for every property).
 -   `date` - defines object of JavaScript `Date` class.
 -   `array` - defines array, you can define a schema for Array emelement.
+-   `tuple` - defines a fixed-length array where each position has its own type constraint.
 -   `union` - allows to define unions. e.g. `string | number` types (or any combination off schema types from this list).
 -   custom schema types. You just need to inherit `SchemaBuilder` abstract class to implement your own schema type.
 
@@ -81,6 +82,7 @@ Library exports several functions used to define schemas:
 -   `object`
 -   `date`
 -   `array`
+-   `tuple`
 -   `union`
 
 All these functions returns so called schema builders.
@@ -95,6 +97,7 @@ Schema builder classes are also exported (in case if you want to develop your ow
 -   `NumberSchemaBuilder`
 -   `SchemaBuilder` - abstract class.
 -   `StringSchemaBuilder`
+-   `TupleSchemaBuilder`
 -   `UnionSchemaBuilder`
 
 ## Schema Builders Are Immutable
@@ -149,4 +152,66 @@ const StringOrNumberArraySchema = array()
     .minLength(2)
     .maxLength(5)
     .of(union(string()).or(number().min(0).max(100)));
+```
+
+## Tuple Schemas
+
+Use `tuple` to define a fixed-length array where each position has its own type constraint.
+This is the TypeScript tuple equivalent — `tuple([string(), number()])` infers as `[string, number]`.
+
+```ts
+import { tuple, string, number, InferType } from '@cleverbrush/schema';
+
+const CoordSchema = tuple([number(), number()]);
+// InferType<typeof CoordSchema> === [number, number]
+
+const result = await CoordSchema.validate([10, 20]);
+// result.valid === true
+// result.object === [10, 20]
+```
+
+Validation enforces **exact length** and **per-position types**:
+
+```ts
+await CoordSchema.validate([10]);           // invalid — wrong length
+await CoordSchema.validate([10, 'hello']);  // invalid — wrong type at index 1
+await CoordSchema.validate([10, 20, 30]);   // invalid — wrong length
+```
+
+Tuple schemas compose with other builders:
+
+```ts
+const EventSchema = tuple([
+    string(),                                      // event name
+    number(),                                      // timestamp
+    object({ userId: string(), action: string() }) // payload
+]);
+```
+
+### Readonly Tuples
+
+Call `.readonly()` on a tuple schema to mark its inferred type as `readonly`:
+
+```ts
+const PointSchema = tuple([number(), number()]).readonly();
+// InferType<typeof PointSchema> === readonly [number, number]
+
+const result = await PointSchema.validate([1, 2]);
+// result.valid === true
+// result.object is typed as readonly [number, number]
+```
+
+This is a **type-level only** change. Runtime validation behaviour is identical.
+Use `.notReadonly()` to remove the readonly modifier:
+
+```ts
+const MutableSchema = PointSchema.notReadonly();
+// InferType<typeof MutableSchema> === [number, number]
+```
+
+The `isReadonly` flag is also exposed via `.introspect()` for downstream tooling:
+
+```ts
+PointSchema.introspect().isReadonly // true
+tuple([string(), number()]).introspect().isReadonly // false
 ```
