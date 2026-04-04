@@ -183,6 +183,19 @@ export class AnySchemaBuilder<
         TExtensions {
         return super.brand(_name);
     }
+
+    /**
+     * @hidden
+     */
+    public readonly(): AnySchemaBuilder<
+        TRequired,
+        Readonly<TResult>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
 }
 
 /**

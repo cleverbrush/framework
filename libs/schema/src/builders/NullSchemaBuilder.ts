@@ -219,6 +219,19 @@ export class NullSchemaBuilder<
         TExtensions {
         return super.brand(_name);
     }
+
+    /**
+     * @hidden
+     */
+    public readonly(): NullSchemaBuilder<
+        TRequired,
+        Readonly<null>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
 }
 
 /**

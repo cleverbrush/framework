@@ -673,6 +673,19 @@ export class NumberSchemaBuilder<
     }
 
     /**
+     * @hidden
+     */
+    public readonly(): NumberSchemaBuilder<
+        Readonly<TResult>,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    /**
      * Do not accept NaN value
      */
     public notNaN(

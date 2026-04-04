@@ -636,6 +636,19 @@ export class DateSchemaBuilder<
     }
 
     /**
+     * @hidden
+     */
+    public readonly(): DateSchemaBuilder<
+        Readonly<TResult>,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    /**
      * Accept only dates in the future.
      */
     public isInFuture(

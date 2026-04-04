@@ -219,6 +219,19 @@ export class FunctionSchemaBuilder<
         TExtensions {
         return super.brand(_name);
     }
+
+    /**
+     * @hidden
+     */
+    public readonly(): FunctionSchemaBuilder<
+        TRequired,
+        Readonly<TResult>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
 }
 
 /**

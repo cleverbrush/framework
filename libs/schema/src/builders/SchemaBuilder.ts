@@ -198,6 +198,7 @@ export type ValidatorEntry<T> = { fn: Validator<T>; mutates: boolean };
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
+    isReadonly?: boolean;
     preprocessors: PreprocessorEntry<T>[];
     validators: ValidatorEntry<T>[];
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
@@ -561,6 +562,7 @@ export abstract class SchemaBuilder<
     TExtensions = {}
 > {
     #isRequired = true;
+    #isReadonly = false;
     #preprocessors: PreprocessorEntry<TResult>[] = [];
     #validators: ValidatorEntry<TResult>[] = [];
     #hasMutating = false;
@@ -672,6 +674,14 @@ export abstract class SchemaBuilder<
      */
     protected get hasDefault(): boolean {
         return this.#defaultValue !== undefined;
+    }
+
+    /**
+     * Whether this schema is marked as readonly.
+     * Type-level only — no runtime enforcement.
+     */
+    protected get isReadonly(): boolean {
+        return this.#isReadonly;
     }
 
     /**
@@ -1075,6 +1085,11 @@ export abstract class SchemaBuilder<
              */
             isRequired: this.#isRequired,
             /**
+             * If set to `true`, the inferred type is marked as readonly.
+             * Type-level only — no runtime enforcement.
+             */
+            isReadonly: this.#isReadonly,
+            /**
              * Array of preprocessor functions
              */
             preprocessors: [
@@ -1173,6 +1188,30 @@ export abstract class SchemaBuilder<
     public brand<TBrand extends string | symbol>(_name?: TBrand) {
         return this.createFromProps({
             ...this.introspect()
+        }) as any;
+    }
+
+    /**
+     * Marks the inferred type as readonly. For objects, produces `Readonly<T>`.
+     * For arrays, produces `ReadonlyArray<T>`. Primitives are unchanged.
+     * Type-level only — no runtime enforcement.
+     *
+     * @example
+     * ```ts
+     * const schema = object({ name: string(), age: number() }).readonly();
+     * type T = InferType<typeof schema>; // Readonly<{ name: string; age: number }>
+     * ```
+     *
+     * @example
+     * ```ts
+     * const schema = array(string()).readonly();
+     * type T = InferType<typeof schema>; // ReadonlyArray<string>
+     * ```
+     */
+    public readonly() {
+        return this.createFromProps({
+            ...this.introspect(),
+            isReadonly: true
         }) as any;
     }
 
@@ -1458,6 +1497,7 @@ export abstract class SchemaBuilder<
         const { type, preprocessors, validators, isRequired } = props;
         this.type = type;
         if (typeof isRequired === 'boolean') this.isRequired = isRequired;
+        if (typeof props.isReadonly === 'boolean') this.#isReadonly = props.isReadonly;
         if (Array.isArray(preprocessors)) {
             this.#preprocessors = [...preprocessors];
         }

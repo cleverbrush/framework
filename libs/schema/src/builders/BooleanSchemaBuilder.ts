@@ -380,6 +380,20 @@ export class BooleanSchemaBuilder<
     }
 
     /**
+     * @hidden
+     */
+    public readonly(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        Readonly<TFinalResult>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    /**
      * Restricts object to be equal to `value`.
      */
     public equals<T extends boolean>(

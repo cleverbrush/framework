@@ -10,11 +10,12 @@ function escapeRegex(s: string): string {
 function convertNode(schema: SchemaBuilder<any, any, any>): Out {
     const info = schema.introspect() as any;
     const ext: Record<string, unknown> = info.extensions ?? {};
+    const readOnly: Out = info.isReadonly === true ? { readOnly: true } : {};
 
     switch (info.type) {
         case 'string': {
-            if (info.equalsTo !== undefined) return { const: info.equalsTo };
-            const out: Out = { type: 'string' };
+            if (info.equalsTo !== undefined) return { ...readOnly, const: info.equalsTo };
+            const out: Out = { ...readOnly, type: 'string' };
             if (ext['email'] === true) {
                 out['format'] = 'email';
             } else if (ext['uuid'] === true) {
@@ -51,8 +52,8 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'number': {
-            if (info.equalsTo !== undefined) return { const: info.equalsTo };
-            const out: Out = { type: info.isInteger ? 'integer' : 'number' };
+            if (info.equalsTo !== undefined) return { ...readOnly, const: info.equalsTo };
+            const out: Out = { ...readOnly, type: info.isInteger ? 'integer' : 'number' };
             if (info.min !== undefined) out['minimum'] = info.min;
             if (info.max !== undefined) out['maximum'] = info.max;
             if (ext['multipleOf'] !== undefined)
@@ -63,15 +64,15 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'boolean': {
-            if (info.equalsTo !== undefined) return { const: info.equalsTo };
-            return { type: 'boolean' };
+            if (info.equalsTo !== undefined) return { ...readOnly, const: info.equalsTo };
+            return { ...readOnly, type: 'boolean' };
         }
 
         case 'date':
-            return { type: 'string', format: 'date-time' };
+            return { ...readOnly, type: 'string', format: 'date-time' };
 
         case 'array': {
-            const out: Out = { type: 'array' };
+            const out: Out = { ...readOnly, type: 'array' };
             if (info.elementSchema)
                 out['items'] = convertNode(info.elementSchema);
             if (info.minLength !== undefined) out['minItems'] = info.minLength;
@@ -82,7 +83,7 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'object': {
-            const out: Out = { type: 'object' };
+            const out: Out = { ...readOnly, type: 'object' };
             const props = info.properties as
                 | Record<string, SchemaBuilder<any, any, any>>
                 | undefined;
@@ -103,7 +104,7 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         }
 
         case 'null':
-            return { type: 'null' };
+            return { ...readOnly, type: 'null' };
 
         case 'union': {
             const options: SchemaBuilder<any, any, any>[] = info.options ?? [];
@@ -123,8 +124,8 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
                     break;
                 }
             }
-            if (allConst) return { enum: enumValues };
-            return { anyOf: options.map(convertNode) };
+            if (allConst) return { ...readOnly, enum: enumValues };
+            return { ...readOnly, anyOf: options.map(convertNode) };
         }
 
         default:

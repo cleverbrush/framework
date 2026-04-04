@@ -881,6 +881,24 @@ export class UnionSchemaBuilder<
     }
 
     /**
+     * @hidden
+     */
+    public readonly(): UnionSchemaBuilder<
+        TOptions,
+        TRequired,
+        Readonly<
+            TExplicitType extends undefined
+                ? SchemaArrayToUnion<TOptions>
+                : TExplicitType
+        >,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    /**
      * Adds a new schema option described by `schema`.
      * schema must be an instance of `SchemaBuilder` class ancestor.
      * @param schema schema to be added as an option.

@@ -378,6 +378,24 @@ export class ObjectSchemaBuilder<
         return super.brand(_name);
     }
 
+    /**
+     * @hidden
+     */
+    public readonly(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        Readonly<
+            undefined extends TExplicitType
+                ? RespectPropsOptionality<TProperties>
+                : TExplicitType
+        >,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
     #applyPropertyDescriptors(
         result: PreValidationResult<any, { validatedObject: any }>
     ): void {

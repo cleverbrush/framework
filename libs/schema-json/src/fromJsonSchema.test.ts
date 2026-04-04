@@ -822,3 +822,36 @@ test('fromJsonSchema - 53: create product — optional stock may be absent', () 
         })
     ).toBe(true);
 });
+
+// ---------------------------------------------------------------------------
+// readOnly round-trip
+// ---------------------------------------------------------------------------
+
+test('fromJsonSchema - 54: { type: string, readOnly: true } → isReadonly: true', () => {
+    const schema = fromJsonSchema({ type: 'string', readOnly: true } as const);
+    expect((schema.introspect() as any).isReadonly).toBe(true);
+});
+
+test('fromJsonSchema - 55: { type: object, readOnly: true } → isReadonly: true', () => {
+    const schema = fromJsonSchema({
+        type: 'object',
+        readOnly: true,
+        properties: { name: { type: 'string' } },
+        required: ['name']
+    } as const);
+    expect((schema.introspect() as any).isReadonly).toBe(true);
+});
+
+test('fromJsonSchema - 56: { type: array, readOnly: true } → isReadonly: true', () => {
+    const schema = fromJsonSchema({
+        type: 'array',
+        readOnly: true,
+        items: { type: 'number' }
+    } as const);
+    expect((schema.introspect() as any).isReadonly).toBe(true);
+});
+
+test('fromJsonSchema - 57: { type: number } without readOnly → isReadonly: false', () => {
+    const schema = fromJsonSchema({ type: 'number' } as const);
+    expect((schema.introspect() as any).isReadonly).toBe(false);
+});

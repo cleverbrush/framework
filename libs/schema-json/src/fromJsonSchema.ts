@@ -27,33 +27,46 @@ function buildNode(s: unknown): SchemaBuilder<any, any, any> {
     if (typeof s !== 'object' || s === null) return any();
     const node = s as Record<string, unknown>;
 
-    if ('enum' in node && Array.isArray(node['enum']))
-        return buildEnum(node['enum']);
-    if ('const' in node) return buildConst(node['const']);
-    if ('anyOf' in node && Array.isArray(node['anyOf']))
-        return buildAnyOf(node['anyOf']);
-    // allOf is not supported (no intersection builder); fall back to any()
-    if ('allOf' in node && Array.isArray(node['allOf'])) return any();
-    if (!('type' in node)) return any();
+    let b: SchemaBuilder<any, any, any>;
 
-    switch (node['type']) {
-        case 'string':
-            return buildString(node);
-        case 'number':
-            return buildNumber(node, false);
-        case 'integer':
-            return buildNumber(node, true);
-        case 'boolean':
-            return boolean();
-        case 'null':
-            return nul();
-        case 'array':
-            return buildArray(node);
-        case 'object':
-            return buildObject(node);
-        default:
-            return any();
+    if ('enum' in node && Array.isArray(node['enum']))
+        b = buildEnum(node['enum']);
+    else if ('const' in node) b = buildConst(node['const']);
+    else if ('anyOf' in node && Array.isArray(node['anyOf']))
+        b = buildAnyOf(node['anyOf']);
+    // allOf is not supported (no intersection builder); fall back to any()
+    else if ('allOf' in node && Array.isArray(node['allOf'])) b = any();
+    else if (!('type' in node)) b = any();
+    else {
+        switch (node['type']) {
+            case 'string':
+                b = buildString(node);
+                break;
+            case 'number':
+                b = buildNumber(node, false);
+                break;
+            case 'integer':
+                b = buildNumber(node, true);
+                break;
+            case 'boolean':
+                b = boolean();
+                break;
+            case 'null':
+                b = nul();
+                break;
+            case 'array':
+                b = buildArray(node);
+                break;
+            case 'object':
+                b = buildObject(node);
+                break;
+            default:
+                b = any();
+        }
     }
+
+    if (node['readOnly'] === true) b = (b as any).readonly();
+    return b;
 }
 
 function buildConst(val: unknown): SchemaBuilder<any, any, any> {

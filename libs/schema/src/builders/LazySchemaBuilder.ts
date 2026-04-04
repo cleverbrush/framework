@@ -265,6 +265,19 @@ export class LazySchemaBuilder<
         TExtensions {
         return super.brand(_name);
     }
+
+    /**
+     * @hidden
+     */
+    public readonly(): LazySchemaBuilder<
+        Readonly<TResult>,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
 }
 
 /**

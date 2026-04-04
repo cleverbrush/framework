@@ -644,6 +644,19 @@ export class StringSchemaBuilder<
     }
 
     /**
+     * @hidden
+     */
+    public readonly(): StringSchemaBuilder<
+        Readonly<TResult>,
+        TRequired,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    /**
      * Set minimal length of the valid value for schema.
      * @param length minimum string length
      */
