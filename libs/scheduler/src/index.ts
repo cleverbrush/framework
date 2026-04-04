@@ -383,6 +383,10 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             });
 
             timer = setTimeout(async () => {
+                if (this._status !== 'started') {
+                    return;
+                }
+
                 const actualJob = await this._jobsRepository.getJobById(job.id);
 
                 if (!actualJob || actualJob.status !== 'active') {
@@ -462,13 +466,13 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
             CHECK_INTERVAL
         );
 
-        // TODO: add logic
+        await this.checkForUpcomingJobs();
     }
 
     /**
      * Stops the scheduler (all jobs will be stopped and no new jobs will be scheduled).
      */
-    public stop() {
+    public async stop() {
         if (this._status === 'stopped') {
             throw new Error('Scheduler is already stopped');
         }
@@ -476,7 +480,23 @@ export class JobScheduler extends EventEmitter implements IJobScheduler {
         clearInterval(this._checkTimer);
 
         this.status = 'stopped';
-        // TODO: add logic
+
+        this.scheduleCalculatorCache.clear();
+
+        const jobs = await this._jobsRepository.getJobs();
+        for (const job of jobs) {
+            const scheduledInstances =
+                await this._jobsRepository.getInstancesWithStatus(
+                    job.id,
+                    'scheduled'
+                );
+            for (const instance of scheduledInstances) {
+                await this._jobsRepository.saveInstance({
+                    ...instance,
+                    status: 'canceled'
+                });
+            }
+        }
     }
 
     /**
