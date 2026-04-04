@@ -2837,6 +2837,234 @@ export declare function string<T extends string>(equals: T, errorMessage: Valida
 export declare function string(): StringSchemaBuilder<string, true>;
 export {};
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/TupleSchemaBuilder.d.ts": `import type { ObjectSchemaBuilder, ObjectSchemaValidationResult } from './ObjectSchemaBuilder.js';
+import { type BRAND, type InferType, type NestedValidationResult, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+import type { UnionSchemaBuilder, UnionSchemaValidationResult } from './UnionSchemaBuilder.js';
+/**
+ * Maps a tuple of schema builders to a tuple of their per-position
+ * validation result types.
+ * Union schema elements get \`UnionSchemaValidationResult\`,
+ * object schema elements get \`ObjectSchemaValidationResult\`,
+ * other types get \`ValidationResult\`.
+ */
+export type TupleElementValidationResults<TElements extends readonly SchemaBuilder<any, any, any>[]> = {
+    [K in keyof TElements]: TElements[K] extends UnionSchemaBuilder<infer UOptions extends readonly SchemaBuilder<any, any, any>[], any, any> ? UnionSchemaValidationResult<InferType<TElements[K]>, UOptions> : TElements[K] extends ObjectSchemaBuilder<any, any, any, any, any> ? ObjectSchemaValidationResult<InferType<TElements[K]>, TElements[K]> : ValidationResult<InferType<TElements[K]>>;
+};
+/**
+ * Validation result type returned by \`TupleSchemaBuilder.validate()\`.
+ * Extends \`ValidationResult\` with \`getNestedErrors\` for root-level tuple
+ * errors and per-position validation results.
+ */
+export type TupleSchemaValidationResult<TResult, TElements extends readonly SchemaBuilder<any, any, any>[]> = ValidationResult<TResult> & {
+    /**
+     * Returns root-level tuple validation errors combined with
+     * per-position validation results.
+     * The returned value has both \`NestedValidationResult\` properties
+     * (\`errors\`, \`isValid\`, \`descriptor\`, \`seenValue\`) and indexed
+     * position results (\`[0]\`, \`[1]\`, etc.).
+     */
+    getNestedErrors(): TupleElementValidationResults<TElements> & NestedValidationResult<any, any, any>;
+};
+type TupleSchemaBuilderCreateProps<TElements extends readonly SchemaBuilder<any, any, any>[], TRestSchema extends SchemaBuilder<any, any, any> | undefined = undefined, R extends boolean = true> = Partial<ReturnType<TupleSchemaBuilder<TElements, R, undefined, false, {}, TRestSchema>['introspect']>>;
+/**
+ * Fixed-length array schema builder with per-position type validation.
+ * Similar to TypeScript's tuple types — each element at a specific array index
+ * is validated against its own schema.
+ *
+ * Use it when you need to validate function arguments, CSV rows, coordinate
+ * pairs, structured event payloads, or any other fixed-structure array.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link tuple | tuple()} function instead.
+ *
+ * @example
+ * \`\`\`ts
+ * const schema = tuple([string(), number(), boolean()]);
+ * // Inferred TypeScript type: [string, number, boolean]
+ *
+ * schema.validate(['hello', 42, true]);
+ * // result.valid === true
+ * // result.object === ['hello', 42, true]
+ *
+ * schema.validate(['hello', 42]);
+ * // result.valid === false  (too few elements)
+ *
+ * schema.validate(['hello', 'oops', true]);
+ * // result.valid === false  (wrong type at position 1)
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Tuple with variadic rest elements
+ * const schema = tuple([string(), number()]).rest(boolean());
+ * // Inferred TypeScript type: [string, number, ...boolean[]]
+ *
+ * schema.validate(['hello', 42, true, false]);
+ * // result.valid === true — any number of extra booleans allowed
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Nested tuple combining with object schemas
+ * const point = tuple([number(), number()]);
+ * const segment = tuple([point, point]);
+ *
+ * segment.validate([[0, 0], [10, 20]]);
+ * // result.valid === true
+ * \`\`\`
+ *
+ * @see {@link tuple}
+ */
+export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder<any, any, any>[], TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TRestSchema extends SchemaBuilder<any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? TRestSchema extends SchemaBuilder<any, any, any> ? [
+    ...{
+        [K in keyof TElements]: InferType<TElements[K]>;
+    },
+    ...Array<InferType<TRestSchema>>
+] : {
+    [K in keyof TElements]: InferType<TElements[K]>;
+} : TExplicitType> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+    #private;
+    /**
+     * @hidden
+     */
+    static create(props: TupleSchemaBuilderCreateProps<any, any, any>): TupleSchemaBuilder<readonly SchemaBuilder<any, any, any, {}>[], true, undefined, false, {}, undefined, readonly any[]>;
+    protected constructor(props: TupleSchemaBuilderCreateProps<TElements, TRestSchema, TRequired>);
+    /**
+     * @inheritdoc
+     */
+    hasType<T>(_notUsed?: T): TupleSchemaBuilder<TElements, true, T, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    clearHasType(): TupleSchemaBuilder<TElements, TRequired, undefined, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    /**
+     * Performs synchronous validation of the schema over \`object\`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    validate(object: TResult, context?: ValidationContext): TupleSchemaValidationResult<TResult, TElements>;
+    /**
+     * Performs async validation of the schema over \`object\`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<TupleSchemaValidationResult<TResult, TElements>>;
+    /**
+     * @hidden
+     */
+    protected createFromProps<TReq extends boolean>(props: TupleSchemaBuilderCreateProps<TElements, TRestSchema, TReq>): this;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): TupleSchemaBuilder<TElements, true, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): TupleSchemaBuilder<TElements, false, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): TupleSchemaBuilder<TElements, true, TExplicitType, true, TExtensions, TRestSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): TupleSchemaBuilder<TElements, TRequired, TExplicitType, false, TExtensions, TRestSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): TupleSchemaBuilder<TElements, TRequired, TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    introspect(): {
+        /**
+         * Per-position element schemas defining the fixed tuple structure.
+         */
+        elements: TElements;
+        /**
+         * Optional schema for elements beyond the fixed positions.
+         * When set, additional elements are validated against this schema.
+         * Mirrors TypeScript's rest element syntax: \`[string, number, ...boolean[]]\`.
+         */
+        restSchema: (TRestSchema & SchemaBuilder<any, any, any, {}>) | undefined;
+        type: string;
+        isRequired: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+    };
+    /**
+     * Sets a schema that all elements beyond the fixed positions must satisfy.
+     * Mirrors TypeScript's variadic tuple tail: \`[string, number, ...boolean[]]\`.
+     *
+     * When set, the tuple length must be at least equal to the number of fixed
+     * elements, and any additional elements are validated against \`schema\`.
+     * When not set, the tuple length must be exactly equal to the fixed count.
+     *
+     * @param schema Schema that extra array elements must satisfy.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = tuple([string(), number()]).rest(boolean());
+     * // Inferred TypeScript type: [string, number, ...boolean[]]
+     *
+     * schema.validate(['hello', 42]);               // valid
+     * schema.validate(['hello', 42, true]);          // valid
+     * schema.validate(['hello', 42, true, false]);   // valid
+     * schema.validate(['hello', 42, 'extra']);       // invalid — 'extra' not boolean
+     * \`\`\`
+     */
+    rest<TSchema extends SchemaBuilder<any, any, any>>(schema: TSchema): TupleSchemaBuilder<TElements, TRequired, TExplicitType, THasDefault, TExtensions, TSchema> & TExtensions;
+    /**
+     * Removes the rest schema set by \`rest()\`. After this call, the tuple
+     * length must be exactly equal to the number of fixed element schemas.
+     */
+    clearRest(): TupleSchemaBuilder<TElements, TRequired, TExplicitType, THasDefault, TExtensions, undefined> & TExtensions;
+}
+/**
+ * Creates a fixed-length array schema (tuple) where each element at a
+ * specific index is validated against its own schema.
+ *
+ * @param elements Array of per-position schemas. The length of this array
+ *   determines the required tuple length (unless \`.rest()\` is used).
+ *
+ * @example
+ * \`\`\`ts
+ * import { tuple, string, number, boolean } from '@cleverbrush/schema';
+ *
+ * const schema = tuple([string(), number(), boolean()]);
+ * // Inferred TypeScript type: [string, number, boolean]
+ *
+ * schema.validate(['hello', 42, true]);     // valid
+ * schema.validate(['hello', 42]);           // invalid — too few elements
+ * schema.validate(['hello', 'oops', true]); // invalid — wrong type at [1]
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // 2-D coordinate pair
+ * const point = tuple([number(), number()]);
+ * const result = point.validate([10.5, 20.3]);
+ * // result.valid === true
+ * // result.object === [10.5, 20.3]
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Optional tuple with default value
+ * const schema = tuple([string(), number()])
+ *     .optional()
+ *     .default(() => ['', 0]);
+ * \`\`\`
+ */
+export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => TupleSchemaBuilder<TElements, true>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/UnionSchemaBuilder.d.ts": `import type { ObjectSchemaBuilder, ObjectSchemaValidationResult } from './ObjectSchemaBuilder.js';
 import { type BRAND, type InferType, type NestedValidationResult, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type UnionSchemaBuilderCreateProps<T extends readonly SchemaBuilder<any, any, any>[], R extends boolean = true> = Partial<ReturnType<UnionSchemaBuilder<T, R>['introspect']>>;
@@ -3058,6 +3286,8 @@ export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/
 export type { PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
 export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
+export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
+export { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
 export type { OptionValidationResults, UnionSchemaValidationResult } from './builders/UnionSchemaBuilder.js';
 export { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
 export type { CleanExtended, ExtensionConfig, ExtensionDescriptor, FixedMethods, HiddenExtensionMethods } from './extension.js';
@@ -3136,6 +3366,7 @@ import { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 import type { SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
+import { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 import { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
 /**
  * Maps each builder type name to the corresponding generic builder class.
@@ -3152,6 +3383,7 @@ type BuilderMap = {
     date: DateSchemaBuilder<any, any, any, any>;
     object: ObjectSchemaBuilder<any, any, any, any, any>;
     array: ArraySchemaBuilder<any, any, any, any, any, any>;
+    tuple: TupleSchemaBuilder<any, any, any, any, any, any>;
     union: UnionSchemaBuilder<any, any, any, any, any>;
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any>;
@@ -3279,6 +3511,7 @@ type ExtendedArrayFactory<TExt> = <TElementSchema extends SchemaBuilder<any, any
 type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any>>(schema: T) => CleanExtended<UnionSchemaBuilder<[T], true, undefined, false, TExt>, TExt>;
 type ExtendedFuncFactory<TExt> = () => CleanExtended<FunctionSchemaBuilder<true, undefined, false, TExt>, TExt>;
 type ExtendedAnyFactory<TExt> = () => CleanExtended<AnySchemaBuilder<true, undefined, false, TExt>, TExt>;
+type ExtendedTupleFactory<TExt> = <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => CleanExtended<TupleSchemaBuilder<TElements, true, undefined, false, TExt>, TExt>;
 /**
  * The return type of {@link withExtensions}.
  *
@@ -3298,6 +3531,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     date: ExtendedDateFactory<MergeExtensionMethods<TExts, 'date'>>;
     object: ExtendedObjectFactory<MergeExtensionMethods<TExts, 'object'>>;
     array: ExtendedArrayFactory<MergeExtensionMethods<TExts, 'array'>>;
+    tuple: ExtendedTupleFactory<MergeExtensionMethods<TExts, 'tuple'>>;
     union: ExtendedUnionFactory<MergeExtensionMethods<TExts, 'union'>>;
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
@@ -3607,14 +3841,15 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
+import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import type { ArrayBuiltinExtensions } from './array.js';
-import type { AnyBuiltinExtensions, BooleanBuiltinExtensions, DateBuiltinExtensions, FuncBuiltinExtensions, ObjectBuiltinExtensions, UnionBuiltinExtensions } from './nullable.js';
+import type { AnyBuiltinExtensions, BooleanBuiltinExtensions, DateBuiltinExtensions, FuncBuiltinExtensions, ObjectBuiltinExtensions, TupleBuiltinExtensions, UnionBuiltinExtensions } from './nullable.js';
 import type { NumberBuiltinExtensions } from './number.js';
 import type { StringBuiltinExtensions } from './string.js';
 export { type ArrayBuiltinExtensions, arrayExtensions } from './array.js';
-export { type AnyBuiltinExtensions, type BooleanBuiltinExtensions, type DateBuiltinExtensions, type FuncBuiltinExtensions, type NullableMethod, type NullableReturn, nullableExtension, type ObjectBuiltinExtensions, type UnionBuiltinExtensions } from './nullable.js';
+export { type AnyBuiltinExtensions, type BooleanBuiltinExtensions, type DateBuiltinExtensions, type FuncBuiltinExtensions, type NullableMethod, type NullableReturn, nullableExtension, type ObjectBuiltinExtensions, type TupleBuiltinExtensions, type UnionBuiltinExtensions } from './nullable.js';
 export { type NumberBuiltinExtensions, numberExtensions } from './number.js';
 export { type StringBuiltinExtensions, stringExtensions } from './string.js';
 /** A \`StringSchemaBuilder\` with built-in extension methods. */
@@ -3635,6 +3870,8 @@ export type ExtendedUnion<TOptions extends readonly SchemaBuilder<any, any, any>
 export type ExtendedFunc = FunctionSchemaBuilder<true, undefined, false, FuncBuiltinExtensions> & FuncBuiltinExtensions & HiddenExtensionMethods;
 /** An \`AnySchemaBuilder\` with built-in extension methods. */
 export type ExtendedAny = AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions> & AnyBuiltinExtensions & HiddenExtensionMethods;
+/** A \`TupleSchemaBuilder\` with built-in extension methods. */
+export type ExtendedTuple<TElements extends readonly SchemaBuilder<any, any, any>[] = readonly SchemaBuilder<any, any, any>[]> = TupleSchemaBuilder<TElements, true, undefined, false, TupleBuiltinExtensions<TElements>> & TupleBuiltinExtensions<TElements> & HiddenExtensionMethods;
 export declare const string: {
     (): ExtendedString;
     <T extends string>(equals: T): ExtendedString<T>;
@@ -3654,6 +3891,7 @@ export declare const object: {
 export declare const union: <TOptions extends SchemaBuilder<any, any, any>>(schema: TOptions) => ExtendedUnion<[TOptions]>;
 export declare const func: () => ExtendedFunc;
 export declare const any: () => ExtendedAny;
+export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => ExtendedTuple<TElements>;
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/nullable.d.ts": `/**
  * Built-in nullable extension for \`@cleverbrush/schema\`.
@@ -3677,6 +3915,7 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
+import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import { type UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
 /**
  * The return type produced by \`.nullable()\` on any schema builder \`TBuilder\`.
@@ -3726,6 +3965,11 @@ export interface FuncBuiltinExtensions {
 export interface AnyBuiltinExtensions {
     /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
     nullable(): NullableReturn<AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions>>;
+}
+/** Methods threaded through \`TExtensions\` for \`TupleSchemaBuilder\`. */
+export interface TupleBuiltinExtensions<TElements extends readonly SchemaBuilder<any, any, any>[] = readonly SchemaBuilder<any, any, any>[]> {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<TupleSchemaBuilder<TElements, true, undefined, false, TupleBuiltinExtensions<TElements>>>;
 }
 export interface NullableMethod<TBuilder extends SchemaBuilder<any, any, any>> {
     /**
@@ -3855,6 +4099,14 @@ export declare const nullableExtension: import("../extension.js").ExtensionDescr
          * @returns a \`UnionSchemaBuilder\` that accepts any value or \`null\`
          */
         nullable(this: AnySchemaBuilder): UnionSchemaBuilder<[AnySchemaBuilder<true, undefined, false, {}, any>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[AnySchemaBuilder<true, undefined, false, {}, any>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    tuple: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts the tuple type or \`null\`
+         */
+        nullable(this: TupleSchemaBuilder<any>): UnionSchemaBuilder<[TupleSchemaBuilder<any, true, undefined, false, {}, undefined, any[]>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[TupleSchemaBuilder<any, true, undefined, false, {}, undefined, any[]>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
     };
 }>;
 `,
@@ -4339,8 +4591,10 @@ export declare function resolveErrorMessageAsync(provider: ValidationErrorMessag
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/index.d.ts": `export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
+export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
-export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedString, type ExtendedUnion, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type StringBuiltinExtensions, string, stringExtensions, type UnionBuiltinExtensions, union } from './extensions/index.js';
+export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedString, type ExtendedTuple, type ExtendedUnion, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type StringBuiltinExtensions, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

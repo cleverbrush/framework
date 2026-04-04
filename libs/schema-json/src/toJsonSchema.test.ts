@@ -7,6 +7,7 @@ import {
     number,
     object,
     string,
+    tuple,
     union
 } from '@cleverbrush/schema';
 import { expect, test } from 'vitest';
@@ -323,4 +324,56 @@ test('toJsonSchema - 38: string().readonly() → readOnly: true', () => {
 test('toJsonSchema - 39: number() without readonly → no readOnly key', () => {
     const result = toJsonSchema(number(), { $schema: false });
     expect(result).not.toHaveProperty('readOnly');
+  
+// ---------------------------------------------------------------------------
+// tuple
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 36: tuple([string(), number()]) → prefixItems + items:false', () => {
+    const result = toJsonSchema(tuple([string(), number()]), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: 'array',
+        prefixItems: [{ type: 'string' }, { type: 'integer' }],
+        minItems: 2,
+        maxItems: 2,
+        items: false
+    });
+});
+
+test('toJsonSchema - 37: tuple([]) → empty prefixItems + items:false', () => {
+    const result = toJsonSchema(tuple([]), { $schema: false });
+    expect(result).toEqual({
+        type: 'array',
+        prefixItems: [],
+        minItems: 0,
+        maxItems: 0,
+        items: false
+    });
+});
+
+test('toJsonSchema - 38: tuple([string()]).rest(number().isFloat()) → items: {type:number}', () => {
+    const result = toJsonSchema(tuple([string()]).rest(number().isFloat()), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: 'array',
+        prefixItems: [{ type: 'string' }],
+        minItems: 1,
+        items: { type: 'number' }
+    });
+});
+
+test('toJsonSchema - 39: tuple([boolean(), string()]) → prefixItems order preserved', () => {
+    const result = toJsonSchema(tuple([boolean(), string()]), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: 'array',
+        prefixItems: [{ type: 'boolean' }, { type: 'string' }],
+        minItems: 2,
+        maxItems: 2,
+        items: false
+    });
 });

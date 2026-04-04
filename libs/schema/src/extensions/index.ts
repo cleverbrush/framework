@@ -20,6 +20,7 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
+import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { withExtensions } from '../extension.js';
@@ -31,6 +32,7 @@ import type {
     DateBuiltinExtensions,
     FuncBuiltinExtensions,
     ObjectBuiltinExtensions,
+    TupleBuiltinExtensions,
     UnionBuiltinExtensions
 } from './nullable.js';
 import { nullableExtension } from './nullable.js';
@@ -49,6 +51,7 @@ export {
     type NullableReturn,
     nullableExtension,
     type ObjectBuiltinExtensions,
+    type TupleBuiltinExtensions,
     type UnionBuiltinExtensions
 } from './nullable.js';
 export { type NumberBuiltinExtensions, numberExtensions } from './number.js';
@@ -168,6 +171,23 @@ export type ExtendedAny = AnySchemaBuilder<
     AnyBuiltinExtensions &
     HiddenExtensionMethods;
 
+/** A `TupleSchemaBuilder` with built-in extension methods. */
+export type ExtendedTuple<
+    TElements extends readonly SchemaBuilder<
+        any,
+        any,
+        any
+    >[] = readonly SchemaBuilder<any, any, any>[]
+> = TupleSchemaBuilder<
+    TElements,
+    true,
+    undefined,
+    false,
+    TupleBuiltinExtensions<TElements>
+> &
+    TupleBuiltinExtensions<TElements> &
+    HiddenExtensionMethods;
+
 // -- Runtime factories with explicit type annotations -------------------------
 
 const s = withExtensions(
@@ -207,3 +227,8 @@ export const union: <TOptions extends SchemaBuilder<any, any, any>>(
 ) => ExtendedUnion<[TOptions]> = s.union as any;
 export const func: () => ExtendedFunc = s.func as any;
 export const any: () => ExtendedAny = s.any as any;
+export const tuple: <
+    const TElements extends readonly SchemaBuilder<any, any, any>[]
+>(
+    elements: [...TElements]
+) => ExtendedTuple<TElements> = s.tuple as any;

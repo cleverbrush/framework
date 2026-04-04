@@ -88,6 +88,23 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
             return out;
         }
 
+        case 'tuple': {
+            const elements: SchemaBuilder<any, any, any>[] =
+                info.elements ?? [];
+            const out: Out = {
+                type: 'array',
+                prefixItems: elements.map(convertNode),
+                minItems: elements.length
+            };
+            if (info.restSchema) {
+                out['items'] = convertNode(info.restSchema);
+            } else {
+                out['items'] = false;
+                out['maxItems'] = elements.length;
+            }
+            return out;
+        }
+
         case 'object': {
             const out: Out = { ...readOnly, type: 'object' };
             const props = info.properties as

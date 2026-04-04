@@ -7,6 +7,7 @@ import {
     number,
     object,
     string,
+    tuple,
     union
 } from '@cleverbrush/schema';
 import type { JsonSchemaNodeToBuilder } from './types.js';
@@ -146,6 +147,21 @@ function buildNumber(
 function buildArray(
     node: Record<string, unknown>
 ): SchemaBuilder<any, any, any> {
+    // JSON Schema 2020-12 tuples use `prefixItems`
+    if (Array.isArray(node['prefixItems'])) {
+        const elements = (node['prefixItems'] as unknown[]).map(buildNode);
+        let b: any = tuple(elements as any);
+        // `items: false` means no extra elements (default for tuple)
+        // `items: <schema>` means rest elements validated against that schema
+        if (
+            node['items'] !== undefined &&
+            node['items'] !== false &&
+            typeof node['items'] === 'object'
+        ) {
+            b = b.rest(buildNode(node['items']));
+        }
+        return b;
+    }
     let b: any = array();
     if (node['items'] !== undefined) b = b.of(buildNode(node['items']));
     if (typeof node['minItems'] === 'number') b = b.minLength(node['minItems']);

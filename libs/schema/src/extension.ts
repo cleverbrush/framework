@@ -77,6 +77,7 @@ import { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder, object } from './builders/ObjectSchemaBuilder.js';
 import type { SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
+import { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
 import { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,7 @@ type BuilderMap = {
     date: DateSchemaBuilder<any, any, any, any>;
     object: ObjectSchemaBuilder<any, any, any, any, any>;
     array: ArraySchemaBuilder<any, any, any, any, any, any>;
+    tuple: TupleSchemaBuilder<any, any, any, any, any, any>;
     union: UnionSchemaBuilder<any, any, any, any, any>;
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any>;
@@ -113,6 +115,7 @@ const builderClasses: Record<BuilderTypeName, typeof SchemaBuilder> = {
     date: DateSchemaBuilder as any,
     object: ObjectSchemaBuilder as any,
     array: ArraySchemaBuilder as any,
+    tuple: TupleSchemaBuilder as any,
     union: UnionSchemaBuilder as any,
     func: FunctionSchemaBuilder as any,
     any: AnySchemaBuilder as any
@@ -126,6 +129,7 @@ const builderFactories: Record<BuilderTypeName, (...args: any[]) => any> = {
     date,
     object,
     array,
+    tuple,
     union,
     func,
     any
@@ -335,6 +339,15 @@ type ExtendedAnyFactory<TExt> = () => CleanExtended<
     TExt
 >;
 
+type ExtendedTupleFactory<TExt> = <
+    const TElements extends readonly SchemaBuilder<any, any, any>[]
+>(
+    elements: [...TElements]
+) => CleanExtended<
+    TupleSchemaBuilder<TElements, true, undefined, false, TExt>,
+    TExt
+>;
+
 /**
  * The return type of {@link withExtensions}.
  *
@@ -354,6 +367,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     date: ExtendedDateFactory<MergeExtensionMethods<TExts, 'date'>>;
     object: ExtendedObjectFactory<MergeExtensionMethods<TExts, 'object'>>;
     array: ExtendedArrayFactory<MergeExtensionMethods<TExts, 'array'>>;
+    tuple: ExtendedTupleFactory<MergeExtensionMethods<TExts, 'tuple'>>;
     union: ExtendedUnionFactory<MergeExtensionMethods<TExts, 'union'>>;
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
