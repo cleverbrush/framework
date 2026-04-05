@@ -204,6 +204,8 @@ export type SchemaBuilderProps<T> = {
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
     defaultValue?: T | (() => T);
+    catchValue?: T | (() => T);
+    hasCatch?: boolean;
     description?: string;
 };
 
@@ -576,6 +578,8 @@ export abstract class SchemaBuilder<
     #requiredErrorMessageProvider: ValidationErrorMessageProvider =
         'is required';
     #defaultValue: TResult | (() => TResult) | undefined = undefined;
+    #catchValue: TResult | (() => TResult) | undefined = undefined;
+    #hasCatch = false;
 
     /**
      * Type-level brand encoding the inferred type of this schema.
@@ -676,6 +680,23 @@ export abstract class SchemaBuilder<
      */
     protected get hasDefault(): boolean {
         return this.#defaultValue !== undefined;
+    }
+
+    /**
+     * Whether this schema has a catch/fallback value configured via `.catch()`.
+     */
+    protected get hasCatch(): boolean {
+        return this.#hasCatch;
+    }
+
+    /**
+     * Resolves the catch/fallback value. If the stored value is a factory function,
+     * it is called to produce the value (useful for mutable fallbacks like `() => []`).
+     */
+    protected resolveCatchValue(): TResult {
+        return typeof this.#catchValue === 'function'
+            ? (this.#catchValue as () => TResult)()
+            : (this.#catchValue as TResult);
     }
 
     /**
@@ -1124,7 +1145,15 @@ export abstract class SchemaBuilder<
              * The human-readable description attached to this schema via `.describe()`,
              * or `undefined` if none was set.
              */
-            description: this.#description
+            description: this.#description,
+            /**
+             * Whether a catch/fallback value has been set on this schema via `.catch()`.
+             */
+            hasCatch: this.#hasCatch,
+            /**
+             * The catch/fallback value or factory function set via `.catch()`.
+             */
+            catchValue: this.#catchValue
         };
     }
 
@@ -1164,6 +1193,58 @@ export abstract class SchemaBuilder<
             ...this.introspect(),
             defaultValue: value
         }) as any;
+    }
+
+    /**
+     * Sets a fallback value for this schema. When validation **fails** for any reason,
+     * the fallback value is returned as a successful result instead of validation errors.
+     *
+     * This is useful for graceful degradation — for example, providing a safe default
+     * when parsing untrusted input that might not conform to the schema.
+     *
+     * Accepts either a static value or a factory function. Factory functions are called
+     * each time the fallback is needed (useful for mutable values like `() => []`).
+     *
+     * Unlike {@link default}, which only fires when the input is `undefined`, `.catch()`
+     * fires on **any** validation failure — type mismatch, constraint violation, etc.
+     *
+     * When `.catch()` is set, {@link parse} and {@link parseAsync} will **never throw**.
+     *
+     * @param value - the fallback value, or a factory function producing the fallback
+     *
+     * @example
+     * ```ts
+     * const schema = string().catch('unknown');
+     * schema.validate(42);        // { valid: true, object: 'unknown' }
+     * schema.validate('hello');   // { valid: true, object: 'hello' }
+     * schema.parse(42);           // 'unknown'  (no throw)
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Factory function for mutable fallbacks
+     * const schema = array(string()).catch(() => []);
+     * schema.validate(null);  // { valid: true, object: [] }
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Contrast with .default() — default fires only on undefined
+     * const d = string().default('anon');
+     * d.validate(undefined); // { valid: true, object: 'anon' }  ← fires
+     * d.validate(42);        // { valid: false, errors: [...] }  ← does NOT fire
+     *
+     * const c = string().catch('anon');
+     * c.validate(undefined); // { valid: true, object: 'anon' }  ← fires
+     * c.validate(42);        // { valid: true, object: 'anon' }  ← also fires
+     * ```
+     */
+    public catch(value: TResult | (() => TResult)): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            catchValue: value,
+            hasCatch: true
+        }) as unknown as this;
     }
 
     /**
@@ -1330,23 +1411,32 @@ export abstract class SchemaBuilder<
      * Perform synchronous schema validation on `object`.
      * Throws at runtime if any preprocessor, validator, or error message
      * provider returns a Promise — use {@link validateAsync} instead.
+     * @internal Override this in subclasses. External callers use {@link validate}.
      */
-    public abstract validate(
-        /**
-         * Object to validate
-         */
+    protected abstract _validate(
         object: any,
-        /**
-         * Optional `ValidationContext` settings
-         */
         context?: ValidationContext
     ): ValidationResult<any>;
 
     /**
      * Perform asynchronous schema validation on `object`.
      * Supports async preprocessors, validators, and error message providers.
+     * @internal Override this in subclasses. External callers use {@link validateAsync}.
      */
-    public abstract validateAsync(
+    protected abstract _validateAsync(
+        object: any,
+        context?: ValidationContext
+    ): Promise<ValidationResult<any>>;
+
+    /**
+     * Perform synchronous schema validation on `object`.
+     * Throws at runtime if any preprocessor, validator, or error message
+     * provider returns a Promise — use {@link validateAsync} instead.
+     *
+     * If a fallback has been set via {@link catch}, a failed validation result
+     * is replaced by `{ valid: true, object: fallback }` instead of returning errors.
+     */
+    public validate(
         /**
          * Object to validate
          */
@@ -1355,7 +1445,37 @@ export abstract class SchemaBuilder<
          * Optional `ValidationContext` settings
          */
         context?: ValidationContext
-    ): Promise<ValidationResult<any>>;
+    ): ValidationResult<any> {
+        const result = this._validate(object, context);
+        if (!result.valid && this.#hasCatch) {
+            return { valid: true, object: this.resolveCatchValue() };
+        }
+        return result;
+    }
+
+    /**
+     * Perform asynchronous schema validation on `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     *
+     * If a fallback has been set via {@link catch}, a failed validation result
+     * is replaced by `{ valid: true, object: fallback }` instead of returning errors.
+     */
+    public async validateAsync(
+        /**
+         * Object to validate
+         */
+        object: any,
+        /**
+         * Optional `ValidationContext` settings
+         */
+        context?: ValidationContext
+    ): Promise<ValidationResult<any>> {
+        const result = await this._validateAsync(object, context);
+        if (!result.valid && this.#hasCatch) {
+            return { valid: true, object: this.resolveCatchValue() };
+        }
+        return result;
+    }
 
     /**
      * Synchronously resolves a `ValidationErrorMessageProvider` to a string.
@@ -1553,6 +1673,11 @@ export abstract class SchemaBuilder<
 
         if (props.defaultValue !== undefined) {
             this.#defaultValue = props.defaultValue;
+        }
+
+        if (props.hasCatch) {
+            this.#hasCatch = true;
+            this.#catchValue = props.catchValue;
         }
 
         if (typeof props.description === 'string') {

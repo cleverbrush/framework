@@ -436,12 +436,30 @@ export class StringSchemaBuilder<
         };
     }
 
+    /** {@inheritDoc SchemaBuilder.validate} */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        return super.validate(object, context) as ValidationResult<TResult>;
+    }
+
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        return super.validateAsync(object, context) as Promise<
+            ValidationResult<TResult>
+        >;
+    }
+
     /**
      * Performs synchronous validation of string schema over `object`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional `ValidationContext` settings.
      */
-    public validate(
+    protected _validate(
         object: TResult,
         context?: ValidationContext
     ): ValidationResult<TResult> {
@@ -514,7 +532,7 @@ export class StringSchemaBuilder<
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional `ValidationContext` settings.
      */
-    public async validateAsync(
+    protected async _validateAsync(
         object: TResult,
         context?: ValidationContext
     ): Promise<ValidationResult<TResult>> {

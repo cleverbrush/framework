@@ -679,6 +679,48 @@ console.log(info.hasDefault);    // true
 console.log(info.defaultValue);  // 'hello'
 ```
 
+## Catch / Fallback
+
+Every schema builder supports `.catch(value)`. When validation **fails for any reason** — wrong type, constraint violation, missing required value — the fallback is returned as a successful result instead of errors.
+
+Unlike `.default()`, which only fires when the input is `undefined`, `.catch()` fires on **any** validation failure.
+
+```typescript
+import { string, number, array, object } from '@cleverbrush/schema';
+
+// Static fallback
+const Name = string().catch('unknown');
+Name.validate(42);          // { valid: true, object: 'unknown' }
+Name.validate(null);        // { valid: true, object: 'unknown' }
+Name.validate('Alice');     // { valid: true, object: 'Alice' }
+
+// Constraint violation also triggers catch
+const Age = number().min(0).catch(-1);
+Age.validate(-5);           // { valid: true, object: -1 }
+
+// .parse() and .parseAsync() never throw when .catch() is set
+Name.parse(42);             // 'unknown'  (no SchemaValidationError thrown)
+```
+
+Use a factory function for mutable fallback values to avoid shared references:
+
+```typescript
+const Tags = array(string()).catch(() => []);
+
+const r1 = Tags.validate(null);  // { valid: true, object: [] }
+const r2 = Tags.validate(null);  // { valid: true, object: [] }
+// r1.object !== r2.object — separate array instances each time
+```
+
+The fallback state is exposed via `.introspect()`:
+
+```typescript
+const schema = string().catch('unknown');
+const info = schema.introspect();
+console.log(info.hasCatch);    // true
+console.log(info.catchValue);  // 'unknown'
+```
+
 ## Readonly Modifier
 
 Every schema builder supports `.readonly()`. This is a **type-level-only** modifier — it marks the inferred TypeScript type as immutable, but does not alter validation behaviour or freeze the validated value at runtime.

@@ -67,6 +67,16 @@ export const EXAMPLE_GROUPS = [
             'default-validation',
             'default-introspect'
         ]
+    },
+    {
+        label: 'Catch / Fallback',
+        ids: [
+            'catch-static',
+            'catch-factory',
+            'catch-vs-default',
+            'catch-parse',
+            'catch-introspect'
+        ]
     }
 ];
 
@@ -1265,6 +1275,141 @@ const info = schema.introspect();
 const result = schema.validate(undefined as any);
 `,
         testData: '"world"'
+    },
+
+    // ── Catch / Fallback ────────────────────────────────────────
+    {
+        id: 'catch-static',
+        title: 'Static Catch Fallback',
+        description:
+            'Use <code>.catch(value)</code> to provide a fallback when validation fails for <em>any</em> reason — wrong type, constraint violation, or missing required value.',
+        group: 'Catch / Fallback',
+        code: `import { string, number } from '@cleverbrush/schema';
+
+// Static fallback string
+const Name = string().catch('unknown');
+// Wrong type → fallback
+// Name.validate(42)    → { valid: true, object: 'unknown' }
+// null → fallback
+// Name.validate(null)  → { valid: true, object: 'unknown' }
+// Valid input passes through unchanged
+// Name.validate('Alice') → { valid: true, object: 'Alice' }
+
+// Constraint violation also triggers catch
+const Age = number().min(0).catch(-1);
+// Age.validate(-5)    → { valid: true, object: -1 }
+
+const result = Name.validate(undefined as any);
+`,
+        testData: '"Alice"'
+    },
+    {
+        id: 'catch-factory',
+        title: 'Factory Function Fallback',
+        description:
+            'Pass a factory function to <code>.catch()</code> to produce a fresh fallback value on each failure — essential for mutable values like arrays and objects.',
+        group: 'Catch / Fallback',
+        code: `import { array, object, string } from '@cleverbrush/schema';
+
+// Factory function — a NEW array is created on each failure
+const Tags = array(string()).catch(() => []);
+
+const r1 = Tags.validate(null as any);
+const r2 = Tags.validate(null as any);
+// r1.object ⇒ []
+// r2.object ⇒ []
+// r1.object !== r2.object  — separate instances each time
+
+// Useful for objects too
+const UserFallback = object({ name: string(), age: string() })
+  .catch(() => ({ name: 'Guest', age: '0' }));
+
+const result = Tags.validate(999 as any);
+`,
+        testData: '["tag1", "tag2"]'
+    },
+    {
+        id: 'catch-vs-default',
+        title: 'Catch vs Default',
+        description:
+            '<code>.default(value)</code> fires only when input is <code>undefined</code>. <code>.catch(value)</code> fires on <em>any</em> validation failure — including type mismatches and constraint violations.',
+        group: 'Catch / Fallback',
+        code: `import { string } from '@cleverbrush/schema';
+
+// .default() — fires only on undefined
+const withDefault = string().default('anon');
+// withDefault.validate(undefined) → { valid: true, object: 'anon' }  ← fires
+// withDefault.validate(42)        → { valid: false, errors: [...] }  ← does NOT fire
+
+// .catch() — fires on any validation failure
+const withCatch = string().catch('anon');
+// withCatch.validate(undefined) → { valid: true, object: 'anon' }  ← fires
+// withCatch.validate(42)        → { valid: true, object: 'anon' }  ← also fires
+
+// Combining both:
+// .default() handles missing values, .catch() handles any remaining failures
+const schema = string().default('default-val').catch('catch-val');
+// schema.validate(undefined) → { valid: true, object: 'default-val' }  (default fires first)
+// schema.validate(42)        → { valid: true, object: 'catch-val' }   (catch fires)
+
+const result = withCatch.validate(42 as any);
+`,
+        testData: '"Alice"'
+    },
+    {
+        id: 'catch-parse',
+        title: 'parse() Never Throws',
+        description:
+            'When <code>.catch()</code> is set, <code>.parse()</code> and <code>.parseAsync()</code> will never throw a <code>SchemaValidationError</code> — the fallback is returned instead.',
+        group: 'Catch / Fallback',
+        code: `import { string, object, number } from '@cleverbrush/schema';
+
+const Name = string().catch('unknown');
+
+// Without .catch(), parse() throws on invalid input
+// string().parse(42)  ← throws SchemaValidationError
+
+// With .catch(), parse() always returns a value
+const name = Name.parse(42 as any);   // 'unknown'  (no throw)
+const name2 = Name.parse('Alice');    // 'Alice'
+
+// Works with complex schemas too
+const User = object({ name: string(), age: number() })
+  .catch({ name: 'Guest', age: 0 });
+
+const user = User.parse('not an object' as any);
+// { name: 'Guest', age: 0 }
+
+const result = Name.validate(123 as any);
+`,
+        testData: '"hello"'
+    },
+    {
+        id: 'catch-introspect',
+        title: 'Introspecting Catch',
+        description:
+            'Use <code>.introspect()</code> to inspect the catch configuration of a schema at runtime.',
+        group: 'Catch / Fallback',
+        code: `import { string, number } from '@cleverbrush/schema';
+
+const schema = string().catch('unknown');
+
+// Inspect the catch configuration
+const info = schema.introspect();
+// info.hasCatch   → true
+// info.catchValue → 'unknown'
+
+const noFallback = number();
+// noFallback.introspect().hasCatch → false
+
+// Catch state survives fluent chaining
+const chained = string().minLength(5).catch('short').optional();
+// chained.introspect().hasCatch   → true
+// chained.introspect().catchValue → 'short'
+
+const result = schema.validate(42 as any);
+`,
+        testData: '"hello"'
     }
 ];
 

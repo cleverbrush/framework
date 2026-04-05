@@ -44,7 +44,7 @@ The framework has matured significantly. The core schema library, extension syst
 | **Tuple** | `z.tuple([str, num])` | ✅ `tuple([str, num])` — `TupleSchemaBuilder` | ✅ DONE |
 | **Record** | `z.record(keySchema, valSchema)` | ✅ `record(keySchema, valSchema)` — `RecordSchemaBuilder` | ✅ DONE |
 | **Deep partial** | `.deepPartial()` | ✅ `.deepPartial()` — recurses into nested `object()` schemas | ✅ DONE |
-| **Catch/fallback** | `.catch(fallback)` | None | Low-medium |
+| **Catch/fallback** | `.catch(fallback)` | None | ✅ DONE |
 | **Readonly** | `.readonly()` | ✅ `.readonly()` — type-level `Readonly<T>` / `ReadonlyArray<T>` | ✅ DONE |
 | **Describe** | `.describe('...')` | ✅ `.describe(text)` — runtime metadata on all builders, emitted as `description` in JSON Schema | ✅ DONE |
 | **Coercion namespace** | `z.coerce.string()` | `.addPreprocessor()` | Low — preprocessors cover this |
@@ -260,9 +260,9 @@ Show real-world patterns with code examples (playground or blog):
 - Chains naturally with `.required()`, `.optional()`, `.default()`, `.readonly()`, `.brand()`
 - Tests covering: flat objects, nested objects, 3-level depth, arrays, immutability, chaining
 
-### 4.5 Catch / fallback
+### 4.5 Catch / fallback ✅ DONE
 
-`.catch(fallbackValue)` — use a fallback value when validation fails instead of returning errors. Useful for graceful degradation.
+`.catch(value | factory)` — use a fallback value when validation fails for any reason (type mismatch, constraint violation, missing required). `parse()` and `parseAsync()` never throw when catch is set. Factory functions supported (`() => value`) for mutable fallbacks. Introspect via `hasCatch`/`catchValue`. Template-method pattern: concrete `validate()`/`validateAsync()` wrappers in base class, all 13 subclasses renamed to `_validate()`/`_validateAsync()`. 5 playground examples, README section, full JSDoc, 45+ tests.
 
 ### 4.6 Readonly modifier ✅ DONE
 
