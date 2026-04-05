@@ -82,6 +82,7 @@ type DeepMakeChildrenOptional<
     T extends Record<string, SchemaBuilder<any, any, any>>
 > = {
     [K in keyof T]: T[K] extends ObjectSchemaBuilder<
+        // biome-ignore lint/correctness/noUnusedVariables: used in extensions
         infer P extends Record<string, SchemaBuilder<any, any, any>>,
         any,
         any,
