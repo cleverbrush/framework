@@ -1922,11 +1922,63 @@ export declare class PropertyValidationResult<TSchema extends ObjectSchemaBuilde
 import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationResult } from './SchemaBuilder.js';
 import type { StringSchemaBuilder } from './StringSchemaBuilder.js';
 /**
+ * Descriptor for a single key-value entry within a validated record.
+ * Provides \`getValue\`, \`setValue\`, and \`getSchema\` operations for the entry.
+ *
+ * Returned as part of {@link RecordKeyValidationResult}.
+ */
+export type RecordKeyDescriptor<TRecord, TValueSchema extends SchemaBuilder<any, any, any>> = {
+    /** The key within the record this descriptor refers to. */
+    readonly key: string;
+    /** Returns the value schema every record entry must satisfy. */
+    getSchema(): TValueSchema;
+    /**
+     * Retrieves the value at \`key\` from the given record object.
+     * Returns \`{ success: false }\` when the key is not present.
+     */
+    getValue(obj: TRecord): {
+        value?: InferType<TValueSchema>;
+        success: boolean;
+    };
+    /**
+     * Sets the value at \`key\` on the given record object.
+     * Returns \`false\` when \`obj\` is not a non-null object.
+     */
+    setValue(obj: TRecord, value: InferType<TValueSchema>): boolean;
+};
+/**
+ * Validation result for a single key-value entry in a record.
+ * Returned by {@link RecordSchemaValidationResult.getErrorsFor | getErrorsFor(key)}.
+ */
+export type RecordKeyValidationResult<TRecord, TValueSchema extends SchemaBuilder<any, any, any>> = {
+    /** Validation error messages for this entry; empty array when valid. */
+    readonly errors: ReadonlyArray<string>;
+    /** \`true\` when there are no validation errors for this entry. */
+    readonly isValid: boolean;
+    /** The value that was seen at this key during validation. */
+    readonly seenValue: InferType<TValueSchema> | undefined;
+    /** Descriptor for reading/writing the value at this key. */
+    readonly descriptor: RecordKeyDescriptor<TRecord, TValueSchema>;
+};
+/**
+ * Root-level validation result for the record object itself.
+ * Returned by {@link RecordSchemaValidationResult.getErrorsFor | getErrorsFor()} (no argument).
+ */
+export type RecordRootValidationResult<TResult> = {
+    /** Root-level error messages (e.g. \`"object expected"\`); empty when valid. */
+    readonly errors: ReadonlyArray<string>;
+    /** \`true\` when there are no root-level errors. */
+    readonly isValid: boolean;
+    /** The value that was being validated. */
+    readonly seenValue: TResult | undefined;
+};
+/**
  * Validation result type returned by \`RecordSchemaBuilder.validate()\`.
  *
- * Extends \`ValidationResult\` with \`getNestedErrors()\`, which returns a
- * plain object mapping each key to its own \`ValidationResult\` — making it
- * easy to surface per-field errors in a form or API response.
+ * Extends \`ValidationResult\` with:
+ * - \`getNestedErrors()\` — a per-key map of \`ValidationResult\` objects.
+ * - \`getErrorsFor()\` — root-level errors for the record container itself.
+ * - \`getErrorsFor(key)\` — errors, seen value, and descriptor for a specific key.
  */
 export type RecordSchemaValidationResult<TResult, TValueSchema extends SchemaBuilder<any, any, any>> = ValidationResult<TResult> & {
     /**
@@ -1937,8 +1989,8 @@ export type RecordSchemaValidationResult<TResult, TValueSchema extends SchemaBui
      * first failing key (in the default stop-on-first-error mode). Keys that
      * passed are not included.
      *
-     * The result is only populated after a validation call. Reading it
-     * before validating returns an empty object.
+     * @deprecated Prefer {@link getErrorsFor} for a richer per-entry result
+     * that also includes a descriptor and \`seenValue\`.
      *
      * @example
      * \`\`\`ts
@@ -1956,6 +2008,48 @@ export type RecordSchemaValidationResult<TResult, TValueSchema extends SchemaBui
      * \`\`\`
      */
     getNestedErrors(): Record<string, ValidationResult<InferType<TValueSchema>>>;
+    /**
+     * Returns root-level errors for the record container itself
+     * (e.g. \`"object expected"\` when a non-object value is passed,
+     * or errors from custom validators added to the record schema).
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = record(string(), number());
+     * const root = schema.validate(42 as any).getErrorsFor();
+     * // root.errors[0] === 'object expected'
+     * // root.isValid === false
+     * \`\`\`
+     */
+    getErrorsFor(): RecordRootValidationResult<TResult>;
+    /**
+     * Returns the validation result for the entry with the given key,
+     * including error messages, the seen value, and a descriptor for
+     * accessing and modifying the value at that key.
+     *
+     * If the key was not reached during validation (e.g. an earlier key
+     * already failed in stop-on-first-error mode), an empty result with
+     * \`isValid: true\` and no errors is returned.
+     *
+     * @param key - the key whose validation result to retrieve
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = record(string(), number().min(0));
+     * const result = schema.validate(
+     *   { a: 5, b: -2 },
+     *   { doNotStopOnFirstError: true }
+     * );
+     *
+     * const bErrors = result.getErrorsFor('b');
+     * // bErrors.isValid === false
+     * // bErrors.errors[0] === 'the value must be >= 0'
+     * // bErrors.seenValue === -2
+     * // bErrors.descriptor.key === 'b'
+     * // bErrors.descriptor.getSchema() === valueSchema
+     * \`\`\`
+     */
+    getErrorsFor(key: string): RecordKeyValidationResult<TResult, TValueSchema>;
 };
 type RecordSchemaBuilderCreateProps<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>, R extends boolean = true> = Partial<ReturnType<RecordSchemaBuilder<TKeySchema, TValueSchema, R>['introspect']>>;
 /**
@@ -2063,7 +2157,7 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
         defaultValue: TResult | (() => TResult) | undefined;
     };
     /**
-     * Core sync validation. Returns \`{ valid, object, errors, getNestedErrors }\`.
+     * Core sync validation. Returns \`{ valid, object, errors, getNestedErrors, getErrorsFor }\`.
      */
     validate(object: TResult, context?: ValidationContext): RecordSchemaValidationResult<TResult, TValueSchema>;
     /**
@@ -3578,9 +3672,9 @@ export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
+export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/ObjectSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
-export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/ObjectSchemaBuilder.js';
 export type { PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
 export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
@@ -4916,7 +5010,7 @@ export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
-export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, record, type RecordBuiltinExtensions, type StringBuiltinExtensions, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
+export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type RecordBuiltinExtensions, record, type StringBuiltinExtensions, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

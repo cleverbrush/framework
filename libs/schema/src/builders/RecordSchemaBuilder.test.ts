@@ -1,15 +1,14 @@
 import { expect, expectTypeOf, test } from 'vitest';
-
-import { number } from './NumberSchemaBuilder.js';
-import type { InferType } from './SchemaBuilder.js';
-import { string } from './StringSchemaBuilder.js';
-import { RecordSchemaBuilder, record } from './RecordSchemaBuilder.js';
 // Extended factories (include nullable and other built-in extensions)
 import {
+    number as extNumber,
     record as extRecord,
-    string as extString,
-    number as extNumber
+    string as extString
 } from '../extensions/index.js';
+import { number } from './NumberSchemaBuilder.js';
+import { RecordSchemaBuilder, record } from './RecordSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
+import { string } from './StringSchemaBuilder.js';
 
 // ---------------------------------------------------------------------------
 // Type-level tests
@@ -349,4 +348,197 @@ test('Nullable - .nullable() accepts a valid record', () => {
 test('Nullable - .nullable() rejects invalid record', () => {
     const schema = extRecord(extString(), extNumber()).nullable();
     expect(schema.validate({ a: 'bad' } as any).valid).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// getErrorsFor — root errors
+// ---------------------------------------------------------------------------
+
+test('getErrorsFor() - root: returns empty errors on valid record', () => {
+    const schema = record(string(), number());
+    const result = schema.validate({ a: 1, b: 2 });
+    const root = result.getErrorsFor();
+    expect(root.isValid).toBe(true);
+    expect(root.errors).toHaveLength(0);
+    expect(root.seenValue).toEqual({ a: 1, b: 2 });
+});
+
+test('getErrorsFor() - root: returns "object expected" when non-object passed', () => {
+    const schema = record(string(), number());
+    const result = schema.validate(42 as any);
+    expect(result.valid).toBe(false);
+    const root = result.getErrorsFor();
+    expect(root.isValid).toBe(false);
+    expect(root.errors[0]).toBe('object expected');
+    expect(root.seenValue).toBe(42);
+});
+
+test('getErrorsFor() - root: captures custom validator errors', () => {
+    const schema = record(string(), number()).addValidator(obj => ({
+        valid: Object.keys(obj ?? {}).length > 0,
+        errors: [{ message: 'record must not be empty' }]
+    }));
+    const result = schema.validate({} as any);
+    expect(result.valid).toBe(false);
+    const root = result.getErrorsFor();
+    expect(root.isValid).toBe(false);
+    expect(root.errors[0]).toBe('record must not be empty');
+});
+
+test('getErrorsFor() - root: returns empty errors for optional null', () => {
+    const schema = record(string(), number()).optional();
+    const result = schema.validate(null as any);
+    const root = result.getErrorsFor();
+    expect(root.isValid).toBe(true);
+    expect(root.errors).toHaveLength(0);
+});
+
+// ---------------------------------------------------------------------------
+// getErrorsFor — per-key value errors
+// ---------------------------------------------------------------------------
+
+test('getErrorsFor(key) - reports errors for invalid value', () => {
+    const schema = record(string(), number().min(0));
+    const result = schema.validate(
+        { a: 5, b: -2 },
+        { doNotStopOnFirstError: true }
+    );
+    expect(result.valid).toBe(false);
+    const bResult = result.getErrorsFor('b');
+    expect(bResult.isValid).toBe(false);
+    expect(bResult.errors.length).toBeGreaterThan(0);
+    expect(bResult.seenValue).toBe(-2);
+});
+
+test('getErrorsFor(key) - returns empty for valid key', () => {
+    const schema = record(string(), number().min(0));
+    const result = schema.validate(
+        { a: 5, b: -2 },
+        { doNotStopOnFirstError: true }
+    );
+    const aResult = result.getErrorsFor('a');
+    expect(aResult.isValid).toBe(true);
+    expect(aResult.errors).toHaveLength(0);
+    expect(aResult.seenValue).toBe(5);
+});
+
+test('getErrorsFor(key) - returns empty result for key not reached (stop-on-first-error)', () => {
+    const schema = record(string(), number().min(0));
+    // With stop-on-first-error, only one key error is collected
+    const result = schema.validate({ b: -2, c: -3 });
+    expect(result.valid).toBe(false);
+    // 'c' may not have been reached; still returns a result object
+    const cResult = result.getErrorsFor('c');
+    expect(cResult).toBeDefined();
+    expect(typeof cResult.isValid).toBe('boolean');
+});
+
+test('getErrorsFor(key) - multiple errors collected with doNotStopOnFirstError', () => {
+    const schema = record(string(), number().min(0));
+    const result = schema.validate(
+        { a: -1, b: -2, c: 3 },
+        { doNotStopOnFirstError: true }
+    );
+    expect(result.valid).toBe(false);
+    expect(result.getErrorsFor('a').isValid).toBe(false);
+    expect(result.getErrorsFor('b').isValid).toBe(false);
+    expect(result.getErrorsFor('c').isValid).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// getErrorsFor — per-key descriptor
+// ---------------------------------------------------------------------------
+
+test('getErrorsFor(key) - descriptor.key is the key string', () => {
+    const schema = record(string(), number().min(0));
+    const result = schema.validate({ b: -2 });
+    const bResult = result.getErrorsFor('b');
+    expect(bResult.descriptor.key).toBe('b');
+});
+
+test('getErrorsFor(key) - descriptor.getSchema() returns the value schema', () => {
+    const valueSchema = number().min(0);
+    const schema = record(string(), valueSchema);
+    const result = schema.validate({ b: -2 });
+    const bResult = result.getErrorsFor('b');
+    // getSchema() should return the same schema instance
+    expect(bResult.descriptor.getSchema()).toBe(valueSchema);
+});
+
+test('getErrorsFor(key) - descriptor.getValue() retrieves the value', () => {
+    const schema = record(string(), number());
+    const obj = { x: 42 };
+    const result = schema.validate(obj);
+    const xResult = result.getErrorsFor('x');
+    const got = xResult.descriptor.getValue(obj as any);
+    expect(got.success).toBe(true);
+    expect(got.value).toBe(42);
+});
+
+test('getErrorsFor(key) - descriptor.getValue() returns success:false for missing key', () => {
+    const schema = record(string(), number());
+    const obj = { x: 42 };
+    const result = schema.validate(obj);
+    const zResult = result.getErrorsFor('z');
+    const got = zResult.descriptor.getValue(obj as any);
+    expect(got.success).toBe(false);
+});
+
+test('getErrorsFor(key) - descriptor.setValue() sets the value on the record', () => {
+    const schema = record(string(), number());
+    const obj: Record<string, number> = { x: 42 };
+    const result = schema.validate(obj);
+    const xResult = result.getErrorsFor('x');
+    const ok = xResult.descriptor.setValue(obj as any, 99);
+    expect(ok).toBe(true);
+    expect(obj.x).toBe(99);
+});
+
+test('getErrorsFor(key) - descriptor.setValue() returns false for non-object', () => {
+    const schema = record(string(), number());
+    const result = schema.validate({ x: 1 });
+    const xResult = result.getErrorsFor('x');
+    const ok = xResult.descriptor.setValue(null as any, 99);
+    expect(ok).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// getErrorsFor — key constraint errors
+// ---------------------------------------------------------------------------
+
+test('getErrorsFor(key) - reports errors for invalid key', () => {
+    const schema = record(string().matches(/^[a-z]+$/), number());
+    // '1bad' fails the key schema
+    const result = schema.validate({ '1bad': 5 });
+    expect(result.valid).toBe(false);
+    const keyResult = result.getErrorsFor('1bad');
+    expect(keyResult.isValid).toBe(false);
+    expect(keyResult.errors.length).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// getErrorsFor — async
+// ---------------------------------------------------------------------------
+
+test('getErrorsFor(key) - works with validateAsync', async () => {
+    const schema = record(string(), number().min(0));
+    const result = await schema.validateAsync(
+        { a: 5, b: -3 },
+        { doNotStopOnFirstError: true }
+    );
+    expect(result.valid).toBe(false);
+    const bResult = result.getErrorsFor('b');
+    expect(bResult.isValid).toBe(false);
+    expect(bResult.errors.length).toBeGreaterThan(0);
+    expect(bResult.seenValue).toBe(-3);
+    expect(bResult.descriptor.key).toBe('b');
+});
+
+test('getErrorsFor() - root errors returned by validateAsync', async () => {
+    const schema = record(string(), number());
+    const result = await schema.validateAsync('not-an-object' as any);
+    expect(result.valid).toBe(false);
+    const root = result.getErrorsFor();
+    expect(root.isValid).toBe(false);
+    expect(root.errors[0]).toBe('object expected');
 });

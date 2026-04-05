@@ -214,7 +214,7 @@ const userMap = record(
 // ── Optional with factory default ────────────────────────────────────────────
 const cache = record(string(), number()).optional().default(() => ({}));
 
-// ── getNestedErrors() — per-key validation results ───────────────────────────
+// ── getErrorsFor(key) — rich per-key result with descriptor ────────────────────
 const schema = record(string(), number().min(0));
 const result = schema.validate(
     { a: 1, b: -2, c: -3 },
@@ -222,9 +222,22 @@ const result = schema.validate(
 );
 
 if (!result.valid) {
-    const nested = result.getNestedErrors();
-    console.log(nested['b']); // ValidationResult for key 'b'
-    console.log(nested['c']); // ValidationResult for key 'c'
+    // Root-level errors (e.g. 'object expected')
+    const root = result.getErrorsFor();
+    console.log(root.isValid);  // false if the container itself is invalid
+
+    // Per-key errors
+    const bResult = result.getErrorsFor('b');
+    console.log(bResult.isValid);    // false
+    console.log(bResult.errors[0]);  // 'the value must be >= 0'
+    console.log(bResult.seenValue);  // -2
+
+    // Descriptor: read/write the entry on the original object
+    const descriptor = bResult.descriptor;
+    console.log(descriptor.key);        // 'b'
+    descriptor.getSchema();             // → NumberSchemaBuilder
+    descriptor.getValue(result.object); // → { success: true, value: -2 }
+    descriptor.setValue(result.object, 0); // fixes the value in-place
 }
 ```
 

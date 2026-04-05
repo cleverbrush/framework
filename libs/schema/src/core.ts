@@ -16,13 +16,13 @@ export {
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
-export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
-export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export {
     ObjectSchemaBuilder,
     object,
     SchemaPropertySelector
 } from './builders/ObjectSchemaBuilder.js';
+export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
+export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type {
     PropertyDescriptor,
     PropertyDescriptorInner,
