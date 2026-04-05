@@ -159,7 +159,7 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
 function convertNode(schema: SchemaBuilder<any, any, any>): Out {
     const out = convertNodeInner(schema);
     const info = schema.introspect() as any;
-    if (typeof info.description === 'string')
+    if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
     return out;
 }
