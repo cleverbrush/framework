@@ -1112,7 +1112,9 @@ User.validate({ name: 'Alice', bio: null, age: null }); // valid
 | Method | Available on | Description |
 | --- | --- | --- |
 | `.oneOf(...values)` | `string`, `number` | Constrains the value to one of the given literals and **narrows the inferred type** to the literal union. |
+| `.oneOf(valuesArray, errorMessage?)` | `string`, `number` | Array-form with an optional custom error message (string or factory). |
 | `enumOf(...values)` | top-level factory | Sugar for `string().oneOf(...)`. Mirrors Zod's `z.enum()`. |
+| `enumOf(valuesArray, errorMessage?)` | top-level factory | Array-form with an optional custom error message. |
 
 ```typescript
 import { string, number, enumOf, InferType } from '@cleverbrush/schema';
@@ -1137,6 +1139,42 @@ const OptionalRole = enumOf('admin', 'user').nullable(); // 'admin' | 'user' | n
 // Runtime access to allowed values via introspect
 Role.introspect().extensions?.oneOf; // ['admin', 'user', 'guest']
 ```
+
+#### Custom error messages for `.oneOf()`
+
+`.oneOf()` accepts a custom error message via the **array form**, where the allowed values are passed as an array and the error message is the second argument:
+
+```typescript
+import { string, number, enumOf } from '@cleverbrush/schema';
+
+// String — array form with custom string error message
+const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+role.validate('other'); // invalid — "Invalid role"
+
+// String — array form with factory function
+const role2 = string().oneOf(
+    ['admin', 'user'],
+    (val) => `"${val}" is not a valid role`
+);
+
+// enumOf — array form with custom error message
+const Role = enumOf(['admin', 'user', 'guest'], 'Invalid role');
+
+// Number — trailing error message (unambiguous since values are numbers)
+const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+priority.validate(99); // invalid — "Priority must be 1, 2, or 3"
+
+// Number — array form
+const priority2 = number().oneOf([1, 2, 3], 'Invalid priority');
+
+// Number — factory function
+const priority3 = number().oneOf(
+    1, 2, 3,
+    (val) => `${val} is not a valid priority`
+);
+```
+
+> **Note on string `.oneOf()` error messages:** Because `.oneOf()` accepts a variadic list of string values, a trailing string argument is treated as another allowed value (not an error message). To provide a string error message for a string enum, use the **array form** — `string().oneOf(['a', 'b'], 'error message')`. A trailing *function* is always unambiguously treated as an error message factory in the rest-params form.
 
 All validator extensions accept an optional error message as the last parameter — either a string or a function (matching the same `ValidationErrorMessageProvider` pattern used by built-in constraints like `.minLength()`):
 

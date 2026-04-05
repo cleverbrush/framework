@@ -59,6 +59,58 @@ describe('enum extension (oneOf)', () => {
             }
         });
 
+        test('accepts custom string error message via array form', () => {
+            const schema = string().oneOf(
+                ['admin', 'user', 'guest'],
+                'Invalid role'
+            );
+            const result = schema.validate('other' as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe('Invalid role');
+            }
+        });
+
+        test('accepts custom error factory via array form', () => {
+            const schema = string().oneOf(
+                ['admin', 'user'],
+                (val: unknown) => `"${val}" is not a valid role`
+            );
+            const result = schema.validate('superadmin' as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe(
+                    '"superadmin" is not a valid role'
+                );
+            }
+        });
+
+        test('accepts custom error factory via rest-params form (function as last arg)', () => {
+            const schema = string().oneOf(
+                'admin',
+                'user',
+                (val: unknown) => `"${val}" is not allowed`
+            );
+            const result = schema.validate('other' as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe('"other" is not allowed');
+            }
+        });
+
+        test('array form still validates correctly', () => {
+            const schema = string().oneOf(['admin', 'user'], 'Invalid role');
+            expect(schema.validate('admin').valid).toBe(true);
+            expect(schema.validate('user').valid).toBe(true);
+            expect(schema.validate('other' as any).valid).toBe(false);
+        });
+
+        test('array form stores oneOf metadata via introspect', () => {
+            const schema = string().oneOf(['a', 'b', 'c'], 'error');
+            const meta = schema.introspect();
+            expect(meta.extensions?.oneOf).toEqual(['a', 'b', 'c']);
+        });
+
         test('stores oneOf metadata via introspect', () => {
             const schema = string().oneOf('a', 'b', 'c');
             const meta = schema.introspect();
@@ -157,6 +209,67 @@ describe('enum extension (oneOf)', () => {
             }
         });
 
+        test('accepts custom string error message as last rest-param', () => {
+            const schema = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+            const result = schema.validate(99 as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe(
+                    'Priority must be 1, 2, or 3'
+                );
+            }
+        });
+
+        test('accepts custom error factory as last rest-param', () => {
+            const schema = number().oneOf(
+                1,
+                2,
+                3,
+                (val: unknown) => `${val} is not a valid priority`
+            );
+            const result = schema.validate(99 as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe(
+                    '99 is not a valid priority'
+                );
+            }
+        });
+
+        test('accepts custom string error message via array form', () => {
+            const schema = number().oneOf([1, 2, 3], 'Invalid priority');
+            const result = schema.validate(99 as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe('Invalid priority');
+            }
+        });
+
+        test('accepts custom error factory via array form', () => {
+            const schema = number().oneOf(
+                [1, 2, 3],
+                (val: unknown) => `${val} is not valid`
+            );
+            const result = schema.validate(99 as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe('99 is not valid');
+            }
+        });
+
+        test('rest-params with string error message still validates correctly', () => {
+            const schema = number().oneOf(1, 2, 3, 'error');
+            expect(schema.validate(1).valid).toBe(true);
+            expect(schema.validate(2).valid).toBe(true);
+            expect(schema.validate(4 as any).valid).toBe(false);
+        });
+
+        test('rest-params with error message stores correct metadata', () => {
+            const schema = number().oneOf(10, 20, 'error');
+            const meta = schema.introspect();
+            expect(meta.extensions?.oneOf).toEqual([10, 20]);
+        });
+
         test('stores oneOf metadata via introspect', () => {
             const schema = number().oneOf(10, 20);
             const meta = schema.introspect();
@@ -219,8 +332,50 @@ describe('enum extension (oneOf)', () => {
             expect(schema.validate(null as any).valid).toBe(false);
         });
 
+        test('accepts custom string error message via array form', () => {
+            const schema = enumOf(
+                ['admin', 'user', 'guest'],
+                'Invalid role'
+            );
+            const result = schema.validate('other' as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe('Invalid role');
+            }
+        });
+
+        test('accepts custom error factory via array form', () => {
+            const schema = enumOf(
+                ['admin', 'user'],
+                (val: unknown) => `"${val}" is not a valid role`
+            );
+            const result = schema.validate('other' as any);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                expect(result.errors![0].message).toBe(
+                    '"other" is not a valid role'
+                );
+            }
+        });
+
+        test('array form still validates correctly', () => {
+            const schema = enumOf(['admin', 'user'], 'Invalid role');
+            expect(schema.validate('admin').valid).toBe(true);
+            expect(schema.validate('user').valid).toBe(true);
+            expect(schema.validate('other' as any).valid).toBe(false);
+        });
+
         test('infers literal union type', () => {
             const schema = enumOf('admin', 'user', 'guest');
+            type T = InferType<typeof schema>;
+            expectTypeOf<T>().toEqualTypeOf<'admin' | 'user' | 'guest'>();
+        });
+
+        test('infers literal union type via array form', () => {
+            const schema = enumOf(
+                ['admin', 'user', 'guest'] as const,
+                'Invalid role'
+            );
             type T = InferType<typeof schema>;
             expectTypeOf<T>().toEqualTypeOf<'admin' | 'user' | 'guest'>();
         });

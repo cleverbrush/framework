@@ -15,6 +15,7 @@
  * @module
  */
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
+import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
@@ -82,6 +83,32 @@ export interface StringOneOfExtension {
      * ```
      */
     oneOf<V extends string>(...values: [V, ...V[]]): StringOneOfReturn<V>;
+
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * Pass the allowed values as an array (first argument) to provide a
+     * custom error message as the second argument.
+     *
+     * @param values - the allowed string literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * import { string, InferType } from '@cleverbrush/schema';
+     *
+     * const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+     * role.validate('other');  // invalid — "Invalid role"
+     *
+     * const role2 = string().oneOf(['admin', 'user'], (val) => `"${val}" is not a valid role`);
+     * ```
+     */
+    oneOf<V extends string>(
+        values: readonly [V, ...V[]],
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringOneOfReturn<V>;
 }
 
 /**
@@ -112,6 +139,51 @@ export interface NumberOneOfExtension {
      * ```
      */
     oneOf<V extends number>(...values: [V, ...V[]]): NumberOneOfReturn<V>;
+
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * Because number values are always numbers, a trailing `string` or
+     * function argument is unambiguously the error message.
+     *
+     * @param args - the allowed number literals followed by an error message
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * import { number } from '@cleverbrush/schema';
+     *
+     * const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+     * const priority2 = number().oneOf(1, 2, 3, (val) => `${val} is not a valid priority`);
+     * ```
+     */
+    oneOf<V extends number>(
+        ...args: [...[V, ...V[]], ValidationErrorMessageProvider<NumberSchemaBuilder>]
+    ): NumberOneOfReturn<V>;
+
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * Pass the allowed values as an array (first argument) to provide a
+     * custom error message as the second argument.
+     *
+     * @param values - the allowed number literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * import { number } from '@cleverbrush/schema';
+     *
+     * const priority = number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+     * ```
+     */
+    oneOf<V extends number>(
+        values: readonly [V, ...V[]],
+        errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
+    ): NumberOneOfReturn<V>;
 }
 
 /**
@@ -129,17 +201,47 @@ export interface NumberOneOfExtension {
  */
 export const enumExtension = defineExtension({
     string: {
-        oneOf(this: StringSchemaBuilder, ...values: [string, ...string[]]) {
+        oneOf(this: StringSchemaBuilder, ...args: any[]) {
+            let values: string[];
+            let errorMessage:
+                | ValidationErrorMessageProvider<StringSchemaBuilder>
+                | undefined;
+
+            if (args.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            if (Array.isArray(args[0])) {
+                // Array form: oneOf(['a', 'b', 'c'], errorMessage?)
+                values = args[0] as string[];
+                errorMessage = args[1] as
+                    | ValidationErrorMessageProvider<StringSchemaBuilder>
+                    | undefined;
+            } else {
+                // Rest params form: oneOf('a', 'b', 'c') or oneOf('a', 'b', errorFn)
+                // Last arg is a function → error message factory (unambiguous)
+                const lastArg = args[args.length - 1];
+                if (typeof lastArg === 'function') {
+                    values = args.slice(0, -1) as string[];
+                    errorMessage =
+                        lastArg as ValidationErrorMessageProvider<StringSchemaBuilder>;
+                } else {
+                    values = args as string[];
+                    errorMessage = undefined;
+                }
+            }
+
             if (values.length === 0) {
                 throw new Error('oneOf requires at least one value');
             }
+
             const allowed = new Set(values);
             return this.withExtension('oneOf', values).addValidator(val => {
                 if (typeof val === 'string' && allowed.has(val)) {
                     return { valid: true, errors: [] };
                 }
                 return validationFail(
-                    undefined,
+                    errorMessage,
                     `must be one of: ${values.join(', ')}`,
                     val,
                     this
@@ -148,17 +250,50 @@ export const enumExtension = defineExtension({
         }
     },
     number: {
-        oneOf(this: NumberSchemaBuilder, ...values: [number, ...number[]]) {
+        oneOf(this: NumberSchemaBuilder, ...args: any[]) {
+            let values: number[];
+            let errorMessage:
+                | ValidationErrorMessageProvider<NumberSchemaBuilder>
+                | undefined;
+
+            if (args.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            if (Array.isArray(args[0])) {
+                // Array form: oneOf([1, 2, 3], errorMessage?)
+                values = args[0] as number[];
+                errorMessage = args[1] as
+                    | ValidationErrorMessageProvider<NumberSchemaBuilder>
+                    | undefined;
+            } else {
+                // Rest params form: oneOf(1, 2, 3) or oneOf(1, 2, 3, 'error') or oneOf(1, 2, 3, errorFn)
+                // Last arg is a string or function → error message (unambiguous since values are numbers)
+                const lastArg = args[args.length - 1];
+                if (
+                    typeof lastArg === 'string' ||
+                    typeof lastArg === 'function'
+                ) {
+                    values = args.slice(0, -1) as number[];
+                    errorMessage =
+                        lastArg as ValidationErrorMessageProvider<NumberSchemaBuilder>;
+                } else {
+                    values = args as number[];
+                    errorMessage = undefined;
+                }
+            }
+
             if (values.length === 0) {
                 throw new Error('oneOf requires at least one value');
             }
+
             const allowed = new Set(values);
             return this.withExtension('oneOf', values).addValidator(val => {
                 if (typeof val === 'number' && allowed.has(val)) {
                     return { valid: true, errors: [] };
                 }
                 return validationFail(
-                    undefined,
+                    errorMessage,
                     `must be one of: ${values.join(', ')}`,
                     val,
                     this

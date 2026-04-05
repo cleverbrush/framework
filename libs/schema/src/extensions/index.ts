@@ -19,7 +19,7 @@ import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
-import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
+import type { SchemaBuilder, ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
@@ -284,6 +284,17 @@ export const record: <
  * Convenience factory equivalent to `string().oneOf(...values)`.
  * Mirrors Zod's `z.enum(['admin', 'user', 'guest'])` API.
  *
+ * **Rest-params form** (no custom error message):
+ * ```ts
+ * const Role = enumOf('admin', 'user', 'guest');
+ * ```
+ *
+ * **Array form** (with optional custom error message):
+ * ```ts
+ * const Role = enumOf(['admin', 'user', 'guest'], 'Invalid role');
+ * const Role2 = enumOf(['admin', 'user'], (val) => `"${val}" is not a valid role`);
+ * ```
+ *
  * @param values - the allowed string literals (at least one required)
  * @returns a typed `StringSchemaBuilder` that only accepts the given values
  *
@@ -298,8 +309,21 @@ export const record: <
  * Role.validate('other');  // invalid
  * ```
  */
-export const enumOf = <const T extends string>(
+export function enumOf<const T extends string>(
     ...values: [T, ...T[]]
-): ExtendedString<T> => {
-    return (string() as any).oneOf(...values);
-};
+): ExtendedString<T>;
+export function enumOf<const T extends string>(
+    values: readonly [T, ...T[]],
+    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+): ExtendedString<T>;
+export function enumOf<const T extends string>(
+    ...args: [T, ...T[]] | [readonly [T, ...T[]], (ValidationErrorMessageProvider<StringSchemaBuilder>)?]
+): ExtendedString<T> {
+    if (Array.isArray(args[0])) {
+        return string().oneOf(
+            args[0] as readonly [T, ...T[]],
+            args[1] as ValidationErrorMessageProvider<StringSchemaBuilder> | undefined
+        ) as unknown as ExtendedString<T>;
+    }
+    return string().oneOf(...(args as [T, ...T[]])) as unknown as ExtendedString<T>;
+}
