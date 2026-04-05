@@ -1,8 +1,6 @@
 # Improvement Plan & Growth Strategy
 
-> **Last updated:** April 3, 2026. **Status:** Pre-publication — library and website are built but not yet publicly released.
-
-The framework has matured significantly. The core schema library, extension system, mapper, react-form, and schema-json packages are all implemented with tests. A full Next.js website with 32 interactive playground examples, migration guide, and API docs is ready. CI/CD is configured. The focus now shifts from building foundations to **publishing, performance, filling remaining API gaps, and growing adoption**.
+> **Last updated:** April 5, 2026. **Status:** Pre-publication — all packages built, website ready, benchmarks show market-leading performance. Shifting focus from features to publishing, ecosystem integration, and adoption.
 
 ---
 
@@ -12,85 +10,24 @@ The framework has matured significantly. The core schema library, extension syst
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Schema core** | Done | 11 builders (String, Number, Boolean, Date, Object, Array, Union, Function, Any, Null, + base), sync/async validation, branded types, immutable fluent API |
-| **Extension system** | Done | `defineExtension()` + `withExtensions()`, type-safe plugin architecture |
-| **Built-in extensions** | Done | String: email, url, uuid, ip, trim, toLowerCase, nonempty. Number: positive, negative, finite, multipleOf. Array: nonempty, unique |
-| **Sync Parse API** | Done | `validate()`, `validateAsync()`, `parse()`, `parseAsync()`, `safeParse()`, `safeParseAsync()` |
-| **Branded types** | Done | `.brand<'Email'>()` with `Brand<T, TBrand>` utility type |
-| **Object composition** | Done | `.addProps()`, `.intersect()`, `.pick()`, `.omit()`, `.partial()`, `.modifyPropSchema()`, `.acceptUnknownProps()` / `.notAcceptUnknownProps()` |
-| **PropertyDescriptors** | Done | Runtime introspection tree — the architectural differentiator |
-| **Mapper** | Done | Schema-driven object mapping with `.from()`, `.compute()`, `.ignore()`, auto-mapping |
-| **React Form** | Done | Headless schema-driven forms: `FormProvider`, `Field`, `useSchemaForm()`, custom renderers |
-| **Schema JSON** | Done | Bidirectional JSON Schema interop: `toJsonSchema()` + `fromJsonSchema()` with type inference |
-| **Deep** | Done | `deepEqual()`, `deepExtend()`, `deepFlatten()`, `hashObject()` |
-| **Async** | Done | `Collector`, `debounce()`, `throttle()`, `retry()` |
-| **Scheduler** | Done | Cron-like job scheduler with worker threads, schema-validated schedules |
-| **Knex-ClickHouse** | Done | Knex dialect for ClickHouse with retry logic; tests added |
-| **Website** | Done (unpublished) | Next.js 16, landing page, docs for all packages, playground (32 examples), "Migrating from Zod" guide, API docs (TypeDoc) |
-| **CI/CD** | Done | GitHub Actions: `ci.yml` (lint + build + test), `release.yml` (changesets publish) |
-| **Community files** | Done | CONTRIBUTING.md, CODE_OF_CONDUCT.md |
-| **Benchmarks** | Done (excellent results) | vs zod/yup/joi — **schema is #1 in 14/15 benchmarks**, 1.3–2.2x faster than zod on valid input, 8–230x faster on invalid input |
-| **Discriminated Unions** | Not needed | Works naturally with `union()` + `.equals()`, documented in playground |
+| **Schema core** | ✅ Done | 13 builders (String, Number, Boolean, Date, Object, Array, Union, Tuple, Record, Function, Any, Null, Lazy), sync/async validation, branded types, immutable fluent API |
+| **Base methods** | ✅ Done | `.optional()`, `.required()`, `.default()`, `.catch()`, `.readonly()`, `.describe()`, `.brand()`, `.hasType()`, `.addValidator()`, `.addPreprocessor()`, `.introspect()`, `.deepPartial()` (objects) |
+| **Extension system** | ✅ Done | `defineExtension()` + `withExtensions()`, type-safe plugin architecture |
+| **Built-in extensions** | ✅ Done | String: email, url, uuid, ip, trim, toLowerCase, nonempty. Number: positive, negative, finite, multipleOf. Array: nonempty, unique. All builders: nullable |
+| **PropertyDescriptors** | ✅ Done | Runtime introspection tree — the architectural differentiator |
+| **Mapper** | ✅ Done | Schema-driven object mapping: `.from()`, `.compute()`, `.ignore()`, auto-mapping, compile-time completeness checking |
+| **React Form** | ✅ Done | Headless: `FormProvider`, `Field`, `useSchemaForm()`, custom renderers, schema-driven field generation |
+| **Schema JSON** | ✅ Done | Bidirectional: `toJsonSchema()` + `fromJsonSchema()` with type inference |
+| **Deep** | ✅ Done | `deepEqual()`, `deepExtend()`, `deepFlatten()`, `hashObject()` |
+| **Async** | ✅ Done | `Collector`, `debounce()`, `throttle()`, `retry()` |
+| **Scheduler** | ✅ Done | Cron-like job scheduler with worker threads, schema-validated schedules |
+| **Knex-ClickHouse** | ✅ Done | Knex dialect for ClickHouse with retry logic |
+| **Website** | ✅ Done (unpublished) | Next.js 16, landing page, docs for all packages, 43 playground examples, "Migrating from Zod" guide, TypeDoc API docs |
+| **CI/CD** | ✅ Done | GitHub Actions: `ci.yml` (lint + build + test), `release.yml` (changesets publish) |
+| **Community files** | ✅ Done | CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue templates, PR template |
+| **Benchmarks** | ✅ Done | **#1 in 14/15 benchmarks** vs Zod/Yup/Joi. 1.3–2.2x faster on valid input, 8–230x faster on invalid input |
 
-### What's NOT Built — Feature Gaps vs Zod
-
-| Feature | Zod API | Current workaround | Impact |
-|---------|---------|-------------------|--------|
-| **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` + `@cleverbrush/mapper` | Low — mapper handles object reshaping with type-safe `.compute()`, preprocessors handle coercion; only inline single-field type-changing is uncovered |
-| **Default values** | `.default(value)` | ✅ `.default(value \| () => value)` | ✅ DONE |
-| **Recursive schemas** | `z.lazy(() => schema)` | ✅ `lazy(() => schema)` — `LazySchemaBuilder` | High — tree structures, comments, menus |
-| **Nullable** | `.nullable()` | ✅ `.nullable()` — built-in extension on all builders | ✅ DONE |
-| **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(string().equals('b'))` | Medium — verbose workaround |
-| **Tuple** | `z.tuple([str, num])` | ✅ `tuple([str, num])` — `TupleSchemaBuilder` | ✅ DONE |
-| **Record** | `z.record(keySchema, valSchema)` | ✅ `record(keySchema, valSchema)` — `RecordSchemaBuilder` | ✅ DONE |
-| **Deep partial** | `.deepPartial()` | ✅ `.deepPartial()` — recurses into nested `object()` schemas | ✅ DONE |
-| **Catch/fallback** | `.catch(fallback)` | None | ✅ DONE |
-| **Readonly** | `.readonly()` | ✅ `.readonly()` — type-level `Readonly<T>` / `ReadonlyArray<T>` | ✅ DONE |
-| **Describe** | `.describe('...')` | ✅ `.describe(text)` — runtime metadata on all builders, emitted as `description` in JSON Schema | ✅ DONE |
-| **Coercion namespace** | `z.coerce.string()` | `.addPreprocessor()` | Low — preprocessors cover this |
-| **Literal builder** | `z.literal(42)` | `number().equals(42)` or `string().equals('x')` | Low — equality operators work |
-| **Map/Set/Promise** | `z.map()`, `z.set()`, `z.promise()` | `.hasType<Map<K,V>>()` — accepts any value matching the given TypeScript type at runtime | Low — niche use cases |
-
----
-
-## Phase 1: Publish & Launch
-
-**Goal:** Get the library into users' hands. Nothing else matters until the library is publicly available.
-
-### 1.1 Publish to npm
-
-- Merge the `mapper` branch to `master`
-- Run changesets release to publish all 8 packages as v2.0.0
-- Verify all sub-path exports resolve correctly (`@cleverbrush/schema/core`, `/string`, etc.)
-- Test installation from npm in a fresh project
-
-### 1.2 Deploy the website
-
-- Deploy to production (Dockerfile is ready, Next.js standalone output configured)
-- Set up a domain (e.g. `framework.cleverbrush.com` or similar)
-- Verify playground, API docs, and all pages work in production
-- Ensure GTM tracking fires
-
-### 1.3 GitHub repo polish
-
-- Write a compelling README.md for the monorepo root (quick pitch, feature list, links)
-- Add badges: npm version, CI status, license, bundle size
-- Create GitHub issue templates: `bug_report.yml`, `feature_request.yml`
-- Add `PULL_REQUEST_TEMPLATE.md`
-- Add "good first issue" labels for contributor onboarding
-- Enable GitHub Discussions
-
----
-
-## Phase 2: Performance & Critical Gaps
-
-**Goal:** Address the biggest objections a developer evaluating the library would have. Performance is now resolved (schema beats zod in nearly every benchmark). The remaining focus is closing critical API gaps — "does it have X?".
-
-### 2.1 Performance optimization ✅ DONE
-
-Performance work on the `feature/performance` branch has transformed benchmarks from a liability into a competitive advantage. **@cleverbrush/schema now ranks #1 in 14 out of 15 benchmarks** across primitives, objects, arrays, and unions.
-
-**Results vs Zod (ops/s):**
+### Benchmark Results vs Zod (ops/s)
 
 | Benchmark | Schema | Zod | Ratio |
 |-----------|--------|-----|-------|
@@ -110,202 +47,300 @@ Performance work on the `feature/performance` branch has transformed benchmarks 
 | Union last branch (video) | 1,292,859 | 1,390,194 | 0.93x (zod 7% faster) |
 | Union no match (invalid) | 11,294,887 | 953,427 | **11.8x faster** |
 
-**Key takeaways:**
-- Valid input: consistently **1.3–2.2x faster** than zod
-- Invalid input: **8–230x faster** than zod (early-exit optimization)
-- Also beats joi and yup in virtually every benchmark
-- Only loss: union match-last-branch, where zod is ~7% faster — effectively a tie
+### Competitive Landscape (April 2026)
 
-**Remaining work:**
-- Merge `feature/performance` branch to `master`
-- Add benchmark CI job to track regressions
-- Performance is now a marketing strength, not a concern
+| | Zod (v4.3.6) | @cleverbrush/schema |
+|---|---|---|
+| **Stars** | 42.3k | Pre-publish |
+| **Bundle size** | 2kb core (gzipped) | **Must measure** |
+| **Standard Schema** | ✅ Yes (v3.24+) | ❌ Not yet — **must implement** |
+| **Runtime introspection** | ❌ Opaque schemas | ✅ **PropertyDescriptors** |
+| **Extension system** | `.refine()` only (black box) | ✅ **`defineExtension()` — type-safe, composable, introspectable** |
+| **Ecosystem integrations** | 50+ tools via Standard Schema (tRPC, RHF, TanStack, Hono, T3 Env...) | mapper + react-form + schema-json (unique but closed ecosystem) |
+| **AI/LLM support** | MCP server, llms.txt | ❌ None yet — **PropertyDescriptors are an advantage here** |
+| **Performance** | Baseline | ✅ **1.3–230x faster** |
+| **JSON Schema** | Built-in (v4) | ✅ Bidirectional via schema-json |
+| **Object mapping** | ❌ None | ✅ **Built-in mapper** |
+| **Form generation** | Via 3rd parties (RHF) | ✅ **Built-in react-form** |
 
-### 2.2 Transform & Pipe — Deprioritized (Low)
+**Key insight:** Zod won through ecosystem integrations, not features. Standard Schema is the bridge — implementing it unlocks 50+ tools instantly. PropertyDescriptors + extension system + mapper + forms are the *moat* that no competitor can replicate.
 
-Zod's `.transform(fn)` and `.pipe(schema)` are post-validation value transformations that change the output type. After analysis, **~90% of real-world transform usage is already covered** by existing tools:
+### Remaining Feature Gaps vs Zod
 
-- **Object reshaping** (the #1 use case) — `@cleverbrush/mapper` does this *better* than Zod transforms: type-safe selectors via `.compute()`, auto-mapping for same-name fields, compile-time completeness checking, and async support. Zod transforms lose property-level type safety and don't verify all output fields are covered.
-- **Value coercion** (trim, lowercase, string→number) — `.addPreprocessor()` handles pre-validation coercion, and string extensions (`trim()`, `toLowerCase()`) cover the most common cases.
-- **The remaining gap** is narrow: inline per-field type change within a single schema (e.g. `string().datetime().transform(s => new Date(s))` where `InferInput` is `string` but `InferOutput` is `Date`). This is a convenience pattern, not a blocker — the mapper handles it at the object level.
-
-May revisit post-launch if user demand materializes, but this is not a launch blocker.
-
-### 2.3 Default values ✅ DONE
-
-`.default(value | () => value)` is implemented on `SchemaBuilder`:
-
-- Returns the default when the input is `undefined`
-- Changes the type from `T | undefined` to `T`
-- Works with `.optional()` — `string().optional().default('')` yields `string`
-- Accepts static values or factory functions (`() => new Date()`, `() => []`)
-- Zero performance cost on the fast-path — default is a dedicated field, not a preprocessor
-- Validated against the schema's constraints (invalid defaults are caught)
-- Exposed via `.introspect()` as `hasDefault` and `defaultValue`
-- 29 tests covering all builders, factory functions, InferType inference, async, parse/safeParse
-
-### 2.4 Recursive schemas ✅ DONE
-
-`lazy(() => schema)` is implemented as `LazySchemaBuilder`:
-
-- Defers schema resolution to first validation call (getter is cached after first call)
-- Works inside `array()`, `object()`, and `union()` — covers trees, comments, menus, org charts
-- `resolve()` public method lets tooling (schema-json, mapper) access the resolved inner schema
-- `introspect()` returns `{ type: 'lazy', getter }` — plays nicely with `UnionSchemaBuilder` discriminator detection (falls back to O(n) scan, which is correct)
-- Requires explicit TypeScript type annotation on the outer schema variable — same as Zod, because TypeScript fundamentally cannot infer recursive types automatically
-- Full fluent API: `.optional()`, `.required()`, `.addPreprocessor()`, `.addValidator()`, `.brand()`, `hasType()`, `clearHasType()`
-- Sync and async validation paths both supported
-
-### 2.5 Nullable convenience ✅ DONE
-
-`.nullable()` is implemented as a built-in extension available on all 9 builder types:
-
-- Shorthand for `union(schema).or(nul())` — implemented via the extension system, not the base class
-- Changes inferred type from `T` to `T | null`
-- Available on `string`, `number`, `boolean`, `date`, `object`, `array`, `union`, `func`, and `any`
-- Propagates optional-ness: `string().optional().nullable()` accepts `string | null | undefined`
-- Call before `.nullable()` to chain builder-specific methods: `string().email().nullable()`
-- Fixed a pre-existing bug in `UnionSchemaBuilder`: required unions now correctly let options evaluate `null` (required check no longer short-circuits `null` before trying options)
-- All 9 existing `ExtendedX` type aliases updated; 6 new explicit factory exports (`boolean`, `date`, `object`, `union`, `func`, `any`) with proper typed overrides so the IDE shows the correct `UnionSchemaBuilder` return type instead of the wrong same-builder type
-- Exported: `nullableExtension`, `NullableMethod<TBuilder>`, `NullableReturn<TBuilder>` from `@cleverbrush/schema`
-- 45 tests covering all 9 builder types, chaining, async, optional combos, object nesting, and type inference
+| Feature | Zod API | Current workaround | Priority |
+|---------|---------|-------------------|----------|
+| **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(...)` | **High — ship before publish** |
+| **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` + `@cleverbrush/mapper` | Low — mapper covers ~90% of use cases |
+| **Coercion namespace** | `z.coerce.string()` | `.addPreprocessor()` | Low — preprocessors cover this |
+| **Literal builder** | `z.literal(42)` | `number().equals(42)` or `string().equals('x')` | Low — equality operators work |
+| **Map/Set/Promise** | `z.map()`, `z.set()`, `z.promise()` | `.hasType<Map<K,V>>()` | Low — niche |
 
 ---
 
-## Phase 3: Adoption & Marketing
+## Phase 1: Final Pre-Publish Polish ← NOW
 
-**Goal:** Get the first 100 GitHub stars and first external contributor. This is where the library transitions from "built" to "adopted".
+**Goal:** Ship the minimum needed to make first impressions excellent.
 
-### 3.1 Launch announcements
+### 1.1 Enum builder
 
-- **Blog post**: "Introducing @cleverbrush/schema — a type-safe, introspectable alternative to Zod" on dev.to, Medium, Hashnode
-- **Reddit**: Post to r/typescript, r/reactjs, r/javascript, r/node with honest comparison
-- **Twitter/X**: Thread showing the PropertyDescriptor advantage with code examples
-- **Hacker News**: "Show HN" post focused on the unique ecosystem story (schema → mapper → forms)
+Add `enumOf('admin', 'user', 'guest')` — the most visible remaining API gap vs Zod. Currently requires verbose `union(string().equals('a')).or(string().equals('b'))...`.
 
-### 3.2 "Why @cleverbrush?" comparison page on website
+- New `EnumSchemaBuilder` with factory function
+- Infers literal union type: `'admin' | 'user' | 'guest'`
+- `.options` property for runtime access to allowed values
+- Playground example, README section, migration guide entry
+- Register in extension system (`BuilderMap`)
 
-A dedicated page that honestly shows:
+### 1.2 Bundle size audit
 
-- **PropertyDescriptors** — runtime introspection that enables mapper, react-form, and tooling zod can't support
-- **Type-safe extensions** — first-class plugin system, not just `.refine()` hacks
-- **JSDoc preservation** — IDE tooltips come from schema definitions
-- **Complete ecosystem** — validation → mapping → forms from one schema definition
-- **Benchmark results** — schema is faster than zod in 14/15 benchmarks, dramatically faster on invalid input
+Zod advertises "2kb core (gzipped)". We need to know our number.
 
-### 3.3 Contributor experience
+- Measure gzipped bundle size for `@cleverbrush/schema` (full and `/core` subpath)
+- If competitive (≤5kb), advertise it prominently
+- If large, investigate tree-shaking and code splitting opportunities
+- Add bundle size badge to README
 
-- Tag 10-15 issues as "good first issue" covering: new extension validators, doc improvements, new playground examples, performance micro-optimizations
-- Write a "Your First Extension" tutorial in the contributing guide
+### 1.3 Merge & publish
+
+- Merge `mapper` branch → `master`
+- Run changesets release: all 8 packages as v2.0.0
+- Verify sub-path exports resolve: `@cleverbrush/schema/core`, `/string`, `/object`, etc.
+- Test `npm install` in a fresh project — verify TypeScript types, ESM imports, IDE autocomplete
+
+### 1.4 README overhaul (monorepo root)
+
+Current README is minimal. For first impressions:
+
+- Compelling one-liner and elevator pitch
+- Feature cards: validation, mapping, forms, JSON Schema — one schema, four capabilities
+- Performance headline: "14/15 benchmarks faster than Zod"
+- Quick-start code example (install → define → validate → infer type)
+- Badges: npm version, CI status, license, bundle size
+- Links to website, playground, API docs
+
+---
+
+## Phase 2: Deploy & Launch
+
+**Goal:** Make the library publicly accessible and generate the first wave of awareness.
+
+### 2.1 Deploy the website
+
+- Deploy to production (Dockerfile ready, Next.js standalone output)
+- Set up domain
+- Verify playground, API docs, and all pages work in production
+- Enable GTM tracking
+- Add `llms.txt` file to website root — document all packages, API surface, key concepts for AI agent discoverability (low effort, high signal)
+
+### 2.2 Launch content blitz
+
+Timing: launch all content within the same 48-hour window for maximum impact.
+
+- **Blog post** (dev.to, Medium, Hashnode): "Introducing @cleverbrush/schema — faster than Zod, with runtime introspection". Lead with benchmarks (concrete numbers), show PropertyDescriptor superpower (define schema → get validation + mapping + forms), include playground links for "try without installing"
+- **Reddit** (r/typescript, r/reactjs, r/javascript, r/node): Honest comparison post, not hype. Lead with "what you can do that you can't with Zod"
+- **Hacker News**: "Show HN" post focused on the ecosystem story (schema → mapper → forms)
+- **Twitter/X + Bluesky**: Thread with code examples and benchmark screenshots
+
+### 2.3 GitHub polish for visitors
+
+- Tag 10-15 issues as "good first issue" (new extensions, docs, playground examples, perf micro-opts)
+- Add "help wanted" labels for medium-complexity tasks
+- Write a "Your First Extension" tutorial (extensions are the lowest-barrier contribution)
 - Respond to issues/PRs within 24 hours in the early days
 - Acknowledge all contributions in release notes
 
-### 3.4 SEO & discoverability
+### 2.4 "Why @cleverbrush?" comparison page on website
 
-- Submit to package discovery sites: npms.io, Snyk Advisor, Socket.dev
-- Add to "awesome-typescript" and "awesome-react" lists
-- Write comparison blog posts that rank for "zod alternative", "typescript validation library"
-- Ensure npm package descriptions and keywords are search-optimized
+A dedicated page that honestly shows:
 
-### 3.5 Integrations & recipes
-
-Show real-world patterns with code examples (playground or blog):
-
-- Environment variable parsing with `@cleverbrush/schema`
-- API request/response validation in Express/Fastify
-- Form validation with React + react-form
-- Database row → domain model mapping with mapper
-- JSON Schema round-trip with schema-json for OpenAPI
+- **PropertyDescriptors** — runtime introspection that enables mapper, react-form, and tooling Zod can't support
+- **Type-safe extensions** — first-class plugin system, not just `.refine()` hacks
+- **JSDoc preservation** — IDE tooltips come from schema definitions
+- **Complete ecosystem** — validation → mapping → forms from one schema definition
+- **Benchmark results** — faster than Zod in 14/15 benchmarks, dramatically faster on invalid input
 
 ---
 
-## Phase 4: API Surface Completion
+## Phase 3: Standard Schema Implementation
 
-**Goal:** Close remaining gaps so that no Feature Request issue says "Zod has X but you don't". These are lower priority because workarounds exist.
+**Goal:** Unlock instant compatibility with 50+ tools (tRPC, React Hook Form, TanStack, Hono, T3 Env, etc.) by implementing the Standard Schema spec (standardschema.dev).
 
-### 4.1 Enum builder
+This is the **single highest-leverage technical feature** for adoption. Without it, every integration requires a custom adapter. With it, @cleverbrush/schema works everywhere Zod works.
 
-`s.enum(['admin', 'user', 'guest'])` — creates a union of string literals. Currently requires verbose `union(string().equals('admin')).or(string().equals('user')).or(...)`.
+### 3.1 Implement `StandardSchemaV1` on `SchemaBuilder`
 
-### 4.2 Tuple builder ✅ DONE
+The interface is small — add a `~standard` property to the base `SchemaBuilder` class:
 
-`tuple([string(), number(), boolean()])` — fixed-length array with per-position types. Needed for function arguments, CSV rows, coordinate pairs.
+- `version: 1`
+- `vendor: '@cleverbrush/schema'`
+- `validate(value)` — wraps existing `.validate()`, maps `ValidationResult` to Standard Schema's `Result<Output>` format (issues array with `message` and `path`)
+- `types` — phantom types for `Input` and `Output` inference
+- Sync-first: return synchronous result when possible, Promise for async validators
 
-### 4.3 Record builder ✅ DONE
+Implementation touches only `SchemaBuilder` base class — all 13 subclasses inherit automatically.
 
-`record(keySchema, valueSchema)` is implemented as `RecordSchemaBuilder`:
+### 3.2 Implement `StandardJSONSchemaV1`
 
-- **Dynamic-key objects** — validates objects whose key set is not known at schema-definition time (`Record<K, V>`)
-- Both key and value schemas are enforced on every entry; key schema must be a `StringSchemaBuilder`
-- Inferred TypeScript type mirrors `Record<InferType<TKeySchema>, InferType<TValueSchema>>`
-- Key-constraint support — pass any `StringSchemaBuilder` with `.matches()`, `.minLength()`, etc. to restrict keys
-- `getNestedErrors()` returns a `Record<string, ValidationResult>` mapping each failing key to its per-entry validation result, making per-field error surfacing trivial
-- `doNotStopOnFirstError` mode collects all key/value errors across the entire record
-- Full sync (`validate()`) and async (`validateAsync()`) validation paths
-- Full fluent API: `.optional()`, `.required()`, `.addPreprocessor()`, `.addValidator()`, `.default()`, `.clearDefault()`, `.brand()`, `.hasType()`, `introspect()`
-- `.nullable()` built-in extension — shorthand for `union(schema).or(nul())`
-- Registered in the extension system (`BuilderMap`, `WithExtensionsResult`) so third-party extensions can target `"record"` builder type
-- Subpath export `@cleverbrush/schema/record`
-- 40 tests covering all builders, type inference, default values, optional/required, custom validators, doNotStopOnFirstError, getNestedErrors, immutability, and nullable
+Since `toJsonSchema()` already exists in `@cleverbrush/schema-json`, wire it to the Standard JSON Schema interface:
 
-### 4.4 Deep partial ✅ DONE
+- `~standard.jsonSchema.input(options)` / `.output(options)` — delegates to `toJsonSchema()`
+- Support `draft-2020-12` and `draft-07` targets (already implemented)
 
-`.deepPartial()` is implemented on `ObjectSchemaBuilder`:
+### 3.3 Verify integrations
 
-- **Recursive by design** — descends into every nested `object()` schema at any depth
-- All `object()` properties at every level are made optional
-- Non-object properties (arrays, unions, primitives, `lazy()`) are made optional at the top level but their internals are not modified
-- The original schema is never mutated — returns a new immutable instance (consistent with the fluent API)
-- New `DeepMakeChildrenOptional<T>` recursive type helper drives TypeScript inference so that `InferType<typeof schema.deepPartial()>` produces fully nested optional types
-- Chains naturally with `.required()`, `.optional()`, `.default()`, `.readonly()`, `.brand()`
-- Tests covering: flat objects, nested objects, 3-level depth, arrays, immutability, chaining
+- Test with tRPC (define procedure input as @cleverbrush/schema)
+- Test with React Hook Form (Standard Schema resolver)
+- Test with Hono middleware
+- Document "Works with X" examples on the website
 
-### 4.5 Catch / fallback ✅ DONE
+### 3.4 Announce
 
-`.catch(value | factory)` — use a fallback value when validation fails for any reason (type mismatch, constraint violation, missing required). `parse()` and `parseAsync()` never throw when catch is set. Factory functions supported (`() => value`) for mutable fallbacks. Introspect via `hasCatch`/`catchValue`. Template-method pattern: concrete `validate()`/`validateAsync()` wrappers in base class, all 13 subclasses renamed to `_validate()`/`_validateAsync()`. 5 playground examples, README section, full JSDoc, 45+ tests.
-
-### 4.6 Readonly modifier ✅ DONE
-
-`.readonly()` is implemented on `SchemaBuilder` base class and overridden with precise return types on all 9 concrete builders:
-
-- **Type-level only** — marks the inferred TypeScript type as immutable but does not alter validation behaviour or freeze the value at runtime
-- `object(…).readonly()` → `Readonly<{ … }>` (all top-level properties become `readonly`)
-- `array(…).readonly()` → `ReadonlyArray<T>` (no `push`, `pop`, etc. at the type level)
-- Primitives (`string`, `number`, `boolean`) are identity — already immutable
-- `date().readonly()` → `Readonly<Date>`
-- `isReadonly` flag exposed via `.introspect()` for tooling
-- **Shallow** — only top-level properties are affected; apply `.readonly()` at each nesting level for deep immutability
-- Chains naturally with `.optional()` and `.default()`
-- Bidirectional JSON Schema interop via `@cleverbrush/schema-json`: `readOnly: true` ↔ `.readonly()`
-- Tests covering all builder types, type inference, introspection, chaining with optional/default, async validation
-
-### 4.7 Describe (runtime) ✅ DONE
-
-`.describe('Human-readable description')` — attach runtime metadata to any schema. Useful for documentation generation, form labels, and AI tool descriptions.
-
-- **Base class implementation** — lives on `SchemaBuilder`, returns `this` (polymorphic), so all 11+ builder subclasses inherit it with zero overrides
-- **Metadata-only** — no effect on validation; purely for tooling and documentation consumers
-- `description` exposed via `.introspect()` — readable field on any builder
-- Bidirectional JSON Schema interop via `@cleverbrush/schema-json`: `.describe(text)` ↔ `description` field (including nested object properties)
-- Chains naturally with `.optional()`, `.required()`, `.readonly()`, `.default()`, and every other fluent method
-- Immutable — returns a new builder instance; original is unaffected
-- Tests covering all builder types, type inference, introspection, chaining, immutability, validation unchanged
+- Blog post: "@cleverbrush/schema now works with tRPC, React Hook Form, Hono, and 50+ tools"
+- Update README with "Compatible with" logos/badges
+- PR to Standard Schema's implementing-libraries list on their repo
 
 ---
 
-## Phase 5: Ecosystem Expansion
+## Phase 4: AI/LLM Tooling
 
-**Goal:** Build integrations that leverage PropertyDescriptors — the library's moat. These are impossible or much harder with Zod because its schemas are opaque.
+**Goal:** Position @cleverbrush/schema as the best validation library for AI-powered development. PropertyDescriptors give us a structural advantage — schemas are introspectable, not opaque.
 
-| Package | What | Why It Matters |
-| --- | --- | --- |
-| `@cleverbrush/schema-openapi` | Generate OpenAPI 3.1 from schemas (bidirectional) | PropertyDescriptors make this natural; drives API-first team adoption |
-| `@cleverbrush/env` | Type-safe `process.env` parsing | Extremely popular use case (t3-env has 1M+ downloads); great standalone entry point |
-| `@cleverbrush/schema-ai` | Generate LLM function-calling / tool-use schemas | Hot area; JSDoc + PropertyDescriptors = better tool descriptions for AI agents |
-| `@cleverbrush/schema-graphql` | Generate GraphQL types from schemas | Full-stack type safety from schema to API |
-| `@cleverbrush/schema-drizzle` | ORM column definitions from schemas | Schema as single source of truth for DB + validation |
-| `@cleverbrush/cli` | CLI argument parsing with schemas | Validated + typed CLI args; niche but sticky |
-| Vue/Svelte/Solid form libs | Expand react-form to other frameworks | Same PropertyDescriptor pattern, different renderer bindings |
+### 4.1 `llms.txt` (ship with Phase 2)
+
+Add `llms.txt` to website root documenting the full API surface, key concepts, and usage patterns. Helps AI coding assistants (Copilot, Cursor, etc.) understand the library.
+
+### 4.2 MCP server for @cleverbrush/schema
+
+Zod already has one. Build an MCP server that lets AI agents search docs, see API examples, and understand PropertyDescriptors.
+
+- Package: `@cleverbrush/schema-mcp` or published as configuration
+- Capabilities: search docs, list builders/extensions, show usage examples
+- Leverage PropertyDescriptors for richer tool descriptions than Zod's MCP can provide
+
+### 4.3 `@cleverbrush/schema-ai` — LLM function-calling schemas
+
+Generate structured output / function-calling tool schemas from @cleverbrush/schema definitions. PropertyDescriptors + `.describe()` metadata = better tool descriptions than any competitor.
+
+- Convert schema → OpenAI function-calling format
+- Convert schema → Anthropic tool-use format
+- `.describe()` annotations flow into tool parameter descriptions automatically
+- This is architecturally impossible with Zod (no runtime introspection of constraints)
+
+---
+
+## Phase 5: Framework Integrations & Entry Points
+
+**Goal:** Meet developers where they already are. Validation libraries spread through framework integrations.
+
+### 5.1 `@cleverbrush/env` — Type-safe environment variables
+
+T3-env has 1M+ downloads. This is a high-traffic entry point:
+
+- Parse `process.env` with type-safe schemas
+- `.default()` for development fallbacks
+- Errors in CI with clear messages for missing/invalid vars
+- Framework presets (Next.js, Vite, Node)
+- Smaller and faster than t3-env (no Zod dependency)
+
+### 5.2 Integration recipes (website pages + playground)
+
+Concrete, copy-paste-ready examples for:
+
+- **tRPC**: Define procedure inputs with @cleverbrush/schema (free via Standard Schema)
+- **Hono**: Request validation middleware
+- **Express/Fastify**: Request body/params/query validation
+- **Next.js Server Actions**: Validate action inputs
+- **React Hook Form**: Use schema as form resolver (free via Standard Schema)
+
+### 5.3 `@cleverbrush/schema-openapi` — OpenAPI 3.1 generation
+
+PropertyDescriptors make this natural. Generate OpenAPI specs from schemas (bidirectional). Drives API-first team adoption.
+
+---
+
+## Phase 6: Community & Growth Engine
+
+**Goal:** Get the first 100 GitHub stars, first external contributor, and build a self-sustaining community.
+
+### 6.1 Content marketing (ongoing)
+
+Write content that ranks for search:
+
+- "Zod vs Cleverbrush Schema — honest comparison" (target "zod alternative")
+- "Best TypeScript validation libraries 2026"
+- "Schema-driven React forms without the boilerplate"
+- "Runtime schema introspection in TypeScript — why it matters"
+- "Faster TypeScript validation — benchmarks explained"
+
+### 6.2 Contributor pipeline
+
+- Extensions are the easiest contribution — self-contained file + test
+- Keep 5+ "good first issue" items available at all times
+- Respond to issues/PRs within 24 hours in early days
+- Name contributors in release notes
+- Write and maintain a "Your First Extension" tutorial
+
+### 6.3 SEO & discoverability
+
+- Submit to: npms.io, Snyk Advisor, Socket.dev, bundlephobia
+- Add to "awesome-typescript", "awesome-react" lists
+- Ensure npm keywords are search-optimized: `schema`, `validation`, `typescript`, `type-safe`, `runtime-validation`, `zod-alternative`
+
+### 6.4 Community platform
+
+Decide before or shortly after launch. Options: Discord, GitHub Discussions, or both.
+
+### 6.5 Make adoption frictionless
+
+- **Playground is the front door** — every doc page should link to a playground example
+- **Copy-paste ready examples** — every API section should have a runnable code block
+- **`npx create-cleverbrush-app`** — scaffold a project with schema + mapper + react-form wired up (future)
+- **Codemods** — `npx @cleverbrush/codemod zod-to-schema` to auto-migrate from Zod (ambitious but high-impact, future)
+
+---
+
+## Phase 7: Demand-Driven Feature Gaps
+
+**Goal:** Only build these if users request them. Workarounds exist for all.
+
+| Feature | Workaround | Build if... |
+|---------|-----------|-------------|
+| **Transform/Pipe** | `mapper` + `.addPreprocessor()` covers ~90% | Users need inline single-field type-changing |
+| **Coercion namespace** | `.addPreprocessor()` | Multiple users request it |
+| **Literal builder** | `number().equals(42)`, `string().equals('x')` | Ergonomics demand |
+| **Map/Set/Promise** | `.hasType<Map<K,V>>()` | Niche — unlikely |
+
+---
+
+## Phase 8: Long-Term Ecosystem Expansion
+
+**Goal:** Build integrations that leverage PropertyDescriptors — the library's moat.
+
+| Package | What | Why |
+|---------|------|-----|
+| `@cleverbrush/schema-graphql` | Generate GraphQL types from schemas | Full-stack type safety |
+| `@cleverbrush/schema-drizzle` | ORM column definitions from schemas | Schema as single source of truth for DB |
+| `@cleverbrush/cli` | CLI argument parsing with schemas | Niche but sticky |
+| Vue/Svelte/Solid form libs | Expand react-form pattern | Same PropertyDescriptor pattern, different renderer bindings |
+
+---
+
+## Execution Order & Dependencies
+
+```
+Phase 1: Pre-publish polish (enum, bundle audit, README) ← NOW
+    ↓
+Phase 2: Publish + deploy + launch content blitz
+    ↓          ↓
+Phase 3:    Phase 4:       (parallel)
+Std Schema  AI/LLM tooling
+    ↓
+Phase 5: Framework integrations (unlocked by Standard Schema)
+    ↓
+Phase 6: Community & growth (ongoing from Phase 2 onward)
+    ↓
+Phase 7-8: Demand-driven features + ecosystem expansion
+```
 
 ---
 
@@ -313,90 +348,107 @@ Show real-world patterns with code examples (playground or blog):
 
 ### Primary: The "Type Safety Maximalist"
 
-**Who they are:**
 - Senior TypeScript developer (3-7 years experience)
-- Works on a React/Next.js app with a Node.js backend
-- Already uses Zod or Yup, but frustrated by limitations
+- Works on React/Next.js + Node.js backend
+- Already uses Zod or Yup, frustrated by limitations
 - Values compile-time guarantees and DRY principles
-- Likely works at a startup or mid-size company (10-200 engineers)
 
-**What they care about:**
-- Single source of truth for types + validation
-- Minimal runtime overhead
-- IDE experience (autocomplete, go-to-definition, JSDoc tooltips)
-- Not writing the same shape twice (schema + mapper + form bindings)
-- Library maintainability and long-term support
-
-**Why they'd switch:**
-- The ecosystem story: define a schema once, get validation + mapping + forms — no other library does this
-- Extensions system: they've hit the limits of `.refine()` and want composable, reusable validators
-- PropertyDescriptors: they're building internal tooling that needs to inspect schemas at runtime
+**Why they'd switch:** Define a schema once, get validation + mapping + forms. Extensions system beats `.refine()`. PropertyDescriptors enable tooling Zod can't support.
 
 ### Secondary: The Form-Heavy App Builder
 
-**Who they are:**
-- Full-stack developer building data-heavy apps (CRM, admin dashboards, ERP)
-- Tired of wiring up validation logic to forms manually
-- Wants headless form bindings that work with any UI library
+- Full-stack developer building CRM, admin dashboards, ERP
+- Tired of wiring validation to forms manually
 
-**Why they'd switch:**
-- `react-form` generates form fields from schema definitions automatically
-- Validation errors map to fields without manual plumbing
-- Schema changes propagate to forms at compile time
+**Why they'd switch:** `react-form` generates fields from schemas automatically. Validation errors map to fields without plumbing.
 
 ### Tertiary: The Library/Tooling Author
 
-**Who they are:**
-- Building an internal framework, code generator, or developer tool
-- Needs to introspect validation schemas at runtime
-- Wants to generate docs, OpenAPI specs, or form UIs from schemas
+- Building frameworks, code generators, or developer tools
+- Needs runtime schema introspection
 
-**Why they'd switch:**
-- PropertyDescriptors provide a complete introspection tree
-- Extension system lets them add domain-specific semantics
-- No other validation library exposes this level of runtime metadata
+**Why they'd switch:** PropertyDescriptors provide a complete introspection tree. No other validation library exposes this level of runtime metadata.
 
 ---
 
-## How to Grow the Community
+## Strategic Pillars
 
-### Make adoption frictionless
+1. **PropertyDescriptors are the moat.** Every piece of marketing should demonstrate what you can do with introspectable schemas that's impossible with Zod. Mapper, react-form, AI tool schemas, OpenAPI — all flow from this.
 
-1. **Playground is the front door** — every doc page should link to a playground example. First impression should be "I can try this without installing anything"
-2. **`npx create-cleverbrush-app`** — scaffold a project with schema + mapper + react-form wired up (future idea)
-3. **Copy-paste ready examples** — every API section should have a runnable code block
-4. **Codemods** — `npx @cleverbrush/codemod zod-to-schema` to auto-migrate from Zod (ambitious but high-impact)
+2. **Standard Schema is the bridge.** Without it, we're an island. With it, we're a drop-in replacement that's also faster and more powerful. This is the highest-leverage work after publishing.
 
-### Make contributing rewarding
+3. **Performance is the headline.** "14/15 benchmarks faster than Zod" is a concrete, provable claim that gets attention. Lead with numbers, not adjectives.
 
-1. **Extensions are the easiest contribution** — each one is a self-contained file with a test, low barrier to entry
-2. **"Good first issue" pipeline** — always keep 5+ tagged issues available
-3. **Recognize contributors** — name in release notes, contributor badge in README
-4. **Discord community** — real-time help and discussion; lower barrier than GitHub issues
+4. **AI/LLM is the growth vector.** The convergence of schema validation + AI tool-use is a trend that plays to our architectural strength. Be early.
 
-### Make the library visible
-
-1. **Write content that ranks** — "Zod vs Cleverbrush", "Best TypeScript validation libraries 2026", "Schema-driven React forms"
-2. **Conference talks / meetup presentations** — the PropertyDescriptor story is a compelling technical talk
-3. **Integration with popular tools** — tRPC adapter, Hono middleware, Fastify plugin — these show up in other libraries' docs and drive traffic
-4. **Sponsor / partner with dev content creators** — get the library into tutorial videos
+5. **Ecosystem integrations > new features.** Developers adopt libraries through the tools they already use. Show up in tRPC, React Hook Form, Hono, T3 Env — and users follow.
 
 ---
 
-## Strategic Insight
+## Completed Features (Reference)
 
-The **PropertyDescriptor system** is the library's moat. Zod schemas are opaque — you can validate with them but can't introspect them to build tooling. `@cleverbrush/schema` schemas are **transparent and introspectable**, enabling an entire ecosystem (mapper, react-form, schema-json, and all of Phase 5) that's architecturally impossible with Zod. This should be the central marketing message.
+<details>
+<summary>Performance optimization ✅</summary>
 
-The secondary moat is the **extension system**. Zod's only customization is `.refine()` — a black-box function with no metadata. Cleverbrush extensions are type-safe, composable, discoverable (via introspection), and can carry metadata. This makes the library a platform, not just a validator.
+Performance work on `feature/performance` branch transformed benchmarks from a liability into a competitive advantage. **#1 in 14 out of 15 benchmarks** across primitives, objects, arrays, and unions. Valid input: 1.3–2.2x faster than Zod. Invalid input: 8–230x faster (early-exit optimization). Only loss: union match-last-branch (~7% slower, effectively a tie).
+</details>
 
----
+<details>
+<summary>Default values ✅</summary>
 
-## Immediate Priorities (ordered)
+`.default(value | () => value)` on `SchemaBuilder`. Returns default when input is `undefined`. Changes type from `T | undefined` to `T`. Accepts static values or factory functions. Zero performance cost on fast-path. Exposed via `.introspect()` as `hasDefault`/`defaultValue`. 29 tests.
+</details>
 
-1. ~~**Performance optimization**~~ ✅ Done — schema is now **faster than zod** in 14/15 benchmarks (1.3–2.2x on valid, 8–230x on invalid)
-2. **Publish to npm** — nothing else matters until people can `npm install` the library
-3. **Deploy the website** — the playground is the best onboarding tool; make it live
-4. **Write launch blog post** — announce on dev.to, Reddit, HN — performance is now a headline feature
-5. ~~**Add .default()**~~ ✅ Done — `.default(value | () => value)` with factory functions, zero perf cost, 29 tests
-6. ~~**Add .transform()**~~ Deprioritized (Low) — mapper's `.compute()` + preprocessors cover ~90% of real-world transform use cases; only inline single-field type-changing is uncovered
-6. **Tag "good first issue" items** — prepare for the first wave of visitors to the repo
+<details>
+<summary>Recursive schemas (lazy) ✅</summary>
+
+`lazy(() => schema)` as `LazySchemaBuilder`. Defers schema resolution to first validation call (cached). Works inside `array()`, `object()`, `union()`. `resolve()` public method for tooling. Requires explicit TS type annotation (same as Zod). Full fluent API, sync/async.
+</details>
+
+<details>
+<summary>Nullable ✅</summary>
+
+`.nullable()` as built-in extension on all builder types. Shorthand for `union(schema).or(nul())`. Changes `T` to `T | null`. 45 tests.
+</details>
+
+<details>
+<summary>Tuple builder ✅</summary>
+
+`tuple([string(), number(), boolean()])` — fixed-length array with per-position types.
+</details>
+
+<details>
+<summary>Record builder ✅</summary>
+
+`record(keySchema, valueSchema)` as `RecordSchemaBuilder`. Dynamic-key objects with key+value schema enforcement. `getNestedErrors()` for per-field error surfacing. `doNotStopOnFirstError` mode. Subpath export `@cleverbrush/schema/record`. 40 tests.
+</details>
+
+<details>
+<summary>Deep partial ✅</summary>
+
+`.deepPartial()` on `ObjectSchemaBuilder`. Recurses into every nested `object()` at any depth. `DeepMakeChildrenOptional<T>` type helper. Immutable.
+</details>
+
+<details>
+<summary>Catch / fallback ✅</summary>
+
+`.catch(value | factory)` — fallback value when validation fails. `parse()`/`parseAsync()` never throw with catch set. Factory functions supported. Introspect via `hasCatch`/`catchValue`. Template-method pattern in base class. 45+ tests.
+</details>
+
+<details>
+<summary>Readonly modifier ✅</summary>
+
+`.readonly()` on `SchemaBuilder` base class. Type-level only (`Readonly<T>` / `ReadonlyArray<T>`). `isReadonly` flag via `.introspect()`. Bidirectional JSON Schema interop (`readOnly: true`).
+</details>
+
+<details>
+<summary>Describe ✅</summary>
+
+`.describe('text')` on `SchemaBuilder`. Metadata-only, no validation effect. `description` via `.introspect()`. Bidirectional JSON Schema interop. Immutable.
+</details>
+
+<details>
+<summary>Transform/Pipe — Deprioritized</summary>
+
+~90% of real-world usage covered by mapper's `.compute()` + `.addPreprocessor()` + string extensions. The remaining gap (inline single-field type change) is a convenience, not a blocker. Moved to demand-driven (Phase 7).
+</details>
