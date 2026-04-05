@@ -53,9 +53,16 @@ type NumberSchemaBuilderCreateProps<
 export class NumberSchemaBuilder<
     TResult = number,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #min?: number;
     #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
         NumberSchemaBuilder<TResult, TRequired>
@@ -276,7 +283,8 @@ export class NumberSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): NumberSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
+    ): NumberSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -288,6 +296,7 @@ export class NumberSchemaBuilder<
     public clearHasType(): NumberSchemaBuilder<
         number,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -372,8 +381,8 @@ export class NumberSchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
                 done: true,
@@ -442,7 +451,10 @@ export class NumberSchemaBuilder<
             if (typeof object === 'undefined' || object === null) {
                 if (typeof object === 'undefined' && this.hasDefault) {
                     object = this.resolveDefaultValue();
-                } else if (!this.isRequired) {
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
                     return { valid: true, object: object };
                 } else {
                     return {
@@ -552,6 +564,7 @@ export class NumberSchemaBuilder<
         }) as any as NumberSchemaBuilder<
             T,
             TRequired,
+            TNullable,
             THasDefault,
             TExtensions
         > &
@@ -564,6 +577,7 @@ export class NumberSchemaBuilder<
     public clearEquals(): NumberSchemaBuilder<
         number,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -581,6 +595,7 @@ export class NumberSchemaBuilder<
     public isFloat(): NumberSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -599,6 +614,7 @@ export class NumberSchemaBuilder<
     public clearIsInteger(): NumberSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -621,7 +637,13 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -635,7 +657,7 @@ export class NumberSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): NumberSchemaBuilder<TResult, true, THasDefault, TExtensions> &
+    ): NumberSchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -646,6 +668,7 @@ export class NumberSchemaBuilder<
     public optional(): NumberSchemaBuilder<
         TResult,
         false,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -658,7 +681,8 @@ export class NumberSchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): NumberSchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
+    ): NumberSchemaBuilder<TResult, true, TNullable, true, TExtensions> &
+        TExtensions {
         return super.default(value) as any;
     }
 
@@ -668,6 +692,7 @@ export class NumberSchemaBuilder<
     public clearDefault(): NumberSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         false,
         TExtensions
     > &
@@ -683,6 +708,7 @@ export class NumberSchemaBuilder<
     ): NumberSchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -700,6 +726,7 @@ export class NumberSchemaBuilder<
     public readonly(): NumberSchemaBuilder<
         Readonly<TResult>,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -717,7 +744,13 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -732,6 +765,7 @@ export class NumberSchemaBuilder<
     public canBeNaN(): NumberSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -754,7 +788,13 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -769,6 +809,7 @@ export class NumberSchemaBuilder<
     public canBeInfinite(): NumberSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -792,7 +833,13 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (typeof minValue !== 'number')
             throw new Error('minValue must be a number');
@@ -809,6 +856,7 @@ export class NumberSchemaBuilder<
     public clearMin(): NumberSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -831,7 +879,13 @@ export class NumberSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             NumberSchemaBuilder<TResult, TRequired>
         >
-    ): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (typeof maxValue !== 'number')
             throw new Error('maxValue must be a number');
@@ -848,6 +902,7 @@ export class NumberSchemaBuilder<
     public clearMax(): NumberSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -857,6 +912,34 @@ export class NumberSchemaBuilder<
         return this.createFromProps({
             ...schema
         }) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        true,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 

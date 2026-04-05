@@ -712,10 +712,6 @@ li {
     overflow: hidden;
 }
 
-.bench-group-compact .bench-bar-track {
-    /* same style, just a flag for future tweaks */
-}
-
 .bench-bar-fill {
     height: 100%;
     border-radius: 4px;
@@ -947,6 +943,65 @@ li {
     color: var(--text-secondary);
     margin: 0 0 0.5rem;
     line-height: 1.65;
+}
+
+/* ── Bundle Size Details ─────────────────────────────────────────── */
+
+.bundle-size-details {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 0.75rem;
+}
+
+.bundle-size-details summary {
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.bundle-size-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.bundle-size-details summary::before {
+    content: "▶";
+    font-size: 0.6rem;
+    transition: transform 0.15s ease;
+    display: inline-block;
+}
+
+.bundle-size-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.bundle-size-details summary:hover {
+    color: var(--text-secondary);
+}
+
+.bundle-size-body {
+    padding-top: 0.75rem;
+}
+
+.bundle-size-body p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 0 0.75rem;
+}
+
+.bundle-size-note {
+    /* biome-ignore lint/complexity/noImportantStyles: This section requires !important to override other styles */
+    font-size: 0.82rem !important;
+    /* biome-ignore lint/complexity/noImportantStyles: This section requires !important to override other styles */
+    color: var(--text-muted) !important;
+    /* biome-ignore lint/complexity/noImportantStyles: This section requires !important to override other styles */
+    margin-top: 0.75rem !important;
+    /* biome-ignore lint/complexity/noImportantStyles: This section requires !important to override other styles */
+    margin-bottom: 0 !important;
 }
 
 /* ── Code Blocks ─────────────────────────────────────────────────── */

@@ -76,9 +76,16 @@ const parseFromEpochPreprocessor = (value: any) => {
 export class DateSchemaBuilder<
     TResult = Date,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #min?: Date;
     #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
         DateSchemaBuilder<TResult, TRequired>
@@ -300,7 +307,8 @@ export class DateSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): DateSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -312,6 +320,7 @@ export class DateSchemaBuilder<
     public clearHasType(): DateSchemaBuilder<
         Date,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -378,8 +387,8 @@ export class DateSchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
                 done: true,
@@ -463,7 +472,10 @@ export class DateSchemaBuilder<
             if (typeof object === 'undefined' || object === null) {
                 if (typeof object === 'undefined' && this.hasDefault) {
                     object = this.resolveDefaultValue();
-                } else if (!this.isRequired) {
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
                     return { valid: true, object: object };
                 } else {
                     return {
@@ -567,13 +579,20 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<T, TRequired, THasDefault, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<T, TRequired, TNullable, THasDefault, TExtensions> &
+        TExtensions {
         if (!(value instanceof Date)) throw new Error('Date expected');
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
-        }) as any as DateSchemaBuilder<T, TRequired, THasDefault, TExtensions> &
+        }) as any as DateSchemaBuilder<
+            T,
+            TRequired,
+            TNullable,
+            THasDefault,
+            TExtensions
+        > &
             TExtensions;
     }
 
@@ -583,6 +602,7 @@ export class DateSchemaBuilder<
     public clearEquals(): DateSchemaBuilder<
         Date,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -598,7 +618,7 @@ export class DateSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): DateSchemaBuilder<TResult, true, THasDefault, TExtensions> &
+    ): DateSchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -609,6 +629,7 @@ export class DateSchemaBuilder<
     public optional(): DateSchemaBuilder<
         TResult,
         false,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -621,7 +642,8 @@ export class DateSchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): DateSchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
+    ): DateSchemaBuilder<TResult, true, TNullable, true, TExtensions> &
+        TExtensions {
         return super.default(value) as any;
     }
 
@@ -631,6 +653,7 @@ export class DateSchemaBuilder<
     public clearDefault(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         false,
         TExtensions
     > &
@@ -646,6 +669,7 @@ export class DateSchemaBuilder<
     ): DateSchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -663,6 +687,7 @@ export class DateSchemaBuilder<
     public readonly(): DateSchemaBuilder<
         Readonly<TResult>,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -680,7 +705,13 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -695,6 +726,7 @@ export class DateSchemaBuilder<
     public clearIsInFuture(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -715,7 +747,13 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect(),
@@ -730,6 +768,7 @@ export class DateSchemaBuilder<
     public clearIsInPast(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -751,7 +790,13 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (!(minValue instanceof Date))
             throw new Error('minValue must be a Date');
@@ -768,6 +813,7 @@ export class DateSchemaBuilder<
     public clearMin(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -790,7 +836,13 @@ export class DateSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             DateSchemaBuilder<TResult, TRequired>
         >
-    ): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (!(maxValue instanceof Date))
             throw new Error('maxValue must be a Date');
@@ -807,6 +859,7 @@ export class DateSchemaBuilder<
     public clearMax(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -825,6 +878,7 @@ export class DateSchemaBuilder<
     public acceptJsonString(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -841,6 +895,7 @@ export class DateSchemaBuilder<
     public doNotAcceptJsonString(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -858,6 +913,7 @@ export class DateSchemaBuilder<
     public acceptEpoch(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -874,6 +930,7 @@ export class DateSchemaBuilder<
     public doNotAcceptEpoch(): DateSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -882,6 +939,34 @@ export class DateSchemaBuilder<
             ...this.introspect(),
             parseFromEpoch: false
         }) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        true,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 

@@ -191,6 +191,26 @@ export default function MigratingFromZodPage() {
                                 </tr>
                                 <tr>
                                     <td>
+                                        <code>
+                                            z.enum([&apos;a&apos;,
+                                            &apos;b&apos;])
+                                        </code>
+                                    </td>
+                                    <td>
+                                        <code>
+                                            enumOf(&apos;a&apos;, &apos;b&apos;)
+                                        </code>
+                                    </td>
+                                    <td>
+                                        Also available as{' '}
+                                        <code>
+                                            string().oneOf(&apos;a&apos;,
+                                            &apos;b&apos;)
+                                        </code>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>.parse(v)</code>
                                     </td>
                                     <td>
@@ -564,6 +584,35 @@ const Circle    = object({ kind: string().equals('circle'),    radius: number() 
 const Rectangle = object({ kind: string().equals('rectangle'), width: number(), height: number() });
 const Shape     = union(Circle).or(Rectangle);
 // TypeScript infers: { kind: 'circle'; radius: number } | { kind: 'rectangle'; width: number; height: number }`
+                                )
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Enums ────────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Enums</h2>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(
+                                    `// Zod
+const Role = z.enum(['admin', 'user', 'guest']);
+type Role = z.infer<typeof Role>; // 'admin' | 'user' | 'guest'
+
+// @cleverbrush/schema — top-level factory
+import { enumOf, InferType } from '@cleverbrush/schema';
+const Role = enumOf('admin', 'user', 'guest');
+type Role = InferType<typeof Role>; // 'admin' | 'user' | 'guest'
+
+// or as an extension method on string()
+const Role2 = string().oneOf('admin', 'user', 'guest');
+
+// Also works on numbers
+const Priority = number().oneOf(1, 2, 3);
+type Priority = InferType<typeof Priority>; // 1 | 2 | 3`
                                 )
                             }}
                         />

@@ -15,6 +15,7 @@
 import {
     type BRAND,
     type InferType,
+    type PreValidationResult,
     SchemaBuilder,
     type ValidationContext,
     type ValidationError,
@@ -35,7 +36,7 @@ import type { StringSchemaBuilder } from './StringSchemaBuilder.js';
  */
 export type RecordKeyDescriptor<
     TRecord,
-    TValueSchema extends SchemaBuilder<any, any, any>
+    TValueSchema extends SchemaBuilder<any, any, any, any, any>
 > = {
     /** The key within the record this descriptor refers to. */
     readonly key: string;
@@ -62,7 +63,7 @@ export type RecordKeyDescriptor<
  */
 export type RecordKeyValidationResult<
     TRecord,
-    TValueSchema extends SchemaBuilder<any, any, any>
+    TValueSchema extends SchemaBuilder<any, any, any, any, any>
 > = {
     /** Validation error messages for this entry; empty array when valid. */
     readonly errors: ReadonlyArray<string>;
@@ -97,7 +98,7 @@ export type RecordRootValidationResult<TResult> = {
  */
 export type RecordSchemaValidationResult<
     TResult,
-    TValueSchema extends SchemaBuilder<any, any, any>
+    TValueSchema extends SchemaBuilder<any, any, any, any, any>
 > = ValidationResult<TResult> & {
     /**
      * Returns per-key validation results as a plain object.
@@ -175,7 +176,7 @@ export type RecordSchemaValidationResult<
 
 type RecordSchemaBuilderCreateProps<
     TKeySchema extends StringSchemaBuilder<any, any, any, any>,
-    TValueSchema extends SchemaBuilder<any, any, any>,
+    TValueSchema extends SchemaBuilder<any, any, any, any, any>,
     R extends boolean = true
 > = Partial<
     ReturnType<RecordSchemaBuilder<TKeySchema, TValueSchema, R>['introspect']>
@@ -226,15 +227,22 @@ type RecordSchemaBuilderCreateProps<
  */
 export class RecordSchemaBuilder<
     TKeySchema extends StringSchemaBuilder<any, any, any, any>,
-    TValueSchema extends SchemaBuilder<any, any, any>,
+    TValueSchema extends SchemaBuilder<any, any, any, any, any>,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
     THasDefault extends boolean = false,
     TExtensions = {},
     TResult = TExplicitType extends undefined
         ? Record<InferType<TKeySchema>, InferType<TValueSchema>>
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #keySchema!: TKeySchema;
     #valueSchema!: TValueSchema;
 
@@ -274,6 +282,7 @@ export class RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
         true,
+        TNullable,
         T,
         THasDefault,
         TExtensions
@@ -291,6 +300,7 @@ export class RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
         TRequired,
+        TNullable,
         undefined,
         THasDefault,
         TExtensions
@@ -319,6 +329,7 @@ export class RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
         true,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -334,6 +345,7 @@ export class RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
         false,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -351,6 +363,7 @@ export class RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
         true,
+        TNullable,
         TExplicitType,
         true,
         TExtensions
@@ -366,6 +379,7 @@ export class RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
         TRequired,
+        TNullable,
         TExplicitType,
         false,
         TExtensions
@@ -383,6 +397,7 @@ export class RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
         TRequired,
+        TNullable,
         TResult & { readonly [K in BRAND]: TBrand },
         THasDefault,
         TExtensions
@@ -465,6 +480,149 @@ export class RecordSchemaBuilder<
     }
 
     /**
+     * Shared setup for {@link #validateFull} and {@link _validateAsync}.
+     * Runs pre-validation guards (null / undefined / type checks) and
+     * builds the `getNestedErrors` / `getErrorsFor` closures.
+     *
+     * Returns either an early result (when validation can short-circuit)
+     * or the data needed for the per-entry loop.
+     */
+    #createValidationSetup(
+        object: TResult,
+        superResult: PreValidationResult<any, { validatedObject: any }>
+    ):
+        | {
+              earlyReturn: true;
+              result: RecordSchemaValidationResult<TResult, TValueSchema>;
+          }
+        | {
+              earlyReturn: false;
+              objToValidate: any;
+              nestedKeyResults: Map<
+                  string,
+                  ValidationResult<InferType<TValueSchema>>
+              >;
+              getNestedErrors: () => Record<
+                  string,
+                  ValidationResult<InferType<TValueSchema>>
+              >;
+              getErrorsFor: (key?: string) => any;
+          } {
+        const { valid, errors } = superResult;
+
+        const rootErrorMsgs: string[] = [];
+        const nestedKeyResults = new Map<
+            string,
+            ValidationResult<InferType<TValueSchema>>
+        >();
+        const getNestedErrors = () => this.#buildNestedErrors(nestedKeyResults);
+        const getErrorsFor = (key?: string): any => {
+            if (typeof key === 'undefined') {
+                return {
+                    errors: rootErrorMsgs as ReadonlyArray<string>,
+                    isValid: rootErrorMsgs.length === 0,
+                    seenValue: object
+                };
+            }
+            const nestedResult = nestedKeyResults.get(key);
+            const errMsgs =
+                nestedResult && !nestedResult.valid
+                    ? (nestedResult.errors ?? []).map(
+                          (e: ValidationError) => e.message
+                      )
+                    : [];
+            return this.#makeKeyResult(key, errMsgs, object);
+        };
+
+        if (!valid) {
+            for (const e of errors ?? []) rootErrorMsgs.push(e.message);
+            return {
+                earlyReturn: true,
+                result: {
+                    valid,
+                    errors,
+                    getNestedErrors,
+                    getErrorsFor
+                } as any
+            };
+        }
+
+        const objToValidate = superResult.transaction!.object
+            .validatedObject as any;
+
+        if (
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
+        ) {
+            return {
+                earlyReturn: true,
+                result: {
+                    valid: true,
+                    object: objToValidate,
+                    getNestedErrors,
+                    getErrorsFor
+                } as any
+            };
+        }
+
+        if (
+            typeof objToValidate !== 'object' ||
+            Array.isArray(objToValidate) ||
+            objToValidate === null
+        ) {
+            rootErrorMsgs.push('object expected');
+            return {
+                earlyReturn: true,
+                result: {
+                    valid: false,
+                    errors: [{ message: 'object expected' }],
+                    getNestedErrors,
+                    getErrorsFor
+                } as any
+            };
+        }
+
+        return {
+            earlyReturn: false,
+            objToValidate,
+            nestedKeyResults,
+            getNestedErrors,
+            getErrorsFor
+        };
+    }
+
+    /**
+     * Builds the final validation result from the per-entry loop outcome.
+     */
+    #buildEntryResult(
+        allValid: boolean,
+        allErrors: ValidationError[],
+        result: Record<string, any>,
+        doNotStop: boolean,
+        getNestedErrors: () => Record<
+            string,
+            ValidationResult<InferType<TValueSchema>>
+        >,
+        getErrorsFor: (key?: string) => any
+    ): RecordSchemaValidationResult<TResult, TValueSchema> {
+        if (!allValid) {
+            return {
+                valid: false,
+                errors: doNotStop ? allErrors : [allErrors[0]],
+                getNestedErrors,
+                getErrorsFor
+            } as any;
+        }
+
+        return {
+            valid: true,
+            object: result as TResult,
+            getNestedErrors,
+            getErrorsFor
+        } as any;
+    }
+
+    /**
      * Core sync validation. {@inheritDoc SchemaBuilder.validate}
      */
     public validate(
@@ -501,7 +659,10 @@ export class RecordSchemaBuilder<
             if (typeof object === 'undefined' || object === null) {
                 if (typeof object === 'undefined' && this.hasDefault) {
                     object = this.resolveDefaultValue();
-                } else if (!this.isRequired) {
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
                     const capturedObj = object;
                     return {
                         valid: true,
@@ -631,74 +792,24 @@ export class RecordSchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): RecordSchemaValidationResult<TResult, TValueSchema> {
-        const superResult = this.preValidateSync(object, context);
-        const { valid, errors } = superResult;
+        const setup = this.#createValidationSetup(
+            object,
+            this.preValidateSync(object, context)
+        );
+        if (setup.earlyReturn) return setup.result;
 
-        const rootErrorMsgs: string[] = [];
-        const nestedKeyResults = new Map<
-            string,
-            ValidationResult<InferType<TValueSchema>>
-        >();
-        const getNestedErrors = () => this.#buildNestedErrors(nestedKeyResults);
-        const getErrorsFor = (key?: string): any => {
-            if (typeof key === 'undefined') {
-                return {
-                    errors: rootErrorMsgs as ReadonlyArray<string>,
-                    isValid: rootErrorMsgs.length === 0,
-                    seenValue: object
-                };
-            }
-            const nestedResult = nestedKeyResults.get(key);
-            const errMsgs =
-                nestedResult && !nestedResult.valid
-                    ? (nestedResult.errors ?? []).map(
-                          (e: ValidationError) => e.message
-                      )
-                    : [];
-            return this.#makeKeyResult(key, errMsgs, object);
-        };
-
-        if (!valid) {
-            for (const e of errors ?? []) rootErrorMsgs.push(e.message);
-            return { valid, errors, getNestedErrors, getErrorsFor } as any;
-        }
-
-        const objToValidate = superResult.transaction!.object
-            .validatedObject as any;
-
-        if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            !this.isRequired
-        ) {
-            return {
-                valid: true,
-                object: objToValidate,
-                getNestedErrors,
-                getErrorsFor
-            } as any;
-        }
-
-        if (
-            typeof objToValidate !== 'object' ||
-            Array.isArray(objToValidate) ||
-            objToValidate === null
-        ) {
-            rootErrorMsgs.push('object expected');
-            return {
-                valid: false,
-                errors: [{ message: 'object expected' }],
-                getNestedErrors,
-                getErrorsFor
-            } as any;
-        }
-
-        const keys = Object.keys(objToValidate);
+        const {
+            objToValidate,
+            nestedKeyResults,
+            getNestedErrors,
+            getErrorsFor
+        } = setup;
         const doNotStop = context?.doNotStopOnFirstError ?? false;
         let allValid = true;
         const result: Record<string, any> = {};
         const allErrors: ValidationError[] = [];
 
-        for (const key of keys) {
+        for (const key of Object.keys(objToValidate)) {
             const keyResult = this.#keySchema.validate(key);
             if (!keyResult.valid) {
                 allValid = false;
@@ -706,13 +817,10 @@ export class RecordSchemaBuilder<
                     keyResult.errors && keyResult.errors.length > 0
                         ? keyResult.errors
                         : [{ message: `key "${key}" is invalid` }];
-
-                // Store in nested errors for the value slot too
                 nestedKeyResults.set(key, {
                     valid: false,
                     errors: keyErrors
                 });
-
                 allErrors.push(...keyErrors);
                 if (!doNotStop) break;
                 continue;
@@ -722,7 +830,6 @@ export class RecordSchemaBuilder<
                 objToValidate[key],
                 doNotStop ? { doNotStopOnFirstError: true } : undefined
             );
-
             nestedKeyResults.set(key, valueResult as any);
 
             if (!valueResult.valid) {
@@ -738,21 +845,14 @@ export class RecordSchemaBuilder<
             }
         }
 
-        if (!allValid) {
-            return {
-                valid: false,
-                errors: doNotStop ? allErrors : [allErrors[0]],
-                getNestedErrors,
-                getErrorsFor
-            } as any;
-        }
-
-        return {
-            valid: true,
-            object: result as TResult,
+        return this.#buildEntryResult(
+            allValid,
+            allErrors,
+            result,
+            doNotStop,
             getNestedErrors,
             getErrorsFor
-        } as any;
+        );
     }
 
     /**
@@ -767,74 +867,24 @@ export class RecordSchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): Promise<RecordSchemaValidationResult<TResult, TValueSchema>> {
-        const superResult = await this.preValidateAsync(object, context);
-        const { valid, errors } = superResult;
+        const setup = this.#createValidationSetup(
+            object,
+            await this.preValidateAsync(object, context)
+        );
+        if (setup.earlyReturn) return setup.result;
 
-        const rootErrorMsgs: string[] = [];
-        const nestedKeyResults = new Map<
-            string,
-            ValidationResult<InferType<TValueSchema>>
-        >();
-        const getNestedErrors = () => this.#buildNestedErrors(nestedKeyResults);
-        const getErrorsFor = (key?: string): any => {
-            if (typeof key === 'undefined') {
-                return {
-                    errors: rootErrorMsgs as ReadonlyArray<string>,
-                    isValid: rootErrorMsgs.length === 0,
-                    seenValue: object
-                };
-            }
-            const nestedResult = nestedKeyResults.get(key);
-            const errMsgs =
-                nestedResult && !nestedResult.valid
-                    ? (nestedResult.errors ?? []).map(
-                          (e: ValidationError) => e.message
-                      )
-                    : [];
-            return this.#makeKeyResult(key, errMsgs, object);
-        };
-
-        if (!valid) {
-            for (const e of errors ?? []) rootErrorMsgs.push(e.message);
-            return { valid, errors, getNestedErrors, getErrorsFor } as any;
-        }
-
-        const objToValidate = superResult.transaction!.object
-            .validatedObject as any;
-
-        if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            !this.isRequired
-        ) {
-            return {
-                valid: true,
-                object: objToValidate,
-                getNestedErrors,
-                getErrorsFor
-            } as any;
-        }
-
-        if (
-            typeof objToValidate !== 'object' ||
-            Array.isArray(objToValidate) ||
-            objToValidate === null
-        ) {
-            rootErrorMsgs.push('object expected');
-            return {
-                valid: false,
-                errors: [{ message: 'object expected' }],
-                getNestedErrors,
-                getErrorsFor
-            } as any;
-        }
-
-        const keys = Object.keys(objToValidate);
+        const {
+            objToValidate,
+            nestedKeyResults,
+            getNestedErrors,
+            getErrorsFor
+        } = setup;
         const doNotStop = context?.doNotStopOnFirstError ?? false;
         let allValid = true;
         const result: Record<string, any> = {};
         const allErrors: ValidationError[] = [];
 
-        for (const key of keys) {
+        for (const key of Object.keys(objToValidate)) {
             const keyResult = await this.#keySchema.validateAsync(key);
             if (!keyResult.valid) {
                 allValid = false;
@@ -842,8 +892,10 @@ export class RecordSchemaBuilder<
                     keyResult.errors && keyResult.errors.length > 0
                         ? keyResult.errors
                         : [{ message: `key "${key}" is invalid` }];
-
-                nestedKeyResults.set(key, { valid: false, errors: keyErrors });
+                nestedKeyResults.set(key, {
+                    valid: false,
+                    errors: keyErrors
+                });
                 allErrors.push(...keyErrors);
                 if (!doNotStop) break;
                 continue;
@@ -853,7 +905,6 @@ export class RecordSchemaBuilder<
                 objToValidate[key],
                 doNotStop ? { doNotStopOnFirstError: true } : undefined
             );
-
             nestedKeyResults.set(key, valueResult as any);
 
             if (!valueResult.valid) {
@@ -869,21 +920,46 @@ export class RecordSchemaBuilder<
             }
         }
 
-        if (!allValid) {
-            return {
-                valid: false,
-                errors: doNotStop ? allErrors : [allErrors[0]],
-                getNestedErrors,
-                getErrorsFor
-            } as any;
-        }
-
-        return {
-            valid: true,
-            object: result as TResult,
+        return this.#buildEntryResult(
+            allValid,
+            allErrors,
+            result,
+            doNotStop,
             getNestedErrors,
             getErrorsFor
-        } as any;
+        );
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): RecordSchemaBuilder<
+        TKeySchema,
+        TValueSchema,
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): RecordSchemaBuilder<
+        TKeySchema,
+        TValueSchema,
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 
@@ -947,7 +1023,7 @@ export class RecordSchemaBuilder<
  */
 export function record<
     TKeySchema extends StringSchemaBuilder<any, any, any, any>,
-    TValueSchema extends SchemaBuilder<any, any, any>
+    TValueSchema extends SchemaBuilder<any, any, any, any, any>
 >(
     keySchema: TKeySchema,
     valueSchema: TValueSchema

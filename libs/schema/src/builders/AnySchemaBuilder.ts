@@ -29,11 +29,18 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<
  */
 export class AnySchemaBuilder<
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
     THasDefault extends boolean = false,
     TExtensions = {},
     TResult = TExplicitType extends undefined ? any : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     /**
      * @hidden
      */
@@ -53,7 +60,8 @@ export class AnySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): AnySchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions {
+    ): AnySchemaBuilder<true, TNullable, T, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -64,6 +72,7 @@ export class AnySchemaBuilder<
      */
     public clearHasType(): AnySchemaBuilder<
         TRequired,
+        TNullable,
         undefined,
         THasDefault,
         TExtensions
@@ -147,7 +156,13 @@ export class AnySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): AnySchemaBuilder<true, TExplicitType, THasDefault, TExtensions> &
+    ): AnySchemaBuilder<
+        true,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -157,6 +172,7 @@ export class AnySchemaBuilder<
      */
     public optional(): AnySchemaBuilder<
         false,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -170,7 +186,8 @@ export class AnySchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): AnySchemaBuilder<true, TExplicitType, true, TExtensions> & TExtensions {
+    ): AnySchemaBuilder<true, TNullable, TExplicitType, true, TExtensions> &
+        TExtensions {
         return super.default(value) as any;
     }
 
@@ -179,6 +196,7 @@ export class AnySchemaBuilder<
      */
     public clearDefault(): AnySchemaBuilder<
         TRequired,
+        TNullable,
         TExplicitType,
         false,
         TExtensions
@@ -194,6 +212,7 @@ export class AnySchemaBuilder<
         _name?: TBrand
     ): AnySchemaBuilder<
         TRequired,
+        TNullable,
         TResult & { readonly [K in BRAND]: TBrand },
         THasDefault,
         TExtensions
@@ -210,12 +229,41 @@ export class AnySchemaBuilder<
      */
     public readonly(): AnySchemaBuilder<
         TRequired,
+        TNullable,
         Readonly<TResult>,
         THasDefault,
         TExtensions
     > &
         TExtensions {
         return super.readonly();
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): AnySchemaBuilder<
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): AnySchemaBuilder<
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 

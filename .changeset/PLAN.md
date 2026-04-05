@@ -13,7 +13,7 @@
 | **Schema core** | ✅ Done | 13 builders (String, Number, Boolean, Date, Object, Array, Union, Tuple, Record, Function, Any, Null, Lazy), sync/async validation, branded types, immutable fluent API |
 | **Base methods** | ✅ Done | `.optional()`, `.required()`, `.default()`, `.catch()`, `.readonly()`, `.describe()`, `.brand()`, `.hasType()`, `.addValidator()`, `.addPreprocessor()`, `.introspect()`, `.deepPartial()` (objects) |
 | **Extension system** | ✅ Done | `defineExtension()` + `withExtensions()`, type-safe plugin architecture |
-| **Built-in extensions** | ✅ Done | String: email, url, uuid, ip, trim, toLowerCase, nonempty. Number: positive, negative, finite, multipleOf. Array: nonempty, unique. All builders: nullable |
+| **Built-in extensions** | ✅ Done | String: email, url, uuid, ip, trim, toLowerCase, nonempty, oneOf. Number: positive, negative, finite, multipleOf, oneOf. Array: nonempty, unique. All builders: nullable. Top-level: enumOf |
 | **PropertyDescriptors** | ✅ Done | Runtime introspection tree — the architectural differentiator |
 | **Mapper** | ✅ Done | Schema-driven object mapping: `.from()`, `.compute()`, `.ignore()`, auto-mapping, compile-time completeness checking |
 | **React Form** | ✅ Done | Headless: `FormProvider`, `Field`, `useSchemaForm()`, custom renderers, schema-driven field generation |
@@ -52,7 +52,7 @@
 | | Zod (v4.3.6) | @cleverbrush/schema |
 |---|---|---|
 | **Stars** | 42.3k | Pre-publish |
-| **Bundle size** | 2kb core (gzipped) | **Must measure** |
+| **Bundle size** | Zod v3: 14.4 KB gz; Zod v4: **41 KB gz** | **14 KB gz (full) / 4 KB gz (subpath)** |
 | **Standard Schema** | ✅ Yes (v3.24+) | ❌ Not yet — **must implement** |
 | **Runtime introspection** | ❌ Opaque schemas | ✅ **PropertyDescriptors** |
 | **Extension system** | `.refine()` only (black box) | ✅ **`defineExtension()` — type-safe, composable, introspectable** |
@@ -69,7 +69,6 @@
 
 | Feature | Zod API | Current workaround | Priority |
 |---------|---------|-------------------|----------|
-| **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(...)` | **High — ship before publish** |
 | **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` + `@cleverbrush/mapper` | Low — mapper covers ~90% of use cases |
 | **Coercion namespace** | `z.coerce.string()` | `.addPreprocessor()` | Low — preprocessors cover this |
 | **Literal builder** | `z.literal(42)` | `number().equals(42)` or `string().equals('x')` | Low — equality operators work |
@@ -81,24 +80,57 @@
 
 **Goal:** Ship the minimum needed to make first impressions excellent.
 
-### 1.1 Enum builder
+### 1.1 Enum builder ✅
 
-Add `enumOf('admin', 'user', 'guest')` — the most visible remaining API gap vs Zod. Currently requires verbose `union(string().equals('a')).or(string().equals('b'))...`.
+Implemented as a built-in extension (not a separate builder class) following the same pattern as `nullable`, `email`, `positive`, etc.
 
-- New `EnumSchemaBuilder` with factory function
-- Infers literal union type: `'admin' | 'user' | 'guest'`
-- `.options` property for runtime access to allowed values
+- `.oneOf()` extension method on `StringSchemaBuilder` and `NumberSchemaBuilder`
+- `enumOf('admin', 'user', 'guest')` top-level convenience factory (sugar for `string().oneOf(...)`)
+- Narrows inferred type: `string().oneOf('a', 'b')` → `'a' | 'b'`
+- Runtime introspection via `.introspect().extensions.oneOf`
+- Chains with `.nullable()`, `.optional()`, `.default()`
+- 34 tests (runtime + type-level)
 - Playground example, README section, migration guide entry
-- Register in extension system (`BuilderMap`)
 
-### 1.2 Bundle size audit
+### 1.2 Bundle size audit ✅
 
-Zod advertises "2kb core (gzipped)". We need to know our number.
+**Measured April 5, 2026** using esbuild single-file bundle + gzip level 9.
 
-- Measure gzipped bundle size for `@cleverbrush/schema` (full and `/core` subpath)
-- If competitive (≤5kb), advertise it prominently
-- If large, investigate tree-shaking and code splitting opportunities
-- Add bundle size badge to README
+#### Results — @cleverbrush/schema
+
+| Entry point | Raw (min) | Gzipped | Brotli |
+|-------------|-----------|---------|--------|
+| `@cleverbrush/schema` (full index) | 76.8 KB | **14.0 KB** | 12.4 KB |
+| `@cleverbrush/schema/core` (no extensions) | 71.1 KB | **12.6 KB** | 11.2 KB |
+| `@cleverbrush/schema/string` | 15.7 KB | **3.8 KB** | 3.5 KB |
+| `@cleverbrush/schema/number` | 15.4 KB | **3.8 KB** | 3.5 KB |
+| `@cleverbrush/schema/object` | 22.8 KB | **5.8 KB** | 5.3 KB |
+| `@cleverbrush/schema/array` | 15.6 KB | **4.0 KB** | 3.7 KB |
+| `SchemaBuilder` base class alone | 9.8 KB | **2.7 KB** | — |
+
+#### Reference: Zod bundle sizes (same methodology)
+
+| Package | Gzipped | Notes |
+|---------|---------|-------|
+| Zod v3 (full) | 14.4 KB | Installed: 3.25.76 |
+| Zod v4 (full) | 41.0 KB | 3× larger than us |
+| Zod v4-mini | 45.3 KB | Larger than v4/core |
+
+> The PLAN's earlier "Zod 2kb core" claim is a Zod marketing reference; **actual Zod numbers** measured above.
+
+#### Verdict
+
+- **Full import: 14 KB gzip** — competitive with Zod v3 (~3% smaller), and **3× smaller than Zod v4**.
+- **Sub-path imports: 3.8–5.8 KB gzip** — well within the ≤5 KB goal for primitive builders; `object` just exceeds it.
+- **Tree-shaking**: Importing partial symbols from `@cleverbrush/schema` (full index) does NOT tree-shake — the entire `SchemaBuilder` inheritance chain is pulled in. The sub-path exports (`/string`, `/number`, etc.) ARE the mechanism for smaller bundles, and they work as intended. The base `SchemaBuilder` class represents a ~2.7 KB gzip floor (unavoidable — it holds all fluent methods, validation engine, introspection, etc.).
+- **Extensions** add only ~1.4 KB gzip on top of core (full index vs core subpath).
+
+#### Actions taken
+
+- ✅ Size is competitive — advertise it
+- ✅ Sub-path exports already satisfy tree-shaking use cases
+- ⚠️ Add badge to README: `14 KB gzipped (full)` / `~4 KB gzipped (per builder)`
+- ⚠️ Update competitive table: clarify Zod v4 is **3× larger**, not smaller
 
 ### 1.3 Merge & publish
 
@@ -451,4 +483,10 @@ Performance work on `feature/performance` branch transformed benchmarks from a l
 <summary>Transform/Pipe — Deprioritized</summary>
 
 ~90% of real-world usage covered by mapper's `.compute()` + `.addPreprocessor()` + string extensions. The remaining gap (inline single-field type change) is a convenience, not a blocker. Moved to demand-driven (Phase 7).
+</details>
+
+<details>
+<summary>Enum / oneOf ✅</summary>
+
+`.oneOf()` built-in extension on `StringSchemaBuilder` and `NumberSchemaBuilder`. Top-level `enumOf()` convenience factory. Narrows inferred type to the literal union (e.g., `'admin' | 'user' | 'guest'`). Runtime introspection via `.introspect().extensions.oneOf`. Chains with `.nullable()`, `.optional()`, `.default()`. 34 tests.
 </details>

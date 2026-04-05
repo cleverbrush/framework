@@ -12,7 +12,8 @@ A schema definition and validation library for TypeScript. Define object schemas
 
 - **PropertyDescriptors** — a runtime descriptor tree that other tools can introspect. The [`@cleverbrush/mapper`](../mapper) uses it for type-safe property selectors. The [`@cleverbrush/react-form`](../react-form) uses it to auto-generate form fields with correct validation. This makes the schema library a **foundation** for an entire ecosystem — not just a standalone validation tool.
 - **Extension system** — add custom methods to any builder type (`string`, `number`, `date`, …) via `defineExtension()` + `withExtensions()`. Extensions are fully typed, chainable, and composable. No other popular schema library offers a comparable type-safe plugin system.
-- **Built-in extension pack** — common validators like `email()`, `url()`, `uuid()`, `ip()`, `trim()`, `positive()`, `negative()`, `nonempty()`, `unique()`, `nullable()`, and more are included out of the box. The default import has them pre-applied; import from `@cleverbrush/schema/core` to get bare builders without extensions.
+- **Built-in extension pack** — common validators like `email()`, `url()`, `uuid()`, `ip()`, `trim()`, `positive()`, `negative()`, `nonempty()`, `unique()`, and more are included out of the box. The default import has them pre-applied; import from `@cleverbrush/schema/core` to get bare builders without extensions.
+- **First-class nullable support** — `.nullable()` and `.notNullable()` are native methods on every builder. The inferred type automatically includes or excludes `null`, and `introspect()` exposes `isNullable` for runtime metadata.
 - **JSDoc comment preservation** — JSDoc comments on schema properties carry through to the inferred TypeScript type, so IDE tooltips and autocomplete descriptions come from the schema definition itself.
 - **Zero dependencies** — no runtime dependencies at all.
 
@@ -104,18 +105,19 @@ The following builder functions are available:
 
 | Function        | Description                                       | Key Methods                                                     |
 | --------------- | ------------------------------------------------- | --------------------------------------------------------------- |
-| `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.default(value)`, `.addValidator(fn)`                              |
-| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.nullable()`, `.default(value)` |
-| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.nullable()`, `.default(value)` |
-| `boolean()`     | Boolean value.                                    | `.optional()`, `.nullable()`, `.default(value)`                                                   |
-| `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.nullable()`, `.default(value)`                                                   |
-| `func()`        | Function value.                                   | `.optional()`, `.nullable()`, `.default(value)`                                                   |
+| `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`, `.addValidator(fn)`                              |
+| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.oneOf(...values)`, `.nullable()`, `.notNullable()`, `.default(value)` |
+| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.oneOf(...values)`, `.nullable()`, `.notNullable()`, `.default(value)` |
+| `boolean()`     | Boolean value.                                    | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
+| `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
+| `func()`        | Function value.                                   | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
 | `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`, `.default(value)`                                                   |
-| `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.nullable()`, `.default(value)`            |
-| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.nullable()`, `.default(value)` |
-| `tuple([...schemas])` | Fixed-length array with per-position types. Each index validated against its own schema — mirrors TypeScript tuple types. | `.rest(schema)`, `.optional()`, `.nullable()`, `.default(value)` |
-| `record(keySchema, valSchema)` | Object with dynamic string keys. Every key must satisfy `keySchema` (a string schema) and every value must satisfy `valSchema` — mirrors TypeScript's `Record<K, V>`. | `.optional()`, `.nullable()`, `.default(value)`, `.addValidator(fn)` |
-| `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.nullable()`, `.default(value)`                 |
+| `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`            |
+| `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.nullable()`, `.notNullable()`, `.default(value)` |
+| `tuple([...schemas])` | Fixed-length array with per-position types. Each index validated against its own schema — mirrors TypeScript tuple types. | `.rest(schema)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
+| `record(keySchema, valSchema)` | Object with dynamic string keys. Every key must satisfy `keySchema` (a string schema) and every value must satisfy `valSchema` — mirrors TypeScript's `Record<K, V>`. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`, `.addValidator(fn)` |
+| `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                 |
+| `enumOf(...values)` | String enum — sugar for `string().oneOf(...)`. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 
 ## Immutability
@@ -1075,11 +1077,14 @@ The default import from `@cleverbrush/schema` includes a pre-applied extension p
 | `.nonempty(errorMessage?)` | Array must have at least one element | `true` |
 | `.unique(keyFn?, errorMessage?)` | All elements must be unique. Optional `keyFn` extracts comparison key for objects | `true` or `keyFn` |
 
-### Nullable Extension
+### Nullable / Not Nullable
 
-| Method | Availableon | Description |
+`.nullable()` and `.notNullable()` are **native methods** available on every builder — no extension required.
+
+| Method | Available on | Description |
 | --- | --- | --- |
-| `.nullable()` | all builders | Returns a `union(thisSchema).or(nul())` that accepts the original type **or** `null`. If the source schema is `.optional()`, the resulting union is also optional (accepts `undefined` too). |
+| `.nullable()` | all builders | Marks the schema as nullable — `null` is accepted as a valid value. The inferred type changes from `T` to `T \| null`. |
+| `.notNullable()` | all builders | Removes the nullable mark — `null` is no longer accepted. The inferred type changes from `T \| null` back to `T`. |
 
 ```typescript
 import { string, number, object, InferType } from '@cleverbrush/schema';
@@ -1104,7 +1109,87 @@ const User = object({
 });
 
 User.validate({ name: 'Alice', bio: null, age: null }); // valid
+
+// Toggle back with .notNullable()
+const strictName = string().nullable().notNullable();
+type StrictName = InferType<typeof strictName>; // string (not string | null)
+
+strictName.validate(null);    // invalid
+strictName.validate('Alice'); // valid
+
+// Introspect at runtime
+string().nullable().introspect().isNullable;       // true
+string().nullable().notNullable().introspect().isNullable; // false
 ```
+
+### Enum / oneOf Extension
+
+| Method | Available on | Description |
+| --- | --- | --- |
+| `.oneOf(...values)` | `string`, `number` | Constrains the value to one of the given literals and **narrows the inferred type** to the literal union. |
+| `.oneOf(valuesArray, errorMessage?)` | `string`, `number` | Array-form with an optional custom error message (string or factory). |
+| `enumOf(...values)` | top-level factory | Sugar for `string().oneOf(...)`. Mirrors Zod's `z.enum()`. |
+| `enumOf(valuesArray, errorMessage?)` | top-level factory | Array-form with an optional custom error message. |
+
+```typescript
+import { string, number, enumOf, InferType } from '@cleverbrush/schema';
+
+// String enum — infers 'admin' | 'user' | 'guest'
+const Role = enumOf('admin', 'user', 'guest');
+type Role = InferType<typeof Role>;
+
+Role.validate('admin'); // valid
+Role.validate('other'); // invalid — "must be one of: admin, user, guest"
+
+// Equivalent long-form
+const Role2 = string().oneOf('admin', 'user', 'guest');
+
+// Number enum — infers 1 | 2 | 3
+const Priority = number().oneOf(1, 2, 3);
+type Priority = InferType<typeof Priority>;
+
+// Chains with nullable / optional
+const OptionalRole = enumOf('admin', 'user').nullable(); // 'admin' | 'user' | null
+
+// Runtime access to allowed values via introspect
+Role.introspect().extensions?.oneOf; // ['admin', 'user', 'guest']
+```
+
+#### Custom error messages for `.oneOf()`
+
+`.oneOf()` accepts a custom error message via the **array form**, where the allowed values are passed as an array and the error message is the second argument:
+
+```typescript
+import { string, number, enumOf } from '@cleverbrush/schema';
+
+// String — array form with custom string error message
+const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+role.validate('other'); // invalid — "Invalid role"
+
+// String — array form with factory function
+const role2 = string().oneOf(
+    ['admin', 'user'],
+    (val) => `"${val}" is not a valid role`
+);
+
+// enumOf — array form with custom error message
+const Role = enumOf(['admin', 'user', 'guest'], 'Invalid role');
+
+// Number — trailing error message (unambiguous since values are numbers)
+const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+priority.validate(99); // invalid — "Priority must be 1, 2, or 3"
+
+// Number — array form
+const priority2 = number().oneOf([1, 2, 3], 'Invalid priority');
+
+// Number — factory function
+const priority3 = number().oneOf(
+    1, 2, 3,
+    (val) => `${val} is not a valid priority`
+);
+```
+
+> **Note on string `.oneOf()` error messages:** Because `.oneOf()` accepts a variadic list of string values, a trailing string argument is treated as another allowed value (not an error message). To provide a string error message for a string enum, use the **array form** — `string().oneOf(['a', 'b'], 'error message')`. A trailing *function* is always unambiguously treated as an error message factory in the rest-params form.
 
 All validator extensions accept an optional error message as the last parameter — either a string or a function (matching the same `ValidationErrorMessageProvider` pattern used by built-in constraints like `.minLength()`):
 

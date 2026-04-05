@@ -63,6 +63,7 @@ export default function HomePage() {
                     <span className="badge">Zero dependencies*</span>
                     <span className="badge">Compile-time guarantees</span>
                     <span className="badge">BSD-3 Licensed</span>
+                    <span className="badge">14 KB gzipped</span>
                 </div>
             </section>
 

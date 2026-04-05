@@ -16,7 +16,6 @@ import type {
 } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
-import type { NullableMethod, NullableReturn } from './nullable.js';
 import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -25,28 +24,22 @@ import { validationFail } from './util.js';
 
 /** Return type shared by every method on {@link ArrayBuiltinExtensions}. */
 type ArrayExtReturn<
-    TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<
+    TElementSchema extends SchemaBuilder<
+        any,
+        any,
         any,
         any,
         any
-    >
+    > = SchemaBuilder<any, any, any>
 > = ArraySchemaBuilder<
     TElementSchema,
     true,
+    false,
     undefined,
     false,
     ArrayBuiltinExtensions<TElementSchema>
 > &
     ArrayBuiltinExtensions<TElementSchema> &
-    NullableMethod<
-        ArraySchemaBuilder<
-            TElementSchema,
-            true,
-            undefined,
-            false,
-            ArrayBuiltinExtensions<TElementSchema>
-        >
-    > &
     HiddenExtensionMethods;
 
 /**
@@ -62,11 +55,13 @@ type ArrayExtReturn<
  * @see https://github.com/microsoft/TypeScript/issues/50715
  */
 export interface ArrayBuiltinExtensions<
-    TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<
+    TElementSchema extends SchemaBuilder<
+        any,
+        any,
         any,
         any,
         any
-    >
+    > = SchemaBuilder<any, any, any>
 > {
     /**
      * Validates that the array contains at least one element.
@@ -105,17 +100,6 @@ export interface ArrayBuiltinExtensions<
         keyFn?: (item: any) => unknown,
         errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>
     ): ArrayExtReturn<TElementSchema>;
-
-    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
-    nullable(): NullableReturn<
-        ArraySchemaBuilder<
-            TElementSchema,
-            true,
-            undefined,
-            false,
-            ArrayBuiltinExtensions<TElementSchema>
-        >
-    >;
 }
 
 /**

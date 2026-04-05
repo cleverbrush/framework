@@ -65,10 +65,11 @@ type NullSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  */
 export class NullSchemaBuilder<
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
     THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<null, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<null, TRequired, TNullable, THasDefault, TExtensions> {
     /**
      * @hidden
      */
@@ -88,7 +89,8 @@ export class NullSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): NullSchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions {
+    ): NullSchemaBuilder<true, TNullable, T, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -99,6 +101,7 @@ export class NullSchemaBuilder<
      */
     public clearHasType(): NullSchemaBuilder<
         TRequired,
+        TNullable,
         undefined,
         THasDefault,
         TExtensions
@@ -183,7 +186,13 @@ export class NullSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): NullSchemaBuilder<true, TExplicitType, THasDefault, TExtensions> &
+    ): NullSchemaBuilder<
+        true,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -193,6 +202,7 @@ export class NullSchemaBuilder<
      */
     public optional(): NullSchemaBuilder<
         false,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -206,7 +216,8 @@ export class NullSchemaBuilder<
      */
     public default(
         value: null | (() => null)
-    ): NullSchemaBuilder<true, TExplicitType, true, TExtensions> & TExtensions {
+    ): NullSchemaBuilder<true, TNullable, TExplicitType, true, TExtensions> &
+        TExtensions {
         return super.default(value) as any;
     }
 
@@ -215,6 +226,7 @@ export class NullSchemaBuilder<
      */
     public clearDefault(): NullSchemaBuilder<
         TRequired,
+        TNullable,
         TExplicitType,
         false,
         TExtensions
@@ -230,6 +242,7 @@ export class NullSchemaBuilder<
         _name?: TBrand
     ): NullSchemaBuilder<
         TRequired,
+        TNullable,
         null & { readonly [K in BRAND]: TBrand },
         THasDefault,
         TExtensions
@@ -247,12 +260,41 @@ export class NullSchemaBuilder<
      */
     public readonly(): NullSchemaBuilder<
         TRequired,
+        TNullable,
         Readonly<null>,
         THasDefault,
         TExtensions
     > &
         TExtensions {
         return super.readonly();
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): NullSchemaBuilder<
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): NullSchemaBuilder<
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 

@@ -66,7 +66,7 @@ describe('describe - type inference', () => {
     test('any().describe() returns AnySchemaBuilder', () => {
         const schema = any().describe('Anything');
         expectTypeOf(schema).toMatchTypeOf<
-            AnySchemaBuilder<true, undefined, false, {}, any>
+            AnySchemaBuilder<true, false, undefined, false, {}, any>
         >();
     });
 
