@@ -80,6 +80,11 @@ export type NestedValidationResult<
      */
     errors: ReadonlyArray<string>;
 
+    /**
+     * Whether validation passed for this property and all of its children.
+     */
+    isValid: boolean;
+
     get descriptor(): PropertyDescriptorInner<
         TRootSchema,
         TSchema,

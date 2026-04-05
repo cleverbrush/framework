@@ -392,10 +392,10 @@ describe('.catch() — object preserves getErrorsFor() after catch fires', () =>
 
 describe('.catch() — tuple preserves getNestedErrors() after catch fires', () => {
     test('getNestedErrors is a function on the result when catch fires', () => {
-        const schema = tuple([string(), number()]).catch([
-            'fallback',
-            0
-        ] as [string, number]);
+        const schema = tuple([string(), number()]).catch(['fallback', 0] as [
+            string,
+            number
+        ]);
         const result = schema.validate('bad-input' as any);
         expect(result.valid).toBe(true);
         expect(result.object).toEqual(['fallback', 0]);

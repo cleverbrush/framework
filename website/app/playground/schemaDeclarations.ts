@@ -2374,6 +2374,10 @@ export type NestedValidationResult<TSchema, TRootSchema extends ObjectSchemaBuil
      * A list of errors, empty if object satisfies a schema
      */
     errors: ReadonlyArray<string>;
+    /**
+     * Whether validation passed for this property and all of its children.
+     */
+    isValid: boolean;
     get descriptor(): PropertyDescriptorInner<TRootSchema, TSchema, TParentPropertyDescriptor>;
 };
 /**
@@ -3038,7 +3042,8 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * provider returns a Promise — use {@link validateAsync} instead.
      *
      * If a fallback has been set via {@link catch}, a failed validation result
-     * is replaced by \`{ valid: true, object: fallback }\` instead of returning errors.
+     * is replaced by a successful result built from the fallback value, preserving
+     * the specialized result shape (e.g. \`getErrorsFor\` / \`getNestedErrors\` methods).
      */
     validate(
     /**
@@ -3054,7 +3059,8 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * Supports async preprocessors, validators, and error message providers.
      *
      * If a fallback has been set via {@link catch}, a failed validation result
-     * is replaced by \`{ valid: true, object: fallback }\` instead of returning errors.
+     * is replaced by a successful result built from the fallback value, preserving
+     * the specialized result shape (e.g. \`getErrorsFor\` / \`getNestedErrors\` methods).
      */
     validateAsync(
     /**
