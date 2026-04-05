@@ -114,6 +114,7 @@ The following builder functions are available:
 | `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.nullable()`, `.default(value)`            |
 | `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.nullable()`, `.default(value)` |
 | `tuple([...schemas])` | Fixed-length array with per-position types. Each index validated against its own schema — mirrors TypeScript tuple types. | `.rest(schema)`, `.optional()`, `.nullable()`, `.default(value)` |
+| `record(keySchema, valSchema)` | Object with dynamic string keys. Every key must satisfy `keySchema` (a string schema) and every value must satisfy `valSchema` — mirrors TypeScript's `Record<K, V>`. | `.optional()`, `.nullable()`, `.default(value)`, `.addValidator(fn)` |
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.nullable()`, `.default(value)`                 |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 
@@ -174,6 +175,57 @@ const TeamSchema = object({
 const IdOrEmail = union(string().minLength(1)).or(
     string().matches(/^[^@]+@[^@]+$/)
 );
+```
+
+## Record Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/record-schemas)
+
+Use `record(keySchema, valueSchema)` to validate objects with **dynamic string keys** — lookup tables, i18n bundles, caches, or any `Record<string, V>` shape. Unlike `object()`, which requires a fixed set of known property names, `record()` validates objects whose keys are not known at schema-definition time.
+
+Both the key and the value schema are enforced at runtime, and the inferred TypeScript type mirrors `Record<K, V>`.
+
+```typescript
+import { record, string, number, object, InferType } from '@cleverbrush/schema';
+
+// ── Basic: string keys → number values ──────────────────────────────────────
+const scores = record(string(), number().min(0).max(100));
+// InferType<typeof scores> → Record<string, number>
+
+scores.validate({ alice: 95, bob: 87 }); // { valid: true }
+scores.validate({ alice: 95, bob: -1 }); // { valid: false } — negative score
+
+// ── Key constraint — only locale-style keys allowed ──────────────────────────
+const i18n = record(
+    string().matches(/^[a-z]{2}(-[A-Z]{2})?$/),
+    string().nonempty()
+);
+
+i18n.validate({ en: 'Hello', 'fr-FR': 'Bonjour' }); // { valid: true }
+i18n.validate({ '123': 'oops' });                     // { valid: false } — bad key
+
+// ── Nested: values are objects ───────────────────────────────────────────────
+const userMap = record(
+    string(),
+    object({ name: string(), age: number() })
+);
+// InferType<typeof userMap> → Record<string, { name: string; age: number }>
+
+// ── Optional with factory default ────────────────────────────────────────────
+const cache = record(string(), number()).optional().default(() => ({}));
+
+// ── getNestedErrors() — per-key validation results ───────────────────────────
+const schema = record(string(), number().min(0));
+const result = schema.validate(
+    { a: 1, b: -2, c: -3 },
+    { doNotStopOnFirstError: true }
+);
+
+if (!result.valid) {
+    const nested = result.getNestedErrors();
+    console.log(nested['b']); // ValidationResult for key 'b'
+    console.log(nested['c']); // ValidationResult for key 'c'
+}
 ```
 
 ## Recursive Schemas

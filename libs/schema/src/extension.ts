@@ -75,6 +75,7 @@ import {
 } from './builders/FunctionSchemaBuilder.js';
 import { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder, object } from './builders/ObjectSchemaBuilder.js';
+import { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 import { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
@@ -100,6 +101,7 @@ type BuilderMap = {
     object: ObjectSchemaBuilder<any, any, any, any, any>;
     array: ArraySchemaBuilder<any, any, any, any, any, any>;
     tuple: TupleSchemaBuilder<any, any, any, any, any, any>;
+    record: RecordSchemaBuilder<any, any, any, any, any, any>;
     union: UnionSchemaBuilder<any, any, any, any, any>;
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any>;
@@ -116,6 +118,7 @@ const builderClasses: Record<BuilderTypeName, typeof SchemaBuilder> = {
     object: ObjectSchemaBuilder as any,
     array: ArraySchemaBuilder as any,
     tuple: TupleSchemaBuilder as any,
+    record: RecordSchemaBuilder as any,
     union: UnionSchemaBuilder as any,
     func: FunctionSchemaBuilder as any,
     any: AnySchemaBuilder as any
@@ -130,6 +133,7 @@ const builderFactories: Record<BuilderTypeName, (...args: any[]) => any> = {
     object,
     array,
     tuple,
+    record,
     union,
     func,
     any
@@ -348,6 +352,17 @@ type ExtendedTupleFactory<TExt> = <
     TExt
 >;
 
+type ExtendedRecordFactory<TExt> = <
+    TKeySchema extends StringSchemaBuilder<any, any, any, any>,
+    TValueSchema extends SchemaBuilder<any, any, any>
+>(
+    keySchema: TKeySchema,
+    valueSchema: TValueSchema
+) => CleanExtended<
+    RecordSchemaBuilder<TKeySchema, TValueSchema, true, undefined, false, TExt>,
+    TExt
+>;
+
 /**
  * The return type of {@link withExtensions}.
  *
@@ -368,6 +383,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     object: ExtendedObjectFactory<MergeExtensionMethods<TExts, 'object'>>;
     array: ExtendedArrayFactory<MergeExtensionMethods<TExts, 'array'>>;
     tuple: ExtendedTupleFactory<MergeExtensionMethods<TExts, 'tuple'>>;
+    record: ExtendedRecordFactory<MergeExtensionMethods<TExts, 'record'>>;
     union: ExtendedUnionFactory<MergeExtensionMethods<TExts, 'union'>>;
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;

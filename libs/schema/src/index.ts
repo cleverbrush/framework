@@ -1,6 +1,8 @@
 // Re-export all types, classes, and extension system from core
 
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
+export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 export type {
     TupleElementValidationResults,
     TupleSchemaValidationResult
@@ -27,6 +29,7 @@ export {
     type ExtendedFunc,
     type ExtendedNumber,
     type ExtendedObject,
+    type ExtendedRecord,
     type ExtendedString,
     type ExtendedTuple,
     type ExtendedUnion,
@@ -40,6 +43,8 @@ export {
     numberExtensions,
     type ObjectBuiltinExtensions,
     object,
+    record,
+    type RecordBuiltinExtensions,
     type StringBuiltinExtensions,
     string,
     stringExtensions,

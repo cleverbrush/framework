@@ -377,6 +377,30 @@ console.log(bad.errors);
                                 </tr>
                                 <tr>
                                     <td>
+                                        <code>
+                                            record(keySchema, valueSchema)
+                                        </code>
+                                    </td>
+                                    <td>
+                                        Object with dynamic string keys —
+                                        mirrors TypeScript&apos;s{' '}
+                                        <code>Record&lt;K, V&gt;</code>. Every
+                                        key must satisfy <code>keySchema</code>{' '}
+                                        and every value must satisfy{' '}
+                                        <code>valueSchema</code>. Use for lookup
+                                        tables, i18n bundles, and any map-like
+                                        structure whose keys are unknown at
+                                        schema-definition time.
+                                    </td>
+                                    <td>
+                                        <code>.optional()</code>,{' '}
+                                        <code>.nullable()</code>,{' '}
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.addValidator(fn)</code>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>union(...schemas)</code>
                                     </td>
                                     <td>

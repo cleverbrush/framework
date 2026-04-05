@@ -18,6 +18,7 @@ import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js
 import { type NullSchemaBuilder, nul } from '../builders/NullSchemaBuilder.js';
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
+import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
@@ -132,6 +133,33 @@ export interface TupleBuiltinExtensions<
             undefined,
             false,
             TupleBuiltinExtensions<TElements>
+        >
+    >;
+}
+
+/** Methods threaded through `TExtensions` for `RecordSchemaBuilder`. */
+export interface RecordBuiltinExtensions<
+    TKeySchema extends StringSchemaBuilder<
+        any,
+        any,
+        any,
+        any
+    > = StringSchemaBuilder<any, any, any, any>,
+    TValueSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<
+        any,
+        any,
+        any
+    >
+> {
+    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
+    nullable(): NullableReturn<
+        RecordSchemaBuilder<
+            TKeySchema,
+            TValueSchema,
+            true,
+            undefined,
+            false,
+            RecordBuiltinExtensions<TKeySchema, TValueSchema>
         >
     >;
 }
@@ -304,6 +332,17 @@ export const nullableExtension = defineExtension({
          * @returns a `UnionSchemaBuilder` that accepts the tuple type or `null`
          */
         nullable(this: TupleSchemaBuilder<any>) {
+            const u = union(this).or(nul());
+            return this.isRequired ? u : u.optional();
+        }
+    },
+    record: {
+        /**
+         * Makes this schema nullable — shorthand for `union(schema).or(nul())`.
+         *
+         * @returns a `UnionSchemaBuilder` that accepts the record type or `null`
+         */
+        nullable(this: RecordSchemaBuilder<any, any>) {
             const u = union(this).or(nul());
             return this.isRequired ? u : u.optional();
         }

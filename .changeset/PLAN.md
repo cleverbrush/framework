@@ -42,7 +42,7 @@ The framework has matured significantly. The core schema library, extension syst
 | **Nullable** | `.nullable()` | ✅ `.nullable()` — built-in extension on all builders | ✅ DONE |
 | **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(string().equals('b'))` | Medium — verbose workaround |
 | **Tuple** | `z.tuple([str, num])` | ✅ `tuple([str, num])` — `TupleSchemaBuilder` | ✅ DONE |
-| **Record** | `z.record(keySchema, valSchema)` | Not possible | Medium — dynamic-key objects |
+| **Record** | `z.record(keySchema, valSchema)` | ✅ `record(keySchema, valSchema)` — `RecordSchemaBuilder` | ✅ DONE |
 | **Deep partial** | `.deepPartial()` | ✅ `.deepPartial()` — recurses into nested `object()` schemas | ✅ DONE |
 | **Catch/fallback** | `.catch(fallback)` | None | Low-medium |
 | **Readonly** | `.readonly()` | ✅ `.readonly()` — type-level `Readonly<T>` / `ReadonlyArray<T>` | ✅ DONE |
@@ -231,9 +231,22 @@ Show real-world patterns with code examples (playground or blog):
 
 `tuple([string(), number(), boolean()])` — fixed-length array with per-position types. Needed for function arguments, CSV rows, coordinate pairs.
 
-### 4.3 Record builder
+### 4.3 Record builder ✅ DONE
 
-`s.record(string(), number())` — objects with dynamic keys. Needed for dictionaries, lookup tables, i18n bundles.
+`record(keySchema, valueSchema)` is implemented as `RecordSchemaBuilder`:
+
+- **Dynamic-key objects** — validates objects whose key set is not known at schema-definition time (`Record<K, V>`)
+- Both key and value schemas are enforced on every entry; key schema must be a `StringSchemaBuilder`
+- Inferred TypeScript type mirrors `Record<InferType<TKeySchema>, InferType<TValueSchema>>`
+- Key-constraint support — pass any `StringSchemaBuilder` with `.matches()`, `.minLength()`, etc. to restrict keys
+- `getNestedErrors()` returns a `Record<string, ValidationResult>` mapping each failing key to its per-entry validation result, making per-field error surfacing trivial
+- `doNotStopOnFirstError` mode collects all key/value errors across the entire record
+- Full sync (`validate()`) and async (`validateAsync()`) validation paths
+- Full fluent API: `.optional()`, `.required()`, `.addPreprocessor()`, `.addValidator()`, `.default()`, `.clearDefault()`, `.brand()`, `.hasType()`, `introspect()`
+- `.nullable()` built-in extension — shorthand for `union(schema).or(nul())`
+- Registered in the extension system (`BuilderMap`, `WithExtensionsResult`) so third-party extensions can target `"record"` builder type
+- Subpath export `@cleverbrush/schema/record`
+- 40 tests covering all builders, type inference, default values, optional/required, custom validators, doNotStopOnFirstError, getNestedErrors, immutability, and nullable
 
 ### 4.4 Deep partial ✅ DONE
 

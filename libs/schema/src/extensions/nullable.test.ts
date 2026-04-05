@@ -8,6 +8,7 @@ import {
     type InferType,
     number,
     object,
+    record,
     string,
     tuple,
     union
@@ -396,6 +397,44 @@ describe('nullable extension', () => {
             const schema = tuple([string(), number()]).nullable();
             type T = InferType<typeof schema>;
             expectTypeOf<T>().toMatchTypeOf<[string, number] | null>();
+            expectTypeOf<null>().toMatchTypeOf<T>();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // record().nullable()
+    // -----------------------------------------------------------------------
+    describe('record().nullable()', () => {
+        test('accepts a valid record', () => {
+            const schema = record(string(), number()).nullable();
+            const result = schema.validate({ a: 1, b: 2 });
+            expect(result.valid).toBe(true);
+            expect(result.object).toEqual({ a: 1, b: 2 });
+        });
+
+        test('accepts null', () => {
+            const schema = record(string(), number()).nullable();
+            const result = schema.validate(null as any);
+            expect(result.valid).toBe(true);
+            expect(result.object).toBeNull();
+        });
+
+        test('rejects undefined', () => {
+            const schema = record(string(), number()).nullable();
+            const result = schema.validate(undefined as any);
+            expect(result.valid).toBe(false);
+        });
+
+        test('rejects wrong value type', () => {
+            const schema = record(string(), number()).nullable();
+            const result = schema.validate({ a: 'oops' } as any);
+            expect(result.valid).toBe(false);
+        });
+
+        test('inferred type is Record<string, number> | null', () => {
+            const schema = record(string(), number()).nullable();
+            type T = InferType<typeof schema>;
+            expectTypeOf<T>().toMatchTypeOf<Record<string, number> | null>();
             expectTypeOf<null>().toMatchTypeOf<T>();
         });
     });

@@ -34,6 +34,7 @@ export const EXAMPLE_GROUPS = [
         ids: [
             'arrays',
             'tuples',
+            'record-schemas',
             'union-types',
             'discriminated-unions',
             'nullable'
@@ -923,6 +924,50 @@ const l = log.validate(['info', 200, 'request ok', 'extra detail']);
 // l.valid === true
 `,
         testData: '["hello", 42, true]'
+    },
+    {
+        id: 'record-schemas',
+        title: 'Record Schemas',
+        description:
+            "Use <code>record(keySchema, valueSchema)</code> to validate objects with <strong>dynamic string keys</strong>. Both keys and values are validated against their schemas — mirrors TypeScript's <code>Record&lt;K, V&gt;</code>.",
+        group: 'Arrays & Unions',
+        code: `import { record, string, number, object, InferType } from '@cleverbrush/schema';
+
+// Basic: string keys → number values
+const scores = record(string(), number().min(0).max(100));
+// InferType<typeof scores> → Record<string, number>
+
+const result = scores.validate({ alice: 95, bob: 87 });
+// result.valid === true, result.object === { alice: 95, bob: 87 }
+
+// Key constraint — only lowercase letters allowed
+const env = record(
+    string().matches(/^[a-z][a-z0-9_]*$/),
+    string().nonempty()
+);
+// env.validate({ PORT: '3000' }) → invalid (uppercase key)
+// env.validate({ port: '3000' }) → valid
+
+// Nested: values are objects
+const userMap = record(
+    string(),
+    object({ name: string(), age: number() })
+);
+// InferType<typeof userMap> → Record<string, { name: string; age: number }>
+
+// Optional with factory default
+const cache = record(string(), number()).optional().default(() => ({}));
+
+// Per-key errors with getNestedErrors()
+const schema = record(string(), number().min(0));
+const invalid = schema.validate(
+    { a: 1, b: -2, c: -3 },
+    { doNotStopOnFirstError: true }
+);
+// invalid.valid === false
+// invalid.getNestedErrors()['b'].valid === false ← per-key result
+`,
+        testData: '{ "alice": 95, "bob": 87 }'
     },
     {
         id: 'custom-extensions',
