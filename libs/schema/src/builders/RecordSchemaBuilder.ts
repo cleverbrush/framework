@@ -476,14 +476,15 @@ export class RecordSchemaBuilder<
                     object = this.resolveDefaultValue();
                 } else if (!this.isRequired) {
                     const capturedObj = object;
+                    const self = this;
                     return {
                         valid: true,
                         object,
-                        getNestedErrors: () =>
-                            ({}) as Record<
-                                string,
-                                ValidationResult<InferType<TValueSchema>>
-                            >,
+                        getNestedErrors() {
+                            return self
+                                .#validateFull(capturedObj, context)
+                                .getNestedErrors();
+                        },
                         getErrorsFor: (key?: string): any => {
                             if (typeof key === 'undefined') {
                                 return {
@@ -492,7 +493,9 @@ export class RecordSchemaBuilder<
                                     seenValue: capturedObj
                                 };
                             }
-                            return this.#makeKeyResult(key, [], capturedObj);
+                            return self
+                                .#validateFull(capturedObj, context)
+                                .getErrorsFor(key);
                         }
                     } as any;
                 } else {
@@ -513,33 +516,24 @@ export class RecordSchemaBuilder<
             for (const key of Object.keys(object as any)) {
                 const keyResult = this.#keySchema.validate(key);
                 if (!keyResult.valid) {
-                    const capturedKey = key;
                     const capturedObj = object;
                     const keyErrMsgs =
                         keyResult.errors && keyResult.errors.length > 0
                             ? keyResult.errors.map(e => e.message)
                             : [`key "${key}" is invalid`];
+                    const self = this;
                     return {
                         valid: false,
                         errors: [{ message: keyErrMsgs[0] }],
-                        getNestedErrors: () =>
-                            ({}) as Record<
-                                string,
-                                ValidationResult<InferType<TValueSchema>>
-                            >,
+                        getNestedErrors() {
+                            return self
+                                .#validateFull(capturedObj, context)
+                                .getNestedErrors();
+                        },
                         getErrorsFor: (k?: string): any => {
-                            if (typeof k === 'undefined') {
-                                return {
-                                    errors: [] as ReadonlyArray<string>,
-                                    isValid: true,
-                                    seenValue: capturedObj
-                                };
-                            }
-                            return this.#makeKeyResult(
-                                k,
-                                k === capturedKey ? keyErrMsgs : [],
-                                capturedObj
-                            );
+                            return self
+                                .#validateFull(capturedObj, context)
+                                .getErrorsFor(k);
                         }
                     } as any;
                 }
@@ -548,33 +542,24 @@ export class RecordSchemaBuilder<
                     (object as any)[key]
                 );
                 if (!valueResult.valid) {
-                    const capturedKey = key;
                     const capturedObj = object;
                     const valErrMsgs =
                         valueResult.errors && valueResult.errors.length > 0
                             ? valueResult.errors.map(e => e.message)
                             : [`value for key "${key}" is invalid`];
+                    const self = this;
                     return {
                         valid: false,
                         errors: [{ message: valErrMsgs[0] }],
-                        getNestedErrors: () =>
-                            ({}) as Record<
-                                string,
-                                ValidationResult<InferType<TValueSchema>>
-                            >,
+                        getNestedErrors() {
+                            return self
+                                .#validateFull(capturedObj, context)
+                                .getNestedErrors();
+                        },
                         getErrorsFor: (k?: string): any => {
-                            if (typeof k === 'undefined') {
-                                return {
-                                    errors: [] as ReadonlyArray<string>,
-                                    isValid: true,
-                                    seenValue: capturedObj
-                                };
-                            }
-                            return this.#makeKeyResult(
-                                k,
-                                k === capturedKey ? valErrMsgs : [],
-                                capturedObj
-                            );
+                            return self
+                                .#validateFull(capturedObj, context)
+                                .getErrorsFor(k);
                         }
                     } as any;
                 }
@@ -583,23 +568,19 @@ export class RecordSchemaBuilder<
             }
 
             const capturedInput = object;
+            const self = this;
             return {
                 valid: true,
                 object: result as TResult,
-                getNestedErrors: () =>
-                    ({}) as Record<
-                        string,
-                        ValidationResult<InferType<TValueSchema>>
-                    >,
+                getNestedErrors() {
+                    return self
+                        .#validateFull(capturedInput, context)
+                        .getNestedErrors();
+                },
                 getErrorsFor: (key?: string): any => {
-                    if (typeof key === 'undefined') {
-                        return {
-                            errors: [] as ReadonlyArray<string>,
-                            isValid: true,
-                            seenValue: capturedInput
-                        };
-                    }
-                    return this.#makeKeyResult(key, [], capturedInput);
+                    return self
+                        .#validateFull(capturedInput, context)
+                        .getErrorsFor(key);
                 }
             } as any;
         }

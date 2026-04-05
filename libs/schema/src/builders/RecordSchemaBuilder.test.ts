@@ -218,12 +218,13 @@ test('getNestedErrors - returns per-key results on invalid', () => {
     expect(nested['c']?.valid).toBe(false);
 });
 
-test('getNestedErrors - empty on valid result', () => {
+test('getNestedErrors - returns per-key results on valid record', () => {
     const schema = record(string(), number());
     const result = schema.validate({ a: 1 });
     expect(result.valid).toBe(true);
     const nested = result.getNestedErrors();
-    expect(Object.keys(nested).length).toBe(0);
+    expect(Object.keys(nested).length).toBe(1);
+    expect(nested['a']?.valid).toBe(true);
 });
 
 // ---------------------------------------------------------------------------

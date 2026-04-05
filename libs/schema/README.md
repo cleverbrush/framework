@@ -179,7 +179,7 @@ const IdOrEmail = union(string().minLength(1)).or(
 
 ## Record Schemas
 
-[▶ Open in Playground](https://docs.cleverbrush.com/playground/record-schemas)
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/record-basics)
 
 Use `record(keySchema, valueSchema)` to validate objects with **dynamic string keys** — lookup tables, i18n bundles, caches, or any `Record<string, V>` shape. Unlike `object()`, which requires a fixed set of known property names, `record()` validates objects whose keys are not known at schema-definition time.
 
