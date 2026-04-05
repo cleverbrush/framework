@@ -516,7 +516,6 @@ export class RecordSchemaBuilder<
             for (const key of Object.keys(object as any)) {
                 const keyResult = this.#keySchema.validate(key);
                 if (!keyResult.valid) {
-                    const capturedObj = object;
                     const keyErrMsgs =
                         keyResult.errors && keyResult.errors.length > 0
                             ? keyResult.errors.map(e => e.message)
@@ -527,12 +526,12 @@ export class RecordSchemaBuilder<
                         errors: [{ message: keyErrMsgs[0] }],
                         getNestedErrors() {
                             return self
-                                .#validateFull(capturedObj, context)
+                                .#validateFull(object, context)
                                 .getNestedErrors();
                         },
                         getErrorsFor: (k?: string): any => {
                             return self
-                                .#validateFull(capturedObj, context)
+                                .#validateFull(object, context)
                                 .getErrorsFor(k);
                         }
                     } as any;
@@ -542,7 +541,6 @@ export class RecordSchemaBuilder<
                     (object as any)[key]
                 );
                 if (!valueResult.valid) {
-                    const capturedObj = object;
                     const valErrMsgs =
                         valueResult.errors && valueResult.errors.length > 0
                             ? valueResult.errors.map(e => e.message)
@@ -553,12 +551,12 @@ export class RecordSchemaBuilder<
                         errors: [{ message: valErrMsgs[0] }],
                         getNestedErrors() {
                             return self
-                                .#validateFull(capturedObj, context)
+                                .#validateFull(object, context)
                                 .getNestedErrors();
                         },
                         getErrorsFor: (k?: string): any => {
                             return self
-                                .#validateFull(capturedObj, context)
+                                .#validateFull(object, context)
                                 .getErrorsFor(k);
                         }
                     } as any;
