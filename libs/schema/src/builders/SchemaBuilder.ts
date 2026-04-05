@@ -1434,7 +1434,8 @@ export abstract class SchemaBuilder<
      * provider returns a Promise — use {@link validateAsync} instead.
      *
      * If a fallback has been set via {@link catch}, a failed validation result
-     * is replaced by `{ valid: true, object: fallback }` instead of returning errors.
+     * is replaced by a successful result built from the fallback value, preserving
+     * the specialized result shape (e.g. `getErrorsFor` / `getNestedErrors` methods).
      */
     public validate(
         /**
@@ -1448,7 +1449,21 @@ export abstract class SchemaBuilder<
     ): ValidationResult<any> {
         const result = this._validate(object, context);
         if (!result.valid && this.#hasCatch) {
-            return { valid: true, object: this.resolveCatchValue() };
+            const catchValue = this.resolveCatchValue();
+            // Re-validate the fallback value so the returned result has the same
+            // specialized shape as a normal successful result (e.g. getErrorsFor /
+            // getNestedErrors helper methods are present and reflect success semantics).
+            const catchResult = this._validate(catchValue, context);
+            if (catchResult.valid) {
+                return catchResult;
+            }
+            // Fallback value did not pass validation (user error) – return a plain
+            // valid result as best-effort so that .catch() still suppresses the error.
+            // Note: in this case specialized result methods such as getErrorsFor() /
+            // getNestedErrors() will NOT be present on the returned object. This is an
+            // edge case caused by the caller supplying a catch value that itself fails
+            // schema validation; the type system should prevent this under normal use.
+            return { valid: true, object: catchValue };
         }
         return result;
     }
@@ -1458,7 +1473,8 @@ export abstract class SchemaBuilder<
      * Supports async preprocessors, validators, and error message providers.
      *
      * If a fallback has been set via {@link catch}, a failed validation result
-     * is replaced by `{ valid: true, object: fallback }` instead of returning errors.
+     * is replaced by a successful result built from the fallback value, preserving
+     * the specialized result shape (e.g. `getErrorsFor` / `getNestedErrors` methods).
      */
     public async validateAsync(
         /**
@@ -1472,7 +1488,21 @@ export abstract class SchemaBuilder<
     ): Promise<ValidationResult<any>> {
         const result = await this._validateAsync(object, context);
         if (!result.valid && this.#hasCatch) {
-            return { valid: true, object: this.resolveCatchValue() };
+            const catchValue = this.resolveCatchValue();
+            // Re-validate the fallback value so the returned result has the same
+            // specialized shape as a normal successful result (e.g. getErrorsFor /
+            // getNestedErrors helper methods are present and reflect success semantics).
+            const catchResult = await this._validateAsync(catchValue, context);
+            if (catchResult.valid) {
+                return catchResult;
+            }
+            // Fallback value did not pass validation (user error) – return a plain
+            // valid result as best-effort so that .catch() still suppresses the error.
+            // Note: in this case specialized result methods such as getErrorsFor() /
+            // getNestedErrors() will NOT be present on the returned object. This is an
+            // edge case caused by the caller supplying a catch value that itself fails
+            // schema validation; the type system should prevent this under normal use.
+            return { valid: true, object: catchValue };
         }
         return result;
     }

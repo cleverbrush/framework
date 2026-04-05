@@ -8,6 +8,7 @@ import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
 import type { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
+import { tuple } from './TupleSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
 
 // ─── string ──────────────────────────────────────────────────────────────────
@@ -332,5 +333,97 @@ describe('.catch() — type inference (no InferType change)', () => {
     test('array InferType unchanged by .catch()', () => {
         const schema = array(string()).catch([]);
         expectTypeOf<InferType<typeof schema>>().toEqualTypeOf<string[]>();
+    });
+});
+
+// ─── specialized result methods preserved after catch ────────────────────────
+
+describe('.catch() — object preserves getErrorsFor() after catch fires', () => {
+    test('getErrorsFor is a function on the result when catch fires', () => {
+        const schema = object({ name: string(), age: number() }).catch({
+            name: 'unknown',
+            age: 0
+        });
+        const result = schema.validate(42 as any);
+        expect(result.valid).toBe(true);
+        expect(result.object).toEqual({ name: 'unknown', age: 0 });
+        expect(typeof result.getErrorsFor).toBe('function');
+    });
+
+    test('getErrorsFor() returns no errors when catch fires', () => {
+        const schema = object({ name: string(), age: number() }).catch({
+            name: 'fallback',
+            age: -1
+        });
+        const result = schema.validate('bad-input' as any);
+        expect(result.valid).toBe(true);
+        const nameErrors = result.getErrorsFor(t => t.name);
+        expect(nameErrors.isValid).toBe(true);
+        expect(nameErrors.errors.length).toBe(0);
+    });
+
+    test('getErrorsFor() works correctly after catch fires with factory fallback', () => {
+        const schema = object({ x: number() }).catch(() => ({ x: 0 }));
+        const result = schema.validate(null as any);
+        expect(result.valid).toBe(true);
+        expect(typeof result.getErrorsFor).toBe('function');
+        const xErrors = result.getErrorsFor(t => t.x);
+        expect(xErrors.isValid).toBe(true);
+    });
+
+    test('getErrorsFor() not affected: valid inputs still return valid result', () => {
+        const schema = object({ name: string() }).catch({ name: 'fallback' });
+        const result = schema.validate({ name: 'Alice' });
+        expect(result.valid).toBe(true);
+        expect(result.object).toEqual({ name: 'Alice' });
+        expect(typeof result.getErrorsFor).toBe('function');
+        expect(result.getErrorsFor(t => t.name).isValid).toBe(true);
+    });
+
+    test('async: getErrorsFor is a function on the result when catch fires', async () => {
+        const schema = object({ name: string() }).catch({ name: 'fallback' });
+        const result = await schema.validateAsync(99 as any);
+        expect(result.valid).toBe(true);
+        expect(result.object).toEqual({ name: 'fallback' });
+        expect(typeof result.getErrorsFor).toBe('function');
+        expect(result.getErrorsFor(t => t.name).isValid).toBe(true);
+    });
+});
+
+describe('.catch() — tuple preserves getNestedErrors() after catch fires', () => {
+    test('getNestedErrors is a function on the result when catch fires', () => {
+        const schema = tuple([string(), number()]).catch([
+            'fallback',
+            0
+        ] as [string, number]);
+        const result = schema.validate('bad-input' as any);
+        expect(result.valid).toBe(true);
+        expect(result.object).toEqual(['fallback', 0]);
+        expect(typeof result.getNestedErrors).toBe('function');
+    });
+
+    test('getNestedErrors() returns no errors when catch fires', () => {
+        const schema = tuple([string(), number()]).catch(['x', 1] as [
+            string,
+            number
+        ]);
+        const result = schema.validate(42 as any);
+        expect(result.valid).toBe(true);
+        const nested = result.getNestedErrors();
+        expect(nested.isValid).toBe(true);
+        expect(nested.errors.length).toBe(0);
+    });
+
+    test('async: getNestedErrors is a function on the result when catch fires', async () => {
+        const schema = tuple([number(), boolean()]).catch([0, false] as [
+            number,
+            boolean
+        ]);
+        const result = await schema.validateAsync('bad' as any);
+        expect(result.valid).toBe(true);
+        expect(result.object).toEqual([0, false]);
+        expect(typeof result.getNestedErrors).toBe('function');
+        const nested = result.getNestedErrors();
+        expect(nested.isValid).toBe(true);
     });
 });
