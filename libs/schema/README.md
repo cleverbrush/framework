@@ -356,7 +356,7 @@ type User = InferType<typeof UserSchema>;
 
 [▶ Open in Playground](https://docs.cleverbrush.com/playground/deep-partial)
 
-`.deepPartial()` recursively marks **all properties at every nesting level** as optional. It is the deep-object equivalent of TypeScript's built-in `DeepPartial<T>` utility type, and is the recommended way to build PATCH API bodies or partial form state.
+`.deepPartial()` recursively marks **all properties at every nesting level** as optional. It is the deep-object equivalent of a common `DeepPartial<T>` helper type in TypeScript, and is the recommended way to build PATCH API bodies or partial form state.
 
 | Schema type | Effect |
 |-------------|--------|
