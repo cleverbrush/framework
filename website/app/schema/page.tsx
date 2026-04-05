@@ -25,6 +25,92 @@ export default function SchemaPage() {
                             }}
                         />
                     </pre>
+                    <details className="bundle-size-details">
+                        <summary>Bundle size</summary>
+                        <div className="bundle-size-body">
+                            <p>
+                                Measured with esbuild (minified + gzip level 9,
+                                single-file bundle, browser target).
+                            </p>
+                            <div className="table-wrap">
+                                <table className="api-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Import</th>
+                                            <th>Gzipped</th>
+                                            <th>Brotli</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>
+                                                <code>@cleverbrush/schema</code>{' '}
+                                                (full)
+                                            </td>
+                                            <td>14.0 KB</td>
+                                            <td>12.4 KB</td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <code>
+                                                    @cleverbrush/schema/core
+                                                </code>{' '}
+                                                (no built-in extensions)
+                                            </td>
+                                            <td>12.6 KB</td>
+                                            <td>11.2 KB</td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <code>
+                                                    @cleverbrush/schema/string
+                                                </code>{' '}
+                                                (single builder)
+                                            </td>
+                                            <td>3.8 KB</td>
+                                            <td>3.5 KB</td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <code>
+                                                    @cleverbrush/schema/number
+                                                </code>
+                                            </td>
+                                            <td>3.8 KB</td>
+                                            <td>3.5 KB</td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <code>
+                                                    @cleverbrush/schema/object
+                                                </code>
+                                            </td>
+                                            <td>5.8 KB</td>
+                                            <td>5.3 KB</td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                <code>
+                                                    @cleverbrush/schema/array
+                                                </code>
+                                            </td>
+                                            <td>4.0 KB</td>
+                                            <td>3.7 KB</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p className="bundle-size-note">
+                                The <code>sideEffects: false</code> flag is set
+                                in the package manifest. When your bundler
+                                supports tree-shaking, use the sub-path exports
+                                above to keep your bundle smaller — each builder
+                                carries only its own validation logic plus the
+                                shared <code>SchemaBuilder</code> base (~2.7 KB
+                                gzip).
+                            </p>
+                        </div>
+                    </details>
                 </div>
 
                 {/* ── Why ──────────────────────────────────────────── */}

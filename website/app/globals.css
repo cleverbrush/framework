@@ -949,6 +949,61 @@ li {
     line-height: 1.65;
 }
 
+/* ── Bundle Size Details ─────────────────────────────────────────── */
+
+.bundle-size-details {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 0.75rem;
+}
+
+.bundle-size-details summary {
+    cursor: pointer;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.bundle-size-details summary::-webkit-details-marker {
+    display: none;
+}
+
+.bundle-size-details summary::before {
+    content: "▶";
+    font-size: 0.6rem;
+    transition: transform 0.15s ease;
+    display: inline-block;
+}
+
+.bundle-size-details[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.bundle-size-details summary:hover {
+    color: var(--text-secondary);
+}
+
+.bundle-size-body {
+    padding-top: 0.75rem;
+}
+
+.bundle-size-body p {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin: 0 0 0.75rem;
+}
+
+.bundle-size-note {
+    font-size: 0.82rem !important;
+    color: var(--text-muted) !important;
+    margin-top: 0.75rem !important;
+    margin-bottom: 0 !important;
+}
+
 /* ── Code Blocks ─────────────────────────────────────────────────── */
 
 pre {

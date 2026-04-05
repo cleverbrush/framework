@@ -52,7 +52,7 @@
 | | Zod (v4.3.6) | @cleverbrush/schema |
 |---|---|---|
 | **Stars** | 42.3k | Pre-publish |
-| **Bundle size** | 2kb core (gzipped) | **Must measure** |
+| **Bundle size** | Zod v3: 14.4 KB gz; Zod v4: **41 KB gz** | **14 KB gz (full) / 4 KB gz (subpath)** |
 | **Standard Schema** | ✅ Yes (v3.24+) | ❌ Not yet — **must implement** |
 | **Runtime introspection** | ❌ Opaque schemas | ✅ **PropertyDescriptors** |
 | **Extension system** | `.refine()` only (black box) | ✅ **`defineExtension()` — type-safe, composable, introspectable** |
@@ -92,14 +92,45 @@ Implemented as a built-in extension (not a separate builder class) following the
 - 34 tests (runtime + type-level)
 - Playground example, README section, migration guide entry
 
-### 1.2 Bundle size audit
+### 1.2 Bundle size audit ✅
 
-Zod advertises "2kb core (gzipped)". We need to know our number.
+**Measured April 5, 2026** using esbuild single-file bundle + gzip level 9.
 
-- Measure gzipped bundle size for `@cleverbrush/schema` (full and `/core` subpath)
-- If competitive (≤5kb), advertise it prominently
-- If large, investigate tree-shaking and code splitting opportunities
-- Add bundle size badge to README
+#### Results — @cleverbrush/schema
+
+| Entry point | Raw (min) | Gzipped | Brotli |
+|-------------|-----------|---------|--------|
+| `@cleverbrush/schema` (full index) | 76.8 KB | **14.0 KB** | 12.4 KB |
+| `@cleverbrush/schema/core` (no extensions) | 71.1 KB | **12.6 KB** | 11.2 KB |
+| `@cleverbrush/schema/string` | 15.7 KB | **3.8 KB** | 3.5 KB |
+| `@cleverbrush/schema/number` | 15.4 KB | **3.8 KB** | 3.5 KB |
+| `@cleverbrush/schema/object` | 22.8 KB | **5.8 KB** | 5.3 KB |
+| `@cleverbrush/schema/array` | 15.6 KB | **4.0 KB** | 3.7 KB |
+| `SchemaBuilder` base class alone | 9.8 KB | **2.7 KB** | — |
+
+#### Reference: Zod bundle sizes (same methodology)
+
+| Package | Gzipped | Notes |
+|---------|---------|-------|
+| Zod v3 (full) | 14.4 KB | Installed: 3.25.76 |
+| Zod v4 (full) | 41.0 KB | 3× larger than us |
+| Zod v4-mini | 45.3 KB | Larger than v4/core |
+
+> The PLAN's earlier "Zod 2kb core" claim is a Zod marketing reference; **actual Zod numbers** measured above.
+
+#### Verdict
+
+- **Full import: 14 KB gzip** — competitive with Zod v3 (~3% smaller), and **3× smaller than Zod v4**.
+- **Sub-path imports: 3.8–5.8 KB gzip** — well within the ≤5 KB goal for primitive builders; `object` just exceeds it.
+- **Tree-shaking**: Importing partial symbols from `@cleverbrush/schema` (full index) does NOT tree-shake — the entire `SchemaBuilder` inheritance chain is pulled in. The sub-path exports (`/string`, `/number`, etc.) ARE the mechanism for smaller bundles, and they work as intended. The base `SchemaBuilder` class represents a ~2.7 KB gzip floor (unavoidable — it holds all fluent methods, validation engine, introspection, etc.).
+- **Extensions** add only ~1.4 KB gzip on top of core (full index vs core subpath).
+
+#### Actions taken
+
+- ✅ Size is competitive — advertise it
+- ✅ Sub-path exports already satisfy tree-shaking use cases
+- ⚠️ Add badge to README: `14 KB gzipped (full)` / `~4 KB gzipped (per builder)`
+- ⚠️ Update competitive table: clarify Zod v4 is **3× larger**, not smaller
 
 ### 1.3 Merge & publish
 
