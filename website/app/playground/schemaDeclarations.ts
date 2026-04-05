@@ -248,6 +248,7 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
     };
     /**
      * Set a schema that every array item has to satisfy. If it is not set,
@@ -364,6 +365,7 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         };
         hasDefault: boolean;
         defaultValue: TFinalResult | (() => TFinalResult) | undefined;
+        description: string | undefined;
     };
     /**
      * @inheritdoc
@@ -557,6 +559,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
     };
     /**
      * @inheritdoc
@@ -858,6 +861,7 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
     };
     /**
      * Performs synchronous validation of the schema over \`object\`.
@@ -1210,6 +1214,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
     };
     /**
      * @inheritdoc
@@ -1535,6 +1540,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         };
         hasDefault: boolean;
         defaultValue: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | undefined;
+        description: string | undefined;
     };
     /**
      * @hidden
@@ -2155,6 +2161,7 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
     };
     /**
      * Core sync validation. Returns \`{ valid, object, errors, getNestedErrors, getErrorsFor }\`.
@@ -2389,6 +2396,7 @@ export type SchemaBuilderProps<T> = {
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
     defaultValue?: T | (() => T);
+    description?: string;
 };
 export type ValidationContext<TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = {
     /**
@@ -2757,6 +2765,11 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
          * The default value or factory function.
          */
         defaultValue: TResult | (() => TResult) | undefined;
+        /**
+         * The human-readable description attached to this schema via \`.describe()\`,
+         * or \`undefined\` if none was set.
+         */
+        description: string | undefined;
     };
     /**
      * Makes schema optional (consider \`null\` and \`undefined\` as valid objects for this schema)
@@ -2788,6 +2801,26 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * Removes the default value set by a previous call to \`.default()\`.
      */
     clearDefault(): any;
+    /**
+     * Attaches a human-readable description to this schema as runtime metadata.
+     *
+     * The description has no effect on validation — it is purely informational.
+     * It is accessible via \`.introspect().description\` and is emitted as the
+     * \`description\` field by \`toJsonSchema()\` from \`@cleverbrush/schema-json\`.
+     *
+     * Useful for documentation generation, form labels, and AI tool descriptions.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = object({
+     *   name: string().describe('The user\\'s full name'),
+     *   age:  number().optional().describe('Age in years'),
+     * }).describe('A user object');
+     *
+     * schema.introspect().description; // 'A user object'
+     * \`\`\`
+     */
+    describe(text: string): this;
     /**
      * Brands the schema with a phantom type tag, preventing structural mixing
      * of semantically different values at the type level. Zero runtime cost.
@@ -3085,6 +3118,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
     };
     /**
      * @inheritdoc
@@ -3387,6 +3421,7 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
     };
     /**
      * Sets a schema that all elements beyond the fixed positions must satisfy.
@@ -3569,6 +3604,7 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         };
         hasDefault: boolean;
         defaultValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
+        description: string | undefined;
     };
     /**
      * Null is a legitimate JavaScript value that a union option (e.g.

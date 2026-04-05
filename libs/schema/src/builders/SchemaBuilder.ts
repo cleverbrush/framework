@@ -204,6 +204,7 @@ export type SchemaBuilderProps<T> = {
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
     defaultValue?: T | (() => T);
+    description?: string;
 };
 
 export type ValidationContext<
@@ -563,6 +564,7 @@ export abstract class SchemaBuilder<
 > {
     #isRequired = true;
     #isReadonly = false;
+    #description: string | undefined;
     #preprocessors: PreprocessorEntry<TResult>[] = [];
     #validators: ValidatorEntry<TResult>[] = [];
     #hasMutating = false;
@@ -1117,7 +1119,12 @@ export abstract class SchemaBuilder<
             /**
              * The default value or factory function.
              */
-            defaultValue: this.#defaultValue
+            defaultValue: this.#defaultValue,
+            /**
+             * The human-readable description attached to this schema via `.describe()`,
+             * or `undefined` if none was set.
+             */
+            description: this.#description
         };
     }
 
@@ -1167,6 +1174,32 @@ export abstract class SchemaBuilder<
             ...this.introspect(),
             defaultValue: undefined
         }) as any;
+    }
+
+    /**
+     * Attaches a human-readable description to this schema as runtime metadata.
+     *
+     * The description has no effect on validation — it is purely informational.
+     * It is accessible via `.introspect().description` and is emitted as the
+     * `description` field by `toJsonSchema()` from `@cleverbrush/schema-json`.
+     *
+     * Useful for documentation generation, form labels, and AI tool descriptions.
+     *
+     * @example
+     * ```ts
+     * const schema = object({
+     *   name: string().describe('The user\'s full name'),
+     *   age:  number().optional().describe('Age in years'),
+     * }).describe('A user object');
+     *
+     * schema.introspect().description; // 'A user object'
+     * ```
+     */
+    public describe(text: string): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            description: text
+        }) as unknown as this;
     }
 
     /**
@@ -1520,6 +1553,10 @@ export abstract class SchemaBuilder<
 
         if (props.defaultValue !== undefined) {
             this.#defaultValue = props.defaultValue;
+        }
+
+        if (typeof props.description === 'string') {
+            this.#description = props.description;
         }
 
         this.#requiredErrorMessageProvider =

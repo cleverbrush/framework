@@ -345,6 +345,14 @@ const result = UserSchema.parse({
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
+                                <tr>
+                                    <td>
+                                        <code>description</code>
+                                    </td>
+                                    <td>
+                                        <code>.describe(text)</code>
+                                    </td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
@@ -360,6 +368,9 @@ const result = UserSchema.parse({
                         a JSON Schema object. Declarative constraints (formats,
                         min/max, patterns, enum/const literals,
                         required/optional per property) round-trip cleanly.
+                        Descriptions set via <code>.describe(text)</code> are
+                        emitted as the <code>description</code> field on the
+                        corresponding JSON Schema node.
                     </p>
                     <pre>
                         <code

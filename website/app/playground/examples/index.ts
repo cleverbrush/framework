@@ -56,6 +56,7 @@ export const EXAMPLE_GROUPS = [
         ]
     },
     { label: 'Extensions', ids: ['builtin-extensions', 'custom-extensions'] },
+    { label: 'Metadata', ids: ['describe-metadata'] },
     {
         label: 'Default Values',
         ids: [
@@ -1184,6 +1185,67 @@ const result = Bad.validate(undefined as any);
 // result.valid === false
 `,
         testData: 'null'
+    },
+    {
+        id: 'describe-metadata',
+        title: 'Schema Descriptions',
+        description:
+            'Use <code>.describe()</code> to attach human-readable descriptions to any schema. Descriptions are metadata-only — they have no effect on validation but are accessible via <code>.introspect()</code> and emitted as <code>description</code> fields by <code>toJsonSchema()</code>.',
+        group: 'Metadata',
+        code: `import { object, string, number, array, InferType } from '@cleverbrush/schema';
+import { toJsonSchema } from '@cleverbrush/schema-json';
+
+// Attach descriptions to individual fields and the top-level schema
+const ProductSchema = object({
+    id: string()
+        .uuid()
+        .describe('Unique product identifier (UUID v4)'),
+    name: string()
+        .nonempty()
+        .describe('Display name shown to customers'),
+    price: number()
+        .positive()
+        .describe('Price in USD, must be greater than 0'),
+    tags: array(string())
+        .describe('Searchable keywords for filtering')
+}).describe('A product in the catalogue');
+
+// Read descriptions back via .introspect()
+const info = ProductSchema.introspect();
+console.log(info.description);
+// 'A product in the catalogue'
+
+console.log(info.props.name.introspect().description);
+// 'Display name shown to customers'
+
+// Convert to JSON Schema — descriptions are emitted automatically
+const jsonSchema = toJsonSchema(ProductSchema, { $schema: false });
+console.log(JSON.stringify(jsonSchema, null, 2));
+// {
+//   "type": "object",
+//   "description": "A product in the catalogue",
+//   "properties": {
+//     "name": { "type": "string", "description": "Display name ..." },
+//     ...
+//   }
+// }
+
+// .describe() chains with all other modifiers — order doesn't matter
+const OptionalDescription = string()
+    .optional()
+    .describe('Optional note')
+    .minLength(1);
+
+// Validation is completely unaffected
+const result = ProductSchema.validate({
+    id: '550e8400-e29b-41d4-a716-446655440000',
+    name: 'Widget',
+    price: 9.99,
+    tags: ['sale', 'featured']
+});
+`,
+        testData:
+            '{"id":"550e8400-e29b-41d4-a716-446655440000","name":"Widget","price":9.99,"tags":["sale","featured"]}'
     },
     {
         id: 'default-introspect',

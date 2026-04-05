@@ -727,6 +727,39 @@ console.log(schema.introspect().isReadonly); // true
 
 > **Note:** `.readonly()` is **shallow** — only top-level object properties or the array itself are marked readonly. For deeply nested immutability consider applying `.readonly()` at each level, or use a `DeepReadonly` utility type post-validation.
 
+## Describe
+
+Every schema builder supports `.describe(text)`. This is a **metadata-only** modifier — it stores a human-readable description on the schema at runtime with no effect on validation.
+
+```typescript
+const UserSchema = object({
+    name: string().describe("The user's full name"),
+    age:  number().optional().describe('Age in years'),
+}).describe('A user object');
+
+// Read the description back at runtime
+UserSchema.introspect().description; // 'A user object'
+```
+
+The description is accessible via `.introspect().description` and chains naturally with all other modifiers:
+
+```typescript
+string().describe('A name').optional().readonly()
+//  ^ InferType is string | undefined, isReadonly: true, description: 'A name'
+```
+
+When using `@cleverbrush/schema-json`, descriptions round-trip through JSON Schema's standard `description` field:
+
+```typescript
+import { toJsonSchema, fromJsonSchema } from '@cleverbrush/schema-json';
+
+const spec = toJsonSchema(string().describe('A name'), { $schema: false });
+// { type: 'string', description: 'A name' }
+
+const schema = fromJsonSchema({ type: 'string', description: 'A name' } as const);
+schema.introspect().description; // 'A name'
+```
+
 ## Extensions
 
 [▶ Open in Playground](https://docs.cleverbrush.com/playground/custom-extensions)
