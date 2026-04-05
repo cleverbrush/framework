@@ -55,7 +55,10 @@ export const EXAMPLE_GROUPS = [
             'deep-nesting-errors'
         ]
     },
-    { label: 'Extensions', ids: ['builtin-extensions', 'custom-extensions'] },
+    {
+        label: 'Extensions',
+        ids: ['builtin-extensions', 'custom-extensions', 'enum']
+    },
     { label: 'Metadata', ids: ['describe-metadata'] },
     {
         label: 'Default Values',
@@ -1096,6 +1099,45 @@ const result = ThemeSchema.validate({
 `,
         testData:
             '{ "primaryColor": "#ff00aa", "secondaryColor": "#00ff00", "name": "Ocean" }'
+    },
+    {
+        id: 'enum',
+        title: 'Enum / oneOf',
+        description:
+            'Use <code>enumOf()</code> or <code>.oneOf()</code> to constrain a string or number to a fixed set of literal values. The inferred type narrows automatically.',
+        group: 'Extensions',
+        code: `import { string, number, enumOf, InferType } from '@cleverbrush/schema';
+
+// Top-level factory — mirrors Zod's z.enum()
+const Role = enumOf('admin', 'user', 'guest');
+type Role = InferType<typeof Role>; // 'admin' | 'user' | 'guest'
+
+const r1 = Role.validate('admin');   // valid
+const r2 = Role.validate('other');   // invalid
+
+// Equivalent: string().oneOf()
+const Status = string().oneOf('active', 'inactive', 'pending');
+type Status = InferType<typeof Status>; // 'active' | 'inactive' | 'pending'
+
+// Number enum
+const Priority = number().oneOf(1, 2, 3);
+type Priority = InferType<typeof Priority>; // 1 | 2 | 3
+
+const p1 = Priority.validate(2);  // valid
+const p2 = Priority.validate(4);  // invalid
+
+// Chains with .nullable() and .optional()
+const OptionalRole = enumOf('admin', 'user').nullable();
+// Type: 'admin' | 'user' | null
+
+const r3 = OptionalRole.validate('admin'); // valid
+const r4 = OptionalRole.validate(null);    // valid
+
+// Runtime access to allowed values
+const meta = Role.introspect();
+// meta.extensions.oneOf === ['admin', 'user', 'guest']
+`,
+        testData: '"admin"'
     },
 
     // ── Default Values ──────────────────────────────

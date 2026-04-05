@@ -13,7 +13,7 @@
 | **Schema core** | ✅ Done | 13 builders (String, Number, Boolean, Date, Object, Array, Union, Tuple, Record, Function, Any, Null, Lazy), sync/async validation, branded types, immutable fluent API |
 | **Base methods** | ✅ Done | `.optional()`, `.required()`, `.default()`, `.catch()`, `.readonly()`, `.describe()`, `.brand()`, `.hasType()`, `.addValidator()`, `.addPreprocessor()`, `.introspect()`, `.deepPartial()` (objects) |
 | **Extension system** | ✅ Done | `defineExtension()` + `withExtensions()`, type-safe plugin architecture |
-| **Built-in extensions** | ✅ Done | String: email, url, uuid, ip, trim, toLowerCase, nonempty. Number: positive, negative, finite, multipleOf. Array: nonempty, unique. All builders: nullable |
+| **Built-in extensions** | ✅ Done | String: email, url, uuid, ip, trim, toLowerCase, nonempty, oneOf. Number: positive, negative, finite, multipleOf, oneOf. Array: nonempty, unique. All builders: nullable. Top-level: enumOf |
 | **PropertyDescriptors** | ✅ Done | Runtime introspection tree — the architectural differentiator |
 | **Mapper** | ✅ Done | Schema-driven object mapping: `.from()`, `.compute()`, `.ignore()`, auto-mapping, compile-time completeness checking |
 | **React Form** | ✅ Done | Headless: `FormProvider`, `Field`, `useSchemaForm()`, custom renderers, schema-driven field generation |
@@ -69,7 +69,6 @@
 
 | Feature | Zod API | Current workaround | Priority |
 |---------|---------|-------------------|----------|
-| **Enum builder** | `z.enum(['a', 'b'])` | `union(string().equals('a')).or(...)` | **High — ship before publish** |
 | **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` + `@cleverbrush/mapper` | Low — mapper covers ~90% of use cases |
 | **Coercion namespace** | `z.coerce.string()` | `.addPreprocessor()` | Low — preprocessors cover this |
 | **Literal builder** | `z.literal(42)` | `number().equals(42)` or `string().equals('x')` | Low — equality operators work |
@@ -81,15 +80,17 @@
 
 **Goal:** Ship the minimum needed to make first impressions excellent.
 
-### 1.1 Enum builder
+### 1.1 Enum builder ✅
 
-Add `enumOf('admin', 'user', 'guest')` — the most visible remaining API gap vs Zod. Currently requires verbose `union(string().equals('a')).or(string().equals('b'))...`.
+Implemented as a built-in extension (not a separate builder class) following the same pattern as `nullable`, `email`, `positive`, etc.
 
-- New `EnumSchemaBuilder` with factory function
-- Infers literal union type: `'admin' | 'user' | 'guest'`
-- `.options` property for runtime access to allowed values
+- `.oneOf()` extension method on `StringSchemaBuilder` and `NumberSchemaBuilder`
+- `enumOf('admin', 'user', 'guest')` top-level convenience factory (sugar for `string().oneOf(...)`)
+- Narrows inferred type: `string().oneOf('a', 'b')` → `'a' | 'b'`
+- Runtime introspection via `.introspect().extensions.oneOf`
+- Chains with `.nullable()`, `.optional()`, `.default()`
+- 34 tests (runtime + type-level)
 - Playground example, README section, migration guide entry
-- Register in extension system (`BuilderMap`)
 
 ### 1.2 Bundle size audit
 
@@ -451,4 +452,10 @@ Performance work on `feature/performance` branch transformed benchmarks from a l
 <summary>Transform/Pipe — Deprioritized</summary>
 
 ~90% of real-world usage covered by mapper's `.compute()` + `.addPreprocessor()` + string extensions. The remaining gap (inline single-field type change) is a convenience, not a blocker. Moved to demand-driven (Phase 7).
+</details>
+
+<details>
+<summary>Enum / oneOf ✅</summary>
+
+`.oneOf()` built-in extension on `StringSchemaBuilder` and `NumberSchemaBuilder`. Top-level `enumOf()` convenience factory. Narrows inferred type to the literal union (e.g., `'admin' | 'user' | 'guest'`). Runtime introspection via `.introspect().extensions.oneOf`. Chains with `.nullable()`, `.optional()`, `.default()`. 34 tests.
 </details>

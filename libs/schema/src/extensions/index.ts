@@ -27,6 +27,8 @@ import type { HiddenExtensionMethods } from '../extension.js';
 import { withExtensions } from '../extension.js';
 import type { ArrayBuiltinExtensions } from './array.js';
 import { arrayExtensions } from './array.js';
+import type { NumberOneOfExtension, StringOneOfExtension } from './enum.js';
+import { enumExtension } from './enum.js';
 import type {
     AnyBuiltinExtensions,
     BooleanBuiltinExtensions,
@@ -44,6 +46,11 @@ import type { StringBuiltinExtensions } from './string.js';
 import { stringExtensions } from './string.js';
 
 export { type ArrayBuiltinExtensions, arrayExtensions } from './array.js';
+export {
+    enumExtension,
+    type NumberOneOfExtension,
+    type StringOneOfExtension
+} from './enum.js';
 export {
     type AnyBuiltinExtensions,
     type BooleanBuiltinExtensions,
@@ -75,9 +82,10 @@ export type ExtendedString<T extends string = string> = StringSchemaBuilder<
     T,
     true,
     false,
-    StringBuiltinExtensions<T>
+    StringBuiltinExtensions<T> & StringOneOfExtension
 > &
     StringBuiltinExtensions<T> &
+    StringOneOfExtension &
     HiddenExtensionMethods;
 
 /** A `NumberSchemaBuilder` with built-in extension methods. */
@@ -85,9 +93,10 @@ export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<
     T,
     true,
     false,
-    NumberBuiltinExtensions<T>
+    NumberBuiltinExtensions<T> & NumberOneOfExtension
 > &
     NumberBuiltinExtensions<T> &
+    NumberOneOfExtension &
     HiddenExtensionMethods;
 
 /** An `ArraySchemaBuilder` with built-in extension methods. */
@@ -221,7 +230,8 @@ const s = withExtensions(
     stringExtensions,
     numberExtensions,
     arrayExtensions,
-    nullableExtension
+    nullableExtension,
+    enumExtension
 );
 
 export const string: {
@@ -267,3 +277,29 @@ export const record: <
     keySchema: TKeySchema,
     valueSchema: TValueSchema
 ) => ExtendedRecord<TKeySchema, TValueSchema> = s.record as any;
+
+/**
+ * Creates a string schema constrained to the given literal values.
+ *
+ * Convenience factory equivalent to `string().oneOf(...values)`.
+ * Mirrors Zod's `z.enum(['admin', 'user', 'guest'])` API.
+ *
+ * @param values - the allowed string literals (at least one required)
+ * @returns a typed `StringSchemaBuilder` that only accepts the given values
+ *
+ * @example
+ * ```ts
+ * import { enumOf, InferType } from '@cleverbrush/schema';
+ *
+ * const Role = enumOf('admin', 'user', 'guest');
+ * type Role = InferType<typeof Role>; // 'admin' | 'user' | 'guest'
+ *
+ * Role.validate('admin');  // valid
+ * Role.validate('other');  // invalid
+ * ```
+ */
+export const enumOf = <const T extends string>(
+    ...values: [T, ...T[]]
+): ExtendedString<T> => {
+    return (string() as any).oneOf(...values);
+};

@@ -105,8 +105,8 @@ The following builder functions are available:
 | Function        | Description                                       | Key Methods                                                     |
 | --------------- | ------------------------------------------------- | --------------------------------------------------------------- |
 | `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.default(value)`, `.addValidator(fn)`                              |
-| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.nullable()`, `.default(value)` |
-| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.nullable()`, `.default(value)` |
+| `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.oneOf(...values)`, `.nullable()`, `.default(value)` |
+| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.oneOf(...values)`, `.nullable()`, `.default(value)` |
 | `boolean()`     | Boolean value.                                    | `.optional()`, `.nullable()`, `.default(value)`                                                   |
 | `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.nullable()`, `.default(value)`                                                   |
 | `func()`        | Function value.                                   | `.optional()`, `.nullable()`, `.default(value)`                                                   |
@@ -116,6 +116,7 @@ The following builder functions are available:
 | `tuple([...schemas])` | Fixed-length array with per-position types. Each index validated against its own schema — mirrors TypeScript tuple types. | `.rest(schema)`, `.optional()`, `.nullable()`, `.default(value)` |
 | `record(keySchema, valSchema)` | Object with dynamic string keys. Every key must satisfy `keySchema` (a string schema) and every value must satisfy `valSchema` — mirrors TypeScript's `Record<K, V>`. | `.optional()`, `.nullable()`, `.default(value)`, `.addValidator(fn)` |
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.nullable()`, `.default(value)`                 |
+| `enumOf(...values)` | String enum — sugar for `string().oneOf(...)`. | `.optional()`, `.nullable()`, `.default(value)` |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 
 ## Immutability
@@ -1104,6 +1105,37 @@ const User = object({
 });
 
 User.validate({ name: 'Alice', bio: null, age: null }); // valid
+```
+
+### Enum / oneOf Extension
+
+| Method | Available on | Description |
+| --- | --- | --- |
+| `.oneOf(...values)` | `string`, `number` | Constrains the value to one of the given literals and **narrows the inferred type** to the literal union. |
+| `enumOf(...values)` | top-level factory | Sugar for `string().oneOf(...)`. Mirrors Zod's `z.enum()`. |
+
+```typescript
+import { string, number, enumOf, InferType } from '@cleverbrush/schema';
+
+// String enum — infers 'admin' | 'user' | 'guest'
+const Role = enumOf('admin', 'user', 'guest');
+type Role = InferType<typeof Role>;
+
+Role.validate('admin'); // valid
+Role.validate('other'); // invalid — "must be one of: admin, user, guest"
+
+// Equivalent long-form
+const Role2 = string().oneOf('admin', 'user', 'guest');
+
+// Number enum — infers 1 | 2 | 3
+const Priority = number().oneOf(1, 2, 3);
+type Priority = InferType<typeof Priority>;
+
+// Chains with nullable / optional
+const OptionalRole = enumOf('admin', 'user').nullable(); // 'admin' | 'user' | null
+
+// Runtime access to allowed values via introspect
+Role.introspect().extensions?.oneOf; // ['admin', 'user', 'guest']
 ```
 
 All validator extensions accept an optional error message as the last parameter — either a string or a function (matching the same `ValidationErrorMessageProvider` pattern used by built-in constraints like `.minLength()`):
