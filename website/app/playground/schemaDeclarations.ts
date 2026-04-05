@@ -4440,182 +4440,6 @@ export declare const arrayExtensions: import("../extension.js").ExtensionDescrip
 }>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/extensions/enum.d.ts": `/**
- * Built-in enum extension for \`@cleverbrush/schema\`.
- *
- * Provides the \`.oneOf()\` method on \`StringSchemaBuilder\` and
- * \`NumberSchemaBuilder\`, constraining the value to a fixed set of
- * allowed literals and narrowing the inferred type accordingly.
- *
- * Also exports the top-level {@link enumOf} convenience factory, which is
- * sugar for \`string().oneOf(...)\`.
- *
- * These are pre-applied in the default \`@cleverbrush/schema\` import.
- * Import from \`@cleverbrush/schema/core\` to get bare builders without
- * these extensions.
- *
- * @module
- */
-import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
-import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
-import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
-import type { HiddenExtensionMethods } from '../extension.js';
-import type { NullableMethod } from './nullable.js';
-/** Return type for \`.oneOf()\` on \`StringSchemaBuilder\`. */
-type StringOneOfReturn<T extends string = string> = StringSchemaBuilder<T, true, false, StringOneOfExtension> & StringOneOfExtension & NullableMethod<StringSchemaBuilder<T, true, false, StringOneOfExtension>> & HiddenExtensionMethods;
-/** Return type for \`.oneOf()\` on \`NumberSchemaBuilder\`. */
-type NumberOneOfReturn<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberOneOfExtension> & NumberOneOfExtension & NullableMethod<NumberSchemaBuilder<T, true, false, NumberOneOfExtension>> & HiddenExtensionMethods;
-/**
- * \`.oneOf()\` method added to \`StringSchemaBuilder\` by the built-in enum
- * extension pack.
- *
- * **WORKAROUND:** This interface duplicates the method signature from
- * \`enumExtension\` so that JSDoc survives into the published \`.d.ts\`
- * files. TypeScript strips JSDoc when method signatures are reconstructed
- * through the \`FixedMethods\` mapped type (conditional \`infer\` loses
- * comments). Remove this interface once TypeScript preserves JSDoc
- * through mapped types / conditional type inference.
- *
- * @see https://github.com/microsoft/TypeScript/issues/50715
- */
-export interface StringOneOfExtension {
-    /**
-     * Constrains the string to one of the specified literal values.
-     *
-     * Narrows the inferred type from \`string\` to the union of the
-     * provided literals.
-     *
-     * @param values - the allowed string literals
-     * @returns a new schema builder restricted to the given values
-     *
-     * @example
-     * \`\`\`ts
-     * import { string, InferType } from '@cleverbrush/schema';
-     *
-     * const role = string().oneOf('admin', 'user', 'guest');
-     * type Role = InferType<typeof role>; // 'admin' | 'user' | 'guest'
-     *
-     * role.validate('admin');  // valid
-     * role.validate('other');  // invalid — "must be one of: admin, user, guest"
-     * \`\`\`
-     */
-    oneOf<V extends string>(...values: [V, ...V[]]): StringOneOfReturn<V>;
-    /**
-     * Constrains the string to one of the specified literal values,
-     * with an optional custom error message or factory.
-     *
-     * Pass the allowed values as an array (first argument) to provide a
-     * custom error message as the second argument.
-     *
-     * @param values - the allowed string literals as an array
-     * @param errorMessage - optional custom error message or factory function
-     * @returns a new schema builder restricted to the given values
-     *
-     * @example
-     * \`\`\`ts
-     * import { string, InferType } from '@cleverbrush/schema';
-     *
-     * const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
-     * role.validate('other');  // invalid — "Invalid role"
-     *
-     * const role2 = string().oneOf(['admin', 'user'], (val) => \`"\${val}" is not a valid role\`);
-     * \`\`\`
-     */
-    oneOf<V extends string>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringOneOfReturn<V>;
-}
-/**
- * \`.oneOf()\` method added to \`NumberSchemaBuilder\` by the built-in enum
- * extension pack.
- *
- * @see StringOneOfExtension for full JSDoc rationale.
- */
-export interface NumberOneOfExtension {
-    /**
-     * Constrains the number to one of the specified literal values.
-     *
-     * Narrows the inferred type from \`number\` to the union of the
-     * provided literals.
-     *
-     * @param values - the allowed number literals
-     * @returns a new schema builder restricted to the given values
-     *
-     * @example
-     * \`\`\`ts
-     * import { number, InferType } from '@cleverbrush/schema';
-     *
-     * const priority = number().oneOf(1, 2, 3);
-     * type Priority = InferType<typeof priority>; // 1 | 2 | 3
-     *
-     * priority.validate(1);  // valid
-     * priority.validate(4);  // invalid — "must be one of: 1, 2, 3"
-     * \`\`\`
-     */
-    oneOf<V extends number>(...values: [V, ...V[]]): NumberOneOfReturn<V>;
-    /**
-     * Constrains the number to one of the specified literal values,
-     * with a custom error message or factory as the last argument.
-     *
-     * Because number values are always numbers, a trailing \`string\` or
-     * function argument is unambiguously the error message.
-     *
-     * @param args - the allowed number literals followed by an error message
-     * @returns a new schema builder restricted to the given values
-     *
-     * @example
-     * \`\`\`ts
-     * import { number } from '@cleverbrush/schema';
-     *
-     * const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
-     * const priority2 = number().oneOf(1, 2, 3, (val) => \`\${val} is not a valid priority\`);
-     * \`\`\`
-     */
-    oneOf<V extends number>(...args: [
-        ...[V, ...V[]],
-        ValidationErrorMessageProvider<NumberSchemaBuilder>
-    ]): NumberOneOfReturn<V>;
-    /**
-     * Constrains the number to one of the specified literal values,
-     * with an optional custom error message or factory.
-     *
-     * Pass the allowed values as an array (first argument) to provide a
-     * custom error message as the second argument.
-     *
-     * @param values - the allowed number literals as an array
-     * @param errorMessage - optional custom error message or factory function
-     * @returns a new schema builder restricted to the given values
-     *
-     * @example
-     * \`\`\`ts
-     * import { number } from '@cleverbrush/schema';
-     *
-     * const priority = number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
-     * \`\`\`
-     */
-    oneOf<V extends number>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberOneOfReturn<V>;
-}
-/**
- * Extension descriptor that adds \`.oneOf()\` to \`StringSchemaBuilder\`
- * and \`NumberSchemaBuilder\`.
- *
- * @example
- * \`\`\`ts
- * import { withExtensions } from '@cleverbrush/schema/core';
- * import { enumExtension } from '@cleverbrush/schema';
- *
- * const s = withExtensions(enumExtension);
- * const role = s.string().oneOf('admin', 'user', 'guest');
- * \`\`\`
- */
-export declare const enumExtension: import("../extension.js").ExtensionDescriptor<{
-    string: {
-        oneOf(this: StringSchemaBuilder, ...args: any[]): StringSchemaBuilder<string, true, false, {}>;
-    };
-    number: {
-        oneOf(this: NumberSchemaBuilder, ...args: any[]): NumberSchemaBuilder<number, true, false, {}>;
-    };
-}>;
-export {};
-`,
     "file:///node_modules/@cleverbrush/schema/extensions/index.d.ts": `/**
  * Pre‑wired extension pack for \`@cleverbrush/schema\`.
  *
@@ -4643,19 +4467,17 @@ import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import type { ArrayBuiltinExtensions } from './array.js';
-import type { NumberOneOfExtension, StringOneOfExtension } from './enum.js';
 import type { AnyBuiltinExtensions, BooleanBuiltinExtensions, DateBuiltinExtensions, FuncBuiltinExtensions, ObjectBuiltinExtensions, RecordBuiltinExtensions, TupleBuiltinExtensions, UnionBuiltinExtensions } from './nullable.js';
 import type { NumberBuiltinExtensions } from './number.js';
 import type { StringBuiltinExtensions } from './string.js';
 export { type ArrayBuiltinExtensions, arrayExtensions } from './array.js';
-export { enumExtension, type NumberOneOfExtension, type StringOneOfExtension } from './enum.js';
 export { type AnyBuiltinExtensions, type BooleanBuiltinExtensions, type DateBuiltinExtensions, type FuncBuiltinExtensions, type NullableMethod, type NullableReturn, nullableExtension, type ObjectBuiltinExtensions, type RecordBuiltinExtensions, type TupleBuiltinExtensions, type UnionBuiltinExtensions } from './nullable.js';
-export { type NumberBuiltinExtensions, numberExtensions } from './number.js';
-export { type StringBuiltinExtensions, stringExtensions } from './string.js';
+export { type NumberBuiltinExtensions, type NumberOneOfExtension, numberExtensions } from './number.js';
+export { type StringBuiltinExtensions, type StringOneOfExtension, stringExtensions } from './string.js';
 /** A \`StringSchemaBuilder\` with built-in extension methods. */
-export type ExtendedString<T extends string = string> = StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T> & StringOneOfExtension> & StringBuiltinExtensions<T> & StringOneOfExtension & HiddenExtensionMethods;
+export type ExtendedString<T extends string = string> = StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>> & StringBuiltinExtensions<T> & HiddenExtensionMethods;
 /** A \`NumberSchemaBuilder\` with built-in extension methods. */
-export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T> & NumberOneOfExtension> & NumberBuiltinExtensions<T> & NumberOneOfExtension & HiddenExtensionMethods;
+export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>> & NumberBuiltinExtensions<T> & HiddenExtensionMethods;
 /** An \`ArraySchemaBuilder\` with built-in extension methods. */
 export type ExtendedArray<TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & HiddenExtensionMethods;
 /** A \`BooleanSchemaBuilder\` with built-in extension methods. */
@@ -4965,7 +4787,7 @@ export declare const nullableExtension: import("../extension.js").ExtensionDescr
  *
  * Provides common number validators: {@link numberExtensions | positive},
  * {@link numberExtensions | negative}, {@link numberExtensions | finite},
- * and {@link numberExtensions | multipleOf}.
+ * {@link numberExtensions | multipleOf}, and {@link numberExtensions | oneOf}.
  *
  * These are pre-applied in the default \`@cleverbrush/schema\` import.
  * Import from \`@cleverbrush/schema/core\` to get bare builders without these extensions.
@@ -5046,14 +4868,68 @@ export interface NumberBuiltinExtensions<T extends number = number> {
      * \`\`\`
      */
     multipleOf(n: number, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberExtReturn<T>;
+    /**
+     * Constrains the number to one of the specified literal values.
+     *
+     * Narrows the inferred type from \`number\` to the union of the
+     * provided literals.
+     *
+     * @param values - the allowed number literals
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * import { number, InferType } from '@cleverbrush/schema';
+     *
+     * const priority = number().oneOf(1, 2, 3);
+     * type Priority = InferType<typeof priority>; // 1 | 2 | 3
+     *
+     * priority.validate(1);  // valid
+     * priority.validate(4);  // invalid — "must be one of: 1, 2, 3"
+     * \`\`\`
+     */
+    oneOf<V extends number>(...values: [V, ...V[]]): NumberExtReturn<V>;
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * @example
+     * \`\`\`ts
+     * const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+     * const priority2 = number().oneOf(1, 2, 3, (val) => \`\${val} is not a valid priority\`);
+     * \`\`\`
+     */
+    oneOf<V extends number>(...args: [
+        ...[V, ...V[]],
+        ValidationErrorMessageProvider<NumberSchemaBuilder>
+    ]): NumberExtReturn<V>;
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * @param values - the allowed number literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * const priority = number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+     * \`\`\`
+     */
+    oneOf<V extends number>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberExtReturn<V>;
     /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
     nullable(): NullableReturn<NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>>;
 }
 /**
+ * Subset of {@link NumberBuiltinExtensions} containing only the \`.oneOf()\` overloads.
+ * Exported for backward compatibility.
+ */
+export type NumberOneOfExtension = Pick<NumberBuiltinExtensions, 'oneOf'>;
+/**
  * Extension descriptor that adds common number validators
  * to \`NumberSchemaBuilder\`.
  *
- * Included methods: \`positive\`, \`negative\`, \`finite\`, \`multipleOf\`.
+ * Included methods: \`positive\`, \`negative\`, \`finite\`, \`multipleOf\`, \`oneOf\`.
  *
  * @example
  * \`\`\`ts
@@ -5121,6 +4997,19 @@ export declare const numberExtensions: import("../extension.js").ExtensionDescri
          * \`\`\`
          */
         multipleOf(this: NumberSchemaBuilder, n: number, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, {}>;
+        /**
+         * Constrains the number to one of the specified literal values.
+         *
+         * @param args - the allowed number literals, optionally followed by an error message
+         * @returns a new schema builder restricted to the given values
+         *
+         * @example
+         * \`\`\`ts
+         * number().oneOf(1, 2, 3);
+         * number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+         * \`\`\`
+         */
+        oneOf(this: NumberSchemaBuilder, ...args: any[]): NumberSchemaBuilder<number, true, false, {}>;
     };
 }>;
 export {};
@@ -5131,7 +5020,8 @@ export {};
  * Provides common string validators and preprocessors: {@link stringExtensions | email},
  * {@link stringExtensions | url}, {@link stringExtensions | uuid},
  * {@link stringExtensions | ip}, {@link stringExtensions | trim},
- * {@link stringExtensions | toLowerCase}, and {@link stringExtensions | nonempty}.
+ * {@link stringExtensions | toLowerCase}, {@link stringExtensions | nonempty},
+ * and {@link stringExtensions | oneOf}.
  *
  * These are pre-applied in the default \`@cleverbrush/schema\` import.
  * Import from \`@cleverbrush/schema/core\` to get bare builders without these extensions.
@@ -5264,14 +5154,67 @@ export interface StringBuiltinExtensions<T extends string = string> {
      * \`\`\`
      */
     nonempty(errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringExtReturn<T>;
+    /**
+     * Constrains the string to one of the specified literal values.
+     *
+     * Narrows the inferred type from \`string\` to the union of the
+     * provided literals.
+     *
+     * @param values - the allowed string literals
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * import { string, InferType } from '@cleverbrush/schema';
+     *
+     * const role = string().oneOf('admin', 'user', 'guest');
+     * type Role = InferType<typeof role>; // 'admin' | 'user' | 'guest'
+     *
+     * role.validate('admin');  // valid
+     * role.validate('other');  // invalid — "must be one of: admin, user, guest"
+     * \`\`\`
+     */
+    oneOf<V extends string>(...values: [V, ...V[]]): StringExtReturn<V>;
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * @example
+     * \`\`\`ts
+     * const role = string().oneOf('admin', 'user', (val) => \`"\${val}" is not allowed\`);
+     * \`\`\`
+     */
+    oneOf<V extends string>(...args: [
+        ...[V, ...V[]],
+        ValidationErrorMessageProvider<StringSchemaBuilder>
+    ]): StringExtReturn<V>;
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * @param values - the allowed string literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+     * \`\`\`
+     */
+    oneOf<V extends string>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringExtReturn<V>;
     /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
     nullable(): NullableReturn<StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>>;
 }
 /**
+ * Subset of {@link StringBuiltinExtensions} containing only the \`.oneOf()\` overloads.
+ * Exported for backward compatibility.
+ */
+export type StringOneOfExtension = Pick<StringBuiltinExtensions, 'oneOf'>;
+/**
  * Extension descriptor that adds common string validators and preprocessors
  * to \`StringSchemaBuilder\`.
  *
- * Included methods: \`email\`, \`url\`, \`uuid\`, \`ip\`, \`trim\`, \`toLowerCase\`, \`nonempty\`.
+ * Included methods: \`email\`, \`url\`, \`uuid\`, \`ip\`, \`trim\`, \`toLowerCase\`, \`nonempty\`, \`oneOf\`.
  *
  * @example
  * \`\`\`ts
@@ -5390,6 +5333,19 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * \`\`\`
          */
         nonempty(this: StringSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, {}>;
+        /**
+         * Constrains the string to one of the specified literal values.
+         *
+         * @param args - the allowed string literals, optionally followed by an error message
+         * @returns a new schema builder restricted to the given values
+         *
+         * @example
+         * \`\`\`ts
+         * string().oneOf('admin', 'user', 'guest');
+         * string().oneOf(['admin', 'user'], 'Invalid role');
+         * \`\`\`
+         */
+        oneOf(this: StringSchemaBuilder, ...args: any[]): StringSchemaBuilder<string, true, false, {}>;
     };
 }>;
 export {};
@@ -5446,7 +5402,7 @@ export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
-export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, enumExtension, enumOf, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, type NumberOneOfExtension, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type RecordBuiltinExtensions, record, type StringBuiltinExtensions, type StringOneOfExtension, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
+export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, enumOf, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, type NumberOneOfExtension, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type RecordBuiltinExtensions, record, type StringBuiltinExtensions, type StringOneOfExtension, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

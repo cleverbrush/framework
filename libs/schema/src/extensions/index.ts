@@ -30,8 +30,6 @@ import type { HiddenExtensionMethods } from '../extension.js';
 import { withExtensions } from '../extension.js';
 import type { ArrayBuiltinExtensions } from './array.js';
 import { arrayExtensions } from './array.js';
-import type { NumberOneOfExtension, StringOneOfExtension } from './enum.js';
-import { enumExtension } from './enum.js';
 import type {
     AnyBuiltinExtensions,
     BooleanBuiltinExtensions,
@@ -50,11 +48,6 @@ import { stringExtensions } from './string.js';
 
 export { type ArrayBuiltinExtensions, arrayExtensions } from './array.js';
 export {
-    enumExtension,
-    type NumberOneOfExtension,
-    type StringOneOfExtension
-} from './enum.js';
-export {
     type AnyBuiltinExtensions,
     type BooleanBuiltinExtensions,
     type DateBuiltinExtensions,
@@ -67,8 +60,16 @@ export {
     type TupleBuiltinExtensions,
     type UnionBuiltinExtensions
 } from './nullable.js';
-export { type NumberBuiltinExtensions, numberExtensions } from './number.js';
-export { type StringBuiltinExtensions, stringExtensions } from './string.js';
+export {
+    type NumberBuiltinExtensions,
+    type NumberOneOfExtension,
+    numberExtensions
+} from './number.js';
+export {
+    type StringBuiltinExtensions,
+    type StringOneOfExtension,
+    stringExtensions
+} from './string.js';
 
 // ---------------------------------------------------------------------------
 // Explicitly-typed factories — preserves JSDoc in .d.ts output.
@@ -85,10 +86,9 @@ export type ExtendedString<T extends string = string> = StringSchemaBuilder<
     T,
     true,
     false,
-    StringBuiltinExtensions<T> & StringOneOfExtension
+    StringBuiltinExtensions<T>
 > &
     StringBuiltinExtensions<T> &
-    StringOneOfExtension &
     HiddenExtensionMethods;
 
 /** A `NumberSchemaBuilder` with built-in extension methods. */
@@ -96,10 +96,9 @@ export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<
     T,
     true,
     false,
-    NumberBuiltinExtensions<T> & NumberOneOfExtension
+    NumberBuiltinExtensions<T>
 > &
     NumberBuiltinExtensions<T> &
-    NumberOneOfExtension &
     HiddenExtensionMethods;
 
 /** An `ArraySchemaBuilder` with built-in extension methods. */
@@ -233,8 +232,7 @@ const s = withExtensions(
     stringExtensions,
     numberExtensions,
     arrayExtensions,
-    nullableExtension,
-    enumExtension
+    nullableExtension
 );
 
 export const string: {

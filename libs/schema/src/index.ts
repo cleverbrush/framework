@@ -33,7 +33,6 @@ export {
     type ExtendedString,
     type ExtendedTuple,
     type ExtendedUnion,
-    enumExtension,
     enumOf,
     type FuncBuiltinExtensions,
     func,
