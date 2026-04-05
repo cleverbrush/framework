@@ -7,7 +7,7 @@ function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function convertNode(schema: SchemaBuilder<any, any, any>): Out {
+function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
     const info = schema.introspect() as any;
     const ext: Record<string, unknown> = info.extensions ?? {};
     const readOnly: Out = info.isReadonly === true ? { readOnly: true } : {};
@@ -154,6 +154,14 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         default:
             return {};
     }
+}
+
+function convertNode(schema: SchemaBuilder<any, any, any>): Out {
+    const out = convertNodeInner(schema);
+    const info = schema.introspect() as any;
+    if (typeof info.description === 'string' && info.description !== '')
+        out['description'] = info.description;
+    return out;
 }
 
 /**

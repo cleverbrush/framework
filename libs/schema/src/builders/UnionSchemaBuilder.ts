@@ -436,11 +436,47 @@ export class UnionSchemaBuilder<
     }
 
     /**
+     * Performs synchronous validation of the union schema over `object`. {@inheritDoc SchemaBuilder.validate}
+     */
+    public validate(
+        object: TExplicitType extends undefined
+            ? SchemaArrayToUnion<TOptions>
+            : TExplicitType,
+        context?: ValidationContext
+    ): UnionSchemaValidationResult<
+        TExplicitType extends undefined
+            ? SchemaArrayToUnion<TOptions>
+            : TExplicitType,
+        TOptions
+    > {
+        return super.validate(object, context) as any;
+    }
+
+    /**
+     * Performs async validation of the union schema over `object`. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    public async validateAsync(
+        object: TExplicitType extends undefined
+            ? SchemaArrayToUnion<TOptions>
+            : TExplicitType,
+        context?: ValidationContext
+    ): Promise<
+        UnionSchemaValidationResult<
+            TExplicitType extends undefined
+                ? SchemaArrayToUnion<TOptions>
+                : TExplicitType,
+            TOptions
+        >
+    > {
+        return super.validateAsync(object, context) as any;
+    }
+
+    /**
      * Performs synchronous validation of the union schema over `object`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional `ValidationContext` settings.
      */
-    public validate(
+    protected _validate(
         object: TExplicitType extends undefined
             ? SchemaArrayToUnion<TOptions>
             : TExplicitType,
@@ -704,7 +740,7 @@ export class UnionSchemaBuilder<
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional `ValidationContext` settings.
      */
-    public async validateAsync(
+    protected async _validateAsync(
         object: TExplicitType extends undefined
             ? SchemaArrayToUnion<TOptions>
             : TExplicitType,

@@ -38,18 +38,22 @@ export declare class AnySchemaBuilder<TRequired extends boolean = true, TExplici
      * @inheritdoc
      */
     clearHasType(): AnySchemaBuilder<TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * Performs synchronous validation of the schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /**
      * Performs async validation of the schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     protected createFromProps<TReq extends boolean>(props: AnySchemaBuilderCreateProps<TReq>): this;
     /**
      * @hidden
@@ -169,17 +173,25 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
      */
     clearHasType(): ArraySchemaBuilder<TElementSchema, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
     /**
+     * Performs synchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
+     */
+    validate(object: TResult, context?: ValidationContext): ArraySchemaValidationResult<TResult, TElementSchema>;
+    /**
+     * Performs asynchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ArraySchemaValidationResult<TResult, TElementSchema>>;
+    /**
      * Performs synchronous validation of the schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ArraySchemaValidationResult<TResult, TElementSchema>;
+    protected _validate(object: TResult, context?: ValidationContext): ArraySchemaValidationResult<TResult, TElementSchema>;
     /**
      * Performs async validation of the schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ArraySchemaValidationResult<TResult, TElementSchema>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ArraySchemaValidationResult<TResult, TElementSchema>>;
     /**
      * @hidden
      */
@@ -248,6 +260,9 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
     };
     /**
      * Set a schema that every array item has to satisfy. If it is not set,
@@ -364,6 +379,9 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
         };
         hasDefault: boolean;
         defaultValue: TFinalResult | (() => TFinalResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TFinalResult | (() => TFinalResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -373,18 +391,22 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
      * @inheritdoc
      */
     clearHasType(): BooleanSchemaBuilder<TResult, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * Performs synchronous validation of the schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /**
      * Performs async validation of the schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     protected createFromProps<TReq extends boolean>(props: BooleanSchemaBuilderCreateProps<TReq>): this;
     /**
      * @hidden
@@ -557,6 +579,9 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -566,18 +591,22 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
      * @inheritdoc
      */
     clearHasType(): DateSchemaBuilder<Date, TRequired, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * Performs synchronous validation of Date schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /**
      * Performs async validation of Date schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * @hidden
      */
@@ -740,18 +769,22 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TEx
      * @hidden
      */
     clearHasType(): FunctionSchemaBuilder<TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * Performs synchronous validation of the schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /**
      * Performs async validation of the schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     protected createFromProps<TReq extends boolean>(props: FunctionSchemaBuilderCreateProps<TReq>): this;
     /**
      * @hidden
@@ -858,19 +891,26 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
     };
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * Performs synchronous validation of the schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /**
      * Performs async validation of the schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     protected createFromProps<TReq extends boolean>(props: LazySchemaBuilderCreateProps<TReq>): this;
     /**
      * @inheritdoc
@@ -1012,16 +1052,20 @@ export declare class NullSchemaBuilder<TRequired extends boolean = true, TExplic
      * @hidden
      */
     clearHasType(): NullSchemaBuilder<TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: null, context?: ValidationContext): ValidationResult<null>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: null, context?: ValidationContext): Promise<ValidationResult<null>>;
     /**
      * Performs synchronous validation of the schema over \`object\`.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: null, _context?: ValidationContext): ValidationResult<null>;
+    protected _validate(object: null, _context?: ValidationContext): ValidationResult<null>;
     /**
      * Performs async validation of the schema over \`object\`.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: null, _context?: ValidationContext): Promise<ValidationResult<null>>;
+    protected _validateAsync(object: null, _context?: ValidationContext): Promise<ValidationResult<null>>;
     protected createFromProps<TReq extends boolean>(props: NullSchemaBuilderCreateProps<TReq>): this;
     /**
      * @hidden
@@ -1210,6 +1254,9 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -1219,18 +1266,22 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
      * @inheritdoc
      */
     clearHasType(): NumberSchemaBuilder<number, TRequired, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * Performs synchronous validation of number schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /**
      * Performs async validation of number schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     protected createFromProps<T, TReq extends boolean>(props: NumberSchemaBuilderCreateProps<T, TReq>): this;
     /**
      * Restricts number to be equal to \`value\`.
@@ -1535,6 +1586,9 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         };
         hasDefault: boolean;
         defaultValue: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | undefined;
     };
     /**
      * @hidden
@@ -1583,13 +1637,29 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      */
     validate(object: undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionalityForInput<TProperties>> : TExplicitType, TRequired>> : TExplicitType, context?: ValidationContext<this>): ObjectSchemaValidationResult<undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>> : TExplicitType, this>;
     /**
+     * @param object The object to validate against this schema.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    validateAsync(object: undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionalityForInput<TProperties>> : TExplicitType, TRequired>> : TExplicitType, context?: ValidationContext<this>): Promise<ObjectSchemaValidationResult<undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>> : TExplicitType, this>>;
+    /**
+     * Performs synchronous validation of object schema over the \`object\`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     *
+     * The returned result includes a \`getErrorsFor()\` method for type-safe,
+     * per-property error inspection.
+     *
+     * @param object The object to validate against this schema.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    protected _validate(object: undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionalityForInput<TProperties>> : TExplicitType, TRequired>> : TExplicitType, context?: ValidationContext<this>): ObjectSchemaValidationResult<undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>> : TExplicitType, this>;
+    /**
      * Performs async validation of object schema over the \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      *
      * @param object The object to validate against this schema.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionalityForInput<TProperties>> : TExplicitType, TRequired>> : TExplicitType, context?: ValidationContext<this>): Promise<ObjectSchemaValidationResult<undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>> : TExplicitType, this>>;
+    protected _validateAsync(object: undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionalityForInput<TProperties>> : TExplicitType, TRequired>> : TExplicitType, context?: ValidationContext<this>): Promise<ObjectSchemaValidationResult<undefined extends TExplicitType ? InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>> : TExplicitType, this>>;
     /**
      * Fields not defined in \`properties\` will not be validated
      * and will be passed through the validation.
@@ -2155,11 +2225,22 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
     };
+    /**
+     * Core sync validation. {@inheritDoc SchemaBuilder.validate}
+     */
+    validate(object: TResult, context?: ValidationContext): RecordSchemaValidationResult<TResult, TValueSchema>;
+    /**
+     * Core async validation. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<RecordSchemaValidationResult<TResult, TValueSchema>>;
     /**
      * Core sync validation. Returns \`{ valid, object, errors, getNestedErrors, getErrorsFor }\`.
      */
-    validate(object: TResult, context?: ValidationContext): RecordSchemaValidationResult<TResult, TValueSchema>;
+    protected _validate(object: TResult, context?: ValidationContext): RecordSchemaValidationResult<TResult, TValueSchema>;
     /**
      * Performs async validation of the record schema.
      *
@@ -2168,7 +2249,7 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
      * @param object - the value to validate
      * @param context - optional \`ValidationContext\` settings
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<RecordSchemaValidationResult<TResult, TValueSchema>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<RecordSchemaValidationResult<TResult, TValueSchema>>;
 }
 /**
  * Creates a schema for objects with dynamic string keys, where every key
@@ -2293,6 +2374,10 @@ export type NestedValidationResult<TSchema, TRootSchema extends ObjectSchemaBuil
      * A list of errors, empty if object satisfies a schema
      */
     errors: ReadonlyArray<string>;
+    /**
+     * Whether validation passed for this property and all of its children.
+     */
+    isValid: boolean;
     get descriptor(): PropertyDescriptorInner<TRootSchema, TSchema, TParentPropertyDescriptor>;
 };
 /**
@@ -2389,6 +2474,9 @@ export type SchemaBuilderProps<T> = {
     requiredValidationErrorMessageProvider?: ValidationErrorMessageProvider;
     extensions?: Record<string, unknown>;
     defaultValue?: T | (() => T);
+    catchValue?: T | (() => T);
+    hasCatch?: boolean;
+    description?: string;
 };
 export type ValidationContext<TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = {
     /**
@@ -2654,6 +2742,15 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      */
     protected get hasDefault(): boolean;
     /**
+     * Whether this schema has a catch/fallback value configured via \`.catch()\`.
+     */
+    protected get hasCatch(): boolean;
+    /**
+     * Resolves the catch/fallback value. If the stored value is a factory function,
+     * it is called to produce the value (useful for mutable fallbacks like \`() => []\`).
+     */
+    protected resolveCatchValue(): TResult;
+    /**
      * Whether this schema is marked as readonly.
      * Type-level only — no runtime enforcement.
      */
@@ -2757,6 +2854,19 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
          * The default value or factory function.
          */
         defaultValue: TResult | (() => TResult) | undefined;
+        /**
+         * The human-readable description attached to this schema via \`.describe()\`,
+         * or \`undefined\` if none was set.
+         */
+        description: string | undefined;
+        /**
+         * Whether a catch/fallback value has been set on this schema via \`.catch()\`.
+         */
+        hasCatch: boolean;
+        /**
+         * The catch/fallback value or factory function set via \`.catch()\`.
+         */
+        catchValue: TResult | (() => TResult) | undefined;
     };
     /**
      * Makes schema optional (consider \`null\` and \`undefined\` as valid objects for this schema)
@@ -2785,9 +2895,74 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      */
     default(value: TResult | (() => TResult)): any;
     /**
+     * Sets a fallback value for this schema. When validation **fails** for any reason,
+     * the fallback value is returned as a successful result instead of validation errors.
+     *
+     * This is useful for graceful degradation — for example, providing a safe default
+     * when parsing untrusted input that might not conform to the schema.
+     *
+     * Accepts either a static value or a factory function. Factory functions are called
+     * each time the fallback is needed (useful for mutable values like \`() => []\`).
+     *
+     * Unlike {@link default}, which only fires when the input is \`undefined\`, \`.catch()\`
+     * fires on **any** validation failure — type mismatch, constraint violation, etc.
+     *
+     * When \`.catch()\` is set, {@link parse} and {@link parseAsync} will **never throw**.
+     *
+     * @param value - the fallback value, or a factory function producing the fallback
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = string().catch('unknown');
+     * schema.validate(42);        // { valid: true, object: 'unknown' }
+     * schema.validate('hello');   // { valid: true, object: 'hello' }
+     * schema.parse(42);           // 'unknown'  (no throw)
+     * \`\`\`
+     *
+     * @example
+     * \`\`\`ts
+     * // Factory function for mutable fallbacks
+     * const schema = array(string()).catch(() => []);
+     * schema.validate(null);  // { valid: true, object: [] }
+     * \`\`\`
+     *
+     * @example
+     * \`\`\`ts
+     * // Contrast with .default() — default fires only on undefined
+     * const d = string().default('anon');
+     * d.validate(undefined); // { valid: true, object: 'anon' }  ← fires
+     * d.validate(42);        // { valid: false, errors: [...] }  ← does NOT fire
+     *
+     * const c = string().catch('anon');
+     * c.validate(undefined); // { valid: true, object: 'anon' }  ← fires
+     * c.validate(42);        // { valid: true, object: 'anon' }  ← also fires
+     * \`\`\`
+     */
+    catch(value: TResult | (() => TResult)): this;
+    /**
      * Removes the default value set by a previous call to \`.default()\`.
      */
     clearDefault(): any;
+    /**
+     * Attaches a human-readable description to this schema as runtime metadata.
+     *
+     * The description has no effect on validation — it is purely informational.
+     * It is accessible via \`.introspect().description\` and is emitted as the
+     * \`description\` field by \`toJsonSchema()\` from \`@cleverbrush/schema-json\`.
+     *
+     * Useful for documentation generation, form labels, and AI tool descriptions.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = object({
+     *   name: string().describe('The user\\'s full name'),
+     *   age:  number().optional().describe('Age in years'),
+     * }).describe('A user object');
+     *
+     * schema.introspect().description; // 'A user object'
+     * \`\`\`
+     */
+    describe(text: string): this;
     /**
      * Brands the schema with a phantom type tag, preventing structural mixing
      * of semantically different values at the type level. Zero runtime cost.
@@ -2852,8 +3027,25 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * Perform synchronous schema validation on \`object\`.
      * Throws at runtime if any preprocessor, validator, or error message
      * provider returns a Promise — use {@link validateAsync} instead.
+     * @internal Override this in subclasses. External callers use {@link validate}.
      */
-    abstract validate(
+    protected abstract _validate(object: any, context?: ValidationContext): ValidationResult<any>;
+    /**
+     * Perform asynchronous schema validation on \`object\`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @internal Override this in subclasses. External callers use {@link validateAsync}.
+     */
+    protected abstract _validateAsync(object: any, context?: ValidationContext): Promise<ValidationResult<any>>;
+    /**
+     * Perform synchronous schema validation on \`object\`.
+     * Throws at runtime if any preprocessor, validator, or error message
+     * provider returns a Promise — use {@link validateAsync} instead.
+     *
+     * If a fallback has been set via {@link catch}, a failed validation result
+     * is replaced by a successful result built from the fallback value, preserving
+     * the specialized result shape (e.g. \`getErrorsFor\` / \`getNestedErrors\` methods).
+     */
+    validate(
     /**
      * Object to validate
      */
@@ -2865,8 +3057,12 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
     /**
      * Perform asynchronous schema validation on \`object\`.
      * Supports async preprocessors, validators, and error message providers.
+     *
+     * If a fallback has been set via {@link catch}, a failed validation result
+     * is replaced by a successful result built from the fallback value, preserving
+     * the specialized result shape (e.g. \`getErrorsFor\` / \`getNestedErrors\` methods).
      */
-    abstract validateAsync(
+    validateAsync(
     /**
      * Object to validate
      */
@@ -3085,6 +3281,9 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
     };
     /**
      * @inheritdoc
@@ -3094,18 +3293,22 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
      * @inheritdoc
      */
     clearHasType(): StringSchemaBuilder<string, TRequired, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     /**
      * Performs synchronous validation of string schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /**
      * Performs async validation of string schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
     protected createFromProps<T, TReq extends boolean>(props: StringSchemaBuilderCreateProps<T, TReq>): this;
     /**
      * Restricts string to be equal to \`value\`.
@@ -3328,17 +3531,25 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
      */
     clearHasType(): TupleSchemaBuilder<TElements, TRequired, undefined, THasDefault, TExtensions, TRestSchema> & TExtensions;
     /**
+     * Performs synchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
+     */
+    validate(object: TResult, context?: ValidationContext): TupleSchemaValidationResult<TResult, TElements>;
+    /**
+     * Performs asynchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<TupleSchemaValidationResult<TResult, TElements>>;
+    /**
      * Performs synchronous validation of the schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TResult, context?: ValidationContext): TupleSchemaValidationResult<TResult, TElements>;
+    protected _validate(object: TResult, context?: ValidationContext): TupleSchemaValidationResult<TResult, TElements>;
     /**
      * Performs async validation of the schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TResult, context?: ValidationContext): Promise<TupleSchemaValidationResult<TResult, TElements>>;
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<TupleSchemaValidationResult<TResult, TElements>>;
     /**
      * @hidden
      */
@@ -3387,6 +3598,9 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
         };
         hasDefault: boolean;
         defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
     };
     /**
      * Sets a schema that all elements beyond the fixed positions must satisfy.
@@ -3569,6 +3783,9 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         };
         hasDefault: boolean;
         defaultValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | undefined;
     };
     /**
      * Null is a legitimate JavaScript value that a union option (e.g.
@@ -3587,17 +3804,25 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
      */
     clearHasType(): UnionSchemaBuilder<TOptions, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
     /**
+     * Performs synchronous validation of the union schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
+     */
+    validate(object: TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, context?: ValidationContext): UnionSchemaValidationResult<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TOptions>;
+    /**
+     * Performs async validation of the union schema over \`object\`. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    validateAsync(object: TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, context?: ValidationContext): Promise<UnionSchemaValidationResult<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TOptions>>;
+    /**
      * Performs synchronous validation of the union schema over \`object\`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validate(object: TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, context?: ValidationContext): UnionSchemaValidationResult<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TOptions>;
+    protected _validate(object: TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, context?: ValidationContext): UnionSchemaValidationResult<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TOptions>;
     /**
      * Performs async validation of the union schema over \`object\`.
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional \`ValidationContext\` settings.
      */
-    validateAsync(object: TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, context?: ValidationContext): Promise<UnionSchemaValidationResult<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TOptions>>;
+    protected _validateAsync(object: TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, context?: ValidationContext): Promise<UnionSchemaValidationResult<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TOptions>>;
     protected createFromProps<T extends readonly SchemaBuilder<any, any, any>[], TReq extends boolean>(props: UnionSchemaBuilderCreateProps<T, TReq>): this;
     /**
      * @hidden

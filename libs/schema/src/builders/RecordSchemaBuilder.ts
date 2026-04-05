@@ -465,9 +465,34 @@ export class RecordSchemaBuilder<
     }
 
     /**
-     * Core sync validation. Returns `{ valid, object, errors, getNestedErrors, getErrorsFor }`.
+     * Core sync validation. {@inheritDoc SchemaBuilder.validate}
      */
     public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): RecordSchemaValidationResult<TResult, TValueSchema> {
+        return super.validate(object, context) as RecordSchemaValidationResult<
+            TResult,
+            TValueSchema
+        >;
+    }
+
+    /**
+     * Core async validation. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<RecordSchemaValidationResult<TResult, TValueSchema>> {
+        return super.validateAsync(object, context) as Promise<
+            RecordSchemaValidationResult<TResult, TValueSchema>
+        >;
+    }
+
+    /**
+     * Core sync validation. Returns `{ valid, object, errors, getNestedErrors, getErrorsFor }`.
+     */
+    protected _validate(
         object: TResult,
         context?: ValidationContext
     ): RecordSchemaValidationResult<TResult, TValueSchema> {
@@ -738,7 +763,7 @@ export class RecordSchemaBuilder<
      * @param object - the value to validate
      * @param context - optional `ValidationContext` settings
      */
-    public async validateAsync(
+    protected async _validateAsync(
         object: TResult,
         context?: ValidationContext
     ): Promise<RecordSchemaValidationResult<TResult, TValueSchema>> {

@@ -918,6 +918,78 @@ export class ObjectSchemaBuilder<
             : TExplicitType,
         this
     > {
+        return super.validate(object, context) as any;
+    }
+
+    /**
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): Promise<
+        ObjectSchemaValidationResult<
+            undefined extends TExplicitType
+                ? InferType<
+                      SchemaBuilder<
+                          undefined extends TExplicitType
+                              ? Id<RespectPropsOptionality<TProperties>>
+                              : TExplicitType,
+                          TRequired
+                      >
+                  >
+                : TExplicitType,
+            this
+        >
+    > {
+        return super.validateAsync(object, context) as any;
+    }
+
+    /**
+     * Performs synchronous validation of object schema over the `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     *
+     * The returned result includes a `getErrorsFor()` method for type-safe,
+     * per-property error inspection.
+     *
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected _validate(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): ObjectSchemaValidationResult<
+        undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionality<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        this
+    > {
         // Fast path: skip preValidateSync + setupValidation when no preprocessors/validators
         if (
             this.canSkipPreValidation &&
@@ -1084,7 +1156,7 @@ export class ObjectSchemaBuilder<
      * @param object The object to validate against this schema.
      * @param context Optional `ValidationContext` settings.
      */
-    public async validateAsync(
+    protected async _validateAsync(
         object: undefined extends TExplicitType
             ? InferType<
                   SchemaBuilder<

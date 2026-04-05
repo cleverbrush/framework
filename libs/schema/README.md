@@ -679,6 +679,48 @@ console.log(info.hasDefault);    // true
 console.log(info.defaultValue);  // 'hello'
 ```
 
+## Catch / Fallback
+
+Every schema builder supports `.catch(value)`. When validation **fails for any reason** — wrong type, constraint violation, missing required value — the fallback is returned as a successful result instead of errors.
+
+Unlike `.default()`, which only fires when the input is `undefined`, `.catch()` fires on **any** validation failure.
+
+```typescript
+import { string, number, array, object } from '@cleverbrush/schema';
+
+// Static fallback
+const Name = string().catch('unknown');
+Name.validate(42);          // { valid: true, object: 'unknown' }
+Name.validate(null);        // { valid: true, object: 'unknown' }
+Name.validate('Alice');     // { valid: true, object: 'Alice' }
+
+// Constraint violation also triggers catch
+const Age = number().min(0).catch(-1);
+Age.validate(-5);           // { valid: true, object: -1 }
+
+// .parse() and .parseAsync() never throw when .catch() is set
+Name.parse(42);             // 'unknown'  (no SchemaValidationError thrown)
+```
+
+Use a factory function for mutable fallback values to avoid shared references:
+
+```typescript
+const Tags = array(string()).catch(() => []);
+
+const r1 = Tags.validate(null);  // { valid: true, object: [] }
+const r2 = Tags.validate(null);  // { valid: true, object: [] }
+// r1.object !== r2.object — separate array instances each time
+```
+
+The fallback state is exposed via `.introspect()`:
+
+```typescript
+const schema = string().catch('unknown');
+const info = schema.introspect();
+console.log(info.hasCatch);    // true
+console.log(info.catchValue);  // 'unknown'
+```
+
 ## Readonly Modifier
 
 Every schema builder supports `.readonly()`. This is a **type-level-only** modifier — it marks the inferred TypeScript type as immutable, but does not alter validation behaviour or freeze the validated value at runtime.
@@ -726,6 +768,39 @@ console.log(schema.introspect().isReadonly); // true
 ```
 
 > **Note:** `.readonly()` is **shallow** — only top-level object properties or the array itself are marked readonly. For deeply nested immutability consider applying `.readonly()` at each level, or use a `DeepReadonly` utility type post-validation.
+
+## Describe
+
+Every schema builder supports `.describe(text)`. This is a **metadata-only** modifier — it stores a human-readable description on the schema at runtime with no effect on validation.
+
+```typescript
+const UserSchema = object({
+    name: string().describe("The user's full name"),
+    age:  number().optional().describe('Age in years'),
+}).describe('A user object');
+
+// Read the description back at runtime
+UserSchema.introspect().description; // 'A user object'
+```
+
+The description is accessible via `.introspect().description` and chains naturally with all other modifiers:
+
+```typescript
+string().describe('A name').optional().readonly()
+//  ^ InferType is string | undefined, isReadonly: true, description: 'A name'
+```
+
+When using `@cleverbrush/schema-json`, descriptions round-trip through JSON Schema's standard `description` field:
+
+```typescript
+import { toJsonSchema, fromJsonSchema } from '@cleverbrush/schema-json';
+
+const spec = toJsonSchema(string().describe('A name'), { $schema: false });
+// { type: 'string', description: 'A name' }
+
+const schema = fromJsonSchema({ type: 'string', description: 'A name' } as const);
+schema.introspect().description; // 'A name'
+```
 
 ## Extensions
 

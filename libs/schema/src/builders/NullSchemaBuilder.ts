@@ -132,11 +132,29 @@ export class NullSchemaBuilder<
         };
     }
 
+    /** {@inheritDoc SchemaBuilder.validate} */
+    public validate(
+        object: null,
+        context?: ValidationContext
+    ): ValidationResult<null> {
+        return super.validate(object, context) as ValidationResult<null>;
+    }
+
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    public async validateAsync(
+        object: null,
+        context?: ValidationContext
+    ): Promise<ValidationResult<null>> {
+        return super.validateAsync(object, context) as Promise<
+            ValidationResult<null>
+        >;
+    }
+
     /**
      * Performs synchronous validation of the schema over `object`.
      * @param context Optional `ValidationContext` settings.
      */
-    public validate(
+    protected _validate(
         object: null,
         _context?: ValidationContext
     ): ValidationResult<null> {
@@ -147,7 +165,7 @@ export class NullSchemaBuilder<
      * Performs async validation of the schema over `object`.
      * @param context Optional `ValidationContext` settings.
      */
-    public async validateAsync(
+    protected async _validateAsync(
         object: null,
         _context?: ValidationContext
     ): Promise<ValidationResult<null>> {

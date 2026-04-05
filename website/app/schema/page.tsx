@@ -225,6 +225,7 @@ console.log(bad.errors);
                                     <td>
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>,{' '}
                                         <code>.addValidator(fn)</code>
                                     </td>
@@ -248,6 +249,7 @@ console.log(bad.errors);
                                         <code>.toLowerCase()</code>,{' '}
                                         <code>.nonempty()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
@@ -277,6 +279,7 @@ console.log(bad.errors);
                                     <td>
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
@@ -291,6 +294,7 @@ console.log(bad.errors);
                                     <td>
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
@@ -305,6 +309,7 @@ console.log(bad.errors);
                                     <td>
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
@@ -320,6 +325,7 @@ console.log(bad.errors);
                                     <td>
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
@@ -338,6 +344,7 @@ console.log(bad.errors);
                                         <code>.addProps({'{...}'})</code>,{' '}
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
@@ -372,7 +379,8 @@ console.log(bad.errors);
                                         <code>.rest(schema)</code>,{' '}
                                         <code>.optional()</code>,{' '}
                                         <code>.nullable()</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -396,6 +404,7 @@ console.log(bad.errors);
                                         <code>.optional()</code>,{' '}
                                         <code>.nullable()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.addValidator(fn)</code>
                                         validation result:{' '}
                                         <code>.getErrorsFor(key?)</code>
@@ -414,6 +423,7 @@ console.log(bad.errors);
                                         <code>.validateAsync(data)</code>,{' '}
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.readonly()</code>
                                     </td>
                                 </tr>
@@ -433,7 +443,8 @@ console.log(bad.errors);
                                         <code>.optional()</code>,{' '}
                                         <code>.addValidator(fn)</code>,{' '}
                                         <code>.addPreprocessor(fn)</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                             </tbody>
@@ -1105,6 +1116,76 @@ console.log(info.defaultValue);  // 'hello'`)
                     </pre>
                 </div>
 
+                {/* ── Catch / Fallback ────────────────────────────── */}
+                <div className="card">
+                    <h2>Catch / Fallback</h2>
+                    <a
+                        href="/playground/catch-static"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
+                    <p>
+                        Every schema builder supports <code>.catch(value)</code>
+                        . When validation <strong>fails for any reason</strong>{' '}
+                        — wrong type, constraint violation, missing required
+                        value — the fallback is returned as a successful result
+                        instead of errors.
+                    </p>
+                    <p>
+                        Unlike <code>.default()</code>, which only fires when
+                        the input is <code>undefined</code>,{' '}
+                        <code>.catch()</code> fires on <strong>any</strong>{' '}
+                        validation failure. When <code>.catch()</code> is set,{' '}
+                        <code>.parse()</code> and <code>.parseAsync()</code>{' '}
+                        will <strong>never throw</strong>.
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { string, number, array } from '@cleverbrush/schema';
+
+// Static fallback
+const Name = string().catch('unknown');
+Name.validate(42);        // { valid: true, object: 'unknown' }
+Name.validate(null);      // { valid: true, object: 'unknown' }
+Name.validate('Alice');   // { valid: true, object: 'Alice' }
+
+// Constraint violation also triggers catch
+const Age = number().min(0).catch(-1);
+Age.validate(-5);         // { valid: true, object: -1 }
+
+// .parse() never throws when .catch() is set
+Name.parse(42);           // 'unknown'
+`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Use a factory function for mutable fallback values to
+                        avoid shared references between calls:
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const Tags = array(string()).catch(() => []);
+
+const r1 = Tags.validate(null);  // { valid: true, object: [] }
+const r2 = Tags.validate(null);  // { valid: true, object: [] }
+// r1.object !== r2.object  — a fresh [] each time
+
+// Introspect the fallback state
+const schema = string().catch('unknown');
+const info = schema.introspect();
+console.log(info.hasCatch);    // true
+console.log(info.catchValue);  // 'unknown'`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
                 {/* ── Readonly Modifier ───────────────────────────── */}
                 <div className="card">
                     <h2>Readonly Modifier</h2>
@@ -1207,6 +1288,103 @@ console.log(schema.introspect().isReadonly); // true`)
                         deeply nested immutability, apply{' '}
                         <code>.readonly()</code> at each level.
                     </p>
+                </div>
+
+                {/* ── Describe ────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Describe</h2>
+                    <a
+                        href="/playground/describe-metadata"
+                        className="playground-link"
+                    >
+                        ▶ Open in Playground
+                    </a>
+                    <p>
+                        Every schema builder supports{' '}
+                        <code>.describe(text)</code>. This attaches a
+                        human-readable description to the schema as{' '}
+                        <strong>metadata only</strong> — it has no effect on
+                        validation, but it is accessible via{' '}
+                        <code>.introspect().description</code> and is
+                        automatically emitted as the <code>description</code>{' '}
+                        field by <code>toJsonSchema()</code> (including nested
+                        properties).
+                    </p>
+                    <div className="table-wrap">
+                        <table className="api-table">
+                            <thead>
+                                <tr>
+                                    <th>Method</th>
+                                    <th>Signature</th>
+                                    <th>Returns</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <code>.describe(text)</code>
+                                    </td>
+                                    <td>
+                                        <code>
+                                            {'describe(text: string): this'}
+                                        </code>
+                                    </td>
+                                    <td>
+                                        New builder instance with{' '}
+                                        <code>description</code> set; original
+                                        is unchanged
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>.introspect().description</code>
+                                    </td>
+                                    <td>
+                                        <code>{'string | undefined'}</code>
+                                    </td>
+                                    <td>
+                                        The text passed to{' '}
+                                        <code>.describe()</code>, or{' '}
+                                        <code>undefined</code> if not set
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { object, string, number } from '@cleverbrush/schema';
+import { toJsonSchema } from '@cleverbrush/schema-json';
+
+const ProductSchema = object({
+    id:    string().uuid().describe('Unique product identifier'),
+    name:  string().nonempty().describe('Display name shown to customers'),
+    price: number().positive().describe('Price in USD')
+}).describe('A product in the catalogue');
+
+// Read description back at runtime
+console.log(ProductSchema.introspect().description);
+// 'A product in the catalogue'
+
+// toJsonSchema emits description fields automatically
+const schema = toJsonSchema(ProductSchema, { $schema: false });
+// {
+//   type: 'object',
+//   description: 'A product in the catalogue',
+//   properties: {
+//     id:    { type: 'string', format: 'uuid', description: 'Unique product identifier' },
+//     name:  { type: 'string', minLength: 1,   description: 'Display name shown to customers' },
+//     price: { type: 'number', exclusiveMinimum: 0, description: 'Price in USD' }
+//   }
+// }
+
+// Chains naturally with all other modifiers — order does not matter
+const field = string().optional().describe('Optional note').minLength(1);`)
+                            }}
+                        />
+                    </pre>
                 </div>
 
                 {/* ── Extensions ──────────────────────────────────── */}
@@ -1730,6 +1908,7 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>
                                         <code>.optional()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>,{' '}
                                         <code>.addValidator(fn)</code>
                                     </td>
                                 </tr>
@@ -1748,7 +1927,8 @@ const s = withExtensions(myCustomExtension);`)
                                         , <code>.trim()</code>,{' '}
                                         <code>.toLowerCase()</code>,{' '}
                                         <code>.nonempty()</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1764,7 +1944,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.negative()</code>,{' '}
                                         <code>.finite()</code>,{' '}
                                         <code>.multipleOf(n)</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1774,7 +1955,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>Boolean schema builder</td>
                                     <td>
                                         <code>.optional()</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1784,7 +1966,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>Date schema builder</td>
                                     <td>
                                         <code>.optional()</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1794,7 +1977,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>Function schema builder</td>
                                     <td>
                                         <code>.optional()</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1806,7 +1990,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.validate(data)</code>,{' '}
                                         <code>.validateAsync(data)</code>,{' '}
                                         <code>.addProps({'{...}'})</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1820,7 +2005,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.of(schema)</code>,{' '}
                                         <code>.nonempty()</code>,{' '}
                                         <code>.unique()</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1831,7 +2017,8 @@ const s = withExtensions(myCustomExtension);`)
                                     <td>
                                         <code>.validate(data)</code>,{' '}
                                         <code>.validateAsync(data)</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1846,7 +2033,8 @@ const s = withExtensions(myCustomExtension);`)
                                         <code>.resolve()</code>,{' '}
                                         <code>.optional()</code>,{' '}
                                         <code>.addValidator(fn)</code>,{' '}
-                                        <code>.default(value)</code>
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
                                     </td>
                                 </tr>
                             </tbody>

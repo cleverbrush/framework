@@ -126,6 +126,7 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `format: 'ipv6'` | `.ip({ version: 'v6' })` |
 | `format: 'date-time'` | `.matches(iso8601 regex)` |
 | `readOnly: true` | `.readonly()` |
+| `description` | `.describe(text)` |
 
 ---
 
@@ -146,6 +147,8 @@ function toJsonSchema(
 | `opts` | `ToJsonSchemaOptions` | optional output configuration |
 
 **Returns** a plain JavaScript object that is safe to `JSON.stringify`.
+
+Descriptions set via `.describe(text)` are emitted as the `description` field on the corresponding JSON Schema node (including nested object properties).
 
 #### `ToJsonSchemaOptions`
 

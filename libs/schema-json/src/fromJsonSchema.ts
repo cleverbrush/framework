@@ -67,6 +67,8 @@ function buildNode(s: unknown): SchemaBuilder<any, any, any> {
     }
 
     if (node['readOnly'] === true) b = (b as any).readonly();
+    if (typeof node['description'] === 'string' && node['description'])
+        b = (b as any).describe(node['description']);
     return b;
 }
 

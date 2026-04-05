@@ -924,3 +924,48 @@ test('fromJsonSchema - 59: empty prefixItems → empty tuple', () => {
     expect(valid(schema, [])).toBe(true);
     expect(valid(schema, ['extra'])).toBe(false);
 });
+
+// ---------------------------------------------------------------------------
+// description round-trip
+// ---------------------------------------------------------------------------
+
+test('fromJsonSchema - 60: { type: string, description: ... } → introspect().description', () => {
+    const schema = fromJsonSchema({
+        type: 'string',
+        description: 'A name'
+    } as const);
+    expect((schema.introspect() as any).description).toBe('A name');
+});
+
+test('fromJsonSchema - 61: { type: object, description: ... } → introspect().description', () => {
+    const schema = fromJsonSchema({
+        type: 'object',
+        description: 'A user',
+        properties: { name: { type: 'string' } },
+        required: ['name']
+    } as const);
+    expect((schema.introspect() as any).description).toBe('A user');
+});
+
+test('fromJsonSchema - 62: nested property description is preserved', () => {
+    const schema = fromJsonSchema({
+        type: 'object',
+        properties: {
+            name: { type: 'string', description: 'Full name' }
+        },
+        required: ['name']
+    } as const) as any;
+    const nameProp = schema.introspect().properties.name;
+    expect((nameProp.introspect() as any).description).toBe('Full name');
+});
+
+test('fromJsonSchema - 63: { type: number } without description → undefined', () => {
+    const schema = fromJsonSchema({ type: 'number' } as const);
+    expect((schema.introspect() as any).description).toBeUndefined();
+});
+
+test('fromJsonSchema - 64: empty description string is ignored', () => {
+    // Empty string is falsy — describe() is not called
+    const schema = fromJsonSchema({ type: 'string', description: '' } as const);
+    expect((schema.introspect() as any).description).toBeUndefined();
+});

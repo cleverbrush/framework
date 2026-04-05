@@ -349,11 +349,36 @@ export class TupleSchemaBuilder<
     }
 
     /**
+     * Performs synchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validate}
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): TupleSchemaValidationResult<TResult, TElements> {
+        return super.validate(object, context) as TupleSchemaValidationResult<
+            TResult,
+            TElements
+        >;
+    }
+
+    /**
+     * Performs asynchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<TupleSchemaValidationResult<TResult, TElements>> {
+        return super.validateAsync(object, context) as Promise<
+            TupleSchemaValidationResult<TResult, TElements>
+        >;
+    }
+
+    /**
      * Performs synchronous validation of the schema over `object`.
      * Throws if any preprocessor, validator, or error message provider returns a Promise.
      * @param context Optional `ValidationContext` settings.
      */
-    public validate(
+    protected _validate(
         object: TResult,
         context?: ValidationContext
     ): TupleSchemaValidationResult<TResult, TElements> {
@@ -588,7 +613,7 @@ export class TupleSchemaBuilder<
      * Supports async preprocessors, validators, and error message providers.
      * @param context Optional `ValidationContext` settings.
      */
-    public async validateAsync(
+    protected async _validateAsync(
         object: TResult,
         context?: ValidationContext
     ): Promise<TupleSchemaValidationResult<TResult, TElements>> {
