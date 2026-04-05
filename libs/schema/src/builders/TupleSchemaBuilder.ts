@@ -27,10 +27,16 @@ import type {
  * other types get `ValidationResult`.
  */
 export type TupleElementValidationResults<
-    TElements extends readonly SchemaBuilder<any, any, any>[]
+    TElements extends readonly SchemaBuilder<any, any, any, any, any>[]
 > = {
     [K in keyof TElements]: TElements[K] extends UnionSchemaBuilder<
-        infer UOptions extends readonly SchemaBuilder<any, any, any>[],
+        infer UOptions extends readonly SchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any
+        >[],
         any,
         any
     >
@@ -47,7 +53,7 @@ export type TupleElementValidationResults<
  */
 export type TupleSchemaValidationResult<
     TResult,
-    TElements extends readonly SchemaBuilder<any, any, any>[]
+    TElements extends readonly SchemaBuilder<any, any, any, any, any>[]
 > = ValidationResult<TResult> & {
     /**
      * Returns root-level tuple validation errors combined with
@@ -61,14 +67,18 @@ export type TupleSchemaValidationResult<
 };
 
 type TupleSchemaBuilderCreateProps<
-    TElements extends readonly SchemaBuilder<any, any, any>[],
-    TRestSchema extends SchemaBuilder<any, any, any> | undefined = undefined,
-    R extends boolean = true
+    TElements extends readonly SchemaBuilder<any, any, any, any, any>[],
+    TRestSchema extends
+        | SchemaBuilder<any, any, any, any, any>
+        | undefined = undefined,
+    R extends boolean = true,
+    N extends boolean = false
 > = Partial<
     ReturnType<
         TupleSchemaBuilder<
             TElements,
             R,
+            N,
             undefined,
             false,
             {},
@@ -128,28 +138,41 @@ type TupleSchemaBuilderCreateProps<
  * @see {@link tuple}
  */
 export class TupleSchemaBuilder<
-    TElements extends readonly SchemaBuilder<any, any, any>[],
+    TElements extends readonly SchemaBuilder<any, any, any, any, any>[],
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
     THasDefault extends boolean = false,
     TExtensions = {},
-    TRestSchema extends SchemaBuilder<any, any, any> | undefined = undefined,
+    TRestSchema extends
+        | SchemaBuilder<any, any, any, any, any>
+        | undefined = undefined,
     TResult = TExplicitType extends undefined
-        ? TRestSchema extends SchemaBuilder<any, any, any>
+        ? TRestSchema extends SchemaBuilder<any, any, any, any, any>
             ? [
                   ...{ [K in keyof TElements]: InferType<TElements[K]> },
                   ...Array<InferType<TRestSchema>>
               ]
             : { [K in keyof TElements]: InferType<TElements[K]> }
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #elements!: TElements;
-    #restSchema: (TRestSchema & SchemaBuilder<any, any, any>) | undefined;
+    #restSchema:
+        | (TRestSchema & SchemaBuilder<any, any, any, any, any>)
+        | undefined;
 
     /**
      * @hidden
      */
-    public static create(props: TupleSchemaBuilderCreateProps<any, any, any>) {
+    public static create(
+        props: TupleSchemaBuilderCreateProps<any, any, any, any>
+    ) {
         return new TupleSchemaBuilder({
             type: 'tuple',
             ...props
@@ -157,7 +180,12 @@ export class TupleSchemaBuilder<
     }
 
     protected constructor(
-        props: TupleSchemaBuilderCreateProps<TElements, TRestSchema, TRequired>
+        props: TupleSchemaBuilderCreateProps<
+            TElements,
+            TRestSchema,
+            TRequired,
+            TNullable
+        >
     ) {
         super(props as any);
 
@@ -180,6 +208,7 @@ export class TupleSchemaBuilder<
     ): TupleSchemaBuilder<
         TElements,
         true,
+        TNullable,
         T,
         THasDefault,
         TExtensions,
@@ -197,6 +226,7 @@ export class TupleSchemaBuilder<
     public clearHasType(): TupleSchemaBuilder<
         TElements,
         TRequired,
+        TNullable,
         undefined,
         THasDefault,
         TExtensions,
@@ -274,8 +304,8 @@ export class TupleSchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
                 needsElementValidation: false as const,
@@ -388,7 +418,10 @@ export class TupleSchemaBuilder<
             if (typeof object === 'undefined' || object === null) {
                 if (typeof object === 'undefined' && this.hasDefault) {
                     object = this.resolveDefaultValue();
-                } else if (!this.isRequired) {
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
                     const self = this;
                     return {
                         valid: true,
@@ -752,6 +785,7 @@ export class TupleSchemaBuilder<
     ): TupleSchemaBuilder<
         TElements,
         true,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions,
@@ -767,6 +801,7 @@ export class TupleSchemaBuilder<
     public optional(): TupleSchemaBuilder<
         TElements,
         false,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions,
@@ -784,6 +819,7 @@ export class TupleSchemaBuilder<
     ): TupleSchemaBuilder<
         TElements,
         true,
+        TNullable,
         TExplicitType,
         true,
         TExtensions,
@@ -799,6 +835,7 @@ export class TupleSchemaBuilder<
     public clearDefault(): TupleSchemaBuilder<
         TElements,
         TRequired,
+        TNullable,
         TExplicitType,
         false,
         TExtensions,
@@ -816,6 +853,7 @@ export class TupleSchemaBuilder<
     ): TupleSchemaBuilder<
         TElements,
         TRequired,
+        TNullable,
         TResult & { readonly [K in BRAND]: TBrand },
         THasDefault,
         TExtensions,
@@ -862,11 +900,12 @@ export class TupleSchemaBuilder<
      * schema.validate(['hello', 42, 'extra']);       // invalid — 'extra' not boolean
      * ```
      */
-    public rest<TSchema extends SchemaBuilder<any, any, any>>(
+    public rest<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
     ): TupleSchemaBuilder<
         TElements,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions,
@@ -886,6 +925,7 @@ export class TupleSchemaBuilder<
     public clearRest(): TupleSchemaBuilder<
         TElements,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions,
@@ -896,6 +936,38 @@ export class TupleSchemaBuilder<
             ...this.introspect(),
             restSchema: undefined
         } as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): TupleSchemaBuilder<
+        TElements,
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions,
+        TRestSchema
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): TupleSchemaBuilder<
+        TElements,
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions,
+        TRestSchema
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 
@@ -936,7 +1008,7 @@ export class TupleSchemaBuilder<
  * ```
  */
 export const tuple = <
-    const TElements extends readonly SchemaBuilder<any, any, any>[]
+    const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]
 >(
     elements: [...TElements]
 ) =>

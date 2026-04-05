@@ -43,11 +43,18 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class BooleanSchemaBuilder<
     TResult = boolean,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
     THasDefault extends boolean = false,
     TExtensions = {},
     TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType
-> extends SchemaBuilder<TFinalResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TFinalResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #equalsTo?: boolean;
     #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
         BooleanSchemaBuilder<TResult, TRequired>
@@ -106,7 +113,14 @@ export class BooleanSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): BooleanSchemaBuilder<TResult, true, T, THasDefault, TExtensions> &
+    ): BooleanSchemaBuilder<
+        TResult,
+        true,
+        TNullable,
+        T,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -119,6 +133,7 @@ export class BooleanSchemaBuilder<
     public clearHasType(): BooleanSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         undefined,
         THasDefault,
         TExtensions
@@ -170,8 +185,8 @@ export class BooleanSchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
                 done: true,
@@ -237,7 +252,10 @@ export class BooleanSchemaBuilder<
             if (typeof object === 'undefined' || object === null) {
                 if (typeof object === 'undefined' && this.hasDefault) {
                     object = this.resolveDefaultValue() as typeof object;
-                } else if (!this.isRequired) {
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
                     return { valid: true, object: object };
                 } else {
                     return {
@@ -335,6 +353,7 @@ export class BooleanSchemaBuilder<
     ): BooleanSchemaBuilder<
         TResult,
         true,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -349,6 +368,7 @@ export class BooleanSchemaBuilder<
     public optional(): BooleanSchemaBuilder<
         TResult,
         false,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -362,7 +382,14 @@ export class BooleanSchemaBuilder<
      */
     public default(
         value: TFinalResult | (() => TFinalResult)
-    ): BooleanSchemaBuilder<TResult, true, TExplicitType, true, TExtensions> &
+    ): BooleanSchemaBuilder<
+        TResult,
+        true,
+        TNullable,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
         TExtensions {
         return super.default(value) as any;
     }
@@ -373,6 +400,7 @@ export class BooleanSchemaBuilder<
     public clearDefault(): BooleanSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         TExplicitType,
         false,
         TExtensions
@@ -389,6 +417,7 @@ export class BooleanSchemaBuilder<
     ): BooleanSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         TFinalResult & { readonly [K in BRAND]: TBrand },
         THasDefault,
         TExtensions
@@ -407,6 +436,7 @@ export class BooleanSchemaBuilder<
     public readonly(): BooleanSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         Readonly<TFinalResult>,
         THasDefault,
         TExtensions
@@ -435,6 +465,7 @@ export class BooleanSchemaBuilder<
         } as any) as any as BooleanSchemaBuilder<
             T,
             TRequired,
+            TNullable,
             TExplicitType,
             THasDefault,
             TExtensions
@@ -448,6 +479,7 @@ export class BooleanSchemaBuilder<
     public clearEquals(): BooleanSchemaBuilder<
         boolean,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -457,6 +489,36 @@ export class BooleanSchemaBuilder<
             ...this.introspect(),
             equalsTo: undefined
         } as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 

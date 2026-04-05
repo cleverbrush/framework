@@ -47,9 +47,16 @@ type LazySchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class LazySchemaBuilder<
     TResult = any,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #getter: () => SchemaBuilder<TResult, any, any>;
     #resolvedSchema: SchemaBuilder<TResult, any, any> | null = null;
 
@@ -203,7 +210,8 @@ export class LazySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): LazySchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
+    ): LazySchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -215,6 +223,7 @@ export class LazySchemaBuilder<
     public clearHasType(): LazySchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -229,7 +238,7 @@ export class LazySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): LazySchemaBuilder<TResult, true, THasDefault, TExtensions> &
+    ): LazySchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -240,6 +249,7 @@ export class LazySchemaBuilder<
     public optional(): LazySchemaBuilder<
         TResult,
         false,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -252,7 +262,8 @@ export class LazySchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): LazySchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
+    ): LazySchemaBuilder<TResult, true, TNullable, true, TExtensions> &
+        TExtensions {
         return super.default(value) as any;
     }
 
@@ -262,6 +273,7 @@ export class LazySchemaBuilder<
     public clearDefault(): LazySchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         false,
         TExtensions
     > &
@@ -277,6 +289,7 @@ export class LazySchemaBuilder<
     ): LazySchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -290,11 +303,40 @@ export class LazySchemaBuilder<
     public readonly(): LazySchemaBuilder<
         Readonly<TResult>,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
         TExtensions {
         return super.readonly();
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): LazySchemaBuilder<
+        TResult,
+        TRequired,
+        true,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): LazySchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 
@@ -332,7 +374,7 @@ export class LazySchemaBuilder<
  */
 export function lazy<TResult>(
     getter: () => SchemaBuilder<TResult, any, any>
-): LazySchemaBuilder<TResult, true, false, {}> {
+): LazySchemaBuilder<TResult, true, false, false, {}> {
     return LazySchemaBuilder.create({
         type: 'lazy',
         isRequired: true,

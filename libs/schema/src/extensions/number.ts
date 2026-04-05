@@ -14,7 +14,6 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
-import type { NullableMethod, NullableReturn } from './nullable.js';
 import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -26,12 +25,10 @@ type NumberExtReturn<T extends number = number> = NumberSchemaBuilder<
     T,
     true,
     false,
+    false,
     NumberBuiltinExtensions<T>
 > &
     NumberBuiltinExtensions<T> &
-    NullableMethod<
-        NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>
-    > &
     HiddenExtensionMethods;
 
 /**
@@ -171,11 +168,6 @@ export interface NumberBuiltinExtensions<T extends number = number> {
         values: readonly [V, ...V[]],
         errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
     ): NumberExtReturn<V>;
-
-    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
-    nullable(): NullableReturn<
-        NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>
-    >;
 }
 
 /**

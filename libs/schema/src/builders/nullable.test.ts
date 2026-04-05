@@ -59,11 +59,11 @@ describe('nullable extension', () => {
             expect(schema.validate('not-an-email').valid).toBe(false);
         });
 
-        test('stores nullable extension metadata on the union', () => {
+        test('introspect reports isNullable', () => {
             const schema = string().nullable();
             const meta = schema.introspect();
-            expect(meta.type).toBe('union');
-            expect(meta.options).toHaveLength(2);
+            expect(meta.type).toBe('string');
+            expect(meta.isNullable).toBe(true);
         });
     });
 
