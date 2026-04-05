@@ -352,6 +352,67 @@ type User = InferType<typeof UserSchema>;
 //   "Contact email — must be unique across all users"
 ```
 
+## Deep Partial
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/deep-partial)
+
+`.deepPartial()` recursively marks **all properties at every nesting level** as optional. It is the deep-object equivalent of a common `DeepPartial<T>` helper type in TypeScript, and is the recommended way to build PATCH API bodies or partial form state.
+
+| Schema type | Effect |
+|-------------|--------|
+| `object(…).deepPartial()` | All top-level and nested object properties become optional |
+| Nested `object(…)` inside an object | Recursed — its properties are made optional too |
+| `array(…)`, `union(…)`, primitives | The property itself is made optional; internals are **not** modified |
+
+```typescript
+import { object, string, number, array, type InferType } from '@cleverbrush/schema';
+
+const CreateUser = object({
+    name:    string(),
+    address: object({
+        street: string(),
+        city:   string()
+    })
+});
+
+const PatchUser = CreateUser.deepPartial();
+
+type PatchUserPayload = InferType<typeof PatchUser>;
+// {
+//   name?:    string;
+//   address?: { street?: string; city?: string };
+// }
+
+// All three are valid:
+PatchUser.validate({});                          // { valid: true }
+PatchUser.validate({ address: {} });             // { valid: true }
+PatchUser.validate({ address: { city: 'Paris' } }); // { valid: true }
+```
+
+Contrast with `.partial()`, which only affects the top level:
+
+```typescript
+const ShallowPartial = CreateUser.partial();
+// { name?: string; address?: { street: string; city: string } }
+//                                        ↑ still required inside
+
+ShallowPartial.validate({ address: {} });
+// { valid: false } — street and city are still required
+```
+
+Chains naturally with other modifiers:
+
+```typescript
+const Schema = CreateUser.deepPartial().readonly();
+type T = InferType<typeof Schema>;
+// Readonly<{ name?: string; address?: { street?: string; city?: string } }>
+```
+
+> **Note:** `.deepPartial()` recurses only into nested `object()` schemas. Array element schemas and union option schemas are not modified — `array(object({…}))` becomes an optional array but its element shape is unchanged. If you need deep-partialed array elements, apply `.deepPartial()` to the element schema before passing it to `array()`:
+> ```typescript
+> array(InnerSchema.deepPartial()).optional()
+> ```
+
 ## Validation
 
 [▶ Open in Playground](https://docs.cleverbrush.com/playground/validation-errors)

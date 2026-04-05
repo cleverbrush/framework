@@ -73,6 +73,26 @@ type MakeChildrenOptional<
     [K in keyof T]: ReturnType<T[K]['optional']>;
 };
 
+/**
+ * Recursively maps each property to its optional form, descending into
+ * nested `ObjectSchemaBuilder` schemas.  All other schema types (arrays,
+ * unions, primitives) are only made optional at the top level.
+ */
+type DeepMakeChildrenOptional<
+    T extends Record<string, SchemaBuilder<any, any, any>>
+> = {
+    [K in keyof T]: T[K] extends ObjectSchemaBuilder<
+        // biome-ignore lint/correctness/noUnusedVariables: used in extensions
+        infer P extends Record<string, SchemaBuilder<any, any, any>>,
+        any,
+        any,
+        any,
+        any
+    >
+        ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']>
+        : ReturnType<T[K]['optional']>;
+};
+
 type MakeChildOptional<
     T extends Record<any, SchemaBuilder<any, any, any>>,
     TProp extends keyof T
@@ -1627,6 +1647,89 @@ export class ObjectSchemaBuilder<
         }
 
         throw new Error('expecting string or string[] parameter');
+    }
+
+    /**
+     * Recursively marks all properties — and all properties of nested
+     * `object()` schemas — as optional.  Useful for PATCH API bodies
+     * and partial form state where every field at every level is optional.
+     *
+     * Only nested `ObjectSchemaBuilder` schemas are recursed into.
+     * Other schema types (arrays, unions, primitives, lazy) are made
+     * optional at the top level but their internals are not modified.
+     *
+     * @example
+     * ```ts
+     * const Address = object({
+     *   street: string(),
+     *   city:   string()
+     * });
+     *
+     * const User = object({
+     *   name:    string(),
+     *   address: Address
+     * });
+     *
+     * const PatchUser = User.deepPartial();
+     * // PatchUser infers as:
+     * // { name?: string; address?: { street?: string; city?: string } }
+     *
+     * PatchUser.validate({ address: { city: 'Paris' } }); // valid
+     * PatchUser.validate({});                              // valid
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Three-level nesting
+     * const schema = object({
+     *   a: object({
+     *     b: object({ c: string() })
+     *   })
+     * }).deepPartial();
+     *
+     * schema.validate({});               // valid
+     * schema.validate({ a: {} });        // valid
+     * schema.validate({ a: { b: {} } }); // valid
+     * ```
+     *
+     * @example
+     * ```ts
+     * // PATCH API body
+     * const CreateBody = object({
+     *   profile: object({ displayName: string(), bio: string() }),
+     *   settings: object({ theme: string(), language: string() })
+     * });
+     *
+     * const PatchBody = CreateBody.deepPartial();
+     * // All fields are optional at every level —
+     * // send only what you want to update.
+     * ```
+     *
+     * @see {@link partial} for shallow-only property optionality.
+     */
+    public deepPartial(): ObjectSchemaBuilder<
+        DeepMakeChildrenOptional<TProperties>,
+        TRequired,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        const newProps: Record<string, SchemaBuilder<any, any, any>> = {};
+        for (const key of Object.keys(this.#properties)) {
+            const prop = this.#properties[key];
+            if (prop instanceof ObjectSchemaBuilder) {
+                newProps[key] = (prop as ObjectSchemaBuilder<any, any, any>)
+                    .deepPartial()
+                    .optional();
+            } else {
+                newProps[key] = prop.optional();
+            }
+        }
+        return this.createFromProps({
+            ...this.introspect(),
+            properties: newProps
+        } as any) as any;
     }
 
     /**
