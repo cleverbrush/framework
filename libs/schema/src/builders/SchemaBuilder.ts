@@ -660,6 +660,10 @@ export abstract class SchemaBuilder<
             ): StandardSchemaV1.Result<
                 ResolvedSchemaType<TResult, TRequired, TNullable>
             > {
+                // Standard Schema validate accepts `unknown`, while the
+                // schema's own validate() has a typed parameter. The cast
+                // is safe because validate() performs full runtime
+                // validation regardless of the compile-time input type.
                 const result = self.validate(value as any);
                 if (result.valid) {
                     return {

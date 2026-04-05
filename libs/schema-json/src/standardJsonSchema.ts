@@ -72,8 +72,12 @@ export function withStandardJsonSchema<
     const existingStandard = schema['~standard'];
     const enrichedStandard = { ...existingStandard, jsonSchema: converter };
 
-    // Override the prototype getter with an instance-level property so that
-    // private field access continues to work correctly (proxies break this).
+    // Override the prototype getter with an instance-level property.
+    // A Proxy wrapper was considered but JavaScript private fields (#field)
+    // are bound to the original class instance; when a method is invoked
+    // through a Proxy the receiver is the Proxy, not the real instance, so
+    // private-field access throws a TypeError. defineProperty avoids this
+    // because `this` inside methods still refers to the original schema.
     Object.defineProperty(schema, '~standard', {
         value: enrichedStandard,
         configurable: true,
