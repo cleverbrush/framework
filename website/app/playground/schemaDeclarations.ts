@@ -23,21 +23,21 @@ type AnySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<
  * // result.object === 123
  * \`\`\`
  */
-export declare class AnySchemaBuilder<TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? any : TExplicitType> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class AnySchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: AnySchemaBuilderCreateProps<any>): AnySchemaBuilder<true, undefined, false, {}, any>;
+    static create(props: AnySchemaBuilderCreateProps<any>): AnySchemaBuilder<true, false, undefined, false, {}, any>;
     protected constructor(props: AnySchemaBuilderCreateProps<TRequired>);
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): AnySchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): AnySchemaBuilder<true, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): AnySchemaBuilder<TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): AnySchemaBuilder<TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -58,23 +58,23 @@ export declare class AnySchemaBuilder<TRequired extends boolean = true, TExplici
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): AnySchemaBuilder<true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): AnySchemaBuilder<true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): AnySchemaBuilder<false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): AnySchemaBuilder<false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): AnySchemaBuilder<true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): AnySchemaBuilder<true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): AnySchemaBuilder<TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): AnySchemaBuilder<TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): AnySchemaBuilder<TRequired, TResult & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): AnySchemaBuilder<TRequired, TNullable, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
@@ -83,7 +83,15 @@ export declare class AnySchemaBuilder<TRequired extends boolean = true, TExplici
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): AnySchemaBuilder<TRequired, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+    readonly(): AnySchemaBuilder<TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): AnySchemaBuilder<TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): AnySchemaBuilder<TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a \`any\` schema.
@@ -122,13 +130,13 @@ import type { UnionSchemaBuilder, UnionSchemaValidationResult } from './UnionSch
  * Object schema elements get \`ObjectSchemaValidationResult\`,
  * other types get \`ValidationResult\`.
  */
-export type ElementValidationResult<TElementSchema extends SchemaBuilder<any, any, any>> = TElementSchema extends UnionSchemaBuilder<infer UOptions extends readonly SchemaBuilder<any, any, any>[], any, any> ? UnionSchemaValidationResult<InferType<TElementSchema>, UOptions> : TElementSchema extends ObjectSchemaBuilder<any, any, any, any, any> ? ObjectSchemaValidationResult<InferType<TElementSchema>, TElementSchema> : ValidationResult<InferType<TElementSchema>>;
+export type ElementValidationResult<TElementSchema extends SchemaBuilder<any, any, any, any, any>> = TElementSchema extends UnionSchemaBuilder<infer UOptions extends readonly SchemaBuilder<any, any, any, any, any>[], any, any> ? UnionSchemaValidationResult<InferType<TElementSchema>, UOptions> : TElementSchema extends ObjectSchemaBuilder<any, any, any, any, any> ? ObjectSchemaValidationResult<InferType<TElementSchema>, TElementSchema> : ValidationResult<InferType<TElementSchema>>;
 /**
  * Validation result type returned by \`ArraySchemaBuilder.validate()\`.
  * Extends \`ValidationResult\` with \`getNestedErrors\` for root-level array
  * errors and per-element validation results.
  */
-export type ArraySchemaValidationResult<TResult, TElementSchema extends SchemaBuilder<any, any, any>> = ValidationResult<TResult> & {
+export type ArraySchemaValidationResult<TResult, TElementSchema extends SchemaBuilder<any, any, any, any, any>> = ValidationResult<TResult> & {
     /**
      * Returns root-level array validation errors combined with
      * per-element validation results.
@@ -138,7 +146,7 @@ export type ArraySchemaValidationResult<TResult, TElementSchema extends SchemaBu
      */
     getNestedErrors(): Array<ElementValidationResult<TElementSchema>> & NestedValidationResult<any, any, any>;
 };
-type ArraySchemaBuilderCreateProps<TElementSchema extends SchemaBuilder<any, any, any>, R extends boolean = true> = Partial<ReturnType<ArraySchemaBuilder<TElementSchema, R>['introspect']>>;
+type ArraySchemaBuilderCreateProps<TElementSchema extends SchemaBuilder<any, any, any, any, any>, R extends boolean = true> = Partial<ReturnType<ArraySchemaBuilder<TElementSchema, R>['introspect']>>;
 /**
  * Similar to the \`Array\` type in TypeScript. It can be used to validate arrays of any type.
  * It can also be used to validate arrays of specific type.
@@ -157,21 +165,21 @@ type ArraySchemaBuilderCreateProps<TElementSchema extends SchemaBuilder<any, any
  * directly. Use {@link array | array()} function instead.
  * @see {@link array}
  */
-export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any, any, any>, TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? TElementSchema extends undefined ? Array<any> : TElementSchema extends SchemaBuilder<infer T1, infer T2> ? Array<InferType<SchemaBuilder<T1, T2>>> : never : TExplicitType> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? TElementSchema extends undefined ? Array<any> : TElementSchema extends SchemaBuilder<infer T1, infer T2> ? Array<InferType<SchemaBuilder<T1, T2>>> : never : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: ArraySchemaBuilderCreateProps<any, any>): ArraySchemaBuilder<SchemaBuilder<any, any, any, {}>, true, undefined, false, {}, any[]>;
+    static create(props: ArraySchemaBuilderCreateProps<any, any>): ArraySchemaBuilder<SchemaBuilder<any, any, any, any, any>, true, false, undefined, false, {}, any[]>;
     protected constructor(props: ArraySchemaBuilderCreateProps<TElementSchema, TRequired>);
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): ArraySchemaBuilder<TElementSchema, true, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): ArraySchemaBuilder<TElementSchema, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): ArraySchemaBuilder<TElementSchema, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
      * Performs synchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
      */
@@ -199,23 +207,23 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): ArraySchemaBuilder<TElementSchema, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): ArraySchemaBuilder<TElementSchema, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): ArraySchemaBuilder<TElementSchema, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): ArraySchemaBuilder<TElementSchema, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): ArraySchemaBuilder<TElementSchema, true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): ArraySchemaBuilder<TElementSchema, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): ArraySchemaBuilder<TElementSchema, TRequired, TResult & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
@@ -225,7 +233,7 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): ArraySchemaBuilder<TElementSchema, TRequired, ReadonlyArray<TElementSchema extends SchemaBuilder<infer T1, infer T2> ? InferType<SchemaBuilder<T1, T2>> : any>, THasDefault, TExtensions> & TExtensions;
+    readonly(): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, ReadonlyArray<TElementSchema extends SchemaBuilder<infer T1, infer T2> ? InferType<SchemaBuilder<T1, T2>> : any>, THasDefault, TExtensions> & TExtensions;
     introspect(): {
         /**
          * Schema of array item (if defined)
@@ -239,7 +247,7 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
          * Min length validation error message provider.
          * If not provided, default error message provider is used.
          */
-        minLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, false, {}, TExplicitType extends undefined ? TElementSchema extends undefined ? any[] : TElementSchema extends SchemaBuilder<infer T1, infer T2 extends boolean, false, {}> ? (T2 extends true ? T1 : T1 | undefined)[] : never : TExplicitType>>;
+        minLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType, false, {}, TExplicitType extends undefined ? TElementSchema extends undefined ? any[] : TElementSchema extends SchemaBuilder<infer T1, infer T2 extends boolean, false, false, {}> ? (T2 extends true ? T1 : T1 | undefined)[] : never : TExplicitType>>;
         /**
          * Max length of a valid array
          */
@@ -248,13 +256,14 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
          * Max length validation error message provider.
          * If not provided, default error message provider is used.
          */
-        maxLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, false, {}, TExplicitType extends undefined ? TElementSchema extends undefined ? any[] : TElementSchema extends SchemaBuilder<infer T1, infer T2 extends boolean, false, {}> ? (T2 extends true ? T1 : T1 | undefined)[] : never : TExplicitType>>;
+        maxLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType, false, {}, TExplicitType extends undefined ? TElementSchema extends undefined ? any[] : TElementSchema extends SchemaBuilder<infer T1, infer T2 extends boolean, false, false, {}> ? (T2 extends true ? T1 : T1 | undefined)[] : never : TExplicitType>>;
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -269,12 +278,12 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
      * Item of any type is allowed.
      * @param schema Schema that every array item has to satisfy
      */
-    of<TSchema extends SchemaBuilder<any, any, any>>(schema: TSchema): ArraySchemaBuilder<TSchema, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    of<TSchema extends SchemaBuilder<any, any, any, any, any>>(schema: TSchema): ArraySchemaBuilder<TSchema, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Clears the element schema set by \`of()\`. After this call,
      * array items of any type will be accepted.
      */
-    clearOf(): ArraySchemaBuilder<any, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    clearOf(): ArraySchemaBuilder<any, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Set minimal length of the valid array value for schema.
      */
@@ -282,11 +291,11 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>>): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>>): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear minimal length of the valid array value for schema.
      */
-    clearMinLength(): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    clearMinLength(): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Set max length of the valid array value for schema.
      */
@@ -294,11 +303,19 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>>): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>>): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear max length of the valid array value for schema.
      */
-    clearMaxLength(): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    clearMaxLength(): ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): ArraySchemaBuilder<TElementSchema, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): ArraySchemaBuilder<TElementSchema, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a \`Array\` schema.
@@ -316,7 +333,7 @@ export declare class ArraySchemaBuilder<TElementSchema extends SchemaBuilder<any
  *  // undefined - invalid
  * \`\`\`
  */
-export declare const array: <TElementSchema extends SchemaBuilder<any, any, any>>(elementSchema?: TElementSchema) => ArraySchemaBuilder<TElementSchema, true>;
+export declare const array: <TElementSchema extends SchemaBuilder<any, any, any, any, any>>(elementSchema?: TElementSchema) => ArraySchemaBuilder<TElementSchema, true>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/BooleanSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
@@ -351,12 +368,12 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnT
  *
  * @see {@link boolean}
  */
-export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType> extends SchemaBuilder<TFinalResult, TRequired, THasDefault, TExtensions> {
+export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType> extends SchemaBuilder<TFinalResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: BooleanSchemaBuilderCreateProps<any>): BooleanSchemaBuilder<boolean, any, undefined, false, {}, boolean>;
+    static create(props: BooleanSchemaBuilderCreateProps<any>): BooleanSchemaBuilder<boolean, any, false, undefined, false, {}, boolean>;
     protected constructor(props: BooleanSchemaBuilderCreateProps<TRequired>);
     introspect(): {
         /**
@@ -367,13 +384,14 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
          * Equals to validation error message provider.
          * If not provided, default error message will be used.
          */
-        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired, undefined, false, {}, TResult>>;
+        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired, false, undefined, false, {}, TResult>>;
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TFinalResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TFinalResult>[];
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -386,11 +404,11 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): BooleanSchemaBuilder<TResult, true, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): BooleanSchemaBuilder<TResult, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): BooleanSchemaBuilder<TResult, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): BooleanSchemaBuilder<TResult, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -411,23 +429,23 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): BooleanSchemaBuilder<TResult, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): BooleanSchemaBuilder<TResult, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): BooleanSchemaBuilder<TResult, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): BooleanSchemaBuilder<TResult, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TFinalResult | (() => TFinalResult)): BooleanSchemaBuilder<TResult, true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: TFinalResult | (() => TFinalResult)): BooleanSchemaBuilder<TResult, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): BooleanSchemaBuilder<TResult, TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): BooleanSchemaBuilder<TResult, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): BooleanSchemaBuilder<TResult, TRequired, TFinalResult & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): BooleanSchemaBuilder<TResult, TRequired, TNullable, TFinalResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
@@ -437,7 +455,7 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): BooleanSchemaBuilder<TResult, TRequired, Readonly<TFinalResult>, THasDefault, TExtensions> & TExtensions;
+    readonly(): BooleanSchemaBuilder<TResult, TRequired, TNullable, Readonly<TFinalResult>, THasDefault, TExtensions> & TExtensions;
     /**
      * Restricts object to be equal to \`value\`.
      */
@@ -445,11 +463,19 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired>>): BooleanSchemaBuilder<T, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<BooleanSchemaBuilder<TResult, TRequired>>): BooleanSchemaBuilder<T, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Removes a \`value\` defined by \`equals()\` call.
      */
-    clearEquals(): BooleanSchemaBuilder<boolean, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    clearEquals(): BooleanSchemaBuilder<boolean, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): BooleanSchemaBuilder<TResult, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): BooleanSchemaBuilder<TResult, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a \`boolean\` schema.
@@ -499,12 +525,12 @@ type DateSchemaBuilderCreateProps<T = Date, R extends boolean = true> = Partial<
  *
  * @see {@link date}
  */
-export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean = true, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: DateSchemaBuilderCreateProps): DateSchemaBuilder<Date, true, false, {}>;
+    static create(props: DateSchemaBuilderCreateProps): DateSchemaBuilder<Date, true, false, false, {}>;
     protected constructor(props: DateSchemaBuilderCreateProps);
     introspect(): {
         /**
@@ -515,7 +541,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
          * Min value validation error message provider.
          * If not provided, default error message will be used.
          */
-        minValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, {}>>;
+        minValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Max valid value (if defined).
          */
@@ -524,7 +550,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
          * Max value validation error message provider.
          * If not provided, default error message will be used.
          */
-        maxValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, {}>>;
+        maxValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Make sure that date is in future. \`false\` by default.
          */
@@ -533,7 +559,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
          * Ensure in future validation error message provider.
          * If not provided, default error message will be used.
          */
-        ensureIsInFutureValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, {}>>;
+        ensureIsInFutureValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Make sure that date is in past. \`false\` by default.
          */
@@ -542,7 +568,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
          * Ensure in past validation error message provider.
          * If not provided, default error message will be used.
          */
-        ensureIsInPastValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, {}>>;
+        ensureIsInPastValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * If set, restrict date to be equal to a certain value.
          */
@@ -551,7 +577,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
          * Equals to validation error message provider.
          * If not provided, default error message will be used.
          */
-        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, {}>>;
+        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * If set, schema will try to parse date from the UNIX epoch (number).
          * \`false\` by default.
@@ -572,8 +598,9 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
         validators: ValidatorEntry<TResult>[];
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -586,11 +613,11 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): DateSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): DateSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): DateSchemaBuilder<Date, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): DateSchemaBuilder<Date, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -618,33 +645,33 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<T, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<T, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Clears \`equals()\` call.
      */
-    clearEquals(): DateSchemaBuilder<Date, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearEquals(): DateSchemaBuilder<Date, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): DateSchemaBuilder<TResult, true, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): DateSchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): DateSchemaBuilder<TResult, false, THasDefault, TExtensions> & TExtensions;
+    optional(): DateSchemaBuilder<TResult, false, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): DateSchemaBuilder<TResult, true, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): DateSchemaBuilder<TResult, true, TNullable, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): DateSchemaBuilder<TResult, TRequired, false, TExtensions> & TExtensions;
+    clearDefault(): DateSchemaBuilder<TResult, TRequired, TNullable, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
     brand<TBrand extends string | symbol>(_name?: TBrand): DateSchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
-    }, TRequired, THasDefault, TExtensions> & TExtensions;
+    }, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Marks the inferred type as \`Readonly<Date>\` — prevents mutation of
      * Date methods like \`setFullYear()\` at the type level. Validation
@@ -652,7 +679,7 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): DateSchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
+    readonly(): DateSchemaBuilder<Readonly<TResult>, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Accept only dates in the future.
      */
@@ -660,11 +687,11 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancel \`isInFuture()\` call.
      */
-    clearIsInFuture(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearIsInFuture(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Accept only dates in the past.
      */
@@ -672,11 +699,11 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancel \`isInPast()\` call.
      */
-    clearIsInPast(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearIsInPast(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Set minimal valid Date value for schema.
      */
@@ -684,11 +711,11 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear \`min()\` call.
      */
-    clearMin(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearMin(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Set maximal valid Date value for schema.
      */
@@ -696,34 +723,42 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<DateSchemaBuilder<TResult, TRequired>>): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear \`max()\` call.
      */
-    clearMax(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearMax(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Accepts JSON string as a valid Date.
      * String must be in ISO format and will be parsed using \`JSON.parse()\`.
      */
-    acceptJsonString(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    acceptJsonString(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancel \`acceptJsonString()\` call.
      */
-    doNotAcceptJsonString(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    doNotAcceptJsonString(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Accepts epoch number as a valid Date.
      * Epoch number will be parsed using \`new Date(epoch)\`.
      */
-    acceptEpoch(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    acceptEpoch(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancel \`acceptEpoch()\` call.
      */
-    doNotAcceptEpoch(): DateSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    doNotAcceptEpoch(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): DateSchemaBuilder<TResult, TRequired, true, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): DateSchemaBuilder<TResult, TRequired, false, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a Date schema.
  */
-export declare const date: () => DateSchemaBuilder<Date, true, false, {}>;
+export declare const date: () => DateSchemaBuilder<Date, true, false, false, {}>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/FunctionSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
@@ -754,21 +789,21 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<Return
  *
  * @see {@link func}
  */
-export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? (...args: any[]) => any : TExplicitType> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? (...args: any[]) => any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: FunctionSchemaBuilderCreateProps<any>): FunctionSchemaBuilder<true, undefined, false, {}, (...args: any[]) => any>;
+    static create(props: FunctionSchemaBuilderCreateProps<any>): FunctionSchemaBuilder<true, false, undefined, false, {}, (...args: any[]) => any>;
     protected constructor(props: FunctionSchemaBuilderCreateProps<TRequired>);
     /**
      * @hidden
      */
-    hasType<T>(_notUsed?: T): FunctionSchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): FunctionSchemaBuilder<true, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearHasType(): FunctionSchemaBuilder<TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): FunctionSchemaBuilder<TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -789,23 +824,23 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TEx
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): FunctionSchemaBuilder<true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): FunctionSchemaBuilder<true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): FunctionSchemaBuilder<false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): FunctionSchemaBuilder<false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): FunctionSchemaBuilder<true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): FunctionSchemaBuilder<true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): FunctionSchemaBuilder<TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): FunctionSchemaBuilder<TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): FunctionSchemaBuilder<TRequired, TResult & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): FunctionSchemaBuilder<TRequired, TNullable, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
@@ -814,7 +849,15 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TEx
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): FunctionSchemaBuilder<TRequired, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+    readonly(): FunctionSchemaBuilder<TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): FunctionSchemaBuilder<TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): FunctionSchemaBuilder<TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a \`function\` schema.
@@ -859,12 +902,12 @@ type LazySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType
  * });
  * \`\`\`
  */
-export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean = true, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: LazySchemaBuilderCreateProps<any>): LazySchemaBuilder<any, true, false, {}>;
+    static create(props: LazySchemaBuilderCreateProps<any>): LazySchemaBuilder<any, true, false, false, {}>;
     protected constructor(props: LazySchemaBuilderCreateProps<TRequired>);
     /**
      * Resolves the lazy schema by calling the getter (once; result is cached).
@@ -882,10 +925,11 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
         getter: () => SchemaBuilder<TResult, any, any>;
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -915,37 +959,45 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): LazySchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): LazySchemaBuilder<T, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): LazySchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): LazySchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): LazySchemaBuilder<TResult, true, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): LazySchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): LazySchemaBuilder<TResult, false, THasDefault, TExtensions> & TExtensions;
+    optional(): LazySchemaBuilder<TResult, false, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): LazySchemaBuilder<TResult, true, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): LazySchemaBuilder<TResult, true, TNullable, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): LazySchemaBuilder<TResult, TRequired, false, TExtensions> & TExtensions;
+    clearDefault(): LazySchemaBuilder<TResult, TRequired, TNullable, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
     brand<TBrand extends string | symbol>(_name?: TBrand): LazySchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
-    }, TRequired, THasDefault, TExtensions> & TExtensions;
+    }, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    readonly(): LazySchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
+    readonly(): LazySchemaBuilder<Readonly<TResult>, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): LazySchemaBuilder<TResult, TRequired, true, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): LazySchemaBuilder<TResult, TRequired, false, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a lazy schema that defers the schema definition until first validation.
@@ -979,7 +1031,7 @@ export declare class LazySchemaBuilder<TResult = any, TRequired extends boolean 
  * });
  * \`\`\`
  */
-export declare function lazy<TResult>(getter: () => SchemaBuilder<TResult, any, any>): LazySchemaBuilder<TResult, true, false, {}>;
+export declare function lazy<TResult>(getter: () => SchemaBuilder<TResult, any, any>): LazySchemaBuilder<TResult, true, false, false, {}>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/NullSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
@@ -1037,21 +1089,21 @@ type NullSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType
  *
  * @see {@link nul}
  */
-export declare class NullSchemaBuilder<TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<null, TRequired, THasDefault, TExtensions> {
+export declare class NullSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<null, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: NullSchemaBuilderCreateProps<any>): NullSchemaBuilder<true, undefined, false, {}>;
+    static create(props: NullSchemaBuilderCreateProps<any>): NullSchemaBuilder<true, false, undefined, false, {}>;
     protected constructor(props: NullSchemaBuilderCreateProps<TRequired>);
     /**
      * @hidden
      */
-    hasType<T>(_notUsed?: T): NullSchemaBuilder<true, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): NullSchemaBuilder<true, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearHasType(): NullSchemaBuilder<TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): NullSchemaBuilder<TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: null, context?: ValidationContext): ValidationResult<null>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -1070,23 +1122,23 @@ export declare class NullSchemaBuilder<TRequired extends boolean = true, TExplic
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): NullSchemaBuilder<true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): NullSchemaBuilder<true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): NullSchemaBuilder<false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): NullSchemaBuilder<false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: null | (() => null)): NullSchemaBuilder<true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: null | (() => null)): NullSchemaBuilder<true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): NullSchemaBuilder<TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): NullSchemaBuilder<TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): NullSchemaBuilder<TRequired, null & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): NullSchemaBuilder<TRequired, TNullable, null & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
@@ -1096,7 +1148,15 @@ export declare class NullSchemaBuilder<TRequired extends boolean = true, TExplic
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): NullSchemaBuilder<TRequired, Readonly<null>, THasDefault, TExtensions> & TExtensions;
+    readonly(): NullSchemaBuilder<TRequired, TNullable, Readonly<null>, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): NullSchemaBuilder<TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): NullSchemaBuilder<TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a schema that validates the value is exactly \`null\`.
@@ -1176,12 +1236,12 @@ type NumberSchemaBuilderCreateProps<T = number, R extends boolean = true> = Part
  *
  * @see {@link number}
  */
-export declare class NumberSchemaBuilder<TResult = number, TRequired extends boolean = true, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class NumberSchemaBuilder<TResult = number, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: NumberSchemaBuilderCreateProps): NumberSchemaBuilder<number, true, false, {}>;
+    static create(props: NumberSchemaBuilderCreateProps): NumberSchemaBuilder<number, true, false, false, {}>;
     protected constructor(props: NumberSchemaBuilderCreateProps);
     introspect(): {
         /**
@@ -1192,7 +1252,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
          * Min valid value error message provider.
          * If not provided, default error message will be used.
          */
-        minValidationErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, {}>>;
+        minValidationErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Max valid value (if defined).
          */
@@ -1201,7 +1261,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
          * Max valid value error message provider.
          * If not provided, default error message will be used.
          */
-        maxValidationErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, {}>>;
+        maxValidationErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Make sure that object is not \`NaN\`. \`true\` by default.
          */
@@ -1210,7 +1270,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
          * EnsureNotNaN error message provider.
          * If not provided, default error message will be used.
          */
-        ensureNotNaNErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, {}>>;
+        ensureNotNaNErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Make sure that object is not different kinds of \`infinity\`. \`true\` by default.
          */
@@ -1218,7 +1278,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         /**
          * EnsureIsFinite error message provider.
          */
-        ensureIsFiniteErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, {}>>;
+        ensureIsFiniteErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * If set, restrict object to be equal to a certain value.
          */
@@ -1227,7 +1287,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
          * EqualsTo error message provider.
          * If not provided, default error message will be used.
          */
-        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, {}>>;
+        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Allow only integer values (floating point values will be rejected
          * as invalid)
@@ -1236,7 +1296,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         /**
          * EnsureIsInteger error message provider.
          */
-        ensureIsIntegerErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, {}>>;
+        ensureIsIntegerErrorMessageProvider: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Array of preprocessor functions
          */
@@ -1247,8 +1307,9 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
         validators: ValidatorEntry<TResult>[];
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -1261,11 +1322,11 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): NumberSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): NumberSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): NumberSchemaBuilder<number, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): NumberSchemaBuilder<number, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -1290,20 +1351,20 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<T, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<T, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear \`equals()\` call.
      */
-    clearEquals(): NumberSchemaBuilder<number, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearEquals(): NumberSchemaBuilder<number, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @deprecated Use {@link clearIsInteger} instead.
      * Float values will be considered as valid after this call.
      */
-    isFloat(): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    isFloat(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear \`isInteger()\` call.
      */
-    clearIsInteger(): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearIsInteger(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Only integer values will be considered as valid after this call.
      */
@@ -1311,29 +1372,29 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): NumberSchemaBuilder<TResult, true, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): NumberSchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): NumberSchemaBuilder<TResult, false, THasDefault, TExtensions> & TExtensions;
+    optional(): NumberSchemaBuilder<TResult, false, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): NumberSchemaBuilder<TResult, true, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): NumberSchemaBuilder<TResult, true, TNullable, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): NumberSchemaBuilder<TResult, TRequired, false, TExtensions> & TExtensions;
+    clearDefault(): NumberSchemaBuilder<TResult, TRequired, TNullable, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
     brand<TBrand extends string | symbol>(_name?: TBrand): NumberSchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
-    }, TRequired, THasDefault, TExtensions> & TExtensions;
+    }, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Marks the inferred type as \`Readonly<number>\`. Since numbers are
      * already immutable this is an identity operation, but it sets the
@@ -1341,7 +1402,7 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): NumberSchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
+    readonly(): NumberSchemaBuilder<Readonly<TResult>, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Do not accept NaN value
      */
@@ -1349,11 +1410,11 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Consider NaN value as valid
      */
-    canBeNaN(): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    canBeNaN(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Do not accept \`Infinity\`.
      */
@@ -1361,11 +1422,11 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Consider \`Infinity\` as valid.
      */
-    canBeInfinite(): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    canBeInfinite(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Restrict number to be at least \`minValue\`.
      */
@@ -1373,11 +1434,11 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear \`min()\` call.
      */
-    clearMin(): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearMin(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Restrict number to be no more than \`maxValue\`.
      */
@@ -1385,11 +1446,19 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder<TResult, TRequired>>): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Clear \`max()\` call.
      */
-    clearMax(): NumberSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearMax(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): NumberSchemaBuilder<TResult, TRequired, true, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): NumberSchemaBuilder<TResult, TRequired, false, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a number schema restricted to \`equals\` value.
@@ -1410,26 +1479,26 @@ import { type BRAND, type InferType, type NestedValidationResult, type PreValida
  * from the schema for the further usage. e.g. to select source and destination
  * properties for object mappings
  */
-export type SchemaPropertySelector<TSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TPropertySchema extends SchemaBuilder<any, any, any>, TAssignableTo = any, TParentPropertyDescriptor = undefined> = (l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>) => PropertyDescriptor<TSchema, TPropertySchema, TParentPropertyDescriptor>;
+export type SchemaPropertySelector<TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>, TPropertySchema extends SchemaBuilder<any, any, any, any, any>, TAssignableTo = any, TParentPropertyDescriptor = undefined> = (l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>) => PropertyDescriptor<TSchema, TPropertySchema, TParentPropertyDescriptor>;
 type ObjectSchemaBuilderProps<T extends Record<string, SchemaBuilder> = {}, TRequired extends boolean = true> = ReturnType<ObjectSchemaBuilder<T, TRequired>['introspect']>;
 type ObjectSchemaBuilderCreateProps<T extends Record<string, SchemaBuilder> = {}, TRequired extends boolean = true> = Partial<ObjectSchemaBuilderProps<T, TRequired>>;
 type Id<T> = T extends infer U ? {
     [K in keyof U]: U[K];
 } : never;
-export type RespectPropsOptionality<T extends Record<string, SchemaBuilder<any, any, any>>> = {
+export type RespectPropsOptionality<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = {
     [K in RequiredProps<T>]: InferType<T[K]>;
 } & {
     [K in NotRequiredProps<T>]?: InferType<T[K]>;
 };
-type RespectPropsOptionalityForInput<T extends Record<string, SchemaBuilder<any, any, any>>> = {
+type RespectPropsOptionalityForInput<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = {
     [K in RequiredInputProps<T>]: InferType<T[K]>;
 } & {
     [K in NotRequiredInputProps<T>]?: InferType<T[K]>;
 };
-type MakeChildrenRequired<T extends Record<string, SchemaBuilder<any, any, any>>> = {
+type MakeChildrenRequired<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = {
     [K in keyof T]: ReturnType<T[K]['required']>;
 };
-type MakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any>>> = {
+type MakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = {
     [K in keyof T]: ReturnType<T[K]['optional']>;
 };
 /**
@@ -1437,19 +1506,19 @@ type MakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any>>
  * nested \`ObjectSchemaBuilder\` schemas.  All other schema types (arrays,
  * unions, primitives) are only made optional at the top level.
  */
-type DeepMakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any>>> = {
-    [K in keyof T]: T[K] extends ObjectSchemaBuilder<infer P extends Record<string, SchemaBuilder<any, any, any>>, any, any, any, any> ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']> : ReturnType<T[K]['optional']>;
+type DeepMakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = {
+    [K in keyof T]: T[K] extends ObjectSchemaBuilder<infer P extends Record<string, SchemaBuilder<any, any, any, any, any>>, any, any, any, any, any> ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']> : ReturnType<T[K]['optional']>;
 };
-type MakeChildOptional<T extends Record<any, SchemaBuilder<any, any, any>>, TProp extends keyof T> = {
+type MakeChildOptional<T extends Record<any, SchemaBuilder<any, any, any, any, any>>, TProp extends keyof T> = {
     [K in keyof T]: K extends TProp ? ReturnType<T[K]['optional']> : T[K];
 };
-type MakeChildRequired<T extends Record<any, SchemaBuilder<any, any, any>>, TProp extends keyof T> = {
+type MakeChildRequired<T extends Record<any, SchemaBuilder<any, any, any, any, any>>, TProp extends keyof T> = {
     [K in keyof T]: K extends TProp ? ReturnType<T[K]['required']> : T[K];
 };
-type ModifyPropSchema<T extends Record<any, SchemaBuilder<any, any, any>>, TProp extends keyof T, TSchema extends SchemaBuilder<any, any, any>> = {
+type ModifyPropSchema<T extends Record<any, SchemaBuilder<any, any, any, any, any>>, TProp extends keyof T, TSchema extends SchemaBuilder<any, any, any, any, any>> = {
     [K in keyof T]: K extends TProp ? TSchema : T[K];
 };
-export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TSchema extends ObjectSchemaBuilder<any, any, any, any, any> = TRootSchema> = Omit<ValidationResult<T>, 'errors'> & {
+export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>, TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any> = TRootSchema> = Omit<ValidationResult<T>, 'errors'> & {
     /**
      * A flat list of validation errors.
      *
@@ -1467,7 +1536,7 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
      *
      * @param selector a callback function to select property from the schema.
      */
-    getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(selector?: (properties: PropertyDescriptorTree<TSchema, TRootSchema>) => PropertyDescriptor<TRootSchema, TPropertySchema, TParentPropertyDescriptor>): TPropertySchema extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor> : NestedValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor>;
+    getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(selector?: (properties: PropertyDescriptorTree<TSchema, TRootSchema>) => PropertyDescriptor<TRootSchema, TPropertySchema, TParentPropertyDescriptor>): TPropertySchema extends ObjectSchemaBuilder<any, any, any, any, any, any> ? PropertyValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor> : NestedValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor>;
 };
 /**
  * Object schema builder class. Similar to the \`object\` type
@@ -1555,12 +1624,12 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  * \`\`\`
  * @see {@link object}
  */
-export declare class ObjectSchemaBuilder<TProperties extends Record<string, SchemaBuilder<any, any, any>> = {}, TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType, TRequired, THasDefault, TExtensions> {
+export declare class ObjectSchemaBuilder<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create<P extends Record<string, SchemaBuilder>, R extends boolean>(props: ObjectSchemaBuilderCreateProps<P, R>): ObjectSchemaBuilder<{}, true, undefined, false, {}>;
+    static create<P extends Record<string, SchemaBuilder>, R extends boolean>(props: ObjectSchemaBuilderCreateProps<P, R>): ObjectSchemaBuilder<{}, true, false, undefined, false, {}>;
     protected createFromProps<T extends Record<string, SchemaBuilder>, R extends boolean = true>(props: ObjectSchemaBuilderCreateProps<T, R>): this;
     protected constructor(props: ObjectSchemaBuilderCreateProps);
     introspect(): {
@@ -1577,10 +1646,11 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
         acceptUnknownProps: boolean;
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -1593,23 +1663,23 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): ObjectSchemaBuilder<TProperties, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): ObjectSchemaBuilder<TProperties, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): ObjectSchemaBuilder<TProperties, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): ObjectSchemaBuilder<TProperties, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType)): ObjectSchemaBuilder<TProperties, true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType)): ObjectSchemaBuilder<TProperties, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): ObjectSchemaBuilder<TProperties, TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): ObjectSchemaBuilder<TProperties, TRequired, (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): ObjectSchemaBuilder<TProperties, TRequired, TNullable, (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
@@ -1618,7 +1688,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): ObjectSchemaBuilder<TProperties, TRequired, Readonly<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
+    readonly(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, Readonly<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
     protected preValidateSync(object: any, context?: ValidationContext<this>): PreValidationResult<InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>>, {
         validatedObject: any;
     }>;
@@ -1664,29 +1734,29 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * Fields not defined in \`properties\` will not be validated
      * and will be passed through the validation.
      */
-    acceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    acceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Fields not defined in \`properties\` will be considered
      * as schema violation. This is the default behavior.
      */
-    notAcceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    notAcceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): ObjectSchemaBuilder<TProperties, TRequired, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): ObjectSchemaBuilder<TProperties, TRequired, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): ObjectSchemaBuilder<TProperties, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
      * Adds a new property to the object schema. The new property
      * will be validated according to the provided schema.
      * @param propName name of the new property
      * @param schema schema builder of the new property
      */
-    addProp<TType extends SchemaBuilder<any, any, any>, TName extends string>(propName: TName, schema: TType): ObjectSchemaBuilder<TProperties & {
+    addProp<TType extends SchemaBuilder<any, any, any, any, any>, TName extends string>(propName: TName, schema: TType): ObjectSchemaBuilder<TProperties & {
         [k in TName]: TType;
-    }, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    }, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      * @deprecated this is for internal use, do not use if you are
@@ -1701,62 +1771,62 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * comments were lost. Hopefully it will be fixed in the future by Typescript team or somebody will
      * find a workaround/fix and create a pull request.
      */
-    optimize(): SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired, THasDefault, TExtensions>;
+    optimize(): SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions>;
     /**
      * Adds new properties to the object schema. The same as \`.addProp()\` but
      * allows to add multiple properties with one call. The new properties
      * will be validated according to the provided schemas.
      * @param props a key/schema object map.
      */
-    addProps<TProps extends Record<string, SchemaBuilder<any, any, any>>>(props: TProps): ObjectSchemaBuilder<TProperties & TProps, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    addProps<TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(props: TProps): ObjectSchemaBuilder<TProperties & TProps, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
      * Adds all properties from the \`schema\` object schema to the current schema.
      * @param schema an instance of \`ObjectSchemaBuilder\`
      */
-    addProps<K extends ObjectSchemaBuilder<any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProp, infer _, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProp> & TProp, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
+    addProps<K extends ObjectSchemaBuilder<any, any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProp, infer _, any, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProp> & TProp, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
     /**
      * Omits properties listed in \`properties\` from the schema.
      * Consider \`Omit<Type, 'prop1'|'prop2'...>\` as a good illustration
      * from the TS world.
      * @param properties - array of property names (strings) to remove from the schema.
      */
-    omit<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    omit<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Removes \`propName\` from the list of properties.
      * @param propName property name to remove. Schema should contain
      * this property. An error will be thrown otherwise.
      */
-    omit<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    omit<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Removes all properties of \`schema\` from the current schema.
      * \`Omit<TSchema, keyof TAnotherSchema>\` as a good illustration
      * from the TS world.
      * @param schema schema builder to take properties from.
      */
-    omit<T>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer TRequired, infer TExplicitType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
+    omit<T>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer TRequired, any, infer TExplicitType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
     /**
      * Adds all properties from \`schema\` to the current schema.
      * \`TSchema & TAnotherSchema\` is a good example of the similar concept
      * in the TS type system.
      * @param schema an object schema to take properties from
      */
-    intersect<T extends ObjectSchemaBuilder<any, any, any, any, any>>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer _, infer TExplType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps> & TProps, TRequired, TExplType, THasDefault, TExtensions> & TExtensions : never;
+    intersect<T extends ObjectSchemaBuilder<any, any, any, any, any, any>>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer _, any, infer TExplType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps> & TProps, TRequired, TNullable, TExplType, THasDefault, TExtensions> & TExtensions : never;
     /**
      * Marks all properties in the current schema as optional.
      * It is the same as call \`.optional('propname')\` where \`propname\` is the name
      * of every property in the schema.
      */
-    partial(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    partial(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Marks all properties from \`properties\` as optional in the schema.
      * @param properties list of property names (string) to make optional
      */
-    partial<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K> & Pick<MakeChildrenOptional<TProperties>, K>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    partial<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K> & Pick<MakeChildrenOptional<TProperties>, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Marks property \`propName\` as optional in the schema.
      * @param propName the name of the property (string).
      */
-    partial<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty> & Pick<MakeChildrenOptional<TProperties>, TProperty>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    partial<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty> & Pick<MakeChildrenOptional<TProperties>, TProperty>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Recursively marks all properties — and all properties of nested
      * \`object()\` schemas — as optional.  Useful for PATCH API bodies
@@ -1815,27 +1885,27 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      *
      * @see {@link partial} for shallow-only property optionality.
      */
-    deepPartial(): ObjectSchemaBuilder<DeepMakeChildrenOptional<TProperties>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    deepPartial(): ObjectSchemaBuilder<DeepMakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Returns a new schema containing only properties listed in
      * \`properties\` array.
      * @param properties array of property names (strings)
      */
-    pick<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    pick<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
      * Returns new schema based on the current schema. This new schema
      * will consists only from properties which names are taken from the
      * \`schema\` object schema.
      * @param schema schema to take property names list from
      */
-    pick<K extends ObjectSchemaBuilder<any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProps, infer _, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof Omit<TProperties, keyof TProps>>, TRequired, undefined, THasDefault, TExtensions> & TExtensions : never;
+    pick<K extends ObjectSchemaBuilder<any, any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProps, infer _, any, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof Omit<TProperties, keyof TProps>>, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions : never;
     /**
      * Returns a new schema consisting of only one property
      * (taken from the \`property\` property name). If the property
      * does not exists in the current schema, an error will be thrown.
      * @param property the name of the property (string).
      */
-    pick<K extends keyof TProperties>(property: K): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    pick<K extends keyof TProperties>(property: K): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
      * Modify schema for \`propName\` and return a new schema.
      * Could be useful if you want to leave all schema intact, but
@@ -1845,31 +1915,33 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * you will receive an old schema for \`propName\`.
      * @returns
      */
-    modifyPropSchema<K extends keyof TProperties, R extends SchemaBuilder<any, any, any>>(propName: K, callback: (builder: TProperties[K]) => R): ObjectSchemaBuilder<ModifyPropSchema<TProperties, K, R>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    modifyPropSchema<K extends keyof TProperties, R extends SchemaBuilder<any, any, any, any, any>>(propName: K, callback: (builder: TProperties[K]) => R): ObjectSchemaBuilder<ModifyPropSchema<TProperties, K, R>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * An alias for \`.partial(prop: string)\`
      * @param prop name of the property
      */
-    makePropOptional<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildOptional<TProperties, K>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    makePropOptional<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildOptional<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Marks \`prop\` as required property.
      * If \`prop\` does not exists in the current schema,
      * an error will be thrown.
      * @param prop name of the property
      */
-    makePropRequired<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildRequired<TProperties, K>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    makePropRequired<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildRequired<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * \`Partial<T>\` would be a good example of the
      * same operation in the TS world.
      */
-    makeAllPropsOptional(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    makeAllPropsOptional(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * \`Required<T>\` would be a good example of the
      * same operation in the TS world.
      */
-    makeAllPropsRequired(): ObjectSchemaBuilder<MakeChildrenRequired<TProperties>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
-    static getPropertiesFor<TProperties extends Record<string, SchemaBuilder<any, any, any>> = {}, TRequired extends boolean = true, TExplicitType = undefined, TSchema extends ObjectSchemaBuilder<any, any, any> = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>>(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema>;
+    makeAllPropsRequired(): ObjectSchemaBuilder<MakeChildrenRequired<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    static getPropertiesFor<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TExplicitType = undefined, TSchema extends ObjectSchemaBuilder<any, any, any, any> = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>>(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema>;
     static isValidPropertyDescriptor(descriptor: PropertyDescriptor<any, any, any>): boolean;
+    nullable(): ObjectSchemaBuilder<TProperties, TRequired, true, TExplicitType, THasDefault, TExtensions>;
+    notNullable(): ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType, THasDefault, TExtensions>;
 }
 export interface Object {
     /**
@@ -1880,12 +1952,12 @@ export interface Object {
      * Defines an object schema, properties definitions are takens from \`props\`.
      * @param props key/schema object map for schema's properties.
      */
-    <TProps extends Record<string, SchemaBuilder<any, any, any>>>(props: TProps): ObjectSchemaBuilder<TProps, true>;
+    <TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(props: TProps): ObjectSchemaBuilder<TProps, true>;
     /**
      * Defines an object schema, properties definitions are takens from \`props\`.
      * @param props key/schema object map for schema's properties.
      */
-    <TProps extends Record<string, SchemaBuilder<any, any, any>>>(props?: TProps): ObjectSchemaBuilder<TProps, true>;
+    <TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(props?: TProps): ObjectSchemaBuilder<TProps, true>;
     /**
      * Returns a tree of property descriptors for the given \`schema\`.
      * The structure of the tree is the same as the structure of the \`schema\`.
@@ -1893,7 +1965,7 @@ export interface Object {
      * property in the schema in a useful and type-safe way.
      * @param schema
      */
-    getPropertiesFor<TProperties extends Record<string, SchemaBuilder<any, any, any>> = {}, TRequired extends boolean = true, TExplicitType = undefined, TSchema extends ObjectSchemaBuilder<any, any, any> = ObjectSchemaBuilder<TProperties, TRequired, TExplicitType>>(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema>;
+    getPropertiesFor<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TExplicitType = undefined, TSchema extends ObjectSchemaBuilder<any, any, any, any> = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>>(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema>;
     /**
      * Verifies if the given \`descriptor\` is a valid property descriptor.
      * @param descriptor a property descriptor to check
@@ -1902,17 +1974,17 @@ export interface Object {
 }
 declare const object: Object;
 export { object };
-type RequiredProps<T extends Record<string, SchemaBuilder<any, any, any>>> = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any> ? TReq extends true ? k : never : never]: T[k];
+type RequiredProps<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, any> ? TReq extends true ? k : never : never]: T[k];
 };
-type NotRequiredProps<T extends Record<string, SchemaBuilder<any, any, any>>> = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any> ? TReq extends true ? never : k : never]: T[k];
+type NotRequiredProps<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, any> ? TReq extends true ? never : k : never]: T[k];
 };
-type RequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any>>> = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, infer THasDef> ? TReq extends true ? THasDef extends true ? never : k : never : never]: T[k];
+type RequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, infer THasDef> ? TReq extends true ? THasDef extends true ? never : k : never : never]: T[k];
 };
-type NotRequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any>>> = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, infer THasDef> ? TReq extends true ? THasDef extends true ? k : never : k : never]: T[k];
+type NotRequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, infer THasDef> ? TReq extends true ? THasDef extends true ? k : never : k : never]: T[k];
 };
 `,
     "file:///node_modules/@cleverbrush/schema/builders/PropertyValidationResult.d.ts": `import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
@@ -1997,7 +2069,7 @@ import type { StringSchemaBuilder } from './StringSchemaBuilder.js';
  *
  * Returned as part of {@link RecordKeyValidationResult}.
  */
-export type RecordKeyDescriptor<TRecord, TValueSchema extends SchemaBuilder<any, any, any>> = {
+export type RecordKeyDescriptor<TRecord, TValueSchema extends SchemaBuilder<any, any, any, any, any>> = {
     /** The key within the record this descriptor refers to. */
     readonly key: string;
     /** Returns the value schema every record entry must satisfy. */
@@ -2020,7 +2092,7 @@ export type RecordKeyDescriptor<TRecord, TValueSchema extends SchemaBuilder<any,
  * Validation result for a single key-value entry in a record.
  * Returned by {@link RecordSchemaValidationResult.getErrorsFor | getErrorsFor(key)}.
  */
-export type RecordKeyValidationResult<TRecord, TValueSchema extends SchemaBuilder<any, any, any>> = {
+export type RecordKeyValidationResult<TRecord, TValueSchema extends SchemaBuilder<any, any, any, any, any>> = {
     /** Validation error messages for this entry; empty array when valid. */
     readonly errors: ReadonlyArray<string>;
     /** \`true\` when there are no validation errors for this entry. */
@@ -2050,7 +2122,7 @@ export type RecordRootValidationResult<TResult> = {
  * - \`getErrorsFor()\` — root-level errors for the record container itself.
  * - \`getErrorsFor(key)\` — errors, seen value, and descriptor for a specific key.
  */
-export type RecordSchemaValidationResult<TResult, TValueSchema extends SchemaBuilder<any, any, any>> = ValidationResult<TResult> & {
+export type RecordSchemaValidationResult<TResult, TValueSchema extends SchemaBuilder<any, any, any, any, any>> = ValidationResult<TResult> & {
     /**
      * Returns per-key validation results as a plain object.
      *
@@ -2121,7 +2193,7 @@ export type RecordSchemaValidationResult<TResult, TValueSchema extends SchemaBui
      */
     getErrorsFor(key: string): RecordKeyValidationResult<TResult, TValueSchema>;
 };
-type RecordSchemaBuilderCreateProps<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>, R extends boolean = true> = Partial<ReturnType<RecordSchemaBuilder<TKeySchema, TValueSchema, R>['introspect']>>;
+type RecordSchemaBuilderCreateProps<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>, R extends boolean = true> = Partial<ReturnType<RecordSchemaBuilder<TKeySchema, TValueSchema, R>['introspect']>>;
 /**
  * Schema builder for objects with dynamic string keys.
  *
@@ -2161,21 +2233,21 @@ type RecordSchemaBuilderCreateProps<TKeySchema extends StringSchemaBuilder<any, 
  *
  * @see {@link record}
  */
-export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>, TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? Record<InferType<TKeySchema>, InferType<TValueSchema>> : TExplicitType> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? Record<InferType<TKeySchema>, InferType<TValueSchema>> : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: RecordSchemaBuilderCreateProps<any, any, any>): RecordSchemaBuilder<StringSchemaBuilder<any, any, any, any>, SchemaBuilder<any, any, any, {}>, true, undefined, false, {}, Record<any, any>>;
+    static create(props: RecordSchemaBuilderCreateProps<any, any, any>): RecordSchemaBuilder<StringSchemaBuilder<any, any, any, any, {}>, SchemaBuilder<any, any, any, any, any>, true, false, undefined, false, {}, Record<any, any>>;
     protected constructor(props: RecordSchemaBuilderCreateProps<TKeySchema, TValueSchema, TRequired>);
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): RecordSchemaBuilder<TKeySchema, TValueSchema, true, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
@@ -2183,23 +2255,23 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): RecordSchemaBuilder<TKeySchema, TValueSchema, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): RecordSchemaBuilder<TKeySchema, TValueSchema, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, TResult & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, TNullable, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
@@ -2216,10 +2288,11 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
         valueSchema: TValueSchema;
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -2250,6 +2323,14 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
      * @param context - optional \`ValidationContext\` settings
      */
     protected _validateAsync(object: TResult, context?: ValidationContext): Promise<RecordSchemaValidationResult<TResult, TValueSchema>>;
+    /**
+     * @hidden
+     */
+    nullable(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a schema for objects with dynamic string keys, where every key
@@ -2305,7 +2386,7 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
  * );
  * \`\`\`
  */
-export declare function record<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema): RecordSchemaBuilder<TKeySchema, TValueSchema>;
+export declare function record<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema): RecordSchemaBuilder<TKeySchema, TValueSchema>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import { type Transaction } from '../utils/transaction.js';
@@ -2393,7 +2474,7 @@ export type MakeOptional<T> = {
  * returning a string or a promise of a string.
  * Should be used to provide a custom validation error message.
  */
-export type ValidationErrorMessageProvider<TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = string | ((seenValue: InferType<TSchema>, schema: TSchema) => string | Promise<string>);
+export type ValidationErrorMessageProvider<TSchema extends SchemaBuilder<any, any, any, any, any> = SchemaBuilder<any, any, any, any, any>> = string | ((seenValue: InferType<TSchema>, schema: TSchema) => string | Promise<string>);
 export type ValidationResult<T> = {
     /**
      * If \`true\` - object satisfies schema
@@ -2468,6 +2549,7 @@ export type ValidatorEntry<T> = {
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
+    isNullable?: boolean;
     isReadonly?: boolean;
     preprocessors: PreprocessorEntry<T>[];
     validators: ValidatorEntry<T>[];
@@ -2478,7 +2560,7 @@ export type SchemaBuilderProps<T> = {
     hasCatch?: boolean;
     description?: string;
 };
-export type ValidationContext<TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = {
+export type ValidationContext<TSchema extends SchemaBuilder<any, any, any, any> = SchemaBuilder<any, any, any, any>> = {
     /**
      * Optional. By default validation will stop after the first validation error, in case if
      * you want to receive all validation erors, please set this flag to \`true\`.
@@ -2673,14 +2755,14 @@ export declare function createHybridErrorArray<T extends any[]>(items: T, seenVa
  * @typeparam TResult Type of the object that will be returned by \`validate()\` method.
  * @typeparam TRequired If \`true\`, object will be required. If \`false\`, object will be optional.
  */
-export declare abstract class SchemaBuilder<TResult = any, TRequired extends boolean = true, THasDefault extends boolean = false, TExtensions = {}> {
+export declare abstract class SchemaBuilder<TResult = any, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> {
     #private;
     /**
      * Type-level brand encoding the inferred type of this schema.
      * Not emitted at runtime — used only by {@link InferType}.
      * @internal
      */
-    readonly [__type]: TRequired extends true ? TResult : MakeOptional<TResult>;
+    readonly [__type]: TRequired extends true ? TNullable extends true ? TResult | null : TResult : MakeOptional<TNullable extends true ? TResult | null : TResult>;
     /**
      * Type-level brand encoding whether this schema has a default value.
      * Not emitted at runtime — used by input type inference.
@@ -2727,6 +2809,10 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * Whether the schema requires a non-null/non-undefined value.
      */
     protected get isRequired(): TRequired;
+    /**
+     * Whether \`null\` is an accepted value for this schema.
+     */
+    protected get isNullable(): boolean;
     /**
      * Sets the requirement flag. Must be a boolean.
      */
@@ -2824,6 +2910,10 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
          */
         isRequired: boolean;
         /**
+         * If set to \`true\`, schema values of \`null\` are considered valid.
+         */
+        isNullable: boolean;
+        /**
          * If set to \`true\`, the inferred type is marked as readonly.
          * Type-level only — no runtime enforcement.
          */
@@ -2839,7 +2929,7 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
         /**
          * Custom error message provider for the 'is required' validation error.
          */
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         /**
          * Extension metadata. Stores custom state set by schema extensions.
          */
@@ -2872,6 +2962,19 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * Makes schema optional (consider \`null\` and \`undefined\` as valid objects for this schema)
      */
     optional(): any;
+    /**
+     * Makes schema nullable — \`null\` is accepted as a valid value.
+     *
+     * Unlike \`.optional()\` which accepts \`undefined\`, \`.nullable()\` accepts
+     * \`null\`. The inferred type changes from \`T\` to \`T | null\`. Combine with
+     * \`.optional()\` to accept both \`null\` and \`undefined\`.
+     */
+    nullable(): any;
+    /**
+     * Removes the nullable mark — \`null\` is no longer accepted as a valid
+     * value. This is the counterpart of \`.nullable()\`.
+     */
+    notNullable(): any;
     /**
      * Sets a default value for this schema. When the input is \`undefined\`,
      * the default value is used instead. The default is still validated
@@ -3202,12 +3305,12 @@ type StringSchemaBuilderCreateProps<T = string, R extends boolean = true> = Part
  *
  * @see {@link string}
  */
-export declare class StringSchemaBuilder<TResult = string, TRequired extends boolean = true, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+export declare class StringSchemaBuilder<TResult = string, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: StringSchemaBuilderCreateProps): StringSchemaBuilder<string, true, false, {}>;
+    static create(props: StringSchemaBuilderCreateProps): StringSchemaBuilder<string, true, false, false, {}>;
     protected constructor(props: StringSchemaBuilderCreateProps);
     introspect(): {
         /**
@@ -3218,7 +3321,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
          * Min length validation error message provider.
          * If not provided, default error message will be used.
          */
-        minLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, {}>>;
+        minLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Max length of the string (if defined).
          */
@@ -3227,7 +3330,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
          * Max length validation error message provider.
          * If not provided, default error message will be used.
          */
-        maxLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, {}>>;
+        maxLengthValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * If set, restrict object to be equal to a certain value.
          */
@@ -3236,7 +3339,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
          * Equals validation error message provider.
          * If not provided, default error message will be used.
          */
-        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, {}>>;
+        equalsToValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * If set, restrict string to start with a certain value.
          */
@@ -3245,7 +3348,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
          * Starts with validation error message provider.
          * If not provided, default error message will be used.
          */
-        startsWithValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, {}>>;
+        startsWithValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * If set, restrict string to end with a certain value.
          */
@@ -3254,7 +3357,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
          * Ends with validation error message provider.
          * If not provided, default error message will be used.
          */
-        endsWithValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, {}>>;
+        endsWithValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * If set, restrict string to match a certain regular expression.
          */
@@ -3263,7 +3366,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
          * Matches validation error message provider.
          * If not provided, default error message will be used.
          */
-        matchesValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, {}>>;
+        matchesValidationErrorMessageProvider: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired, false, false, {}>>;
         /**
          * Array of preprocessor functions
          */
@@ -3274,8 +3377,9 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
         validators: ValidatorEntry<TResult>[];
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -3288,11 +3392,11 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): StringSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): StringSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): StringSchemaBuilder<string, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): StringSchemaBuilder<string, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -3317,33 +3421,41 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<T, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<T, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancels \`equals()\` call.
      */
-    clearEquals(): StringSchemaBuilder<string, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearEquals(): StringSchemaBuilder<string, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): StringSchemaBuilder<TResult, true, THasDefault, TExtensions> & TExtensions;
+    nullable(): StringSchemaBuilder<TResult, TRequired, true, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): StringSchemaBuilder<TResult, false, THasDefault, TExtensions> & TExtensions;
+    notNullable(): StringSchemaBuilder<TResult, TRequired, false, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): StringSchemaBuilder<TResult, true, true, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): StringSchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): StringSchemaBuilder<TResult, TRequired, false, TExtensions> & TExtensions;
+    optional(): StringSchemaBuilder<TResult, false, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): StringSchemaBuilder<TResult, true, TNullable, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): StringSchemaBuilder<TResult, TRequired, TNullable, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
     brand<TBrand extends string | symbol>(_name?: TBrand): StringSchemaBuilder<TResult & {
         readonly [K in BRAND]: TBrand;
-    }, TRequired, THasDefault, TExtensions> & TExtensions;
+    }, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Marks the inferred type as \`Readonly<string>\`. Since strings are
      * already immutable this is an identity operation, but it sets the
@@ -3351,7 +3463,7 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): StringSchemaBuilder<Readonly<TResult>, TRequired, THasDefault, TExtensions> & TExtensions;
+    readonly(): StringSchemaBuilder<Readonly<TResult>, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Set minimal length of the valid value for schema.
      * @param length minimum string length
@@ -3360,11 +3472,11 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancel \`minLength()\` call.
      */
-    clearMinLength(): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearMinLength(): StringSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Set maximal length of the valid value for schema.
      * @param length maximum string length
@@ -3373,11 +3485,11 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancel \`maxLength()\` call.
      */
-    clearMaxLength(): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearMaxLength(): StringSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Restricts string to start with \`val\`.
      */
@@ -3385,11 +3497,11 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult extends string ? \`\${T}\${TResult}\` : TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult extends string ? \`\${T}\${TResult}\` : TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancels \`startsWith()\` call.
      */
-    clearStartsWith(): StringSchemaBuilder<string, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearStartsWith(): StringSchemaBuilder<string, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Restricts string to end with \`val\`.
      */
@@ -3397,11 +3509,11 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult extends string ? \`\${TResult}\${T}\` : TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult extends string ? \`\${TResult}\${T}\` : TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancels \`endsWith()\` call.
      */
-    clearEndsWith(): StringSchemaBuilder<string, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearEndsWith(): StringSchemaBuilder<string, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Restricts string to match \`regexp\`.
      * @param regexp regular expression pattern to match against
@@ -3410,11 +3522,11 @@ export declare class StringSchemaBuilder<TResult = string, TRequired extends boo
     /**
      * Custom error message provider.
      */
-    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder<TResult, TRequired>>): StringSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Cancels \`matches()\` call.
      */
-    clearMatches(): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> & TExtensions;
+    clearMatches(): StringSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a string schema restricted to be equal to \`equals\`.
@@ -3439,15 +3551,15 @@ import type { UnionSchemaBuilder, UnionSchemaValidationResult } from './UnionSch
  * object schema elements get \`ObjectSchemaValidationResult\`,
  * other types get \`ValidationResult\`.
  */
-export type TupleElementValidationResults<TElements extends readonly SchemaBuilder<any, any, any>[]> = {
-    [K in keyof TElements]: TElements[K] extends UnionSchemaBuilder<infer UOptions extends readonly SchemaBuilder<any, any, any>[], any, any> ? UnionSchemaValidationResult<InferType<TElements[K]>, UOptions> : TElements[K] extends ObjectSchemaBuilder<any, any, any, any, any> ? ObjectSchemaValidationResult<InferType<TElements[K]>, TElements[K]> : ValidationResult<InferType<TElements[K]>>;
+export type TupleElementValidationResults<TElements extends readonly SchemaBuilder<any, any, any, any, any>[]> = {
+    [K in keyof TElements]: TElements[K] extends UnionSchemaBuilder<infer UOptions extends readonly SchemaBuilder<any, any, any, any, any>[], any, any> ? UnionSchemaValidationResult<InferType<TElements[K]>, UOptions> : TElements[K] extends ObjectSchemaBuilder<any, any, any, any, any> ? ObjectSchemaValidationResult<InferType<TElements[K]>, TElements[K]> : ValidationResult<InferType<TElements[K]>>;
 };
 /**
  * Validation result type returned by \`TupleSchemaBuilder.validate()\`.
  * Extends \`ValidationResult\` with \`getNestedErrors\` for root-level tuple
  * errors and per-position validation results.
  */
-export type TupleSchemaValidationResult<TResult, TElements extends readonly SchemaBuilder<any, any, any>[]> = ValidationResult<TResult> & {
+export type TupleSchemaValidationResult<TResult, TElements extends readonly SchemaBuilder<any, any, any, any, any>[]> = ValidationResult<TResult> & {
     /**
      * Returns root-level tuple validation errors combined with
      * per-position validation results.
@@ -3457,7 +3569,7 @@ export type TupleSchemaValidationResult<TResult, TElements extends readonly Sche
      */
     getNestedErrors(): TupleElementValidationResults<TElements> & NestedValidationResult<any, any, any>;
 };
-type TupleSchemaBuilderCreateProps<TElements extends readonly SchemaBuilder<any, any, any>[], TRestSchema extends SchemaBuilder<any, any, any> | undefined = undefined, R extends boolean = true> = Partial<ReturnType<TupleSchemaBuilder<TElements, R, undefined, false, {}, TRestSchema>['introspect']>>;
+type TupleSchemaBuilderCreateProps<TElements extends readonly SchemaBuilder<any, any, any, any, any>[], TRestSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, R extends boolean = true, N extends boolean = false> = Partial<ReturnType<TupleSchemaBuilder<TElements, R, N, undefined, false, {}, TRestSchema>['introspect']>>;
 /**
  * Fixed-length array schema builder with per-position type validation.
  * Similar to TypeScript's tuple types — each element at a specific array index
@@ -3508,28 +3620,28 @@ type TupleSchemaBuilderCreateProps<TElements extends readonly SchemaBuilder<any,
  *
  * @see {@link tuple}
  */
-export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder<any, any, any>[], TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TRestSchema extends SchemaBuilder<any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? TRestSchema extends SchemaBuilder<any, any, any> ? [
+export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder<any, any, any, any, any>[], TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TRestSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? TRestSchema extends SchemaBuilder<any, any, any, any, any> ? [
     ...{
         [K in keyof TElements]: InferType<TElements[K]>;
     },
     ...Array<InferType<TRestSchema>>
 ] : {
     [K in keyof TElements]: InferType<TElements[K]>;
-} : TExplicitType> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+} : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: TupleSchemaBuilderCreateProps<any, any, any>): TupleSchemaBuilder<readonly SchemaBuilder<any, any, any, {}>[], true, undefined, false, {}, undefined, readonly any[]>;
-    protected constructor(props: TupleSchemaBuilderCreateProps<TElements, TRestSchema, TRequired>);
+    static create(props: TupleSchemaBuilderCreateProps<any, any, any, any>): TupleSchemaBuilder<readonly SchemaBuilder<any, any, any, any, any>[], true, false, undefined, false, {}, undefined, readonly any[]>;
+    protected constructor(props: TupleSchemaBuilderCreateProps<TElements, TRestSchema, TRequired, TNullable>);
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): TupleSchemaBuilder<TElements, true, T, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    hasType<T>(_notUsed?: T): TupleSchemaBuilder<TElements, true, TNullable, T, THasDefault, TExtensions, TRestSchema> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): TupleSchemaBuilder<TElements, TRequired, undefined, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    clearHasType(): TupleSchemaBuilder<TElements, TRequired, TNullable, undefined, THasDefault, TExtensions, TRestSchema> & TExtensions;
     /**
      * Performs synchronous validation of the schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
      */
@@ -3557,23 +3669,23 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): TupleSchemaBuilder<TElements, true, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): TupleSchemaBuilder<TElements, true, TNullable, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
     /**
      * @hidden
      */
-    optional(): TupleSchemaBuilder<TElements, false, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    optional(): TupleSchemaBuilder<TElements, false, TNullable, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): TupleSchemaBuilder<TElements, true, TExplicitType, true, TExtensions, TRestSchema> & TExtensions;
+    default(value: TResult | (() => TResult)): TupleSchemaBuilder<TElements, true, TNullable, TExplicitType, true, TExtensions, TRestSchema> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): TupleSchemaBuilder<TElements, TRequired, TExplicitType, false, TExtensions, TRestSchema> & TExtensions;
+    clearDefault(): TupleSchemaBuilder<TElements, TRequired, TNullable, TExplicitType, false, TExtensions, TRestSchema> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): TupleSchemaBuilder<TElements, TRequired, TResult & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): TupleSchemaBuilder<TElements, TRequired, TNullable, TResult & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions, TRestSchema> & TExtensions;
     introspect(): {
@@ -3586,13 +3698,14 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
          * When set, additional elements are validated against this schema.
          * Mirrors TypeScript's rest element syntax: \`[string, number, ...boolean[]]\`.
          */
-        restSchema: (TRestSchema & SchemaBuilder<any, any, any, {}>) | undefined;
+        restSchema: (TRestSchema & SchemaBuilder<any, any, any, any, any>) | undefined;
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -3623,12 +3736,20 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
      * schema.validate(['hello', 42, 'extra']);       // invalid — 'extra' not boolean
      * \`\`\`
      */
-    rest<TSchema extends SchemaBuilder<any, any, any>>(schema: TSchema): TupleSchemaBuilder<TElements, TRequired, TExplicitType, THasDefault, TExtensions, TSchema> & TExtensions;
+    rest<TSchema extends SchemaBuilder<any, any, any, any, any>>(schema: TSchema): TupleSchemaBuilder<TElements, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TSchema> & TExtensions;
     /**
      * Removes the rest schema set by \`rest()\`. After this call, the tuple
      * length must be exactly equal to the number of fixed element schemas.
      */
-    clearRest(): TupleSchemaBuilder<TElements, TRequired, TExplicitType, THasDefault, TExtensions, undefined> & TExtensions;
+    clearRest(): TupleSchemaBuilder<TElements, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, undefined> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): TupleSchemaBuilder<TElements, TRequired, true, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): TupleSchemaBuilder<TElements, TRequired, false, TExplicitType, THasDefault, TExtensions, TRestSchema> & TExtensions;
 }
 /**
  * Creates a fixed-length array schema (tuple) where each element at a
@@ -3666,12 +3787,12 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
  *     .default(() => ['', 0]);
  * \`\`\`
  */
-export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => TupleSchemaBuilder<TElements, true>;
+export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => TupleSchemaBuilder<TElements, true>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/UnionSchemaBuilder.d.ts": `import type { ObjectSchemaBuilder, ObjectSchemaValidationResult } from './ObjectSchemaBuilder.js';
 import { type BRAND, type InferType, type NestedValidationResult, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
-type UnionSchemaBuilderCreateProps<T extends readonly SchemaBuilder<any, any, any>[], R extends boolean = true> = Partial<ReturnType<UnionSchemaBuilder<T, R>['introspect']>>;
+type UnionSchemaBuilderCreateProps<T extends readonly SchemaBuilder<any, any, any, any, any>[], R extends boolean = true> = Partial<ReturnType<UnionSchemaBuilder<T, R>['introspect']>>;
 /**
  * Mapped tuple type that converts a tuple of SchemaBuilder options into
  * a tuple of their corresponding validation results.
@@ -3679,15 +3800,15 @@ type UnionSchemaBuilderCreateProps<T extends readonly SchemaBuilder<any, any, an
  * \`getNestedErrors\` navigation; object schema options get
  * \`ObjectSchemaValidationResult\`; other types get \`ValidationResult\`.
  */
-export type OptionValidationResults<TOptions extends readonly SchemaBuilder<any, any, any>[]> = {
-    [K in keyof TOptions]: TOptions[K] extends UnionSchemaBuilder<infer UOptions extends readonly SchemaBuilder<any, any, any>[], any, any> ? UnionSchemaValidationResult<InferType<TOptions[K]>, UOptions> : TOptions[K] extends ObjectSchemaBuilder<any, any, any, any> ? ObjectSchemaValidationResult<InferType<TOptions[K]>, TOptions[K]> : ValidationResult<InferType<TOptions[K]>>;
+export type OptionValidationResults<TOptions extends readonly SchemaBuilder<any, any, any, any, any>[]> = {
+    [K in keyof TOptions]: TOptions[K] extends UnionSchemaBuilder<infer UOptions extends readonly SchemaBuilder<any, any, any, any, any>[], any, any> ? UnionSchemaValidationResult<InferType<TOptions[K]>, UOptions> : TOptions[K] extends ObjectSchemaBuilder<any, any, any, any> ? ObjectSchemaValidationResult<InferType<TOptions[K]>, TOptions[K]> : ValidationResult<InferType<TOptions[K]>>;
 };
 /**
  * Validation result type returned by \`UnionSchemaBuilder.validate()\`.
  * Extends \`ValidationResult\` with:
  * - \`getNestedErrors\` for root-level union errors and per-branch validation results
  */
-export type UnionSchemaValidationResult<T, TOptions extends readonly SchemaBuilder<any, any, any>[]> = ValidationResult<T> & {
+export type UnionSchemaValidationResult<T, TOptions extends readonly SchemaBuilder<any, any, any, any, any>[]> = ValidationResult<T> & {
     /**
      * Returns root-level union validation errors combined with
      * per-branch validation results.
@@ -3697,19 +3818,19 @@ export type UnionSchemaValidationResult<T, TOptions extends readonly SchemaBuild
      */
     getNestedErrors(): OptionValidationResults<TOptions> & NestedValidationResult<any, any, any>;
 };
-type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any, any>[]> = TArr['length'] extends 1 ? InferType<TArr[0]> : TArr extends readonly [
-    infer TFirst extends SchemaBuilder<any, any, any>,
-    ...infer TRest extends SchemaBuilder<any, any, any>[]
+type SchemaArrayToUnion<TArr extends readonly SchemaBuilder<any, any, any, any, any>[]> = TArr['length'] extends 1 ? InferType<TArr[0]> : TArr extends readonly [
+    infer TFirst extends SchemaBuilder<any, any, any, any, any>,
+    ...infer TRest extends SchemaBuilder<any, any, any, any, any>[]
 ] ? InferType<TFirst> | SchemaArrayToUnion<[...TRest]> : never;
-type TakeBeforeIndex<TArr extends readonly SchemaBuilder<any, any, any>[], TIndex extends number> = TArr extends [
-    ...infer TRest extends SchemaBuilder<any, any, any>[],
-    infer _ extends SchemaBuilder<any, any, any>
+type TakeBeforeIndex<TArr extends readonly SchemaBuilder<any, any, any, any, any>[], TIndex extends number> = TArr extends [
+    ...infer TRest extends SchemaBuilder<any, any, any, any, any>[],
+    infer _ extends SchemaBuilder<any, any, any, any, any>
 ] ? TRest['length'] extends TIndex ? TRest : TakeBeforeIndex<TRest, TIndex> : never;
-type TakeAfterIndex<TArr extends readonly SchemaBuilder<any, any, any>[], TIndex extends number, TAcc extends readonly SchemaBuilder<any, any, any>[] = []> = TArr extends [
-    ...infer TRest extends SchemaBuilder<any, any, any>[],
-    infer TLast extends SchemaBuilder<any, any, any>
+type TakeAfterIndex<TArr extends readonly SchemaBuilder<any, any, any, any, any>[], TIndex extends number, TAcc extends readonly SchemaBuilder<any, any, any, any, any>[] = []> = TArr extends [
+    ...infer TRest extends SchemaBuilder<any, any, any, any, any>[],
+    infer TLast extends SchemaBuilder<any, any, any, any, any>
 ] ? TRest['length'] extends TIndex ? TAcc : TakeAfterIndex<TRest, TIndex, [TLast, ...TAcc]> : never;
-type TakeExceptIndex<TArr extends readonly SchemaBuilder<any, any, any>[], TIndex extends number> = [...TakeBeforeIndex<TArr, TIndex>, ...TakeAfterIndex<TArr, TIndex>];
+type TakeExceptIndex<TArr extends readonly SchemaBuilder<any, any, any, any, any>[], TIndex extends number> = [...TakeBeforeIndex<TArr, TIndex>, ...TakeAfterIndex<TArr, TIndex>];
 /**
  * Union schema builder class. Allows to create schemas
  * containing alternatives. E.g. string | number | Date.
@@ -3760,12 +3881,12 @@ type TakeExceptIndex<TArr extends readonly SchemaBuilder<any, any, any>[], TInde
  *
  * @see {@link union}
  */
-export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<any, any, any>[], TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TRequired, THasDefault, TExtensions> {
+export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<any, any, any, any, any>[], TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: UnionSchemaBuilderCreateProps<any>): UnionSchemaBuilder<any, true, undefined, false, {}>;
+    static create(props: UnionSchemaBuilderCreateProps<any>): UnionSchemaBuilder<any, true, false, undefined, false, {}>;
     protected constructor(props: UnionSchemaBuilderCreateProps<TOptions, TRequired>);
     introspect(): {
         /**
@@ -3774,10 +3895,11 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
         options: TOptions;
         type: string;
         isRequired: boolean;
+        isNullable: boolean;
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>[];
-        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
@@ -3798,11 +3920,11 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): UnionSchemaBuilder<TOptions, true, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): UnionSchemaBuilder<TOptions, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): UnionSchemaBuilder<TOptions, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): UnionSchemaBuilder<TOptions, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
     /**
      * Performs synchronous validation of the union schema over \`object\`. {@inheritDoc SchemaBuilder.validate}
      */
@@ -3823,69 +3945,77 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
      * @param context Optional \`ValidationContext\` settings.
      */
     protected _validateAsync(object: TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, context?: ValidationContext): Promise<UnionSchemaValidationResult<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType, TOptions>>;
-    protected createFromProps<T extends readonly SchemaBuilder<any, any, any>[], TReq extends boolean>(props: UnionSchemaBuilderCreateProps<T, TReq>): this;
+    protected createFromProps<T extends readonly SchemaBuilder<any, any, any, any, any>[], TReq extends boolean>(props: UnionSchemaBuilderCreateProps<T, TReq>): this;
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): UnionSchemaBuilder<TOptions, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): UnionSchemaBuilder<TOptions, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    optional(): UnionSchemaBuilder<TOptions, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): UnionSchemaBuilder<TOptions, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    default(value: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType)): UnionSchemaBuilder<TOptions, true, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType)): UnionSchemaBuilder<TOptions, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): UnionSchemaBuilder<TOptions, TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): UnionSchemaBuilder<TOptions, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    brand<TBrand extends string | symbol>(_name?: TBrand): UnionSchemaBuilder<TOptions, TRequired, (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) & {
+    brand<TBrand extends string | symbol>(_name?: TBrand): UnionSchemaBuilder<TOptions, TRequired, TNullable, (TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType) & {
         readonly [K in BRAND]: TBrand;
     }, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
-    readonly(): UnionSchemaBuilder<TOptions, TRequired, Readonly<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
+    readonly(): UnionSchemaBuilder<TOptions, TRequired, TNullable, Readonly<TExplicitType extends undefined ? SchemaArrayToUnion<TOptions> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
     /**
      * Adds a new schema option described by \`schema\`.
      * schema must be an instance of \`SchemaBuilder\` class ancestor.
      * @param schema schema to be added as an option.
      */
-    or<T extends SchemaBuilder<any, any, any>>(schema: T): UnionSchemaBuilder<[
+    or<T extends SchemaBuilder<any, any, any, any, any>>(schema: T): UnionSchemaBuilder<[
         ...TOptions,
         T
-    ], TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    ], TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Removes option by its \`index\`. If \`index\` is out of bounds,
      * an error is thrown.
      * @param index index of the option, starting from \`0\`.
      */
-    removeOption<T extends number>(index: T): UnionSchemaBuilder<TakeExceptIndex<TOptions, T>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    removeOption<T extends number>(index: T): UnionSchemaBuilder<TakeExceptIndex<TOptions, T>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * Removes first option from the union schema.
      */
     removeFirstOption(): TOptions extends [
         infer _,
-        ...infer TRest extends SchemaBuilder<any, any, any>[]
-    ] ? UnionSchemaBuilder<TRest, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
+        ...infer TRest extends SchemaBuilder<any, any, any, any, any>[]
+    ] ? UnionSchemaBuilder<TRest, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
     /**
      * Removes all options and replaces them by single \`schema\` option.
      * Equivalent to \`union(schema)\` function, but could be useful in some cases.
      * @param schema schema to be added as a single option to the new schema.
      */
-    reset<T extends SchemaBuilder<any, any, any>>(schema: T): UnionSchemaBuilder<[
+    reset<T extends SchemaBuilder<any, any, any, any, any>>(schema: T): UnionSchemaBuilder<[
         T
-    ], TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    ], TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): UnionSchemaBuilder<TOptions, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): UnionSchemaBuilder<TOptions, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
 }
 /**
  * Creates a union schema.
  * @param schema required and will be considered as a first option for the union schema.
  */
-export declare const union: <T extends SchemaBuilder<any, any, any>>(schema: T) => UnionSchemaBuilder<[T]>;
+export declare const union: <T extends SchemaBuilder<any, any, any, any, any>>(schema: T) => UnionSchemaBuilder<[T]>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/core.d.ts": `export { AnySchemaBuilder, any } from './builders/AnySchemaBuilder.js';
@@ -3995,17 +4125,17 @@ import { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
  * @internal Not exported — used only by the extension type machinery.
  */
 type BuilderMap = {
-    string: StringSchemaBuilder<any, any, any, any>;
-    number: NumberSchemaBuilder<any, any, any, any>;
-    boolean: BooleanSchemaBuilder<any, any, any, any, any, any>;
-    date: DateSchemaBuilder<any, any, any, any>;
-    object: ObjectSchemaBuilder<any, any, any, any, any>;
-    array: ArraySchemaBuilder<any, any, any, any, any, any>;
-    tuple: TupleSchemaBuilder<any, any, any, any, any, any>;
-    record: RecordSchemaBuilder<any, any, any, any, any, any>;
-    union: UnionSchemaBuilder<any, any, any, any, any>;
+    string: StringSchemaBuilder<any, any, any, any, any>;
+    number: NumberSchemaBuilder<any, any, any, any, any>;
+    boolean: BooleanSchemaBuilder<any, any, any, any, any, any, any>;
+    date: DateSchemaBuilder<any, any, any, any, any>;
+    object: ObjectSchemaBuilder<any, any, any, any, any, any>;
+    array: ArraySchemaBuilder<any, any, any, any, any, any, any>;
+    tuple: TupleSchemaBuilder<any, any, any, any, any, any, any>;
+    record: RecordSchemaBuilder<any, any, any, any, any, any, any>;
+    union: UnionSchemaBuilder<any, any, any, any, any, any>;
     func: FunctionSchemaBuilder<any, any, any, any, any>;
-    any: AnySchemaBuilder<any, any, any, any, any>;
+    any: AnySchemaBuilder<any, any, any, any, any, any>;
 };
 type BuilderTypeName = keyof BuilderMap;
 /**
@@ -4088,7 +4218,7 @@ type MergeExtensionMethods<TExts extends readonly ExtensionDescriptor<any>[], TT
  * Intersected onto consumer-facing builder types to make \`withExtension\`
  * and \`getExtension\` uncallable (\`never\`). Using an intersection instead
  * of \`Omit\` preserves the class identity so extended builders remain
- * assignable to \`SchemaBuilder<any, any, any>\`.
+ * assignable to \`SchemaBuilder<any, any, any, any, any>\`.
  */
 export type HiddenExtensionMethods = {
     /** @internal Extension-author only — use inside \`defineExtension()\`. */
@@ -4116,22 +4246,22 @@ export type FixedMethods<TRawMethods, TBase> = {
  */
 export type CleanExtended<TBuilder, TExt> = TBuilder & FixedMethods<TExt, TBuilder> & HiddenExtensionMethods;
 type ExtendedStringFactory<TExt> = {
-    (): CleanExtended<StringSchemaBuilder<string, true, false, TExt>, TExt>;
-    <T extends string>(equals: T): CleanExtended<StringSchemaBuilder<T, true, false, TExt>, TExt>;
+    (): CleanExtended<StringSchemaBuilder<string, true, false, false, TExt>, TExt>;
+    <T extends string>(equals: T): CleanExtended<StringSchemaBuilder<T, true, false, false, TExt>, TExt>;
 };
 type ExtendedNumberFactory<TExt> = {
-    (): CleanExtended<NumberSchemaBuilder<number, true, false, TExt>, TExt>;
-    <T extends number>(equals: T): CleanExtended<NumberSchemaBuilder<T, true, false, TExt>, TExt>;
+    (): CleanExtended<NumberSchemaBuilder<number, true, false, false, TExt>, TExt>;
+    <T extends number>(equals: T): CleanExtended<NumberSchemaBuilder<T, true, false, false, TExt>, TExt>;
 };
-type ExtendedBooleanFactory<TExt> = () => CleanExtended<BooleanSchemaBuilder<boolean, true, undefined, false, TExt>, TExt>;
-type ExtendedDateFactory<TExt> = () => CleanExtended<DateSchemaBuilder<Date, true, false, TExt>, TExt>;
-type ExtendedObjectFactory<TExt> = <P extends Record<string, SchemaBuilder<any, any, any>>>(properties?: P) => CleanExtended<ObjectSchemaBuilder<P, true, undefined, false, TExt>, TExt>;
-type ExtendedArrayFactory<TExt> = <TElementSchema extends SchemaBuilder<any, any, any>>(elementSchema?: TElementSchema) => CleanExtended<ArraySchemaBuilder<TElementSchema, true, undefined, false, TExt>, TExt>;
-type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any>>(schema: T) => CleanExtended<UnionSchemaBuilder<[T], true, undefined, false, TExt>, TExt>;
-type ExtendedFuncFactory<TExt> = () => CleanExtended<FunctionSchemaBuilder<true, undefined, false, TExt>, TExt>;
-type ExtendedAnyFactory<TExt> = () => CleanExtended<AnySchemaBuilder<true, undefined, false, TExt>, TExt>;
-type ExtendedTupleFactory<TExt> = <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => CleanExtended<TupleSchemaBuilder<TElements, true, undefined, false, TExt>, TExt>;
-type ExtendedRecordFactory<TExt> = <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => CleanExtended<RecordSchemaBuilder<TKeySchema, TValueSchema, true, undefined, false, TExt>, TExt>;
+type ExtendedBooleanFactory<TExt> = () => CleanExtended<BooleanSchemaBuilder<boolean, true, false, undefined, false, TExt>, TExt>;
+type ExtendedDateFactory<TExt> = () => CleanExtended<DateSchemaBuilder<Date, true, false, false, TExt>, TExt>;
+type ExtendedObjectFactory<TExt> = <P extends Record<string, SchemaBuilder<any, any, any, any, any>>>(properties?: P) => CleanExtended<ObjectSchemaBuilder<P, true, false, undefined, false, TExt>, TExt>;
+type ExtendedArrayFactory<TExt> = <TElementSchema extends SchemaBuilder<any, any, any, any, any>>(elementSchema?: TElementSchema) => CleanExtended<ArraySchemaBuilder<TElementSchema, true, false, undefined, false, TExt>, TExt>;
+type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any, any, any>>(schema: T) => CleanExtended<UnionSchemaBuilder<[T], true, false, undefined, false, TExt>, TExt>;
+type ExtendedFuncFactory<TExt> = () => CleanExtended<FunctionSchemaBuilder<true, false, undefined, false, TExt>, TExt>;
+type ExtendedAnyFactory<TExt> = () => CleanExtended<AnySchemaBuilder<true, false, undefined, false, TExt>, TExt>;
+type ExtendedTupleFactory<TExt> = <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => CleanExtended<TupleSchemaBuilder<TElements, true, false, undefined, false, TExt>, TExt>;
+type ExtendedRecordFactory<TExt> = <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => CleanExtended<RecordSchemaBuilder<TKeySchema, TValueSchema, true, false, undefined, false, TExt>, TExt>;
 /**
  * The return type of {@link withExtensions}.
  *
@@ -4338,9 +4468,8 @@ export {};
 import type { ArraySchemaBuilder } from '../builders/ArraySchemaBuilder.js';
 import type { SchemaBuilder, ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
-import type { NullableMethod, NullableReturn } from './nullable.js';
 /** Return type shared by every method on {@link ArrayBuiltinExtensions}. */
-type ArrayExtReturn<TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & NullableMethod<ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>>> & HiddenExtensionMethods;
+type ArrayExtReturn<TElementSchema extends SchemaBuilder<any, any, any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, false, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & HiddenExtensionMethods;
 /**
  * Methods added to \`ArraySchemaBuilder\` by the built-in array extension pack.
  *
@@ -4353,7 +4482,7 @@ type ArrayExtReturn<TElementSchema extends SchemaBuilder<any, any, any> = Schema
  *
  * @see https://github.com/microsoft/TypeScript/issues/50715
  */
-export interface ArrayBuiltinExtensions<TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> {
+export interface ArrayBuiltinExtensions<TElementSchema extends SchemaBuilder<any, any, any, any, any> = SchemaBuilder<any, any, any>> {
     /**
      * Validates that the array contains at least one element.
      *
@@ -4385,8 +4514,6 @@ export interface ArrayBuiltinExtensions<TElementSchema extends SchemaBuilder<any
      * \`\`\`
      */
     unique(keyFn?: (item: any) => unknown, errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>): ArrayExtReturn<TElementSchema>;
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>>>;
 }
 /**
  * Extension descriptor that adds common array validators
@@ -4417,7 +4544,7 @@ export declare const arrayExtensions: import("../extension.js").ExtensionDescrip
          * array().nonempty('At least one item required');
          * \`\`\`
          */
-        nonempty(this: ArraySchemaBuilder<any>, errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>): ArraySchemaBuilder<any, true, undefined, false, {}, any[] | unknown[]>;
+        nonempty(this: ArraySchemaBuilder<any>, errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>): ArraySchemaBuilder<any, true, false, undefined, false, {}, any[] | unknown[]>;
         /**
          * Validates that all elements in the array are unique.
          *
@@ -4435,7 +4562,7 @@ export declare const arrayExtensions: import("../extension.js").ExtensionDescrip
          * array().unique(undefined, 'No duplicates allowed');
          * \`\`\`
          */
-        unique(this: ArraySchemaBuilder<any>, keyFn?: (item: any) => unknown, errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>): ArraySchemaBuilder<any, true, undefined, false, {}, any[] | unknown[]>;
+        unique(this: ArraySchemaBuilder<any>, keyFn?: (item: any) => unknown, errorMessage?: ValidationErrorMessageProvider<ArraySchemaBuilder<any>>): ArraySchemaBuilder<any, true, false, undefined, false, {}, any[] | unknown[]>;
     };
 }>;
 export {};
@@ -4460,11 +4587,10 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
-import type { NullableMethod } from './nullable.js';
 /** Return type for \`.oneOf()\` on \`StringSchemaBuilder\`. */
-type StringOneOfReturn<T extends string = string> = StringSchemaBuilder<T, true, false, StringOneOfExtension> & StringOneOfExtension & NullableMethod<StringSchemaBuilder<T, true, false, StringOneOfExtension>> & HiddenExtensionMethods;
+type StringOneOfReturn<T extends string = string> = StringSchemaBuilder<T, true, false, false, StringOneOfExtension> & StringOneOfExtension & HiddenExtensionMethods;
 /** Return type for \`.oneOf()\` on \`NumberSchemaBuilder\`. */
-type NumberOneOfReturn<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberOneOfExtension> & NumberOneOfExtension & NullableMethod<NumberSchemaBuilder<T, true, false, NumberOneOfExtension>> & HiddenExtensionMethods;
+type NumberOneOfReturn<T extends number = number> = NumberSchemaBuilder<T, true, false, false, NumberOneOfExtension> & NumberOneOfExtension & HiddenExtensionMethods;
 /**
  * \`.oneOf()\` method added to \`StringSchemaBuilder\` by the built-in enum
  * extension pack.
@@ -4500,6 +4626,22 @@ export interface StringOneOfExtension {
      * \`\`\`
      */
     oneOf<V extends string>(...values: [V, ...V[]]): StringOneOfReturn<V>;
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * A trailing \`string\` or function argument is unambiguously the error
+     * message when using rest-param form.
+     *
+     * @example
+     * \`\`\`ts
+     * const role = string().oneOf('admin', 'user', (val) => \`"\${val}" is not allowed\`);
+     * \`\`\`
+     */
+    oneOf<V extends string>(...args: [
+        ...[V, ...V[]],
+        ValidationErrorMessageProvider<StringSchemaBuilder>
+    ]): StringOneOfReturn<V>;
     /**
      * Constrains the string to one of the specified literal values,
      * with an optional custom error message or factory.
@@ -4608,10 +4750,10 @@ export interface NumberOneOfExtension {
  */
 export declare const enumExtension: import("../extension.js").ExtensionDescriptor<{
     string: {
-        oneOf(this: StringSchemaBuilder, ...args: any[]): StringSchemaBuilder<string, true, false, {}>;
+        oneOf(this: StringSchemaBuilder, ...args: any[]): StringSchemaBuilder<string, true, false, false, {}>;
     };
     number: {
-        oneOf(this: NumberSchemaBuilder, ...args: any[]): NumberSchemaBuilder<number, true, false, {}>;
+        oneOf(this: NumberSchemaBuilder, ...args: any[]): NumberSchemaBuilder<number, true, false, false, {}>;
     };
 }>;
 export {};
@@ -4620,7 +4762,7 @@ export {};
  * Pre‑wired extension pack for \`@cleverbrush/schema\`.
  *
  * Combines {@link stringExtensions}, {@link numberExtensions},
- * {@link arrayExtensions}, and {@link nullableExtension} via
+ * and {@link arrayExtensions} via
  * \`withExtensions()\` and re‑exports the augmented factory functions.
  *
  * The default \`@cleverbrush/schema\` entry point re‑exports these
@@ -4643,37 +4785,33 @@ import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import type { ArrayBuiltinExtensions } from './array.js';
-import type { NumberOneOfExtension, StringOneOfExtension } from './enum.js';
-import type { AnyBuiltinExtensions, BooleanBuiltinExtensions, DateBuiltinExtensions, FuncBuiltinExtensions, ObjectBuiltinExtensions, RecordBuiltinExtensions, TupleBuiltinExtensions, UnionBuiltinExtensions } from './nullable.js';
 import type { NumberBuiltinExtensions } from './number.js';
 import type { StringBuiltinExtensions } from './string.js';
 export { type ArrayBuiltinExtensions, arrayExtensions } from './array.js';
-export { enumExtension, type NumberOneOfExtension, type StringOneOfExtension } from './enum.js';
-export { type AnyBuiltinExtensions, type BooleanBuiltinExtensions, type DateBuiltinExtensions, type FuncBuiltinExtensions, type NullableMethod, type NullableReturn, nullableExtension, type ObjectBuiltinExtensions, type RecordBuiltinExtensions, type TupleBuiltinExtensions, type UnionBuiltinExtensions } from './nullable.js';
-export { type NumberBuiltinExtensions, numberExtensions } from './number.js';
-export { type StringBuiltinExtensions, stringExtensions } from './string.js';
+export { type NumberBuiltinExtensions, type NumberOneOfExtension, numberExtensions } from './number.js';
+export { type StringBuiltinExtensions, type StringOneOfExtension, stringExtensions } from './string.js';
 /** A \`StringSchemaBuilder\` with built-in extension methods. */
-export type ExtendedString<T extends string = string> = StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T> & StringOneOfExtension> & StringBuiltinExtensions<T> & StringOneOfExtension & HiddenExtensionMethods;
+export type ExtendedString<T extends string = string> = StringSchemaBuilder<T, true, false, false, StringBuiltinExtensions<T>> & StringBuiltinExtensions<T> & HiddenExtensionMethods;
 /** A \`NumberSchemaBuilder\` with built-in extension methods. */
-export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T> & NumberOneOfExtension> & NumberBuiltinExtensions<T> & NumberOneOfExtension & HiddenExtensionMethods;
+export type ExtendedNumber<T extends number = number> = NumberSchemaBuilder<T, true, false, false, NumberBuiltinExtensions<T>> & NumberBuiltinExtensions<T> & HiddenExtensionMethods;
 /** An \`ArraySchemaBuilder\` with built-in extension methods. */
-export type ExtendedArray<TElementSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & HiddenExtensionMethods;
+export type ExtendedArray<TElementSchema extends SchemaBuilder<any, any, any, any, any> = SchemaBuilder<any, any, any>> = ArraySchemaBuilder<TElementSchema, true, false, undefined, false, ArrayBuiltinExtensions<TElementSchema>> & ArrayBuiltinExtensions<TElementSchema> & HiddenExtensionMethods;
 /** A \`BooleanSchemaBuilder\` with built-in extension methods. */
-export type ExtendedBoolean = BooleanSchemaBuilder<boolean, true, undefined, false, BooleanBuiltinExtensions> & BooleanBuiltinExtensions & HiddenExtensionMethods;
+export type ExtendedBoolean = BooleanSchemaBuilder<boolean, true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`DateSchemaBuilder\` with built-in extension methods. */
-export type ExtendedDate = DateSchemaBuilder<Date, true, false, DateBuiltinExtensions> & DateBuiltinExtensions & HiddenExtensionMethods;
+export type ExtendedDate = DateSchemaBuilder<Date, true, false, false, {}> & HiddenExtensionMethods;
 /** An \`ObjectSchemaBuilder\` with built-in extension methods. */
-export type ExtendedObject<TProps extends Record<string, SchemaBuilder<any, any, any>> = {}> = ObjectSchemaBuilder<TProps, true, undefined, false, ObjectBuiltinExtensions<TProps>> & ObjectBuiltinExtensions<TProps> & HiddenExtensionMethods;
+export type ExtendedObject<TProps extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}> = ObjectSchemaBuilder<TProps, true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`UnionSchemaBuilder\` with built-in extension methods. */
-export type ExtendedUnion<TOptions extends readonly SchemaBuilder<any, any, any>[]> = UnionSchemaBuilder<TOptions, true, undefined, false, UnionBuiltinExtensions> & UnionBuiltinExtensions & HiddenExtensionMethods;
+export type ExtendedUnion<TOptions extends readonly SchemaBuilder<any, any, any, any, any>[]> = UnionSchemaBuilder<TOptions, true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`FunctionSchemaBuilder\` with built-in extension methods. */
-export type ExtendedFunc = FunctionSchemaBuilder<true, undefined, false, FuncBuiltinExtensions> & FuncBuiltinExtensions & HiddenExtensionMethods;
+export type ExtendedFunc = FunctionSchemaBuilder<true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** An \`AnySchemaBuilder\` with built-in extension methods. */
-export type ExtendedAny = AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions> & AnyBuiltinExtensions & HiddenExtensionMethods;
+export type ExtendedAny = AnySchemaBuilder<true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`TupleSchemaBuilder\` with built-in extension methods. */
-export type ExtendedTuple<TElements extends readonly SchemaBuilder<any, any, any>[] = readonly SchemaBuilder<any, any, any>[]> = TupleSchemaBuilder<TElements, true, undefined, false, TupleBuiltinExtensions<TElements>> & TupleBuiltinExtensions<TElements> & HiddenExtensionMethods;
+export type ExtendedTuple<TElements extends readonly SchemaBuilder<any, any, any>[] = readonly SchemaBuilder<any, any, any, any, any>[]> = TupleSchemaBuilder<TElements, true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`RecordSchemaBuilder\` with built-in extension methods. */
-export type ExtendedRecord<TKeySchema extends StringSchemaBuilder<any, any, any, any> = StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = RecordSchemaBuilder<TKeySchema, TValueSchema, true, undefined, false, RecordBuiltinExtensions<TKeySchema, TValueSchema>> & RecordBuiltinExtensions<TKeySchema, TValueSchema> & HiddenExtensionMethods;
+export type ExtendedRecord<TKeySchema extends StringSchemaBuilder<any, any, any, any> = StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any> = SchemaBuilder<any, any, any>> = RecordSchemaBuilder<TKeySchema, TValueSchema, true, false, undefined, false, {}> & HiddenExtensionMethods;
 export declare const string: {
     (): ExtendedString;
     <T extends string>(equals: T): ExtendedString<T>;
@@ -4682,19 +4820,19 @@ export declare const number: {
     (): ExtendedNumber;
     <T extends number>(equals: T): ExtendedNumber<T>;
 };
-export declare const array: <TElementSchema extends SchemaBuilder<any, any, any>>(elementSchema?: TElementSchema) => ExtendedArray<TElementSchema>;
+export declare const array: <TElementSchema extends SchemaBuilder<any, any, any, any, any>>(elementSchema?: TElementSchema) => ExtendedArray<TElementSchema>;
 export declare const boolean: () => ExtendedBoolean;
 export declare const date: () => ExtendedDate;
 export declare const object: {
     (): ExtendedObject<{}>;
-    <TProps extends Record<string, SchemaBuilder<any, any, any>>>(props: TProps): ExtendedObject<TProps>;
-    <TProps extends Record<string, SchemaBuilder<any, any, any>>>(props?: TProps): ExtendedObject<TProps>;
+    <TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(props: TProps): ExtendedObject<TProps>;
+    <TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(props?: TProps): ExtendedObject<TProps>;
 };
-export declare const union: <TOptions extends SchemaBuilder<any, any, any>>(schema: TOptions) => ExtendedUnion<[TOptions]>;
+export declare const union: <TOptions extends SchemaBuilder<any, any, any, any, any>>(schema: TOptions) => ExtendedUnion<[TOptions]>;
 export declare const func: () => ExtendedFunc;
 export declare const any: () => ExtendedAny;
-export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => ExtendedTuple<TElements>;
-export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => ExtendedRecord<TKeySchema, TValueSchema>;
+export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => ExtendedTuple<TElements>;
+export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => ExtendedRecord<TKeySchema, TValueSchema>;
 /**
  * Creates a string schema constrained to the given literal values.
  *
@@ -4729,243 +4867,12 @@ export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, a
 export declare function enumOf<const T extends string>(...values: [T, ...T[]]): ExtendedString<T>;
 export declare function enumOf<const T extends string>(values: readonly [T, ...T[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): ExtendedString<T>;
 `,
-    "file:///node_modules/@cleverbrush/schema/extensions/nullable.d.ts": `/**
- * Built-in nullable extension for \`@cleverbrush/schema\`.
- *
- * Provides the \`.nullable()\` convenience method on every schema builder type.
- * It is a shorthand for \`union(schema).or(nul())\` that changes the inferred
- * type from \`T\` to \`T | null\`.
- *
- * This extension is pre-applied in the default \`@cleverbrush/schema\` import.
- * Import from \`@cleverbrush/schema/core\` to get bare builders without it.
- *
- * @module
- */
-import type { AnySchemaBuilder } from '../builders/AnySchemaBuilder.js';
-import type { ArraySchemaBuilder } from '../builders/ArraySchemaBuilder.js';
-import type { BooleanSchemaBuilder } from '../builders/BooleanSchemaBuilder.js';
-import type { DateSchemaBuilder } from '../builders/DateSchemaBuilder.js';
-import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js';
-import { type NullSchemaBuilder } from '../builders/NullSchemaBuilder.js';
-import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
-import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
-import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
-import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
-import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
-import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
-import { type UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
-/**
- * The return type produced by \`.nullable()\` on any schema builder \`TBuilder\`.
- *
- * Wraps the builder in a union with \`NullSchemaBuilder\`, giving the inferred
- * type \`InferType<TBuilder> | null\`.
- */
-export type NullableReturn<TBuilder extends SchemaBuilder<any, any, any>> = UnionSchemaBuilder<[TBuilder, NullSchemaBuilder<true>]>;
-/**
- * The \`.nullable()\` method added to every built-in schema builder.
- *
- * **WORKAROUND:** This interface duplicates the method signature from
- * \`nullableExtension\` so that JSDoc survives into the published \`.d.ts\`
- * files. TypeScript strips JSDoc when method signatures are reconstructed
- * through the \`FixedMethods\` mapped type (conditional \`infer\` loses
- * comments). Remove this interface once TypeScript preserves JSDoc
- * through mapped types / conditional type inference.
- *
- * @see https://github.com/microsoft/TypeScript/issues/50715
- */
-/** Methods threaded through \`TExtensions\` for \`BooleanSchemaBuilder\`. */
-export interface BooleanBuiltinExtensions {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<BooleanSchemaBuilder<boolean, true, undefined, false, BooleanBuiltinExtensions>>;
-}
-/** Methods threaded through \`TExtensions\` for \`DateSchemaBuilder\`. */
-export interface DateBuiltinExtensions {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<DateSchemaBuilder<Date, true, false, DateBuiltinExtensions>>;
-}
-/** Methods threaded through \`TExtensions\` for \`ObjectSchemaBuilder\`. */
-export interface ObjectBuiltinExtensions<TProps extends Record<string, SchemaBuilder<any, any, any>> = {}> {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<ObjectSchemaBuilder<TProps, true, undefined, false, ObjectBuiltinExtensions<TProps>>>;
-}
-/** Methods threaded through \`TExtensions\` for \`UnionSchemaBuilder\`. */
-export interface UnionBuiltinExtensions {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<SchemaBuilder<any, any, any>>;
-}
-/** Methods threaded through \`TExtensions\` for \`FunctionSchemaBuilder\`. */
-export interface FuncBuiltinExtensions {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<FunctionSchemaBuilder<true, undefined, false, FuncBuiltinExtensions>>;
-}
-/** Methods threaded through \`TExtensions\` for \`AnySchemaBuilder\`. */
-export interface AnyBuiltinExtensions {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions>>;
-}
-/** Methods threaded through \`TExtensions\` for \`TupleSchemaBuilder\`. */
-export interface TupleBuiltinExtensions<TElements extends readonly SchemaBuilder<any, any, any>[] = readonly SchemaBuilder<any, any, any>[]> {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<TupleSchemaBuilder<TElements, true, undefined, false, TupleBuiltinExtensions<TElements>>>;
-}
-/** Methods threaded through \`TExtensions\` for \`RecordSchemaBuilder\`. */
-export interface RecordBuiltinExtensions<TKeySchema extends StringSchemaBuilder<any, any, any, any> = StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> {
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<RecordSchemaBuilder<TKeySchema, TValueSchema, true, undefined, false, RecordBuiltinExtensions<TKeySchema, TValueSchema>>>;
-}
-export interface NullableMethod<TBuilder extends SchemaBuilder<any, any, any>> {
-    /**
-     * Makes this schema nullable by wrapping it in a union with \`null\`.
-     *
-     * Shorthand for \`union(schema).or(nul())\`.
-     *
-     * After calling \`.nullable()\`, the schema accepts the original type **or**
-     * \`null\`. The inferred type changes from \`T\` to \`T | null\`. Builder-specific
-     * methods (e.g. \`.email()\`, \`.positive()\`) are no longer available on the
-     * result — call them before \`.nullable()\`.
-     *
-     * @returns a \`UnionSchemaBuilder\` that accepts the original type or \`null\`
-     *
-     * @example
-     * \`\`\`ts
-     * import { string, number, object, InferType } from '@cleverbrush/schema';
-     *
-     * // Any builder can be made nullable
-     * const name = string().nullable();
-     * type Name = InferType<typeof name>; // string | null
-     *
-     * const age  = number().nullable();
-     * type Age  = InferType<typeof age>;  // number | null
-     *
-     * // Chain validators before .nullable()
-     * const email = string().email().nullable();
-     * email.validate('user@example.com'); // valid
-     * email.validate(null);               // valid
-     * email.validate('not-an-email');     // invalid
-     *
-     * // Useful for optional database columns that can be NULL
-     * const UserSchema = object({
-     *     name:     string().nonempty(),
-     *     bio:      string().nullable(),   // bio can be null
-     *     avatarId: number().nullable(),   // FK can be null
-     * });
-     * \`\`\`
-     */
-    nullable(): NullableReturn<TBuilder>;
-}
-/**
- * Extension descriptor that adds \`.nullable()\` to every built-in schema
- * builder type.
- *
- * Included on all nine builders: \`string\`, \`number\`, \`boolean\`, \`date\`,
- * \`object\`, \`array\`, \`union\`, \`func\`, and \`any\`.
- *
- * @example
- * \`\`\`ts
- * import { withExtensions } from '@cleverbrush/schema/core';
- * import { nullableExtension } from '@cleverbrush/schema';
- *
- * const { string: s } = withExtensions(nullableExtension);
- * const schema = s().nullable();
- * \`\`\`
- */
-export declare const nullableExtension: import("../extension.js").ExtensionDescriptor<{
-    string: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts \`string | null\`
-         */
-        nullable(this: StringSchemaBuilder): UnionSchemaBuilder<[StringSchemaBuilder<string, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[StringSchemaBuilder<string, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    number: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts \`number | null\`
-         */
-        nullable(this: NumberSchemaBuilder): UnionSchemaBuilder<[NumberSchemaBuilder<number, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[NumberSchemaBuilder<number, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    boolean: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts \`boolean | null\`
-         */
-        nullable(this: BooleanSchemaBuilder): UnionSchemaBuilder<[BooleanSchemaBuilder<boolean, true, undefined, false, {}, boolean>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[BooleanSchemaBuilder<boolean, true, undefined, false, {}, boolean>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    date: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts \`Date | null\`
-         */
-        nullable(this: DateSchemaBuilder): UnionSchemaBuilder<[DateSchemaBuilder<Date, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[DateSchemaBuilder<Date, true, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    object: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts the object type or \`null\`
-         */
-        nullable(this: ObjectSchemaBuilder): UnionSchemaBuilder<[ObjectSchemaBuilder<{}, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[ObjectSchemaBuilder<{}, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    array: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts the array type or \`null\`
-         */
-        nullable(this: ArraySchemaBuilder<any>): UnionSchemaBuilder<[ArraySchemaBuilder<any, true, undefined, false, {}, any[] | unknown[]>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[ArraySchemaBuilder<any, true, undefined, false, {}, any[] | unknown[]>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    union: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that includes \`null\` as an option
-         */
-        nullable(this: UnionSchemaBuilder<any>): UnionSchemaBuilder<[UnionSchemaBuilder<any, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[UnionSchemaBuilder<any, true, undefined, false, {}>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    func: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts a function or \`null\`
-         */
-        nullable(this: FunctionSchemaBuilder): UnionSchemaBuilder<[FunctionSchemaBuilder<true, undefined, false, {}, (...args: any[]) => any>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[FunctionSchemaBuilder<true, undefined, false, {}, (...args: any[]) => any>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    any: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts any value or \`null\`
-         */
-        nullable(this: AnySchemaBuilder): UnionSchemaBuilder<[AnySchemaBuilder<true, undefined, false, {}, any>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[AnySchemaBuilder<true, undefined, false, {}, any>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    tuple: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts the tuple type or \`null\`
-         */
-        nullable(this: TupleSchemaBuilder<any>): UnionSchemaBuilder<[TupleSchemaBuilder<any, true, undefined, false, {}, undefined, any[]>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[TupleSchemaBuilder<any, true, undefined, false, {}, undefined, any[]>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-    record: {
-        /**
-         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
-         *
-         * @returns a \`UnionSchemaBuilder\` that accepts the record type or \`null\`
-         */
-        nullable(this: RecordSchemaBuilder<any, any>): UnionSchemaBuilder<[RecordSchemaBuilder<any, any, true, undefined, false, {}, Record<any, any>>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[RecordSchemaBuilder<any, any, true, undefined, false, {}, Record<any, any>>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
-    };
-}>;
-`,
     "file:///node_modules/@cleverbrush/schema/extensions/number.d.ts": `/**
  * Built-in number extensions for \`@cleverbrush/schema\`.
  *
  * Provides common number validators: {@link numberExtensions | positive},
  * {@link numberExtensions | negative}, {@link numberExtensions | finite},
- * and {@link numberExtensions | multipleOf}.
+ * {@link numberExtensions | multipleOf}, and {@link numberExtensions | oneOf}.
  *
  * These are pre-applied in the default \`@cleverbrush/schema\` import.
  * Import from \`@cleverbrush/schema/core\` to get bare builders without these extensions.
@@ -4975,9 +4882,8 @@ export declare const nullableExtension: import("../extension.js").ExtensionDescr
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
-import type { NullableMethod, NullableReturn } from './nullable.js';
 /** Return type shared by every method on {@link NumberBuiltinExtensions}. */
-type NumberExtReturn<T extends number = number> = NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>> & NumberBuiltinExtensions<T> & NullableMethod<NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>> & HiddenExtensionMethods;
+type NumberExtReturn<T extends number = number> = NumberSchemaBuilder<T, true, false, false, NumberBuiltinExtensions<T>> & NumberBuiltinExtensions<T> & HiddenExtensionMethods;
 /**
  * Methods added to \`NumberSchemaBuilder\` by the built-in number extension pack.
  *
@@ -5046,14 +4952,66 @@ export interface NumberBuiltinExtensions<T extends number = number> {
      * \`\`\`
      */
     multipleOf(n: number, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberExtReturn<T>;
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>>;
+    /**
+     * Constrains the number to one of the specified literal values.
+     *
+     * Narrows the inferred type from \`number\` to the union of the
+     * provided literals.
+     *
+     * @param values - the allowed number literals
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * import { number, InferType } from '@cleverbrush/schema';
+     *
+     * const priority = number().oneOf(1, 2, 3);
+     * type Priority = InferType<typeof priority>; // 1 | 2 | 3
+     *
+     * priority.validate(1);  // valid
+     * priority.validate(4);  // invalid — "must be one of: 1, 2, 3"
+     * \`\`\`
+     */
+    oneOf<V extends number>(...values: [V, ...V[]]): NumberExtReturn<V>;
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * @example
+     * \`\`\`ts
+     * const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+     * const priority2 = number().oneOf(1, 2, 3, (val) => \`\${val} is not a valid priority\`);
+     * \`\`\`
+     */
+    oneOf<V extends number>(...args: [
+        ...[V, ...V[]],
+        ValidationErrorMessageProvider<NumberSchemaBuilder>
+    ]): NumberExtReturn<V>;
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * @param values - the allowed number literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * const priority = number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+     * \`\`\`
+     */
+    oneOf<V extends number>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberExtReturn<V>;
 }
+/**
+ * Subset of {@link NumberBuiltinExtensions} containing only the \`.oneOf()\` overloads.
+ * Exported for backward compatibility.
+ */
+export type NumberOneOfExtension = Pick<NumberBuiltinExtensions, 'oneOf'>;
 /**
  * Extension descriptor that adds common number validators
  * to \`NumberSchemaBuilder\`.
  *
- * Included methods: \`positive\`, \`negative\`, \`finite\`, \`multipleOf\`.
+ * Included methods: \`positive\`, \`negative\`, \`finite\`, \`multipleOf\`, \`oneOf\`.
  *
  * @example
  * \`\`\`ts
@@ -5078,7 +5036,7 @@ export declare const numberExtensions: import("../extension.js").ExtensionDescri
          * number().positive('Must be greater than zero');
          * \`\`\`
          */
-        positive(this: NumberSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, {}>;
+        positive(this: NumberSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, false, {}>;
         /**
          * Validates that the number is strictly less than zero.
          *
@@ -5091,7 +5049,7 @@ export declare const numberExtensions: import("../extension.js").ExtensionDescri
          * number().negative('Must be below zero');
          * \`\`\`
          */
-        negative(this: NumberSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, {}>;
+        negative(this: NumberSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, false, {}>;
         /**
          * Validates that the number is finite (rejects \`Infinity\` and \`-Infinity\`).
          *
@@ -5104,7 +5062,7 @@ export declare const numberExtensions: import("../extension.js").ExtensionDescri
          * number().finite('No infinities allowed');
          * \`\`\`
          */
-        finite(this: NumberSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, {}>;
+        finite(this: NumberSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, false, {}>;
         /**
          * Validates that the number is an exact multiple of \`n\`.
          *
@@ -5120,7 +5078,20 @@ export declare const numberExtensions: import("../extension.js").ExtensionDescri
          * number().multipleOf(0.1, 'Must be a multiple of 0.1');
          * \`\`\`
          */
-        multipleOf(this: NumberSchemaBuilder, n: number, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, {}>;
+        multipleOf(this: NumberSchemaBuilder, n: number, errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberSchemaBuilder<number, true, false, false, {}>;
+        /**
+         * Constrains the number to one of the specified literal values.
+         *
+         * @param args - the allowed number literals, optionally followed by an error message
+         * @returns a new schema builder restricted to the given values
+         *
+         * @example
+         * \`\`\`ts
+         * number().oneOf(1, 2, 3);
+         * number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+         * \`\`\`
+         */
+        oneOf(this: NumberSchemaBuilder, ...args: any[]): NumberSchemaBuilder<number, true, false, false, {}>;
     };
 }>;
 export {};
@@ -5131,7 +5102,8 @@ export {};
  * Provides common string validators and preprocessors: {@link stringExtensions | email},
  * {@link stringExtensions | url}, {@link stringExtensions | uuid},
  * {@link stringExtensions | ip}, {@link stringExtensions | trim},
- * {@link stringExtensions | toLowerCase}, and {@link stringExtensions | nonempty}.
+ * {@link stringExtensions | toLowerCase}, {@link stringExtensions | nonempty},
+ * and {@link stringExtensions | oneOf}.
  *
  * These are pre-applied in the default \`@cleverbrush/schema\` import.
  * Import from \`@cleverbrush/schema/core\` to get bare builders without these extensions.
@@ -5141,9 +5113,8 @@ export {};
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
-import type { NullableMethod, NullableReturn } from './nullable.js';
 /** Return type shared by every method on {@link StringBuiltinExtensions}. */
-type StringExtReturn<T extends string = string> = StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>> & StringBuiltinExtensions<T> & NullableMethod<StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>> & HiddenExtensionMethods;
+type StringExtReturn<T extends string = string> = StringSchemaBuilder<T, true, false, false, StringBuiltinExtensions<T>> & StringBuiltinExtensions<T> & HiddenExtensionMethods;
 /**
  * Methods added to \`StringSchemaBuilder\` by the built-in string extension pack.
  *
@@ -5264,14 +5235,65 @@ export interface StringBuiltinExtensions<T extends string = string> {
      * \`\`\`
      */
     nonempty(errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringExtReturn<T>;
-    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
-    nullable(): NullableReturn<StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>>;
+    /**
+     * Constrains the string to one of the specified literal values.
+     *
+     * Narrows the inferred type from \`string\` to the union of the
+     * provided literals.
+     *
+     * @param values - the allowed string literals
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * import { string, InferType } from '@cleverbrush/schema';
+     *
+     * const role = string().oneOf('admin', 'user', 'guest');
+     * type Role = InferType<typeof role>; // 'admin' | 'user' | 'guest'
+     *
+     * role.validate('admin');  // valid
+     * role.validate('other');  // invalid — "must be one of: admin, user, guest"
+     * \`\`\`
+     */
+    oneOf<V extends string>(...values: [V, ...V[]]): StringExtReturn<V>;
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * @example
+     * \`\`\`ts
+     * const role = string().oneOf('admin', 'user', (val) => \`"\${val}" is not allowed\`);
+     * \`\`\`
+     */
+    oneOf<V extends string>(...args: [
+        ...[V, ...V[]],
+        ValidationErrorMessageProvider<StringSchemaBuilder>
+    ]): StringExtReturn<V>;
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * @param values - the allowed string literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+     * \`\`\`
+     */
+    oneOf<V extends string>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringExtReturn<V>;
 }
+/**
+ * Subset of {@link StringBuiltinExtensions} containing only the \`.oneOf()\` overloads.
+ * Exported for backward compatibility.
+ */
+export type StringOneOfExtension = Pick<StringBuiltinExtensions, 'oneOf'>;
 /**
  * Extension descriptor that adds common string validators and preprocessors
  * to \`StringSchemaBuilder\`.
  *
- * Included methods: \`email\`, \`url\`, \`uuid\`, \`ip\`, \`trim\`, \`toLowerCase\`, \`nonempty\`.
+ * Included methods: \`email\`, \`url\`, \`uuid\`, \`ip\`, \`trim\`, \`toLowerCase\`, \`nonempty\`, \`oneOf\`.
  *
  * @example
  * \`\`\`ts
@@ -5299,7 +5321,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * string().email((val) => \`"\${val}" is not a valid email\`);
          * \`\`\`
          */
-        email(this: StringSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, {}>;
+        email(this: StringSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, false, {}>;
         /**
          * Validates that the string is a well-formed URL.
          *
@@ -5321,7 +5343,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          */
         url(this: StringSchemaBuilder, optsOrError?: {
             protocols?: string[];
-        } | ValidationErrorMessageProvider<StringSchemaBuilder>, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, {}>;
+        } | ValidationErrorMessageProvider<StringSchemaBuilder>, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, false, {}>;
         /**
          * Validates that the string is a valid UUID (versions 1–5).
          *
@@ -5334,7 +5356,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * string().uuid('Invalid identifier');
          * \`\`\`
          */
-        uuid(this: StringSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, {}>;
+        uuid(this: StringSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, false, {}>;
         /**
          * Validates that the string is a valid IP address (IPv4 or IPv6).
          *
@@ -5354,7 +5376,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          */
         ip(this: StringSchemaBuilder, opts?: {
             version?: "v4" | "v6";
-        }, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, {}>;
+        }, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, false, {}>;
         /**
          * Preprocessor that trims leading and trailing whitespace before validation.
          *
@@ -5365,7 +5387,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * string().trim().minLength(1); // '  hi  ' → 'hi'
          * \`\`\`
          */
-        trim(this: StringSchemaBuilder): StringSchemaBuilder<string, true, false, {}>;
+        trim(this: StringSchemaBuilder): StringSchemaBuilder<string, true, false, false, {}>;
         /**
          * Preprocessor that converts the string to lowercase before validation.
          *
@@ -5376,7 +5398,7 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * string().toLowerCase(); // 'HELLO' → 'hello'
          * \`\`\`
          */
-        toLowerCase(this: StringSchemaBuilder): StringSchemaBuilder<string, true, false, {}>;
+        toLowerCase(this: StringSchemaBuilder): StringSchemaBuilder<string, true, false, false, {}>;
         /**
          * Validates that the string is not empty (length > 0).
          *
@@ -5389,7 +5411,20 @@ export declare const stringExtensions: import("../extension.js").ExtensionDescri
          * string().nonempty('Name is required');
          * \`\`\`
          */
-        nonempty(this: StringSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, {}>;
+        nonempty(this: StringSchemaBuilder, errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringSchemaBuilder<string, true, false, false, {}>;
+        /**
+         * Constrains the string to one of the specified literal values.
+         *
+         * @param args - the allowed string literals, optionally followed by an error message
+         * @returns a new schema builder restricted to the given values
+         *
+         * @example
+         * \`\`\`ts
+         * string().oneOf('admin', 'user', 'guest');
+         * string().oneOf(['admin', 'user'], 'Invalid role');
+         * \`\`\`
+         */
+        oneOf(this: StringSchemaBuilder, ...args: any[]): StringSchemaBuilder<string, true, false, false, {}>;
     };
 }>;
 export {};
@@ -5446,7 +5481,7 @@ export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
-export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, enumExtension, enumOf, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, type NumberOneOfExtension, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type RecordBuiltinExtensions, record, type StringBuiltinExtensions, type StringOneOfExtension, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
+export { type ArrayBuiltinExtensions, any, array, arrayExtensions, boolean, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, enumOf, func, type NumberBuiltinExtensions, type NumberOneOfExtension, number, numberExtensions, object, record, type StringBuiltinExtensions, type StringOneOfExtension, string, stringExtensions, tuple, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

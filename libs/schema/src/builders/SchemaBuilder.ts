@@ -105,7 +105,13 @@ export type MakeOptional<T> = { prop?: T }['prop'];
  * Should be used to provide a custom validation error message.
  */
 export type ValidationErrorMessageProvider<
-    TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>
+    TSchema extends SchemaBuilder<any, any, any, any, any> = SchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any
+    >
 > =
     | string
     | ((
@@ -203,6 +209,7 @@ export type ValidatorEntry<T> = { fn: Validator<T>; mutates: boolean };
 export type SchemaBuilderProps<T> = {
     type: string;
     isRequired?: boolean;
+    isNullable?: boolean;
     isReadonly?: boolean;
     preprocessors: PreprocessorEntry<T>[];
     validators: ValidatorEntry<T>[];
@@ -215,7 +222,12 @@ export type SchemaBuilderProps<T> = {
 };
 
 export type ValidationContext<
-    TSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>
+    TSchema extends SchemaBuilder<any, any, any, any> = SchemaBuilder<
+        any,
+        any,
+        any,
+        any
+    >
 > = {
     /**
      * Optional. By default validation will stop after the first validation error, in case if
@@ -565,11 +577,13 @@ export function createHybridErrorArray<T extends any[]>(
 export abstract class SchemaBuilder<
     TResult = any,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     THasDefault extends boolean = false,
     // biome-ignore lint/correctness/noUnusedVariables: used in extensions
     TExtensions = {}
 > {
     #isRequired = true;
+    #isNullable = false;
     #isReadonly = false;
     #description: string | undefined;
     #preprocessors: PreprocessorEntry<TResult>[] = [];
@@ -592,8 +606,10 @@ export abstract class SchemaBuilder<
      * @internal
      */
     declare readonly [__type]: TRequired extends true
-        ? TResult
-        : MakeOptional<TResult>;
+        ? TNullable extends true
+            ? TResult | null
+            : TResult
+        : MakeOptional<TNullable extends true ? TResult | null : TResult>;
 
     /**
      * Type-level brand encoding whether this schema has a default value.
@@ -660,6 +676,13 @@ export abstract class SchemaBuilder<
      */
     protected get isRequired(): TRequired {
         return this.#isRequired as TRequired;
+    }
+
+    /**
+     * Whether `null` is an accepted value for this schema.
+     */
+    protected get isNullable(): boolean {
+        return this.#isNullable;
     }
 
     /**
@@ -901,7 +924,8 @@ export abstract class SchemaBuilder<
 
         if (
             this.#validators.length > 0 &&
-            !(preprocessedObject == null && !this.isRequired)
+            !(preprocessedObject == null && !this.isRequired) &&
+            !(preprocessedObject === null && this.#isNullable)
         ) {
             let currentValidatorIndex = 0;
             for (const entry of this.#validators) {
@@ -951,7 +975,9 @@ export abstract class SchemaBuilder<
         if (
             this.isRequired &&
             (typeof preprocessedObject === 'undefined' ||
-                (preprocessedObject === null && this.isNullRequiredViolation))
+                (preprocessedObject === null &&
+                    this.isNullRequiredViolation &&
+                    !this.#isNullable))
         ) {
             errors.push({
                 message: this.getValidationErrorMessageSync(
@@ -1026,7 +1052,8 @@ export abstract class SchemaBuilder<
 
         if (
             this.#validators.length > 0 &&
-            !(preprocessedObject == null && !this.isRequired)
+            !(preprocessedObject == null && !this.isRequired) &&
+            !(preprocessedObject === null && this.#isNullable)
         ) {
             let currentValidatorIndex = 0;
             for (const entry of this.#validators) {
@@ -1066,7 +1093,9 @@ export abstract class SchemaBuilder<
         if (
             this.isRequired &&
             (typeof preprocessedObject === 'undefined' ||
-                (preprocessedObject === null && this.isNullRequiredViolation))
+                (preprocessedObject === null &&
+                    this.isNullRequiredViolation &&
+                    !this.#isNullable))
         ) {
             errors.push({
                 message: await this.getValidationErrorMessage(
@@ -1112,6 +1141,10 @@ export abstract class SchemaBuilder<
              * will be considered as valid).
              */
             isRequired: this.#isRequired,
+            /**
+             * If set to `true`, schema values of `null` are considered valid.
+             */
+            isNullable: this.#isNullable,
             /**
              * If set to `true`, the inferred type is marked as readonly.
              * Type-level only — no runtime enforcement.
@@ -1169,6 +1202,31 @@ export abstract class SchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             isRequired: false
+        }) as any;
+    }
+
+    /**
+     * Makes schema nullable — `null` is accepted as a valid value.
+     *
+     * Unlike `.optional()` which accepts `undefined`, `.nullable()` accepts
+     * `null`. The inferred type changes from `T` to `T | null`. Combine with
+     * `.optional()` to accept both `null` and `undefined`.
+     */
+    public nullable() {
+        return this.createFromProps({
+            ...this.introspect(),
+            isNullable: true
+        }) as any;
+    }
+
+    /**
+     * Removes the nullable mark — `null` is no longer accepted as a valid
+     * value. This is the counterpart of `.nullable()`.
+     */
+    public notNullable() {
+        return this.createFromProps({
+            ...this.introspect(),
+            isNullable: false
         }) as any;
     }
 
@@ -1685,6 +1743,8 @@ export abstract class SchemaBuilder<
         const { type, preprocessors, validators, isRequired } = props;
         this.type = type;
         if (typeof isRequired === 'boolean') this.isRequired = isRequired;
+        if (typeof props.isNullable === 'boolean')
+            this.#isNullable = props.isNullable;
         if (typeof props.isReadonly === 'boolean')
             this.#isReadonly = props.isReadonly;
         if (Array.isArray(preprocessors)) {

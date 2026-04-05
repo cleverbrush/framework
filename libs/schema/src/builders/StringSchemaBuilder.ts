@@ -70,9 +70,16 @@ type StringSchemaBuilderCreateProps<
 export class StringSchemaBuilder<
     TResult = string,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     THasDefault extends boolean = false,
     TExtensions = {}
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>
@@ -305,7 +312,8 @@ export class StringSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): StringSchemaBuilder<T, true, THasDefault, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -317,6 +325,7 @@ export class StringSchemaBuilder<
     public clearHasType(): StringSchemaBuilder<
         string,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -401,8 +410,8 @@ export class StringSchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
                 done: true,
@@ -469,7 +478,10 @@ export class StringSchemaBuilder<
             if (typeof object === 'undefined' || object === null) {
                 if (typeof object === 'undefined' && this.hasDefault) {
                     object = this.resolveDefaultValue();
-                } else if (!this.isRequired) {
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
                     return { valid: true, object: object };
                 } else {
                     return {
@@ -579,6 +591,7 @@ export class StringSchemaBuilder<
         }) as any as StringSchemaBuilder<
             T,
             TRequired,
+            TNullable,
             THasDefault,
             TExtensions
         > &
@@ -591,6 +604,7 @@ export class StringSchemaBuilder<
     public clearEquals(): StringSchemaBuilder<
         string,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -604,9 +618,37 @@ export class StringSchemaBuilder<
     /**
      * @hidden
      */
+    public nullable(): StringSchemaBuilder<
+        TResult,
+        TRequired,
+        true,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): StringSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): StringSchemaBuilder<TResult, true, THasDefault, TExtensions> &
+    ): StringSchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -617,6 +659,7 @@ export class StringSchemaBuilder<
     public optional(): StringSchemaBuilder<
         TResult,
         false,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -629,7 +672,8 @@ export class StringSchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): StringSchemaBuilder<TResult, true, true, TExtensions> & TExtensions {
+    ): StringSchemaBuilder<TResult, true, TNullable, true, TExtensions> &
+        TExtensions {
         return super.default(value) as any;
     }
 
@@ -639,6 +683,7 @@ export class StringSchemaBuilder<
     public clearDefault(): StringSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         false,
         TExtensions
     > &
@@ -654,6 +699,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -671,6 +717,7 @@ export class StringSchemaBuilder<
     public readonly(): StringSchemaBuilder<
         Readonly<TResult>,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -690,7 +737,13 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): StringSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
@@ -707,6 +760,7 @@ export class StringSchemaBuilder<
     public clearMinLength(): StringSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -730,7 +784,13 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): StringSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
@@ -747,6 +807,7 @@ export class StringSchemaBuilder<
     public clearMaxLength(): StringSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -772,6 +833,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult extends string ? `${T}${TResult}` : TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -791,6 +853,7 @@ export class StringSchemaBuilder<
     public clearStartsWith(): StringSchemaBuilder<
         string,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -816,6 +879,7 @@ export class StringSchemaBuilder<
     ): StringSchemaBuilder<
         TResult extends string ? `${TResult}${T}` : TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -835,6 +899,7 @@ export class StringSchemaBuilder<
     public clearEndsWith(): StringSchemaBuilder<
         string,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &
@@ -858,7 +923,13 @@ export class StringSchemaBuilder<
         errorMessage?: ValidationErrorMessageProvider<
             StringSchemaBuilder<TResult, TRequired>
         >
-    ): StringSchemaBuilder<TResult, TRequired, THasDefault, TExtensions> &
+    ): StringSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         if (!(regexp instanceof RegExp)) throw new Error('regexp expected');
         return this.createFromProps({
@@ -874,6 +945,7 @@ export class StringSchemaBuilder<
     public clearMatches(): StringSchemaBuilder<
         TResult,
         TRequired,
+        TNullable,
         THasDefault,
         TExtensions
     > &

@@ -3,7 +3,7 @@
  *
  * Provides common number validators: {@link numberExtensions | positive},
  * {@link numberExtensions | negative}, {@link numberExtensions | finite},
- * and {@link numberExtensions | multipleOf}.
+ * {@link numberExtensions | multipleOf}, and {@link numberExtensions | oneOf}.
  *
  * These are pre-applied in the default `@cleverbrush/schema` import.
  * Import from `@cleverbrush/schema/core` to get bare builders without these extensions.
@@ -14,7 +14,6 @@ import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
-import type { NullableMethod, NullableReturn } from './nullable.js';
 import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -26,12 +25,10 @@ type NumberExtReturn<T extends number = number> = NumberSchemaBuilder<
     T,
     true,
     false,
+    false,
     NumberBuiltinExtensions<T>
 > &
     NumberBuiltinExtensions<T> &
-    NullableMethod<
-        NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>
-    > &
     HiddenExtensionMethods;
 
 /**
@@ -115,17 +112,75 @@ export interface NumberBuiltinExtensions<T extends number = number> {
         errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
     ): NumberExtReturn<T>;
 
-    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
-    nullable(): NullableReturn<
-        NumberSchemaBuilder<T, true, false, NumberBuiltinExtensions<T>>
-    >;
+    /**
+     * Constrains the number to one of the specified literal values.
+     *
+     * Narrows the inferred type from `number` to the union of the
+     * provided literals.
+     *
+     * @param values - the allowed number literals
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * import { number, InferType } from '@cleverbrush/schema';
+     *
+     * const priority = number().oneOf(1, 2, 3);
+     * type Priority = InferType<typeof priority>; // 1 | 2 | 3
+     *
+     * priority.validate(1);  // valid
+     * priority.validate(4);  // invalid — "must be one of: 1, 2, 3"
+     * ```
+     */
+    oneOf<V extends number>(...values: [V, ...V[]]): NumberExtReturn<V>;
+
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * @example
+     * ```ts
+     * const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+     * const priority2 = number().oneOf(1, 2, 3, (val) => `${val} is not a valid priority`);
+     * ```
+     */
+    oneOf<V extends number>(
+        ...args: [
+            ...[V, ...V[]],
+            ValidationErrorMessageProvider<NumberSchemaBuilder>
+        ]
+    ): NumberExtReturn<V>;
+
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * @param values - the allowed number literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * const priority = number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+     * ```
+     */
+    oneOf<V extends number>(
+        values: readonly [V, ...V[]],
+        errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>
+    ): NumberExtReturn<V>;
 }
+
+/**
+ * Subset of {@link NumberBuiltinExtensions} containing only the `.oneOf()` overloads.
+ * Exported for backward compatibility.
+ */
+export type NumberOneOfExtension = Pick<NumberBuiltinExtensions, 'oneOf'>;
 
 /**
  * Extension descriptor that adds common number validators
  * to `NumberSchemaBuilder`.
  *
- * Included methods: `positive`, `negative`, `finite`, `multipleOf`.
+ * Included methods: `positive`, `negative`, `finite`, `multipleOf`, `oneOf`.
  *
  * @example
  * ```ts
@@ -285,6 +340,69 @@ export const numberExtensions = defineExtension({
                 return validationFail(
                     errorMessage,
                     `must be a multiple of ${n}`,
+                    val,
+                    this
+                );
+            });
+        },
+
+        /**
+         * Constrains the number to one of the specified literal values.
+         *
+         * @param args - the allowed number literals, optionally followed by an error message
+         * @returns a new schema builder restricted to the given values
+         *
+         * @example
+         * ```ts
+         * number().oneOf(1, 2, 3);
+         * number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+         * ```
+         */
+        oneOf(this: NumberSchemaBuilder, ...args: any[]) {
+            let values: number[];
+            let errorMessage:
+                | ValidationErrorMessageProvider<NumberSchemaBuilder>
+                | undefined;
+
+            if (args.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            if (Array.isArray(args[0])) {
+                // Array form: oneOf([1, 2, 3], errorMessage?)
+                values = args[0] as number[];
+                errorMessage = args[1] as
+                    | ValidationErrorMessageProvider<NumberSchemaBuilder>
+                    | undefined;
+            } else {
+                // Rest params form: oneOf(1, 2, 3) or oneOf(1, 2, 3, 'error') or oneOf(1, 2, 3, errorFn)
+                // Last arg is a string or function → error message (unambiguous since values are numbers)
+                const lastArg = args[args.length - 1];
+                if (
+                    typeof lastArg === 'string' ||
+                    typeof lastArg === 'function'
+                ) {
+                    values = args.slice(0, -1) as number[];
+                    errorMessage =
+                        lastArg as ValidationErrorMessageProvider<NumberSchemaBuilder>;
+                } else {
+                    values = args as number[];
+                    errorMessage = undefined;
+                }
+            }
+
+            if (values.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            const allowed = new Set(values);
+            return this.withExtension('oneOf', values).addValidator(val => {
+                if (typeof val === 'number' && allowed.has(val)) {
+                    return { valid: true, errors: [] };
+                }
+                return validationFail(
+                    errorMessage,
+                    `must be one of: ${values.join(', ')}`,
                     val,
                     this
                 );

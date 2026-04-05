@@ -235,7 +235,7 @@ describe('brand - runtime behavior', () => {
 describe('brand - extension integration', () => {
     const trimExt = defineExtension({
         string: {
-            trim(this: StringSchemaBuilder) {
+            trim(this: StringSchemaBuilder<any, any, any, any, any>) {
                 return this.addPreprocessor((val: string) => val.trim());
             }
         }

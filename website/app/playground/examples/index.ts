@@ -882,7 +882,7 @@ const result = price.validate(-5);
         id: 'nullable',
         title: 'Nullable Fields',
         description:
-            'Use <code>.nullable()</code> to accept the original type <em>or</em> <code>null</code>. Works on every builder. Shorthand for <code>union(schema).or(nul())</code>.',
+            'Use <code>.nullable()</code> to accept the original type <em>or</em> <code>null</code>. Use <code>.notNullable()</code> to reverse it. Both are native methods on every builder — the inferred type updates automatically.',
         group: 'Arrays & Unions',
         code: `import { string, number, object, InferType } from '@cleverbrush/schema';
 
@@ -907,6 +907,17 @@ const result = User.validate({
     bio:  null,
     age:  null,
 });
+
+// Toggle back with .notNullable()
+const strictName = string().nullable().notNullable();
+type StrictName = InferType<typeof strictName>; // string (not string | null)
+
+strictName.validate(null);    // invalid
+strictName.validate('Alice'); // valid
+
+// Introspect at runtime
+string().nullable().introspect().isNullable;                // true
+string().nullable().notNullable().introspect().isNullable;  // false
 `,
         testData: '{ "name": "Alice", "bio": null, "age": null }'
     },

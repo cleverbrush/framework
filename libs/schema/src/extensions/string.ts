@@ -4,7 +4,8 @@
  * Provides common string validators and preprocessors: {@link stringExtensions | email},
  * {@link stringExtensions | url}, {@link stringExtensions | uuid},
  * {@link stringExtensions | ip}, {@link stringExtensions | trim},
- * {@link stringExtensions | toLowerCase}, and {@link stringExtensions | nonempty}.
+ * {@link stringExtensions | toLowerCase}, {@link stringExtensions | nonempty},
+ * and {@link stringExtensions | oneOf}.
  *
  * These are pre-applied in the default `@cleverbrush/schema` import.
  * Import from `@cleverbrush/schema/core` to get bare builders without these extensions.
@@ -15,7 +16,6 @@ import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.j
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
-import type { NullableMethod, NullableReturn } from './nullable.js';
 import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -27,12 +27,10 @@ type StringExtReturn<T extends string = string> = StringSchemaBuilder<
     T,
     true,
     false,
+    false,
     StringBuiltinExtensions<T>
 > &
     StringBuiltinExtensions<T> &
-    NullableMethod<
-        StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>
-    > &
     HiddenExtensionMethods;
 
 /**
@@ -172,11 +170,68 @@ export interface StringBuiltinExtensions<T extends string = string> {
         errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
     ): StringExtReturn<T>;
 
-    /** Makes this schema nullable — shorthand for `union(schema).or(nul())`. */
-    nullable(): NullableReturn<
-        StringSchemaBuilder<T, true, false, StringBuiltinExtensions<T>>
-    >;
+    /**
+     * Constrains the string to one of the specified literal values.
+     *
+     * Narrows the inferred type from `string` to the union of the
+     * provided literals.
+     *
+     * @param values - the allowed string literals
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * import { string, InferType } from '@cleverbrush/schema';
+     *
+     * const role = string().oneOf('admin', 'user', 'guest');
+     * type Role = InferType<typeof role>; // 'admin' | 'user' | 'guest'
+     *
+     * role.validate('admin');  // valid
+     * role.validate('other');  // invalid — "must be one of: admin, user, guest"
+     * ```
+     */
+    oneOf<V extends string>(...values: [V, ...V[]]): StringExtReturn<V>;
+
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * @example
+     * ```ts
+     * const role = string().oneOf('admin', 'user', (val) => `"${val}" is not allowed`);
+     * ```
+     */
+    oneOf<V extends string>(
+        ...args: [
+            ...[V, ...V[]],
+            ValidationErrorMessageProvider<StringSchemaBuilder>
+        ]
+    ): StringExtReturn<V>;
+
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * @param values - the allowed string literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+     * ```
+     */
+    oneOf<V extends string>(
+        values: readonly [V, ...V[]],
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<V>;
 }
+
+/**
+ * Subset of {@link StringBuiltinExtensions} containing only the `.oneOf()` overloads.
+ * Exported for backward compatibility.
+ */
+export type StringOneOfExtension = Pick<StringBuiltinExtensions, 'oneOf'>;
 
 const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -191,7 +246,7 @@ const IPV6_RE =
  * Extension descriptor that adds common string validators and preprocessors
  * to `StringSchemaBuilder`.
  *
- * Included methods: `email`, `url`, `uuid`, `ip`, `trim`, `toLowerCase`, `nonempty`.
+ * Included methods: `email`, `url`, `uuid`, `ip`, `trim`, `toLowerCase`, `nonempty`, `oneOf`.
  *
  * @example
  * ```ts
@@ -454,6 +509,66 @@ export const stringExtensions = defineExtension({
                 return validationFail(
                     errorMessage,
                     'must not be empty',
+                    val,
+                    this
+                );
+            });
+        },
+
+        /**
+         * Constrains the string to one of the specified literal values.
+         *
+         * @param args - the allowed string literals, optionally followed by an error message
+         * @returns a new schema builder restricted to the given values
+         *
+         * @example
+         * ```ts
+         * string().oneOf('admin', 'user', 'guest');
+         * string().oneOf(['admin', 'user'], 'Invalid role');
+         * ```
+         */
+        oneOf(this: StringSchemaBuilder, ...args: any[]) {
+            let values: string[];
+            let errorMessage:
+                | ValidationErrorMessageProvider<StringSchemaBuilder>
+                | undefined;
+
+            if (args.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            if (Array.isArray(args[0])) {
+                // Array form: oneOf(['a', 'b', 'c'], errorMessage?)
+                values = args[0] as string[];
+                errorMessage = args[1] as
+                    | ValidationErrorMessageProvider<StringSchemaBuilder>
+                    | undefined;
+            } else {
+                // Rest params form: oneOf('a', 'b', 'c') or oneOf('a', 'b', errorFn)
+                // Last arg is a function → error message factory (unambiguous)
+                const lastArg = args[args.length - 1];
+                if (typeof lastArg === 'function') {
+                    values = args.slice(0, -1) as string[];
+                    errorMessage =
+                        lastArg as ValidationErrorMessageProvider<StringSchemaBuilder>;
+                } else {
+                    values = args as string[];
+                    errorMessage = undefined;
+                }
+            }
+
+            if (values.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            const allowed = new Set(values);
+            return this.withExtension('oneOf', values).addValidator(val => {
+                if (typeof val === 'string' && allowed.has(val)) {
+                    return { valid: true, errors: [] };
+                }
+                return validationFail(
+                    errorMessage,
+                    `must be one of: ${values.join(', ')}`,
                     val,
                     this
                 );

@@ -27,10 +27,16 @@ import type {
  * other types get `ValidationResult`.
  */
 export type ElementValidationResult<
-    TElementSchema extends SchemaBuilder<any, any, any>
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>
 > =
     TElementSchema extends UnionSchemaBuilder<
-        infer UOptions extends readonly SchemaBuilder<any, any, any>[],
+        infer UOptions extends readonly SchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any
+        >[],
         any,
         any
     >
@@ -49,7 +55,7 @@ export type ElementValidationResult<
  */
 export type ArraySchemaValidationResult<
     TResult,
-    TElementSchema extends SchemaBuilder<any, any, any>
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>
 > = ValidationResult<TResult> & {
     /**
      * Returns root-level array validation errors combined with
@@ -63,7 +69,7 @@ export type ArraySchemaValidationResult<
 };
 
 type ArraySchemaBuilderCreateProps<
-    TElementSchema extends SchemaBuilder<any, any, any>,
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>,
     R extends boolean = true
 > = Partial<ReturnType<ArraySchemaBuilder<TElementSchema, R>['introspect']>>;
 
@@ -86,8 +92,9 @@ type ArraySchemaBuilderCreateProps<
  * @see {@link array}
  */
 export class ArraySchemaBuilder<
-    TElementSchema extends SchemaBuilder<any, any, any>,
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
     THasDefault extends boolean = false,
     TExtensions = {},
@@ -98,25 +105,31 @@ export class ArraySchemaBuilder<
               ? Array<InferType<SchemaBuilder<T1, T2>>>
               : never
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
-        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
-    > = function (this: ArraySchemaBuilder<any, any, any>) {
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
+    > = function (this: ArraySchemaBuilder<any, any, any, any, any>) {
         return `is expected to have no less than ${this.#minLength} elements`;
     };
     #minLengthErrorMessageProvider: ValidationErrorMessageProvider<
-        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
     > = this.#defaultMinLengthErrorMessageProvider;
 
     #maxLength?: number;
     #defaultMaxLengthErrorMessageProvider: ValidationErrorMessageProvider<
-        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
-    > = function (this: ArraySchemaBuilder<any, any, any>) {
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
+    > = function (this: ArraySchemaBuilder<any, any, any, any, any>) {
         return `is expected to have no more than ${this.#maxLength} elements`;
     };
     #maxLengthErrorMessageProvider: ValidationErrorMessageProvider<
-        ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
     > = this.#defaultMaxLengthErrorMessageProvider;
 
     #elementSchema?: TElementSchema;
@@ -166,7 +179,14 @@ export class ArraySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): ArraySchemaBuilder<TElementSchema, true, T, THasDefault, TExtensions> &
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TNullable,
+        T,
+        THasDefault,
+        TExtensions
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -179,6 +199,7 @@ export class ArraySchemaBuilder<
     public clearHasType(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         undefined,
         THasDefault,
         TExtensions
@@ -243,8 +264,8 @@ export class ArraySchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
                 needsElementValidation: false as const,
@@ -379,7 +400,10 @@ export class ArraySchemaBuilder<
             if (typeof object === 'undefined' || object === null) {
                 if (typeof object === 'undefined' && this.hasDefault) {
                     object = this.resolveDefaultValue();
-                } else if (!this.isRequired) {
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
                     const self = this;
                     return {
                         valid: true,
@@ -668,6 +692,7 @@ export class ArraySchemaBuilder<
     ): ArraySchemaBuilder<
         TElementSchema,
         true,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -682,6 +707,7 @@ export class ArraySchemaBuilder<
     public optional(): ArraySchemaBuilder<
         TElementSchema,
         false,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -698,6 +724,7 @@ export class ArraySchemaBuilder<
     ): ArraySchemaBuilder<
         TElementSchema,
         true,
+        TNullable,
         TExplicitType,
         true,
         TExtensions
@@ -712,6 +739,7 @@ export class ArraySchemaBuilder<
     public clearDefault(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         TExplicitType,
         false,
         TExtensions
@@ -728,6 +756,7 @@ export class ArraySchemaBuilder<
     ): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         TResult & { readonly [K in BRAND]: TBrand },
         THasDefault,
         TExtensions
@@ -746,6 +775,7 @@ export class ArraySchemaBuilder<
     public readonly(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         ReadonlyArray<
             TElementSchema extends SchemaBuilder<infer T1, infer T2>
                 ? InferType<SchemaBuilder<T1, T2>>
@@ -796,11 +826,12 @@ export class ArraySchemaBuilder<
      * Item of any type is allowed.
      * @param schema Schema that every array item has to satisfy
      */
-    public of<TSchema extends SchemaBuilder<any, any, any>>(
+    public of<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
     ): ArraySchemaBuilder<
         TSchema,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -819,6 +850,7 @@ export class ArraySchemaBuilder<
     public clearOf(): ArraySchemaBuilder<
         any,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -839,11 +871,17 @@ export class ArraySchemaBuilder<
          * Custom error message provider.
          */
         errorMessage?: ValidationErrorMessageProvider<
-            ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+            ArraySchemaBuilder<
+                TElementSchema,
+                TRequired,
+                TNullable,
+                TExplicitType
+            >
         >
     ): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -864,6 +902,7 @@ export class ArraySchemaBuilder<
     public clearMinLength(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -885,11 +924,17 @@ export class ArraySchemaBuilder<
          * Custom error message provider.
          */
         errorMessage?: ValidationErrorMessageProvider<
-            ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType>
+            ArraySchemaBuilder<
+                TElementSchema,
+                TRequired,
+                TNullable,
+                TExplicitType
+            >
         >
     ): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -910,6 +955,7 @@ export class ArraySchemaBuilder<
     public clearMaxLength(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
+        TNullable,
         TExplicitType,
         THasDefault,
         TExtensions
@@ -920,6 +966,36 @@ export class ArraySchemaBuilder<
         return this.createFromProps({
             ...schema
         } as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 
@@ -939,7 +1015,9 @@ export class ArraySchemaBuilder<
  *  // undefined - invalid
  * ```
  */
-export const array = <TElementSchema extends SchemaBuilder<any, any, any>>(
+export const array = <
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>
+>(
     elementSchema?: TElementSchema
 ) =>
     ArraySchemaBuilder.create({

@@ -19,7 +19,6 @@ import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.j
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import { defineExtension } from '../extension.js';
-import type { NullableMethod } from './nullable.js';
 import { validationFail } from './util.js';
 
 // ---------------------------------------------------------------------------
@@ -31,10 +30,10 @@ type StringOneOfReturn<T extends string = string> = StringSchemaBuilder<
     T,
     true,
     false,
+    false,
     StringOneOfExtension
 > &
     StringOneOfExtension &
-    NullableMethod<StringSchemaBuilder<T, true, false, StringOneOfExtension>> &
     HiddenExtensionMethods;
 
 /** Return type for `.oneOf()` on `NumberSchemaBuilder`. */
@@ -42,10 +41,10 @@ type NumberOneOfReturn<T extends number = number> = NumberSchemaBuilder<
     T,
     true,
     false,
+    false,
     NumberOneOfExtension
 > &
     NumberOneOfExtension &
-    NullableMethod<NumberSchemaBuilder<T, true, false, NumberOneOfExtension>> &
     HiddenExtensionMethods;
 
 /**
