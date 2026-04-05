@@ -86,6 +86,25 @@ export interface StringOneOfExtension {
 
     /**
      * Constrains the string to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * A trailing `string` or function argument is unambiguously the error
+     * message when using rest-param form.
+     *
+     * @example
+     * ```ts
+     * const role = string().oneOf('admin', 'user', (val) => `"${val}" is not allowed`);
+     * ```
+     */
+    oneOf<V extends string>(
+        ...args: [
+            ...[V, ...V[]],
+            ValidationErrorMessageProvider<StringSchemaBuilder>
+        ]
+    ): StringOneOfReturn<V>;
+
+    /**
+     * Constrains the string to one of the specified literal values,
      * with an optional custom error message or factory.
      *
      * Pass the allowed values as an array (first argument) to provide a
@@ -159,7 +178,10 @@ export interface NumberOneOfExtension {
      * ```
      */
     oneOf<V extends number>(
-        ...args: [...[V, ...V[]], ValidationErrorMessageProvider<NumberSchemaBuilder>]
+        ...args: [
+            ...[V, ...V[]],
+            ValidationErrorMessageProvider<NumberSchemaBuilder>
+        ]
     ): NumberOneOfReturn<V>;
 
     /**

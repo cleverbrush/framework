@@ -19,7 +19,10 @@ import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
-import type { SchemaBuilder, ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
+import type {
+    SchemaBuilder,
+    ValidationErrorMessageProvider
+} from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
@@ -317,13 +320,22 @@ export function enumOf<const T extends string>(
     errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
 ): ExtendedString<T>;
 export function enumOf<const T extends string>(
-    ...args: [T, ...T[]] | [readonly [T, ...T[]], (ValidationErrorMessageProvider<StringSchemaBuilder>)?]
+    ...args:
+        | [T, ...T[]]
+        | [
+              readonly [T, ...T[]],
+              ValidationErrorMessageProvider<StringSchemaBuilder>?
+          ]
 ): ExtendedString<T> {
     if (Array.isArray(args[0])) {
         return string().oneOf(
             args[0] as readonly [T, ...T[]],
-            args[1] as ValidationErrorMessageProvider<StringSchemaBuilder> | undefined
+            args[1] as
+                | ValidationErrorMessageProvider<StringSchemaBuilder>
+                | undefined
         ) as unknown as ExtendedString<T>;
     }
-    return string().oneOf(...(args as [T, ...T[]])) as unknown as ExtendedString<T>;
+    return string().oneOf(
+        ...(args as [T, ...T[]])
+    ) as unknown as ExtendedString<T>;
 }

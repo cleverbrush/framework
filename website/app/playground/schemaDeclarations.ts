@@ -4457,6 +4457,7 @@ export {};
  * @module
  */
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
+import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import type { NullableMethod } from './nullable.js';
@@ -4499,6 +4500,28 @@ export interface StringOneOfExtension {
      * \`\`\`
      */
     oneOf<V extends string>(...values: [V, ...V[]]): StringOneOfReturn<V>;
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * Pass the allowed values as an array (first argument) to provide a
+     * custom error message as the second argument.
+     *
+     * @param values - the allowed string literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * import { string, InferType } from '@cleverbrush/schema';
+     *
+     * const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+     * role.validate('other');  // invalid — "Invalid role"
+     *
+     * const role2 = string().oneOf(['admin', 'user'], (val) => \`"\${val}" is not a valid role\`);
+     * \`\`\`
+     */
+    oneOf<V extends string>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): StringOneOfReturn<V>;
 }
 /**
  * \`.oneOf()\` method added to \`NumberSchemaBuilder\` by the built-in enum
@@ -4528,6 +4551,47 @@ export interface NumberOneOfExtension {
      * \`\`\`
      */
     oneOf<V extends number>(...values: [V, ...V[]]): NumberOneOfReturn<V>;
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * Because number values are always numbers, a trailing \`string\` or
+     * function argument is unambiguously the error message.
+     *
+     * @param args - the allowed number literals followed by an error message
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * import { number } from '@cleverbrush/schema';
+     *
+     * const priority = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+     * const priority2 = number().oneOf(1, 2, 3, (val) => \`\${val} is not a valid priority\`);
+     * \`\`\`
+     */
+    oneOf<V extends number>(...args: [
+        ...[V, ...V[]],
+        ValidationErrorMessageProvider<NumberSchemaBuilder>
+    ]): NumberOneOfReturn<V>;
+    /**
+     * Constrains the number to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * Pass the allowed values as an array (first argument) to provide a
+     * custom error message as the second argument.
+     *
+     * @param values - the allowed number literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * \`\`\`ts
+     * import { number } from '@cleverbrush/schema';
+     *
+     * const priority = number().oneOf([1, 2, 3], 'Must be 1, 2, or 3');
+     * \`\`\`
+     */
+    oneOf<V extends number>(values: readonly [V, ...V[]], errorMessage?: ValidationErrorMessageProvider<NumberSchemaBuilder>): NumberOneOfReturn<V>;
 }
 /**
  * Extension descriptor that adds \`.oneOf()\` to \`StringSchemaBuilder\`
@@ -4544,10 +4608,10 @@ export interface NumberOneOfExtension {
  */
 export declare const enumExtension: import("../extension.js").ExtensionDescriptor<{
     string: {
-        oneOf(this: StringSchemaBuilder, values_0: string, ...values: string[]): StringSchemaBuilder<string, true, false, {}>;
+        oneOf(this: StringSchemaBuilder, ...args: any[]): StringSchemaBuilder<string, true, false, {}>;
     };
     number: {
-        oneOf(this: NumberSchemaBuilder, values_0: number, ...values: number[]): NumberSchemaBuilder<number, true, false, {}>;
+        oneOf(this: NumberSchemaBuilder, ...args: any[]): NumberSchemaBuilder<number, true, false, {}>;
     };
 }>;
 export {};
@@ -4573,7 +4637,7 @@ import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
 import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
-import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
+import type { SchemaBuilder, ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
@@ -4637,6 +4701,17 @@ export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, a
  * Convenience factory equivalent to \`string().oneOf(...values)\`.
  * Mirrors Zod's \`z.enum(['admin', 'user', 'guest'])\` API.
  *
+ * **Rest-params form** (no custom error message):
+ * \`\`\`ts
+ * const Role = enumOf('admin', 'user', 'guest');
+ * \`\`\`
+ *
+ * **Array form** (with optional custom error message):
+ * \`\`\`ts
+ * const Role = enumOf(['admin', 'user', 'guest'], 'Invalid role');
+ * const Role2 = enumOf(['admin', 'user'], (val) => \`"\${val}" is not a valid role\`);
+ * \`\`\`
+ *
  * @param values - the allowed string literals (at least one required)
  * @returns a typed \`StringSchemaBuilder\` that only accepts the given values
  *
@@ -4651,7 +4726,8 @@ export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, a
  * Role.validate('other');  // invalid
  * \`\`\`
  */
-export declare const enumOf: <const T extends string>(...values: [T, ...T[]]) => ExtendedString<T>;
+export declare function enumOf<const T extends string>(...values: [T, ...T[]]): ExtendedString<T>;
+export declare function enumOf<const T extends string>(values: readonly [T, ...T[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): ExtendedString<T>;
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/nullable.d.ts": `/**
  * Built-in nullable extension for \`@cleverbrush/schema\`.

@@ -94,7 +94,9 @@ describe('enum extension (oneOf)', () => {
             const result = schema.validate('other' as any);
             expect(result.valid).toBe(false);
             if (!result.valid) {
-                expect(result.errors![0].message).toBe('"other" is not allowed');
+                expect(result.errors![0].message).toBe(
+                    '"other" is not allowed'
+                );
             }
         });
 
@@ -210,7 +212,12 @@ describe('enum extension (oneOf)', () => {
         });
 
         test('accepts custom string error message as last rest-param', () => {
-            const schema = number().oneOf(1, 2, 3, 'Priority must be 1, 2, or 3');
+            const schema = number().oneOf(
+                1,
+                2,
+                3,
+                'Priority must be 1, 2, or 3'
+            );
             const result = schema.validate(99 as any);
             expect(result.valid).toBe(false);
             if (!result.valid) {
@@ -333,10 +340,7 @@ describe('enum extension (oneOf)', () => {
         });
 
         test('accepts custom string error message via array form', () => {
-            const schema = enumOf(
-                ['admin', 'user', 'guest'],
-                'Invalid role'
-            );
+            const schema = enumOf(['admin', 'user', 'guest'], 'Invalid role');
             const result = schema.validate('other' as any);
             expect(result.valid).toBe(false);
             if (!result.valid) {
