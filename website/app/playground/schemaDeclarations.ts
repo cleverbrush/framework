@@ -1919,7 +1919,7 @@ export declare class PropertyValidationResult<TSchema extends ObjectSchemaBuilde
  *
  * @module
  */
-import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationResult } from './SchemaBuilder.js';
+import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 import type { StringSchemaBuilder } from './StringSchemaBuilder.js';
 /**
  * Descriptor for a single key-value entry within a validated record.
@@ -2113,7 +2113,7 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
     /**
      * @hidden
      */
-    required(errorMessage?: import('./SchemaBuilder.js').ValidationErrorMessageProvider): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
      * @hidden
      */
@@ -2149,7 +2149,7 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
         isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
-        requiredValidationErrorMessageProvider: import("./SchemaBuilder.js").ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
         extensions: {
             [x: string]: unknown;
         };

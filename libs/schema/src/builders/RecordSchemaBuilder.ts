@@ -17,6 +17,8 @@ import {
     type InferType,
     SchemaBuilder,
     type ValidationContext,
+    type ValidationError,
+    type ValidationErrorMessageProvider,
     type ValidationResult
 } from './SchemaBuilder.js';
 import type { StringSchemaBuilder } from './StringSchemaBuilder.js';
@@ -312,7 +314,7 @@ export class RecordSchemaBuilder<
      * @hidden
      */
     public required(
-        errorMessage?: import('./SchemaBuilder.js').ValidationErrorMessageProvider
+        errorMessage?: ValidationErrorMessageProvider
     ): RecordSchemaBuilder<
         TKeySchema,
         TValueSchema,
@@ -476,14 +478,11 @@ export class RecordSchemaBuilder<
                     object = this.resolveDefaultValue();
                 } else if (!this.isRequired) {
                     const capturedObj = object;
-                    const self = this;
                     return {
                         valid: true,
                         object,
                         getNestedErrors() {
-                            return self
-                                .#validateFull(capturedObj, context)
-                                .getNestedErrors();
+                            return {};
                         },
                         getErrorsFor: (key?: string): any => {
                             if (typeof key === 'undefined') {
@@ -493,9 +492,11 @@ export class RecordSchemaBuilder<
                                     seenValue: capturedObj
                                 };
                             }
-                            return self
-                                .#validateFull(capturedObj, context)
-                                .getErrorsFor(key);
+                            return this.#makeKeyResult(
+                                key,
+                                [],
+                                capturedObj as TResult
+                            );
                         }
                     } as any;
                 } else {
@@ -511,75 +512,86 @@ export class RecordSchemaBuilder<
                 return this.#validateFull(object, context);
             }
 
-            // Validate every entry inline.
+            // Validate every entry inline, collecting per-key results as we go.
+            const nestedKeyResults = new Map<string, ValidationResult<any>>();
             const result: Record<string, any> = {};
+            let firstError: ValidationError | null = null;
+
             for (const key of Object.keys(object as any)) {
                 const keyResult = this.#keySchema.validate(key);
                 if (!keyResult.valid) {
-                    const keyErrMsgs =
+                    const keyErrors =
                         keyResult.errors && keyResult.errors.length > 0
-                            ? keyResult.errors.map(e => e.message)
-                            : [`key "${key}" is invalid`];
-                    const self = this;
-                    return {
+                            ? keyResult.errors
+                            : [{ message: `key "${key}" is invalid` }];
+                    nestedKeyResults.set(key, {
                         valid: false,
-                        errors: [{ message: keyErrMsgs[0] }],
-                        getNestedErrors() {
-                            return self
-                                .#validateFull(object, context)
-                                .getNestedErrors();
-                        },
-                        getErrorsFor: (k?: string): any => {
-                            return self
-                                .#validateFull(object, context)
-                                .getErrorsFor(k);
-                        }
-                    } as any;
+                        errors: keyErrors
+                    });
+                    firstError = keyErrors[0];
+                    break;
                 }
 
                 const valueResult = this.#valueSchema.validate(
                     (object as any)[key]
                 );
-                if (!valueResult.valid) {
-                    const valErrMsgs =
-                        valueResult.errors && valueResult.errors.length > 0
-                            ? valueResult.errors.map(e => e.message)
-                            : [`value for key "${key}" is invalid`];
-                    const self = this;
-                    return {
-                        valid: false,
-                        errors: [{ message: valErrMsgs[0] }],
-                        getNestedErrors() {
-                            return self
-                                .#validateFull(object, context)
-                                .getNestedErrors();
-                        },
-                        getErrorsFor: (k?: string): any => {
-                            return self
-                                .#validateFull(object, context)
-                                .getErrorsFor(k);
-                        }
-                    } as any;
-                }
+                nestedKeyResults.set(key, valueResult as any);
 
-                result[key] = valueResult.object;
+                if (!valueResult.valid) {
+                    const valErrors =
+                        valueResult.errors && valueResult.errors.length > 0
+                            ? valueResult.errors
+                            : [
+                                  {
+                                      message: `value for key "${key}" is invalid`
+                                  }
+                              ];
+                    nestedKeyResults.set(key, {
+                        valid: false,
+                        errors: valErrors
+                    });
+                    firstError = valErrors[0];
+                    break;
+                } else {
+                    result[key] = valueResult.object;
+                }
             }
 
             const capturedInput = object;
-            const self = this;
+            const getNestedErrors = () =>
+                this.#buildNestedErrors(nestedKeyResults);
+            const getErrorsFor = (key?: string): any => {
+                if (typeof key === 'undefined') {
+                    return {
+                        errors: [] as ReadonlyArray<string>,
+                        isValid: true,
+                        seenValue: capturedInput
+                    };
+                }
+                const nestedResult = nestedKeyResults.get(key);
+                const errMsgs =
+                    nestedResult && !nestedResult.valid
+                        ? (nestedResult.errors ?? []).map(
+                              (e: ValidationError) => e.message
+                          )
+                        : [];
+                return this.#makeKeyResult(key, errMsgs, capturedInput);
+            };
+
+            if (firstError !== null) {
+                return {
+                    valid: false,
+                    errors: [firstError],
+                    getNestedErrors,
+                    getErrorsFor
+                } as any;
+            }
+
             return {
                 valid: true,
                 object: result as TResult,
-                getNestedErrors() {
-                    return self
-                        .#validateFull(capturedInput, context)
-                        .getNestedErrors();
-                },
-                getErrorsFor: (key?: string): any => {
-                    return self
-                        .#validateFull(capturedInput, context)
-                        .getErrorsFor(key);
-                }
+                getNestedErrors,
+                getErrorsFor
             } as any;
         }
 
@@ -615,8 +627,7 @@ export class RecordSchemaBuilder<
             const errMsgs =
                 nestedResult && !nestedResult.valid
                     ? (nestedResult.errors ?? []).map(
-                          (e: import('./SchemaBuilder.js').ValidationError) =>
-                              e.message
+                          (e: ValidationError) => e.message
                       )
                     : [];
             return this.#makeKeyResult(key, errMsgs, object);
@@ -660,7 +671,7 @@ export class RecordSchemaBuilder<
         const doNotStop = context?.doNotStopOnFirstError ?? false;
         let allValid = true;
         const result: Record<string, any> = {};
-        const allErrors: import('./SchemaBuilder.js').ValidationError[] = [];
+        const allErrors: ValidationError[] = [];
 
         for (const key of keys) {
             const keyResult = this.#keySchema.validate(key);
@@ -752,8 +763,7 @@ export class RecordSchemaBuilder<
             const errMsgs =
                 nestedResult && !nestedResult.valid
                     ? (nestedResult.errors ?? []).map(
-                          (e: import('./SchemaBuilder.js').ValidationError) =>
-                              e.message
+                          (e: ValidationError) => e.message
                       )
                     : [];
             return this.#makeKeyResult(key, errMsgs, object);
@@ -797,7 +807,7 @@ export class RecordSchemaBuilder<
         const doNotStop = context?.doNotStopOnFirstError ?? false;
         let allValid = true;
         const result: Record<string, any> = {};
-        const allErrors: import('./SchemaBuilder.js').ValidationError[] = [];
+        const allErrors: ValidationError[] = [];
 
         for (const key of keys) {
             const keyResult = await this.#keySchema.validateAsync(key);

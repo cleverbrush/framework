@@ -396,7 +396,7 @@ console.log(bad.errors);
                                         <code>.optional()</code>,{' '}
                                         <code>.nullable()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
-                                        <code>.addValidator(fn)</code>;
+                                        <code>.addValidator(fn)</code>
                                         validation result:{' '}
                                         <code>.getErrorsFor(key?)</code>
                                     </td>
