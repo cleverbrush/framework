@@ -18,6 +18,7 @@ import type { DateSchemaBuilder } from '../builders/DateSchemaBuilder.js';
 import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js';
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
+import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
@@ -32,6 +33,7 @@ import type {
     DateBuiltinExtensions,
     FuncBuiltinExtensions,
     ObjectBuiltinExtensions,
+    RecordBuiltinExtensions,
     TupleBuiltinExtensions,
     UnionBuiltinExtensions
 } from './nullable.js';
@@ -51,6 +53,7 @@ export {
     type NullableReturn,
     nullableExtension,
     type ObjectBuiltinExtensions,
+    type RecordBuiltinExtensions,
     type TupleBuiltinExtensions,
     type UnionBuiltinExtensions
 } from './nullable.js';
@@ -188,6 +191,30 @@ export type ExtendedTuple<
     TupleBuiltinExtensions<TElements> &
     HiddenExtensionMethods;
 
+/** A `RecordSchemaBuilder` with built-in extension methods. */
+export type ExtendedRecord<
+    TKeySchema extends StringSchemaBuilder<
+        any,
+        any,
+        any,
+        any
+    > = StringSchemaBuilder<any, any, any, any>,
+    TValueSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<
+        any,
+        any,
+        any
+    >
+> = RecordSchemaBuilder<
+    TKeySchema,
+    TValueSchema,
+    true,
+    undefined,
+    false,
+    RecordBuiltinExtensions<TKeySchema, TValueSchema>
+> &
+    RecordBuiltinExtensions<TKeySchema, TValueSchema> &
+    HiddenExtensionMethods;
+
 // -- Runtime factories with explicit type annotations -------------------------
 
 const s = withExtensions(
@@ -232,3 +259,11 @@ export const tuple: <
 >(
     elements: [...TElements]
 ) => ExtendedTuple<TElements> = s.tuple as any;
+
+export const record: <
+    TKeySchema extends StringSchemaBuilder<any, any, any, any>,
+    TValueSchema extends SchemaBuilder<any, any, any>
+>(
+    keySchema: TKeySchema,
+    valueSchema: TValueSchema
+) => ExtendedRecord<TKeySchema, TValueSchema> = s.record as any;

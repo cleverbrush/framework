@@ -1381,6 +1381,14 @@ type MakeChildrenRequired<T extends Record<string, SchemaBuilder<any, any, any>>
 type MakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any>>> = {
     [K in keyof T]: ReturnType<T[K]['optional']>;
 };
+/**
+ * Recursively maps each property to its optional form, descending into
+ * nested \`ObjectSchemaBuilder\` schemas.  All other schema types (arrays,
+ * unions, primitives) are only made optional at the top level.
+ */
+type DeepMakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any>>> = {
+    [K in keyof T]: T[K] extends ObjectSchemaBuilder<infer P extends Record<string, SchemaBuilder<any, any, any>>, any, any, any, any> ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']> : ReturnType<T[K]['optional']>;
+};
 type MakeChildOptional<T extends Record<any, SchemaBuilder<any, any, any>>, TProp extends keyof T> = {
     [K in keyof T]: K extends TProp ? ReturnType<T[K]['optional']> : T[K];
 };
@@ -1680,6 +1688,65 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      */
     partial<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty> & Pick<MakeChildrenOptional<TProperties>, TProperty>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
+     * Recursively marks all properties — and all properties of nested
+     * \`object()\` schemas — as optional.  Useful for PATCH API bodies
+     * and partial form state where every field at every level is optional.
+     *
+     * Only nested \`ObjectSchemaBuilder\` schemas are recursed into.
+     * Other schema types (arrays, unions, primitives, lazy) are made
+     * optional at the top level but their internals are not modified.
+     *
+     * @example
+     * \`\`\`ts
+     * const Address = object({
+     *   street: string(),
+     *   city:   string()
+     * });
+     *
+     * const User = object({
+     *   name:    string(),
+     *   address: Address
+     * });
+     *
+     * const PatchUser = User.deepPartial();
+     * // PatchUser infers as:
+     * // { name?: string; address?: { street?: string; city?: string } }
+     *
+     * PatchUser.validate({ address: { city: 'Paris' } }); // valid
+     * PatchUser.validate({});                              // valid
+     * \`\`\`
+     *
+     * @example
+     * \`\`\`ts
+     * // Three-level nesting
+     * const schema = object({
+     *   a: object({
+     *     b: object({ c: string() })
+     *   })
+     * }).deepPartial();
+     *
+     * schema.validate({});               // valid
+     * schema.validate({ a: {} });        // valid
+     * schema.validate({ a: { b: {} } }); // valid
+     * \`\`\`
+     *
+     * @example
+     * \`\`\`ts
+     * // PATCH API body
+     * const CreateBody = object({
+     *   profile: object({ displayName: string(), bio: string() }),
+     *   settings: object({ theme: string(), language: string() })
+     * });
+     *
+     * const PatchBody = CreateBody.deepPartial();
+     * // All fields are optional at every level —
+     * // send only what you want to update.
+     * \`\`\`
+     *
+     * @see {@link partial} for shallow-only property optionality.
+     */
+    deepPartial(): ObjectSchemaBuilder<DeepMakeChildrenOptional<TProperties>, TRequired, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
      * Returns a new schema containing only properties listed in
      * \`properties\` array.
      * @param properties array of property names (strings)
@@ -1837,6 +1904,328 @@ export declare class PropertyValidationResult<TSchema extends ObjectSchemaBuilde
      */
     addChildError(childError: NestedValidationResult<any, any, any>): void;
 }
+`,
+    "file:///node_modules/@cleverbrush/schema/builders/RecordSchemaBuilder.d.ts": `/**
+ * Schema builder for objects with dynamic string keys, where every value
+ * must satisfy the same value schema.
+ *
+ * Equivalent to TypeScript's \`Record<string, V>\` (or a more constrained key
+ * set when using a string-literal key schema) and Zod's \`z.record()\`.
+ *
+ * Unlike \`ObjectSchemaBuilder\` — which validates objects with a **known,
+ * fixed set of property names** — \`RecordSchemaBuilder\` validates objects
+ * whose keys are not known at schema-definition time (look-up tables, i18n
+ * bundles, caches, etc.).
+ *
+ * @module
+ */
+import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+import type { StringSchemaBuilder } from './StringSchemaBuilder.js';
+/**
+ * Descriptor for a single key-value entry within a validated record.
+ * Provides \`getValue\`, \`setValue\`, and \`getSchema\` operations for the entry.
+ *
+ * Returned as part of {@link RecordKeyValidationResult}.
+ */
+export type RecordKeyDescriptor<TRecord, TValueSchema extends SchemaBuilder<any, any, any>> = {
+    /** The key within the record this descriptor refers to. */
+    readonly key: string;
+    /** Returns the value schema every record entry must satisfy. */
+    getSchema(): TValueSchema;
+    /**
+     * Retrieves the value at \`key\` from the given record object.
+     * Returns \`{ success: false }\` when the key is not present.
+     */
+    getValue(obj: TRecord): {
+        value?: InferType<TValueSchema>;
+        success: boolean;
+    };
+    /**
+     * Sets the value at \`key\` on the given record object.
+     * Returns \`false\` when \`obj\` is not a non-null object.
+     */
+    setValue(obj: TRecord, value: InferType<TValueSchema>): boolean;
+};
+/**
+ * Validation result for a single key-value entry in a record.
+ * Returned by {@link RecordSchemaValidationResult.getErrorsFor | getErrorsFor(key)}.
+ */
+export type RecordKeyValidationResult<TRecord, TValueSchema extends SchemaBuilder<any, any, any>> = {
+    /** Validation error messages for this entry; empty array when valid. */
+    readonly errors: ReadonlyArray<string>;
+    /** \`true\` when there are no validation errors for this entry. */
+    readonly isValid: boolean;
+    /** The value that was seen at this key during validation. */
+    readonly seenValue: InferType<TValueSchema> | undefined;
+    /** Descriptor for reading/writing the value at this key. */
+    readonly descriptor: RecordKeyDescriptor<TRecord, TValueSchema>;
+};
+/**
+ * Root-level validation result for the record object itself.
+ * Returned by {@link RecordSchemaValidationResult.getErrorsFor | getErrorsFor()} (no argument).
+ */
+export type RecordRootValidationResult<TResult> = {
+    /** Root-level error messages (e.g. \`"object expected"\`); empty when valid. */
+    readonly errors: ReadonlyArray<string>;
+    /** \`true\` when there are no root-level errors. */
+    readonly isValid: boolean;
+    /** The value that was being validated. */
+    readonly seenValue: TResult | undefined;
+};
+/**
+ * Validation result type returned by \`RecordSchemaBuilder.validate()\`.
+ *
+ * Extends \`ValidationResult\` with:
+ * - \`getNestedErrors()\` — a per-key map of \`ValidationResult\` objects.
+ * - \`getErrorsFor()\` — root-level errors for the record container itself.
+ * - \`getErrorsFor(key)\` — errors, seen value, and descriptor for a specific key.
+ */
+export type RecordSchemaValidationResult<TResult, TValueSchema extends SchemaBuilder<any, any, any>> = ValidationResult<TResult> & {
+    /**
+     * Returns per-key validation results as a plain object.
+     *
+     * Each key in the returned object corresponds to a key in the input that
+     * **failed** validation (in \`doNotStopOnFirstError\` mode) or the single
+     * first failing key (in the default stop-on-first-error mode). Keys that
+     * passed are not included.
+     *
+     * @deprecated Prefer {@link getErrorsFor} for a richer per-entry result
+     * that also includes a descriptor and \`seenValue\`.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = record(string(), number().positive());
+     * const result = schema.validate(
+     *   { a: 1, b: -2, c: 'oops' },
+     *   { doNotStopOnFirstError: true }
+     * );
+     *
+     * if (!result.valid) {
+     *   const nested = result.getNestedErrors();
+     *   console.log(nested['b']); // ValidationResult for key 'b'
+     *   console.log(nested['c']); // ValidationResult for key 'c'
+     * }
+     * \`\`\`
+     */
+    getNestedErrors(): Record<string, ValidationResult<InferType<TValueSchema>>>;
+    /**
+     * Returns root-level errors for the record container itself
+     * (e.g. \`"object expected"\` when a non-object value is passed,
+     * or errors from custom validators added to the record schema).
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = record(string(), number());
+     * const root = schema.validate(42 as any).getErrorsFor();
+     * // root.errors[0] === 'object expected'
+     * // root.isValid === false
+     * \`\`\`
+     */
+    getErrorsFor(): RecordRootValidationResult<TResult>;
+    /**
+     * Returns the validation result for the entry with the given key,
+     * including error messages, the seen value, and a descriptor for
+     * accessing and modifying the value at that key.
+     *
+     * If the key was not reached during validation (e.g. an earlier key
+     * already failed in stop-on-first-error mode), an empty result with
+     * \`isValid: true\` and no errors is returned.
+     *
+     * @param key - the key whose validation result to retrieve
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = record(string(), number().min(0));
+     * const result = schema.validate(
+     *   { a: 5, b: -2 },
+     *   { doNotStopOnFirstError: true }
+     * );
+     *
+     * const bErrors = result.getErrorsFor('b');
+     * // bErrors.isValid === false
+     * // bErrors.errors[0] === 'the value must be >= 0'
+     * // bErrors.seenValue === -2
+     * // bErrors.descriptor.key === 'b'
+     * // bErrors.descriptor.getSchema() === valueSchema
+     * \`\`\`
+     */
+    getErrorsFor(key: string): RecordKeyValidationResult<TResult, TValueSchema>;
+};
+type RecordSchemaBuilderCreateProps<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>, R extends boolean = true> = Partial<ReturnType<RecordSchemaBuilder<TKeySchema, TValueSchema, R>['introspect']>>;
+/**
+ * Schema builder for objects with dynamic string keys.
+ *
+ * Every key in the validated object must be accepted by \`keySchema\` (a
+ * \`StringSchemaBuilder\`) and every value must satisfy \`valueSchema\`.
+ *
+ * The inferred TypeScript type mirrors \`Record<K, V>\` where \`K\` is the
+ * string type produced by \`keySchema\` and \`V\` is the type produced by
+ * \`valueSchema\`.
+ *
+ * **NOTE** — this class is exported to allow extension by inheritance. Use
+ * the {@link record | record()} factory function instead of instantiating it
+ * directly.
+ *
+ * @example
+ * \`\`\`ts
+ * import { record, string, number } from '@cleverbrush/schema';
+ *
+ * // Basic: string keys, number values
+ * const scores = record(string(), number().min(0));
+ * // InferType<typeof scores> → Record<string, number>
+ *
+ * scores.validate({ alice: 95, bob: 87 }); // valid
+ * scores.validate({ alice: 95, bob: -1 }); // invalid (negative)
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Restrict keys to a specific set of literals with .equals()
+ * const locales = record(
+ *   string().matches(/^[a-z]{2}(-[A-Z]{2})?$/),
+ *   string().nonempty()
+ * );
+ * // accepts: { en: 'Hello', fr: 'Bonjour' }
+ * // rejects: { 123: 'oops' }  ← key doesn't match pattern
+ * \`\`\`
+ *
+ * @see {@link record}
+ */
+export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>, TRequired extends boolean = true, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? Record<InferType<TKeySchema>, InferType<TValueSchema>> : TExplicitType> extends SchemaBuilder<TResult, TRequired, THasDefault, TExtensions> {
+    #private;
+    /**
+     * @hidden
+     */
+    static create(props: RecordSchemaBuilderCreateProps<any, any, any>): RecordSchemaBuilder<StringSchemaBuilder<any, any, any, any>, SchemaBuilder<any, any, any, {}>, true, undefined, false, {}, Record<any, any>>;
+    protected constructor(props: RecordSchemaBuilderCreateProps<TKeySchema, TValueSchema, TRequired>);
+    /**
+     * @inheritdoc
+     */
+    hasType<T>(_notUsed?: T): RecordSchemaBuilder<TKeySchema, TValueSchema, true, T, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    clearHasType(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, undefined, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    protected createFromProps<TReq extends boolean>(props: RecordSchemaBuilderCreateProps<TKeySchema, TValueSchema, TReq>): this;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): RecordSchemaBuilder<TKeySchema, TValueSchema, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): RecordSchemaBuilder<TKeySchema, TValueSchema, true, TExplicitType, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, TExplicitType, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): RecordSchemaBuilder<TKeySchema, TValueSchema, TRequired, TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Returns an introspection object describing the record schema.
+     */
+    introspect(): {
+        /**
+         * The schema every key must satisfy (a \`StringSchemaBuilder\`).
+         */
+        keySchema: TKeySchema;
+        /**
+         * The schema every value must satisfy.
+         */
+        valueSchema: TValueSchema;
+        type: string;
+        isRequired: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+    };
+    /**
+     * Core sync validation. Returns \`{ valid, object, errors, getNestedErrors, getErrorsFor }\`.
+     */
+    validate(object: TResult, context?: ValidationContext): RecordSchemaValidationResult<TResult, TValueSchema>;
+    /**
+     * Performs async validation of the record schema.
+     *
+     * Supports async preprocessors, validators, and error message providers.
+     *
+     * @param object - the value to validate
+     * @param context - optional \`ValidationContext\` settings
+     */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<RecordSchemaValidationResult<TResult, TValueSchema>>;
+}
+/**
+ * Creates a schema for objects with dynamic string keys, where every key
+ * must satisfy \`keySchema\` and every value must satisfy \`valueSchema\`.
+ *
+ * The inferred TypeScript type is \`Record<K, V>\` where \`K\` is derived from
+ * \`keySchema\` and \`V\` from \`valueSchema\`.
+ *
+ * @param keySchema  - a \`StringSchemaBuilder\` that each key must satisfy
+ * @param valueSchema - a \`SchemaBuilder\` that each value must satisfy
+ *
+ * @example
+ * \`\`\`ts
+ * import { record, string, number } from '@cleverbrush/schema';
+ *
+ * // Look-up table: string keys → number scores
+ * const scores = record(string(), number().min(0).max(100));
+ * // InferType<typeof scores> → Record<string, number>
+ *
+ * scores.validate({ alice: 95, bob: 87 }); // { valid: true }
+ * scores.validate({ alice: 95, bob: -1 }); // { valid: false }
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // i18n bundle: locale code keys → non-empty strings
+ * const bundle = record(
+ *   string().matches(/^[a-z]{2}(-[A-Z]{2})?$/),
+ *   string().nonempty()
+ * );
+ *
+ * bundle.validate({ en: 'Hello', 'fr-FR': 'Bonjour' }); // valid
+ * bundle.validate({ en: '' });                            // invalid (empty value)
+ * bundle.validate({ '123': 'hi' });                      // invalid (bad key)
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Optional record with a factory default
+ * const cache = record(string(), number())
+ *   .optional()
+ *   .default(() => ({}));
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Nested record — values are objects
+ * import { record, string, object, number } from '@cleverbrush/schema';
+ *
+ * const userMap = record(
+ *   string(),
+ *   object({ name: string(), age: number() })
+ * );
+ * \`\`\`
+ */
+export declare function record<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema): RecordSchemaBuilder<TKeySchema, TValueSchema>;
+export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import { type Transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
@@ -2989,6 +3378,7 @@ export declare class TupleSchemaBuilder<TElements extends readonly SchemaBuilder
         restSchema: (TRestSchema & SchemaBuilder<any, any, any, {}>) | undefined;
         type: string;
         isRequired: boolean;
+        isReadonly: boolean;
         preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
         validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, {}>>;
@@ -3283,6 +3673,8 @@ export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/ObjectSchemaBuilder.js';
+export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
+export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type { PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
 export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
@@ -3364,6 +3756,7 @@ import { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 import { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
 import { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
+import { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
 import { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
@@ -3384,6 +3777,7 @@ type BuilderMap = {
     object: ObjectSchemaBuilder<any, any, any, any, any>;
     array: ArraySchemaBuilder<any, any, any, any, any, any>;
     tuple: TupleSchemaBuilder<any, any, any, any, any, any>;
+    record: RecordSchemaBuilder<any, any, any, any, any, any>;
     union: UnionSchemaBuilder<any, any, any, any, any>;
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any>;
@@ -3512,6 +3906,7 @@ type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any>>(schem
 type ExtendedFuncFactory<TExt> = () => CleanExtended<FunctionSchemaBuilder<true, undefined, false, TExt>, TExt>;
 type ExtendedAnyFactory<TExt> = () => CleanExtended<AnySchemaBuilder<true, undefined, false, TExt>, TExt>;
 type ExtendedTupleFactory<TExt> = <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => CleanExtended<TupleSchemaBuilder<TElements, true, undefined, false, TExt>, TExt>;
+type ExtendedRecordFactory<TExt> = <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => CleanExtended<RecordSchemaBuilder<TKeySchema, TValueSchema, true, undefined, false, TExt>, TExt>;
 /**
  * The return type of {@link withExtensions}.
  *
@@ -3532,6 +3927,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     object: ExtendedObjectFactory<MergeExtensionMethods<TExts, 'object'>>;
     array: ExtendedArrayFactory<MergeExtensionMethods<TExts, 'array'>>;
     tuple: ExtendedTupleFactory<MergeExtensionMethods<TExts, 'tuple'>>;
+    record: ExtendedRecordFactory<MergeExtensionMethods<TExts, 'record'>>;
     union: ExtendedUnionFactory<MergeExtensionMethods<TExts, 'union'>>;
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
@@ -3839,17 +4235,18 @@ import type { DateSchemaBuilder } from '../builders/DateSchemaBuilder.js';
 import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js';
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
+import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
 import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
 import type { HiddenExtensionMethods } from '../extension.js';
 import type { ArrayBuiltinExtensions } from './array.js';
-import type { AnyBuiltinExtensions, BooleanBuiltinExtensions, DateBuiltinExtensions, FuncBuiltinExtensions, ObjectBuiltinExtensions, TupleBuiltinExtensions, UnionBuiltinExtensions } from './nullable.js';
+import type { AnyBuiltinExtensions, BooleanBuiltinExtensions, DateBuiltinExtensions, FuncBuiltinExtensions, ObjectBuiltinExtensions, RecordBuiltinExtensions, TupleBuiltinExtensions, UnionBuiltinExtensions } from './nullable.js';
 import type { NumberBuiltinExtensions } from './number.js';
 import type { StringBuiltinExtensions } from './string.js';
 export { type ArrayBuiltinExtensions, arrayExtensions } from './array.js';
-export { type AnyBuiltinExtensions, type BooleanBuiltinExtensions, type DateBuiltinExtensions, type FuncBuiltinExtensions, type NullableMethod, type NullableReturn, nullableExtension, type ObjectBuiltinExtensions, type TupleBuiltinExtensions, type UnionBuiltinExtensions } from './nullable.js';
+export { type AnyBuiltinExtensions, type BooleanBuiltinExtensions, type DateBuiltinExtensions, type FuncBuiltinExtensions, type NullableMethod, type NullableReturn, nullableExtension, type ObjectBuiltinExtensions, type RecordBuiltinExtensions, type TupleBuiltinExtensions, type UnionBuiltinExtensions } from './nullable.js';
 export { type NumberBuiltinExtensions, numberExtensions } from './number.js';
 export { type StringBuiltinExtensions, stringExtensions } from './string.js';
 /** A \`StringSchemaBuilder\` with built-in extension methods. */
@@ -3872,6 +4269,8 @@ export type ExtendedFunc = FunctionSchemaBuilder<true, undefined, false, FuncBui
 export type ExtendedAny = AnySchemaBuilder<true, undefined, false, AnyBuiltinExtensions> & AnyBuiltinExtensions & HiddenExtensionMethods;
 /** A \`TupleSchemaBuilder\` with built-in extension methods. */
 export type ExtendedTuple<TElements extends readonly SchemaBuilder<any, any, any>[] = readonly SchemaBuilder<any, any, any>[]> = TupleSchemaBuilder<TElements, true, undefined, false, TupleBuiltinExtensions<TElements>> & TupleBuiltinExtensions<TElements> & HiddenExtensionMethods;
+/** A \`RecordSchemaBuilder\` with built-in extension methods. */
+export type ExtendedRecord<TKeySchema extends StringSchemaBuilder<any, any, any, any> = StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> = RecordSchemaBuilder<TKeySchema, TValueSchema, true, undefined, false, RecordBuiltinExtensions<TKeySchema, TValueSchema>> & RecordBuiltinExtensions<TKeySchema, TValueSchema> & HiddenExtensionMethods;
 export declare const string: {
     (): ExtendedString;
     <T extends string>(equals: T): ExtendedString<T>;
@@ -3892,6 +4291,7 @@ export declare const union: <TOptions extends SchemaBuilder<any, any, any>>(sche
 export declare const func: () => ExtendedFunc;
 export declare const any: () => ExtendedAny;
 export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any>[]>(elements: [...TElements]) => ExtendedTuple<TElements>;
+export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => ExtendedRecord<TKeySchema, TValueSchema>;
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/nullable.d.ts": `/**
  * Built-in nullable extension for \`@cleverbrush/schema\`.
@@ -3913,6 +4313,7 @@ import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js
 import { type NullSchemaBuilder } from '../builders/NullSchemaBuilder.js';
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
+import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
 import type { TupleSchemaBuilder } from '../builders/TupleSchemaBuilder.js';
@@ -3970,6 +4371,11 @@ export interface AnyBuiltinExtensions {
 export interface TupleBuiltinExtensions<TElements extends readonly SchemaBuilder<any, any, any>[] = readonly SchemaBuilder<any, any, any>[]> {
     /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
     nullable(): NullableReturn<TupleSchemaBuilder<TElements, true, undefined, false, TupleBuiltinExtensions<TElements>>>;
+}
+/** Methods threaded through \`TExtensions\` for \`RecordSchemaBuilder\`. */
+export interface RecordBuiltinExtensions<TKeySchema extends StringSchemaBuilder<any, any, any, any> = StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any> = SchemaBuilder<any, any, any>> {
+    /** Makes this schema nullable — shorthand for \`union(schema).or(nul())\`. */
+    nullable(): NullableReturn<RecordSchemaBuilder<TKeySchema, TValueSchema, true, undefined, false, RecordBuiltinExtensions<TKeySchema, TValueSchema>>>;
 }
 export interface NullableMethod<TBuilder extends SchemaBuilder<any, any, any>> {
     /**
@@ -4107,6 +4513,14 @@ export declare const nullableExtension: import("../extension.js").ExtensionDescr
          * @returns a \`UnionSchemaBuilder\` that accepts the tuple type or \`null\`
          */
         nullable(this: TupleSchemaBuilder<any>): UnionSchemaBuilder<[TupleSchemaBuilder<any, true, undefined, false, {}, undefined, any[]>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[TupleSchemaBuilder<any, true, undefined, false, {}, undefined, any[]>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
+    };
+    record: {
+        /**
+         * Makes this schema nullable — shorthand for \`union(schema).or(nul())\`.
+         *
+         * @returns a \`UnionSchemaBuilder\` that accepts the record type or \`null\`
+         */
+        nullable(this: RecordSchemaBuilder<any, any>): UnionSchemaBuilder<[RecordSchemaBuilder<any, any, true, undefined, false, {}, Record<any, any>>, NullSchemaBuilder<true, undefined, false, {}>], true, undefined, false, {}> | UnionSchemaBuilder<[RecordSchemaBuilder<any, any, true, undefined, false, {}, Record<any, any>>, NullSchemaBuilder<true, undefined, false, {}>], false, undefined, false, {}>;
     };
 }>;
 `,
@@ -4591,10 +5005,12 @@ export declare function resolveErrorMessageAsync(provider: ValidationErrorMessag
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/index.d.ts": `export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
+export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
-export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedString, type ExtendedTuple, type ExtendedUnion, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type StringBuiltinExtensions, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
+export { type AnyBuiltinExtensions, type ArrayBuiltinExtensions, any, array, arrayExtensions, type BooleanBuiltinExtensions, boolean, type DateBuiltinExtensions, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, type FuncBuiltinExtensions, func, type NullableMethod, type NullableReturn, type NumberBuiltinExtensions, nullableExtension, number, numberExtensions, type ObjectBuiltinExtensions, object, type RecordBuiltinExtensions, record, type StringBuiltinExtensions, string, stringExtensions, type TupleBuiltinExtensions, tuple, type UnionBuiltinExtensions, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

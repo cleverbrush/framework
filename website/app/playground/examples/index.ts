@@ -34,6 +34,10 @@ export const EXAMPLE_GROUPS = [
         ids: [
             'arrays',
             'tuples',
+            'record-basics',
+            'record-key-constraints',
+            'record-nested',
+            'record-errors',
             'union-types',
             'discriminated-unions',
             'nullable'
@@ -923,6 +927,120 @@ const l = log.validate(['info', 200, 'request ok', 'extra detail']);
 // l.valid === true
 `,
         testData: '["hello", 42, true]'
+    },
+    {
+        id: 'record-basics',
+        title: 'Record Schemas',
+        description:
+            'Use <code>record(keySchema, valueSchema)</code> to validate objects with <strong>dynamic string keys</strong> — lookup tables, i18n bundles, caches, and any <code>Record&lt;K,V&gt;</code> shape. Unlike <code>object()</code>, the set of keys need not be known at schema-definition time.',
+        group: 'Arrays & Unions',
+        code: `import { record, string, number, InferType } from '@cleverbrush/schema';
+
+// string keys → number values
+const scores = record(string(), number().min(0).max(100));
+type Scores = InferType<typeof scores>; // Record<string, number>
+
+// Optional record with a factory default
+const cache = record(string(), number()).optional().default(() => ({}));
+
+const result = scores.validate({ alice: 95, bob: 87 });
+// result.valid === true
+// result.object === { alice: 95, bob: 87 }
+`,
+        testData: '{ "alice": 95, "bob": 87 }'
+    },
+    {
+        id: 'record-key-constraints',
+        title: 'Record — Key Constraints',
+        description:
+            'The first argument to <code>record()</code> is a <code>StringSchemaBuilder</code> — chain any string constraint to restrict which keys are valid. Here <code>.startsWith()</code> also <strong>narrows the inferred key type</strong> to a template literal.',
+        group: 'Arrays & Unions',
+        code: `import { record, string, InferType } from '@cleverbrush/schema';
+
+// Keys must start with "get" AND match a camelCase getter pattern.
+// .startsWith('get') narrows the inferred key type to \`get\${string}\`.
+const i18n = record(
+    string().startsWith('get').matches(/^get[A-Z]/),
+    string().nonempty()
+);
+
+type I18n = InferType<typeof i18n>;
+// Record<\`get\${string}\`, string>
+// — only "get…" keys are type-safe
+
+const result = i18n.validate({
+    getWelcome:  'Welcome!',
+    getGoodbye:  'Goodbye!',
+    getNotFound: 'Page not found'
+});
+// result.valid === true
+
+// i18n.validate({ welcome: 'hi' })     → invalid (missing "get" prefix)
+// i18n.validate({ getWelcome: '' })     → invalid (empty string value)
+// i18n.validate({ GetWelcome: 'hi' })   → invalid (uppercase "G")
+`,
+        testData: '{ "getWelcome": "Welcome!", "getGoodbye": "Goodbye!" }'
+    },
+    {
+        id: 'record-nested',
+        title: 'Record — Nested Object Values',
+        description:
+            'Values in a record can be any schema, including <code>object()</code>. This is useful for maps from an ID or key to a structured entity.',
+        group: 'Arrays & Unions',
+        code: `import { record, string, number, object, InferType } from '@cleverbrush/schema';
+
+const userMap = record(
+    string(),
+    object({ name: string(), age: number().min(0) })
+);
+
+type UserMap = InferType<typeof userMap>;
+// Record<string, { name: string; age: number }>
+
+const result = userMap.validate({
+    u1: { name: 'Alice', age: 30 },
+    u2: { name: 'Bob',   age: 25 }
+});
+// result.valid === true
+`,
+        testData:
+            '{ "u1": { "name": "Alice", "age": 30 }, "u2": { "name": "Bob", "age": 25 } }'
+    },
+    {
+        id: 'record-errors',
+        title: 'Record — Per-Key Errors',
+        description:
+            'Use <code>getErrorsFor(key)</code> to retrieve rich per-entry error information — error messages, the seen value, and a <strong>descriptor</strong> that lets you read and write the entry on the validated object. Use <code>getErrorsFor()</code> (no argument) for root-level errors.',
+        group: 'Arrays & Unions',
+        code: `import { record, string, number } from '@cleverbrush/schema';
+
+const schema = record(string(), number().min(0));
+
+const result = schema.validate(
+    { a: 1, b: -2, c: -3 },
+    { doNotStopOnFirstError: true }
+);
+// result.valid === false
+
+// Root-level errors (e.g. "object expected" when a non-object is passed)
+const root = result.getErrorsFor();
+// root.isValid === true  (the container itself is valid)
+// root.seenValue        === { a: 1, b: -2, c: -3 }
+
+// Per-key result: errors, seen value, and a descriptor
+const bResult = result.getErrorsFor('b');
+// bResult.isValid    === false
+// bResult.errors[0]  === 'the value must be >= 0'
+// bResult.seenValue  === -2
+
+// Descriptor: key name, schema, get/set helpers
+const desc = bResult.descriptor;
+// desc.key === 'b'
+// desc.getSchema()               → NumberSchemaBuilder
+// desc.getValue(result.object)   → { success: true, value: -2 }
+// desc.setValue(result.object, 0) → fixes 'b' in-place
+`,
+        testData: '{ "a": 1, "b": -2, "c": -3 }'
     },
     {
         id: 'custom-extensions',

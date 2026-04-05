@@ -13,7 +13,8 @@ export default defineConfig({
         'src/builders/AnySchemaBuilder.ts',
         'src/builders/UnionSchemaBuilder.ts',
         'src/builders/FunctionSchemaBuilder.ts',
-        'src/builders/TupleSchemaBuilder.ts'
+        'src/builders/TupleSchemaBuilder.ts',
+        'src/builders/RecordSchemaBuilder.ts'
     ],
     format: ['esm'],
     tsconfig: './tsconfig.build.json',

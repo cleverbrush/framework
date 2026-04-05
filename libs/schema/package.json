@@ -62,6 +62,10 @@
             "types": "./dist/builders/TupleSchemaBuilder.d.ts",
             "import": "./dist/builders/TupleSchemaBuilder.js"
         },
+        "./record": {
+            "types": "./dist/builders/RecordSchemaBuilder.d.ts",
+            "import": "./dist/builders/RecordSchemaBuilder.js"
+        },
         "./function": {
             "types": "./dist/builders/FunctionSchemaBuilder.d.ts",
             "import": "./dist/builders/FunctionSchemaBuilder.js"
