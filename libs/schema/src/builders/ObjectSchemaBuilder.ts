@@ -88,7 +88,7 @@ type DeepMakeChildrenOptional<
         any,
         any
     >
-        ? ObjectSchemaBuilder<DeepMakeChildrenOptional<P>, false>
+        ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']>
         : ReturnType<T[K]['optional']>;
 };
 
