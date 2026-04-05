@@ -17,7 +17,12 @@
  * @module
  */
 
+export type {
+    StandardJSONSchemaV1,
+    StandardTypedV1
+} from '@standard-schema/spec';
 export { fromJsonSchema } from './fromJsonSchema.js';
+export { withStandardJsonSchema } from './standardJsonSchema.js';
 export { toJsonSchema } from './toJsonSchema.js';
 export type {
     InferFromJsonSchema,
