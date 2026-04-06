@@ -26,27 +26,27 @@
 | **Website** | ✅ Done (unpublished) | Next.js 16, landing page, docs for all packages, 43 playground examples, "Migrating from Zod" guide, TypeDoc API docs + Standard Schema showcases (TanStack Form, T3 Env) |
 | **CI/CD** | ✅ Done | GitHub Actions: `ci.yml` (lint + build + test), `release.yml` (changesets publish) |
 | **Community files** | ✅ Done | CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue templates, PR template |
-| **Benchmarks** | ✅ Done | **#1 in 14/15 benchmarks** vs Zod/Yup/Joi. 1.3–2.2x faster on valid input, 8–230x faster on invalid input |
+| **Benchmarks** | ✅ Done | **#1 in 14/15 benchmarks** vs Zod/Yup/Joi. 1.2–2.65x faster on valid input, 8–204x faster on invalid input |
 
 ### Benchmark Results vs Zod (ops/s)
 
 | Benchmark | Schema | Zod | Ratio |
 |-----------|--------|-----|-------|
-| Array 100 objects (valid) | 70,001 | 32,282 | **2.17x faster** |
-| Array 100 objects (invalid) | 2,816,587 | 12,255 | **230x faster** |
-| Complex order (valid) | 447,420 | 274,238 | **1.63x faster** |
-| Complex order (invalid) | 2,159,649 | 68,471 | **31.5x faster** |
-| Flat object (valid) | 2,064,271 | 1,424,508 | **1.45x faster** |
-| Flat object (invalid) | 5,032,145 | 336,995 | **14.9x faster** |
-| Nested object (valid) | 1,215,356 | 780,329 | **1.56x faster** |
-| Nested object (invalid) | 5,549,210 | 172,313 | **32.2x faster** |
-| String (valid) | 10,188,501 | 7,914,923 | **1.29x faster** |
-| String (invalid) | 11,420,265 | 1,171,617 | **9.75x faster** |
-| Number (valid) | 13,149,357 | 7,406,617 | **1.78x faster** |
-| Number (invalid) | 11,122,316 | 1,335,207 | **8.33x faster** |
-| Union first branch (text) | 3,860,391 | 2,834,793 | **1.36x faster** |
-| Union last branch (video) | 1,292,859 | 1,390,194 | 0.93x (zod 7% faster) |
-| Union no match (invalid) | 11,294,887 | 953,427 | **11.8x faster** |
+| Array 100 objects (valid) | 35,228 | 13,277 | **2.65x faster** |
+| Array 100 objects (invalid) | 899,329 | 4,396 | **204x faster** |
+| Complex order (valid) | 198,988 | 136,090 | **1.46x faster** |
+| Complex order (invalid) | 884,706 | 26,106 | **33.9x faster** |
+| Flat object (valid) | 1,001,194 | 840,725 | **1.19x faster** |
+| Flat object (invalid) | 2,653,630 | 176,222 | **15.1x faster** |
+| Nested object (valid) | 690,556 | 368,893 | **1.87x faster** |
+| Nested object (invalid) | 2,739,319 | 87,245 | **31.4x faster** |
+| String (valid) | 5,348,564 | 3,533,945 | **1.51x faster** |
+| String (invalid) | 5,749,087 | 482,961 | **11.9x faster** |
+| Number (valid) | 7,911,266 | 4,806,511 | **1.65x faster** |
+| Number (invalid) | 5,387,475 | 637,513 | **8.45x faster** |
+| Union first branch (text) | 1,925,508 | 1,529,547 | **1.26x faster** |
+| Union last branch (video) | 676,107 | 732,682 | 0.92x (zod 8% faster) |
+| Union no match (invalid) | 5,873,118 | 385,453 | **15.2x faster** |
 
 ### Competitive Landscape (April 2026)
 
@@ -59,7 +59,7 @@
 | **Extension system** | `.refine()` only (black box) | ✅ **`defineExtension()` — type-safe, composable, introspectable** |
 | **Ecosystem integrations** | 50+ tools via Standard Schema (tRPC, RHF, TanStack, Hono, T3 Env...) | ✅ **50+ tools via Standard Schema** + mapper + react-form + schema-json (broader than Zod's ecosystem) |
 | **AI/LLM support** | MCP server, llms.txt | ❌ None yet — **PropertyDescriptors are an advantage here** |
-| **Performance** | Baseline | ✅ **1.3–230x faster** |
+| **Performance** | Baseline | ✅ **1.2–2.65x faster on valid input, 8–204x faster on invalid input** |
 | **JSON Schema** | Built-in (v4) | ✅ Bidirectional via schema-json |
 | **Object mapping** | ❌ None | ✅ **Built-in mapper** |
 | **Form generation** | Via 3rd parties (RHF) | ✅ **Built-in react-form** |
@@ -130,8 +130,8 @@ Implemented as a built-in extension (not a separate builder class) following the
 
 - ✅ Size is competitive — advertise it
 - ✅ Sub-path exports already satisfy tree-shaking use cases
-- ⚠️ Add badge to README: `14 KB gzipped (full)` / `~4 KB gzipped (per builder)`
-- ⚠️ Update competitive table: clarify Zod v4 is **3× larger**, not smaller
+- ✅ Add badge to README: `14 KB gzipped (full)` / `~4 KB gzipped (per builder)`
+- ✅ Update competitive table: clarify Zod v4 is **3× larger**, not smaller
 
 ### 1.3 Merge & publish
 
@@ -140,16 +140,19 @@ Implemented as a built-in extension (not a separate builder class) following the
 - Verify sub-path exports resolve: `@cleverbrush/schema/core`, `/string`, `/object`, etc.
 - Test `npm install` in a fresh project — verify TypeScript types, ESM imports, IDE autocomplete
 
-### 1.4 README overhaul (monorepo root)
+### 1.4 README overhaul (monorepo root) ✅
 
-Current README is minimal. For first impressions:
+Completed April 6, 2026. Both root and all library READMEs overhauled:
 
-- Compelling one-liner and elevator pitch
-- Feature cards: validation, mapping, forms, JSON Schema — one schema, four capabilities
-- Performance headline: "14/15 benchmarks faster than Zod"
-- Quick-start code example (install → define → validate → infer type)
-- Badges: npm version, CI status, license, bundle size
-- Links to website, playground, API docs
+- Compelling one-liner and elevator pitch with headline numbers upfront
+- "One schema, four capabilities" diagram showing the ecosystem architecture
+- Performance benchmark table (14/15 vs Zod with concrete ops/s numbers)
+- Bundle size comparison table (calling out Zod v4's 3× larger size)
+- Competitive feature comparison table (PropertyDescriptors, extension system, mapper, forms, JSON Schema)
+- Quick-start code example with Standard Schema interop
+- Badges: CI status, license, Standard Schema, bundle size
+- Code Quality section — Biome, TypeScript strict, Vitest, tsup, benchmarks
+- Links to API docs and playground throughout
 
 ---
 
@@ -418,7 +421,7 @@ Phase 7-8: Demand-driven features + ecosystem expansion
 <details>
 <summary>Performance optimization ✅</summary>
 
-Performance work on `feature/performance` branch transformed benchmarks from a liability into a competitive advantage. **#1 in 14 out of 15 benchmarks** across primitives, objects, arrays, and unions. Valid input: 1.3–2.2x faster than Zod. Invalid input: 8–230x faster (early-exit optimization). Only loss: union match-last-branch (~7% slower, effectively a tie).
+Performance work on `feature/performance` branch transformed benchmarks from a liability into a competitive advantage. **#1 in 14 out of 15 benchmarks** across primitives, objects, arrays, and unions. Valid input: 1.2–2.65x faster than Zod. Invalid input: 8–204x faster (early-exit optimization). Only loss: union match-last-branch (~8% slower, effectively a tie).
 </details>
 
 <details>
