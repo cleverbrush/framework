@@ -44,6 +44,23 @@ const entries = files.map((absPath) => {
     return { monacoPath, content };
 });
 
+// Also include @standard-schema/spec types (required by ExternSchemaBuilder).
+// Register at multiple paths to ensure Monaco resolves bare `@standard-schema/spec` imports.
+const STANDARD_SCHEMA_DTS = join(
+    __dirname, '..', 'node_modules', '@standard-schema', 'spec', 'dist', 'index.d.ts'
+);
+try {
+    const ssContent = readFileSync(STANDARD_SCHEMA_DTS, 'utf-8');
+    for (const monacoPath of [
+        'file:///node_modules/@standard-schema/spec/dist/index.d.ts',
+        'file:///node_modules/@standard-schema/spec/index.d.ts',
+    ]) {
+        entries.push({ monacoPath, content: ssContent });
+    }
+} catch {
+    console.warn('⚠ @standard-schema/spec not found — extern() types may not work in playground');
+}
+
 let output = `// AUTO-GENERATED — do not edit manually.
 // Run: node scripts/generate-playground-declarations.js
 //

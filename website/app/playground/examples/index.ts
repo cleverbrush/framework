@@ -80,6 +80,10 @@ export const EXAMPLE_GROUPS = [
             'catch-parse',
             'catch-introspect'
         ]
+    },
+    {
+        label: 'External Schema Interop',
+        ids: ['extern-basic']
     }
 ];
 
@@ -1463,6 +1467,44 @@ const chained = string().minLength(5).catch('short').optional();
 const result = schema.validate(42 as any);
 `,
         testData: '"hello"'
+    },
+
+    // ── External Schema Interop ─────────────────────
+    {
+        id: 'extern-basic',
+        title: 'Wrapping Zod with extern()',
+        description:
+            'Use <code>extern()</code> to wrap a Zod schema (or any <a href="https://standardschema.dev/" target="_blank">Standard Schema v1</a> library) into a <code>@cleverbrush/schema</code> builder. Mix and match schemas from different libraries — types and <code>getErrorsFor()</code> work across the boundary.',
+        group: 'External Schema Interop',
+        code: `import { z } from 'zod';
+import { object, number, extern } from '@cleverbrush/schema';
+
+// Existing Zod schema — keep as-is, no need to rewrite
+const ZodAddress = z.object({
+  street: z.string().min(1, 'Street is required'),
+  city:   z.string().min(1, 'City is required'),
+  zip:    z.string().length(5, 'ZIP must be 5 characters'),
+});
+
+// Compose into a @cleverbrush/schema object
+const OrderSchema = object({
+  /** Shipping address (validated by Zod) */
+  address:    extern(ZodAddress),
+  /** Total amount in cents */
+  totalCents: number().min(1, 'Total must be positive'),
+});
+
+// Validate — Zod handles address, @cleverbrush handles totalCents
+const result = OrderSchema.validate(
+  {
+    address: { street: '', city: '', zip: '1' },
+    totalCents: 0,
+  },
+  { doNotStopOnFirstError: true }
+);
+`,
+        testData:
+            '{ "address": { "street": "5th Ave", "city": "NYC", "zip": "10001" }, "totalCents": 4999 }'
     }
 ];
 

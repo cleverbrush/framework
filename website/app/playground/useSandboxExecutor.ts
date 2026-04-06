@@ -29,16 +29,21 @@ function escapeScriptClose(code: string): string {
     return code.replace(/<\//g, '<\\/');
 }
 
-function buildSrcdoc(bundle: string): string {
+function buildSrcdoc(bundle: string, zodBundle: string): string {
     const escaped = escapeScriptClose(bundle);
+    const escapedZod = escapeScriptClose(zodBundle);
 
     // The JavaScript below runs inside the sandboxed iframe (opaque origin).
     // It receives transpiled JS via postMessage, executes it with the schema
     // library injected, and posts results back.
     return `<!DOCTYPE html><html><head><script>
 ${escaped}
+</script><script>
+${escapedZod}
+</script><script>
 ;(function() {
     var schema = typeof __schema !== 'undefined' ? __schema : {};
+    var zod = typeof __zod !== 'undefined' ? __zod : {};
 
     function sanitize(obj) {
         if (obj === null || obj === undefined || typeof obj !== 'object') return {};
@@ -221,7 +226,35 @@ ${escaped}
                 return 'var ' + k + ' = __schema["' + k + '"];';
             }).join('\\n');
 
+            // Build Zod bindings only for what the user explicitly imports from 'zod'.
+            // Binding all Object.keys(zod) would include reserved keywords such as
+            // 'default', 'enum', 'function', 'catch', and 'instanceof', which produce
+            // a syntax error inside new Function(...).
+            var zodNamedRe = /import\\s*\\{([^}]*)\\}\\s*from\\s*['"]zod['"]/g;
+            var zodStarRe = /import\\s*\\*\\s*as\\s*(\\w+)\\s*from\\s*['"]zod['"]/g;
+            var zodImportMatch;
+            var zodBindingLines = [];
+            while ((zodImportMatch = zodNamedRe.exec(code)) !== null) {
+                var importItems = zodImportMatch[1].split(',');
+                for (var zi = 0; zi < importItems.length; zi++) {
+                    var importParts = importItems[zi].trim().split(/\\s+as\\s+/);
+                    var exportedName = importParts[0].trim();
+                    var localName = importParts.length > 1 ? importParts[1].trim() : exportedName;
+                    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(localName) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(exportedName)) {
+                        zodBindingLines.push('var ' + localName + ' = __zod["' + exportedName + '"];');
+                    }
+                }
+            }
+            while ((zodImportMatch = zodStarRe.exec(code)) !== null) {
+                var nsName = zodImportMatch[1].trim();
+                if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(nsName)) {
+                    zodBindingLines.push('var ' + nsName + ' = __zod;');
+                }
+            }
+            var zodDestructure = zodBindingLines.join('\\n');
+
             var wrappedCode = destructure + '\\n'
+                + zodDestructure + '\\n'
                 + 'var __lastSchema, __lastResult;\\n'
                 + strippedCode + '\\n';
 
@@ -242,8 +275,8 @@ ${escaped}
 
             wrappedCode += 'return { __lastSchema: __lastSchema, __lastResult: __lastResult };';
 
-            var fn = new Function('__schema', wrappedCode);
-            var execResult = fn(schema);
+            var fn = new Function('__schema', '__zod', wrappedCode);
+            var execResult = fn(schema, zod);
 
             var output = {};
 
@@ -281,6 +314,7 @@ ${escaped}
 export function useSandboxExecutor() {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const bundleRef = useRef<string>('');
+    const zodBundleRef = useRef<string>('');
     const readyRef = useRef(false);
     const pendingRef = useRef<
         Map<
@@ -294,12 +328,12 @@ export function useSandboxExecutor() {
     const readyQueueRef = useRef<Array<() => void>>([]);
 
     useEffect(() => {
-        function createIframe(bundle: string) {
+        function createIframe(bundle: string, zodBundle: string) {
             destroyIframe();
             const iframe = document.createElement('iframe');
             iframe.setAttribute('sandbox', 'allow-scripts');
             iframe.style.display = 'none';
-            iframe.srcdoc = buildSrcdoc(bundle);
+            iframe.srcdoc = buildSrcdoc(bundle, zodBundle);
             document.body.appendChild(iframe);
             iframeRef.current = iframe;
         }
@@ -340,11 +374,16 @@ export function useSandboxExecutor() {
 
         window.addEventListener('message', handleMessage);
 
-        fetch('/playground/schema-bundle.js')
-            .then(r => r.text())
-            .then(text => {
-                bundleRef.current = text;
-                createIframe(text);
+        Promise.all([
+            fetch('/playground/schema-bundle.js').then(r => r.text()),
+            fetch('/playground/zod-bundle.js')
+                .then(r => r.text())
+                .catch(() => '')
+        ])
+            .then(([schemaText, zodText]) => {
+                bundleRef.current = schemaText;
+                zodBundleRef.current = zodText;
+                createIframe(schemaText, zodText);
             })
             .catch(() => {
                 // Bundle fetch failed — sandbox won't be available

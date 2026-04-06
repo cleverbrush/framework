@@ -761,6 +761,207 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
 export declare const date: () => DateSchemaBuilder<Date, true, false, false, {}>;
 export {};
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/ExternSchemaBuilder.d.ts": `import type { StandardSchemaV1 } from '@standard-schema/spec';
+import { type BRAND, SchemaBuilder, SYMBOL_HAS_PROPERTIES, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<ExternSchemaBuilder<any, R>['introspect']>> & {
+    standardSchema: StandardSchemaV1;
+};
+/**
+ * Schema builder that wraps an external
+ * [Standard Schema v1](https://standardschema.dev/) compatible schema
+ * (e.g. Zod, Valibot, ArkType) into a \`@cleverbrush/schema\` builder.
+ *
+ * This enables cross-library schema composition — you can use a Zod schema
+ * as a property inside a \`@cleverbrush/schema\` object schema, and the
+ * inferred TypeScript type will be correct.
+ *
+ * Validation is delegated entirely to the external schema's
+ * \`['~standard'].validate()\` method. Standard Schema issues are mapped to
+ * \`@cleverbrush/schema\` \`ValidationError\` objects, with any issue paths
+ * formatted as dotted prefixes (e.g. \`"address.city: must be a string"\`).
+ *
+ * When used inside an \`object()\` schema, the property descriptor tree is
+ * built dynamically (via Proxy) from the external schema's output type,
+ * so \`getErrorsFor(t => t.order.id)\` works without any additional
+ * configuration.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use the {@link extern | extern()} factory function instead.
+ *
+ * @example
+ * \`\`\`ts
+ * import { z } from 'zod';
+ * import { object, date, extern, InferType } from '@cleverbrush/schema';
+ *
+ * const zodUser = z.object({ first: z.string(), last: z.string() });
+ *
+ * const order = object({
+ *   user: extern(zodUser),
+ *   date: date(),
+ * });
+ *
+ * type Order = InferType<typeof order>;
+ * // { user: { first: string; last: string }; date: Date }
+ * \`\`\`
+ *
+ * @see {@link extern}
+ */
+export declare class ExternSchemaBuilder<TStandardSchema extends StandardSchemaV1 = StandardSchemaV1, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? StandardSchemaV1.InferOutput<TStandardSchema> : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+    #private;
+    /**
+     * Always \`true\` for extern schemas — enables Proxy-based property
+     * descriptor trees and nested error propagation in
+     * \`ObjectSchemaBuilder\`.
+     */
+    readonly [SYMBOL_HAS_PROPERTIES] = true;
+    /**
+     * @hidden
+     */
+    static create(props: ExternSchemaBuilderCreateProps<any>): ExternSchemaBuilder<StandardSchemaV1<unknown, unknown>, true, false, undefined, false, {}, unknown>;
+    protected constructor(props: ExternSchemaBuilderCreateProps<TRequired>);
+    /**
+     * Returns the wrapped Standard Schema instance.
+     */
+    get standardSchema(): TStandardSchema;
+    /**
+     * @inheritdoc
+     */
+    hasType<T>(_notUsed?: T): ExternSchemaBuilder<TStandardSchema, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    clearHasType(): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    /**
+     * Performs synchronous validation by delegating to the external
+     * Standard Schema's \`validate()\` method.
+     *
+     * If the external schema returns a \`Promise\` (async validation),
+     * this method throws — use {@link validateAsync} instead.
+     */
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /**
+     * Performs async validation by delegating to the external
+     * Standard Schema's \`validate()\` method. Supports external schemas
+     * that return a \`Promise\` from their \`validate()\`.
+     */
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected createFromProps<TReq extends boolean>(props: ExternSchemaBuilderCreateProps<TReq>): this;
+    /**
+     * Returns a snapshot of the builder's internal state.
+     * Includes the wrapped \`standardSchema\` reference.
+     */
+    introspect(): {
+        standardSchema: TStandardSchema;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+    };
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): ExternSchemaBuilder<TStandardSchema, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): ExternSchemaBuilder<TStandardSchema, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): ExternSchemaBuilder<TStandardSchema, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<T>\`. Sets the \`isReadonly\`
+     * introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): ExternSchemaBuilder<TStandardSchema, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): ExternSchemaBuilder<TStandardSchema, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+}
+/**
+ * Wraps an external [Standard Schema v1](https://standardschema.dev/)
+ * compatible schema into a \`@cleverbrush/schema\` builder.
+ *
+ * This enables cross-library schema composition — use schemas from Zod,
+ * Valibot, ArkType, or any Standard Schema v1 compliant library as
+ * properties inside \`@cleverbrush/schema\` object schemas with full type
+ * inference.
+ *
+ * @param standardSchema - A Standard Schema v1 compliant schema instance
+ *   (any object that exposes a \`['~standard']\` property with \`version: 1\`
+ *   and a \`validate\` function).
+ *
+ * @example
+ * \`\`\`ts
+ * import { z } from 'zod';
+ * import { object, date, extern, InferType } from '@cleverbrush/schema';
+ *
+ * const zodUser = z.object({ first: z.string(), last: z.string() });
+ *
+ * const order = object({
+ *   user: extern(zodUser),
+ *   date: date(),
+ * });
+ *
+ * type Order = InferType<typeof order>;
+ * // { user: { first: string; last: string }; date: Date }
+ *
+ * order.validate({
+ *   user: { first: 'Alice', last: 'Smith' },
+ *   date: new Date(),
+ * }); // { valid: true, object: { user: …, date: … } }
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Optional external schema
+ * const schema = extern(zodUser).optional();
+ * schema.validate(undefined); // valid
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Inside an array
+ * import { array, extern } from '@cleverbrush/schema';
+ * const users = array(extern(zodUser));
+ * \`\`\`
+ */
+export declare const extern: <T extends StandardSchemaV1>(standardSchema: T) => ExternSchemaBuilder<T, true>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/FunctionSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<FunctionSchemaBuilder<R>['introspect']>>;
 /**
@@ -1472,7 +1673,7 @@ export declare function number(): NumberSchemaBuilder<number, true>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/ObjectSchemaBuilder.d.ts": `import { PropertyValidationResult } from './PropertyValidationResult.js';
-import { type BRAND, type InferType, type NestedValidationResult, type PreValidationResult, type PropertyDescriptor, type PropertyDescriptorTree, SchemaBuilder, type ValidationContext, type ValidationError, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+import { type BRAND, type InferType, type NestedValidationResult, type PreValidationResult, type PropertyDescriptor, type PropertyDescriptorTree, SchemaBuilder, SYMBOL_HAS_PROPERTIES, type ValidationContext, type ValidationError, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 /**
  * A callback function to select properties from the schema.
  * Normally it's provided by the user to select property descriptors
@@ -1626,6 +1827,8 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  */
 export declare class ObjectSchemaBuilder<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Marks this builder as having sub-properties for descriptor tree recursion. */
+    readonly [SYMBOL_HAS_PROPERTIES] = true;
     /**
      * @hidden
      */
@@ -2045,6 +2248,15 @@ export declare class PropertyValidationResult<TSchema extends ObjectSchemaBuilde
      * @param childError - the child validation result to add
      */
     addChildError(childError: NestedValidationResult<any, any, any>): void;
+    /**
+     * Returns a JSON-serializable representation of this validation result.
+     * This ensures \`JSON.stringify\` includes \`isValid\` and \`errors\`,
+     * which are otherwise non-enumerable prototype getters.
+     */
+    toJSON(): {
+        isValid: boolean;
+        errors: ReadonlyArray<string>;
+    };
 }
 `,
     "file:///node_modules/@cleverbrush/schema/builders/RecordSchemaBuilder.d.ts": `/**
@@ -2392,6 +2604,7 @@ export {};
     "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type Transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
+import type { ExternSchemaBuilder } from './ExternSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 /** @internal Symbol used as the key for the type brand on schema builders. */
 declare const __type: unique symbol;
@@ -2603,6 +2816,18 @@ export type ValidationContext<TSchema extends SchemaBuilder<any, any, any, any> 
  */
 export declare const SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR: unique symbol;
 /**
+ * A symbol that marks a schema as having sub-properties that can
+ * participate in property descriptor trees. When a schema exposes
+ * \`[SYMBOL_HAS_PROPERTIES] = true\` **and** its \`introspect()\` returns
+ * a \`properties\` record, it will be recursed into by
+ * \`ObjectSchemaBuilder.getPropertiesFor()\` — the same way nested
+ * \`ObjectSchemaBuilder\` instances are.
+ *
+ * Currently implemented by \`ObjectSchemaBuilder\` (always) and
+ * \`ExternSchemaBuilder\` (when created with an explicit property map).
+ */
+export declare const SYMBOL_HAS_PROPERTIES: unique symbol;
+/**
  * Describes a property in a schema. And gives you
  * a possibility to access property value and set it.
  * suppose you have a schema like this:
@@ -2740,8 +2965,19 @@ export type PropertyDescriptor<TRootSchema extends ObjectSchemaBuilder<any, any,
  * Has a possibility to filter properties by the type (\`TAssignableTo\` type parameter).
  */
 export type PropertyDescriptorTree<TSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any> = TSchema, TAssignableTo = any, TParentPropertyDescriptor = undefined> = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> & (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any> ? {
-    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never;
+    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ExternSchemaBuilder<any, any, any, any, any, any, infer TExternResult> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> & ExternOutputPropertyDescriptors<TExternResult, TRootSchema, PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never;
 } : never);
+/**
+ * Recursively maps the keys of an extern schema's output type into
+ * property descriptors.  When a value is a plain-object type its keys
+ * are expanded recursively; primitives, arrays, Dates, and functions
+ * are treated as leaves.
+ *
+ * @internal
+ */
+type ExternOutputPropertyDescriptors<TOutput, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TParentPropertyDescriptor> = TOutput extends Date | Function | readonly any[] | string | number | boolean | symbol | bigint | null | undefined ? {} : TOutput extends Record<string, any> ? {
+    [K in keyof TOutput]: PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor> & ExternOutputPropertyDescriptors<TOutput[K], TRootSchema, PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor>>;
+} : {};
 /**
  * Creates an array augmented with non-enumerable NestedValidationResult
  * properties (\`seenValue\`, \`errors\`, \`isValid\`, \`descriptor\`).
@@ -4088,6 +4324,7 @@ export type { ArraySchemaValidationResult, ElementValidationResult } from './bui
 export { ArraySchemaBuilder, array } from './builders/ArraySchemaBuilder.js';
 export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.js';
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
+export { ExternSchemaBuilder, extern } from './builders/ExternSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
@@ -4096,7 +4333,7 @@ export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type { PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
-export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
+export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_HAS_PROPERTIES, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
@@ -5644,5 +5881,245 @@ export declare const noopTransaction: <T extends {}>(initial: T) => Transaction<
  * @returns \`true\` if \`obj\` is a transaction, \`false\` otherwise
  */
 export declare const isTransaction: (obj: any) => any;
+`,
+    "file:///node_modules/@standard-schema/spec/dist/index.d.ts": `/** The Standard Typed interface. This is a base type extended by other specs. */
+interface StandardTypedV1<Input = unknown, Output = Input> {
+    /** The Standard properties. */
+    readonly "~standard": StandardTypedV1.Props<Input, Output>;
+}
+declare namespace StandardTypedV1 {
+    /** The Standard Typed properties interface. */
+    interface Props<Input = unknown, Output = Input> {
+        /** The version number of the standard. */
+        readonly version: 1;
+        /** The vendor name of the schema library. */
+        readonly vendor: string;
+        /** Inferred types associated with the schema. */
+        readonly types?: Types<Input, Output> | undefined;
+    }
+    /** The Standard Typed types interface. */
+    interface Types<Input = unknown, Output = Input> {
+        /** The input type of the schema. */
+        readonly input: Input;
+        /** The output type of the schema. */
+        readonly output: Output;
+    }
+    /** Infers the input type of a Standard Typed. */
+    type InferInput<Schema extends StandardTypedV1> = NonNullable<Schema["~standard"]["types"]>["input"];
+    /** Infers the output type of a Standard Typed. */
+    type InferOutput<Schema extends StandardTypedV1> = NonNullable<Schema["~standard"]["types"]>["output"];
+}
+/** The Standard Schema interface. */
+interface StandardSchemaV1<Input = unknown, Output = Input> {
+    /** The Standard Schema properties. */
+    readonly "~standard": StandardSchemaV1.Props<Input, Output>;
+}
+declare namespace StandardSchemaV1 {
+    /** The Standard Schema properties interface. */
+    interface Props<Input = unknown, Output = Input> extends StandardTypedV1.Props<Input, Output> {
+        /** Validates unknown input values. */
+        readonly validate: (value: unknown, options?: StandardSchemaV1.Options | undefined) => Result<Output> | Promise<Result<Output>>;
+    }
+    /** The result interface of the validate function. */
+    type Result<Output> = SuccessResult<Output> | FailureResult;
+    /** The result interface if validation succeeds. */
+    interface SuccessResult<Output> {
+        /** The typed output value. */
+        readonly value: Output;
+        /** A falsy value for \`issues\` indicates success. */
+        readonly issues?: undefined;
+    }
+    interface Options {
+        /** Explicit support for additional vendor-specific parameters, if needed. */
+        readonly libraryOptions?: Record<string, unknown> | undefined;
+    }
+    /** The result interface if validation fails. */
+    interface FailureResult {
+        /** The issues of failed validation. */
+        readonly issues: ReadonlyArray<Issue>;
+    }
+    /** The issue interface of the failure output. */
+    interface Issue {
+        /** The error message of the issue. */
+        readonly message: string;
+        /** The path of the issue, if any. */
+        readonly path?: ReadonlyArray<PropertyKey | PathSegment> | undefined;
+    }
+    /** The path segment interface of the issue. */
+    interface PathSegment {
+        /** The key representing a path segment. */
+        readonly key: PropertyKey;
+    }
+    /** The Standard types interface. */
+    interface Types<Input = unknown, Output = Input> extends StandardTypedV1.Types<Input, Output> {
+    }
+    /** Infers the input type of a Standard. */
+    type InferInput<Schema extends StandardTypedV1> = StandardTypedV1.InferInput<Schema>;
+    /** Infers the output type of a Standard. */
+    type InferOutput<Schema extends StandardTypedV1> = StandardTypedV1.InferOutput<Schema>;
+}
+/** The Standard JSON Schema interface. */
+interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
+    /** The Standard JSON Schema properties. */
+    readonly "~standard": StandardJSONSchemaV1.Props<Input, Output>;
+}
+declare namespace StandardJSONSchemaV1 {
+    /** The Standard JSON Schema properties interface. */
+    interface Props<Input = unknown, Output = Input> extends StandardTypedV1.Props<Input, Output> {
+        /** Methods for generating the input/output JSON Schema. */
+        readonly jsonSchema: StandardJSONSchemaV1.Converter;
+    }
+    /** The Standard JSON Schema converter interface. */
+    interface Converter {
+        /** Converts the input type to JSON Schema. May throw if conversion is not supported. */
+        readonly input: (options: StandardJSONSchemaV1.Options) => Record<string, unknown>;
+        /** Converts the output type to JSON Schema. May throw if conversion is not supported. */
+        readonly output: (options: StandardJSONSchemaV1.Options) => Record<string, unknown>;
+    }
+    /**
+     * The target version of the generated JSON Schema.
+     *
+     * It is *strongly recommended* that implementers support \`"draft-2020-12"\` and \`"draft-07"\`, as they are both in wide use. All other targets can be implemented on a best-effort basis. Libraries should throw if they don't support a specified target.
+     *
+     * The \`"openapi-3.0"\` target is intended as a standardized specifier for OpenAPI 3.0 which is a superset of JSON Schema \`"draft-04"\`.
+     */
+    type Target = "draft-2020-12" | "draft-07" | "openapi-3.0" | ({} & string);
+    /** The options for the input/output methods. */
+    interface Options {
+        /** Specifies the target version of the generated JSON Schema. Support for all versions is on a best-effort basis. If a given version is not supported, the library should throw. */
+        readonly target: Target;
+        /** Explicit support for additional vendor-specific parameters, if needed. */
+        readonly libraryOptions?: Record<string, unknown> | undefined;
+    }
+    /** The Standard types interface. */
+    interface Types<Input = unknown, Output = Input> extends StandardTypedV1.Types<Input, Output> {
+    }
+    /** Infers the input type of a Standard. */
+    type InferInput<Schema extends StandardTypedV1> = StandardTypedV1.InferInput<Schema>;
+    /** Infers the output type of a Standard. */
+    type InferOutput<Schema extends StandardTypedV1> = StandardTypedV1.InferOutput<Schema>;
+}
+
+export { StandardJSONSchemaV1, StandardSchemaV1, StandardTypedV1 };
+`,
+    "file:///node_modules/@standard-schema/spec/index.d.ts": `/** The Standard Typed interface. This is a base type extended by other specs. */
+interface StandardTypedV1<Input = unknown, Output = Input> {
+    /** The Standard properties. */
+    readonly "~standard": StandardTypedV1.Props<Input, Output>;
+}
+declare namespace StandardTypedV1 {
+    /** The Standard Typed properties interface. */
+    interface Props<Input = unknown, Output = Input> {
+        /** The version number of the standard. */
+        readonly version: 1;
+        /** The vendor name of the schema library. */
+        readonly vendor: string;
+        /** Inferred types associated with the schema. */
+        readonly types?: Types<Input, Output> | undefined;
+    }
+    /** The Standard Typed types interface. */
+    interface Types<Input = unknown, Output = Input> {
+        /** The input type of the schema. */
+        readonly input: Input;
+        /** The output type of the schema. */
+        readonly output: Output;
+    }
+    /** Infers the input type of a Standard Typed. */
+    type InferInput<Schema extends StandardTypedV1> = NonNullable<Schema["~standard"]["types"]>["input"];
+    /** Infers the output type of a Standard Typed. */
+    type InferOutput<Schema extends StandardTypedV1> = NonNullable<Schema["~standard"]["types"]>["output"];
+}
+/** The Standard Schema interface. */
+interface StandardSchemaV1<Input = unknown, Output = Input> {
+    /** The Standard Schema properties. */
+    readonly "~standard": StandardSchemaV1.Props<Input, Output>;
+}
+declare namespace StandardSchemaV1 {
+    /** The Standard Schema properties interface. */
+    interface Props<Input = unknown, Output = Input> extends StandardTypedV1.Props<Input, Output> {
+        /** Validates unknown input values. */
+        readonly validate: (value: unknown, options?: StandardSchemaV1.Options | undefined) => Result<Output> | Promise<Result<Output>>;
+    }
+    /** The result interface of the validate function. */
+    type Result<Output> = SuccessResult<Output> | FailureResult;
+    /** The result interface if validation succeeds. */
+    interface SuccessResult<Output> {
+        /** The typed output value. */
+        readonly value: Output;
+        /** A falsy value for \`issues\` indicates success. */
+        readonly issues?: undefined;
+    }
+    interface Options {
+        /** Explicit support for additional vendor-specific parameters, if needed. */
+        readonly libraryOptions?: Record<string, unknown> | undefined;
+    }
+    /** The result interface if validation fails. */
+    interface FailureResult {
+        /** The issues of failed validation. */
+        readonly issues: ReadonlyArray<Issue>;
+    }
+    /** The issue interface of the failure output. */
+    interface Issue {
+        /** The error message of the issue. */
+        readonly message: string;
+        /** The path of the issue, if any. */
+        readonly path?: ReadonlyArray<PropertyKey | PathSegment> | undefined;
+    }
+    /** The path segment interface of the issue. */
+    interface PathSegment {
+        /** The key representing a path segment. */
+        readonly key: PropertyKey;
+    }
+    /** The Standard types interface. */
+    interface Types<Input = unknown, Output = Input> extends StandardTypedV1.Types<Input, Output> {
+    }
+    /** Infers the input type of a Standard. */
+    type InferInput<Schema extends StandardTypedV1> = StandardTypedV1.InferInput<Schema>;
+    /** Infers the output type of a Standard. */
+    type InferOutput<Schema extends StandardTypedV1> = StandardTypedV1.InferOutput<Schema>;
+}
+/** The Standard JSON Schema interface. */
+interface StandardJSONSchemaV1<Input = unknown, Output = Input> {
+    /** The Standard JSON Schema properties. */
+    readonly "~standard": StandardJSONSchemaV1.Props<Input, Output>;
+}
+declare namespace StandardJSONSchemaV1 {
+    /** The Standard JSON Schema properties interface. */
+    interface Props<Input = unknown, Output = Input> extends StandardTypedV1.Props<Input, Output> {
+        /** Methods for generating the input/output JSON Schema. */
+        readonly jsonSchema: StandardJSONSchemaV1.Converter;
+    }
+    /** The Standard JSON Schema converter interface. */
+    interface Converter {
+        /** Converts the input type to JSON Schema. May throw if conversion is not supported. */
+        readonly input: (options: StandardJSONSchemaV1.Options) => Record<string, unknown>;
+        /** Converts the output type to JSON Schema. May throw if conversion is not supported. */
+        readonly output: (options: StandardJSONSchemaV1.Options) => Record<string, unknown>;
+    }
+    /**
+     * The target version of the generated JSON Schema.
+     *
+     * It is *strongly recommended* that implementers support \`"draft-2020-12"\` and \`"draft-07"\`, as they are both in wide use. All other targets can be implemented on a best-effort basis. Libraries should throw if they don't support a specified target.
+     *
+     * The \`"openapi-3.0"\` target is intended as a standardized specifier for OpenAPI 3.0 which is a superset of JSON Schema \`"draft-04"\`.
+     */
+    type Target = "draft-2020-12" | "draft-07" | "openapi-3.0" | ({} & string);
+    /** The options for the input/output methods. */
+    interface Options {
+        /** Specifies the target version of the generated JSON Schema. Support for all versions is on a best-effort basis. If a given version is not supported, the library should throw. */
+        readonly target: Target;
+        /** Explicit support for additional vendor-specific parameters, if needed. */
+        readonly libraryOptions?: Record<string, unknown> | undefined;
+    }
+    /** The Standard types interface. */
+    interface Types<Input = unknown, Output = Input> extends StandardTypedV1.Types<Input, Output> {
+    }
+    /** Infers the input type of a Standard. */
+    type InferInput<Schema extends StandardTypedV1> = StandardTypedV1.InferInput<Schema>;
+    /** Infers the output type of a Standard. */
+    type InferOutput<Schema extends StandardTypedV1> = StandardTypedV1.InferOutput<Schema>;
+}
+
+export { StandardJSONSchemaV1, StandardSchemaV1, StandardTypedV1 };
 `,
 };

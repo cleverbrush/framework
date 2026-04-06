@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useCallback, useRef } from 'react';
 import { schemaDeclarations } from './schemaDeclarations';
+import { zodDeclarations } from './zodDeclarations';
 
 const MonacoEditor = dynamic(() => import('@monaco-editor/react'), {
     ssr: false,
@@ -139,6 +140,14 @@ function configureMonaco(monaco: MonacoInstance) {
 
     // Register real .d.ts files from @cleverbrush/schema dist
     for (const [filePath, content] of Object.entries(schemaDeclarations)) {
+        monaco.languages.typescript.typescriptDefaults.addExtraLib(
+            content,
+            filePath
+        );
+    }
+
+    // Register Zod .d.ts files for extern() playground examples
+    for (const [filePath, content] of Object.entries(zodDeclarations)) {
         monaco.languages.typescript.typescriptDefaults.addExtraLib(
             content,
             filePath

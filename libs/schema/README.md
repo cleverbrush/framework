@@ -35,6 +35,7 @@ Define a schema **once** and get TypeScript type inference, runtime validation, 
 | **Built-in object mapper** | ✓ | ✗ | ✗ | ✗ |
 | **Built-in form generation** | ✓ | ✗ | ✗ | ✗ |
 | Bidirectional JSON Schema | ✓ | ~ (output only) | ✗ | ✗ |
+| **External schema interop** (`extern()`) | ✓ | ✗ | ✗ | ✗ |
 | JSDoc preservation | ✓ | ✗ | ✗ | ✗ |
 | Immutable schemas | ✓ | ✓ | ✗ | ✗ |
 | Zero dependencies | ✓ | ✓ | ✗ | ✗ |
@@ -1284,6 +1285,49 @@ Benchmarked against Zod v4 with [Vitest bench](https://vitest.dev/guide/features
 | Union no match — invalid | 5,873,118 ops/s | 385,453 ops/s | **15.2× faster** |
 
 The large gains on invalid data come from the early-exit optimization: validation stops at the first failing constraint in each field and skips the rest of the object. For APIs and form handlers where invalid submissions are common, this translates directly to measurable throughput improvements.
+
+## External Schema Interop (`extern()`)
+
+Already using Zod, Valibot, or ArkType? The `extern()` factory wraps any [Standard Schema v1](https://standardschema.dev/) compatible schema into a `@cleverbrush/schema` builder — so you can mix external schemas with native ones inside an `object()` without rewriting anything.
+
+```ts
+import { z } from 'zod';
+import { object, number, extern, InferType } from '@cleverbrush/schema';
+
+// Existing Zod schema — keep as-is
+const ZodAddress = z.object({
+  street: z.string().min(1),
+  city:   z.string(),
+  zip:    z.string().length(5),
+});
+
+// Compose with @cleverbrush/schema
+const OrderSchema = object({
+  address:    extern(ZodAddress),
+  totalCents: number().min(1),
+});
+
+// Type is inferred from *both* libraries:
+type Order = InferType<typeof OrderSchema>;
+// { address: { street: string; city: string; zip: string }; totalCents: number }
+
+const result = OrderSchema.validate({
+  address: { street: '5th Ave', city: 'NYC', zip: '10001' },
+  totalCents: 4999,
+});
+
+if (!result.valid) {
+  // Navigate into the extern property — no type annotation needed
+  const zipErrors = result.getErrorsFor(t => t.address.zip);
+  console.log(zipErrors.errors);
+}
+```
+
+Key points:
+- **One parameter:** `extern(standardSchema)` — types and property descriptors are derived automatically.
+- **getErrorsFor()** works through extern boundaries: `t => t.address.city` navigates into the Zod schema.
+- **Validation** is delegated to the external schema’s `['~standard'].validate()` — @cleverbrush/schema never re-implements the external library’s validation logic.
+- Works with any library that implements Standard Schema v1 (Zod ≥ 3.24, Valibot ≥ 1.0, ArkType, etc.).
 
 ## Standard Schema Interoperability
 

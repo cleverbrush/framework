@@ -137,4 +137,16 @@ export class PropertyValidationResult<
     addChildError(childError: NestedValidationResult<any, any, any>): void {
         this.#childErrors.push(childError);
     }
+
+    /**
+     * Returns a JSON-serializable representation of this validation result.
+     * This ensures `JSON.stringify` includes `isValid` and `errors`,
+     * which are otherwise non-enumerable prototype getters.
+     */
+    toJSON(): { isValid: boolean; errors: ReadonlyArray<string> } {
+        return {
+            isValid: this.isValid,
+            errors: this.errors
+        };
+    }
 }

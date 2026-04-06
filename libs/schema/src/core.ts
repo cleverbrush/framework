@@ -14,6 +14,10 @@ export {
 } from './builders/BooleanSchemaBuilder.js';
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export {
+    ExternSchemaBuilder,
+    extern
+} from './builders/ExternSchemaBuilder.js';
+export {
     FunctionSchemaBuilder,
     func
 } from './builders/FunctionSchemaBuilder.js';
@@ -41,6 +45,7 @@ export {
     MakeOptional,
     SchemaBuilder,
     SchemaValidationError,
+    SYMBOL_HAS_PROPERTIES,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     ValidationError,
     ValidationResult
