@@ -10,6 +10,7 @@ const NAV_ITEMS = [
     { href: '/schema-json', label: 'Schema JSON' },
     { href: '/mapper', label: 'Mapper' },
     { href: '/react-form', label: 'React Form' },
+    { href: '/showcases', label: 'Showcases' },
     { href: '/migrating-from-zod', label: 'Migrate from Zod' },
     { href: '/playground', label: 'Playground', highlight: true },
     { href: '/api-docs', label: 'API Docs' }
@@ -37,7 +38,8 @@ export function Navbar() {
     }, []);
 
     const isActive = (href: string) => {
-        return href === pathname;
+        if (href === '/') return pathname === '/';
+        return pathname === href || pathname.startsWith(href + '/');
     };
 
     return (

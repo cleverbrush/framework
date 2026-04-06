@@ -2389,7 +2389,8 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
 export declare function record<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema): RecordSchemaBuilder<TKeySchema, TValueSchema>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import { type Transaction } from '../utils/transaction.js';
+    "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import type { StandardSchemaV1 } from '@standard-schema/spec';
+import { type Transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 /** @internal Symbol used as the key for the type brand on schema builders. */
@@ -2749,6 +2750,19 @@ export type PropertyDescriptorTree<TSchema extends ObjectSchemaBuilder<any, any,
  */
 export declare function createHybridErrorArray<T extends any[]>(items: T, seenValue: () => any, errors: () => ReadonlyArray<string>, descriptor: () => any): T;
 /**
+ * Resolves the full output type of a schema, accounting for \`TRequired\` and
+ * \`TNullable\` modifiers. Mirrors the branded \`[__type]\` computation so that
+ * the \`~standard\` Standard Schema property carries the correct inferred type.
+ *
+ * - When \`TRequired = true\` and \`TNullable = false\` the result is \`TResult\`.
+ * - When \`TRequired = true\` and \`TNullable = true\` the result is \`TResult | null\`.
+ * - When \`TRequired = false\` the result is wrapped by {@link MakeOptional},
+ *   adding \`| undefined\` (and \`| null\` when also nullable).
+ *
+ * @internal
+ */
+type ResolvedSchemaType<TResult, TRequired extends boolean, TNullable extends boolean> = TRequired extends true ? TNullable extends true ? TResult | null : TResult : MakeOptional<TNullable extends true ? TResult | null : TResult>;
+/**
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
@@ -2769,6 +2783,56 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * @internal
      */
     readonly [__hasDefault]: THasDefault;
+    /**
+     * Standard Schema v1 interface.
+     *
+     * Exposes this schema as a [Standard Schema v1](https://standardschema.dev/)
+     * validator, enabling out-of-the-box interoperability with any library that
+     * consumes the spec — including tRPC, TanStack Form, React Hook Form, T3 Env,
+     * Hono, Elysia, next-safe-action, and 50+ other tools.
+     *
+     * Every \`SchemaBuilder\` subclass (all 13 builders) inherits this property
+     * automatically — no additional setup required.
+     *
+     * **Shape of the returned object:**
+     * - \`version\` — always \`1\` (Standard Schema spec version)
+     * - \`vendor\` — \`'@cleverbrush/schema'\`
+     * - \`validate(value)\` — synchronous; wraps this builder's own \`.validate()\`
+     *   and converts its result to the Standard Schema \`Result<Output>\` format:
+     *   - Success: \`{ value: <validated output> }\`
+     *   - Failure: \`{ issues: [{ message: string }, …] }\`
+     *
+     * The returned object is **cached** after the first access so repeated reads
+     * return the same reference (required by the spec).
+     *
+     * @example
+     * \`\`\`ts
+     * import { object, string, number } from '@cleverbrush/schema';
+     *
+     * const UserSchema = object({
+     *   name:  string().minLength(2),
+     *   email: string().email(),
+     *   age:   number().min(18).optional(),
+     * });
+     *
+     * // Grab the Standard Schema interface
+     * const std = UserSchema['~standard'];
+     * // std.version === 1
+     * // std.vendor  === '@cleverbrush/schema'
+     *
+     * const ok = std.validate({ name: 'Alice', email: 'alice@example.com' });
+     * // { value: { name: 'Alice', email: 'alice@example.com', age: undefined } }
+     *
+     * const fail = std.validate({ name: 'A', email: 'not-an-email' });
+     * // { issues: [{ message: 'minLength' }, { message: 'email' }] }
+     *
+     * // Pass directly to TanStack Form, T3 Env, tRPC, etc.:
+     * // validators: { onChange: UserSchema, onBlur: UserSchema }
+     * \`\`\`
+     *
+     * @see https://standardschema.dev/
+     */
+    get ['~standard'](): StandardSchemaV1.Props<ResolvedSchemaType<TResult, TRequired, TNullable>>;
     /**
      * Set type of schema explicitly. \`notUsed\` param is needed only for case when JS is used. E.g. when you
      * can't call method like \`schema.hasType<Date>()\`, so instead you can call \`schema.hasType(new Date())\`
@@ -4018,7 +4082,8 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
 export declare const union: <T extends SchemaBuilder<any, any, any, any, any>>(schema: T) => UnionSchemaBuilder<[T]>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/core.d.ts": `export { AnySchemaBuilder, any } from './builders/AnySchemaBuilder.js';
+    "file:///node_modules/@cleverbrush/schema/core.d.ts": `export type { StandardSchemaV1, StandardTypedV1 } from '@standard-schema/spec';
+export { AnySchemaBuilder, any } from './builders/AnySchemaBuilder.js';
 export type { ArraySchemaValidationResult, ElementValidationResult } from './builders/ArraySchemaBuilder.js';
 export { ArraySchemaBuilder, array } from './builders/ArraySchemaBuilder.js';
 export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.js';
@@ -4866,6 +4931,33 @@ export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, a
  */
 export declare function enumOf<const T extends string>(...values: [T, ...T[]]): ExtendedString<T>;
 export declare function enumOf<const T extends string>(values: readonly [T, ...T[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): ExtendedString<T>;
+`,
+    "file:///node_modules/@cleverbrush/schema/extensions/nullable.d.ts": `/**
+ * Deprecated nullable extension types for \`@cleverbrush/schema\`.
+ *
+ * \`nullable()\` and \`notNullable()\` are now first-class methods on
+ * \`SchemaBuilder\`. These types are kept for backward compatibility
+ * but will be removed in a future major version.
+ *
+ * @module
+ * @deprecated Use the first-class \`.nullable()\` / \`.notNullable()\` methods
+ * on \`SchemaBuilder\` instead.
+ */
+import type { NullSchemaBuilder } from '../builders/NullSchemaBuilder.js';
+import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
+import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
+/**
+ * @deprecated \`nullable()\` is now a first-class method on \`SchemaBuilder\`.
+ * This type is kept for backward compatibility only.
+ */
+export type NullableReturn<TBuilder extends SchemaBuilder<any, any, any>> = UnionSchemaBuilder<[TBuilder, NullSchemaBuilder<true>]>;
+/**
+ * @deprecated \`nullable()\` is now a first-class method on \`SchemaBuilder\`.
+ * This type is kept for backward compatibility only.
+ */
+export interface NullableMethod<TBuilder extends SchemaBuilder<any, any, any>> {
+    nullable(): NullableReturn<TBuilder>;
+}
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/number.d.ts": `/**
  * Built-in number extensions for \`@cleverbrush/schema\`.

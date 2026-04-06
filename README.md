@@ -12,10 +12,36 @@ Libraries are written in **TypeScript** and distributed as **ES6 modules**. You 
 | -------------------------------------------------------- | ----------------------------------------------------------------- |
 | [`@cleverbrush/async`](./libs/async)                     | Async utilities: `Collector`, `debounce`, `throttle`, `retry`     |
 | [`@cleverbrush/deep`](./libs/deep)                       | Deep operations on objects: equality, merge, flatten              |
-| [`@cleverbrush/schema`](./libs/schema)                   | Schema definition and validation with TypeScript type inference   |
+| [`@cleverbrush/schema`](./libs/schema)                   | Schema definition and validation — TypeScript type inference, runtime introspection, [Standard Schema v1](https://standardschema.dev/) compatible |
 | [`@cleverbrush/mapper`](./libs/mapper)                   | Schema-to-schema object mapping with type-safe property selectors |
 | [`@cleverbrush/scheduler`](./libs/scheduler)             | Job scheduler for Node.js using worker threads                    |
 | [`@cleverbrush/knex-clickhouse`](./libs/knex-clickhouse) | Knex query builder dialect for ClickHouse                         |
+
+## @cleverbrush/schema highlights
+
+- **14 KB gzipped** (full import) — on par with Zod v3, **3× smaller** than Zod v4
+- **Faster than Zod** in 14/15 benchmarks — up to **230× faster** on invalid input
+- **[Standard Schema v1](https://standardschema.dev/) compatible** — works out of the box with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, Elysia, next‑safe‑action, and 50+ other tools
+- **PropertyDescriptors** — runtime-introspectable schemas that power the mapper, react-form, and JSON Schema packages
+- **Type-safe extension system** — `defineExtension()` + `withExtensions()`, composable without casts
+- **JSDoc preservation** — schema descriptions flow through to IDE tooltips
+- **Immutable fluent API** — every builder method returns a new instance
+
+```ts
+import { object, string, number } from '@cleverbrush/schema';
+
+const UserSchema = object({
+  name: string().minLength(2),
+  email: string().email(),
+  age:  number().min(18).optional(),
+});
+
+// Standard Schema interop — pass directly to TanStack Form, T3 Env, tRPC, …
+const validator = UserSchema['~standard'];
+
+const result = UserSchema.validate({ name: 'Alice', email: 'alice@example.com' });
+// { valid: true, object: { name: 'Alice', email: 'alice@example.com', age: undefined } }
+```
 
 ## Development
 

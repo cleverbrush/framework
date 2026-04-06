@@ -1,3 +1,7 @@
+export type {
+    StandardSchemaV1,
+    StandardTypedV1
+} from '@standard-schema/spec';
 export { AnySchemaBuilder, any } from './builders/AnySchemaBuilder.js';
 export type {
     ArraySchemaValidationResult,

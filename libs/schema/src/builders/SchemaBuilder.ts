@@ -1,3 +1,4 @@
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import {
     noopTransaction,
     type Transaction,
@@ -568,6 +569,28 @@ export function createHybridErrorArray<T extends any[]>(
 }
 
 /**
+ * Resolves the full output type of a schema, accounting for `TRequired` and
+ * `TNullable` modifiers. Mirrors the branded `[__type]` computation so that
+ * the `~standard` Standard Schema property carries the correct inferred type.
+ *
+ * - When `TRequired = true` and `TNullable = false` the result is `TResult`.
+ * - When `TRequired = true` and `TNullable = true` the result is `TResult | null`.
+ * - When `TRequired = false` the result is wrapped by {@link MakeOptional},
+ *   adding `| undefined` (and `| null` when also nullable).
+ *
+ * @internal
+ */
+type ResolvedSchemaType<
+    TResult,
+    TRequired extends boolean,
+    TNullable extends boolean
+> = TRequired extends true
+    ? TNullable extends true
+        ? TResult | null
+        : TResult
+    : MakeOptional<TNullable extends true ? TResult | null : TResult>;
+
+/**
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
@@ -599,6 +622,16 @@ export abstract class SchemaBuilder<
     #defaultValue: TResult | (() => TResult) | undefined = undefined;
     #catchValue: TResult | (() => TResult) | undefined = undefined;
     #hasCatch = false;
+    /**
+     * Cached result of the first `['~standard']` access. Stored so that
+     * repeated property reads return the exact same object reference, which
+     * is required by the Standard Schema spec.
+     */
+    #standardProps:
+        | StandardSchemaV1.Props<
+              ResolvedSchemaType<TResult, TRequired, TNullable>
+          >
+        | undefined;
 
     /**
      * Type-level brand encoding the inferred type of this schema.
@@ -617,6 +650,94 @@ export abstract class SchemaBuilder<
      * @internal
      */
     declare readonly [__hasDefault]: THasDefault;
+
+    /**
+     * Standard Schema v1 interface.
+     *
+     * Exposes this schema as a [Standard Schema v1](https://standardschema.dev/)
+     * validator, enabling out-of-the-box interoperability with any library that
+     * consumes the spec — including tRPC, TanStack Form, React Hook Form, T3 Env,
+     * Hono, Elysia, next-safe-action, and 50+ other tools.
+     *
+     * Every `SchemaBuilder` subclass (all 13 builders) inherits this property
+     * automatically — no additional setup required.
+     *
+     * **Shape of the returned object:**
+     * - `version` — always `1` (Standard Schema spec version)
+     * - `vendor` — `'@cleverbrush/schema'`
+     * - `validate(value)` — synchronous; wraps this builder's own `.validate()`
+     *   and converts its result to the Standard Schema `Result<Output>` format:
+     *   - Success: `{ value: <validated output> }`
+     *   - Failure: `{ issues: [{ message: string }, …] }`
+     *
+     * The returned object is **cached** after the first access so repeated reads
+     * return the same reference (required by the spec).
+     *
+     * @example
+     * ```ts
+     * import { object, string, number } from '@cleverbrush/schema';
+     *
+     * const UserSchema = object({
+     *   name:  string().minLength(2),
+     *   email: string().email(),
+     *   age:   number().min(18).optional(),
+     * });
+     *
+     * // Grab the Standard Schema interface
+     * const std = UserSchema['~standard'];
+     * // std.version === 1
+     * // std.vendor  === '@cleverbrush/schema'
+     *
+     * const ok = std.validate({ name: 'Alice', email: 'alice@example.com' });
+     * // { value: { name: 'Alice', email: 'alice@example.com', age: undefined } }
+     *
+     * const fail = std.validate({ name: 'A', email: 'not-an-email' });
+     * // { issues: [{ message: 'minLength' }, { message: 'email' }] }
+     *
+     * // Pass directly to TanStack Form, T3 Env, tRPC, etc.:
+     * // validators: { onChange: UserSchema, onBlur: UserSchema }
+     * ```
+     *
+     * @see https://standardschema.dev/
+     */
+    get ['~standard'](): StandardSchemaV1.Props<
+        ResolvedSchemaType<TResult, TRequired, TNullable>
+    > {
+        if (this.#standardProps) return this.#standardProps;
+        // Capture `this` for the closure so the validate callback can call
+        // the schema's own validate method.
+        const self = this;
+        this.#standardProps = {
+            version: 1 as const,
+            vendor: '@cleverbrush/schema',
+            validate(
+                value: unknown
+            ): StandardSchemaV1.Result<
+                ResolvedSchemaType<TResult, TRequired, TNullable>
+            > {
+                // Standard Schema validate accepts `unknown`, while the
+                // schema's own validate() has a typed parameter. The cast
+                // is safe because validate() performs full runtime
+                // validation regardless of the compile-time input type.
+                const result = self.validate(value as any);
+                if (result.valid) {
+                    return {
+                        value: result.object as ResolvedSchemaType<
+                            TResult,
+                            TRequired,
+                            TNullable
+                        >
+                    };
+                }
+                return {
+                    issues: (result.errors ?? []).map(e => ({
+                        message: e.message
+                    }))
+                };
+            }
+        };
+        return this.#standardProps;
+    }
 
     /**
      * Set type of schema explicitly. `notUsed` param is needed only for case when JS is used. E.g. when you
