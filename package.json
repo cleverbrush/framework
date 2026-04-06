@@ -6,7 +6,7 @@
     "packageManager": "npm@24.13.0",
     "scripts": {
         "build": "turbo run build",
-        "build:all": "npm run lint:fix && npm run build && node scripts/update-bundle-badge.js && npm run test && npm run docs && cd website && npm run build && cd ../ && npm run test:coverage && npm run bench:json",
+        "build:all": "npm run lint:fix && npm run build && node scripts/update-bundle-badge.js && node scripts/measure-bundle-sizes.js && npm run test && npm run docs && cd website && npm run build && cd ../ && npm run test:coverage && npm run bench:json",
         "clean": "turbo run clean",
         "watch": "tsc --build --watch tsconfig.build.json",
         "docs": "typedoc && ./scripts/inject-gtm.sh website/public/api-docs/latest",

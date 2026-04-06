@@ -1,8 +1,21 @@
 import Link from 'next/link';
 import { highlightTS } from '@/lib/highlight';
 import { BenchmarkSection } from './BenchmarkSection';
+import { loadBundleSizes, fmtKB } from '@/lib/bundleSizes';
 
 export default function HomePage() {
+    const bundleSizes = loadBundleSizes();
+    const fullEntry = bundleSizes.entries.find(
+        e => e.import === '@cleverbrush/schema'
+    );
+    const smallestEntry = bundleSizes.entries
+        .filter(e => e.import !== '@cleverbrush/schema')
+        .reduce(
+            (min, e) => (e.gzip < min.gzip ? e : min),
+            bundleSizes.entries[1] ?? bundleSizes.entries[0]
+        );
+    const fullGzip = fullEntry ? fmtKB(fullEntry.gzip) : '~17 KB';
+    const smallGzip = smallestEntry ? fmtKB(smallestEntry.gzip) : '~5 KB';
     return (
         <>
             {/* ── Hero ─────────────────────────────────────────────── */}
@@ -79,7 +92,7 @@ export default function HomePage() {
                     <span className="badge">Immutable &amp; composable</span>
                     <span className="badge">BSD-3 Licensed</span>
                     <span className="badge">
-                        ~5 KB min (full ~17 KB) gzipped
+                        {smallGzip} min (full {fullGzip}) gzipped
                     </span>
                     <span className="badge">Standard Schema compatible</span>
                     <span className="badge">98% test coverage</span>
@@ -168,7 +181,8 @@ export default function HomePage() {
                                 <span className="schema-feature-icon">📦</span>
                                 <strong>Zero dependencies</strong>
                                 <p>
-                                    ~5 KB gzipped (minimalist build) or ~17 KB
+                                    ~{smallGzip} gzipped (minimalist build) or ~
+                                    {fullGzip}
                                     for the full build. Runs in Node, Deno, Bun,
                                     and modern browsers.
                                 </p>

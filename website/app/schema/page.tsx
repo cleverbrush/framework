@@ -1,6 +1,8 @@
 import { highlightTS } from '@/lib/highlight';
+import { loadBundleSizes, fmtKB } from '@/lib/bundleSizes';
 
 export default function SchemaPage() {
+    const bundleSizes = loadBundleSizes();
     return (
         <div className="page">
             <div className="container">
@@ -42,61 +44,18 @@ export default function SchemaPage() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <tr>
-                                            <td>
-                                                <code>@cleverbrush/schema</code>{' '}
-                                                (full)
-                                            </td>
-                                            <td>14.0 KB</td>
-                                            <td>12.4 KB</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <code>
-                                                    @cleverbrush/schema/core
-                                                </code>{' '}
-                                                (no built-in extensions)
-                                            </td>
-                                            <td>12.6 KB</td>
-                                            <td>11.2 KB</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <code>
-                                                    @cleverbrush/schema/string
-                                                </code>{' '}
-                                                (single builder)
-                                            </td>
-                                            <td>3.8 KB</td>
-                                            <td>3.5 KB</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <code>
-                                                    @cleverbrush/schema/number
-                                                </code>
-                                            </td>
-                                            <td>3.8 KB</td>
-                                            <td>3.5 KB</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <code>
-                                                    @cleverbrush/schema/object
-                                                </code>
-                                            </td>
-                                            <td>5.8 KB</td>
-                                            <td>5.3 KB</td>
-                                        </tr>
-                                        <tr>
-                                            <td>
-                                                <code>
-                                                    @cleverbrush/schema/array
-                                                </code>
-                                            </td>
-                                            <td>4.0 KB</td>
-                                            <td>3.7 KB</td>
-                                        </tr>
+                                        {bundleSizes.entries.map(e => (
+                                            <tr key={e.import}>
+                                                <td>
+                                                    <code>{e.import}</code>
+                                                    {e.description
+                                                        ? ` (${e.description})`
+                                                        : ''}
+                                                </td>
+                                                <td>{fmtKB(e.gzip)}</td>
+                                                <td>{fmtKB(e.brotli)}</td>
+                                            </tr>
+                                        ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -669,10 +628,9 @@ const TeamSchema = object({
 });
 
 // Union types
-const IdOrEmail = union(
-  string().minLength(1),   // lookup by ID
-  string().matches(/^[^@]+@[^@]+$/) // or by email
-);`)
+const IdOrEmail = union(string().minLength(1)) // lookup by ID
+  .or(string().matches(/^[^@]+@[^@]+$/));       // or by email
+`)
                             }}
                         />
                     </pre>

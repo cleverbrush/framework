@@ -9,7 +9,10 @@ const GTM_ID = 'GTM-WRLXDMG';
 export const metadata: Metadata = {
     title: 'Cleverbrush — Schema, Mapper & React Form Libraries',
     description:
-        'Type-safe schema validation, object mapping, and headless React forms. Open-source TypeScript libraries by Cleverbrush.'
+        'Type-safe schema validation, object mapping, and headless React forms. Open-source TypeScript libraries by Cleverbrush.',
+    icons: {
+        icon: '/favicon.ico'
+    }
 };
 
 export default function RootLayout({
