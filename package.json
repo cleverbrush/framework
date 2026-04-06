@@ -1,9 +1,9 @@
 {
     "name": "cleverbrush-framework",
     "private": "true",
-    "version": "1.1.10",
+    "version": "2.0.0",
     "description": "Cleverbrush Framework - a set of libraries used by Cleverbrush, a web-based publishing application",
-    "packageManager": "npm@11.11.0",
+    "packageManager": "npm@24.13.0",
     "scripts": {
         "build": "turbo run build",
         "build:all": "npm run lint:fix && npm run build && node scripts/update-bundle-badge.js && npm run test && npm run docs && cd website && npm run build && cd ../ && npm run test:coverage && npm run bench:json",
