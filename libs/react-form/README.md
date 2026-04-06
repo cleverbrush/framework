@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
-<!-- coverage-badge-start -->![Coverage](https://img.shields.io/badge/coverage-96.1%25-brightgreen)<!-- coverage-badge-end -->
+<!-- coverage-badge-start -->
+![Coverage](https://img.shields.io/badge/coverage-96.1%25-brightgreen)
+<!-- coverage-badge-end -->
 
 A headless, schema-driven form system for React based on `@cleverbrush/schema`. Uses PropertyDescriptors for type-safe field binding, supports global UI renderer configuration via a provider, and is completely UI-agnostic — works with plain HTML, MUI, Ant Design, or any component library.
 

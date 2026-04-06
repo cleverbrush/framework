@@ -90,7 +90,7 @@ function updateReadme(readmePath, badge) {
         const regex = new RegExp(
             `${escaped(BADGE_START)}[\\s\\S]*?${escaped(BADGE_END)}`
         );
-        content = content.replace(regex, `${BADGE_START}${badge}${BADGE_END}`);
+        content = content.replace(regex, `${BADGE_START}\n${badge}\n${BADGE_END}`);
         writeFileSync(readmePath, content);
         console.log(`  updated: ${readmePath}`);
         return;
@@ -110,7 +110,7 @@ function updateReadme(readmePath, badge) {
     }
 
     const insertAt = lastBadgeLine >= 0 ? lastBadgeLine + 1 : 1;
-    lines.splice(insertAt, 0, `${BADGE_START}${badge}${BADGE_END}`);
+    lines.splice(insertAt, 0, `${BADGE_START}\n${badge}\n${BADGE_END}`);
     writeFileSync(readmePath, lines.join('\n'));
     console.log(`  inserted: ${readmePath}`);
 }
