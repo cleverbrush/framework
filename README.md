@@ -14,7 +14,7 @@ The flagship package is **`@cleverbrush/schema`** — a schema validation librar
 
 | Package | Description |
 | --- | --- |
-| [`@cleverbrush/schema`](./libs/schema) | Schema definition, type inference, and runtime validation. [Standard Schema v1](https://standardschema.dev/) compatible — works with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, and 50+ other tools |
+| [`@cleverbrush/schema`](./libs/schema) | Schema definition, type inference, and runtime validation. [Standard Schema v1](https://standardschema.dev/) compatible — works with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, and 50+ other tools. Wraps external schemas (Zod, Valibot, ArkType) via `extern()` |
 | [`@cleverbrush/mapper`](./libs/mapper) | Schema-driven object mapping with compile-time completeness checking and type-safe property selectors |
 | [`@cleverbrush/react-form`](./libs/react-form) | Headless, schema-driven form system for React — type-safe field binding, auto-field rendering, UI-agnostic |
 | [`@cleverbrush/schema-json`](./libs/schema-json) | Bidirectional JSON Schema conversion: `toJsonSchema()` + `fromJsonSchema()` with full type inference |
@@ -122,6 +122,7 @@ Sub-path exports (`@cleverbrush/schema/string`, `/number`, `/object`, `/array`, 
 | **Built-in object mapper** | ✓ | ✗ | ✗ | ✗ |
 | **Built-in form generation** | ✓ | ✗ | ✗ | ✗ |
 | Bidirectional JSON Schema | ✓ | ~ (output only) | ✗ | ✗ |
+| **External schema interop** (`extern()`) | ✓ | ✗ | ✗ | ✗ |
 | JSDoc comment preservation | ✓ | ✗ | ✗ | ✗ |
 | Immutable fluent API | ✓ | ✓ | ✗ | ✗ |
 | Zero runtime dependencies | ✓ | ✓ | ✗ | ✗ |

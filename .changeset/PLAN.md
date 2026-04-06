@@ -10,7 +10,7 @@
 
 | Area | Status | Notes |
 |------|--------|-------|
-| **Schema core** | ✅ Done | 13 builders (String, Number, Boolean, Date, Object, Array, Union, Tuple, Record, Function, Any, Null, Lazy), sync/async validation, branded types, immutable fluent API |
+| **Schema core** | ✅ Done | 14 builders (String, Number, Boolean, Date, Object, Array, Union, Tuple, Record, Function, Any, Null, Lazy, **Extern**), sync/async validation, branded types, immutable fluent API |
 | **Base methods** | ✅ Done | `.optional()`, `.required()`, `.default()`, `.catch()`, `.readonly()`, `.describe()`, `.brand()`, `.hasType()`, `.addValidator()`, `.addPreprocessor()`, `.introspect()`, `.deepPartial()` (objects) |
 | **Extension system** | ✅ Done | `defineExtension()` + `withExtensions()`, type-safe plugin architecture |
 | **Built-in extensions** | ✅ Done | String: email, url, uuid, ip, trim, toLowerCase, nonempty, oneOf. Number: positive, negative, finite, multipleOf, oneOf. Array: nonempty, unique. All builders: nullable. Top-level: enumOf |
@@ -22,8 +22,9 @@
 | **Async** | ✅ Done | `Collector`, `debounce()`, `throttle()`, `retry()` |
 | **Scheduler** | ✅ Done | Cron-like job scheduler with worker threads, schema-validated schedules |
 | **Knex-ClickHouse** | ✅ Done | Knex dialect for ClickHouse with retry logic |
-| **Standard Schema v1** | ✅ Done | `~standard` getter on `SchemaBuilder` base — all 13 builders interoperate with 50+ tools (tRPC, TanStack Form, T3 Env, React Hook Form, Hono, …) |
-| **Website** | ✅ Done (unpublished) | Next.js 16, landing page, docs for all packages, 43 playground examples, "Migrating from Zod" guide, TypeDoc API docs + Standard Schema showcases (TanStack Form, T3 Env) |
+| **Standard Schema v1** | ✅ Done | `~standard` getter on `SchemaBuilder` base — all 14 builders interoperate with 50+ tools (tRPC, TanStack Form, T3 Env, React Hook Form, Hono, …) |
+| **External Schema Interop** | ✅ Done | `extern()` factory wraps any Standard Schema v1 library (Zod, Valibot, ArkType) into a `@cleverbrush/schema` builder. Proxy-based lazy property descriptors, full `getErrorsFor()` navigation, type inference from `StandardSchemaV1.InferOutput` |
+| **Website** | ✅ Done (unpublished) | Next.js 16, landing page, docs for all packages, 44 playground examples, "Migrating from Zod" guide, TypeDoc API docs + Standard Schema showcases (TanStack Form, T3 Env) |
 | **CI/CD** | ✅ Done | GitHub Actions: `ci.yml` (lint + build + test), `release.yml` (changesets publish) |
 | **Community files** | ✅ Done | CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue templates, PR template |
 | **Benchmarks** | ✅ Done | **#1 in 14/15 benchmarks** vs Zod/Yup/Joi. 1.2–2.65x faster on valid input, 8–204x faster on invalid input |
@@ -64,7 +65,7 @@
 | **Object mapping** | ❌ None | ✅ **Built-in mapper** |
 | **Form generation** | Via 3rd parties (RHF) | ✅ **Built-in react-form** |
 
-**Key insight:** Zod won through ecosystem integrations, not features. Standard Schema is now implemented — @cleverbrush/schema works with 50+ tools out of the box. PropertyDescriptors + extension system + mapper + forms are the *moat* that no competitor can replicate.
+**Key insight:** Zod won through ecosystem integrations, not features. Standard Schema is now implemented — @cleverbrush/schema works with 50+ tools out of the box. **`extern()` completes the interop story** — not only can other tools consume our schemas (via `['~standard']`), we can now consume *their* schemas too. PropertyDescriptors + extension system + mapper + forms are the *moat* that no competitor can replicate.
 
 ### Remaining Feature Gaps vs Zod
 
@@ -93,7 +94,20 @@ Implemented as a built-in extension (not a separate builder class) following the
 - 34 tests (runtime + type-level)
 - Playground example, README section, migration guide entry
 
-### 1.2 Bundle size audit ✅
+### 1.2 External Schema Interop (`extern()`) ✅
+
+`extern()` factory function that wraps any [Standard Schema v1](https://standardschema.dev/) compatible library (Zod, Valibot, ArkType, etc.) into a `@cleverbrush/schema` builder. This is the **reverse** of the `['~standard']` getter — instead of exposing our schemas *to* other tools, it lets us *consume* other schemas.
+
+- Single-parameter API: `extern(zodSchema)` — no duplicate property declarations needed
+- Validation delegated to the external schema's `['~standard'].validate()`
+- TypeScript type inferred from `StandardSchemaV1.InferOutput` — full type safety
+- Proxy-based lazy property descriptor tree: `getErrorsFor(t => t.order.id)` works for sub-properties of the external schema
+- `SYMBOL_HAS_PROPERTIES` always `true` — `ObjectSchemaBuilder` treats extern properties like native object properties
+- Error propagation: `#propagateNestedErrors` reads `__externErrorPropertyNames` to surface per-property errors in the parent object
+- 56 tests (runtime + type-level + integration with real Zod)
+- `ExternSchemaBuilder` class exported for advanced use (extending); `extern()` factory is the recommended entry point
+
+### 1.3 Bundle size audit ✅
 
 **Measured April 5, 2026** using esbuild single-file bundle + gzip level 9.
 

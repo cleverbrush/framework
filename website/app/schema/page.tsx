@@ -2034,6 +2034,66 @@ export const env = createEnv({
                         />
                     </pre>
 
+                    <h3>
+                        External Schema Interop — <code>extern()</code>
+                    </h3>
+                    <p>
+                        Standard Schema is bidirectional.{' '}
+                        <code>@cleverbrush/schema</code> exposes its schemas{' '}
+                        <em>to</em> other tools via{' '}
+                        <code>[&apos;~standard&apos;]</code>, and it can{' '}
+                        <em>consume</em> schemas from other libraries via{' '}
+                        <code>extern()</code>. Wrap any Standard Schema v1
+                        compatible schema (Zod, Valibot, ArkType, …) into a
+                        native builder — no rewriting needed:
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { z } from 'zod';
+import { object, number, extern, InferType } from '@cleverbrush/schema';
+
+// Keep your existing Zod schema as-is
+const ZodAddress = z.object({
+  street: z.string().min(1),
+  city:   z.string(),
+  zip:    z.string().length(5),
+});
+
+// Compose with @cleverbrush/schema
+const OrderSchema = object({
+  address:    extern(ZodAddress),
+  totalCents: number().min(1),
+});
+
+// Type is inferred from both libraries automatically
+type Order = InferType<typeof OrderSchema>;
+// { address: { street: string; city: string; zip: string }; totalCents: number }
+
+const result = OrderSchema.validate({
+  address: { street: '5th Ave', city: 'NYC', zip: '10001' },
+  totalCents: 4999,
+});
+
+if (!result.valid) {
+  // Navigate into the extern property — no type annotation needed
+  const zipErrors = result.getErrorsFor(t => t.address.zip);
+  console.log(zipErrors.errors);
+}`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        <code>extern()</code> takes a single parameter — the
+                        external schema. Types and property descriptors are
+                        derived automatically. Validation is delegated to the
+                        external library&apos;s{' '}
+                        <code>[&apos;~standard&apos;].validate()</code> method,
+                        so <code>@cleverbrush/schema</code> never re-implements
+                        another library&apos;s validation logic.
+                    </p>
+
                     <h3>Compatible tools</h3>
                     <p>
                         Any library that consumes Standard Schema v1 validators
@@ -2218,6 +2278,16 @@ export const env = createEnv({
                                     <td className="partial">~</td>
                                 </tr>
                                 <tr>
+                                    <td>
+                                        External schema interop (
+                                        <code>extern()</code>)
+                                    </td>
+                                    <td className="check">✓</td>
+                                    <td className="cross">✗</td>
+                                    <td className="cross">✗</td>
+                                    <td className="cross">✗</td>
+                                </tr>
+                                <tr>
                                     <td>Built-in validators (email…)</td>
                                     <td className="check">✓</td>
                                     <td className="check">✓</td>
@@ -2384,6 +2454,23 @@ export const env = createEnv({
                                         <code>.resolve()</code>,{' '}
                                         <code>.optional()</code>,{' '}
                                         <code>.addValidator(fn)</code>,{' '}
+                                        <code>.default(value)</code>,{' '}
+                                        <code>.catch(value)</code>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>extern(standardSchema)</code>
+                                    </td>
+                                    <td>
+                                        Wraps an external Standard Schema v1
+                                        schema (Zod, Valibot, ArkType, …) into a
+                                        native builder
+                                    </td>
+                                    <td>
+                                        <code>.validate(data)</code>,{' '}
+                                        <code>.optional()</code>,{' '}
+                                        <code>.nullable()</code>,{' '}
                                         <code>.default(value)</code>,{' '}
                                         <code>.catch(value)</code>
                                     </td>

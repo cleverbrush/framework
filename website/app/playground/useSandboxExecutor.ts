@@ -29,16 +29,21 @@ function escapeScriptClose(code: string): string {
     return code.replace(/<\//g, '<\\/');
 }
 
-function buildSrcdoc(bundle: string): string {
+function buildSrcdoc(bundle: string, zodBundle: string): string {
     const escaped = escapeScriptClose(bundle);
+    const escapedZod = escapeScriptClose(zodBundle);
 
     // The JavaScript below runs inside the sandboxed iframe (opaque origin).
     // It receives transpiled JS via postMessage, executes it with the schema
     // library injected, and posts results back.
     return `<!DOCTYPE html><html><head><script>
 ${escaped}
+</script><script>
+${escapedZod}
+</script><script>
 ;(function() {
     var schema = typeof __schema !== 'undefined' ? __schema : {};
+    var zod = typeof __zod !== 'undefined' ? __zod : {};
 
     function sanitize(obj) {
         if (obj === null || obj === undefined || typeof obj !== 'object') return {};
@@ -221,7 +226,14 @@ ${escaped}
                 return 'var ' + k + ' = __schema["' + k + '"];';
             }).join('\\n');
 
+            // Destructure Zod exports into scope (for extern() examples)
+            var zodExports = Object.keys(zod);
+            var zodDestructure = zodExports.map(function(k) {
+                return 'var ' + k + ' = __zod["' + k + '"];';
+            }).join('\\n');
+
             var wrappedCode = destructure + '\\n'
+                + zodDestructure + '\\n'
                 + 'var __lastSchema, __lastResult;\\n'
                 + strippedCode + '\\n';
 
@@ -242,8 +254,8 @@ ${escaped}
 
             wrappedCode += 'return { __lastSchema: __lastSchema, __lastResult: __lastResult };';
 
-            var fn = new Function('__schema', wrappedCode);
-            var execResult = fn(schema);
+            var fn = new Function('__schema', '__zod', wrappedCode);
+            var execResult = fn(schema, zod);
 
             var output = {};
 
@@ -281,6 +293,7 @@ ${escaped}
 export function useSandboxExecutor() {
     const iframeRef = useRef<HTMLIFrameElement | null>(null);
     const bundleRef = useRef<string>('');
+    const zodBundleRef = useRef<string>('');
     const readyRef = useRef(false);
     const pendingRef = useRef<
         Map<
@@ -294,12 +307,12 @@ export function useSandboxExecutor() {
     const readyQueueRef = useRef<Array<() => void>>([]);
 
     useEffect(() => {
-        function createIframe(bundle: string) {
+        function createIframe(bundle: string, zodBundle: string) {
             destroyIframe();
             const iframe = document.createElement('iframe');
             iframe.setAttribute('sandbox', 'allow-scripts');
             iframe.style.display = 'none';
-            iframe.srcdoc = buildSrcdoc(bundle);
+            iframe.srcdoc = buildSrcdoc(bundle, zodBundle);
             document.body.appendChild(iframe);
             iframeRef.current = iframe;
         }
@@ -340,11 +353,16 @@ export function useSandboxExecutor() {
 
         window.addEventListener('message', handleMessage);
 
-        fetch('/playground/schema-bundle.js')
-            .then(r => r.text())
-            .then(text => {
-                bundleRef.current = text;
-                createIframe(text);
+        Promise.all([
+            fetch('/playground/schema-bundle.js').then(r => r.text()),
+            fetch('/playground/zod-bundle.js')
+                .then(r => r.text())
+                .catch(() => '')
+        ])
+            .then(([schemaText, zodText]) => {
+                bundleRef.current = schemaText;
+                zodBundleRef.current = zodText;
+                createIframe(schemaText, zodText);
             })
             .catch(() => {
                 // Bundle fetch failed — sandbox won't be available
