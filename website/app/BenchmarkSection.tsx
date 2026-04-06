@@ -1,11 +1,35 @@
 import { type BenchmarkGroup, loadBenchmarks } from '@/lib/benchmarks';
 
 const SCHEMA_NAME = '@cleverbrush/schema';
+const ZOD_NAME = 'zod';
 
 function formatOps(hz: number): string {
     if (hz >= 1_000_000) return `${(hz / 1_000_000).toFixed(1)}M`;
     if (hz >= 1_000) return `${(hz / 1_000).toFixed(0)}K`;
     return hz.toFixed(0);
+}
+
+function rankBadge(rank: number) {
+    if (rank === 1)
+        return (
+            <span className="bench-rank-badge bench-rank-badge-1" title="#1">
+                1
+            </span>
+        );
+    if (rank === 2)
+        return (
+            <span className="bench-rank-badge bench-rank-badge-2" title="#2">
+                2
+            </span>
+        );
+    return (
+        <span
+            className="bench-rank-badge bench-rank-badge-other"
+            title={`#${rank}`}
+        >
+            {rank}
+        </span>
+    );
 }
 
 function BenchmarkBar({
@@ -17,25 +41,30 @@ function BenchmarkBar({
 }) {
     const maxHz = Math.max(...group.entries.map(e => e.hz));
     const sorted = [...group.entries].sort((a, b) => b.hz - a.hz);
+    const winner = sorted[0];
+    const zodWins = winner.name === ZOD_NAME;
 
     return (
         <div className={`bench-group${compact ? ' bench-group-compact' : ''}`}>
             <h4 className="bench-group-label">{group.label}</h4>
             <div className="bench-bars">
-                {sorted.map(entry => {
+                {sorted.map((entry, i) => {
+                    const rank = i + 1;
                     const pct = (entry.hz / maxHz) * 100;
                     const isSchema = entry.name === SCHEMA_NAME;
+                    const zodWinsThisRow = zodWins && isSchema;
                     return (
                         <div
                             key={entry.name}
-                            className={`bench-row${isSchema ? ' bench-row-highlight' : ''}`}
+                            className={`bench-row${isSchema && !zodWinsThisRow ? ' bench-row-highlight' : ''}${zodWinsThisRow ? ' bench-row-zod-wins' : ''}`}
                         >
                             <span className="bench-lib-name">
+                                {rankBadge(rank)}
                                 {entry.name.replace('@cleverbrush/', '')}
                             </span>
                             <div className="bench-bar-track">
                                 <div
-                                    className={`bench-bar-fill${isSchema ? ' bench-bar-accent' : ''}`}
+                                    className={`bench-bar-fill${isSchema && !zodWinsThisRow ? ' bench-bar-accent' : ''}`}
                                     style={{ width: `${pct}%` }}
                                 />
                             </div>
@@ -46,6 +75,12 @@ function BenchmarkBar({
                     );
                 })}
             </div>
+            {zodWins && (
+                <p className="bench-honest-note">
+                    <strong>Zod wins this one.</strong> We show all results —
+                    including the ones we don&apos;t top.
+                </p>
+            )}
         </div>
     );
 }
@@ -61,7 +96,9 @@ export function BenchmarkSection() {
                 <h2 className="section-title">Performance</h2>
                 <p className="bench-intro">
                     Numbers generated automatically from our benchmark suite
-                    (Vitest bench, Node {'>'}= 22). Higher is better.
+                    (Vitest bench, Node {'>'}= 22). Higher is better. We show{' '}
+                    <strong>all tests</strong> — including the ones where we
+                    don&apos;t come first.
                 </p>
                 <div className="bench-columns">
                     <div className="bench-column">

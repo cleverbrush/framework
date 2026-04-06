@@ -230,7 +230,7 @@ export default function SchemaPage() {
                         <code
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { object, string, number, boolean, InferType } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { object, string, number, boolean, type InferType } from '@cleverbrush/schema';
 
 // Define a schema with fluent constraints and custom error messages
 const UserSchema = object({
@@ -603,7 +603,7 @@ const UpdateUser = object({ name: Name.optional(), email: Email.optional() });
                         <code
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { object, string, number, InferType } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { object, string, number, type InferType } from '@cleverbrush/schema';
 
 const UserSchema = object({
   /** Full display name of the user */
@@ -1147,7 +1147,7 @@ console.log(cityResult.value); // 'NYC'`)
                         <code
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { string, number, array, date, object, InferType } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { string, number, array, date, object, type InferType } from '@cleverbrush/schema';
 
 // Static default
 const Name = string().default('Anonymous');
@@ -1344,7 +1344,7 @@ console.log(info.catchValue);  // 'unknown'`)
                         <code
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { object, array, string, number, InferType } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { object, array, string, number, type InferType } from '@cleverbrush/schema';
 
 // Readonly object — all properties become readonly at type level
 const UserSchema = object({ name: string(), age: number() }).readonly();
@@ -2052,7 +2052,7 @@ export const env = createEnv({
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { z } from 'zod';
-import { object, number, extern, InferType } from '@cleverbrush/schema';
+import { object, number, extern, type InferType } from '@cleverbrush/schema';
 
 // Keep your existing Zod schema as-is
 const ZodAddress = z.object({

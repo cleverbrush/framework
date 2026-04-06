@@ -5,24 +5,25 @@ import { BenchmarkSection } from './BenchmarkSection';
 export default function HomePage() {
     return (
         <>
+            {/* ── Hero ─────────────────────────────────────────────── */}
             <section className="hero">
                 <p className="hero-eyebrow">
-                    Strongly Typed Full-Stack Libraries
+                    The cornerstone of type-safe TypeScript
                 </p>
                 <h1>
-                    Your types are your safety net.
+                    One schema.
                     <br />
-                    We make them work harder.
+                    Types, validation, forms.
                 </h1>
                 <p className="tagline">
-                    Open-source TypeScript libraries for front-end and back-end
-                    web apps. Schema validation, object mapping, headless React
-                    forms — all with end-to-end type safety so the compiler
-                    catches mistakes before your users do.
+                    <code>@cleverbrush/schema</code> is an immutable, composable
+                    schema library that infers your TypeScript types at compile
+                    time and validates your data at runtime — with zero
+                    dependencies. The entire ecosystem is built on top of it.
                 </p>
                 <div className="hero-actions">
-                    <a href="#libraries" className="hero-btn hero-btn-primary">
-                        Get Started
+                    <Link href="/schema" className="hero-btn hero-btn-primary">
+                        Explore the Schema Library
                         <svg
                             width="16"
                             height="16"
@@ -38,7 +39,22 @@ export default function HomePage() {
                                 strokeLinejoin="round"
                             />
                         </svg>
-                    </a>
+                    </Link>
+                    <Link
+                        href="/playground"
+                        className="hero-btn hero-btn-playground"
+                    >
+                        <svg
+                            width="15"
+                            height="15"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            aria-hidden="true"
+                        >
+                            <path d="M8 5v14l11-7z" />
+                        </svg>
+                        Try in Playground
+                    </Link>
                     <a
                         href="https://github.com/cleverbrush/framework"
                         target="_blank"
@@ -58,24 +74,31 @@ export default function HomePage() {
                     </a>
                 </div>
                 <div className="hero-badges">
-                    <span className="badge">End-to-end type safety</span>
-                    <span className="badge">Front-end &amp; back-end</span>
-                    <span className="badge">Zero dependencies*</span>
-                    <span className="badge">Compile-time guarantees</span>
+                    <span className="badge">Zero runtime dependencies</span>
+                    <span className="badge">Compile-time type inference</span>
+                    <span className="badge">Immutable &amp; composable</span>
                     <span className="badge">BSD-3 Licensed</span>
-                    <span className="badge">14 KB gzipped</span>
+                    <span className="badge">
+                        ~5 KB min (full ~17 KB) gzipped
+                    </span>
+                    <span className="badge">Standard Schema compatible</span>
+                    <span className="badge">98% test coverage</span>
+                    <span className="badge">Faster than Zod in most tests</span>
                 </div>
             </section>
 
-            <section className="section" id="libraries">
+            {/* ── Schema Spotlight ─────────────────────────────────── */}
+            <section className="section" id="schema">
                 <div className="container">
-                    <h2 className="section-title">The Libraries</h2>
-                    <div className="lib-cards">
-                        <Link href="/schema" className="lib-card">
-                            <div className="lib-card-icon">
+                    <div className="schema-spotlight">
+                        <div className="schema-spotlight-header">
+                            <div
+                                className="schema-spotlight-icon"
+                                aria-hidden="true"
+                            >
                                 <svg
-                                    width="24"
-                                    height="24"
+                                    width="28"
+                                    height="28"
                                     viewBox="0 0 24 24"
                                     fill="none"
                                     stroke="currentColor"
@@ -87,317 +110,530 @@ export default function HomePage() {
                                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
                                 </svg>
                             </div>
-                            <h3>@cleverbrush/schema</h3>
-                            <p>
-                                Immutable, composable schema definitions with
-                                built-in validation and TypeScript type
-                                inference. Define once — get types, validation,
-                                and runtime introspection from a single source.
-                            </p>
-                            <span className="lib-card-link">
-                                Explore docs <span aria-hidden="true">→</span>
-                            </span>
-                        </Link>
-                        <Link href="/schema-json" className="lib-card">
-                            <div className="lib-card-icon">
-                                <svg
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                >
-                                    <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                    <polyline points="14 2 14 8 20 8" />
-                                    <line x1="8" y1="13" x2="16" y2="13" />
-                                    <line x1="8" y1="17" x2="16" y2="17" />
-                                    <line x1="8" y1="9" x2="10" y2="9" />
-                                </svg>
+                            <div>
+                                <h2 className="schema-spotlight-title">
+                                    @cleverbrush/schema
+                                </h2>
+                                <p className="schema-spotlight-sub">
+                                    The foundation everything else builds on
+                                </p>
                             </div>
-                            <h3>@cleverbrush/schema-json</h3>
-                            <p>
-                                Bidirectional JSON Schema interop. Convert
-                                existing JSON Schema (Draft 7 / 2020-12) to a
-                                typed <code>@cleverbrush/schema</code> builder —
-                                and back — with full TypeScript inference.
-                            </p>
-                            <span className="lib-card-link">
-                                Explore docs <span aria-hidden="true">→</span>
-                            </span>
-                        </Link>
-                        <Link href="/mapper" className="lib-card">
-                            <div className="lib-card-icon">
-                                <svg
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
+                            <div className="schema-spotlight-cta">
+                                <a
+                                    href="https://www.npmjs.com/package/@cleverbrush/schema"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hero-btn hero-btn-secondary"
                                 >
-                                    <path d="M17 1l4 4-4 4" />
-                                    <path d="M3 11V9a4 4 0 014-4h14" />
-                                    <path d="M7 23l-4-4 4-4" />
-                                    <path d="M21 13v2a4 4 0 01-4 4H3" />
-                                </svg>
-                            </div>
-                            <h3>@cleverbrush/mapper</h3>
-                            <p>
-                                Type-safe object mapping between schemas with
-                                compile-time completeness checking. Never miss a
-                                property when converting between object shapes.
-                            </p>
-                            <span className="lib-card-link">
-                                Explore docs <span aria-hidden="true">→</span>
-                            </span>
-                        </Link>
-                        <Link href="/react-form" className="lib-card">
-                            <div className="lib-card-icon">
-                                <svg
-                                    width="24"
-                                    height="24"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
+                                    npm ↗
+                                </a>
+                                <Link
+                                    href="/schema"
+                                    className="hero-btn hero-btn-primary"
                                 >
-                                    <rect
-                                        x="3"
-                                        y="3"
-                                        width="18"
-                                        height="18"
-                                        rx="2"
-                                    />
-                                    <path d="M3 9h18" />
-                                    <path d="M9 21V9" />
-                                </svg>
+                                    Read the docs →
+                                </Link>
                             </div>
-                            <h3>@cleverbrush/react-form</h3>
-                            <p>
-                                Headless, schema-driven React forms. Define your
-                                schema once and get validated forms with any UI
-                                library — Material UI, Ant Design, or plain
-                                HTML.
-                            </p>
-                            <span className="lib-card-link">
-                                Explore docs <span aria-hidden="true">→</span>
-                            </span>
-                        </Link>
-                    </div>
+                        </div>
 
-                    <div className="card" style={{ marginTop: '2.5rem' }}>
-                        <h3>How They Work Together</h3>
-                        <p>
-                            The three libraries share a single source of truth —
-                            the schema. Define it once and use it everywhere:
-                        </p>
+                        <div className="schema-features-grid">
+                            <div className="schema-feature">
+                                <span className="schema-feature-icon">⚡</span>
+                                <strong>Runtime validation</strong>
+                                <p>
+                                    Validate untrusted input at API boundaries,
+                                    form submissions, or config files — with
+                                    detailed error messages.
+                                </p>
+                            </div>
+                            <div className="schema-feature">
+                                <span className="schema-feature-icon">🔷</span>
+                                <strong>TypeScript inference</strong>
+                                <p>
+                                    The TypeScript type is derived automatically
+                                    from the schema. No duplicate{' '}
+                                    <code>interface</code> declarations.
+                                </p>
+                            </div>
+                            <div className="schema-feature">
+                                <span className="schema-feature-icon">🧱</span>
+                                <strong>Immutable &amp; composable</strong>
+                                <p>
+                                    Every builder call returns a new instance.
+                                    Schemas are safe to share across modules
+                                    without side effects.
+                                </p>
+                            </div>
+                            <div className="schema-feature">
+                                <span className="schema-feature-icon">📦</span>
+                                <strong>Zero dependencies</strong>
+                                <p>
+                                    ~5 KB gzipped (minimalist build) or ~17 KB
+                                    for the full build. Runs in Node, Deno, Bun,
+                                    and modern browsers.
+                                </p>
+                            </div>
+                            <div className="schema-feature">
+                                <span className="schema-feature-icon">🔗</span>
+                                <strong>
+                                    Standard Schema &amp; Zod interop
+                                </strong>
+                                <p>
+                                    Implements the{' '}
+                                    <a
+                                        href="https://standardschema.dev"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                    >
+                                        Standard Schema
+                                    </a>{' '}
+                                    spec. Consume Zod schemas directly and infer
+                                    their TypeScript types without depending on
+                                    Zod at runtime.
+                                </p>
+                            </div>
+                            <div className="schema-feature">
+                                <span className="schema-feature-icon">🔍</span>
+                                <strong>Introspection &amp; selectors</strong>
+                                <p>
+                                    Inspect any part of a schema at runtime.
+                                    Call{' '}
+                                    <code>
+                                        result.getErrorsFor(u&nbsp;=&gt;&nbsp;u.field)
+                                    </code>{' '}
+                                    on a validation result to get field-level
+                                    errors — no magic strings, compiler catches
+                                    typos.
+                                </p>
+                            </div>
+                        </div>
+
                         <pre>
                             <code
                                 dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`// 1. Define a schema once — this is your single source of truth
-import { object, string, number, InferType } from '@cleverbrush/schema';
+                                    __html: highlightTS(`import { object, string, number, type InferType } from '@cleverbrush/schema';
 
+// ── 1. Define once, get the type for free ───────────────────────────
 const UserSchema = object({
   name:  string().minLength(2, 'Name must be at least 2 characters'),
   email: string().minLength(5, 'Please enter a valid email'),
-  age:   number().min(0, 'Age cannot be negative').max(150)
+  age:   number().min(0).max(150)
 });
 
-// TypeScript type is inferred automatically
 type User = InferType<typeof UserSchema>;
-// { name: string; email: string; age: number }
+// → { name: string; email: string; age: number }
 
-// 2. Validate data at runtime (synchronous)
-const result = UserSchema.validate(someData);
-if (result.valid) {
-  console.log(result.object); // typed as User
-}
-
-// 3. Map between different object shapes
-import { mapper } from '@cleverbrush/mapper';
-
-const ApiResponse = object({
-  full_name: string(),
-  email_address: string(),
-  birth_year: number()
-});
-
-const registry = mapper().configure(ApiResponse, UserSchema, (m) =>
-  m
-    .for((t) => t.name).from((s) => s.full_name)
-    .for((t) => t.email).from((s) => s.email_address)
-    .for((t) => t.age).compute((s) => new Date().getFullYear() - s.birth_year)
-);
-
-// 4. Render type-safe React forms
-import { useSchemaForm, Field, FormSystemProvider } from '@cleverbrush/react-form';
-
-function UserForm() {
-  const form = useSchemaForm(UserSchema);
-  return (
-    <div>
-      <Field forProperty={(t) => t.name} form={form} />
-      <Field forProperty={(t) => t.email} form={form} />
-      <Field forProperty={(t) => t.age} form={form} />
-      <button onClick={() => form.submit()}>Submit</button>
-    </div>
-  );
+// ── 2. Validate and read field-level errors with typed selectors ──────
+const result = UserSchema.validate(rawInput);
+if (!result.valid) {
+  // getErrorsFor is a method on the result — no magic strings
+  const nameErrors = result.getErrorsFor(u => u.name);
+  console.log(nameErrors.errors); // ['Name must be at least 2 characters']
 }`)
                                 }}
                             />
                         </pre>
                     </div>
+                </div>
+            </section>
 
-                    {/* ── Getting Started Guide ───────────────────────── */}
+            {/* ── Ecosystem ─────────────────────────────────────────── */}
+            <section className="section" id="ecosystem">
+                <div className="container">
+                    <h2 className="section-title">Built Around the Schema</h2>
+                    <p className="subtitle" style={{ marginBottom: '2rem' }}>
+                        Every library in the ecosystem takes a schema as its
+                        starting point. Define your data shape once and unlock
+                        type-safe mapping, JSON Schema interop, and headless
+                        React forms for free.
+                    </p>
+
+                    {/* Ecosystem diagram */}
+                    <div className="ecosystem-diagram">
+                        <div className="ecosystem-center">
+                            <Link href="/schema" className="ecosystem-core">
+                                <svg
+                                    width="20"
+                                    height="20"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    aria-hidden="true"
+                                >
+                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                                </svg>
+                                @cleverbrush/schema
+                            </Link>
+                        </div>
+                        <div className="ecosystem-spokes">
+                            <div className="ecosystem-spoke">
+                                <div className="ecosystem-spoke-icon">
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.5"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        aria-hidden="true"
+                                    >
+                                        <path d="M17 1l4 4-4 4" />
+                                        <path d="M3 11V9a4 4 0 014-4h14" />
+                                        <path d="M7 23l-4-4 4-4" />
+                                        <path d="M21 13v2a4 4 0 01-4 4H3" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <strong>@cleverbrush/mapper</strong>
+                                    <span>
+                                        Type-safe object mapping between two
+                                        schemas. Compile-time completeness — the
+                                        compiler errors if you forget a
+                                        property.
+                                    </span>
+                                </div>
+                                <div className="spoke-links">
+                                    <Link
+                                        href="/mapper"
+                                        className="ecosystem-link"
+                                    >
+                                        Docs →
+                                    </Link>
+                                    <a
+                                        href="https://www.npmjs.com/package/@cleverbrush/mapper"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="spoke-npm-link"
+                                    >
+                                        npm ↗
+                                    </a>
+                                </div>
+                            </div>
+                            <div className="ecosystem-spoke">
+                                <div className="ecosystem-spoke-icon">
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.5"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        aria-hidden="true"
+                                    >
+                                        <rect
+                                            x="3"
+                                            y="3"
+                                            width="18"
+                                            height="18"
+                                            rx="2"
+                                        />
+                                        <path d="M3 9h18" />
+                                        <path d="M9 21V9" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <strong>@cleverbrush/react-form</strong>
+                                    <span>
+                                        Headless, schema-driven React forms.
+                                        Works with Material UI, Ant Design, or
+                                        plain HTML inputs.
+                                    </span>
+                                </div>
+                                <div className="spoke-links">
+                                    <Link
+                                        href="/react-form"
+                                        className="ecosystem-link"
+                                    >
+                                        Docs →
+                                    </Link>
+                                    <a
+                                        href="https://www.npmjs.com/package/@cleverbrush/react-form"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="spoke-npm-link"
+                                    >
+                                        npm ↗
+                                    </a>
+                                </div>
+                            </div>
+                            <div className="ecosystem-spoke">
+                                <div className="ecosystem-spoke-icon">
+                                    <svg
+                                        width="18"
+                                        height="18"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="1.5"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        aria-hidden="true"
+                                    >
+                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+                                        <polyline points="14 2 14 8 20 8" />
+                                        <line x1="8" y1="13" x2="16" y2="13" />
+                                        <line x1="8" y1="17" x2="16" y2="17" />
+                                    </svg>
+                                </div>
+                                <div>
+                                    <strong>@cleverbrush/schema-json</strong>
+                                    <span>
+                                        Bidirectional JSON Schema (Draft 7 /
+                                        2020-12) interop — convert to and from
+                                        typed schema builders.
+                                    </span>
+                                </div>
+                                <div className="spoke-links">
+                                    <Link
+                                        href="/schema-json"
+                                        className="ecosystem-link"
+                                    >
+                                        Docs →
+                                    </Link>
+                                    <a
+                                        href="https://www.npmjs.com/package/@cleverbrush/schema-json"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="spoke-npm-link"
+                                    >
+                                        npm ↗
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Why switch from Zod */}
                     <div className="card" style={{ marginTop: '2rem' }}>
-                        <h3>Getting Started in 5 Minutes</h3>
+                        <h3>
+                            A drop-in alternative to Zod — faster, smaller, no
+                            dependencies
+                        </h3>
                         <p>
-                            Install the packages you need. Each library can be
-                            used independently, but they work best together:
+                            The API is intentionally familiar. If you know Zod,
+                            you can migrate field by field. The result: the same
+                            expressiveness with zero transitive dependencies,
+                            better performance in most benchmarks, and a
+                            compile-time type system that is identical to what
+                            your validators enforce at runtime.
                         </p>
                         <pre>
                             <code
                                 dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`# Schema only (validation + type inference)
+                                    __html: highlightTS(`// ── Zod ───────────────────────────────────────────────────────────
+import { z } from 'zod';
+const UserZ = z.object({
+  name:  z.string().min(2),
+  email: z.string().min(5),
+  age:   z.number().min(0).max(150),
+});
+type UserZ = z.infer<typeof UserZ>; // requires z.infer<>
+
+// ── @cleverbrush/schema ──────────────────────────────────────────────
+import { object, string, number, type InferType } from '@cleverbrush/schema';
+const UserSchema = object({
+  name:  string().minLength(2),
+  email: string().minLength(5),
+  age:   number().min(0).max(150),
+});
+type User = InferType<typeof UserSchema>; // { name: string; email: string; age: number } — identical to z.infer<typeof UserZ>
+
+// Validate — result.valid narrows the type automatically
+const result = UserSchema.validate(rawInput);
+if (result.valid) {
+  processUser(result.object); // typed as User ✓
+}`)
+                                }}
+                            />
+                        </pre>
+                        <Link href="/playground" className="playground-link">
+                            &#9654; Try this example in the Playground
+                        </Link>
+                    </div>
+
+                    {/* Composability */}
+                    <div className="card">
+                        <h3>
+                            Immutable &amp; composable — share schemas safely
+                        </h3>
+                        <p>
+                            Every builder method returns a new instance. Schemas
+                            can be exported, extended, or narrowed anywhere in
+                            your codebase without risk of accidental mutation.
+                        </p>
+                        <pre>
+                            <code
+                                dangerouslySetInnerHTML={{
+                                    __html: highlightTS(`import { object, string, number, union, boolean, array, type InferType } from '@cleverbrush/schema';
+
+// Reusable building blocks
+const EmailField = string().minLength(5).maxLength(254);
+const NameField  = string().minLength(2).maxLength(50);
+
+// Extend a base schema for two contexts — neither mutates the other
+const CreateUserSchema = object({ name: NameField, email: EmailField });
+const UpdateUserSchema = CreateUserSchema
+  .extend({ role: string().optional() });
+
+// Discriminated unions with full type narrowing
+const MediaSchema = union([
+  object({ type: string().equals('image'), url: string(), width: number(), height: number() }),
+  object({ type: string().equals('video'), url: string(), duration: number() }),
+  object({ type: string().equals('text'),  body: string() }),
+]);
+type Media = InferType<typeof MediaSchema>;
+// { type: 'image'; url: string; width: number; height: number }
+// | { type: 'video'; url: string; duration: number }
+// | { type: 'text';  body: string }`)
+                                }}
+                            />
+                        </pre>
+                        <Link href="/playground" className="playground-link">
+                            &#9654; Try this example in the Playground
+                        </Link>
+                    </div>
+
+                    {/* Advanced: extern / Zod interop */}
+                    <div className="card">
+                        <h3>
+                            Advanced: adopt incrementally with{' '}
+                            <code>extern()</code>
+                        </h3>
+                        <p>
+                            Already invested in Zod (or any{' '}
+                            <a
+                                href="https://standardschema.dev"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Standard Schema v1
+                            </a>{' '}
+                            compatible library)? Wrap existing schemas with{' '}
+                            <code>extern()</code> and use them as properties
+                            inside <code>@cleverbrush/schema</code> objects.
+                            Types are inferred across the boundary and{' '}
+                            <code>getErrorsFor</code> selectors work through it
+                            too.
+                        </p>
+                        <pre>
+                            <code
+                                dangerouslySetInnerHTML={{
+                                    __html: highlightTS(`import { z } from 'zod';
+import { object, date, number, extern, type InferType } from '@cleverbrush/schema';
+
+// Your existing Zod schema — untouched
+const zodAddress = z.object({ street: z.string(), city: z.string() });
+
+// Compose it into a @cleverbrush/schema object
+const OrderSchema = object({
+  id:        number(),
+  createdAt: date(),
+  address:   extern(zodAddress),  // ← any Standard Schema v1 compatible library
+});
+
+type Order = InferType<typeof OrderSchema>;
+// { id: number; createdAt: Date; address: { street: string; city: string } }`)
+                                }}
+                            />
+                        </pre>
+                        <Link
+                            href="/playground/extern"
+                            className="playground-link"
+                        >
+                            &#9654; Try extern() in the Playground
+                        </Link>
+                    </div>
+
+                    {/* Quick install */}
+                    <div className="card">
+                        <h3>Installation</h3>
+                        <pre>
+                            <code
+                                dangerouslySetInnerHTML={{
+                                    __html: highlightTS(`# Schema only (validation + TypeScript inference)
 npm install @cleverbrush/schema
 
-# Schema + Mapper (add object mapping)
-npm install @cleverbrush/schema @cleverbrush/mapper
+# Add type-safe object mapping
+npm install @cleverbrush/mapper
 
-# Schema + React Form (add form rendering)
-npm install @cleverbrush/schema @cleverbrush/react-form
+# Add headless React forms
+npm install @cleverbrush/react-form
 
-# All three
-npm install @cleverbrush/schema @cleverbrush/mapper @cleverbrush/react-form`)
+# JSON Schema interop (Draft 7 / 2020-12)
+npm install @cleverbrush/schema-json`)
                                 }}
                             />
                         </pre>
-
-                        <h4>Step 1: Define a Schema</h4>
-                        <p>
-                            A schema is an immutable definition of your data
-                            shape. It replaces both your TypeScript type
-                            definitions and your validation logic:
-                        </p>
-                        <pre>
-                            <code
-                                dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`import { object, string, number, InferType } from '@cleverbrush/schema';
-
-const ProductSchema = object({
-  /** Product display name */
-  name:  string().minLength(1, 'Name is required').maxLength(200),
-  /** Price in dollars */
-  price: number().min(0, 'Price must be positive'),
-  /** Stock Keeping Unit identifier */
-  sku:   string().minLength(3).maxLength(20)
-});
-
-// Derive the TypeScript type — no manual interface needed
-type Product = InferType<typeof ProductSchema>;
-// { name: string; price: number; sku: string }
-// JSDoc comments carry through to the inferred type!`)
-                                }}
-                            />
-                        </pre>
-
-                        <h4>Step 2: Validate Data</h4>
-                        <pre>
-                            <code
-                                dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`const result = ProductSchema.validate({
-  name: 'Widget',
-  price: 9.99,
-  sku: 'WDG-001'
-});
-
-if (result.valid) {
-  // result.object is typed as Product
-  saveToDatabase(result.object);
-} else {
-  // result.errors is an array of { message }
-  showErrors(result.errors);
-}`)
-                                }}
-                            />
-                        </pre>
-
-                        <h4>Step 3: Map Between Shapes (optional)</h4>
-                        <pre>
-                            <code
-                                dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`import { mapper } from '@cleverbrush/mapper';
-
-const ProductRow = object({
-  product_name: string(),
-  unit_price:   number(),
-  sku_code:     string()
-});
-
-const registry = mapper().configure(ProductRow, ProductSchema, (m) =>
-  m
-    .for((t) => t.name).from((s) => s.product_name)
-    .for((t) => t.price).from((s) => s.unit_price)
-    .for((t) => t.sku).from((s) => s.sku_code)
-);
-
-const mapFn = registry.getMapper(ProductRow, ProductSchema);
-const product = await mapFn(databaseRow);`)
-                                }}
-                            />
-                        </pre>
-
-                        <h4>Step 4: Render a Form (optional)</h4>
-                        <pre>
-                            <code
-                                dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`import { useSchemaForm, Field, FormSystemProvider } from '@cleverbrush/react-form';
-
-function ProductForm() {
-  const form = useSchemaForm(ProductSchema);
-  return (
-    <div>
-      <label>Name</label>
-      <Field forProperty={(t) => t.name} form={form} />
-      <label>Price</label>
-      <Field forProperty={(t) => t.price} form={form} />
-      <label>SKU</label>
-      <Field forProperty={(t) => t.sku} form={form} />
-      <button onClick={() => form.submit()}>Save</button>
-    </div>
-  );
-}`)
-                                }}
-                            />
-                        </pre>
-                        <p>
-                            Check out the individual library pages for
-                            comprehensive documentation, live demos, and API
-                            references.
+                        <p className="footnote">
+                            * <code>@cleverbrush/schema</code> and{' '}
+                            <code>@cleverbrush/mapper</code> have zero runtime
+                            dependencies. <code>@cleverbrush/react-form</code>{' '}
+                            depends only on React and the schema library.
                         </p>
                     </div>
 
-                    <p className="footnote">
-                        * <code>@cleverbrush/schema</code> and{' '}
-                        <code>@cleverbrush/mapper</code> have zero runtime
-                        dependencies. <code>@cleverbrush/react-form</code>{' '}
-                        depends only on React and the schema library.
-                    </p>
+                    {/* ── Quality & Testing ────────────────────────── */}
+                    <div className="card quality-card">
+                        <h3>Thoroughly Tested</h3>
+                        <p>
+                            Every package ships with a comprehensive unit test
+                            suite run with{' '}
+                            <a
+                                href="https://vitest.dev"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Vitest
+                            </a>{' '}
+                            across the full monorepo. Coverage is measured and
+                            published on every release.
+                        </p>
+                        <div className="quality-stats">
+                            <div className="quality-stat">
+                                <span className="quality-stat-value">
+                                    98.4%
+                                </span>
+                                <span className="quality-stat-label">
+                                    Line coverage
+                                </span>
+                            </div>
+                            <div className="quality-stat">
+                                <span className="quality-stat-value">
+                                    98.7%
+                                </span>
+                                <span className="quality-stat-label">
+                                    Function coverage
+                                </span>
+                            </div>
+                            <div className="quality-stat">
+                                <span className="quality-stat-value">
+                                    92.6%
+                                </span>
+                                <span className="quality-stat-label">
+                                    Branch coverage
+                                </span>
+                            </div>
+                        </div>
+                        <a
+                            href="https://github.com/cleverbrush/framework"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="hero-btn hero-btn-secondary"
+                        >
+                            View source &amp; tests on GitHub →
+                        </a>
+                    </div>
                 </div>
             </section>
 
             <BenchmarkSection />
-
             {/* ── Contribute CTA ──────────────────────────────────── */}
             <section className="section">
                 <div className="container">

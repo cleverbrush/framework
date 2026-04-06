@@ -22,11 +22,14 @@ const GROUP_LABELS: Record<string, string> = {
     'Nested object validation (valid input)': 'Nested object (valid)',
     'Complex "Create Order" (valid input)': 'Complex object (valid)',
     'Array of 100 objects (valid input)': 'Array of 100 (valid)',
+    'Union — match first branch (text)': 'Union first (valid)',
+    'Union — match last branch (video)': 'Union last (valid)',
     'String validation (invalid input)': 'String (invalid)',
     'Flat object validation (invalid input)': 'Flat object (invalid)',
     'Nested object validation (invalid input)': 'Nested object (invalid)',
     'Complex "Create Order" (invalid input)': 'Complex object (invalid)',
-    'Array of 100 objects (invalid input)': 'Array of 100 (invalid)'
+    'Array of 100 objects (invalid input)': 'Array of 100 (invalid)',
+    'Union — no match (invalid)': 'Union no-match (invalid)'
 };
 
 /** Precomputed map from display label to its sort index for O(1) lookups */
