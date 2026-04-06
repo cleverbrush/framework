@@ -12,7 +12,28 @@ import {
     string,
     union
 } from '../index.js';
-import type { StringSchemaBuilder } from './StringSchemaBuilder.js';
+import type { ValidationContext, ValidationResult } from './SchemaBuilder.js';
+import { StringSchemaBuilder } from './StringSchemaBuilder.js';
+
+// A schema that returns { valid: false } with NO errors property — used to
+// test the `result.errors || []` fallback in parse() and parseAsync().
+class NoErrorsStringSchema extends StringSchemaBuilder {
+    constructor() {
+        super({ type: 'string' } as any);
+    }
+    public override validate(
+        _object: any,
+        _context?: ValidationContext
+    ): ValidationResult<any> {
+        return { valid: false } as any;
+    }
+    public override validateAsync(
+        _object: any,
+        _context?: ValidationContext
+    ): Promise<ValidationResult<any>> {
+        return Promise.resolve({ valid: false } as any);
+    }
+}
 
 // ---------- Sync/Async boundary tests ----------
 
@@ -866,4 +887,182 @@ describe('optional schema: validators skipped for null/undefined (async)', () =>
         expect(result.valid).toBe(false);
         expect(called).toBe(true);
     });
+});
+
+// ---------------------------------------------------------------------------
+// SchemaBuilder internals — lines 775, 814, 1200-1206, 1248, 1689, 1721, 1746
+// ---------------------------------------------------------------------------
+
+describe('SchemaBuilder internal edge cases', () => {
+    test('type setter throws on empty string (line 775)', () => {
+        expect(() => (StringSchemaBuilder as any).create({ type: '' })).toThrow(
+            'value should be non empty string'
+        );
+    });
+
+    test('type setter throws on non-string (line 775)', () => {
+        expect(() =>
+            (StringSchemaBuilder as any).create({ type: null })
+        ).toThrow('value should be non empty string');
+    });
+
+    test('isRequired setter throws on non-boolean (line 814)', () => {
+        const schema = string();
+        expect(() => {
+            (schema as any).isRequired = 'not-a-boolean';
+        }).toThrow('should be a boolean value');
+    });
+
+    test('preValidateAsync: validator throws → error message includes "thrown an error" (lines 1200-1206)', async () => {
+        const schema = string().addValidator(() => {
+            throw new Error('validator exploded');
+        });
+        const { valid, errors } = await schema.validateAsync('hello');
+        expect(valid).toBe(false);
+        expect(errors?.[0].message).toMatch(/thrown an error/);
+        expect(errors?.[0].message).toContain('validator exploded');
+    });
+
+    test('preValidateAsync: validator throws + doNotStopOnFirstError continues (lines 1200-1206)', async () => {
+        const schema = string()
+            .addValidator(() => {
+                throw new Error('first blow up');
+            })
+            .addValidator(() => ({
+                valid: false,
+                errors: [{ message: 'second fails' }]
+            }));
+        const { valid, errors } = await schema.validateAsync('hello', {
+            doNotStopOnFirstError: true
+        });
+        expect(valid).toBe(false);
+        expect(errors?.length).toBeGreaterThanOrEqual(2);
+    });
+
+    test('preValidate deprecated alias calls preValidateAsync (line 1248)', async () => {
+        const schema = string();
+        const result = await (schema as any).preValidate('hello');
+        expect(result).toBeDefined();
+        expect(result.valid).toBe(true);
+    });
+
+    test('async catch: catch value does not pass its own schema → plain valid result (line 1689)', async () => {
+        // number().catch('not-a-number') — catch value fails number validation
+        const schema = number().catch('not-a-number' as any);
+        const result = await schema.validateAsync('oops' as any);
+        // Validation fails for 'oops', catch fires with 'not-a-number'
+        // Re-validating 'not-a-number' as number also fails → plain { valid: true, object: 'not-a-number' }
+        expect(result.valid).toBe(true);
+        expect(result.object).toBe('not-a-number');
+    });
+
+    test('getValidationErrorMessageSync: invalid provider throws (line 1721)', () => {
+        const schema = string();
+        expect(() =>
+            (schema as any).getValidationErrorMessageSync(null, 'test')
+        ).toThrow('Invalid error message provider');
+    });
+
+    test('getValidationErrorMessage: invalid provider rejects (line 1746)', async () => {
+        const schema = string();
+        await expect(
+            (schema as any).getValidationErrorMessage(null, 'test')
+        ).rejects.toThrow('Invalid error message provider');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// SchemaBuilder protected getters: hasCatch (line 838) and isReadonly (line 856)
+// ---------------------------------------------------------------------------
+
+test('hasCatch getter returns true for schema with catch, false otherwise (line 838)', () => {
+    const schema = string().catch('fallback');
+    expect((schema as any).hasCatch).toBe(true);
+    expect((string() as any).hasCatch).toBe(false);
+});
+
+test('isReadonly getter returns true for readonly schema, false otherwise (line 856)', () => {
+    const schema = string().readonly();
+    expect((schema as any).isReadonly).toBe(true);
+    expect((string() as any).isReadonly).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// SchemaBuilder line 1202: named validator function throwing includes the fn name
+// ---------------------------------------------------------------------------
+
+test('async validator with named function — error includes function name (line 1202)', async () => {
+    async function myNamedValidator(_val: string) {
+        throw new Error('boom from named');
+    }
+    const schema = string().addValidator(myNamedValidator as any);
+    const { valid, errors } = await schema.validateAsync('hello');
+    expect(valid).toBe(false);
+    // fn.name = 'myNamedValidator' — the TRUE branch of line 1202
+    expect(errors?.[0].message).toContain('myNamedValidator');
+    expect(errors?.[0].message).toMatch(/thrown an error/);
+});
+
+// ---------------------------------------------------------------------------
+// SchemaBuilder line 1177: nullable schema with validator and null input →
+// validator block is SKIPPED (null && isNullable short-circuit)
+// ---------------------------------------------------------------------------
+
+test('preValidateAsync: nullable schema with validator skips validators for null (line 1177)', async () => {
+    // string().nullable() + addValidator that returns invalid
+    // When null is passed to a nullable schema, validators are skipped
+    const schema = string()
+        .nullable()
+        .addValidator(async () => ({
+            valid: false,
+            errors: [{ message: 'should not appear' }]
+        }));
+    const { valid } = await schema.validateAsync(null as any);
+    // null is valid for nullable schema — validators are skipped (line 1177 covers the branch)
+    expect(valid).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// SchemaBuilder line 1169: preValidate (sync) — nullable schema with validator
+// skips validators for null input (the FALSE branch of the validators if block)
+// ---------------------------------------------------------------------------
+
+test('preValidate sync: nullable schema with validator skips validators for null (line 1169)', () => {
+    const schema = string()
+        .nullable()
+        .addValidator(() => ({
+            valid: false,
+            errors: [{ message: 'should not appear' }]
+        }));
+    const { valid } = schema.validate(null as any);
+    // null is valid for nullable schema — sync validator block is skipped
+    expect(valid).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// SchemaBuilder lines 1814, 1834: parse() and parseAsync() `result.errors || []`
+// fallback when schema returns { valid: false } with no errors property
+// ---------------------------------------------------------------------------
+
+test('parse(): result.errors is undefined → fallback to [] in SchemaValidationError (line 1814)', () => {
+    const schema = new NoErrorsStringSchema() as any;
+    try {
+        schema.parse('anything');
+        expect.unreachable('should have thrown');
+    } catch (e) {
+        expect(e).toBeInstanceOf(SchemaValidationError);
+        // errors falls back to []
+        expect((e as SchemaValidationError).errors).toEqual([]);
+    }
+});
+
+test('parseAsync(): result.errors is undefined → fallback to [] in SchemaValidationError (line 1834)', async () => {
+    const schema = new NoErrorsStringSchema() as any;
+    try {
+        await schema.parseAsync('anything');
+        expect.unreachable('should have thrown');
+    } catch (e) {
+        expect(e).toBeInstanceOf(SchemaValidationError);
+        expect((e as SchemaValidationError).errors).toEqual([]);
+    }
 });

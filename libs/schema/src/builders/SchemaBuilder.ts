@@ -1949,6 +1949,8 @@ export abstract class SchemaBuilder<
     }
 
     protected constructor(props: SchemaBuilderProps<TResult>) {
+        if (!(typeof props === 'object' && props))
+            throw new Error('SchemaBuilder props must be an object');
         const { type, preprocessors, validators, isRequired } = props;
         this.type = type;
         if (typeof isRequired === 'boolean') this.isRequired = isRequired;

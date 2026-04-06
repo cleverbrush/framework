@@ -51,8 +51,7 @@ export class InMemoryJobRepository implements IJobRepository {
     }
 
     async removeJob(jobId: string) {
-        const job = this.getJobById(jobId);
-        if (!job) throw new Error(`job with id ${jobId} doesn't exist`);
+        await this.getJobById(jobId);
         this._jobs = this._jobs.filter(j => j.id !== jobId);
     }
 
@@ -85,12 +84,13 @@ export class InMemoryJobRepository implements IJobRepository {
     }
 
     async getJobById(jobId: string): Promise<Job> {
-        return this._jobs.find(j => j.id === jobId)!;
+        const job = this._jobs.find(j => j.id === jobId);
+        if (!job) throw new Error(`Job with id ${jobId} not found`);
+        return job;
     }
 
     async setJobStatus(jobId: string, status: JobStatus): Promise<Job> {
         const job = await this.getJobById(jobId);
-        if (!job) return null as any;
         job.status = status;
         return job;
     }

@@ -227,3 +227,62 @@ test('euqalsTo with custom error message - 1', async () => {
         expect(errors?.[0].message).toEqual('Custom error message');
     }
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 409)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes the default value', () => {
+    const schema = boolean().default(true).clearDefault();
+    const introspected = schema.introspect();
+    expect(introspected.defaultValue).toBeUndefined();
+
+    // Without a default, required schema should reject undefined
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Full validation path (#buildResult) — lines 180, 191, 301-303
+// ---------------------------------------------------------------------------
+
+test('full-path: preValidateSync fails → buildResult done=true with errors (line 180)', () => {
+    // Adding a validator forces canSkipPreValidation = false → full path
+    const schema = boolean()
+        .equals(true)
+        .addValidator(() => ({
+            valid: false,
+            errors: [{ message: 'blocked by validator' }]
+        }));
+    const result = schema.validate(true as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors?.[0].message).toEqual('blocked by validator');
+});
+
+test('full-path: nullable + validator → null is valid (line 191)', () => {
+    const schema = boolean()
+        .nullable()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(null as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toBeNull();
+});
+
+test('full-path: optional + validator → undefined is valid (line 191)', () => {
+    const schema = boolean()
+        .optional()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(undefined as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toBeUndefined();
+});
+
+test('full-path: equalsTo fails with custom provider (lines 301-303)', () => {
+    // validator forces full path; equalsTo violation returns { provider }
+    const schema = boolean()
+        .equals(true)
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(false as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors?.[0].message).toContain('true');
+});

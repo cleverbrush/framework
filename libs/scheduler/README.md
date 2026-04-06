@@ -1,4 +1,7 @@
 # @cleverbrush/scheduler
+<!-- coverage-badge-start -->
+![Coverage](https://img.shields.io/badge/coverage-96.7%25-brightgreen)
+<!-- coverage-badge-end -->
 
 A job scheduler for Node.js that runs tasks in worker threads on configurable schedules.
 

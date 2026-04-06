@@ -7,8 +7,32 @@ import {
 } from '../extensions/index.js';
 import { number } from './NumberSchemaBuilder.js';
 import { RecordSchemaBuilder, record } from './RecordSchemaBuilder.js';
-import type { InferType } from './SchemaBuilder.js';
-import { string } from './StringSchemaBuilder.js';
+import type {
+    InferType,
+    ValidationContext,
+    ValidationResult
+} from './SchemaBuilder.js';
+import { StringSchemaBuilder, string } from './StringSchemaBuilder.js';
+
+// A schema that always returns { valid: false, errors: [] } — used to test the
+// defensive `errors && errors.length > 0 ? errors : [fallback]` branches.
+class EmptyErrorsStringSchema extends StringSchemaBuilder {
+    constructor() {
+        super({ type: 'string' } as any);
+    }
+    public override validate(
+        _object: any,
+        _context?: ValidationContext
+    ): ValidationResult<any> {
+        return { valid: false, errors: [] };
+    }
+    public override validateAsync(
+        _object: any,
+        _context?: ValidationContext
+    ): Promise<ValidationResult<any>> {
+        return Promise.resolve({ valid: false, errors: [] });
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Type-level tests
@@ -542,4 +566,208 @@ test('getErrorsFor() - root errors returned by validateAsync', async () => {
     const root = result.getErrorsFor();
     expect(root.isValid).toBe(false);
     expect(root.errors[0]).toBe('object expected');
+});
+
+// ---------------------------------------------------------------------------
+// hasType / clearHasType
+// ---------------------------------------------------------------------------
+
+test('hasType - returns RecordSchemaBuilder, validation still works', () => {
+    const schema = record(string(), number()).hasType<Record<string, number>>();
+    expect(schema).toBeInstanceOf(RecordSchemaBuilder);
+    expect(schema.validate({ a: 1 }).valid).toBe(true);
+});
+
+test('clearHasType - returns RecordSchemaBuilder', () => {
+    const schema = record(string(), number())
+        .hasType<Record<string, number>>()
+        .clearHasType();
+    expect(schema).toBeInstanceOf(RecordSchemaBuilder);
+    expect(schema.validate({ a: 1 }).valid).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Async validation — full coverage of _validateAsync
+// ---------------------------------------------------------------------------
+
+test('validateAsync - valid record', async () => {
+    const schema = record(string(), number());
+    const { valid, object: res } = await schema.validateAsync({ a: 1, b: 2 });
+    expect(valid).toBe(true);
+    expect(res).toEqual({ a: 1, b: 2 });
+});
+
+test('validateAsync - invalid value (not an object)', async () => {
+    const schema = record(string(), number());
+    const { valid } = await schema.validateAsync(42 as any);
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - invalid key fails validation', async () => {
+    const schema = record(string().matches(/^[a-z]+$/), number());
+    const { valid } = await schema.validateAsync({ '1BAD': 5 });
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - invalid value fails validation', async () => {
+    const schema = record(string(), number().min(0));
+    const { valid } = await schema.validateAsync({ a: -1 });
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - optional record with undefined', async () => {
+    const schema = record(string(), number()).optional();
+    const { valid, object: res } = await schema.validateAsync(undefined as any);
+    expect(valid).toBe(true);
+    expect(res).toBeUndefined();
+});
+
+test('validateAsync - doNotStopOnFirstError collects all key errors', async () => {
+    const schema = record(string(), number().min(0));
+    const { valid, getNestedErrors } = await schema.validateAsync(
+        { a: -1, b: -2, c: 3 },
+        { doNotStopOnFirstError: true }
+    );
+    expect(valid).toBe(false);
+    const nested = getNestedErrors();
+    expect(nested.a.valid).toBe(false);
+    expect(nested.b.valid).toBe(false);
+    expect(nested.c.valid).toBe(true);
+});
+
+test('validateAsync - invalid key with doNotStopOnFirstError', async () => {
+    const schema = record(string().matches(/^[a-z]+$/), number());
+    const { valid } = await schema.validateAsync(
+        { '1bad': 1, '2bad': 2 },
+        { doNotStopOnFirstError: true }
+    );
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - async validator triggers full path', async () => {
+    const schema = record(string(), number()).addValidator(async () => ({
+        valid: false,
+        errors: [{ message: 'async validator failed' }]
+    }));
+    const { valid } = await schema.validateAsync({ a: 1 });
+    expect(valid).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault / required / brand overrides (lines 338, 388, 406)
+// ---------------------------------------------------------------------------
+
+test('required - override (line 338)', () => {
+    const schema = record(string(), number()).optional().required();
+    expect(schema.introspect().isRequired).toBe(true);
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toBe(false);
+});
+
+test('clearDefault - override (line 388)', () => {
+    const schema = record(string(), number())
+        .default({} as any)
+        .clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toBe(false);
+});
+
+test('brand - override (line 406)', () => {
+    const schema = record(string(), number()).brand<'MyRecord'>();
+    expect(schema).toBeInstanceOf(RecordSchemaBuilder);
+    expect(schema.validate({ a: 1 }).valid).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Fast-path: optional null → getNestedErrors + getErrorsFor lazy (lines 671, 681)
+// ---------------------------------------------------------------------------
+
+test('fast-path: optional record with null → getNestedErrors returns {} (line 671)', () => {
+    const schema = record(string(), number()).optional();
+    const result = schema.validate(null as any);
+    expect(result.valid).toBe(true);
+    // Call getNestedErrors — triggers line 671
+    const nested = result.getNestedErrors();
+    expect(nested).toEqual({});
+});
+
+test('fast-path: optional record with null → getErrorsFor(key) uses makeKeyResult (line 681)', () => {
+    const schema = record(string(), number()).optional();
+    const result = schema.validate(null as any);
+    expect(result.valid).toBe(true);
+    // Call getErrorsFor with a key — triggers line 681
+    const keyErrors = result.getErrorsFor('someKey');
+    expect(keyErrors).toBeDefined();
+    // Call getErrorsFor without key — triggers line 674-679
+    const rootErrors = result.getErrorsFor();
+    expect(rootErrors.isValid).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Full-path key validation failure — lines 815-826
+// ---------------------------------------------------------------------------
+
+test('full-path: invalid key stop-on-first via validator (lines 815, 825)', () => {
+    const schema = record(string().matches(/^[a-z]+$/), number()).addValidator(
+        () => ({ valid: true })
+    );
+    const result = schema.validate({ '1BAD': 1, '2BAD': 2 } as any);
+    expect(result.valid).toBe(false);
+    // stop-on-first means we break after first key error (line 825)
+    expect(result.errors?.length).toBe(1);
+});
+
+test('sync: invalid key + doNotStopOnFirstError full path (lines 815-826)', () => {
+    const schema = record(string().matches(/^[a-z]+$/), number());
+    const result = schema.validate({ '1bad': 1, '2bad': 2 } as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// Defensive fallback: empty errors from key schema (lines 838-842)
+// ---------------------------------------------------------------------------
+
+test('sync: key schema returns empty errors → fallback message used (line 838-842)', () => {
+    const emptyKeySchema = new EmptyErrorsStringSchema() as any;
+    const schema = record(emptyKeySchema, number()) as any;
+    const result = schema.validate({ someKey: 1 });
+    expect(result.valid).toBe(false);
+    // Fallback error message is provided since key schema returned no errors
+    expect(result.errors?.[0]?.message).toContain('someKey');
+});
+
+// ---------------------------------------------------------------------------
+// Defensive fallback: empty errors from value schema (line 892)
+// ---------------------------------------------------------------------------
+
+test('sync: value schema returns empty errors → fallback message used (line 892)', () => {
+    const emptyValueSchema = new EmptyErrorsStringSchema() as any;
+    const schema = record(string(), emptyValueSchema) as any;
+    const result = schema.validate({ myKey: 'anything' });
+    expect(result.valid).toBe(false);
+    // Fallback error message is provided since value schema returned no errors
+    expect(result.errors?.[0]?.message).toContain('myKey');
+});
+
+// ---------------------------------------------------------------------------
+// Defensive fallback: empty errors from key schema async (line 913)
+// ---------------------------------------------------------------------------
+
+test('async: key schema returns empty errors → fallback message used (line 913)', async () => {
+    const emptyKeySchema = new EmptyErrorsStringSchema() as any;
+    const schema = record(emptyKeySchema, number()) as any;
+    const result = await schema.validateAsync({ someKey: 1 });
+    expect(result.valid).toBe(false);
+    expect(result.errors?.[0]?.message).toContain('someKey');
+});
+
+test('async: value schema returns empty errors → fallback message used (line 913 value path)', async () => {
+    const emptyValueSchema = new EmptyErrorsStringSchema() as any;
+    const schema = record(string(), emptyValueSchema) as any;
+    const result = await schema.validateAsync({ myKey: 'anything' });
+    expect(result.valid).toBe(false);
+    expect(result.errors?.[0]?.message).toContain('myKey');
 });

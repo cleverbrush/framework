@@ -21,8 +21,10 @@ export default defineConfig({
                 '**/dist/**',
                 '**/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
                 'libs/**/src/index.ts',
-                'libs/**/src/types.ts'
-            ]
+                'libs/**/src/types.ts',
+                'libs/benchmarks/**'
+            ],
+            reporter: ['text', 'text-summary', 'json-summary']
         },
         mockReset: true,
         environment: 'node'

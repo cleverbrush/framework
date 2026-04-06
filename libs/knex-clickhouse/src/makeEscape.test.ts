@@ -205,4 +205,39 @@ describe('makeEscape', () => {
             expect(rawEscape(null, null, {})).toBe('NULL');
         });
     });
+
+    describe('dates - timezone paths', () => {
+        test('local timezone (no ctx) formats using local date methods', () => {
+            // No timeZone ctx → defaults to 'local' → uses getFullYear/getMonth etc.
+            const result = escapeFn(new Date('2024-06-15T12:30:45.123Z'));
+            // Value depends on system locale, but format must be correct
+            expect(result).toMatch(
+                /^'\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}'$/
+            );
+        });
+
+        test('positive UTC offset timezone applies time shift', () => {
+            // +05:00 → convertTimezone returns 300; dt shifts +5h before UTC extraction
+            const result = escapeFn(new Date('2024-06-15T12:30:45.123Z'), {
+                timeZone: '+05:00'
+            });
+            expect(result).toBe("'2024-06-15 17:30:45.123'");
+        });
+
+        test('UTC timezone with no shift (+00:00)', () => {
+            // +00:00 → convertTimezone returns 0; no setTime call; UTC output unchanged
+            const result = escapeFn(new Date('2024-06-15T12:30:45.123Z'), {
+                timeZone: '+00:00'
+            });
+            expect(result).toBe("'2024-06-15 12:30:45.123'");
+        });
+
+        test('invalid timezone string falls back to UTC (convertTimezone returns false)', () => {
+            // 'invalid' does not match the timezone regex → returns false → no time shift
+            const result = escapeFn(new Date('2024-06-15T12:30:45.123Z'), {
+                timeZone: 'invalid'
+            });
+            expect(result).toBe("'2024-06-15 12:30:45.123'");
+        });
+    });
 });

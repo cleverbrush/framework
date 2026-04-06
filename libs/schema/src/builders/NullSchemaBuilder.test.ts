@@ -123,3 +123,63 @@ test('error message for invalid value', () => {
     expect(valid).toEqual(false);
     expect(errors?.[0].message).toEqual('must be null');
 });
+
+test('hasType returns a new NullSchemaBuilder instance', () => {
+    const schema = nul();
+    const typed = schema.hasType<null>();
+    expect(typed).toBeInstanceOf(NullSchemaBuilder);
+    expect(typed.validate(null).valid).toEqual(true);
+});
+
+test('clearHasType returns a new NullSchemaBuilder instance', () => {
+    const schema = nul().hasType<null>();
+    const cleared = schema.clearHasType();
+    expect(cleared).toBeInstanceOf(NullSchemaBuilder);
+    expect(cleared.validate(null).valid).toEqual(true);
+});
+
+test('brand returns a new NullSchemaBuilder', () => {
+    const schema = nul().brand('NullBrand');
+    expect(schema).toBeInstanceOf(NullSchemaBuilder);
+    expect(schema.validate(null).valid).toEqual(true);
+});
+
+test('readonly returns a new NullSchemaBuilder', () => {
+    const schema = nul().readonly();
+    expect(schema).toBeInstanceOf(NullSchemaBuilder);
+    expect(schema.introspect().isReadonly).toEqual(true);
+    expect(schema.validate(null).valid).toEqual(true);
+});
+
+test('nullable allows null when used on nul()', () => {
+    const schema = nul().nullable();
+    expect(schema).toBeInstanceOf(NullSchemaBuilder);
+    expect(schema.validate(null).valid).toEqual(true);
+});
+
+test('notNullable returns a NullSchemaBuilder', () => {
+    const schema = nul().notNullable();
+    expect(schema).toBeInstanceOf(NullSchemaBuilder);
+    expect(schema.validate(null).valid).toEqual(true);
+});
+
+test('default with null value — returns null when undefined given', () => {
+    const schema = nul().optional().default(null);
+    const { valid, object } = schema.validate(undefined as any);
+    expect(valid).toEqual(true);
+    expect(object).toBeNull();
+});
+
+test('default with non-null value — fails validation (null schema wants null)', () => {
+    // default is set to a non-null value; the #buildResult should yield invalid
+    const schema = nul()
+        .optional()
+        .default('not null' as any);
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+test('clearDefault removes the default', () => {
+    const schema = nul().optional().default(null).clearDefault();
+    expect(schema.introspect().hasDefault).toEqual(false);
+});

@@ -1,5 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'vitest';
+import { withExtensions } from '../extension.js';
 import { enumOf, type InferType, number, string } from '../index.js';
+import { enumExtension } from './enum.js';
 
 describe('enum extension (oneOf)', () => {
     // -----------------------------------------------------------------------
@@ -395,6 +397,120 @@ describe('enum extension (oneOf)', () => {
             const schema = enumOf('x', 'y').nullable();
             type T = InferType<typeof schema>;
             expectTypeOf<T>().toMatchTypeOf<'x' | 'y' | null>();
+        });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// enumExtension — standalone extension descriptor
+// ---------------------------------------------------------------------------
+
+describe('enumExtension (standalone withExtensions usage)', () => {
+    const s = withExtensions(enumExtension);
+
+    describe('string().oneOf() via enumExtension', () => {
+        test('valid value is accepted', () => {
+            const schema = (s.string() as any).oneOf('a', 'b', 'c');
+            expect(schema.validate('a').valid).toBe(true);
+        });
+
+        test('invalid value is rejected with default message', () => {
+            const schema = (s.string() as any).oneOf('a', 'b');
+            const result = schema.validate('z');
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain('a');
+        });
+
+        test('array form with custom string error message', () => {
+            const schema = (s.string() as any).oneOf(['x', 'y'], 'bad value');
+            expect(schema.validate('z').valid).toBe(false);
+            expect(schema.validate('z').errors[0].message).toBe('bad value');
+        });
+
+        test('array form with custom error factory', () => {
+            const schema = (s.string() as any).oneOf(
+                ['x', 'y'],
+                (v: unknown) => `got ${v}`
+            );
+            expect(schema.validate('z').errors[0].message).toBe('got z');
+        });
+
+        test('rest-params form with function as last arg', () => {
+            const schema = (s.string() as any).oneOf(
+                'a',
+                'b',
+                (v: unknown) => `not allowed: ${v}`
+            );
+            expect(schema.validate('c').errors[0].message).toBe(
+                'not allowed: c'
+            );
+        });
+
+        test('throws when called with no values', () => {
+            expect(() => (s.string() as any).oneOf()).toThrow(
+                'oneOf requires at least one value'
+            );
+        });
+
+        test('throws when array form has empty array', () => {
+            expect(() => (s.string() as any).oneOf([])).toThrow(
+                'oneOf requires at least one value'
+            );
+        });
+    });
+
+    describe('number().oneOf() via enumExtension', () => {
+        test('valid value is accepted', () => {
+            const schema = (s.number() as any).oneOf(1, 2, 3);
+            expect(schema.validate(1).valid).toBe(true);
+        });
+
+        test('invalid value is rejected with default message', () => {
+            const schema = (s.number() as any).oneOf(1, 2);
+            const result = schema.validate(99);
+            expect(result.valid).toBe(false);
+            expect(result.errors[0].message).toContain('1');
+        });
+
+        test('array form with custom string error message', () => {
+            const schema = (s.number() as any).oneOf([1, 2], 'invalid num');
+            expect(schema.validate(3).errors[0].message).toBe('invalid num');
+        });
+
+        test('array form with custom error factory', () => {
+            const schema = (s.number() as any).oneOf(
+                [10, 20],
+                (v: unknown) => `${v} is not valid`
+            );
+            expect(schema.validate(99).errors[0].message).toBe(
+                '99 is not valid'
+            );
+        });
+
+        test('rest-params form with string error message as last arg', () => {
+            const schema = (s.number() as any).oneOf(1, 2, 3, 'must be 1-3');
+            expect(schema.validate(5).errors[0].message).toBe('must be 1-3');
+        });
+
+        test('rest-params form with function as last arg', () => {
+            const schema = (s.number() as any).oneOf(
+                1,
+                2,
+                (v: unknown) => `${v} rejected`
+            );
+            expect(schema.validate(5).errors[0].message).toBe('5 rejected');
+        });
+
+        test('throws when called with no values', () => {
+            expect(() => (s.number() as any).oneOf()).toThrow(
+                'oneOf requires at least one value'
+            );
+        });
+
+        test('throws when array form has empty array', () => {
+            expect(() => (s.number() as any).oneOf([])).toThrow(
+                'oneOf requires at least one value'
+            );
         });
     });
 });

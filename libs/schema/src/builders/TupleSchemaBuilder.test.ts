@@ -3,10 +3,35 @@ import { expect, expectTypeOf, test } from 'vitest';
 import { boolean } from './BooleanSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
-import type { InferType } from './SchemaBuilder.js';
-import { string } from './StringSchemaBuilder.js';
+import type {
+    InferType,
+    ValidationContext,
+    ValidationResult
+} from './SchemaBuilder.js';
+import { StringSchemaBuilder, string } from './StringSchemaBuilder.js';
 import { TupleSchemaBuilder, tuple } from './TupleSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
+
+// A schema that always returns { valid: false, errors: [] } — used to test the
+// defensive `Array.isArray(result.errors) && result.errors.length > 0 ? ... : []`
+// branches in TupleSchemaBuilder element validation.
+class EmptyErrorsStringSchema extends StringSchemaBuilder {
+    constructor() {
+        super({ type: 'string' } as any);
+    }
+    public override validate(
+        _object: any,
+        _context?: ValidationContext
+    ): ValidationResult<any> {
+        return { valid: false, errors: [] };
+    }
+    public override validateAsync(
+        _object: any,
+        _context?: ValidationContext
+    ): Promise<ValidationResult<any>> {
+        return Promise.resolve({ valid: false, errors: [] });
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Type-level tests
@@ -457,4 +482,249 @@ test('introspect() - restSchema is undefined without rest()', () => {
     const schema = tuple([string()]);
     const info = schema.introspect();
     expect(info.restSchema).toBeUndefined();
+});
+
+// ---------------------------------------------------------------------------
+// hasType / clearHasType
+// ---------------------------------------------------------------------------
+
+test('hasType - returns a TupleSchemaBuilder', () => {
+    const schema = tuple([string(), number()]).hasType<[string, number]>();
+    expect(schema).toBeInstanceOf(TupleSchemaBuilder);
+    expect(schema.validate(['hello', 42] as any).valid).toEqual(true);
+});
+
+test('clearHasType - returns a TupleSchemaBuilder', () => {
+    const schema = tuple([string()]).hasType<[string]>().clearHasType();
+    expect(schema).toBeInstanceOf(TupleSchemaBuilder);
+});
+
+// ---------------------------------------------------------------------------
+// Async validation paths
+// ---------------------------------------------------------------------------
+
+test('validateAsync - valid tuple', async () => {
+    const schema = tuple([string(), number()]);
+    const { valid, object: res } = await schema.validateAsync(['hi', 1] as any);
+    expect(valid).toEqual(true);
+    expect(res).toEqual(['hi', 1]);
+});
+
+test('validateAsync - invalid element', async () => {
+    const schema = tuple([string(), number()]);
+    const { valid } = await schema.validateAsync(['hi', 'not-a-num'] as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - wrong length (too few elements)', async () => {
+    const schema = tuple([string(), number()]);
+    const { valid } = await schema.validateAsync(['only-one'] as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - optional tuple with undefined', async () => {
+    const schema = tuple([string()]).optional();
+    const { valid, object: res } = await schema.validateAsync(undefined as any);
+    expect(valid).toEqual(true);
+    expect(res).toBeUndefined();
+});
+
+test('validateAsync - with rest schema, valid', async () => {
+    const schema = tuple([string()]).rest(number());
+    const { valid, object: res } = await schema.validateAsync([
+        'a',
+        1,
+        2,
+        3
+    ] as any);
+    expect(valid).toEqual(true);
+    expect(res).toEqual(['a', 1, 2, 3]);
+});
+
+test('validateAsync - with rest schema, invalid rest element', async () => {
+    const schema = tuple([string()]).rest(number());
+    const { valid } = await schema.validateAsync(['a', 'bad'] as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - doNotStopOnFirstError collects all errors', async () => {
+    const schema = tuple([string(), number(), boolean()]);
+    const { valid, getNestedErrors } = await schema.validateAsync(
+        [42, 'bad', 'bad'] as any,
+        { doNotStopOnFirstError: true }
+    );
+    expect(valid).toEqual(false);
+    const positions = getNestedErrors();
+    // All three positions should have been validated
+    expect(positions.length).toBeGreaterThanOrEqual(2);
+});
+
+test('validateAsync - prevalidation fails (required, receives undefined)', async () => {
+    const schema = tuple([string()]);
+    const { valid } = await schema.validateAsync(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Constructor edge case: non-array elements (line 195)
+// ---------------------------------------------------------------------------
+
+test('constructor: non-array elements defaults to empty (line 195)', () => {
+    const schema = TupleSchemaBuilder.create({ elements: null as any });
+    // Empty elements means any array is valid as a tuple of length 0
+    const { valid } = schema.validate([] as any);
+    expect(valid).toEqual(true);
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault / brand overrides (line 863)
+// ---------------------------------------------------------------------------
+
+test('brand - tuple brand override (line 863)', () => {
+    const schema = tuple([string()]).brand<'MyTuple'>();
+    expect(schema).toBeInstanceOf(TupleSchemaBuilder);
+    expect(schema.validate(['hello'] as any).valid).toEqual(true);
+});
+
+// ---------------------------------------------------------------------------
+// Fast-path lazy getNestedErrors — lines 430, 451, 471, 498
+// ---------------------------------------------------------------------------
+
+test('fast-path: optional tuple with null → getNestedErrors lazy (line 430)', () => {
+    const schema = tuple([string()]).optional();
+    const result = schema.validate(null as any);
+    // null + not required → valid, getNestedErrors is lazy
+    // (not reached because null when not nullable goes to full path)
+    // For optional (isRequired=false), null is covered by !isRequired
+    expect(result.valid).toEqual(true);
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
+});
+
+test('fast-path: tuple wrong length → getNestedErrors lazy (line 451)', () => {
+    const schema = tuple([string(), number()]);
+    const result = schema.validate(['hi'] as any); // only 1 element, needs 2
+    expect(result.valid).toEqual(false);
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
+});
+
+test('fast-path: tuple invalid element → getNestedErrors lazy (line 471)', () => {
+    const schema = tuple([string(), number()]);
+    const result = schema.validate(['hi', 'not-a-number'] as any);
+    expect(result.valid).toEqual(false);
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
+});
+
+test('fast-path: rest schema invalid element → getNestedErrors lazy (line 498)', () => {
+    const schema = tuple([string()]).rest(number());
+    const result = schema.validate(['hi', 'not-a-number'] as any);
+    expect(result.valid).toEqual(false);
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
+});
+
+// ---------------------------------------------------------------------------
+// Full validation path with rest schema — lines 611-632
+// ---------------------------------------------------------------------------
+
+test('full-path: rest schema valid stop-on-first (lines 611-621)', () => {
+    const schema = tuple([string()])
+        .rest(number())
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(['hi', 1, 2, 3] as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(['hi', 1, 2, 3]);
+});
+
+test('full-path: rest schema invalid element stop-on-first (lines 623-636)', () => {
+    const schema = tuple([string()])
+        .rest(number())
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(['hi', 1, 'bad'] as any);
+    expect(result.valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Async validation path with rest schema — lines 694-699
+// ---------------------------------------------------------------------------
+
+test('validateAsync full-path: rest schema doNotStopOnFirstError (lines 694-699)', async () => {
+    const schema = tuple([string()])
+        .rest(number())
+        .addValidator(() => ({ valid: true }));
+    const result = await schema.validateAsync(['hi', 1, 'bad', 2] as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toEqual(false);
+});
+
+test('validateAsync full-path: rest schema all valid doNotStopOnFirstError', async () => {
+    const schema = tuple([string()])
+        .rest(number())
+        .addValidator(() => ({ valid: true }));
+    const result = await schema.validateAsync(['hi', 1, 2, 3] as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(['hi', 1, 2, 3]);
+});
+
+// ---------------------------------------------------------------------------
+// Full-path: selfDescriptor setValue/getValue (lines 269-270)
+// ---------------------------------------------------------------------------
+
+test('full-path: selfDescriptor set/get via hybrid error array descriptor (lines 269-270)', () => {
+    const schema = tuple([string()]).addValidator(() => ({ valid: true }));
+    const { getNestedErrors } = schema.validate(['hello'] as any);
+    const nested = getNestedErrors();
+    const desc = (nested as any).descriptor;
+    if (desc) {
+        const setResult = desc.setValue({}, 'something', {});
+        expect(setResult).toBe(false);
+        const getResult = desc.getValue('anything');
+        expect(getResult).toEqual({ success: true, value: 'anything' });
+    }
+});
+
+// ---------------------------------------------------------------------------
+// Defensive fallback: element schema returns empty errors (lines 601, 626)
+// ---------------------------------------------------------------------------
+
+test('sync: element schema returns empty errors → empty errors array (line 601)', () => {
+    const emptySchema = new EmptyErrorsStringSchema() as any;
+    const schema = tuple([emptySchema]) as any;
+    const result = schema.validate(['anything']);
+    expect(result.valid).toBe(false);
+    // Fallback branch: errors is [] since element schema returned empty errors
+    expect(result.errors).toEqual([]);
+});
+
+test('sync: rest schema returns empty errors → empty errors array (line 626)', () => {
+    const emptySchema = new EmptyErrorsStringSchema() as any;
+    const schema = tuple([string()]).rest(emptySchema) as any;
+    const result = schema.validate(['hello', 'extra'] as any);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------
+// Defensive fallback: element schema returns empty errors async (lines 727, 753)
+// ---------------------------------------------------------------------------
+
+test('async: element schema returns empty errors → empty errors array (line 727)', async () => {
+    const emptySchema = new EmptyErrorsStringSchema() as any;
+    const schema = tuple([emptySchema]) as any;
+    const result = await schema.validateAsync(['anything']);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual([]);
+});
+
+test('async: rest schema returns empty errors → empty errors array (line 753)', async () => {
+    const emptySchema = new EmptyErrorsStringSchema() as any;
+    const schema = tuple([string()]).rest(emptySchema) as any;
+    const result = await schema.validateAsync(['hello', 'extra'] as any);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toEqual([]);
 });

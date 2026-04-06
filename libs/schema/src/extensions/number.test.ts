@@ -252,3 +252,21 @@ describe('number extensions', () => {
         });
     });
 });
+
+// ---------------------------------------------------------------------------
+// oneOf: edge cases for array form with error message (number extension line 368, 395)
+// ---------------------------------------------------------------------------
+
+describe('oneOf number edge cases', () => {
+    test('oneOf: throws with empty args (line 368)', () => {
+        expect(() => (number() as any).oneOf()).toThrow(
+            'oneOf requires at least one value'
+        );
+    });
+
+    test('oneOf: throws with empty array (line 395)', () => {
+        expect(() => (number() as any).oneOf([])).toThrow(
+            'oneOf requires at least one value'
+        );
+    });
+});

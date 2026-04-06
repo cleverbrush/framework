@@ -484,3 +484,48 @@ test('minute - 3', () => {
 
     expect(calculator.hasNext()).toEqual(false);
 });
+
+test('constructor defaults startsOn to now when not provided', () => {
+    // Covers the else branch (lines 65-66) where startsOn is not given
+    const before = Date.now();
+    const calc = new ScheduleCalculator({
+        every: 'minute',
+        interval: 5,
+        maxOccurences: 2
+    });
+    const after = Date.now();
+
+    expect(calc.hasNext()).toBe(true);
+    const { date } = calc.next();
+    // The first date should be at or after the 'before' timestamp
+    expect(date.getTime()).toBeGreaterThanOrEqual(before);
+    expect(date.getTime()).toBeLessThanOrEqual(after + 500);
+});
+
+test('hasNext(span) returns true when next date is within the span', () => {
+    // Covers lines 364-365: hasNext called with a numeric span
+    const farFutureStart = new Date(Date.now() + 500);
+    const calc = new ScheduleCalculator({
+        every: 'minute',
+        interval: 1,
+        startsOn: farFutureStart,
+        maxOccurences: 2
+    });
+
+    // Next is ~500ms away — a 1-second span should include it
+    expect(calc.hasNext(2000)).toBe(true);
+    // A 0ms span — next is not within 0ms from now
+    expect(calc.hasNext(0)).toBe(false);
+});
+
+test('throws for unknown schedule type', () => {
+    // Covers line 336: default case in #getNext switch
+    expect(
+        () =>
+            new ScheduleCalculator({
+                every: 'hourly' as any,
+                interval: 1,
+                startsOn: new Date()
+            })
+    ).toThrow('unknown schedule type');
+});
