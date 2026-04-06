@@ -27,10 +27,11 @@ describe('InMemoryJobRepository', () => {
         expect(found.id).toBe('j2');
     });
 
-    test('getJobById returns undefined for missing job', async () => {
+    test('getJobById throws for missing job', async () => {
         const repo = new InMemoryJobRepository();
-        const result = await repo.getJobById('nonexistent');
-        expect(result).toBeUndefined();
+        await expect(repo.getJobById('nonexistent')).rejects.toThrow(
+            'Job with id nonexistent not found'
+        );
     });
 
     test('removeJob removes an existing job', async () => {
@@ -40,11 +41,11 @@ describe('InMemoryJobRepository', () => {
         expect(await repo.getJobs()).toHaveLength(0);
     });
 
-    test('removeJob silently does nothing for non-existent job', async () => {
-        // removeJob calls getJobById without await; the null check never fires,
-        // so calling it with an unknown id is a no-op (no throw).
+    test('removeJob throws for non-existent job', async () => {
         const repo = new InMemoryJobRepository();
-        await expect(repo.removeJob('nope')).resolves.toBeUndefined();
+        await expect(repo.removeJob('nope')).rejects.toThrow(
+            'Job with id nope not found'
+        );
     });
 
     test('saveJob updates an existing job', async () => {
@@ -137,10 +138,11 @@ describe('InMemoryJobRepository', () => {
         expect(stored.status).toBe('failed');
     });
 
-    test('setJobStatus returns null for a nonexistent job', async () => {
+    test('setJobStatus throws for a nonexistent job', async () => {
         const repo = new InMemoryJobRepository();
-        const result = await repo.setJobStatus('no-such-id', 'active' as any);
-        expect(result).toBeNull();
+        await expect(
+            repo.setJobStatus('no-such-id', 'active' as any)
+        ).rejects.toThrow('Job with id no-such-id not found');
     });
 
     test('getInstanceById returns the correct instance', async () => {
