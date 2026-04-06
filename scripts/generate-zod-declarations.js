@@ -27,11 +27,9 @@ function collectDts(dir, acc = []) {
     for (const entry of readdirSync(dir)) {
         const full = join(dir, entry);
         if (statSync(full).isDirectory()) {
+            const rel = relative(ZOD_DIR, full);
             // Only recurse into v3/ and v3/helpers/ — skip v4, locales, etc.
-            if (
-                full.endsWith('/v3') ||
-                full.endsWith('/v3/helpers')
-            ) {
+            if (rel === 'v3' || rel === join('v3', 'helpers')) {
                 collectDts(full, acc);
             }
         } else if (entry.endsWith('.d.ts')) {
