@@ -995,7 +995,7 @@ test('async validator with named function — error includes function name (line
     async function myNamedValidator(_val: string) {
         throw new Error('boom from named');
     }
-    const schema = string().addValidator(myNamedValidator);
+    const schema = string().addValidator(myNamedValidator as any);
     const { valid, errors } = await schema.validateAsync('hello');
     expect(valid).toBe(false);
     // fn.name = 'myNamedValidator' — the TRUE branch of line 1202
