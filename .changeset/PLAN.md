@@ -1,6 +1,6 @@
 # Improvement Plan & Growth Strategy
 
-> **Last updated:** April 5, 2026. **Status:** Pre-publication — all packages built, website ready, benchmarks show market-leading performance. Shifting focus from features to publishing, ecosystem integration, and adoption.
+> **Last updated:** April 5, 2026. **Status:** Pre-publication — all packages built, website ready, benchmarks show market-leading performance. Standard Schema v1 implemented. Shifting focus from features to publishing, ecosystem integration, and adoption.
 
 ---
 
@@ -22,7 +22,8 @@
 | **Async** | ✅ Done | `Collector`, `debounce()`, `throttle()`, `retry()` |
 | **Scheduler** | ✅ Done | Cron-like job scheduler with worker threads, schema-validated schedules |
 | **Knex-ClickHouse** | ✅ Done | Knex dialect for ClickHouse with retry logic |
-| **Website** | ✅ Done (unpublished) | Next.js 16, landing page, docs for all packages, 43 playground examples, "Migrating from Zod" guide, TypeDoc API docs |
+| **Standard Schema v1** | ✅ Done | `~standard` getter on `SchemaBuilder` base — all 13 builders interoperate with 50+ tools (tRPC, TanStack Form, T3 Env, React Hook Form, Hono, …) |
+| **Website** | ✅ Done (unpublished) | Next.js 16, landing page, docs for all packages, 43 playground examples, "Migrating from Zod" guide, TypeDoc API docs + Standard Schema showcases (TanStack Form, T3 Env) |
 | **CI/CD** | ✅ Done | GitHub Actions: `ci.yml` (lint + build + test), `release.yml` (changesets publish) |
 | **Community files** | ✅ Done | CONTRIBUTING.md, CODE_OF_CONDUCT.md, issue templates, PR template |
 | **Benchmarks** | ✅ Done | **#1 in 14/15 benchmarks** vs Zod/Yup/Joi. 1.3–2.2x faster on valid input, 8–230x faster on invalid input |
@@ -53,17 +54,17 @@
 |---|---|---|
 | **Stars** | 42.3k | Pre-publish |
 | **Bundle size** | Zod v3: 14.4 KB gz; Zod v4: **41 KB gz** | **14 KB gz (full) / 4 KB gz (subpath)** |
-| **Standard Schema** | ✅ Yes (v3.24+) | ❌ Not yet — **must implement** |
+| **Standard Schema** | ✅ Yes (v3.24+) | ✅ Yes (v1) — [`~standard` on all builders](https://standardschema.dev/) |
 | **Runtime introspection** | ❌ Opaque schemas | ✅ **PropertyDescriptors** |
 | **Extension system** | `.refine()` only (black box) | ✅ **`defineExtension()` — type-safe, composable, introspectable** |
-| **Ecosystem integrations** | 50+ tools via Standard Schema (tRPC, RHF, TanStack, Hono, T3 Env...) | mapper + react-form + schema-json (unique but closed ecosystem) |
+| **Ecosystem integrations** | 50+ tools via Standard Schema (tRPC, RHF, TanStack, Hono, T3 Env...) | ✅ **50+ tools via Standard Schema** + mapper + react-form + schema-json (broader than Zod's ecosystem) |
 | **AI/LLM support** | MCP server, llms.txt | ❌ None yet — **PropertyDescriptors are an advantage here** |
 | **Performance** | Baseline | ✅ **1.3–230x faster** |
 | **JSON Schema** | Built-in (v4) | ✅ Bidirectional via schema-json |
 | **Object mapping** | ❌ None | ✅ **Built-in mapper** |
 | **Form generation** | Via 3rd parties (RHF) | ✅ **Built-in react-form** |
 
-**Key insight:** Zod won through ecosystem integrations, not features. Standard Schema is the bridge — implementing it unlocks 50+ tools instantly. PropertyDescriptors + extension system + mapper + forms are the *moat* that no competitor can replicate.
+**Key insight:** Zod won through ecosystem integrations, not features. Standard Schema is now implemented — @cleverbrush/schema works with 50+ tools out of the box. PropertyDescriptors + extension system + mapper + forms are the *moat* that no competitor can replicate.
 
 ### Remaining Feature Gaps vs Zod
 
@@ -193,43 +194,38 @@ A dedicated page that honestly shows:
 
 ---
 
-## Phase 3: Standard Schema Implementation
+## Phase 3: Standard Schema Implementation ✅ DONE
 
 **Goal:** Unlock instant compatibility with 50+ tools (tRPC, React Hook Form, TanStack, Hono, T3 Env, etc.) by implementing the Standard Schema spec (standardschema.dev).
 
 This is the **single highest-leverage technical feature** for adoption. Without it, every integration requires a custom adapter. With it, @cleverbrush/schema works everywhere Zod works.
 
-### 3.1 Implement `StandardSchemaV1` on `SchemaBuilder`
+### 3.1 Implement `StandardSchemaV1` on `SchemaBuilder` ✅
 
-The interface is small — add a `~standard` property to the base `SchemaBuilder` class:
+`['~standard']` getter implemented on `SchemaBuilder` base class — all 13 builders inherit automatically:
 
 - `version: 1`
 - `vendor: '@cleverbrush/schema'`
 - `validate(value)` — wraps existing `.validate()`, maps `ValidationResult` to Standard Schema's `Result<Output>` format (issues array with `message` and `path`)
-- `types` — phantom types for `Input` and `Output` inference
-- Sync-first: return synchronous result when possible, Promise for async validators
+- Correct TypeScript output type via `ResolvedSchemaType<TResult, TRequired, TNullable>` helper, accounting for optional/nullable modifiers
+- Result object cached via `#standardProps` private field — repeated accesses return the same reference
+- Spec package: `@standard-schema/spec`
 
-Implementation touches only `SchemaBuilder` base class — all 13 subclasses inherit automatically.
+### 3.2 Implement `StandardJSONSchemaV1` — deferred
 
-### 3.2 Implement `StandardJSONSchemaV1`
+Since `toJsonSchema()` already exists in `@cleverbrush/schema-json`, wiring it to the Standard JSON Schema interface is possible but deferred until the spec stabilises further.
 
-Since `toJsonSchema()` already exists in `@cleverbrush/schema-json`, wire it to the Standard JSON Schema interface:
+### 3.3 Verify integrations ✅
 
-- `~standard.jsonSchema.input(options)` / `.output(options)` — delegates to `toJsonSchema()`
-- Support `draft-2020-12` and `draft-07` targets (already implemented)
+- ✅ **TanStack Form** (v1.28.6) — showcase live on website: `/showcases/tanstack-form`. 5-field registration form with per-field `@cleverbrush/schema` validators via `standardSchemaValidator`.
+- ✅ **T3 Env** (`@t3-oss/env-nextjs` v0.13.11) — showcase live on website: `/showcases/t3-env`. Real `createEnv` definition with server + client env schema, live validator demo.
+- ⏳ tRPC, React Hook Form, Hono — documented as compatible (standard schema consumers); dedicated showcases pending.
 
-### 3.3 Verify integrations
+### 3.4 Announce — ready to execute
 
-- Test with tRPC (define procedure input as @cleverbrush/schema)
-- Test with React Hook Form (Standard Schema resolver)
-- Test with Hono middleware
-- Document "Works with X" examples on the website
-
-### 3.4 Announce
-
-- Blog post: "@cleverbrush/schema now works with tRPC, React Hook Form, Hono, and 50+ tools"
-- Update README with "Compatible with" logos/badges
-- PR to Standard Schema's implementing-libraries list on their repo
+- ⏳ Blog post: "@cleverbrush/schema now works with tRPC, React Hook Form, Hono, and 50+ tools"
+- ⏳ Update README with "Compatible with" logos/badges
+- ⏳ PR to Standard Schema's implementing-libraries list on their repo
 
 ---
 

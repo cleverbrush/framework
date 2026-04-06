@@ -572,6 +572,13 @@ export function createHybridErrorArray<T extends any[]>(
  * Resolves the full output type of a schema, accounting for `TRequired` and
  * `TNullable` modifiers. Mirrors the branded `[__type]` computation so that
  * the `~standard` Standard Schema property carries the correct inferred type.
+ *
+ * - When `TRequired = true` and `TNullable = false` the result is `TResult`.
+ * - When `TRequired = true` and `TNullable = true` the result is `TResult | null`.
+ * - When `TRequired = false` the result is wrapped by {@link MakeOptional},
+ *   adding `| undefined` (and `| null` when also nullable).
+ *
+ * @internal
  */
 type ResolvedSchemaType<
     TResult,
@@ -615,6 +622,11 @@ export abstract class SchemaBuilder<
     #defaultValue: TResult | (() => TResult) | undefined = undefined;
     #catchValue: TResult | (() => TResult) | undefined = undefined;
     #hasCatch = false;
+    /**
+     * Cached result of the first `['~standard']` access. Stored so that
+     * repeated property reads return the exact same object reference, which
+     * is required by the Standard Schema spec.
+     */
     #standardProps:
         | StandardSchemaV1.Props<
               ResolvedSchemaType<TResult, TRequired, TNullable>
@@ -641,9 +653,52 @@ export abstract class SchemaBuilder<
 
     /**
      * Standard Schema v1 interface.
-     * Provides vendor-agnostic schema interop as defined by https://standardschema.dev/.
      *
-     * The returned object is cached so that repeated accesses return the same reference.
+     * Exposes this schema as a [Standard Schema v1](https://standardschema.dev/)
+     * validator, enabling out-of-the-box interoperability with any library that
+     * consumes the spec — including tRPC, TanStack Form, React Hook Form, T3 Env,
+     * Hono, Elysia, next-safe-action, and 50+ other tools.
+     *
+     * Every `SchemaBuilder` subclass (all 13 builders) inherits this property
+     * automatically — no additional setup required.
+     *
+     * **Shape of the returned object:**
+     * - `version` — always `1` (Standard Schema spec version)
+     * - `vendor` — `'@cleverbrush/schema'`
+     * - `validate(value)` — synchronous; wraps this builder's own `.validate()`
+     *   and converts its result to the Standard Schema `Result<Output>` format:
+     *   - Success: `{ value: <validated output> }`
+     *   - Failure: `{ issues: [{ message: string }, …] }`
+     *
+     * The returned object is **cached** after the first access so repeated reads
+     * return the same reference (required by the spec).
+     *
+     * @example
+     * ```ts
+     * import { object, string, number } from '@cleverbrush/schema';
+     *
+     * const UserSchema = object({
+     *   name:  string().minLength(2),
+     *   email: string().email(),
+     *   age:   number().min(18).optional(),
+     * });
+     *
+     * // Grab the Standard Schema interface
+     * const std = UserSchema['~standard'];
+     * // std.version === 1
+     * // std.vendor  === '@cleverbrush/schema'
+     *
+     * const ok = std.validate({ name: 'Alice', email: 'alice@example.com' });
+     * // { value: { name: 'Alice', email: 'alice@example.com', age: undefined } }
+     *
+     * const fail = std.validate({ name: 'A', email: 'not-an-email' });
+     * // { issues: [{ message: 'minLength' }, { message: 'email' }] }
+     *
+     * // Pass directly to TanStack Form, T3 Env, tRPC, etc.:
+     * // validators: { onChange: UserSchema, onBlur: UserSchema }
+     * ```
+     *
+     * @see https://standardschema.dev/
      */
     get ['~standard'](): StandardSchemaV1.Props<
         ResolvedSchemaType<TResult, TRequired, TNullable>
