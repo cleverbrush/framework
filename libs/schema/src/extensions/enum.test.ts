@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'vitest';
+import { withExtensions } from '../extension.js';
 import { enumOf, type InferType, number, string } from '../index.js';
 import { enumExtension } from './enum.js';
-import { withExtensions } from '../extension.js';
 
 describe('enum extension (oneOf)', () => {
     // -----------------------------------------------------------------------
