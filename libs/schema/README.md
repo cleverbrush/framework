@@ -2,7 +2,9 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
-[![Bundle size](https://img.shields.io/badge/bundle-14%20KB%20gzip-brightgreen)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+<!-- bundle-badge-start -->
+[![Bundle size](https://img.shields.io/badge/bundle-16.4%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+<!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
 ![Coverage](https://img.shields.io/badge/coverage-99.5%25-brightgreen)
