@@ -226,11 +226,32 @@ ${escapedZod}
                 return 'var ' + k + ' = __schema["' + k + '"];';
             }).join('\\n');
 
-            // Destructure Zod exports into scope (for extern() examples)
-            var zodExports = Object.keys(zod);
-            var zodDestructure = zodExports.map(function(k) {
-                return 'var ' + k + ' = __zod["' + k + '"];';
-            }).join('\\n');
+            // Build Zod bindings only for what the user explicitly imports from 'zod'.
+            // Binding all Object.keys(zod) would include reserved keywords such as
+            // 'default', 'enum', 'function', 'catch', and 'instanceof', which produce
+            // a syntax error inside new Function(...).
+            var zodNamedRe = /import\\s*\\{([^}]*)\\}\\s*from\\s*['"]zod['"]/g;
+            var zodStarRe = /import\\s*\\*\\s*as\\s*(\\w+)\\s*from\\s*['"]zod['"]/g;
+            var zodImportMatch;
+            var zodBindingLines = [];
+            while ((zodImportMatch = zodNamedRe.exec(code)) !== null) {
+                var importItems = zodImportMatch[1].split(',');
+                for (var zi = 0; zi < importItems.length; zi++) {
+                    var importParts = importItems[zi].trim().split(/\\s+as\\s+/);
+                    var exportedName = importParts[0].trim();
+                    var localName = importParts.length > 1 ? importParts[1].trim() : exportedName;
+                    if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(localName) && /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(exportedName)) {
+                        zodBindingLines.push('var ' + localName + ' = __zod["' + exportedName + '"];');
+                    }
+                }
+            }
+            while ((zodImportMatch = zodStarRe.exec(code)) !== null) {
+                var nsName = zodImportMatch[1].trim();
+                if (/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(nsName)) {
+                    zodBindingLines.push('var ' + nsName + ' = __zod;');
+                }
+            }
+            var zodDestructure = zodBindingLines.join('\\n');
 
             var wrappedCode = destructure + '\\n'
                 + zodDestructure + '\\n'
