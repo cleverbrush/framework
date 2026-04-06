@@ -990,3 +990,62 @@ test('e2e: getErrorsFor result is JSON-serializable via toJSON()', () => {
     expect(validJson).toHaveProperty('isValid', true);
     expect(validJson.errors).toHaveLength(0);
 });
+
+test('e2e: getErrorsFor(t => t) on root shows isValid false when extern child fails', () => {
+    const mockZodLikeSchema = createMockSchema<{ id: number; name: string }>(
+        value => {
+            if (typeof value !== 'object' || value === null) {
+                return { issues: [{ message: 'expected an object' }] };
+            }
+            const issues: StandardSchemaV1.Issue[] = [];
+            const v = value as { id?: unknown; name?: unknown };
+
+            if (typeof v.id !== 'number') {
+                issues.push({ message: 'expected number', path: ['id'] });
+            } else if (v.id < 1) {
+                issues.push({
+                    message: 'Too small: expected number to be >=1',
+                    path: ['id']
+                });
+            }
+
+            if (typeof v.name !== 'string') {
+                issues.push({ message: 'expected string', path: ['name'] });
+            }
+
+            if (issues.length > 0) return { issues };
+            return { value: value as { id: number; name: string } };
+        }
+    );
+
+    const UserSchema = object({
+        id: number(),
+        order: extern(mockZodLikeSchema),
+        name: string(),
+        email: string()
+    });
+
+    const result = UserSchema.validate({
+        id: 1,
+        order: { id: -1, name: 'Order 1' },
+        name: 'hello',
+        email: 'andrew@mmm.com'
+    });
+
+    expect(result.valid).toBe(false);
+
+    // Root descriptor must reflect the failure
+    const rootErrors = result.getErrorsFor(t => t);
+    expect(rootErrors.isValid).toBe(false);
+
+    // Sub-property should be invalid
+    const orderIdErrors = result.getErrorsFor(t => t.order.id);
+    expect(orderIdErrors.isValid).toBe(false);
+    expect(orderIdErrors.errors[0]).toBe(
+        'Too small: expected number to be >=1'
+    );
+
+    // Extern descriptor itself should be invalid
+    const orderErrors = result.getErrorsFor(t => t.order);
+    expect(orderErrors.isValid).toBe(false);
+});

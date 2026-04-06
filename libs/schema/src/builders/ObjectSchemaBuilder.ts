@@ -880,7 +880,8 @@ export class ObjectSchemaBuilder<
                         addErrorFor
                     );
                     // For extern schemas, also record errors on the extern
-                    // descriptor itself so getErrorsFor(t => t.extern) works.
+                    // descriptor itself so getErrorsFor(t => t.extern) works,
+                    // and pass the parent so getErrorsFor(t => t) is aware.
                     if (
                         Array.isArray(
                             (result as any).__externErrorPropertyNames
@@ -888,7 +889,11 @@ export class ObjectSchemaBuilder<
                         Array.isArray(result.errors)
                     ) {
                         for (const error of result.errors) {
-                            addErrorFor(descriptor, error.message);
+                            addErrorFor(
+                                descriptor,
+                                error.message,
+                                currentPropertyDescriptor
+                            );
                         }
                     }
                 } else if (Array.isArray(result.errors)) {

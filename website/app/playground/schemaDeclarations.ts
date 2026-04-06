@@ -2248,6 +2248,15 @@ export declare class PropertyValidationResult<TSchema extends ObjectSchemaBuilde
      * @param childError - the child validation result to add
      */
     addChildError(childError: NestedValidationResult<any, any, any>): void;
+    /**
+     * Returns a JSON-serializable representation of this validation result.
+     * This ensures \`JSON.stringify\` includes \`isValid\` and \`errors\`,
+     * which are otherwise non-enumerable prototype getters.
+     */
+    toJSON(): {
+        isValid: boolean;
+        errors: ReadonlyArray<string>;
+    };
 }
 `,
     "file:///node_modules/@cleverbrush/schema/builders/RecordSchemaBuilder.d.ts": `/**
