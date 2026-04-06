@@ -45,6 +45,7 @@ export {
     MakeOptional,
     SchemaBuilder,
     SchemaValidationError,
+    SYMBOL_HAS_PROPERTIES,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     ValidationError,
     ValidationResult

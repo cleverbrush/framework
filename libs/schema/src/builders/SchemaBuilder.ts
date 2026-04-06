@@ -5,6 +5,7 @@ import {
     transaction
 } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
+import type { ExternSchemaBuilder } from './ExternSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
 /** @internal Symbol used as the key for the type brand on schema builders. */
@@ -289,6 +290,19 @@ export type ValidationContext<
 export const SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR = Symbol();
 
 /**
+ * A symbol that marks a schema as having sub-properties that can
+ * participate in property descriptor trees. When a schema exposes
+ * `[SYMBOL_HAS_PROPERTIES] = true` **and** its `introspect()` returns
+ * a `properties` record, it will be recursed into by
+ * `ObjectSchemaBuilder.getPropertiesFor()` — the same way nested
+ * `ObjectSchemaBuilder` instances are.
+ *
+ * Currently implemented by `ObjectSchemaBuilder` (always) and
+ * `ExternSchemaBuilder` (when created with an explicit property map).
+ */
+export const SYMBOL_HAS_PROPERTIES = Symbol();
+
+/**
  * Describes a property in a schema. And gives you
  * a possibility to access property value and set it.
  * suppose you have a schema like this:
@@ -489,28 +503,49 @@ export type PropertyDescriptorTree<
                             TParentPropertyDescriptor
                         >
                     >
-                  : TProperties[K] extends ArraySchemaBuilder<
-                          infer TArrayElement,
+                  : TProperties[K] extends ExternSchemaBuilder<
                           any,
-                          any
+                          any,
+                          any,
+                          any,
+                          any,
+                          any,
+                          infer TExternResult
                       >
-                    ? TArrayElement extends ObjectSchemaBuilder<
-                          any,
-                          any,
-                          any,
-                          any,
-                          any
-                      >
-                        ? PropertyDescriptor<
+                    ? PropertyDescriptor<
+                          TRootSchema,
+                          TProperties[K],
+                          PropertyDescriptor<
                               TRootSchema,
-                              TProperties[K],
+                              TSchema,
+                              TParentPropertyDescriptor
+                          >
+                      > &
+                          ExternOutputPropertyDescriptors<
+                              TExternResult,
+                              TRootSchema,
                               PropertyDescriptor<
                                   TRootSchema,
-                                  TSchema,
-                                  TParentPropertyDescriptor
+                                  TProperties[K],
+                                  PropertyDescriptor<
+                                      TRootSchema,
+                                      TSchema,
+                                      TParentPropertyDescriptor
+                                  >
                               >
                           >
-                        : InferType<TProperties[K]> extends TAssignableTo
+                    : TProperties[K] extends ArraySchemaBuilder<
+                            infer TArrayElement,
+                            any,
+                            any
+                        >
+                      ? TArrayElement extends ObjectSchemaBuilder<
+                            any,
+                            any,
+                            any,
+                            any,
+                            any
+                        >
                           ? PropertyDescriptor<
                                 TRootSchema,
                                 TProperties[K],
@@ -520,20 +555,73 @@ export type PropertyDescriptorTree<
                                     TParentPropertyDescriptor
                                 >
                             >
-                          : never
-                    : InferType<TProperties[K]> extends TAssignableTo
-                      ? PropertyDescriptor<
-                            TRootSchema,
-                            TProperties[K],
-                            PropertyDescriptor<
-                                TRootSchema,
-                                TSchema,
-                                TParentPropertyDescriptor
-                            >
-                        >
-                      : never;
+                          : InferType<TProperties[K]> extends TAssignableTo
+                            ? PropertyDescriptor<
+                                  TRootSchema,
+                                  TProperties[K],
+                                  PropertyDescriptor<
+                                      TRootSchema,
+                                      TSchema,
+                                      TParentPropertyDescriptor
+                                  >
+                              >
+                            : never
+                      : InferType<TProperties[K]> extends TAssignableTo
+                        ? PropertyDescriptor<
+                              TRootSchema,
+                              TProperties[K],
+                              PropertyDescriptor<
+                                  TRootSchema,
+                                  TSchema,
+                                  TParentPropertyDescriptor
+                              >
+                          >
+                        : never;
           }
         : never);
+
+/**
+ * Recursively maps the keys of an extern schema's output type into
+ * property descriptors.  When a value is a plain-object type its keys
+ * are expanded recursively; primitives, arrays, Dates, and functions
+ * are treated as leaves.
+ *
+ * @internal
+ */
+type ExternOutputPropertyDescriptors<
+    TOutput,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
+    TParentPropertyDescriptor
+> = TOutput extends
+    | Date
+    | Function
+    | readonly any[]
+    | string
+    | number
+    | boolean
+    | symbol
+    | bigint
+    | null
+    | undefined
+    ? {}
+    : TOutput extends Record<string, any>
+      ? {
+            [K in keyof TOutput]: PropertyDescriptor<
+                TRootSchema,
+                SchemaBuilder<TOutput[K], true, false, false, {}>,
+                TParentPropertyDescriptor
+            > &
+                ExternOutputPropertyDescriptors<
+                    TOutput[K],
+                    TRootSchema,
+                    PropertyDescriptor<
+                        TRootSchema,
+                        SchemaBuilder<TOutput[K], true, false, false, {}>,
+                        TParentPropertyDescriptor
+                    >
+                >;
+        }
+      : {};
 
 /**
  * Creates an array augmented with non-enumerable NestedValidationResult

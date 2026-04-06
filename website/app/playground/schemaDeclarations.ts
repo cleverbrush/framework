@@ -762,7 +762,7 @@ export declare const date: () => DateSchemaBuilder<Date, true, false, false, {}>
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/ExternSchemaBuilder.d.ts": `import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+import { type BRAND, SchemaBuilder, SYMBOL_HAS_PROPERTIES, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<ExternSchemaBuilder<any, R>['introspect']>> & {
     standardSchema: StandardSchemaV1;
 };
@@ -779,6 +779,11 @@ type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnTy
  * \`['~standard'].validate()\` method. Standard Schema issues are mapped to
  * \`@cleverbrush/schema\` \`ValidationError\` objects, with any issue paths
  * formatted as dotted prefixes (e.g. \`"address.city: must be a string"\`).
+ *
+ * When used inside an \`object()\` schema, the property descriptor tree is
+ * built dynamically (via Proxy) from the external schema's output type,
+ * so \`getErrorsFor(t => t.order.id)\` works without any additional
+ * configuration.
  *
  * **NOTE** this class is exported only to give opportunity to extend it
  * by inheriting. It is not recommended to create an instance of this class
@@ -804,6 +809,12 @@ type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnTy
  */
 export declare class ExternSchemaBuilder<TStandardSchema extends StandardSchemaV1 = StandardSchemaV1, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? StandardSchemaV1.InferOutput<TStandardSchema> : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /**
+     * Always \`true\` for extern schemas — enables Proxy-based property
+     * descriptor trees and nested error propagation in
+     * \`ObjectSchemaBuilder\`.
+     */
+    readonly [SYMBOL_HAS_PROPERTIES] = true;
     /**
      * @hidden
      */
@@ -1662,7 +1673,7 @@ export declare function number(): NumberSchemaBuilder<number, true>;
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/ObjectSchemaBuilder.d.ts": `import { PropertyValidationResult } from './PropertyValidationResult.js';
-import { type BRAND, type InferType, type NestedValidationResult, type PreValidationResult, type PropertyDescriptor, type PropertyDescriptorTree, SchemaBuilder, type ValidationContext, type ValidationError, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+import { type BRAND, type InferType, type NestedValidationResult, type PreValidationResult, type PropertyDescriptor, type PropertyDescriptorTree, SchemaBuilder, SYMBOL_HAS_PROPERTIES, type ValidationContext, type ValidationError, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 /**
  * A callback function to select properties from the schema.
  * Normally it's provided by the user to select property descriptors
@@ -1816,6 +1827,8 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  */
 export declare class ObjectSchemaBuilder<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
+    /** Marks this builder as having sub-properties for descriptor tree recursion. */
+    readonly [SYMBOL_HAS_PROPERTIES] = true;
     /**
      * @hidden
      */
@@ -2582,6 +2595,7 @@ export {};
     "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type Transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
+import type { ExternSchemaBuilder } from './ExternSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 /** @internal Symbol used as the key for the type brand on schema builders. */
 declare const __type: unique symbol;
@@ -2793,6 +2807,18 @@ export type ValidationContext<TSchema extends SchemaBuilder<any, any, any, any> 
  */
 export declare const SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR: unique symbol;
 /**
+ * A symbol that marks a schema as having sub-properties that can
+ * participate in property descriptor trees. When a schema exposes
+ * \`[SYMBOL_HAS_PROPERTIES] = true\` **and** its \`introspect()\` returns
+ * a \`properties\` record, it will be recursed into by
+ * \`ObjectSchemaBuilder.getPropertiesFor()\` — the same way nested
+ * \`ObjectSchemaBuilder\` instances are.
+ *
+ * Currently implemented by \`ObjectSchemaBuilder\` (always) and
+ * \`ExternSchemaBuilder\` (when created with an explicit property map).
+ */
+export declare const SYMBOL_HAS_PROPERTIES: unique symbol;
+/**
  * Describes a property in a schema. And gives you
  * a possibility to access property value and set it.
  * suppose you have a schema like this:
@@ -2930,8 +2956,19 @@ export type PropertyDescriptor<TRootSchema extends ObjectSchemaBuilder<any, any,
  * Has a possibility to filter properties by the type (\`TAssignableTo\` type parameter).
  */
 export type PropertyDescriptorTree<TSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any> = TSchema, TAssignableTo = any, TParentPropertyDescriptor = undefined> = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> & (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any> ? {
-    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never;
+    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ExternSchemaBuilder<any, any, any, any, any, any, infer TExternResult> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> & ExternOutputPropertyDescriptors<TExternResult, TRootSchema, PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never;
 } : never);
+/**
+ * Recursively maps the keys of an extern schema's output type into
+ * property descriptors.  When a value is a plain-object type its keys
+ * are expanded recursively; primitives, arrays, Dates, and functions
+ * are treated as leaves.
+ *
+ * @internal
+ */
+type ExternOutputPropertyDescriptors<TOutput, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TParentPropertyDescriptor> = TOutput extends Date | Function | readonly any[] | string | number | boolean | symbol | bigint | null | undefined ? {} : TOutput extends Record<string, any> ? {
+    [K in keyof TOutput]: PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor> & ExternOutputPropertyDescriptors<TOutput[K], TRootSchema, PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor>>;
+} : {};
 /**
  * Creates an array augmented with non-enumerable NestedValidationResult
  * properties (\`seenValue\`, \`errors\`, \`isValid\`, \`descriptor\`).
@@ -4287,7 +4324,7 @@ export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type { PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
-export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
+export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_HAS_PROPERTIES, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';

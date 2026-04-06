@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec';
 import {
     type BRAND,
     SchemaBuilder,
+    SYMBOL_HAS_PROPERTIES,
     type ValidationContext,
     type ValidationErrorMessageProvider,
     type ValidationResult
@@ -12,6 +13,18 @@ type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 > & {
     standardSchema: StandardSchemaV1;
 };
+
+/**
+ * Extracts the first path segment from a Standard Schema issue path entry
+ * as a string.
+ */
+function firstPathSegmentStr(
+    segment: PropertyKey | StandardSchemaV1.PathSegment
+): string {
+    return typeof segment === 'object' && segment !== null && 'key' in segment
+        ? String(segment.key)
+        : String(segment);
+}
 
 /**
  * Formats a Standard Schema issue path into a dotted string.
@@ -28,13 +41,7 @@ type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 function formatIssuePath(
     path: ReadonlyArray<PropertyKey | StandardSchemaV1.PathSegment>
 ): string {
-    return path
-        .map(segment =>
-            typeof segment === 'object' && segment !== null && 'key' in segment
-                ? String(segment.key)
-                : String(segment)
-        )
-        .join('.');
+    return path.map(firstPathSegmentStr).join('.');
 }
 
 /**
@@ -50,6 +57,11 @@ function formatIssuePath(
  * `['~standard'].validate()` method. Standard Schema issues are mapped to
  * `@cleverbrush/schema` `ValidationError` objects, with any issue paths
  * formatted as dotted prefixes (e.g. `"address.city: must be a string"`).
+ *
+ * When used inside an `object()` schema, the property descriptor tree is
+ * built dynamically (via Proxy) from the external schema's output type,
+ * so `getErrorsFor(t => t.order.id)` works without any additional
+ * configuration.
  *
  * **NOTE** this class is exported only to give opportunity to extend it
  * by inheriting. It is not recommended to create an instance of this class
@@ -91,6 +103,13 @@ export class ExternSchemaBuilder<
     TExtensions
 > {
     #standardSchema: TStandardSchema;
+
+    /**
+     * Always `true` for extern schemas — enables Proxy-based property
+     * descriptor trees and nested error propagation in
+     * `ObjectSchemaBuilder`.
+     */
+    readonly [SYMBOL_HAS_PROPERTIES] = true;
 
     /**
      * @hidden
@@ -165,6 +184,81 @@ export class ExternSchemaBuilder<
         }));
     }
 
+    /**
+     * Builds a `getErrorsFor` function that maps Standard Schema issue
+     * paths to per-property error lists via the Proxy-based property
+     * descriptor tree.
+     *
+     * The function groups issues by their first path segment, then builds
+     * a WeakMap from each Proxy-created child descriptor to its property
+     * name so that `getErrorsFor(() => descriptor)` can look up errors.
+     */
+    #buildGetErrorsFor(
+        issues: ReadonlyArray<StandardSchemaV1.Issue>,
+        context?: ValidationContext
+    ): {
+        fn: (selector?: Function) => { isValid: boolean; errors: string[] };
+        errorPropertyNames: string[];
+    } {
+        const errorsByProperty = new Map<string, string[]>();
+        const errorPropertyNames: string[] = [];
+
+        for (const issue of issues) {
+            if (issue.path && issue.path.length > 0) {
+                const firstName = firstPathSegmentStr(issue.path[0]);
+
+                const restPath = issue.path.slice(1);
+                const message =
+                    restPath.length > 0
+                        ? `${formatIssuePath(restPath)}: ${issue.message}`
+                        : issue.message;
+
+                if (!errorsByProperty.has(firstName)) {
+                    errorsByProperty.set(firstName, []);
+                    errorPropertyNames.push(firstName);
+                }
+                errorsByProperty.get(firstName)!.push(message);
+            }
+        }
+
+        // Build reverse map: access each error property on the Proxy
+        // descriptor to create (and cache) the child, then map it back
+        // to the property name.
+        const descriptorToName = new WeakMap<object, string>();
+        const currentPropertyDescriptor = context?.currentPropertyDescriptor;
+        if (currentPropertyDescriptor) {
+            for (const name of errorPropertyNames) {
+                const desc = (currentPropertyDescriptor as any)[name];
+                if (desc && typeof desc === 'object') {
+                    descriptorToName.set(desc, name);
+                }
+            }
+        }
+
+        const fn = (selector?: Function) => {
+            let descriptor: any;
+            if (typeof selector === 'function') {
+                descriptor = selector(currentPropertyDescriptor);
+            } else {
+                descriptor = currentPropertyDescriptor;
+            }
+
+            if (!descriptor || typeof descriptor !== 'object') {
+                return { isValid: true, errors: [] };
+            }
+
+            const propName = descriptorToName.get(descriptor);
+            const errors = propName ? errorsByProperty.get(propName) || [] : [];
+
+            return {
+                isValid: errors.length === 0,
+                errors
+            };
+        };
+
+        return { fn, errorPropertyNames };
+    }
+
     /** {@inheritDoc SchemaBuilder.validate} */
     public validate(
         object: TResult,
@@ -222,13 +316,24 @@ export class ExternSchemaBuilder<
         }
 
         if ('value' in result) {
-            return { valid: true, object: result.value as TResult };
+            const { fn } = this.#buildGetErrorsFor([], context);
+            return {
+                valid: true,
+                object: result.value as TResult,
+                getErrorsFor: fn
+            } as any;
         }
 
+        const { fn, errorPropertyNames } = this.#buildGetErrorsFor(
+            result.issues,
+            context
+        );
         return {
             valid: false,
-            errors: this.#mapIssues(result.issues)
-        };
+            errors: this.#mapIssues(result.issues),
+            getErrorsFor: fn,
+            __externErrorPropertyNames: errorPropertyNames
+        } as any;
     }
 
     /**
@@ -258,13 +363,24 @@ export class ExternSchemaBuilder<
             await this.#standardSchema['~standard'].validate(objToValidate);
 
         if ('value' in result) {
-            return { valid: true, object: result.value as TResult };
+            const { fn } = this.#buildGetErrorsFor([], context);
+            return {
+                valid: true,
+                object: result.value as TResult,
+                getErrorsFor: fn
+            } as any;
         }
 
+        const { fn, errorPropertyNames } = this.#buildGetErrorsFor(
+            result.issues,
+            context
+        );
         return {
             valid: false,
-            errors: this.#mapIssues(result.issues)
-        };
+            errors: this.#mapIssues(result.issues),
+            getErrorsFor: fn,
+            __externErrorPropertyNames: errorPropertyNames
+        } as any;
     }
 
     protected createFromProps<TReq extends boolean>(

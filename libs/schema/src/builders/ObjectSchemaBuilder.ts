@@ -9,6 +9,7 @@ import {
     type PropertyDescriptorTree,
     type PropertySetterOptions,
     SchemaBuilder,
+    SYMBOL_HAS_PROPERTIES,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     type ValidationContext,
     type ValidationError,
@@ -274,6 +275,9 @@ export class ObjectSchemaBuilder<
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
     #propKeys: string[] = [];
+
+    /** Marks this builder as having sub-properties for descriptor tree recursion. */
+    readonly [SYMBOL_HAS_PROPERTIES] = true;
 
     #propertyDescriptorTreeMap: PropertyDescriptorMap = new WeakMap() as any;
 
@@ -875,6 +879,18 @@ export class ObjectSchemaBuilder<
                         descriptor,
                         addErrorFor
                     );
+                    // For extern schemas, also record errors on the extern
+                    // descriptor itself so getErrorsFor(t => t.extern) works.
+                    if (
+                        Array.isArray(
+                            (result as any).__externErrorPropertyNames
+                        ) &&
+                        Array.isArray(result.errors)
+                    ) {
+                        for (const error of result.errors) {
+                            addErrorFor(descriptor, error.message);
+                        }
+                    }
                 } else if (Array.isArray(result.errors)) {
                     if (
                         ObjectSchemaBuilder.isValidPropertyDescriptor(
@@ -2167,29 +2183,75 @@ export class ObjectSchemaBuilder<
         for (const propName of propsNames) {
             const propSchema = introspected.properties[propName];
             if (propSchema instanceof ObjectSchemaBuilder) {
-                (result as any)[propName] = (
-                    ObjectSchemaBuilder.#getPropertiesFor as any
-                )(
-                    propSchema,
-                    (tree: any, createMissingStructure: any) => {
-                        const selectorResult = selector(
-                            tree,
-                            createMissingStructure
-                        );
-                        if (selectorResult) {
-                            if (
-                                createMissingStructure &&
-                                !selectorResult[propName]
-                            ) {
-                                selectorResult[propName] = {};
+                const childProperties = propSchema.introspect().properties;
+                if (
+                    childProperties &&
+                    typeof childProperties === 'object' &&
+                    Object.keys(childProperties).length > 0
+                ) {
+                    (result as any)[propName] = (
+                        ObjectSchemaBuilder.#getPropertiesFor as any
+                    )(
+                        propSchema,
+                        (tree: any, createMissingStructure: any) => {
+                            const selectorResult = selector(
+                                tree,
+                                createMissingStructure
+                            );
+                            if (selectorResult) {
+                                if (
+                                    createMissingStructure &&
+                                    !selectorResult[propName]
+                                ) {
+                                    selectorResult[propName] = {};
+                                }
+                                return selectorResult[propName];
                             }
-                            return selectorResult[propName];
-                        }
-                        return null;
-                    },
+                            return null;
+                        },
+                        selector,
+                        propName,
+                        result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                    );
+                } else {
+                    (result as any)[propName] = createPropertyDescriptorFor(
+                        selector,
+                        propName,
+                        propSchema,
+                        result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                    );
+                }
+            } else if ((propSchema as any)[SYMBOL_HAS_PROPERTIES] === true) {
+                // Extern schema — create a Proxy-based descriptor that
+                // lazily creates child descriptors on property access.
+                const externBase = createPropertyDescriptorFor(
                     selector,
                     propName,
+                    propSchema,
                     result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                );
+                const externValueSelector = (
+                    tree: any,
+                    createMissingStructure: boolean
+                ) => {
+                    const selectorResult = selector(
+                        tree,
+                        createMissingStructure
+                    );
+                    if (selectorResult) {
+                        if (
+                            createMissingStructure &&
+                            !selectorResult[propName]
+                        ) {
+                            selectorResult[propName] = {};
+                        }
+                        return selectorResult[propName];
+                    }
+                    return null;
+                };
+                (result as any)[propName] = createExternProxyDescriptor(
+                    externBase,
+                    externValueSelector
                 );
             } else {
                 (result as any)[propName] = createPropertyDescriptorFor(
@@ -2256,10 +2318,28 @@ export class ObjectSchemaBuilder<
         const schema =
             ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(descriptor);
         const properties = (schema.introspect() as any).properties;
-        if (!properties) return;
 
-        for (const nestedPropertyName in properties) {
+        // Determine which property names to iterate:
+        // • For ObjectSchemaBuilder — use introspect().properties keys
+        // • For ExternSchemaBuilder — use __externErrorPropertyNames from the result
+        let propertyNames: string[];
+        if (properties) {
+            propertyNames = Object.keys(properties);
+        } else if (Array.isArray((result as any).__externErrorPropertyNames)) {
+            propertyNames = (result as any).__externErrorPropertyNames;
+        } else {
+            return;
+        }
+
+        for (const nestedPropertyName of propertyNames) {
             const nestedPropertyDescriptor = descriptor[nestedPropertyName];
+            if (
+                !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    nestedPropertyDescriptor
+                )
+            ) {
+                continue;
+            }
             const nestedValidationError = result.getErrorsFor(
                 () => nestedPropertyDescriptor
             );
@@ -2272,20 +2352,24 @@ export class ObjectSchemaBuilder<
                     );
                 }
             }
-            // Recurse into nested object schemas
-            const nestedSchema = properties[nestedPropertyName];
-            if (
-                nestedSchema instanceof ObjectSchemaBuilder &&
-                typeof result.getErrorsFor === 'function' &&
-                ObjectSchemaBuilder.isValidPropertyDescriptor(
-                    nestedPropertyDescriptor
-                )
-            ) {
-                ObjectSchemaBuilder.#propagateNestedErrors(
-                    result,
-                    nestedPropertyDescriptor,
-                    addErrorFor
-                );
+            // Recurse into nested object schemas (only when we have a property map)
+            if (properties) {
+                const nestedSchema = properties[nestedPropertyName];
+                if (
+                    (nestedSchema instanceof ObjectSchemaBuilder ||
+                        (nestedSchema as any)[SYMBOL_HAS_PROPERTIES] ===
+                            true) &&
+                    typeof result.getErrorsFor === 'function' &&
+                    ObjectSchemaBuilder.isValidPropertyDescriptor(
+                        nestedPropertyDescriptor
+                    )
+                ) {
+                    ObjectSchemaBuilder.#propagateNestedErrors(
+                        result,
+                        nestedPropertyDescriptor,
+                        addErrorFor
+                    );
+                }
             }
         }
     }
@@ -2439,6 +2523,69 @@ const createPropertyDescriptorFor = (
         parent
     }
 });
+
+/**
+ * Creates a Proxy-wrapped property descriptor for an extern schema.
+ * Child descriptors are lazily created when accessed by name, enabling
+ * `getErrorsFor(t => t.order.id)` navigation without an explicit
+ * property map.
+ *
+ * Each child is also Proxy-wrapped for arbitrary-depth navigation.
+ *
+ * @param baseDescriptor - The base descriptor (with SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR)
+ * @param valueSelector  - Selector that navigates to the extern's VALUE in the root object
+ */
+const createExternProxyDescriptor = (
+    baseDescriptor: ReturnType<typeof createPropertyDescriptorFor>,
+    valueSelector: (obj: any, createMissingStructure: boolean) => any
+): any =>
+    new Proxy(baseDescriptor, {
+        get(target: any, prop: PropertyKey, receiver: any): any {
+            // Fast path for the descriptor symbol — no interception
+            if (prop === SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR) {
+                return target[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+            }
+
+            // For string keys, lazily create and cache child descriptors
+            if (typeof prop === 'string' && !(prop in target)) {
+                const child = createPropertyDescriptorFor(
+                    valueSelector,
+                    prop,
+                    undefined,
+                    target[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                );
+
+                // Build a value selector for the child's own children
+                const childValueSelector = (
+                    obj: any,
+                    createMissingStructure: boolean
+                ) => {
+                    const parentValue = valueSelector(
+                        obj,
+                        createMissingStructure
+                    );
+                    if (
+                        parentValue != null &&
+                        typeof parentValue === 'object'
+                    ) {
+                        if (createMissingStructure && !(prop in parentValue)) {
+                            parentValue[prop as string] = {};
+                        }
+                        return parentValue[prop as string];
+                    }
+                    return null;
+                };
+
+                // Recursively wrap so deeper paths like t.order.address.city work
+                target[prop] = createExternProxyDescriptor(
+                    child,
+                    childValueSelector
+                );
+            }
+
+            return Reflect.get(target, prop, receiver);
+        }
+    });
 
 (object as any).getPropertiesFor = <
     TProperties extends Record<

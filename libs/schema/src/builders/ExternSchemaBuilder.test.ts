@@ -4,8 +4,15 @@ import { expect, expectTypeOf, test } from 'vitest';
 import { array } from './ArraySchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
 import { ExternSchemaBuilder, extern } from './ExternSchemaBuilder.js';
+import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
-import type { InferType, MakeOptional } from './SchemaBuilder.js';
+import {
+    type InferType,
+    type MakeOptional,
+    SYMBOL_HAS_PROPERTIES,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+} from './SchemaBuilder.js';
+import { string } from './StringSchemaBuilder.js';
 
 // ---------------------------------------------------------------------------
 // Mock Standard Schema helpers
@@ -175,16 +182,15 @@ test('InferType resolves inside object()', () => {
 test('validates a valid string', () => {
     const schema = extern(mockStringSchema);
     const result = schema.validate('hello');
-    expect(result).toEqual({ valid: true, object: 'hello' });
+    expect(result.valid).toBe(true);
+    expect(result.object).toBe('hello');
 });
 
 test('validates a valid object', () => {
     const schema = extern(mockUserSchema);
     const result = schema.validate({ first: 'Alice', last: 'Smith' });
-    expect(result).toEqual({
-        valid: true,
-        object: { first: 'Alice', last: 'Smith' }
-    });
+    expect(result.valid).toBe(true);
+    expect(result.object).toEqual({ first: 'Alice', last: 'Smith' });
 });
 
 test('optional extern with undefined is valid', () => {
@@ -263,13 +269,15 @@ test('issue without path has no prefix', () => {
 test('validateAsync works with sync external schema', async () => {
     const schema = extern(mockStringSchema);
     const result = await schema.validateAsync('hello');
-    expect(result).toEqual({ valid: true, object: 'hello' });
+    expect(result.valid).toBe(true);
+    expect(result.object).toBe('hello');
 });
 
 test('validateAsync works with async external schema', async () => {
     const schema = extern(mockAsyncNumberSchema);
     const result = await schema.validateAsync(42);
-    expect(result).toEqual({ valid: true, object: 42 });
+    expect(result.valid).toBe(true);
+    expect(result.object).toBe(42);
 });
 
 test('validateAsync returns failure for invalid async schema', async () => {
@@ -473,4 +481,512 @@ test('extern builder ~standard.validate returns issues on failure', () => {
     expect(result).toHaveProperty('issues');
     const issues = (result as StandardSchemaV1.FailureResult).issues;
     expect(issues.length).toBeGreaterThan(0);
+});
+
+// ===========================================================================
+// Phase 2 — Proxy-based property descriptors & getErrorsFor (single-param)
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+// Property descriptor tree (Proxy-based)
+// ---------------------------------------------------------------------------
+
+test('extern – getPropertiesFor creates Proxy sub-descriptors on access', () => {
+    const order = object({
+        user: extern(mockUserSchema),
+        date: date()
+    });
+
+    const props = object.getPropertiesFor(order);
+
+    expect(props).toHaveProperty('user');
+    expect(props).toHaveProperty('date');
+    // Accessing .first and .last on the extern Proxy creates child descriptors
+    expect(props.user.first[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]).toBeDefined();
+    expect(props.user.last[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]).toBeDefined();
+});
+
+test('extern – sub-descriptor parent points to the extern descriptor', () => {
+    const order = object({
+        user: extern(mockUserSchema)
+    });
+    const props = object.getPropertiesFor(order);
+    const parentDescriptor =
+        props.user.first[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].parent;
+    expect(parentDescriptor).toBeDefined();
+    // The parent's schema should be the extern builder
+    expect(parentDescriptor.getSchema()).toBeInstanceOf(ExternSchemaBuilder);
+});
+
+test('extern – accessing the same sub-descriptor twice returns the same object', () => {
+    const order = object({
+        user: extern(mockUserSchema)
+    });
+    const props = object.getPropertiesFor(order);
+    const first1 = props.user.first;
+    const first2 = props.user.first;
+    expect(first1).toBe(first2);
+});
+
+test('extern – SYMBOL_HAS_PROPERTIES is always true', () => {
+    // Object-outputting extern
+    const s1 = extern(mockUserSchema);
+    expect((s1 as any)[SYMBOL_HAS_PROPERTIES]).toBe(true);
+
+    // Primitive-outputting extern
+    const s2 = extern(mockStringSchema);
+    expect((s2 as any)[SYMBOL_HAS_PROPERTIES]).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// getErrorsFor distributes errors to Proxy children
+// ---------------------------------------------------------------------------
+
+test('extern – getErrorsFor distributes errors to child descriptors', () => {
+    const order = object({
+        user: extern(mockUserSchema),
+        date: date()
+    });
+
+    const result = order.validate(
+        { user: { first: 123, last: 456 }, date: new Date() } as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toBe(false);
+
+    // Errors should be distributed to sub-descriptors via Proxy
+    const firstErrors = result.getErrorsFor(t => t.user.first);
+    expect(firstErrors).toBeDefined();
+    expect(firstErrors.isValid).toBe(false);
+    expect(firstErrors.errors.length).toBe(1);
+    expect(firstErrors.errors[0]).toBe('expected string');
+
+    const lastErrors = result.getErrorsFor(t => t.user.last);
+    expect(lastErrors).toBeDefined();
+    expect(lastErrors.isValid).toBe(false);
+    expect(lastErrors.errors.length).toBe(1);
+    expect(lastErrors.errors[0]).toBe('expected string');
+});
+
+test('extern – getErrorsFor returns no errors for valid child', () => {
+    const order = object({
+        user: extern(mockUserSchema),
+        date: date()
+    });
+
+    // first is valid, last is invalid
+    const result = order.validate(
+        { user: { first: 'Alice', last: 456 }, date: new Date() } as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toBe(false);
+
+    const firstErrors = result.getErrorsFor(t => t.user.first);
+    expect(firstErrors.isValid).toBe(true);
+    expect(firstErrors.errors.length).toBe(0);
+
+    const lastErrors = result.getErrorsFor(t => t.user.last);
+    expect(lastErrors.isValid).toBe(false);
+    expect(lastErrors.errors.length).toBe(1);
+});
+
+test('extern – getErrorsFor on valid result returns no errors', () => {
+    const order = object({
+        user: extern(mockUserSchema),
+        date: date()
+    });
+
+    const result = order.validate({
+        user: { first: 'Alice', last: 'Smith' },
+        date: new Date()
+    });
+
+    expect(result.valid).toBe(true);
+
+    const firstErrors = result.getErrorsFor(t => t.user.first);
+    expect(firstErrors.isValid).toBe(true);
+    expect(firstErrors.errors.length).toBe(0);
+});
+
+test('extern – getErrorsFor on the extern itself shows errors', () => {
+    const order = object({
+        user: extern(mockUserSchema),
+        date: date()
+    });
+
+    const result = order.validate(
+        { user: { first: 123, last: 456 }, date: new Date() } as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toBe(false);
+
+    const userErrors = result.getErrorsFor(t => t.user);
+    expect(userErrors).toBeDefined();
+    expect(userErrors.isValid).toBe(false);
+    // The extern descriptor itself carries the mapped error messages
+    expect(userErrors.errors.length).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// async getErrorsFor
+// ---------------------------------------------------------------------------
+
+test('extern – async getErrorsFor distributes errors to child descriptors', async () => {
+    const mockAsyncUserSchema = createAsyncMockSchema<{
+        first: string;
+        last: string;
+    }>(async value => {
+        await Promise.resolve();
+        if (
+            typeof value !== 'object' ||
+            value === null ||
+            typeof (value as any).first !== 'string' ||
+            typeof (value as any).last !== 'string'
+        ) {
+            const issues: StandardSchemaV1.Issue[] = [];
+            if (typeof value !== 'object' || value === null) {
+                issues.push({ message: 'expected an object' });
+            } else {
+                if (typeof (value as any).first !== 'string')
+                    issues.push({
+                        message: 'expected string',
+                        path: ['first']
+                    });
+                if (typeof (value as any).last !== 'string')
+                    issues.push({
+                        message: 'expected string',
+                        path: ['last']
+                    });
+            }
+            return { issues };
+        }
+        return { value: value as { first: string; last: string } };
+    });
+
+    const order = object({
+        user: extern(mockAsyncUserSchema),
+        date: date()
+    });
+
+    const result = await order.validateAsync(
+        { user: { first: 123, last: 456 }, date: new Date() } as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toBe(false);
+
+    const firstErrors = result.getErrorsFor(t => t.user.first);
+    expect(firstErrors.isValid).toBe(false);
+    expect(firstErrors.errors.length).toBe(1);
+    expect(firstErrors.errors[0]).toBe('expected string');
+});
+
+// ---------------------------------------------------------------------------
+// Standard Schema issue path with PathSegment objects
+// ---------------------------------------------------------------------------
+
+test('extern – PathSegment objects in issue paths work with Proxy descriptors', () => {
+    const mockSchemaWithPathSegments = createMockSchema<{
+        name: string;
+        age: number;
+    }>(value => {
+        if (typeof value !== 'object' || value === null) {
+            return { issues: [{ message: 'expected object' }] };
+        }
+        const issues: StandardSchemaV1.Issue[] = [];
+        if (typeof (value as any).name !== 'string') {
+            issues.push({
+                message: 'expected string',
+                path: [{ key: 'name' }]
+            });
+        }
+        if (typeof (value as any).age !== 'number') {
+            issues.push({
+                message: 'expected number',
+                path: [{ key: 'age' }]
+            });
+        }
+        if (issues.length > 0) return { issues };
+        return { value: value as { name: string; age: number } };
+    });
+
+    const order = object({
+        person: extern(mockSchemaWithPathSegments)
+    });
+
+    const result = order.validate({ person: { name: 42, age: 'old' } } as any, {
+        doNotStopOnFirstError: true
+    });
+
+    expect(result.valid).toBe(false);
+
+    const nameErrors = result.getErrorsFor(t => t.person.name);
+    expect(nameErrors.isValid).toBe(false);
+    expect(nameErrors.errors[0]).toBe('expected string');
+
+    const ageErrors = result.getErrorsFor(t => t.person.age);
+    expect(ageErrors.isValid).toBe(false);
+    expect(ageErrors.errors[0]).toBe('expected number');
+});
+
+// ---------------------------------------------------------------------------
+// E2E: extern inside a larger object schema (Zod-like scenario)
+// ---------------------------------------------------------------------------
+
+/**
+ * Mock that behaves like a Zod z.object({ id: z.number(), name: z.string().min(3).max(50) })
+ */
+const mockZodOrderSchema = createMockSchema<{ id: number; name: string }>(
+    value => {
+        if (typeof value !== 'object' || value === null) {
+            return { issues: [{ message: 'expected an object' }] };
+        }
+        const issues: StandardSchemaV1.Issue[] = [];
+        if (typeof (value as any).id !== 'number') {
+            issues.push({ message: 'expected number', path: ['id'] });
+        }
+        if (typeof (value as any).name !== 'string') {
+            issues.push({ message: 'expected string', path: ['name'] });
+        } else {
+            const name = (value as any).name as string;
+            if (name.length < 3) {
+                issues.push({
+                    message: 'must be at least 3 characters',
+                    path: ['name']
+                });
+            }
+            if (name.length > 50) {
+                issues.push({
+                    message: 'must be at most 50 characters',
+                    path: ['name']
+                });
+            }
+        }
+        if (issues.length > 0) return { issues };
+        return { value: value as { id: number; name: string } };
+    }
+);
+
+test('e2e: getErrorsFor navigates sub-properties without explicit type annotation', () => {
+    const UserSchema = object({
+        id: number(),
+        order: extern(mockZodOrderSchema),
+        name: string(),
+        email: string()
+    });
+
+    const result = UserSchema.validate({
+        id: 1,
+        order: { id: -1, name: 'Order 1' },
+        name: 'hello',
+        email: 'andrew@mmm.com'
+    });
+
+    expect(result.valid).toBe(true);
+
+    // Should be able to navigate into the extern's sub-properties
+    // WITHOUT explicit type annotation on t
+    const orderIdErrors = result.getErrorsFor(t => t.order.id);
+    expect(orderIdErrors).toBeDefined();
+    expect(orderIdErrors.isValid).toBe(true);
+    expect(orderIdErrors.errors).toHaveLength(0);
+
+    const orderNameErrors = result.getErrorsFor(t => t.order.name);
+    expect(orderNameErrors).toBeDefined();
+    expect(orderNameErrors.isValid).toBe(true);
+    expect(orderNameErrors.errors).toHaveLength(0);
+});
+
+test('e2e: getErrorsFor distributes validation failures without explicit type annotation', () => {
+    const UserSchema = object({
+        id: number(),
+        order: extern(mockZodOrderSchema),
+        name: string(),
+        email: string()
+    });
+
+    const result = UserSchema.validate(
+        {
+            id: 1,
+            order: { id: 'not-a-number', name: 'ab' },
+            name: 'hello',
+            email: 'andrew@mmm.com'
+        } as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toBe(false);
+
+    const orderIdErrors = result.getErrorsFor(t => t.order.id);
+    expect(orderIdErrors.isValid).toBe(false);
+    expect(orderIdErrors.errors.length).toBeGreaterThan(0);
+    expect(orderIdErrors.errors[0]).toBe('expected number');
+
+    const orderNameErrors = result.getErrorsFor(t => t.order.name);
+    expect(orderNameErrors.isValid).toBe(false);
+    expect(orderNameErrors.errors[0]).toBe('must be at least 3 characters');
+});
+
+test('e2e: getErrorsFor(t => t.order) returns errors for the extern itself', () => {
+    const UserSchema = object({
+        id: number(),
+        order: extern(mockZodOrderSchema),
+        name: string()
+    });
+
+    const result = UserSchema.validate(
+        {
+            id: 1,
+            order: { id: 'not-a-number', name: 'ab' },
+            name: 'hello'
+        } as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toBe(false);
+
+    const orderErrors = result.getErrorsFor(t => t.order);
+    expect(orderErrors).toBeDefined();
+    expect(orderErrors.isValid).toBe(false);
+    expect(orderErrors.errors.length).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// Regression: getErrorsFor on extern sub-property without doNotStopOnFirstError
+// (mirrors real-world Zod usage where only the extern property fails)
+// ---------------------------------------------------------------------------
+
+test('e2e: getErrorsFor(t => t.order.id) works WITHOUT doNotStopOnFirstError', () => {
+    /**
+     * Mock that mimics Zod z.object({ id: z.number().min(1), name: z.string().min(3).max(50) })
+     * The schema validates id >= 1 and name 3-50 chars.
+     */
+    const mockZodLikeSchema = createMockSchema<{ id: number; name: string }>(
+        value => {
+            if (typeof value !== 'object' || value === null) {
+                return { issues: [{ message: 'expected an object' }] };
+            }
+            const issues: StandardSchemaV1.Issue[] = [];
+            const v = value as { id?: unknown; name?: unknown };
+
+            if (typeof v.id !== 'number') {
+                issues.push({ message: 'expected number', path: ['id'] });
+            } else if (v.id < 1) {
+                issues.push({
+                    message: 'Too small: expected number to be >=1',
+                    path: ['id']
+                });
+            }
+
+            if (typeof v.name !== 'string') {
+                issues.push({ message: 'expected string', path: ['name'] });
+            } else if (v.name.length < 3) {
+                issues.push({
+                    message: 'must be at least 3 characters',
+                    path: ['name']
+                });
+            }
+
+            if (issues.length > 0) return { issues };
+            return { value: value as { id: number; name: string } };
+        }
+    );
+
+    const UserSchema = object({
+        id: number(),
+        order: extern(mockZodLikeSchema),
+        name: string(),
+        email: string()
+    });
+
+    // Only the extern's sub-property "id" fails (id < 1).
+    // Everything else is valid.
+    const result = UserSchema.validate({
+        id: 1,
+        order: { id: -1, name: 'Order 1' },
+        name: 'hello',
+        email: 'andrew@mmm.com'
+    });
+
+    expect(result.valid).toBe(false);
+
+    // getErrorsFor on the extern sub-property should work
+    // without explicit doNotStopOnFirstError
+    const orderIdErrors = result.getErrorsFor(t => t.order.id);
+    expect(orderIdErrors).toBeDefined();
+    expect(orderIdErrors.isValid).toBe(false);
+    expect(orderIdErrors.errors.length).toBe(1);
+    expect(orderIdErrors.errors[0]).toBe(
+        'Too small: expected number to be >=1'
+    );
+
+    // The "name" sub-property should be valid
+    const orderNameErrors = result.getErrorsFor(t => t.order.name);
+    expect(orderNameErrors).toBeDefined();
+    expect(orderNameErrors.isValid).toBe(true);
+    expect(orderNameErrors.errors.length).toBe(0);
+
+    // The extern descriptor itself should have errors
+    const orderErrors = result.getErrorsFor(t => t.order);
+    expect(orderErrors).toBeDefined();
+    expect(orderErrors.isValid).toBe(false);
+});
+
+test('e2e: getErrorsFor result is JSON-serializable via toJSON()', () => {
+    const mockZodLikeSchema = createMockSchema<{ id: number; name: string }>(
+        value => {
+            if (typeof value !== 'object' || value === null) {
+                return { issues: [{ message: 'expected an object' }] };
+            }
+            const issues: StandardSchemaV1.Issue[] = [];
+            const v = value as { id?: unknown; name?: unknown };
+
+            if (typeof v.id !== 'number') {
+                issues.push({ message: 'expected number', path: ['id'] });
+            } else if (v.id < 1) {
+                issues.push({
+                    message: 'Too small: expected number to be >=1',
+                    path: ['id']
+                });
+            }
+
+            if (typeof v.name !== 'string') {
+                issues.push({ message: 'expected string', path: ['name'] });
+            }
+
+            if (issues.length > 0) return { issues };
+            return { value: value as { id: number; name: string } };
+        }
+    );
+
+    const UserSchema = object({
+        id: number(),
+        order: extern(mockZodLikeSchema),
+        name: string()
+    });
+
+    const result = UserSchema.validate({
+        id: 1,
+        order: { id: -1, name: 'Order 1' },
+        name: 'hello'
+    });
+
+    expect(result.valid).toBe(false);
+
+    // JSON.stringify should produce a useful representation (not "{}")
+    const orderIdErrors = result.getErrorsFor(t => t.order.id);
+    const json = JSON.parse(JSON.stringify(orderIdErrors));
+    expect(json).toHaveProperty('isValid', false);
+    expect(json).toHaveProperty('errors');
+    expect(json.errors.length).toBe(1);
+    expect(json.errors[0]).toBe('Too small: expected number to be >=1');
+
+    // Valid property also serializes correctly
+    const nameErrors = result.getErrorsFor(t => t.order.name);
+    const validJson = JSON.parse(JSON.stringify(nameErrors));
+    expect(validJson).toHaveProperty('isValid', true);
+    expect(validJson.errors).toHaveLength(0);
 });
