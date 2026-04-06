@@ -56,3 +56,68 @@ test('Collector - 4', async () => {
         expect(timeoutHandler).toBeCalled();
     }, 600);
 });
+
+test('Collector - 5: timeout rejects the promise and provides partial results', async () => {
+    type Obj = { a: number; b: string };
+
+    const c = new Collector<Obj>(['a', 'b'], 100);
+    const promise = c.toPromise();
+
+    c.collect('a', 10);
+    // 'b' is never collected — timeout fires
+
+    const rejected = await promise.catch(err => err);
+    expect(rejected).toMatchObject({
+        reason: 'timeout',
+        results: { a: 10 }
+    });
+});
+
+test('Collector - 6: collect() after timeout is ignored (no double-fire)', async () => {
+    type Obj = { a: number; b: string };
+
+    const endHandler = vi.fn();
+    const c = new Collector<Obj>(['a', 'b'], 50);
+    c.on('end', endHandler);
+    const promise = c.toPromise();
+
+    // Let timeout fire
+    await promise.catch(() => {});
+
+    // Collect after timeout — should be a no-op
+    c.collect('b', 'late');
+
+    // Give microtasks time to settle
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(endHandler).not.toHaveBeenCalled();
+});
+
+test('Collector - 7: collect with rejected promise rejects toPromise()', async () => {
+    type Obj = { a: number };
+
+    const c = new Collector<Obj>(['a']);
+    const promise = c.toPromise();
+
+    c.collect('a', Promise.reject(new Error('fetch failed')) as any);
+
+    const rejected = await promise.catch(err => err);
+    expect(rejected).toMatchObject({
+        reason: 'error',
+        results: { key: 'a' }
+    });
+});
+
+test('Collector - 8: collect with rejected promise emits error when no promise set up', async () => {
+    type Obj = { a: number };
+
+    const c = new Collector<Obj>(['a']);
+    const errorHandler = vi.fn();
+    c.on('error' as any, errorHandler);
+
+    c.collect('a', Promise.reject(new Error('oops')) as any);
+
+    // Wait for microtask
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(errorHandler).toHaveBeenCalledOnce();
+    expect(errorHandler.mock.calls[0][0]).toMatchObject({ key: 'a' });
+});

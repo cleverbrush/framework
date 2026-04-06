@@ -589,3 +589,104 @@ test('nested union with getNestedErrors', async () => {
     expect(option1_1.valid).toEqual(false);
     expect(typeof (option1_1 as any).getErrorsFor).toEqual('function');
 });
+
+// ---------------------------------------------------------------------------
+// hasType / clearHasType
+// ---------------------------------------------------------------------------
+
+test('hasType - returns a UnionSchemaBuilder with correct validation', () => {
+    const schema = union(string()).or(number()).hasType<string | number>();
+    const { valid } = schema.validate('hello' as any);
+    expect(valid).toEqual(true);
+});
+
+test('clearHasType - returns a UnionSchemaBuilder', () => {
+    const schema = union(string())
+        .or(number())
+        .hasType<string | number>()
+        .clearHasType();
+    expect(schema.validate(42 as any).valid).toEqual(true);
+});
+
+// ---------------------------------------------------------------------------
+// Async fast path
+// ---------------------------------------------------------------------------
+
+test('validateAsync - valid value (non-discriminated)', async () => {
+    const schema = union(string()).or(number());
+    const { valid, object: res } = await schema.validateAsync('hi' as any);
+    expect(valid).toEqual(true);
+    expect(res).toBe('hi');
+});
+
+test('validateAsync - invalid value (non-discriminated)', async () => {
+    const schema = union(string()).or(number());
+    const { valid } = await schema.validateAsync(true as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - optional union returns valid for undefined', async () => {
+    const schema = union(string()).or(number()).optional();
+    const { valid, object: res } = await schema.validateAsync(undefined as any);
+    expect(valid).toEqual(true);
+    expect(res).toBeUndefined();
+});
+
+test('validateAsync - optional union returns valid for null', async () => {
+    const schema = union(string()).or(number()).optional();
+    const { valid, object: res } = await schema.validateAsync(null as any);
+    expect(valid).toEqual(true);
+    expect(res).toBeNull();
+});
+
+test('validateAsync - required union rejects undefined', async () => {
+    const schema = union(string()).or(number());
+    const { valid } = await schema.validateAsync(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - discriminated union valid', async () => {
+    const schema = union(object({ type: string('cat'), name: string() })).or(
+        object({ type: string('dog'), breed: string() })
+    );
+    const { valid, object: res } = await schema.validateAsync({
+        type: 'cat',
+        name: 'Mochi'
+    } as any);
+    expect(valid).toEqual(true);
+    expect((res as any).name).toBe('Mochi');
+});
+
+test('validateAsync - discriminated union no match', async () => {
+    const schema = union(object({ type: string('cat'), name: string() })).or(
+        object({ type: string('dog'), breed: string() })
+    );
+    const { valid } = await schema.validateAsync({ type: 'fish' } as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - prevalidation error (validator on union fails)', async () => {
+    const schema = union(string())
+        .or(number())
+        .addValidator(() => ({
+            valid: false,
+            errors: [{ message: 'union rejected' }]
+        }));
+    const { valid } = await schema.validateAsync('anything' as any);
+    expect(valid).toEqual(false);
+});
+
+test('validate full path - prevalidation error via doNotStopOnFirstError', async () => {
+    const schema = union(string())
+        .or(number())
+        .addValidator(() => ({
+            valid: false,
+            errors: [{ message: 'always fails' }]
+        }));
+    const { valid, getNestedErrors } = schema.validate('val' as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(valid).toEqual(false);
+    const nested = getNestedErrors();
+    expect(nested).toBeDefined();
+});

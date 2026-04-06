@@ -395,3 +395,102 @@ test('lazy - 27: InferType resolves correctly for required and optional schemas'
     const numSchema = lazy(() => number());
     expectTypeOf<InferType<typeof numSchema>>().toEqualTypeOf<number>();
 });
+
+// ---------------------------------------------------------------------------
+// Constructor guard
+// ---------------------------------------------------------------------------
+
+test('lazy - 28: throws when getter is not a function', () => {
+    expect(() =>
+        LazySchemaBuilder.create({
+            type: 'lazy',
+            isRequired: true,
+            getter: 'not-a-function'
+        } as any)
+    ).toThrow('getter must be a function');
+});
+
+// ---------------------------------------------------------------------------
+// Async pre-validation short-circuit paths
+// ---------------------------------------------------------------------------
+
+test('lazy - 29: validateAsync returns invalid when pre-validation fails', async () => {
+    // A required schema receiving undefined will fail pre-validation
+    const schema = lazy(() => string());
+    const result = await schema.validateAsync(undefined as any);
+    expect(result.valid).toEqual(false);
+});
+
+test('lazy - 30: validateAsync with optional + null returns valid without delegating', async () => {
+    const schema = lazy(() => string()).optional();
+    const result = await schema.validateAsync(null as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// Method overrides (hasType, clearHasType, nullable, notNullable, etc.)
+// ---------------------------------------------------------------------------
+
+test('lazy - 31: hasType returns a LazySchemaBuilder', () => {
+    const schema = lazy(() => string()).hasType<string>();
+    expect(schema).toBeInstanceOf(LazySchemaBuilder);
+    expect(schema.validate('hi' as any).valid).toEqual(true);
+});
+
+test('lazy - 32: clearHasType returns a LazySchemaBuilder', () => {
+    const schema = lazy(() => string())
+        .hasType<string>()
+        .clearHasType();
+    expect(schema).toBeInstanceOf(LazySchemaBuilder);
+});
+
+test('lazy - 33: nullable allows null', () => {
+    const schema = lazy(() => string()).nullable();
+    expect(schema).toBeInstanceOf(LazySchemaBuilder);
+    expect(schema.validate(null as any).valid).toEqual(true);
+});
+
+test('lazy - 34: notNullable returns LazySchemaBuilder', () => {
+    const schema = lazy(() => string())
+        .nullable()
+        .notNullable();
+    expect(schema).toBeInstanceOf(LazySchemaBuilder);
+});
+
+test('lazy - 35: required() on lazy returns LazySchemaBuilder', () => {
+    const schema = lazy(() => string())
+        .optional()
+        .required();
+    expect(schema).toBeInstanceOf(LazySchemaBuilder);
+    expect(schema.validate(undefined as any).valid).toEqual(false);
+});
+
+test('lazy - 36: default() provides a fallback value', () => {
+    const schema = lazy(() => string())
+        .optional()
+        .default('fallback');
+    const { valid, object } = schema.validate(undefined as any);
+    expect(valid).toEqual(true);
+    expect(object).toBe('fallback');
+});
+
+test('lazy - 37: clearDefault removes the default', () => {
+    const schema = lazy(() => string())
+        .optional()
+        .default('x')
+        .clearDefault();
+    expect(schema.introspect().hasDefault).toEqual(false);
+});
+
+test('lazy - 38: brand() returns a LazySchemaBuilder', () => {
+    const schema = lazy(() => number()).brand('LazyBrand');
+    expect(schema).toBeInstanceOf(LazySchemaBuilder);
+    expect(schema.validate(1 as any).valid).toEqual(true);
+});
+
+test('lazy - 39: readonly() returns a LazySchemaBuilder', () => {
+    const schema = lazy(() => string()).readonly();
+    expect(schema).toBeInstanceOf(LazySchemaBuilder);
+    expect(schema.introspect().isReadonly).toEqual(true);
+});

@@ -6,7 +6,7 @@
     "packageManager": "npm@11.11.0",
     "scripts": {
         "build": "turbo run build",
-        "build:all": "npm run lint:fix && npm run build && npm run test && npm run docs && cd website && npm run build",
+        "build:all": "npm run lint:fix && npm run build && npm run test && npm run docs && cd website && npm run build && npm run test:coverage",
         "clean": "turbo run clean",
         "watch": "tsc --build --watch tsconfig.build.json",
         "docs": "typedoc && ./scripts/inject-gtm.sh website/public/api-docs/latest",
@@ -21,6 +21,7 @@
         "publish:beta": "npm run clean && npm run build && changeset publish --tag beta",
         "run_scheduler": "node ./libs/scheduler/dist/index.js",
         "test": "vitest --run --typecheck",
+        "test:coverage": "vitest --run --coverage && node scripts/update-coverage-badges.js",
         "bench": "vitest bench --run",
         "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks"
     },
@@ -30,6 +31,7 @@
     "keywords": [],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
     "license": "BSD 3-Clause",
+    "type": "module",
     "devDependencies": {
         "@biomejs/biome": "^2.4.9",
         "@changesets/cli": "^2.30.0",

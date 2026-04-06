@@ -458,3 +458,84 @@ test('introspect() - restSchema is undefined without rest()', () => {
     const info = schema.introspect();
     expect(info.restSchema).toBeUndefined();
 });
+
+// ---------------------------------------------------------------------------
+// hasType / clearHasType
+// ---------------------------------------------------------------------------
+
+test('hasType - returns a TupleSchemaBuilder', () => {
+    const schema = tuple([string(), number()]).hasType<[string, number]>();
+    expect(schema).toBeInstanceOf(TupleSchemaBuilder);
+    expect(schema.validate(['hello', 42] as any).valid).toEqual(true);
+});
+
+test('clearHasType - returns a TupleSchemaBuilder', () => {
+    const schema = tuple([string()]).hasType<[string]>().clearHasType();
+    expect(schema).toBeInstanceOf(TupleSchemaBuilder);
+});
+
+// ---------------------------------------------------------------------------
+// Async validation paths
+// ---------------------------------------------------------------------------
+
+test('validateAsync - valid tuple', async () => {
+    const schema = tuple([string(), number()]);
+    const { valid, object: res } = await schema.validateAsync(['hi', 1] as any);
+    expect(valid).toEqual(true);
+    expect(res).toEqual(['hi', 1]);
+});
+
+test('validateAsync - invalid element', async () => {
+    const schema = tuple([string(), number()]);
+    const { valid } = await schema.validateAsync(['hi', 'not-a-num'] as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - wrong length (too few elements)', async () => {
+    const schema = tuple([string(), number()]);
+    const { valid } = await schema.validateAsync(['only-one'] as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - optional tuple with undefined', async () => {
+    const schema = tuple([string()]).optional();
+    const { valid, object: res } = await schema.validateAsync(undefined as any);
+    expect(valid).toEqual(true);
+    expect(res).toBeUndefined();
+});
+
+test('validateAsync - with rest schema, valid', async () => {
+    const schema = tuple([string()]).rest(number());
+    const { valid, object: res } = await schema.validateAsync([
+        'a',
+        1,
+        2,
+        3
+    ] as any);
+    expect(valid).toEqual(true);
+    expect(res).toEqual(['a', 1, 2, 3]);
+});
+
+test('validateAsync - with rest schema, invalid rest element', async () => {
+    const schema = tuple([string()]).rest(number());
+    const { valid } = await schema.validateAsync(['a', 'bad'] as any);
+    expect(valid).toEqual(false);
+});
+
+test('validateAsync - doNotStopOnFirstError collects all errors', async () => {
+    const schema = tuple([string(), number(), boolean()]);
+    const { valid, getNestedErrors } = await schema.validateAsync(
+        [42, 'bad', 'bad'] as any,
+        { doNotStopOnFirstError: true }
+    );
+    expect(valid).toEqual(false);
+    const positions = getNestedErrors();
+    // All three positions should have been validated
+    expect(positions.length).toBeGreaterThanOrEqual(2);
+});
+
+test('validateAsync - prevalidation fails (required, receives undefined)', async () => {
+    const schema = tuple([string()]);
+    const { valid } = await schema.validateAsync(undefined as any);
+    expect(valid).toEqual(false);
+});

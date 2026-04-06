@@ -543,3 +543,88 @@ test('getErrorsFor() - root errors returned by validateAsync', async () => {
     expect(root.isValid).toBe(false);
     expect(root.errors[0]).toBe('object expected');
 });
+
+// ---------------------------------------------------------------------------
+// hasType / clearHasType
+// ---------------------------------------------------------------------------
+
+test('hasType - returns RecordSchemaBuilder, validation still works', () => {
+    const schema = record(string(), number()).hasType<Record<string, number>>();
+    expect(schema).toBeInstanceOf(RecordSchemaBuilder);
+    expect(schema.validate({ a: 1 }).valid).toBe(true);
+});
+
+test('clearHasType - returns RecordSchemaBuilder', () => {
+    const schema = record(string(), number())
+        .hasType<Record<string, number>>()
+        .clearHasType();
+    expect(schema).toBeInstanceOf(RecordSchemaBuilder);
+    expect(schema.validate({ a: 1 }).valid).toBe(true);
+});
+
+// ---------------------------------------------------------------------------
+// Async validation — full coverage of _validateAsync
+// ---------------------------------------------------------------------------
+
+test('validateAsync - valid record', async () => {
+    const schema = record(string(), number());
+    const { valid, object: res } = await schema.validateAsync({ a: 1, b: 2 });
+    expect(valid).toBe(true);
+    expect(res).toEqual({ a: 1, b: 2 });
+});
+
+test('validateAsync - invalid value (not an object)', async () => {
+    const schema = record(string(), number());
+    const { valid } = await schema.validateAsync(42 as any);
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - invalid key fails validation', async () => {
+    const schema = record(string().matches(/^[a-z]+$/), number());
+    const { valid } = await schema.validateAsync({ '1BAD': 5 });
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - invalid value fails validation', async () => {
+    const schema = record(string(), number().min(0));
+    const { valid } = await schema.validateAsync({ a: -1 });
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - optional record with undefined', async () => {
+    const schema = record(string(), number()).optional();
+    const { valid, object: res } = await schema.validateAsync(undefined as any);
+    expect(valid).toBe(true);
+    expect(res).toBeUndefined();
+});
+
+test('validateAsync - doNotStopOnFirstError collects all key errors', async () => {
+    const schema = record(string(), number().min(0));
+    const { valid, getNestedErrors } = await schema.validateAsync(
+        { a: -1, b: -2, c: 3 },
+        { doNotStopOnFirstError: true }
+    );
+    expect(valid).toBe(false);
+    const nested = getNestedErrors();
+    expect(nested.a.valid).toBe(false);
+    expect(nested.b.valid).toBe(false);
+    expect(nested.c.valid).toBe(true);
+});
+
+test('validateAsync - invalid key with doNotStopOnFirstError', async () => {
+    const schema = record(string().matches(/^[a-z]+$/), number());
+    const { valid } = await schema.validateAsync(
+        { '1bad': 1, '2bad': 2 },
+        { doNotStopOnFirstError: true }
+    );
+    expect(valid).toBe(false);
+});
+
+test('validateAsync - async validator triggers full path', async () => {
+    const schema = record(string(), number()).addValidator(async () => ({
+        valid: false,
+        errors: [{ message: 'async validator failed' }]
+    }));
+    const { valid } = await schema.validateAsync({ a: 1 });
+    expect(valid).toBe(false);
+});

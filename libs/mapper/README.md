@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->![Coverage](https://img.shields.io/badge/coverage-86.5%25-green)<!-- coverage-badge-end -->
 
 A type-safe, declarative object mapper for converting objects between different `@cleverbrush/schema` representations. Uses PropertyDescriptors as pointers to properties (similar to expressions in C# .NET) and enforces **compile-time completeness** — TypeScript will produce an error if any target property is not mapped, auto-mapped, or explicitly ignored.
 
