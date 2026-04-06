@@ -1,5 +1,8 @@
 # @cleverbrush/deep
 
+[![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+
 A library for deep operations on JavaScript objects — deep equality, deep merge, and flattening.
 
 ## Installation
@@ -140,6 +143,14 @@ import { HashObject } from '@cleverbrush/deep';
 const hash = HashObject({ name: 'John', age: 30 });
 ```
 
+## Code Quality
+
+- **Linting:** [Biome](https://biomejs.dev/) — enforced on every PR via CI
+- **Type checking:** TypeScript strict mode
+- **Unit tests:** [Vitest](https://vitest.dev/) — covering deep equality edge cases (circular references, `Date` instances, array order), deep merge, flattening, and hashing
+- **CI:** Every pull request must pass lint + build + test before merge — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+
 ## License
 
 BSD-3-Clause
+

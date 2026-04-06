@@ -1,5 +1,8 @@
 # @cleverbrush/mapper
 
+[![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+
 A type-safe, declarative object mapper for converting objects between different `@cleverbrush/schema` representations. Uses PropertyDescriptors as pointers to properties (similar to expressions in C# .NET) and enforces **compile-time completeness** — TypeScript will produce an error if any target property is not mapped, auto-mapped, or explicitly ignored.
 
 ## Why @cleverbrush/mapper?
@@ -321,6 +324,13 @@ const order = await mapOrder({
 });
 // { id: 'ORD-123', customer: 'Alice Smith', totalPrice: '$49.99', status: 'shipped' }
 ```
+
+## Code Quality
+
+- **Linting:** [Biome](https://biomejs.dev/) — enforced on every PR via CI
+- **Type checking:** TypeScript strict mode — all type selectors and mapping configurations are validated at compile time
+- **Unit tests:** [Vitest](https://vitest.dev/) — runtime tests + type-level tests (`expectTypeOf`) covering auto-mapping, computed fields, nested schemas, and compile-time completeness errors
+- **CI:** Every pull request must pass lint + build + test before merge — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 
 ## License
 

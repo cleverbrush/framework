@@ -1,5 +1,8 @@
 # @cleverbrush/async
 
+[![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+
 A set of simple utilities for working with asynchronous operations.
 
 ## Installation
@@ -129,6 +132,13 @@ const data = await retry(
     }
 );
 ```
+
+## Code Quality
+
+- **Linting:** [Biome](https://biomejs.dev/) — enforced on every PR via CI
+- **Type checking:** TypeScript strict mode
+- **Unit tests:** [Vitest](https://vitest.dev/) — covering `Collector` event/promise modes, debounce/throttle timing, and retry back-off logic
+- **CI:** Every pull request must pass lint + build + test before merge — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 
 ## License
 

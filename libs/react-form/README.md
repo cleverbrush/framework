@@ -1,5 +1,8 @@
 # @cleverbrush/react-form
 
+[![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+
 A headless, schema-driven form system for React based on `@cleverbrush/schema`. Uses PropertyDescriptors for type-safe field binding, supports global UI renderer configuration via a provider, and is completely UI-agnostic — works with plain HTML, MUI, Ant Design, or any component library.
 
 ## Why @cleverbrush/react-form?
@@ -605,6 +608,13 @@ function App() {
 | `FormSystemProviderProps` | Props for `FormSystemProvider` |
 | `FormProviderProps` | Props for `FormProvider` |
 | `FieldProps` | Props for `Field` |
+
+## Code Quality
+
+- **Linting:** [Biome](https://biomejs.dev/) — enforced on every PR via CI
+- **Type checking:** TypeScript strict mode — field selectors and form state are fully typed end-to-end
+- **Unit tests:** [Vitest](https://vitest.dev/) + [Testing Library](https://testing-library.com/) — covering form state management, validation, async validators, field rendering, and provider configuration
+- **CI:** Every pull request must pass lint + build + test before merge — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 
 ## License
 

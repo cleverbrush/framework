@@ -1,6 +1,13 @@
 # @cleverbrush/schema
 
-A schema definition and validation library for TypeScript. Define object schemas, infer their TypeScript types, and validate data at runtime — all with a single, immutable, fluent API.
+[![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
+[![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
+[![Bundle size](https://img.shields.io/badge/bundle-14%20KB%20gzip-brightgreen)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+
+A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).
+
+Define a schema **once** and get TypeScript type inference, runtime validation, object mapping ([`@cleverbrush/mapper`](../mapper)), auto-generated React forms ([`@cleverbrush/react-form`](../react-form)), and bidirectional JSON Schema conversion ([`@cleverbrush/schema-json`](../schema-json)) — all from the same immutable, fluent API.
 
 ## Why @cleverbrush/schema?
 
@@ -10,25 +17,31 @@ A schema definition and validation library for TypeScript. Define object schemas
 
 **What makes it different from Zod / Yup / Joi:**
 
-- **PropertyDescriptors** — a runtime descriptor tree that other tools can introspect. The [`@cleverbrush/mapper`](../mapper) uses it for type-safe property selectors. The [`@cleverbrush/react-form`](../react-form) uses it to auto-generate form fields with correct validation. This makes the schema library a **foundation** for an entire ecosystem — not just a standalone validation tool.
-- **Extension system** — add custom methods to any builder type (`string`, `number`, `date`, …) via `defineExtension()` + `withExtensions()`. Extensions are fully typed, chainable, and composable. No other popular schema library offers a comparable type-safe plugin system.
+- **PropertyDescriptors** — a runtime descriptor tree that every tool in the ecosystem can introspect. The [`@cleverbrush/mapper`](../mapper) uses it for type-safe property selectors. The [`@cleverbrush/react-form`](../react-form) uses it to auto-generate form fields with correct validation. This makes the schema library a **foundation** for an entire ecosystem — not just a standalone validation tool. No other popular schema library exposes this level of runtime metadata.
+- **Standard Schema v1** — the `['~standard']` getter is implemented on every builder. That means your schema works as-is with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, Elysia, next-safe-action, and every other [Standard Schema consumer](https://standardschema.dev/).
+- **Extension system** — add custom methods to any builder type (`string`, `number`, `date`, …) via `defineExtension()` + `withExtensions()`. Extensions are fully typed, chainable, composable, and appear in `introspect()`. No other popular schema library offers a comparable type-safe plugin system.
 - **Built-in extension pack** — common validators like `email()`, `url()`, `uuid()`, `ip()`, `trim()`, `positive()`, `negative()`, `nonempty()`, `unique()`, and more are included out of the box. The default import has them pre-applied; import from `@cleverbrush/schema/core` to get bare builders without extensions.
+- **14 KB gzipped (full) — 3× smaller than Zod v4** — sub-path imports (`@cleverbrush/schema/string`, `/number`, `/object`, `/array`) drop individual builders to ~4 KB.
 - **First-class nullable support** — `.nullable()` and `.notNullable()` are native methods on every builder. The inferred type automatically includes or excludes `null`, and `introspect()` exposes `isNullable` for runtime metadata.
 - **JSDoc comment preservation** — JSDoc comments on schema properties carry through to the inferred TypeScript type, so IDE tooltips and autocomplete descriptions come from the schema definition itself.
-- **Zero dependencies** — no runtime dependencies at all.
+- **Zero runtime dependencies.**
 
-| Feature                       | @cleverbrush/schema | Zod | Yup | Joi |
-| ----------------------------- | ------------------- | --- | --- | --- |
-| TypeScript type inference     | ✓                   | ✓   | ~   | ✗   |
-| Immutable schemas             | ✓                   | ✓   | ✗   | ✗   |
-| PropertyDescriptors           | ✓                   | ✗   | ✗   | ~   |
-| JSDoc preservation            | ✓                   | ✗   | ✗   | ✗   |
-| Zero dependencies             | ✓                   | ✓   | ✗   | ✗   |
-| Sync + async validation       | ✓                   | ✓   | ✓   | ✓   |
-| Per-property error inspection | ✓                   | ~   | ~   | ~   |
-| Extension / plugin system     | ✓                   | ~   | ✗   | ~   |
-| Built-in validators (email…)  | ✓                   | ✓   | ✓   | ✓   |
-| Default values                | ✓                   | ✓   | ✓   | ✓   |
+| Feature | @cleverbrush/schema | Zod | Yup | Joi |
+| --- | --- | --- | --- | --- |
+| TypeScript type inference | ✓ | ✓ | ~ | ✗ |
+| [Standard Schema v1](https://standardschema.dev/) | ✓ | ✓ | ✗ | ✗ |
+| **PropertyDescriptors** (runtime introspection) | ✓ | ✗ | ✗ | ✗ |
+| **Type-safe extension system** | ✓ | ✗ | ✗ | ✗ |
+| **Built-in object mapper** | ✓ | ✗ | ✗ | ✗ |
+| **Built-in form generation** | ✓ | ✗ | ✗ | ✗ |
+| Bidirectional JSON Schema | ✓ | ~ (output only) | ✗ | ✗ |
+| JSDoc preservation | ✓ | ✗ | ✗ | ✗ |
+| Immutable schemas | ✓ | ✓ | ✗ | ✗ |
+| Zero dependencies | ✓ | ✓ | ✗ | ✗ |
+| Sync + async validation | ✓ | ✓ | ✓ | ✓ |
+| Per-property error inspection | ✓ | ~ | ~ | ~ |
+| Default values | ✓ | ✓ | ✓ | ✓ |
+| Bundle size (full, gzipped) | **14 KB** | 41 KB (v4) | ~19 KB | ~26 KB |
 
 ## Installation
 
@@ -1247,6 +1260,56 @@ Define a schema once and use it for runtime validation, object mapping between d
 **Types:** `InferType`, `ValidationResult`, `ValidationError`, `MakeOptional`, `SchemaPropertySelector`, `PropertyDescriptor`, `PropertyDescriptorTree`, `ExtensionConfig`, `ExtensionDescriptor`
 
 See [API documentation](https://docs.cleverbrush.com/) for the full reference.
+
+## Performance
+
+Benchmarked against Zod v4 with [Vitest bench](https://vitest.dev/guide/features.html#benchmarking). Run the benchmarks yourself from the repo root: `npm run bench`.
+
+| Benchmark | @cleverbrush/schema | Zod | Ratio |
+| --- | --- | --- | --- |
+| Array 100 objects — valid | 35,228 ops/s | 13,277 ops/s | **2.65× faster** |
+| Array 100 objects — invalid | 899,329 ops/s | 4,396 ops/s | **204× faster** |
+| Complex order — valid | 198,988 ops/s | 136,090 ops/s | **1.46× faster** |
+| Complex order — invalid | 884,706 ops/s | 26,106 ops/s | **33.9× faster** |
+| Flat object — valid | 1,001,194 ops/s | 840,725 ops/s | **1.19× faster** |
+| Flat object — invalid | 2,653,630 ops/s | 176,222 ops/s | **15.1× faster** |
+| Nested object — valid | 690,556 ops/s | 368,893 ops/s | **1.87× faster** |
+| Nested object — invalid | 2,739,319 ops/s | 87,245 ops/s | **31.4× faster** |
+| String — valid | 5,348,564 ops/s | 3,533,945 ops/s | **1.51× faster** |
+| String — invalid | 5,749,087 ops/s | 482,961 ops/s | **11.9× faster** |
+| Number — valid | 7,911,266 ops/s | 4,806,511 ops/s | **1.65× faster** |
+| Number — invalid | 5,387,475 ops/s | 637,513 ops/s | **8.45× faster** |
+| Union first branch | 1,925,508 ops/s | 1,529,547 ops/s | **1.26× faster** |
+| Union last branch | 676,107 ops/s | 732,682 ops/s | 0.92× |
+| Union no match — invalid | 5,873,118 ops/s | 385,453 ops/s | **15.2× faster** |
+
+The large gains on invalid data come from the early-exit optimization: validation stops at the first failing constraint in each field and skips the rest of the object. For APIs and form handlers where invalid submissions are common, this translates directly to measurable throughput improvements.
+
+## Standard Schema Interoperability
+
+`@cleverbrush/schema` implements [Standard Schema v1](https://standardschema.dev/). Every builder exposes a `['~standard']` getter, which means schemas work as-is with any Standard Schema consumer — no adapters, no wrappers, no configuration:
+
+```ts
+import { object, string, number } from '@cleverbrush/schema';
+
+const UserSchema = object({
+  name: string().nonempty(),
+  age:  number().min(18),
+});
+
+// Works with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, Elysia, …
+const standardSchema = UserSchema['~standard'];
+```
+
+Confirmed integrations: **tRPC**, **TanStack Form**, **React Hook Form**, **T3 Env**, **Hono**, **Elysia**, **next-safe-action**, and 50+ others listed on [standardschema.dev](https://standardschema.dev/).
+
+## Code Quality
+
+- **Linting:** [Biome](https://biomejs.dev/) — strict rules enforced on every PR via CI
+- **Type checking:** TypeScript strict mode (`strictNullChecks`, `noImplicitAny`, full coverage)
+- **Unit tests:** [Vitest](https://vitest.dev/) — runtime tests + type-level tests (`expectTypeOf`) covering all builders, extensions, edge cases, and error paths
+- **Type-level tests:** `expectTypeOf` assertions validate that inferred types are exactly correct, not just assignable
+- **CI:** Every pull request must pass lint + build + test before merge — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
 
 ## License
 
