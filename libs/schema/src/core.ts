@@ -14,6 +14,10 @@ export {
 } from './builders/BooleanSchemaBuilder.js';
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export {
+    ExternSchemaBuilder,
+    extern
+} from './builders/ExternSchemaBuilder.js';
+export {
     FunctionSchemaBuilder,
     func
 } from './builders/FunctionSchemaBuilder.js';

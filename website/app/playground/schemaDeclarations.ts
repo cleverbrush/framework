@@ -761,6 +761,196 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
 export declare const date: () => DateSchemaBuilder<Date, true, false, false, {}>;
 export {};
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/ExternSchemaBuilder.d.ts": `import type { StandardSchemaV1 } from '@standard-schema/spec';
+import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+type ExternSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<ExternSchemaBuilder<any, R>['introspect']>> & {
+    standardSchema: StandardSchemaV1;
+};
+/**
+ * Schema builder that wraps an external
+ * [Standard Schema v1](https://standardschema.dev/) compatible schema
+ * (e.g. Zod, Valibot, ArkType) into a \`@cleverbrush/schema\` builder.
+ *
+ * This enables cross-library schema composition — you can use a Zod schema
+ * as a property inside a \`@cleverbrush/schema\` object schema, and the
+ * inferred TypeScript type will be correct.
+ *
+ * Validation is delegated entirely to the external schema's
+ * \`['~standard'].validate()\` method. Standard Schema issues are mapped to
+ * \`@cleverbrush/schema\` \`ValidationError\` objects, with any issue paths
+ * formatted as dotted prefixes (e.g. \`"address.city: must be a string"\`).
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use the {@link extern | extern()} factory function instead.
+ *
+ * @example
+ * \`\`\`ts
+ * import { z } from 'zod';
+ * import { object, date, extern, InferType } from '@cleverbrush/schema';
+ *
+ * const zodUser = z.object({ first: z.string(), last: z.string() });
+ *
+ * const order = object({
+ *   user: extern(zodUser),
+ *   date: date(),
+ * });
+ *
+ * type Order = InferType<typeof order>;
+ * // { user: { first: string; last: string }; date: Date }
+ * \`\`\`
+ *
+ * @see {@link extern}
+ */
+export declare class ExternSchemaBuilder<TStandardSchema extends StandardSchemaV1 = StandardSchemaV1, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? StandardSchemaV1.InferOutput<TStandardSchema> : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+    #private;
+    /**
+     * @hidden
+     */
+    static create(props: ExternSchemaBuilderCreateProps<any>): ExternSchemaBuilder<StandardSchemaV1<unknown, unknown>, true, false, undefined, false, {}, unknown>;
+    protected constructor(props: ExternSchemaBuilderCreateProps<TRequired>);
+    /**
+     * Returns the wrapped Standard Schema instance.
+     */
+    get standardSchema(): TStandardSchema;
+    /**
+     * @inheritdoc
+     */
+    hasType<T>(_notUsed?: T): ExternSchemaBuilder<TStandardSchema, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    clearHasType(): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    /**
+     * Performs synchronous validation by delegating to the external
+     * Standard Schema's \`validate()\` method.
+     *
+     * If the external schema returns a \`Promise\` (async validation),
+     * this method throws — use {@link validateAsync} instead.
+     */
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /**
+     * Performs async validation by delegating to the external
+     * Standard Schema's \`validate()\` method. Supports external schemas
+     * that return a \`Promise\` from their \`validate()\`.
+     */
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected createFromProps<TReq extends boolean>(props: ExternSchemaBuilderCreateProps<TReq>): this;
+    /**
+     * Returns a snapshot of the builder's internal state.
+     * Includes the wrapped \`standardSchema\` reference.
+     */
+    introspect(): {
+        standardSchema: TStandardSchema;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+    };
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): ExternSchemaBuilder<TStandardSchema, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): ExternSchemaBuilder<TStandardSchema, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): ExternSchemaBuilder<TStandardSchema, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<T>\`. Sets the \`isReadonly\`
+     * introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): ExternSchemaBuilder<TStandardSchema, TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): ExternSchemaBuilder<TStandardSchema, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): ExternSchemaBuilder<TStandardSchema, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+}
+/**
+ * Wraps an external [Standard Schema v1](https://standardschema.dev/)
+ * compatible schema into a \`@cleverbrush/schema\` builder.
+ *
+ * This enables cross-library schema composition — use schemas from Zod,
+ * Valibot, ArkType, or any Standard Schema v1 compliant library as
+ * properties inside \`@cleverbrush/schema\` object schemas with full type
+ * inference.
+ *
+ * @param standardSchema - A Standard Schema v1 compliant schema instance
+ *   (any object that exposes a \`['~standard']\` property with \`version: 1\`
+ *   and a \`validate\` function).
+ *
+ * @example
+ * \`\`\`ts
+ * import { z } from 'zod';
+ * import { object, date, extern, InferType } from '@cleverbrush/schema';
+ *
+ * const zodUser = z.object({ first: z.string(), last: z.string() });
+ *
+ * const order = object({
+ *   user: extern(zodUser),
+ *   date: date(),
+ * });
+ *
+ * type Order = InferType<typeof order>;
+ * // { user: { first: string; last: string }; date: Date }
+ *
+ * order.validate({
+ *   user: { first: 'Alice', last: 'Smith' },
+ *   date: new Date(),
+ * }); // { valid: true, object: { user: …, date: … } }
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Optional external schema
+ * const schema = extern(zodUser).optional();
+ * schema.validate(undefined); // valid
+ * \`\`\`
+ *
+ * @example
+ * \`\`\`ts
+ * // Inside an array
+ * import { array, extern } from '@cleverbrush/schema';
+ * const users = array(extern(zodUser));
+ * \`\`\`
+ */
+export declare const extern: <T extends StandardSchemaV1>(standardSchema: T) => ExternSchemaBuilder<T, true>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/FunctionSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<FunctionSchemaBuilder<R>['introspect']>>;
 /**
@@ -4088,6 +4278,7 @@ export type { ArraySchemaValidationResult, ElementValidationResult } from './bui
 export { ArraySchemaBuilder, array } from './builders/ArraySchemaBuilder.js';
 export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.js';
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
+export { ExternSchemaBuilder, extern } from './builders/ExternSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
