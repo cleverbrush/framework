@@ -89,7 +89,7 @@
     "devDependencies": {
         "@cleverbrush/deep": "^2.0.0"
     },
-    "dependencies": {
+    "peerDependencies": {
         "@standard-schema/spec": "^1.1.0"
     }
 }

@@ -2389,7 +2389,8 @@ export declare class RecordSchemaBuilder<TKeySchema extends StringSchemaBuilder<
 export declare function record<TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema): RecordSchemaBuilder<TKeySchema, TValueSchema>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import { type Transaction } from '../utils/transaction.js';
+    "file:///node_modules/@cleverbrush/schema/builders/SchemaBuilder.d.ts": `import type { StandardSchemaV1 } from '@standard-schema/spec';
+import { type Transaction } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 /** @internal Symbol used as the key for the type brand on schema builders. */
@@ -2749,6 +2750,12 @@ export type PropertyDescriptorTree<TSchema extends ObjectSchemaBuilder<any, any,
  */
 export declare function createHybridErrorArray<T extends any[]>(items: T, seenValue: () => any, errors: () => ReadonlyArray<string>, descriptor: () => any): T;
 /**
+ * Resolves the full output type of a schema, accounting for \`TRequired\` and
+ * \`TNullable\` modifiers. Mirrors the branded \`[__type]\` computation so that
+ * the \`~standard\` Standard Schema property carries the correct inferred type.
+ */
+type ResolvedSchemaType<TResult, TRequired extends boolean, TNullable extends boolean> = TRequired extends true ? TNullable extends true ? TResult | null : TResult : MakeOptional<TNullable extends true ? TResult | null : TResult>;
+/**
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
@@ -2769,6 +2776,13 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * @internal
      */
     readonly [__hasDefault]: THasDefault;
+    /**
+     * Standard Schema v1 interface.
+     * Provides vendor-agnostic schema interop as defined by https://standardschema.dev/.
+     *
+     * The returned object is cached so that repeated accesses return the same reference.
+     */
+    get ['~standard'](): StandardSchemaV1.Props<ResolvedSchemaType<TResult, TRequired, TNullable>>;
     /**
      * Set type of schema explicitly. \`notUsed\` param is needed only for case when JS is used. E.g. when you
      * can't call method like \`schema.hasType<Date>()\`, so instead you can call \`schema.hasType(new Date())\`
@@ -4018,7 +4032,8 @@ export declare class UnionSchemaBuilder<TOptions extends readonly SchemaBuilder<
 export declare const union: <T extends SchemaBuilder<any, any, any, any, any>>(schema: T) => UnionSchemaBuilder<[T]>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/core.d.ts": `export { AnySchemaBuilder, any } from './builders/AnySchemaBuilder.js';
+    "file:///node_modules/@cleverbrush/schema/core.d.ts": `export type { StandardSchemaV1, StandardTypedV1 } from '@standard-schema/spec';
+export { AnySchemaBuilder, any } from './builders/AnySchemaBuilder.js';
 export type { ArraySchemaValidationResult, ElementValidationResult } from './builders/ArraySchemaBuilder.js';
 export { ArraySchemaBuilder, array } from './builders/ArraySchemaBuilder.js';
 export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.js';
@@ -4866,6 +4881,33 @@ export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, a
  */
 export declare function enumOf<const T extends string>(...values: [T, ...T[]]): ExtendedString<T>;
 export declare function enumOf<const T extends string>(values: readonly [T, ...T[]], errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>): ExtendedString<T>;
+`,
+    "file:///node_modules/@cleverbrush/schema/extensions/nullable.d.ts": `/**
+ * Deprecated nullable extension types for \`@cleverbrush/schema\`.
+ *
+ * \`nullable()\` and \`notNullable()\` are now first-class methods on
+ * \`SchemaBuilder\`. These types are kept for backward compatibility
+ * but will be removed in a future major version.
+ *
+ * @module
+ * @deprecated Use the first-class \`.nullable()\` / \`.notNullable()\` methods
+ * on \`SchemaBuilder\` instead.
+ */
+import type { NullSchemaBuilder } from '../builders/NullSchemaBuilder.js';
+import type { SchemaBuilder } from '../builders/SchemaBuilder.js';
+import type { UnionSchemaBuilder } from '../builders/UnionSchemaBuilder.js';
+/**
+ * @deprecated \`nullable()\` is now a first-class method on \`SchemaBuilder\`.
+ * This type is kept for backward compatibility only.
+ */
+export type NullableReturn<TBuilder extends SchemaBuilder<any, any, any>> = UnionSchemaBuilder<[TBuilder, NullSchemaBuilder<true>]>;
+/**
+ * @deprecated \`nullable()\` is now a first-class method on \`SchemaBuilder\`.
+ * This type is kept for backward compatibility only.
+ */
+export interface NullableMethod<TBuilder extends SchemaBuilder<any, any, any>> {
+    nullable(): NullableReturn<TBuilder>;
+}
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/number.d.ts": `/**
  * Built-in number extensions for \`@cleverbrush/schema\`.

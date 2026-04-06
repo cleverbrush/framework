@@ -53,12 +53,12 @@ test('array schema exposes ~standard property', () => {
 });
 
 test('tuple schema exposes ~standard property', () => {
-    const std = tuple(string(), number())['~standard'];
+    const std = tuple([string(), number()])['~standard'];
     expect(std.version).toBe(1);
 });
 
 test('union schema exposes ~standard property', () => {
-    const std = union(string(), number())['~standard'];
+    const std = union(string()).or(number())['~standard'];
     expect(std.version).toBe(1);
 });
 
@@ -212,5 +212,73 @@ test('StandardSchemaV1.InferInput resolves the input type', () => {
 test('StandardSchemaV1.InferOutput works with optional schema', () => {
     const schema = string().optional();
     type Output = StandardSchemaV1.InferOutput<typeof schema>;
-    expectTypeOf<Output>().toEqualTypeOf<MakeOptional<string | null>>();
+    expectTypeOf<Output>().toEqualTypeOf<MakeOptional<string>>();
+});
+
+// ---------------------------------------------------------------------------
+// Error shape — issue messages and mutual exclusivity of value / issues
+// ---------------------------------------------------------------------------
+
+test('failure result has no value property', () => {
+    const result = string()['~standard'].validate(123);
+    expect(result).not.toHaveProperty('value');
+    expect(result).toHaveProperty('issues');
+});
+
+test('success result has no issues property', () => {
+    const result = string()['~standard'].validate('hello');
+    expect(result).toHaveProperty('value');
+    expect(result).not.toHaveProperty('issues');
+});
+
+test('wrong type produces a descriptive message', () => {
+    const result = string()['~standard'].validate(
+        123
+    ) as StandardSchemaV1.FailureResult;
+    expect(result.issues[0].message).toMatch(/string/i);
+});
+
+test('required field missing produces a descriptive message', () => {
+    const result = string()['~standard'].validate(
+        undefined
+    ) as StandardSchemaV1.FailureResult;
+    expect(result.issues[0].message).toMatch(/required/i);
+});
+
+test('null value produces a descriptive message', () => {
+    const result = string()['~standard'].validate(
+        null
+    ) as StandardSchemaV1.FailureResult;
+    expect(result.issues[0].message).toBeTruthy();
+});
+
+test('minLength violation produces a descriptive message', () => {
+    const result = string()
+        .minLength(5)
+        ['~standard'].validate('ab') as StandardSchemaV1.FailureResult;
+    expect(result.issues[0].message).toMatch(/5/);
+});
+
+test('number min violation produces a descriptive message', () => {
+    const result = number()
+        .min(10)
+        ['~standard'].validate(3) as StandardSchemaV1.FailureResult;
+    expect(result.issues[0].message).toMatch(/10/);
+});
+
+test('custom error message string is propagated through issues', () => {
+    const result = string()
+        .minLength(3, 'name too short')
+        ['~standard'].validate('a') as StandardSchemaV1.FailureResult;
+    expect(result.issues[0].message).toBe('name too short');
+});
+
+test('each issue has a non-empty string message', () => {
+    const result = string()['~standard'].validate(
+        false
+    ) as StandardSchemaV1.FailureResult;
+    for (const issue of result.issues) {
+        expect(typeof issue.message).toBe('string');
+        expect(issue.message.length).toBeGreaterThan(0);
+    }
 });
