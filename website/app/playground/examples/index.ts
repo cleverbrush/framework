@@ -26,6 +26,7 @@ export const EXAMPLE_GROUPS = [
             'nested-objects',
             'composing-schemas',
             'immutability',
+            'deep-partial',
             'recursive-schemas'
         ]
     },

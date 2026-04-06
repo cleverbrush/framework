@@ -10,9 +10,14 @@
     ],
     "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_schema.html",
     "keywords": [
-        "object schema validator",
         "schema",
-        "validate object",
+        "validation",
+        "typescript",
+        "type-safe",
+        "runtime-validation",
+        "zod-alternative",
+        "schema-validation",
+        "standard-schema",
         "cleverbrush"
     ],
     "license": "BSD 3-Clause",
@@ -69,6 +74,10 @@
         "./function": {
             "types": "./dist/builders/FunctionSchemaBuilder.d.ts",
             "import": "./dist/builders/FunctionSchemaBuilder.js"
+        },
+        "./extern": {
+            "types": "./dist/builders/ExternSchemaBuilder.d.ts",
+            "import": "./dist/builders/ExternSchemaBuilder.js"
         }
     },
     "sideEffects": false,

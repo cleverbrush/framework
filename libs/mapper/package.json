@@ -7,15 +7,17 @@
     "dependencies": {
         "@cleverbrush/schema": "^2.0.0"
     },
-    "description": "Library for deep operations on objects like deep equal, deep extend, etc.",
+    "description": "Type-safe, schema-driven object mapper for @cleverbrush/schema — compile-time completeness, selector-based field mapping, auto-mapping",
     "files": [
         "dist"
     ],
     "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_mapper.html",
     "keywords": [
-        "deep operations on objects",
-        "deep equal",
-        "deep extend",
+        "object mapper",
+        "schema mapping",
+        "typescript",
+        "type-safe",
+        "data transformation",
         "cleverbrush"
     ],
     "license": "BSD 3-Clause",

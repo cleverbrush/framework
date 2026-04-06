@@ -5,6 +5,7 @@
     "fixed": [
         [
             "@cleverbrush/schema",
+            "@cleverbrush/schema-json",
             "@cleverbrush/deep",
             "@cleverbrush/async",
             "@cleverbrush/scheduler",
