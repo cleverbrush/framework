@@ -2951,3 +2951,262 @@ describe('Mapping property not in target schema', () => {
         expect(() => mapper.for(t => t.name)).not.toThrow();
     });
 });
+
+// ── getMapper error paths ─────────────────────────────────────────────
+
+describe('MappingRegistry.getMapper edge cases', () => {
+    test('throws when fromSchema is not an ObjectSchemaBuilder', () => {
+        const registry = new MappingRegistry();
+        expect(() => registry.getMapper(string() as any, UserDtoSchema)).toThrow(
+            'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
+        );
+    });
+
+    test('throws when toSchema not registered for a known fromSchema', () => {
+        // fromSchema IS in registry (mapped to UserDtoSchema), but a different
+        // toSchema is requested → second "No mapper found" throw (line 998)
+        const registry = new MappingRegistry().configure(
+            UserSchema,
+            UserDtoSchema,
+            m =>
+                m
+                    .for(t => t.name)
+                    .from(f => f.name)
+                    .for(t => t.cityName)
+                    .from(f => f.address.city)
+                    .for(t => t.fullAddress)
+                    .compute(
+                        user => `${user.address.city} ${user.address.houseNr}`
+                    )
+        );
+
+        const UnrelatedSchema = object({ x: string() });
+        expect(() => registry.getMapper(UserSchema, UnrelatedSchema)).toThrow(
+            'No mapper found for the given schemas pair'
+        );
+    });
+});
+
+// ── Mapper runtime edge cases ─────────────────────────────────────────
+
+describe('Mapper runtime edge cases', () => {
+    test('from getValue failure skips property (null nested source)', async () => {
+        // line 810: entry.type === 'prop' but getValue returns {success: false}
+        // Happens when source path traversal fails (e.g. address is null)
+        const mapFn = new Mapper(UserSchema, UserDtoSchema)
+            .for(t => t.name)
+            .from(f => f.name)
+            .for(t => t.cityName)
+            .from(f => f.address.city)
+            .for(t => t.fullAddress)
+            .compute(
+                user => `${user.address?.city ?? ''} ${user.address?.houseNr ?? ''}`
+            )
+            .getMapper();
+
+        // address is null → getValue for address.city returns {success:false}
+        const result = await mapFn({
+            name: 'Test',
+            age: 30,
+            address: null as any
+        });
+
+        expect(result.name).toBe('Test');
+        // cityName is skipped (getValue failed) → not present
+        expect(result).not.toHaveProperty('cityName');
+    });
+
+    test('auto-mapped nested object with undefined value is skipped (line 820)', async () => {
+        // entry.type === 'auto' but getResult.value is undefined → continue
+        const AddressSchema = object({ city: string(), zip: string() });
+        const AddressDtoSchema = object({ city: string(), zip: string() });
+        const PersonSchema = object({
+            name: string(),
+            address: AddressSchema
+        });
+        const PersonDtoSchema = object({
+            name: string(),
+            address: AddressDtoSchema
+        });
+
+        const registry = new MappingRegistry()
+            .configure(AddressSchema, AddressDtoSchema, m =>
+                m
+                    .for(t => t.city)
+                    .from(f => f.city)
+                    .for(t => t.zip)
+                    .from(f => f.zip)
+            )
+            .configure(PersonSchema, PersonDtoSchema, m =>
+                m.for(t => t.name).from(f => f.name)
+            );
+
+        const mapFn = registry.getMapper(PersonSchema, PersonDtoSchema);
+        // address is undefined → auto-mapper sees undefined value → skips
+        const result = await mapFn({
+            name: 'Alice',
+            address: undefined as any
+        });
+
+        expect(result.name).toBe('Alice');
+        expect(result).not.toHaveProperty('address');
+    });
+});
+
+// ── resolveElementMapper edge cases ──────────────────────────────────
+
+describe('resolveElementMapper edge cases', () => {
+    test('auto-maps array of same-structure objects when element schemas share keys but are not registered', async () => {
+        // Covers resolveElementMapper lines 283, 291, 293
+        // Both element schemas are ObjectSchemaBuilder with identical keys but
+        // no registry mapping → identity mapper returned.
+        const ElemSchema1 = object({ city: string(), zip: string() });
+        const ElemSchema2 = object({ city: string(), zip: string() });
+
+        const SrcSchema = object({
+            name: string(),
+            items: array(ElemSchema1)
+        });
+        const TgtSchema = object({
+            name: string(),
+            items: array(ElemSchema2)
+        });
+
+        const registry = new MappingRegistry().configure(
+            SrcSchema,
+            TgtSchema,
+            m => m.for(t => t.name).from(f => f.name)
+            // items auto-maps because element schemas have same keys
+        );
+
+        const mapFn = registry.getMapper(SrcSchema, TgtSchema);
+        const result = await mapFn({
+            name: 'test',
+            items: [
+                { city: 'NYC', zip: '10001' },
+                { city: 'LA', zip: '90001' }
+            ]
+        });
+
+        expect(result).toEqual({
+            name: 'test',
+            items: [
+                { city: 'NYC', zip: '10001' },
+                { city: 'LA', zip: '90001' }
+            ]
+        });
+    });
+
+    test('array of same-structure objects: null array value is skipped', async () => {
+        const ElemSchema1 = object({ city: string(), zip: string() });
+        const ElemSchema2 = object({ city: string(), zip: string() });
+
+        const SrcSchema = object({
+            name: string(),
+            items: array(ElemSchema1)
+        });
+        const TgtSchema = object({
+            name: string(),
+            items: array(ElemSchema2)
+        });
+
+        const registry = new MappingRegistry().configure(
+            SrcSchema,
+            TgtSchema,
+            m => m.for(t => t.name).from(f => f.name)
+        );
+
+        const mapFn = registry.getMapper(SrcSchema, TgtSchema);
+        const result = await mapFn({ name: 'test', items: null as any });
+
+        expect(result.name).toBe('test');
+        expect(result).not.toHaveProperty('items');
+    });
+
+    test('resolveElementMapper returns null for elements with different keys (line 295)', () => {
+        // Element schemas are both ObjectSchemaBuilder but have different property keys,
+        // and no registry mapping → resolveElementMapper returns null → items stays unmapped.
+        const ElemSchema1 = object({ city: string(), zip: string() });
+        const ElemSchema2 = object({ name: string(), code: string() }); // different keys
+
+        const SrcSchema = object({
+            title: string(),
+            items: array(ElemSchema1)
+        });
+        const TgtSchema = object({
+            title: string(),
+            items: array(ElemSchema2)
+        });
+
+        // Without registering ElemSchema1→ElemSchema2 OR explicitly mapping items,
+        // items remains unmapped → MapperConfigurationError
+        expect(() =>
+            new MappingRegistry().configure(
+                SrcSchema,
+                TgtSchema,
+                // @ts-expect-error - items is intentionally left unmapped
+                m => m.for(t => t.title).from(f => f.title)
+            )
+        ).toThrow(MapperConfigurationError);
+    });
+
+    test('nested arrays: array(array(ItemSchema)) auto-mapped via resolveElementMapper recursion', async () => {
+        // Covers lines 304-321: both element schemas are ArraySchemaBuilder
+        // The inner element schemas are also arrays → resolveElementMapper recurses.
+        const InnerElem1 = object({ val: number() });
+        const InnerElem2 = object({ val: number() });
+
+        const SrcSchema = object({
+            matrix: array(array(InnerElem1))
+        });
+        const TgtSchema = object({
+            matrix: array(array(InnerElem2))
+        });
+
+        const registry = new MappingRegistry().configure(
+            SrcSchema,
+            TgtSchema,
+            m => m as any // auto-maps matrix
+        );
+
+        const mapFn = registry.getMapper(SrcSchema, TgtSchema);
+        const result = await mapFn({
+            matrix: [
+                [{ val: 1 }, { val: 2 }],
+                [{ val: 3 }]
+            ]
+        });
+
+        expect(result).toEqual({
+            matrix: [
+                [{ val: 1 }, { val: 2 }],
+                [{ val: 3 }]
+            ]
+        });
+    });
+
+    test('resolveElementMapper returns null when element type mismatch (line 351)', () => {
+        // One element schema is ObjectSchemaBuilder, the other is string (primitive).
+        // The ObjectSchemaBuilder check fires for source but not both → falls through
+        // all conditions → line 351 return null → items unmapped → error.
+        const ObjElem = object({ val: string() });
+
+        const SrcSchema = object({
+            label: string(),
+            items: array(ObjElem)
+        });
+        const TgtSchema = object({
+            label: string(),
+            items: array(string())
+        });
+
+        expect(() =>
+            new MappingRegistry().configure(
+                SrcSchema,
+                TgtSchema,
+                // @ts-expect-error - items typemismatch: array(obj) vs array(string)
+                m => m.for(t => t.label).from(f => f.label)
+            )
+        ).toThrow(MapperConfigurationError);
+    });
+});

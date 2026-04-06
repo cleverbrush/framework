@@ -126,4 +126,35 @@ describe('InMemoryJobRepository', () => {
         );
         expect(running).toHaveLength(1);
     });
+
+    test('setJobStatus updates status on an existing job', async () => {
+        const repo = new InMemoryJobRepository();
+        await repo.createJob({ id: 'j1', path: '/job1' } as any);
+        const updated = await repo.setJobStatus('j1', 'failed' as any);
+        expect(updated.id).toBe('j1');
+        expect(updated.status).toBe('failed');
+        const stored = await repo.getJobById('j1');
+        expect(stored.status).toBe('failed');
+    });
+
+    test('setJobStatus returns null for a nonexistent job', async () => {
+        const repo = new InMemoryJobRepository();
+        const result = await repo.setJobStatus('no-such-id', 'active' as any);
+        expect(result).toBeNull();
+    });
+
+    test('getInstanceById returns the correct instance', async () => {
+        const repo = new InMemoryJobRepository();
+        const inst = await repo.addInstance('j1', { status: 'running' } as any);
+        const found = await repo.getInstanceById(inst.id);
+        expect(found).toBeDefined();
+        expect(found.id).toBe(inst.id);
+        expect(found.jobId).toBe('j1');
+    });
+
+    test('getInstanceById returns undefined for missing instance', async () => {
+        const repo = new InMemoryJobRepository();
+        const result = await repo.getInstanceById(9999);
+        expect(result).toBeUndefined();
+    });
 });
