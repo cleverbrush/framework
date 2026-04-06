@@ -1485,3 +1485,19 @@ describe('realistic validation pipelines', () => {
         expect(result.valid).toBe(true);
     });
 });
+
+// ---------------------------------------------------------------------------
+// defineExtension: config must be object of methods (line 564)
+// ---------------------------------------------------------------------------
+
+test('defineExtension: null methods for a known builder type throws (line 564)', () => {
+    expect(() => defineExtension({ string: null as any })).toThrow(
+        'must be an object of methods'
+    );
+});
+
+test('defineExtension: non-object methods for a known builder type throws (line 564)', () => {
+    expect(() => defineExtension({ string: 'not-an-object' as any })).toThrow(
+        'must be an object of methods'
+    );
+});

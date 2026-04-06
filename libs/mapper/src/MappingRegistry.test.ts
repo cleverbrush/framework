@@ -2957,7 +2957,9 @@ describe('Mapping property not in target schema', () => {
 describe('MappingRegistry.getMapper edge cases', () => {
     test('throws when fromSchema is not an ObjectSchemaBuilder', () => {
         const registry = new MappingRegistry();
-        expect(() => registry.getMapper(string() as any, UserDtoSchema)).toThrow(
+        expect(() =>
+            registry.getMapper(string() as any, UserDtoSchema)
+        ).toThrow(
             'Both fromSchema and toSchema must be instances of ObjectSchemaBuilder'
         );
     });
@@ -3000,7 +3002,8 @@ describe('Mapper runtime edge cases', () => {
             .from(f => f.address.city)
             .for(t => t.fullAddress)
             .compute(
-                user => `${user.address?.city ?? ''} ${user.address?.houseNr ?? ''}`
+                user =>
+                    `${user.address?.city ?? ''} ${user.address?.houseNr ?? ''}`
             )
             .getMapper();
 
@@ -3171,17 +3174,11 @@ describe('resolveElementMapper edge cases', () => {
 
         const mapFn = registry.getMapper(SrcSchema, TgtSchema);
         const result = await mapFn({
-            matrix: [
-                [{ val: 1 }, { val: 2 }],
-                [{ val: 3 }]
-            ]
+            matrix: [[{ val: 1 }, { val: 2 }], [{ val: 3 }]]
         });
 
         expect(result).toEqual({
-            matrix: [
-                [{ val: 1 }, { val: 2 }],
-                [{ val: 3 }]
-            ]
+            matrix: [[{ val: 1 }, { val: 2 }], [{ val: 3 }]]
         });
     });
 

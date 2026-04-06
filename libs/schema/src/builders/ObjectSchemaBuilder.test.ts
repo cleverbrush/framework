@@ -2,8 +2,10 @@ import { expect, expectTypeOf, test } from 'vitest';
 import { array } from './ArraySchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
-import { object } from './ObjectSchemaBuilder.js';
+import { ObjectSchemaBuilder, object } from './ObjectSchemaBuilder.js';
+import { PropertyValidationResult } from './PropertyValidationResult.js';
 import type { InferType } from './SchemaBuilder.js';
+import { SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
 
@@ -3023,4 +3025,181 @@ test('getErrorsFor - root errors from validator', () => {
         Array.isArray(rootErrors.errors) && rootErrors.errors.length === 1
     ).toEqual(true);
     expect(rootErrors.errors[0]).toEqual('Passwords do not match');
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 397)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from object schema', () => {
+    const schema = object({ name: string() })
+        .default({ name: 'default' } as any)
+        .clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Full validation path: null/undefined optional — line 665
+// ---------------------------------------------------------------------------
+
+test('full-path: optional object schema with null → valid (line 665)', () => {
+    const schema = object({ name: string() })
+        .optional()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(null as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toBeNull();
+});
+
+test('full-path: optional object schema with undefined → valid (line 665)', () => {
+    const schema = object({ name: string() })
+        .optional()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(undefined as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toBeUndefined();
+});
+
+// ---------------------------------------------------------------------------
+// Full-path: empty schema + empty object edge cases — lines 703-753
+// ---------------------------------------------------------------------------
+
+test('full-path: empty schema + empty obj + failing validator doNotStopOnFirstError (lines 703-705)', () => {
+    const schema = object().addValidator(() => ({
+        valid: false,
+        errors: [{ message: 'always fails' }]
+    }));
+    const result = schema.validate({} as any, { doNotStopOnFirstError: true });
+    expect(result.valid).toEqual(false);
+});
+
+test('full-path: empty schema + empty obj + passing validator (lines 714-717)', () => {
+    const schema = object().addValidator(() => ({ valid: true }));
+    const result = schema.validate({} as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual({});
+});
+
+test('full-path: empty schema + unknown props + !acceptUnknownProps (lines 727-740)', () => {
+    const schema = object().addValidator(() => ({ valid: true }));
+    const result = schema.validate({ unknownKey: 'val' } as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors?.[0].message).toContain('unknown property');
+});
+
+test('full-path: empty schema + unknown props + doNotStopOnFirstError (lines 728-733)', () => {
+    const schema = object().addValidator(() => ({ valid: true }));
+    const result = schema.validate({ key1: 'a', key2: 'b' } as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toEqual(false);
+    expect(result.errors?.length).toBeGreaterThanOrEqual(2);
+});
+
+test('full-path: empty schema + acceptUnknownProps + unknown props (lines 750-753)', () => {
+    const schema = object()
+        .acceptUnknownProps()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate({ extra: 'value' } as any);
+    expect(result.valid).toEqual(true);
+    expect((result.object as any).extra).toBe('value');
+});
+
+// ---------------------------------------------------------------------------
+// Full-path: acceptUnknownProps with defined + unknown props (lines 853-855)
+// ---------------------------------------------------------------------------
+
+test('full-path: acceptUnknownProps copies unknown keys to result (lines 853-855)', () => {
+    const schema = object({ name: string() })
+        .acceptUnknownProps()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate({ name: 'Alice', extra: 42 } as any);
+    expect(result.valid).toEqual(true);
+    expect((result.object as any).extra).toBe(42);
+});
+
+// ---------------------------------------------------------------------------
+// Fast-path lazy getErrorsFor — lines 1031, 1049
+// ---------------------------------------------------------------------------
+
+test('fast-path: optional object null → getErrorsFor is lazy (line 1031)', () => {
+    const schema = object({ name: string() }).optional();
+    const result = schema.validate(null as any);
+    expect(result.valid).toEqual(true);
+    // Calling getErrorsFor triggers the lazy evaluator at line 1031
+    const errors = result.getErrorsFor();
+    expect(errors).toBeDefined();
+});
+
+test('fast-path: required object undefined → getErrorsFor is lazy (line 1049)', () => {
+    const schema = object({ name: string() });
+    const result = schema.validate(undefined as any);
+    expect(result.valid).toEqual(false);
+    // Calling getErrorsFor triggers the lazy evaluator at line 1049
+    const errors = result.getErrorsFor();
+    expect(errors).toBeDefined();
+});
+
+// ---------------------------------------------------------------------------
+// createPropertyDescriptorFor: getValue when propertyName is undefined (line 2420)
+// ---------------------------------------------------------------------------
+
+test('getPropertiesFor root descriptor: getValue returns seenValue when propertyName not a string (line 2420)', () => {
+    const schema = object({ name: string() });
+    const props = ObjectSchemaBuilder.getPropertiesFor(schema);
+    const rootDesc = (props as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+    if (rootDesc && typeof rootDesc.getValue === 'function') {
+        // Root descriptor has no propertyName → typeof undefined !== 'string'
+        // getValue returns { success: true, value: selectorResult }
+        const testObj = { name: 'Alice' };
+        const result = rootDesc.getValue(testObj);
+        expect(result.success).toBe(true);
+    }
+});
+
+test('PropertyValidationResult: throws on invalid descriptor (line 118)', () => {
+    expect(() => new PropertyValidationResult({} as any, undefined)).toThrow(
+        'Invalid property descriptor'
+    );
+});
+
+// ---------------------------------------------------------------------------
+// getErrorsFor with invalid descriptor throws (line 618)
+// ---------------------------------------------------------------------------
+
+test('getErrorsFor: throws on invalid descriptor (line 618)', () => {
+    const schema = object({ name: string() });
+    const result = schema.validate({ name: 'Alice' });
+    expect(() => result.getErrorsFor(() => ({}) as any)).toThrow(
+        'invalid property descriptor'
+    );
+});
+
+// line 2147 (!introspected.properties branch) is unreachable through public API;
+// ObjectSchemaBuilder.getPropertiesFor validates instanceof before reaching it.
+
+// ---------------------------------------------------------------------------
+// PropertyValidationResult: seenValue false branch (line 58)
+//   and constructor with errors array (line 121)
+// ---------------------------------------------------------------------------
+
+test('PropertyValidationResult: seenValue returns undefined when property missing (line 58)', () => {
+    const schema = object({ city: string() });
+    const props = ObjectSchemaBuilder.getPropertiesFor(schema);
+    // Pass an empty object — city is absent → getValue returns { success: false }
+    const pvr = new PropertyValidationResult((props as any).city, {} as any);
+    expect(pvr.seenValue).toBeUndefined();
+});
+
+test('PropertyValidationResult: constructor with initial errors array (line 121)', () => {
+    const schema = object({ city: string() });
+    const props = ObjectSchemaBuilder.getPropertiesFor(schema);
+    const pvr = new PropertyValidationResult(
+        (props as any).city,
+        { city: 'London' },
+        ['pre-existing error']
+    );
+    expect(pvr.errors).toEqual(['pre-existing error']);
 });

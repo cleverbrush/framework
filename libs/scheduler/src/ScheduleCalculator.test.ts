@@ -520,11 +520,12 @@ test('hasNext(span) returns true when next date is within the span', () => {
 
 test('throws for unknown schedule type', () => {
     // Covers line 336: default case in #getNext switch
-    expect(() =>
-        new ScheduleCalculator({
-            every: 'hourly' as any,
-            interval: 1,
-            startsOn: new Date()
-        })
+    expect(
+        () =>
+            new ScheduleCalculator({
+                every: 'hourly' as any,
+                interval: 1,
+                startsOn: new Date()
+            })
     ).toThrow('unknown schedule type');
 });

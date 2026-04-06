@@ -263,3 +263,17 @@ test('Clear Has type - 1', () => {
     expectTypeOf(typeCheck).toMatchTypeOf<(...args: any[]) => any>();
     expect(schema1 !== (schema2 as any)).toEqual(true);
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 246)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from function schema', () => {
+    const noop = () => null;
+    const schema = func()
+        .default(noop as any)
+        .clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});

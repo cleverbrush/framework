@@ -1058,3 +1058,14 @@ test('custom error message isInteger()', async () => {
         expect(errors?.[0].message).toEqual('some custom error message');
     }
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 700)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from number schema', () => {
+    const schema = number().default(42).clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});

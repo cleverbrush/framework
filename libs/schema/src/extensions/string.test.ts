@@ -394,3 +394,21 @@ describe('string extensions', () => {
         });
     });
 });
+
+// ---------------------------------------------------------------------------
+// oneOf: edge cases for array form with error message (string extension line 537, 561)
+// ---------------------------------------------------------------------------
+
+describe('oneOf string edge cases', () => {
+    test('oneOf: throws with empty args (line 537)', () => {
+        expect(() => (string() as any).oneOf()).toThrow(
+            'oneOf requires at least one value'
+        );
+    });
+
+    test('oneOf: throws with empty array (line 561)', () => {
+        expect(() => (string() as any).oneOf([])).toThrow(
+            'oneOf requires at least one value'
+        );
+    });
+});

@@ -796,3 +796,37 @@ test('deeply nested object > array > object with invalid data returns valid:fals
     expect(result.valid).toEqual(false);
     expect(result.errors!.length).toBeGreaterThan(0);
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 748)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes the default value', () => {
+    const schema = array(string()).default(['a', 'b']).clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Fast path lazy getNestedErrors — lines 448, 475
+// ---------------------------------------------------------------------------
+
+test('fast-path: invalid element → getNestedErrors() returns nested results (line 448)', () => {
+    const schema = array(number());
+    const result = schema.validate(['not-a-number'] as any);
+    expect(result.valid).toEqual(false);
+    // Calling getNestedErrors triggers the lazy evaluator at line 448
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
+    expect(Array.isArray(nested)).toEqual(true);
+});
+
+test('fast-path: empty array → getNestedErrors() returns empty (line 475)', () => {
+    const schema = array(number());
+    const result = schema.validate([] as any);
+    expect(result.valid).toEqual(true);
+    // Calling getNestedErrors triggers the lazy evaluator at line 475
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
+});

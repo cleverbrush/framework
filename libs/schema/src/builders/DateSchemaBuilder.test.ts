@@ -999,3 +999,91 @@ test('isInPast with custom error message - 1', async () => {
         expect(errors?.[0].message).toEqual('Custom error message');
     }
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 661)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from date schema', () => {
+    const schema = date().default(new Date()).clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Date preprocessor: non-string/number value returned as-is (line 33)
+// ---------------------------------------------------------------------------
+
+test('date preprocessor: boolean is not converted (line 33)', () => {
+    // Passing a pure boolean — not undefined, not number, not string
+    // The parseFromEpochPreprocessor returns it as-is (line 33)
+    const schema = date().acceptEpoch();
+    const { valid } = schema.validate(true as any);
+    // true is not a Date, so validation fails
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Full-path #buildResult: null/optional path (line 393)
+// ---------------------------------------------------------------------------
+
+test('full-path: optional date with null → valid (line 393)', () => {
+    const schema = date()
+        .optional()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(null as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// parseFromEpochPreprocessor: NaN number input (line 33)
+// ---------------------------------------------------------------------------
+
+test('parseFromEpoch: NaN number → returns value as-is from NaN branch (line 30)', () => {
+    const schema = date().acceptEpoch();
+    const result = schema.validate(NaN as any);
+    expect(result.valid).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// parseFromJsonPreprocessor branches: undefined (line 17), NaN string (line 20),
+// non-string non-undefined (line 23), and #buildResult null optional (line 390)
+// ---------------------------------------------------------------------------
+
+test('parseFromJson: valid JSON date string is converted to Date (acceptJsonString behavior)', () => {
+    const schema = date().acceptJsonString();
+    const result = schema.validate('2024-01-01T00:00:00.000Z' as any);
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeInstanceOf(Date);
+});
+
+test('parseFromJson: invalid date string returns NaN branch (line 20)', () => {
+    const schema = date().acceptJsonString();
+    const result = schema.validate('not-a-valid-date!!!' as any);
+    // line 20 TRUE branch: Number.isNaN(Date.parse('not-a-valid-date!!!')) = true → returns value
+    expect(result.valid).toBe(false);
+});
+
+test('parseFromJson: non-string non-undefined passes through (line 23)', () => {
+    const schema = date().acceptJsonString();
+    const result = schema.validate(true as any);
+    // line 23: typeof true !== 'string', typeof true !== 'undefined' → returns value as-is
+    expect(result.valid).toBe(false);
+});
+
+test('parseFromEpoch: valid number gives a Date via acceptEpoch (built-in acceptEpoch behavior)', () => {
+    const schema = date().acceptEpoch();
+    const result = schema.validate(1704067200000 as any);
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeInstanceOf(Date);
+});
+
+test('#buildResult: null value on optional parseFromJson schema → valid (line 390 null branch)', () => {
+    const schema = date().acceptJsonString().optional();
+    const result = schema.validate(null as any);
+    // null + !isRequired → line 390 null branch → early return valid
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeNull();
+});

@@ -326,3 +326,14 @@ test('Preprocessors', async () => {
         expect(errors).not.toBeDefined();
     }
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 205)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from any schema', () => {
+    const schema = any().default('fallback').clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});

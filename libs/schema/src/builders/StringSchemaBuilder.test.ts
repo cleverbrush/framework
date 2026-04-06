@@ -1077,3 +1077,14 @@ test('required custom message overridden by new required() call', async () => {
     expect(valid).toEqual(false);
     expect(errors?.[0].message).toEqual('Another message');
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 691)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from string schema', () => {
+    const schema = string().default('fallback').clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
