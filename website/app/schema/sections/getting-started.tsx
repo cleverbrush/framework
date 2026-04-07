@@ -1,3 +1,4 @@
+import { InstallBanner } from '@/app/InstallBanner';
 import { fmtKB, loadBundleSizes } from '@/lib/bundleSizes';
 import { highlightTS } from '@/lib/highlight';
 
@@ -14,61 +15,49 @@ export default function GettingStartedSection() {
             </div>
 
             {/* ── Installation ─────────────────────────────────── */}
-            <div className="card">
-                <h2>Installation</h2>
-                <pre>
-                    <code
-                        // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
-                        dangerouslySetInnerHTML={{
-                            __html: highlightTS(
-                                `npm install @cleverbrush/schema`
-                            )
-                        }}
-                    />
-                </pre>
-                <details className="bundle-size-details">
-                    <summary>Bundle size</summary>
-                    <div className="bundle-size-body">
-                        <p>
-                            Measured with esbuild (minified + gzip level 9,
-                            single-file bundle, browser target).
-                        </p>
-                        <div className="table-wrap">
-                            <table className="api-table">
-                                <thead>
-                                    <tr>
-                                        <th>Import</th>
-                                        <th>Gzipped</th>
-                                        <th>Brotli</th>
+            <InstallBanner command="npm install @cleverbrush/schema" />
+            <details className="bundle-size-details">
+                <summary>Bundle size</summary>
+                <div className="bundle-size-body">
+                    <p>
+                        Measured with esbuild (minified + gzip level 9,
+                        single-file bundle, browser target).
+                    </p>
+                    <div className="table-wrap">
+                        <table className="api-table">
+                            <thead>
+                                <tr>
+                                    <th>Import</th>
+                                    <th>Gzipped</th>
+                                    <th>Brotli</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {bundleSizes.entries.map(e => (
+                                    <tr key={e.import}>
+                                        <td>
+                                            <code>{e.import}</code>
+                                            {e.description
+                                                ? ` (${e.description})`
+                                                : ''}
+                                        </td>
+                                        <td>{fmtKB(e.gzip)}</td>
+                                        <td>{fmtKB(e.brotli)}</td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    {bundleSizes.entries.map(e => (
-                                        <tr key={e.import}>
-                                            <td>
-                                                <code>{e.import}</code>
-                                                {e.description
-                                                    ? ` (${e.description})`
-                                                    : ''}
-                                            </td>
-                                            <td>{fmtKB(e.gzip)}</td>
-                                            <td>{fmtKB(e.brotli)}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        <p className="bundle-size-note">
-                            The <code>sideEffects: false</code> flag is set in
-                            the package manifest. When your bundler supports
-                            tree-shaking, use the sub-path exports above to keep
-                            your bundle smaller — each builder carries only its
-                            own validation logic plus the shared{' '}
-                            <code>SchemaBuilder</code> base (~2.7 KB gzip).
-                        </p>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
-                </details>
-            </div>
+                    <p className="bundle-size-note">
+                        The <code>sideEffects: false</code> flag is set in the
+                        package manifest. When your bundler supports
+                        tree-shaking, use the sub-path exports above to keep
+                        your bundle smaller — each builder carries only its own
+                        validation logic plus the shared{' '}
+                        <code>SchemaBuilder</code> base (~2.7 KB gzip).
+                    </p>
+                </div>
+            </details>
 
             {/* ── Why ──────────────────────────────────────────── */}
             <div className="why-box">
@@ -100,14 +89,18 @@ export default function GettingStartedSection() {
                 <h3>The Unique Feature: PropertyDescriptors</h3>
                 <p>
                     Unlike other schema libraries,{' '}
-                    <code>@cleverbrush/schema</code> exposes a{' '}
-                    <strong>runtime descriptor tree</strong> that other tools
-                    can introspect. The <code>@cleverbrush/mapper</code> uses it
-                    for type-safe property selectors. The{' '}
-                    <code>@cleverbrush/react-form</code> uses it to
-                    auto-generate form fields with correct validation. This
-                    makes the schema library a <strong>foundation</strong> for
-                    an entire ecosystem — not just a standalone validation tool.
+                    <code>@cleverbrush/schema</code> exposes a typed{' '}
+                    <strong>property descriptor</strong> for every field in a
+                    schema object. This lets you reference fields with a typed
+                    arrow function — <code>u =&gt; u.address.city</code> —
+                    instead of a string literal like{' '}
+                    <code>&quot;address.city&quot;</code>. TypeScript verifies
+                    the path at compile time, so renaming a field immediately
+                    surfaces every stale reference as a compile error. No silent
+                    runtime breakage from string paths that drift out of sync.
+                    The <code>@cleverbrush/mapper</code> and{' '}
+                    <code>@cleverbrush/react-form</code> packages both build on
+                    this for type-safe field targeting.
                 </p>
 
                 <h3>Production Tested</h3>
@@ -209,12 +202,11 @@ const bad = UserSchema.validate(
 );
 
 console.log(bad.valid);  // false
-console.log(bad.errors);
-// [
-//   { message: 'Name must be at least 2 characters' },
-//   { message: 'Please enter a valid email address' },
-//   { message: 'Age cannot be negative' }
-// ]`)
+
+// Use getErrorsFor() to inspect per-field errors
+console.log(bad.getErrorsFor(u => u.name).errors);   // ['Name must be at least 2 characters']
+console.log(bad.getErrorsFor(u => u.email).errors);  // ['Please enter a valid email address']
+console.log(bad.getErrorsFor(u => u.age).errors);    // ['Age cannot be negative']`)
                         }}
                     />
                 </pre>

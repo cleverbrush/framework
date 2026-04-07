@@ -1415,28 +1415,28 @@ const result = withCatch.validate(42 as any);
         testData: '"Alice"'
     },
     {
-        id: 'catch-parse',
-        title: 'parse() Never Throws',
+        id: 'catch-validate',
+        title: 'validate() Never Throws',
         description:
-            'When <code>.catch()</code> is set, <code>.parse()</code> and <code>.parseAsync()</code> will never throw a <code>SchemaValidationError</code> — the fallback is returned instead.',
+            'When <code>.catch()</code> is set, <code>.validate()</code> and <code>.validateAsync()</code> will never throw a <code>SchemaValidationError</code> — the fallback is returned instead.',
         group: 'Catch / Fallback',
         code: `import { string, object, number } from '@cleverbrush/schema';
 
 const Name = string().catch('unknown');
 
-// Without .catch(), parse() throws on invalid input
-// string().parse(42)  ← throws SchemaValidationError
+// Without .catch(), validate() returns valid: false on invalid input
+// string().validate(42)  ← { valid: false, errors: [...] }
 
-// With .catch(), parse() always returns a value
-const name = Name.parse(42 as any);   // 'unknown'  (no throw)
-const name2 = Name.parse('Alice');    // 'Alice'
+// With .catch(), validate() always returns valid: true with the fallback
+const result1 = Name.validate(42 as any);   // { valid: true, object: 'unknown' }
+const result2 = Name.validate('Alice');      // { valid: true, object: 'Alice' }
 
 // Works with complex schemas too
 const User = object({ name: string(), age: number() })
   .catch({ name: 'Guest', age: 0 });
 
-const user = User.parse('not an object' as any);
-// { name: 'Guest', age: 0 }
+const result3 = User.validate('not an object' as any);
+// { valid: true, object: { name: 'Guest', age: 0 } }
 
 const result = Name.validate(123 as any);
 `,

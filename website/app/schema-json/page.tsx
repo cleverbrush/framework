@@ -1,3 +1,4 @@
+import { InstallBanner } from '@/app/InstallBanner';
 import { highlightTS } from '@/lib/highlight';
 
 export default function SchemaJsonPage() {
@@ -14,19 +15,18 @@ export default function SchemaJsonPage() {
                 </div>
 
                 {/* ── Installation ─────────────────────────────────── */}
-                <div className="card">
-                    <h2>Installation</h2>
-                    <pre>
-                        <code
-                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
-                            dangerouslySetInnerHTML={{
-                                __html: highlightTS(
-                                    `npm install @cleverbrush/schema-json\n# peer dependency\nnpm install @cleverbrush/schema`
-                                )
-                            }}
-                        />
-                    </pre>
-                </div>
+                <InstallBanner
+                    commands={[
+                        {
+                            command: 'npm install @cleverbrush/schema-json',
+                            label: '@cleverbrush/schema-json'
+                        },
+                        {
+                            command: 'npm install @cleverbrush/schema',
+                            label: 'peer dependency'
+                        }
+                    ]}
+                />
 
                 {/* ── What it does ─────────────────────────────────── */}
                 <div className="why-box">
@@ -123,7 +123,7 @@ type User = InferFromJsonSchema<typeof UserJsonSchema>;
 const UserSchema = fromJsonSchema(UserJsonSchema);
 
 // Validate data — result.object is fully typed as User
-const result = UserSchema.parse({
+const result = UserSchema.validate({
   id: 'a1b2c3d4-e5f6-1234-8abc-000000000001',
   name: 'Alice',
   email: 'alice@example.com',

@@ -3319,7 +3319,7 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * const schema = string().catch('unknown');
      * schema.validate(42);        // { valid: true, object: 'unknown' }
      * schema.validate('hello');   // { valid: true, object: 'hello' }
-     * schema.parse(42);           // 'unknown'  (no throw)
+     * // validate() always returns valid: true when .catch() is set
      * \`\`\`
      *
      * @example

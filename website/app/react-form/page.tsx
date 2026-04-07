@@ -8,6 +8,7 @@ import {
 } from '@cleverbrush/react-form';
 import { number, object, string } from '@cleverbrush/schema';
 import { type ReactNode, useState } from 'react';
+import { InstallBanner } from '@/app/InstallBanner';
 import { highlightTS } from '@/lib/highlight';
 
 /* ── Live Quick-Start form ──────────────────────────────────────── */
@@ -154,23 +155,15 @@ export default function ReactFormPage() {
                 </div>
 
                 {/* ── Installation ─────────────────────────────────── */}
-                <div className="card">
-                    <h2>Installation</h2>
-                    <pre>
-                        <code
-                            // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
-                            dangerouslySetInnerHTML={{
-                                __html: highlightTS(
-                                    `npm install @cleverbrush/react-form`
-                                )
-                            }}
-                        />
-                    </pre>
-                    <p>
-                        Requires <code>@cleverbrush/schema</code> and{' '}
-                        <code>react</code> as peer dependencies.
-                    </p>
-                </div>
+                <InstallBanner
+                    command="npm install @cleverbrush/react-form"
+                    note={
+                        <>
+                            Requires <code>@cleverbrush/schema</code> and{' '}
+                            <code>react</code> as peer dependencies.
+                        </>
+                    }
+                />
 
                 {/* ── Quick Start ──────────────────────────────────── */}
                 <div className="card">

@@ -1,3 +1,4 @@
+import { InstallBanner } from '@/app/InstallBanner';
 import { highlightTS } from '@/lib/highlight';
 
 export default function MapperPage() {
@@ -13,22 +14,15 @@ export default function MapperPage() {
                 </div>
 
                 {/* ── Installation ─────────────────────────────────── */}
-                <div className="card">
-                    <h2>Installation</h2>
-                    <pre>
-                        <code
-                            dangerouslySetInnerHTML={{
-                                __html: highlightTS(
-                                    `npm install @cleverbrush/mapper`
-                                )
-                            }}
-                        />
-                    </pre>
-                    <p>
-                        Requires <code>@cleverbrush/schema</code> as a peer
-                        dependency.
-                    </p>
-                </div>
+                <InstallBanner
+                    command="npm install @cleverbrush/mapper"
+                    note={
+                        <>
+                            Requires <code>@cleverbrush/schema</code> as a peer
+                            dependency.
+                        </>
+                    }
+                />
 
                 {/* ── Why ──────────────────────────────────────────── */}
                 <div className="why-box">

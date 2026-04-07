@@ -37,9 +37,9 @@ export default function ValidationSection() {
 if (result.valid) {
   console.log('Validated:', result.object);
 } else {
-  // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
-  console.log('Errors:', result.errors);
-  // errors is deprecated on object schemas — Array of { message: string }
+  // Use getErrorsFor() for per-property error inspection (see below)
+  const nameErrors = result.getErrorsFor(u => u.name);
+  console.log(nameErrors.errors); // ['...']
 }
 
 // Use validateAsync() when your schema has async validators/preprocessors
@@ -77,18 +77,16 @@ if (result.valid) {
   { doNotStopOnFirstError: true }
 );
 
-if (result.getErrorsFor) {
-  // Get errors for a top-level property
-  const nameErrors = result.getErrorsFor((t) => t.name);
-  console.log(nameErrors.isValid);    // false
-  console.log(nameErrors.errors);     // ['Name must be at least 2 characters']
-  console.log(nameErrors.seenValue);  // 'A'
+// Get errors for a top-level property
+const nameErrors = result.getErrorsFor(t => t.name);
+console.log(nameErrors.isValid);    // false
+console.log(nameErrors.errors);     // ['Name must be at least 2 characters']
+console.log(nameErrors.seenValue);  // 'A'
 
-  // Get errors for a nested property (e.g. address.city)
-  // const cityErrors = result.getErrorsFor((t) => t.address.city);
-  // console.log(cityErrors.isValid);  // true or false
-  // console.log(cityErrors.errors);   // array of error strings
-}`)
+// Get errors for a nested property (e.g. address.city)
+// const cityErrors = result.getErrorsFor(t => t.address.city);
+// console.log(cityErrors.isValid);  // true or false
+// console.log(cityErrors.errors);   // array of error strings`)
                     }}
                 />
             </pre>

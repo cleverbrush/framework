@@ -3337,3 +3337,140 @@ pre code {
         grid-template-columns: 1fr 1fr;
     }
 }
+
+/* ── Install Banner ───────────────────────────────────────────────── */
+
+.install-banner {
+    background: rgba(8, 11, 20, 0.9);
+    border: 1px solid rgba(129, 140, 248, 0.2);
+    border-radius: var(--radius-lg);
+    padding: 0.25rem 0;
+    overflow: hidden;
+    backdrop-filter: blur(12px);
+    box-shadow:
+        0 0 0 1px rgba(129, 140, 248, 0.05),
+        0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.install-row {
+    padding: 0.7rem 1.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.install-row:last-of-type {
+    border-bottom: none;
+}
+
+.install-row-label {
+    display: block;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-bottom: 0.3rem;
+    user-select: none;
+}
+
+.install-row-body {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.install-row-prompt {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.95rem;
+    color: var(--accent-indigo);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.install-row-cmd {
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.95rem;
+    color: var(--text-primary);
+    flex: 1;
+    background: none;
+    border: none;
+    padding: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.install-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.65rem;
+    background: rgba(129, 140, 248, 0.08);
+    border: 1px solid rgba(129, 140, 248, 0.18);
+    border-radius: var(--radius-sm);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition:
+        background var(--transition-fast),
+        color var(--transition-fast),
+        border-color var(--transition-fast);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.install-copy-btn:hover {
+    background: rgba(129, 140, 248, 0.16);
+    color: var(--accent-indigo);
+    border-color: rgba(129, 140, 248, 0.35);
+}
+
+.install-copy-btn.copied {
+    background: rgba(34, 211, 238, 0.1);
+    border-color: rgba(34, 211, 238, 0.3);
+    color: var(--accent-cyan);
+}
+
+.install-copy-btn-text {
+    display: inline;
+}
+
+.install-banner-note {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin: 0;
+    padding: 0.5rem 1.25rem 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Install section on the homepage */
+.install-section {
+    padding: 0 0 3.5rem;
+}
+
+.install-section-header {
+    margin-bottom: 1.25rem;
+}
+
+.install-section-header h2 {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0 0 0.3rem;
+    letter-spacing: -0.02em;
+}
+
+.install-section-header p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+}
+
+@media (max-width: 600px) {
+    .install-copy-btn-text {
+        display: none;
+    }
+
+    .install-copy-btn {
+        padding: 0.3rem 0.45rem;
+    }
+}

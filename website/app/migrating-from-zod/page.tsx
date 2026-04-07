@@ -714,9 +714,10 @@ if (!result.success) console.log(result.error.issues);
 
 // @cleverbrush/schema
 const user = UserSchema.parse(data);           // throws SchemaValidationError on failure
-const result = UserSchema.validate(data);      // { valid, object?, errors? }
-if (!result.valid) console.log(result.errors);
-// errors: [{ message: '...' }, ...]
+const result = UserSchema.validate(data);      // { valid, object? }
+if (!result.valid) {
+  console.log(result.getErrorsFor(u => u.fieldName).errors); // ['...']
+}
 
 // Zod-compat aliases also exist:
 const result2 = UserSchema.safeParse(data);    // alias for .validate()

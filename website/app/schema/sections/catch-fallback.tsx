@@ -17,8 +17,8 @@ export default function CatchFallbackSection() {
                 Unlike <code>.default()</code>, which only fires when the input
                 is <code>undefined</code>, <code>.catch()</code> fires on{' '}
                 <strong>any</strong> validation failure. When{' '}
-                <code>.catch()</code> is set, <code>.parse()</code> and{' '}
-                <code>.parseAsync()</code> will <strong>never throw</strong>.
+                <code>.catch()</code> is set, <code>.validate()</code> and{' '}
+                <code>.validateAsync()</code> will <strong>never throw</strong>.
             </p>
             <pre>
                 <code
@@ -36,8 +36,8 @@ Name.validate('Alice');   // { valid: true, object: 'Alice' }
 const Age = number().min(0).catch(-1);
 Age.validate(-5);         // { valid: true, object: -1 }
 
-// .parse() never throws when .catch() is set
-Name.parse(42);           // 'unknown'
+// .validate() never throws when .catch() is set
+Name.validate(42);           // { valid: true, object: 'unknown' }
 `)
                     }}
                 />

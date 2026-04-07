@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { fmtKB, loadBundleSizes } from '@/lib/bundleSizes';
 import { highlightTS } from '@/lib/highlight';
 import { BenchmarkSection } from './BenchmarkSection';
+import { InstallBanner } from './InstallBanner';
 
 export default function HomePage() {
     const bundleSizes = loadBundleSizes();
@@ -32,7 +33,16 @@ export default function HomePage() {
                     <code>@cleverbrush/schema</code> is an immutable, composable
                     schema library that infers your TypeScript types at compile
                     time and validates your data at runtime — with zero
-                    dependencies. The entire ecosystem is built on top of it.
+                    dependencies. It lays the foundation for a rich ecosystem —
+                    much like{' '}
+                    <a
+                        href="https://zod.dev"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        Zod
+                    </a>{' '}
+                    has shown is possible.
                 </p>
                 <div className="hero-actions">
                     <Link href="/schema" className="hero-btn hero-btn-primary">
@@ -100,6 +110,48 @@ export default function HomePage() {
                 </div>
             </section>
 
+            {/* ── Quick Install ────────────────────────────────────── */}
+            <section className="install-section">
+                <div className="container">
+                    <div className="install-section-header">
+                        <h2>Get started in seconds</h2>
+                        <p>
+                            Install only what you need — each package is
+                            independent and tree-shakeable.
+                        </p>
+                    </div>
+                    <InstallBanner
+                        commands={[
+                            {
+                                command: 'npm install @cleverbrush/schema',
+                                label: 'Schema — validation + TypeScript inference'
+                            },
+                            {
+                                command: 'npm install @cleverbrush/mapper',
+                                label: 'Type-safe object mapping (optional)'
+                            },
+                            {
+                                command: 'npm install @cleverbrush/react-form',
+                                label: 'Headless schema-driven React forms (optional)'
+                            },
+                            {
+                                command: 'npm install @cleverbrush/schema-json',
+                                label: 'JSON Schema Draft 7 / 2020-12 interop (optional)'
+                            }
+                        ]}
+                        note={
+                            <>
+                                <code>@cleverbrush/schema</code> and{' '}
+                                <code>@cleverbrush/mapper</code> have zero
+                                runtime dependencies.{' '}
+                                <code>@cleverbrush/react-form</code> depends
+                                only on React and the schema library.
+                            </>
+                        }
+                    />
+                </div>
+            </section>
+
             {/* ── vs Zod ───────────────────────────────────────────── */}
             <section className="section vs-zod-section" id="vs-zod">
                 <div className="container">
@@ -145,25 +197,28 @@ result.getErrorsFor(u => u.naem) // ← TypeScript error ✓`
                             <div className="vs-zod-icon">🔍</div>
                             <h3>Runtime schema introspection</h3>
                             <p>
-                                Inspect the full schema structure at runtime via{' '}
-                                <code>.introspect()</code>. This powers{' '}
-                                <a href="/mapper">@cleverbrush/mapper</a> and{' '}
-                                <a href="/react-form">
-                                    @cleverbrush/react-form
-                                </a>{' '}
-                                — and is architecturally impossible with Zod.
+                                Both Zod and <code>@cleverbrush/schema</code>{' '}
+                                let you inspect schema structure at runtime —
+                                but <code>@cleverbrush/schema</code> was built
+                                with introspection as a first-class concern.
+                                Every descriptor returned by{' '}
+                                <code>.introspect()</code> is fully typed, so
+                                you get rich autocomplete and compile-time
+                                checks instead of navigating loosely-typed
+                                internal properties.
                             </p>
                             <pre>
                                 <code
                                     dangerouslySetInnerHTML={{
                                         __html: highlightTS(
-                                            `// Zod — schema is opaque at runtime
+                                            `// Zod — possible, but via loosely-typed internals
+schema._zod.def.shape.name  // type: any
 
-// @cleverbrush/schema — full descriptor tree
+// @cleverbrush/schema — fully typed descriptor tree
 const d = UserSchema.introspect();
-d.properties.name.isRequired   // true
-d.properties.age.isRequired    // false (optional field)
-d.properties.email.validators  // [{ name: 'email', ... }]`
+d.properties.name.isRequired   // boolean ✓
+d.properties.age.isRequired    // boolean ✓
+d.properties.email.validators  // TypedValidator[] ✓`
                                         )
                                     }}
                                 />
@@ -351,23 +406,25 @@ const PostSlug = s().slug().minLength(3);
                                     >
                                         Standard Schema
                                     </a>{' '}
-                                    spec. Consume Zod schemas directly and infer
-                                    their TypeScript types without depending on
-                                    Zod at runtime.
+                                    spec, so it works alongside any compatible
+                                    library out of the box — including Zod.
                                 </p>
                             </div>
                             <div className="schema-feature">
                                 <span className="schema-feature-icon">🔍</span>
-                                <strong>Introspection &amp; selectors</strong>
+                                <strong>Typed field-error selectors</strong>
                                 <p>
-                                    Inspect any part of a schema at runtime.
-                                    Call{' '}
+                                    After validation, look up errors for a
+                                    specific field using an arrow function —{' '}
                                     <code>
-                                        result.getErrorsFor(u&nbsp;=&gt;&nbsp;u.field)
-                                    </code>{' '}
-                                    on a validation result to get field-level
-                                    errors — no magic strings, compiler catches
-                                    typos.
+                                        result.getErrorsFor(u&nbsp;=&gt;&nbsp;u.email)
+                                    </code>
+                                    — instead of a plain string like{' '}
+                                    <code>{"errors['email']"}</code>. TypeScript
+                                    verifies the property exists at compile
+                                    time, so a typo like{' '}
+                                    <code>u&nbsp;=&gt;&nbsp;u.emal</code> is a
+                                    build error, not a runtime surprise.
                                 </p>
                             </div>
                         </div>
@@ -710,34 +767,6 @@ type Order = InferType<typeof OrderSchema>;
                         >
                             &#9654; Try extern() in the Playground
                         </Link>
-                    </div>
-
-                    {/* Quick install */}
-                    <div className="card">
-                        <h3>Installation</h3>
-                        <pre>
-                            <code
-                                dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`# Schema only (validation + TypeScript inference)
-npm install @cleverbrush/schema
-
-# Add type-safe object mapping
-npm install @cleverbrush/mapper
-
-# Add headless React forms
-npm install @cleverbrush/react-form
-
-# JSON Schema interop (Draft 7 / 2020-12)
-npm install @cleverbrush/schema-json`)
-                                }}
-                            />
-                        </pre>
-                        <p className="footnote">
-                            * <code>@cleverbrush/schema</code> and{' '}
-                            <code>@cleverbrush/mapper</code> have zero runtime
-                            dependencies. <code>@cleverbrush/react-form</code>{' '}
-                            depends only on React and the schema library.
-                        </p>
                     </div>
 
                     {/* ── Quality & Testing ────────────────────────── */}

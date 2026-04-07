@@ -133,10 +133,13 @@ export default function ComparisonSection() {
                                     </strong>
                                 </td>
                                 <td className="check">✓</td>
-                                <td className="cross">✗</td>
+                                <td className="partial">~</td>
                                 <td>
-                                    <code>.introspect()</code> returns full
-                                    descriptor tree
+                                    <code>.introspect()</code> returns a typed
+                                    stable descriptor tree; Zod exposes
+                                    internals via <code>._def</code> /{' '}
+                                    <code>._zod.def</code> (undocumented,
+                                    unstable API)
                                 </td>
                             </tr>
                             <tr>
@@ -225,10 +228,12 @@ export default function ComparisonSection() {
                                 <td>
                                     <code>z.map()</code> / <code>z.set()</code>
                                 </td>
-                                <td className="cross">✗</td>
+                                <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td>
-                                    Use <code>any()</code> + custom validator
+                                    Use <code>any().hasType(Map)</code> /{' '}
+                                    <code>any().hasType(Set)</code> with
+                                    preprocessors or custom validators
                                 </td>
                             </tr>
                         </tbody>
@@ -287,7 +292,7 @@ export default function ComparisonSection() {
                             <tr>
                                 <td>Runtime introspection</td>
                                 <td className="check">✓</td>
-                                <td className="cross">✗</td>
+                                <td className="partial">~</td>
                                 <td className="cross">✗</td>
                                 <td className="partial">~</td>
                             </tr>
