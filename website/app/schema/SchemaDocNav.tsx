@@ -85,7 +85,7 @@ export function SchemaDocNav({ currentSlug, collapsed, onToggle }: Props) {
             </div>
 
             {!collapsed && (
-                <>
+                <div>
                     {SECTION_GROUPS.map(group => (
                         <div key={group.label} className="pg-nav-group">
                             <h3 className="pg-nav-group-label">
@@ -153,7 +153,7 @@ export function SchemaDocNav({ currentSlug, collapsed, onToggle }: Props) {
                             })}
                         </div>
                     ))}
-                </>
+                </div>
             )}
         </aside>
     );

@@ -1,5 +1,3 @@
-import { highlightTS } from '@/lib/highlight';
-
 export default function SchemaTypesSection() {
     return (
         <>

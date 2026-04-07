@@ -1,7 +1,4 @@
 import { redirect } from 'next/navigation';
-import { SCHEMA_SECTIONS } from '../sections/index';
-import { SchemaDocLayout } from './SchemaDocLayout';
-
 import ApiReferenceSection from '../sections/api-reference';
 import BuiltInExtensionsSection from '../sections/built-in-extensions';
 import CatchFallbackSection from '../sections/catch-fallback';
@@ -12,12 +9,14 @@ import DiscriminatedUnionsSection from '../sections/discriminated-unions';
 import ExtensionsSection from '../sections/extensions';
 import GettingStartedSection from '../sections/getting-started';
 import ImmutabilitySection from '../sections/immutability';
+import { SCHEMA_SECTIONS } from '../sections/index';
 import PropertyDescriptorsSection from '../sections/property-descriptors';
 import ReadonlySection from '../sections/readonly';
 import RecursiveSchemasSection from '../sections/recursive-schemas';
 import SchemaTypesSection from '../sections/schema-types';
 import StandardSchemaSection from '../sections/standard-schema';
 import ValidationSection from '../sections/validation';
+import { SchemaDocLayout } from './SchemaDocLayout';
 
 export function generateStaticParams() {
     return [{ slug: [] }, ...SCHEMA_SECTIONS.map(s => ({ slug: [s.slug] }))];
