@@ -187,11 +187,16 @@ d.properties.email.validators  // [{ name: 'email', ... }]`
                                             `// Zod — only .refine(), no new builder methods
 
 // @cleverbrush/schema — real methods on the builder
-const withSlug = createExtension(() => ({
-  slug() { return this.matches(/^[a-z0-9-]+$/); }
-}));
-const PostSlug = string().extend(withSlug).slug().minLength(3);
-//                                         ^ typed, autocomplete works`
+const slugExt = defineExtension({
+  string: {
+    slug(this: StringSchemaBuilder) {
+      return this.matches(/^[a-z0-9-]+$/);
+    }
+  }
+});
+const { string: s } = withExtensions(slugExt);
+const PostSlug = s().slug().minLength(3);
+//               ^ slug() is typed, autocomplete works`
                                         )
                                     }}
                                 />
@@ -638,14 +643,12 @@ const NameField  = string().minLength(2).maxLength(50);
 // Extend a base schema for two contexts — neither mutates the other
 const CreateUserSchema = object({ name: NameField, email: EmailField });
 const UpdateUserSchema = CreateUserSchema
-  .extend({ role: string().optional() });
+  .addProps({ role: string().optional() });
 
 // Discriminated unions with full type narrowing
-const MediaSchema = union([
-  object({ type: string().equals('image'), url: string(), width: number(), height: number() }),
-  object({ type: string().equals('video'), url: string(), duration: number() }),
-  object({ type: string().equals('text'),  body: string() }),
-]);
+const MediaSchema = union(object({ type: string().equals('image'), url: string(), width: number(), height: number() }))
+  .or(object({ type: string().equals('video'), url: string(), duration: number() }))
+  .or(object({ type: string().equals('text'),  body: string() }));
 type Media = InferType<typeof MediaSchema>;
 // { type: 'image'; url: string; width: number; height: number }
 // | { type: 'video'; url: string; duration: number }

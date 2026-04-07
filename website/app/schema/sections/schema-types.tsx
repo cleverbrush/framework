@@ -71,7 +71,7 @@ export default function SchemaTypesSection() {
                                 </td>
                                 <td>
                                     <code>.min(n)</code>, <code>.max(n)</code>,{' '}
-                                    <code>.integer()</code>,{' '}
+                                    <code>.isInteger()</code>,{' '}
                                     <code>.positive()</code>,{' '}
                                     <code>.negative()</code>,{' '}
                                     <code>.finite()</code>,{' '}

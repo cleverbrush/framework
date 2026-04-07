@@ -203,17 +203,32 @@ export default function ComparisonSection() {
                             </tr>
                             <tr>
                                 <td>
-                                    <code>z.tuple()</code>,{' '}
-                                    <code>z.record()</code>,{' '}
-                                    <code>z.map()</code>
+                                    <code>z.tuple([...])</code>
                                 </td>
-                                <td className="cross">not yet</td>
+                                <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td>
-                                    See{' '}
-                                    <Link href="/migrating-from-zod#gaps">
-                                        Honest Gaps
-                                    </Link>
+                                    Use <code>tuple([...])</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <code>z.record(key, value)</code>
+                                </td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td>
+                                    Use <code>record(string(), value)</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <code>z.map()</code> / <code>z.set()</code>
+                                </td>
+                                <td className="cross">✗</td>
+                                <td className="check">✓</td>
+                                <td>
+                                    Use <code>any()</code> + custom validator
                                 </td>
                             </tr>
                         </tbody>

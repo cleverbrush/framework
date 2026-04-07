@@ -70,10 +70,10 @@ export default function MigratingFromZodPage() {
                             <strong>Type-safe extension system</strong>
                             <p>
                                 Add real builder methods (with TypeScript type
-                                support) using <code>createExtension()</code>.
-                                Zod only exposes <code>.refine()</code> for
-                                custom logic — you cannot add new methods to the
-                                builder chain.
+                                support) using <code>defineExtension()</code> +{' '}
+                                <code>withExtensions()</code>. Zod only exposes{' '}
+                                <code>.refine()</code> for custom logic — you
+                                cannot add new methods to the builder chain.
                             </p>
                         </div>
                     </div>
@@ -288,9 +288,16 @@ export default function MigratingFromZodPage() {
                                         <code>.safeParse(v)</code>
                                     </td>
                                     <td>
-                                        <code>.validate(v)</code>
+                                        <code>.validate(v)</code> or{' '}
+                                        <code>.safeParse(v)</code>
                                     </td>
-                                    <td>Returns result object; sync</td>
+                                    <td>
+                                        Both work; result shape differs from Zod
+                                        (<code>valid</code> /{' '}
+                                        <code>object</code> instead of{' '}
+                                        <code>success</code> / <code>data</code>
+                                        )
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>
@@ -306,9 +313,13 @@ export default function MigratingFromZodPage() {
                                         <code>.safeParseAsync(v)</code>
                                     </td>
                                     <td>
-                                        <code>.validateAsync(v)</code>
+                                        <code>.validateAsync(v)</code> or{' '}
+                                        <code>.safeParseAsync(v)</code>
                                     </td>
-                                    <td>Returns result object; async</td>
+                                    <td>
+                                        Both work; same result shape note
+                                        applies
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>
@@ -516,19 +527,23 @@ string().optional()`
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(
-                                    `// Zod
+                                    `// Zod 3
+z.number().int()          // Zod 3 method-chain style
 z.number().min(0)
 z.number().max(100)
-z.number().int()
 z.number().positive()
 z.number().negative()
 z.number().finite()
 z.number().multipleOf(5)
 
-// @cleverbrush/schema  (identical)
+// Zod 4 — integer moved to a top-level validator
+z.int()                   // replaces z.number().int()
+z.number().min(0)         // .min() / .max() unchanged
+
+// @cleverbrush/schema
+number().isInteger()      // renamed: int() → isInteger()
 number().min(0)
 number().max(100)
-number().integer()          // renamed: int → integer
 number().positive()
 number().negative()
 number().finite()
@@ -703,9 +718,13 @@ const result = UserSchema.validate(data);      // { valid, object?, errors? }
 if (!result.valid) console.log(result.errors);
 // errors: [{ message: '...' }, ...]
 
+// Zod-compat aliases also exist:
+const result2 = UserSchema.safeParse(data);    // alias for .validate()
+const result3 = await UserSchema.safeParseAsync(data); // alias for .validateAsync()
+
 // Async variants
-const user   = await UserSchema.parseAsync(data);
-const result = await UserSchema.validateAsync(data);`
+const user2  = await UserSchema.parseAsync(data);
+const result4 = await UserSchema.validateAsync(data);`
                                 )
                             }}
                         />
@@ -719,7 +738,13 @@ const result = await UserSchema.validateAsync(data);`
                                 '{ valid: boolean, object?: T, errors?: ValidationError[] }'
                             }
                         </code>
-                        .
+                        . For easier migration, <code>.safeParse()</code> and{' '}
+                        <code>.safeParseAsync()</code> exist as aliases for{' '}
+                        <code>.validate()</code> / <code>.validateAsync()</code>{' '}
+                        — note that the returned object shape still uses{' '}
+                        <code>valid</code> / <code>object</code> /{' '}
+                        <code>errors</code>, not Zod&apos;s <code>success</code>{' '}
+                        / <code>data</code>.
                     </p>
                 </div>
 
@@ -980,23 +1005,25 @@ console.log(descriptor.properties.email.type);        // 'string'
                             // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(
-                                    `import { string, createExtension } from '@cleverbrush/schema';
+                                    `import { defineExtension, withExtensions, StringSchemaBuilder } from '@cleverbrush/schema';
 
-// Define a reusable extension — fully typed
-const slugExtension = createExtension<string>(() => ({
-  slug() {
-    return this.matches(/^[a-z0-9-]+$/).addValidator(
-      s => !s.startsWith('-') && !s.endsWith('-'),
-      'Slug must not start or end with a hyphen'
-    );
+// Define a reusable extension — each key is a builder type
+const slugExtension = defineExtension({
+  string: {
+    slug(this: StringSchemaBuilder) {
+      return this.matches(/^[a-z0-9-]+$/).addValidator(
+        s => !s.startsWith('-') && !s.endsWith('-'),
+        'Slug must not start or end with a hyphen'
+      );
+    }
   }
-}));
+});
 
-// Apply it to any string builder
-const SlugString = string().extend(slugExtension);
+// Apply with withExtensions() — returns augmented factory functions
+const { string: s } = withExtensions(slugExtension);
 
 // Now .slug() is a real method — autocomplete works, no type casts
-const PostSlug = SlugString.slug().minLength(3).maxLength(60);`
+const PostSlug = s().slug().minLength(3).maxLength(60);`
                                 )
                             }}
                         />
@@ -1032,21 +1059,22 @@ const PostSlug = SlugString.slug().minLength(3).maxLength(60);`
                                     <td>
                                         <code>z.tuple([...])</code>
                                     </td>
-                                    <td>Not implemented</td>
+                                    <td>✓ Supported</td>
                                     <td>
-                                        Use <code>array()</code> with{' '}
-                                        <code>union()</code> for heterogeneous
-                                        items
+                                        <code>tuple([string(), number()])</code>{' '}
+                                        — import <code>tuple</code> from{' '}
+                                        <code>@cleverbrush/schema</code>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td>
                                         <code>z.record(key, value)</code>
                                     </td>
-                                    <td>Not implemented</td>
+                                    <td>✓ Supported</td>
                                     <td>
-                                        Use <code>any()</code> + custom
-                                        validator for now
+                                        <code>record(string(), number())</code>{' '}
+                                        — import <code>record</code> from{' '}
+                                        <code>@cleverbrush/schema</code>
                                     </td>
                                 </tr>
                                 <tr>
@@ -1062,7 +1090,16 @@ const PostSlug = SlugString.slug().minLength(3).maxLength(60);`
                                 </tr>
                                 <tr>
                                     <td>
-                                        <code>z.null()</code> /{' '}
+                                        <code>z.null()</code>
+                                    </td>
+                                    <td>✓ Supported</td>
+                                    <td>
+                                        <code>nul()</code> — note the spelling
+                                        (avoids the JS reserved word)
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>z.undefined()</code> /{' '}
                                         <code>z.void()</code> /{' '}
                                         <code>z.never()</code>
@@ -1087,8 +1124,13 @@ const PostSlug = SlugString.slug().minLength(3).maxLength(60);`
                                     <td>
                                         <code>.catch(value)</code>
                                     </td>
-                                    <td>Not implemented</td>
-                                    <td>—</td>
+                                    <td>✓ Supported</td>
+                                    <td>
+                                        <code>.catch(value)</code> or{' '}
+                                        <code>.catch(() =&gt; value)</code> —
+                                        returns fallback when validation fails
+                                        instead of throwing
+                                    </td>
                                 </tr>
                                 <tr>
                                     <td>
