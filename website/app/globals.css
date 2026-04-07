@@ -3213,3 +3213,130 @@ pre code {
         margin-left: 0;
     }
 }
+
+/* ── vs Zod section ───────────────────────────────────────────────── */
+.vs-zod-section {
+    background: linear-gradient(
+        180deg,
+        var(--bg-primary) 0%,
+        rgba(129, 140, 248, 0.03) 50%,
+        var(--bg-primary) 100%
+    );
+}
+
+.vs-zod-intro {
+    text-align: center;
+    max-width: 640px;
+    margin: 0 auto 2.5rem;
+}
+
+.vs-zod-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.vs-zod-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: border-color var(--transition-fast);
+}
+
+.vs-zod-card:hover {
+    border-color: rgba(129, 140, 248, 0.25);
+}
+
+.vs-zod-card h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 0;
+}
+
+.vs-zod-card p {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    margin: 0;
+    line-height: 1.6;
+}
+
+.vs-zod-card pre {
+    margin: 0;
+    font-size: 0.78rem;
+    flex: 1;
+}
+
+.vs-zod-icon {
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.vs-zod-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1rem;
+    margin: 2rem 0;
+    padding: 1.5rem;
+    background: rgba(129, 140, 248, 0.04);
+    border: 1px solid rgba(129, 140, 248, 0.1);
+    border-radius: var(--radius-lg);
+}
+
+.vs-zod-metric {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.vs-zod-metric-val {
+    font-size: 1.75rem;
+    font-weight: 800;
+    font-family: "JetBrains Mono", monospace;
+    background: linear-gradient(
+        135deg,
+        var(--accent-indigo),
+        var(--accent-cyan)
+    );
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.02em;
+    line-height: 1;
+}
+
+.vs-zod-metric-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.vs-zod-footer {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 0.5rem;
+}
+
+@media (max-width: 900px) {
+    .vs-zod-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .vs-zod-metrics {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 500px) {
+    .vs-zod-metrics {
+        grid-template-columns: 1fr 1fr;
+    }
+}

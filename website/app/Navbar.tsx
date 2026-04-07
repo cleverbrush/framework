@@ -7,12 +7,12 @@ import { useCallback, useEffect, useState } from 'react';
 const NAV_ITEMS = [
     { href: '/', label: 'Home' },
     { href: '/schema', label: 'Schema' },
-    { href: '/schema-json', label: 'Schema JSON' },
+    { href: '/playground', label: 'Playground', highlight: true },
+    { href: '/migrating-from-zod', label: 'vs Zod' },
     { href: '/mapper', label: 'Mapper' },
     { href: '/react-form', label: 'React Form' },
+    { href: '/schema-json', label: 'Schema JSON' },
     { href: '/showcases', label: 'Showcases' },
-    { href: '/migrating-from-zod', label: 'Migrate from Zod' },
-    { href: '/playground', label: 'Playground', highlight: true },
     { href: '/api-docs', label: 'API Docs' }
 ];
 

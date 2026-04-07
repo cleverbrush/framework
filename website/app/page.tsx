@@ -100,6 +100,151 @@ export default function HomePage() {
                 </div>
             </section>
 
+            {/* ── vs Zod ───────────────────────────────────────────── */}
+            <section className="section vs-zod-section" id="vs-zod">
+                <div className="container">
+                    <div className="vs-zod-intro">
+                        <h2 className="section-title">
+                            How it compares to Zod
+                        </h2>
+                        <p className="subtitle">
+                            If you know Zod, you already know most of the API —
+                            the primitives, the fluent builder style, and{' '}
+                            <code>InferType</code> all work the same way.
+                            @cleverbrush/schema goes further in three areas that
+                            Zod cannot match.
+                        </p>
+                    </div>
+
+                    <div className="vs-zod-grid">
+                        <div className="vs-zod-card">
+                            <div className="vs-zod-icon">🎯</div>
+                            <h3>Typed field-error selectors</h3>
+                            <p>
+                                Access per-field errors through a typed lambda —
+                                no magic strings, no brittle path navigation.
+                                TypeScript catches a misspelled field name at
+                                compile time.
+                            </p>
+                            <pre>
+                                <code
+                                    dangerouslySetInnerHTML={{
+                                        __html: highlightTS(
+                                            `// Zod — string path, no compile-time check
+result.error?.issues.filter(i => i.path[0] === 'naem') // ← typo silently passes
+
+// @cleverbrush/schema — typed selector
+result.getErrorsFor(u => u.naem) // ← TypeScript error ✓`
+                                        )
+                                    }}
+                                />
+                            </pre>
+                        </div>
+
+                        <div className="vs-zod-card">
+                            <div className="vs-zod-icon">🔍</div>
+                            <h3>Runtime schema introspection</h3>
+                            <p>
+                                Inspect the full schema structure at runtime via{' '}
+                                <code>.introspect()</code>. This powers{' '}
+                                <a href="/mapper">@cleverbrush/mapper</a> and{' '}
+                                <a href="/react-form">
+                                    @cleverbrush/react-form
+                                </a>{' '}
+                                — and is architecturally impossible with Zod.
+                            </p>
+                            <pre>
+                                <code
+                                    dangerouslySetInnerHTML={{
+                                        __html: highlightTS(
+                                            `// Zod — schema is opaque at runtime
+
+// @cleverbrush/schema — full descriptor tree
+const d = UserSchema.introspect();
+d.properties.name.isRequired   // true
+d.properties.age.isRequired    // false (optional field)
+d.properties.email.validators  // [{ name: 'email', ... }]`
+                                        )
+                                    }}
+                                />
+                            </pre>
+                        </div>
+
+                        <div className="vs-zod-card">
+                            <div className="vs-zod-icon">🧩</div>
+                            <h3>Type-safe extension system</h3>
+                            <p>
+                                Add your own methods to schema builders — fully
+                                typed, autocomplete-ready. The built-in{' '}
+                                <code>.email()</code>, <code>.url()</code>,{' '}
+                                <code>.uuid()</code> methods use the same public
+                                API.
+                            </p>
+                            <pre>
+                                <code
+                                    dangerouslySetInnerHTML={{
+                                        __html: highlightTS(
+                                            `// Zod — only .refine(), no new builder methods
+
+// @cleverbrush/schema — real methods on the builder
+const withSlug = createExtension(() => ({
+  slug() { return this.matches(/^[a-z0-9-]+$/); }
+}));
+const PostSlug = string().extend(withSlug).slug().minLength(3);
+//                                         ^ typed, autocomplete works`
+                                        )
+                                    }}
+                                />
+                            </pre>
+                        </div>
+                    </div>
+
+                    <div className="vs-zod-metrics">
+                        <div className="vs-zod-metric">
+                            <span className="vs-zod-metric-val">
+                                {smallGzip}
+                            </span>
+                            <span className="vs-zod-metric-label">
+                                min bundle (gzip)
+                            </span>
+                        </div>
+                        <div className="vs-zod-metric">
+                            <span className="vs-zod-metric-val">2×</span>
+                            <span className="vs-zod-metric-label">
+                                faster than Zod in array validation
+                            </span>
+                        </div>
+                        <div className="vs-zod-metric">
+                            <span className="vs-zod-metric-val">0</span>
+                            <span className="vs-zod-metric-label">
+                                runtime dependencies
+                            </span>
+                        </div>
+                        <div className="vs-zod-metric">
+                            <span className="vs-zod-metric-val">98%</span>
+                            <span className="vs-zod-metric-label">
+                                test coverage
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="vs-zod-footer">
+                        <Link
+                            href="/migrating-from-zod"
+                            className="hero-btn hero-btn-primary"
+                        >
+                            Migrate from Zod →
+                        </Link>
+                        <Link
+                            href="/schema/comparison"
+                            className="hero-btn hero-btn-secondary"
+                        >
+                            Full library comparison →
+                        </Link>
+                    </div>
+                </div>
+            </section>
+
             {/* ── Schema Spotlight ─────────────────────────────────── */}
             <section className="section" id="schema">
                 <div className="container">
@@ -254,12 +399,12 @@ if (!result.valid) {
             {/* ── Ecosystem ─────────────────────────────────────────── */}
             <section className="section" id="ecosystem">
                 <div className="container">
-                    <h2 className="section-title">Built Around the Schema</h2>
+                    <h2 className="section-title">What the schema enables</h2>
                     <p className="subtitle" style={{ marginBottom: '2rem' }}>
-                        Every library in the ecosystem takes a schema as its
-                        starting point. Define your data shape once and unlock
-                        type-safe mapping, JSON Schema interop, and headless
-                        React forms for free.
+                        @cleverbrush/schema&apos;s runtime introspection powers
+                        a family of companion libraries. Define your data shape
+                        once and get type-safe mapping, JSON Schema interop, and
+                        headless React forms — all from the same schema object.
                     </p>
 
                     {/* Ecosystem diagram */}
@@ -424,19 +569,18 @@ if (!result.valid) {
                         </div>
                     </div>
 
-                    {/* Why switch from Zod */}
+                    {/* Zod API compatibility */}
                     <div className="card" style={{ marginTop: '2rem' }}>
-                        <h3>
-                            A drop-in alternative to Zod — faster, smaller, no
-                            dependencies
-                        </h3>
+                        <h3>Familiar API — migrate from Zod field by field</h3>
                         <p>
-                            The API is intentionally familiar. If you know Zod,
-                            you can migrate field by field. The result: the same
-                            expressiveness with zero transitive dependencies,
-                            better performance in most benchmarks, and a
-                            compile-time type system that is identical to what
-                            your validators enforce at runtime.
+                            Most Zod primitives are drop-in replacements. The
+                            fluent builder style, <code>optional()</code>,{' '}
+                            <code>default()</code>, <code>brand()</code>, and{' '}
+                            <code>readonly()</code> all work identically. You
+                            can adopt @cleverbrush/schema incrementally — even
+                            wrapping existing Zod schemas with{' '}
+                            <code>extern()</code> to compose them into new
+                            objects.
                         </p>
                         <pre>
                             <code

@@ -14,11 +14,76 @@ export default function MigratingFromZodPage() {
                     <h1>Migrating from Zod</h1>
                     <p className="subtitle">
                         A side-by-side API reference for every Zod feature and
-                        its <code>@cleverbrush/schema</code> equivalent.
+                        its <code>@cleverbrush/schema</code> equivalent. Most
+                        primitives are drop-in replacements.
                     </p>
                 </div>
 
-                {/* ── Quick-Reference Table ─────────────────────── */}
+                {/* ── Why switch? ───────────────────────────────── */}
+                <div className="why-box">
+                    <h2>Why switch from Zod?</h2>
+                    <p>
+                        Zod is excellent — that&apos;s why we modelled our API
+                        after it. If Zod works for you, keep using it.{' '}
+                        <code>@cleverbrush/schema</code> offers three things Zod
+                        cannot:
+                    </p>
+                    <div
+                        className="schema-features-grid"
+                        style={{ marginTop: '1rem' }}
+                    >
+                        <div className="schema-feature">
+                            <span className="schema-feature-icon">🎯</span>
+                            <strong>Typed field-error selectors</strong>
+                            <p>
+                                Call{' '}
+                                <code>
+                                    result.getErrorsFor(u =&gt; u.fieldName)
+                                </code>{' '}
+                                instead of filtering an errors array by string
+                                path. TypeScript catches typos at compile time —
+                                Zod&apos;s{' '}
+                                <code>
+                                    issues.filter(i =&gt; i.path[0] ===
+                                    &apos;fieldName&apos;)
+                                </code>{' '}
+                                does not.
+                            </p>
+                        </div>
+                        <div className="schema-feature">
+                            <span className="schema-feature-icon">🔍</span>
+                            <strong>Runtime schema introspection</strong>
+                            <p>
+                                <code>.introspect()</code> returns the full
+                                descriptor tree at runtime — field names,
+                                validators, optionality, metadata. Zod schemas
+                                are opaque to code. This is what powers{' '}
+                                <a href="/mapper">@cleverbrush/mapper</a> and{' '}
+                                <a href="/react-form">
+                                    @cleverbrush/react-form
+                                </a>
+                                .
+                            </p>
+                        </div>
+                        <div className="schema-feature">
+                            <span className="schema-feature-icon">🧩</span>
+                            <strong>Type-safe extension system</strong>
+                            <p>
+                                Add real builder methods (with TypeScript type
+                                support) using <code>createExtension()</code>.
+                                Zod only exposes <code>.refine()</code> for
+                                custom logic — you cannot add new methods to the
+                                builder chain.
+                            </p>
+                        </div>
+                    </div>
+                    <p style={{ marginTop: '0.75rem' }}>
+                        Also: roughly ~2× faster in array-validation benchmarks,
+                        tree-shakeable to ~4 KB per builder, Standard Schema v1
+                        compatible, and you can wrap existing Zod schemas with{' '}
+                        <code>extern()</code> during incremental migration.
+                    </p>
+                </div>
                 <div className="card">
                     <h2>Quick Reference</h2>
                     <p>
@@ -947,7 +1012,7 @@ const PostSlug = SlugString.slug().minLength(3).maxLength(60);`
                 </div>
 
                 {/* ── Honest Gaps ──────────────────────────────────── */}
-                <div className="card">
+                <div className="card" id="gaps">
                     <h2>Honest Gaps</h2>
                     <p>
                         <code>@cleverbrush/schema</code> does not yet cover
