@@ -1,7 +1,7 @@
 {
     "name": "@cleverbrush/benchmarks",
     "private": true,
-    "version": "1.0.0",
+    "version": "2.0.0",
     "description": "Validation throughput benchmarks — @cleverbrush/schema vs zod, yup, joi",
     "type": "module",
     "scripts": {
