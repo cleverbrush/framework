@@ -1,7 +1,9 @@
 import {
+    type BRAND,
     SchemaBuilder,
-    ValidationResult,
-    ValidationContext
+    type ValidationContext,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
 } from './SchemaBuilder.js';
 
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
@@ -19,7 +21,7 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  * @example
  * ```ts
  * const schema = func();
- * const result = await schema.validate(() => {});
+ * const result = schema.validate(() => {});
  * // result.valid === true
  * // result.object === () => {}
  * ```
@@ -27,7 +29,7 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  * @example
  * ```ts
  * const schema = func().optional();
- * const result = await schema.validate(undefined);
+ * const result = schema.validate(undefined);
  * // result.valid === true
  * // result.object === undefined
  * ```
@@ -36,11 +38,23 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  */
 export class FunctionSchemaBuilder<
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
+    TExtensions = {},
     TResult = TExplicitType extends undefined
         ? (...args: any[]) => any
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
+    /**
+     * @hidden
+     */
     public static create(props: FunctionSchemaBuilderCreateProps<any>) {
         return new FunctionSchemaBuilder({
             type: 'function',
@@ -48,15 +62,17 @@ export class FunctionSchemaBuilder<
         });
     }
 
-    private constructor(props: FunctionSchemaBuilderCreateProps<TRequired>) {
+    protected constructor(props: FunctionSchemaBuilderCreateProps<TRequired>) {
         super(props as any);
     }
 
     /**
      * @hidden
      */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public hasType<T>(notUsed?: T): FunctionSchemaBuilder<true, T> {
+    public hasType<T>(
+        _notUsed?: T
+    ): FunctionSchemaBuilder<true, TNullable, T, THasDefault, TExtensions> &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
@@ -65,30 +81,27 @@ export class FunctionSchemaBuilder<
     /**
      * @hidden
      */
-    public clearHasType(): FunctionSchemaBuilder<TRequired, undefined> {
+    public clearHasType(): FunctionSchemaBuilder<
+        TRequired,
+        TNullable,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
     }
 
-    /**
-     * Performs validion of the schema over `object`. Basically runs
-     * validators, preprocessors and checks for required (if schema is not optional).
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
-        object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
-
+    #buildResult(
+        superResult: ReturnType<FunctionSchemaBuilder['preValidateSync']>
+    ): ValidationResult<TResult> {
         const {
             valid,
-            context: prevalidationContext,
             transaction: preValidationTransaction,
             errors
         } = superResult;
-        const { path } = prevalidationContext;
 
         if (!valid) {
             return { valid, errors };
@@ -99,8 +112,8 @@ export class FunctionSchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
                 valid: true,
@@ -113,8 +126,7 @@ export class FunctionSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `expected type function, but saw ${typeof objToValidate}`,
-                        path: path as string
+                        message: `expected type function, but saw ${typeof objToValidate}`
                     }
                 ]
             };
@@ -126,6 +138,48 @@ export class FunctionSchemaBuilder<
         };
     }
 
+    /** {@inheritDoc SchemaBuilder.validate} */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        return super.validate(object, context) as ValidationResult<TResult>;
+    }
+
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        return super.validateAsync(object, context) as Promise<
+            ValidationResult<TResult>
+        >;
+    }
+
+    /**
+     * Performs synchronous validation of the schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected _validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        return this.#buildResult(this.preValidateSync(object, context));
+    }
+
+    /**
+     * Performs async validation of the schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected async _validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        return this.#buildResult(await super.preValidateAsync(object, context));
+    }
+
     protected createFromProps<TReq extends boolean>(
         props: FunctionSchemaBuilderCreateProps<TReq>
     ): this {
@@ -135,21 +189,128 @@ export class FunctionSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): FunctionSchemaBuilder<true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): FunctionSchemaBuilder<
+        true,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): FunctionSchemaBuilder<false, TExplicitType> {
+    public optional(): FunctionSchemaBuilder<
+        false,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TResult | (() => TResult)
+    ): FunctionSchemaBuilder<
+        true,
+        TNullable,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
+        TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): FunctionSchemaBuilder<
+        TRequired,
+        TNullable,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): FunctionSchemaBuilder<
+        TRequired,
+        TNullable,
+        TResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
+    }
+
+    /**
+     * Marks the inferred type as `Readonly<Function>`. Sets the
+     * `isReadonly` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): FunctionSchemaBuilder<
+        TRequired,
+        TNullable,
+        Readonly<TResult>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): FunctionSchemaBuilder<
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): FunctionSchemaBuilder<
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 
 /**
  * Creates a `function` schema.
- * @retuns {@link FunctionSchemaBuilder}
+ * @returns {@link FunctionSchemaBuilder}
  */
 export const func = () =>
     FunctionSchemaBuilder.create({

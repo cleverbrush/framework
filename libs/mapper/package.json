@@ -1,0 +1,46 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^2.0.0"
+    },
+    "description": "Type-safe, schema-driven object mapper for @cleverbrush/schema — compile-time completeness, selector-based field mapping, auto-mapping",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_mapper.html",
+    "keywords": [
+        "object mapper",
+        "schema mapping",
+        "typescript",
+        "type-safe",
+        "data transformation",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/mapper",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/mapper#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "2.0.0"
+}

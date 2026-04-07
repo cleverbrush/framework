@@ -1,6 +1,6 @@
-import { expectType } from 'tsd';
-import { InferType } from './SchemaBuilder.js';
+import { expect, expectTypeOf, test } from 'vitest';
 import { date } from './DateSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 
 test('Clean', async () => {
     const builder = date();
@@ -10,7 +10,7 @@ test('Clean', async () => {
     expect(schema.type).toEqual('date');
 
     const typeCheck: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const now = new Date();
@@ -41,10 +41,10 @@ test('Optional', () => {
     expect(schema).toHaveProperty('isRequired', false);
 
     const typeCheck1: InferType<typeof builder> = 0 as any;
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 
     let typeCheck2: InferType<typeof builderOptional>;
-    expectType<Date | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<Date | undefined>();
 });
 
 test('Required', () => {
@@ -60,10 +60,10 @@ test('Required', () => {
     expect(schema).toHaveProperty('isRequired', true);
 
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 
     const typeCheck2: InferType<typeof builderOptional> = new Date();
-    expectType<Date | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<Date | undefined>();
 });
 
 test('Optional - 2', async () => {
@@ -113,7 +113,7 @@ test('equals - 1', async () => {
     expect(newSchema.equalsTo).toEqual(dd);
 
     const typeCheck1: InferType<typeof newBuilder> = dd;
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 
     {
         const { valid, object, errors } = await newBuilder.validate(dd);
@@ -137,7 +137,7 @@ test('equals - 2', async () => {
     expect(schema.equalsTo).toBeUndefined();
 
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 });
 
 test('equals - 3', () => {
@@ -381,7 +381,7 @@ test('min - 4', async () => {
 
 test('validator - 1', async () => {
     const builder = date();
-    const newBuilder = builder.addValidator((date) => {
+    const newBuilder = builder.addValidator(date => {
         return date?.getDate() & 1
             ? { valid: true }
             : {
@@ -406,7 +406,7 @@ test('validator - 1', async () => {
 test('preprocessor - 1', async () => {
     const builder = date();
     const newBuilder = builder
-        .addPreprocessor((d) =>
+        .addPreprocessor(d =>
             d < new Date(2022, 0, 1) ? new Date(2022, 0, 1) : d
         )
         .min(new Date(2021, 0, 1));
@@ -424,19 +424,19 @@ test('preprocessor - 1', async () => {
 test('hasType - 1', () => {
     const builder = date().hasType<string>();
     const typeCheck1: InferType<typeof builder> = '123';
-    expectType<string>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<string>();
 });
 
 test('hasType - 2', () => {
     const builder = date().hasType(123);
     const typeCheck1: InferType<typeof builder> = 2233;
-    expectType<number>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<number>();
 });
 
 test('hasType - 3', () => {
     const builder = date().hasType(123).clearHasType();
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 });
 
 test('Parse from JSON - 1', async () => {
@@ -543,6 +543,46 @@ test('Parse from JSON - 3', async () => {
     }
 });
 
+test('Parse from JSON - 4', async () => {
+    const builder = date().acceptJsonString();
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(undefined as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(null as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(NaN as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+});
+
 test('Parse from UNIX Epoch - 1', async () => {
     const builder1 = date();
     const builder2 = date().acceptEpoch();
@@ -617,4 +657,433 @@ test('Parse from UNIX epoch - 2', async () => {
         expect(result).toEqual(date);
         expect(errors).toBeUndefined();
     }
+});
+
+test('Parse from UNIX epoch - 3', async () => {
+    const builder = date().acceptEpoch();
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(undefined as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(null as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+
+    {
+        const {
+            valid,
+            object: result,
+            errors
+        } = await builder.validate(NaN as any);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
+    }
+});
+
+test('euqalsTo with custom error message - 1', async () => {
+    const schema = date().equals(new Date(2022, 0, 1), 'Custom error message');
+    {
+        const { valid, errors } = await schema.validate(new Date(2022, 0, 1));
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+    {
+        const { valid, errors } = await schema.validate(new Date(2022, 0, 2));
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const date2 = new Date(2022, 0, 1);
+    const schema2 = schema.clearEquals().equals(date2);
+
+    {
+        const { valid, errors } = await schema2.validate(date2);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(new Date(2022, 0, 2));
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual(
+            `is expected to be equal ${date2} (${date2.getTime()})`
+        );
+    }
+
+    const schema3 = schema2
+        .clearEquals()
+        .equals(new Date(2022, 1, 24), () => 'Custom error message');
+
+    {
+        const { valid, errors } = await schema3.validate(new Date(2022, 0, 2));
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearEquals()
+        .equals(new Date(2022, 1, 24), () =>
+            Promise.resolve('Custom error message')
+        );
+
+    {
+        const { valid, errors } = await schema4.validateAsync(
+            new Date(2022, 0, 2)
+        );
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+});
+
+test('min with custom error message - 1', async () => {
+    const schema = date().min(new Date(2022, 0, 1), 'Custom error message');
+    {
+        const { valid, errors } = await schema.validate(new Date(2023, 0, 1));
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+    {
+        const { valid, errors } = await schema.validate(new Date(2021, 0, 2));
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const date2 = new Date(2022, 0, 1);
+    const date3 = new Date(2021, 0, 1);
+    const schema2 = schema.clearEquals().min(date2);
+
+    {
+        const { valid, errors } = await schema2.validate(date2);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(date3);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual(
+            `is expected to be after ${date2} (${date2.getTime()})`
+        );
+    }
+
+    const schema3 = schema2
+        .clearEquals()
+        .min(date2, () => 'Custom error message');
+
+    {
+        const { valid, errors } = await schema3.validate(date3);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearEquals()
+        .min(date2, () => Promise.resolve('Custom error message'));
+
+    {
+        const { valid, errors } = await schema4.validateAsync(date3);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+});
+
+test('max with custom error message - 1', async () => {
+    const schema = date().max(new Date(2022, 0, 1), 'Custom error message');
+    {
+        const { valid, errors } = await schema.validate(new Date(2021, 0, 1));
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+    {
+        const { valid, errors } = await schema.validate(new Date(2024, 0, 2));
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const date2 = new Date(2022, 0, 1);
+    const date3 = new Date(2024, 0, 1);
+    const schema2 = schema.clearEquals().max(date2);
+
+    {
+        const { valid, errors } = await schema2.validate(date2);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(date3);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual(
+            `is expected to be before ${date2} (${date2.getTime()})`
+        );
+    }
+
+    const schema3 = schema2
+        .clearEquals()
+        .max(date2, () => 'Custom error message');
+
+    {
+        const { valid, errors } = await schema3.validate(date3);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearEquals()
+        .max(date2, () => Promise.resolve('Custom error message'));
+
+    {
+        const { valid, errors } = await schema4.validateAsync(date3);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+});
+
+test('isInFuture with custom error message - 1', async () => {
+    const schema = date().isInFuture('Custom error message');
+    const thisYear = new Date().getFullYear();
+    const thisMonth = new Date().getMonth();
+    const thisDay = new Date().getDate();
+    {
+        const { valid, errors } = await schema.validate(
+            new Date(thisYear + 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+    {
+        const { valid, errors } = await schema.validate(new Date(2021, 0, 2));
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema2 = schema.clearEquals().isInFuture();
+
+    {
+        const { valid, errors } = await schema2.validate(
+            new Date(thisYear + 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(
+            new Date(thisYear - 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('is expected to be in future');
+    }
+
+    const schema3 = schema2
+        .clearEquals()
+        .isInFuture(() => 'Custom error message');
+
+    {
+        const { valid, errors } = await schema3.validate(new Date(2021, 0, 2));
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearEquals()
+        .isInFuture(() => Promise.resolve('Custom error message'));
+
+    {
+        const { valid, errors } = await schema4.validateAsync(
+            new Date(2021, 0, 2)
+        );
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+});
+
+test('isInPast with custom error message - 1', async () => {
+    const schema = date().isInPast('Custom error message');
+    const thisYear = new Date().getFullYear();
+    const thisMonth = new Date().getMonth();
+    const thisDay = new Date().getDate();
+    {
+        const { valid, errors } = await schema.validate(
+            new Date(thisYear - 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+    {
+        const { valid, errors } = await schema.validate(
+            new Date(thisYear + 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema2 = schema.clearEquals().isInPast();
+
+    {
+        const { valid, errors } = await schema2.validate(
+            new Date(thisYear - 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(
+            new Date(thisYear + 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('is expected to be in past');
+    }
+
+    const schema3 = schema2
+        .clearEquals()
+        .isInPast(() => 'Custom error message');
+
+    {
+        const { valid, errors } = await schema3.validate(
+            new Date(thisYear + 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearEquals()
+        .isInPast(() => Promise.resolve('Custom error message'));
+
+    {
+        const { valid, errors } = await schema4.validateAsync(
+            new Date(thisYear + 1, thisMonth, thisDay)
+        );
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.[0].message).toEqual('Custom error message');
+    }
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 661)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from date schema', () => {
+    const schema = date().default(new Date()).clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Date preprocessor: non-string/number value returned as-is (line 33)
+// ---------------------------------------------------------------------------
+
+test('date preprocessor: boolean is not converted (line 33)', () => {
+    // Passing a pure boolean — not undefined, not number, not string
+    // The parseFromEpochPreprocessor returns it as-is (line 33)
+    const schema = date().acceptEpoch();
+    const { valid } = schema.validate(true as any);
+    // true is not a Date, so validation fails
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Full-path #buildResult: null/optional path (line 393)
+// ---------------------------------------------------------------------------
+
+test('full-path: optional date with null → valid (line 393)', () => {
+    const schema = date()
+        .optional()
+        .addValidator(() => ({ valid: true }));
+    const result = schema.validate(null as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// parseFromEpochPreprocessor: NaN number input (line 33)
+// ---------------------------------------------------------------------------
+
+test('parseFromEpoch: NaN number → returns value as-is from NaN branch (line 30)', () => {
+    const schema = date().acceptEpoch();
+    const result = schema.validate(NaN as any);
+    expect(result.valid).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// parseFromJsonPreprocessor branches: undefined (line 17), NaN string (line 20),
+// non-string non-undefined (line 23), and #buildResult null optional (line 390)
+// ---------------------------------------------------------------------------
+
+test('parseFromJson: valid JSON date string is converted to Date (acceptJsonString behavior)', () => {
+    const schema = date().acceptJsonString();
+    const result = schema.validate('2024-01-01T00:00:00.000Z' as any);
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeInstanceOf(Date);
+});
+
+test('parseFromJson: invalid date string returns NaN branch (line 20)', () => {
+    const schema = date().acceptJsonString();
+    const result = schema.validate('not-a-valid-date!!!' as any);
+    // line 20 TRUE branch: Number.isNaN(Date.parse('not-a-valid-date!!!')) = true → returns value
+    expect(result.valid).toBe(false);
+});
+
+test('parseFromJson: non-string non-undefined passes through (line 23)', () => {
+    const schema = date().acceptJsonString();
+    const result = schema.validate(true as any);
+    // line 23: typeof true !== 'string', typeof true !== 'undefined' → returns value as-is
+    expect(result.valid).toBe(false);
+});
+
+test('parseFromEpoch: valid number gives a Date via acceptEpoch (built-in acceptEpoch behavior)', () => {
+    const schema = date().acceptEpoch();
+    const result = schema.validate(1704067200000 as any);
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeInstanceOf(Date);
+});
+
+test('#buildResult: null value on optional parseFromJson schema → valid (line 390 null branch)', () => {
+    const schema = date().acceptJsonString().optional();
+    const result = schema.validate(null as any);
+    // null + !isRequired → line 390 null branch → early return valid
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeNull();
 });

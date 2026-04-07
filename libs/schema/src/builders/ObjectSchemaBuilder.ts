@@ -1,9 +1,38 @@
+import { PropertyValidationResult } from './PropertyValidationResult.js';
 import {
-    InferType,
+    type BRAND,
+    type InferType,
+    type NestedValidationResult,
+    type PreValidationResult,
+    type PropertyDescriptor,
+    type PropertyDescriptorInner,
+    type PropertyDescriptorTree,
+    type PropertySetterOptions,
     SchemaBuilder,
-    ValidationContext,
-    ValidationResult
+    SYMBOL_HAS_PROPERTIES,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    type ValidationContext,
+    type ValidationError,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
 } from './SchemaBuilder.js';
+
+const MUST_BE_AN_OBJECT_ERROR_MESSSAGE = 'must be an object';
+
+/**
+ * A callback function to select properties from the schema.
+ * Normally it's provided by the user to select property descriptors
+ * from the schema for the further usage. e.g. to select source and destination
+ * properties for object mappings
+ */
+export type SchemaPropertySelector<
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>,
+    TPropertySchema extends SchemaBuilder<any, any, any, any, any>,
+    TAssignableTo = any,
+    TParentPropertyDescriptor = undefined
+> = (
+    l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>
+) => PropertyDescriptor<TSchema, TPropertySchema, TParentPropertyDescriptor>;
 
 type ObjectSchemaBuilderProps<
     T extends Record<string, SchemaBuilder> = {},
@@ -18,41 +47,124 @@ type ObjectSchemaBuilderCreateProps<
 type Id<T> = T extends infer U ? { [K in keyof U]: U[K] } : never;
 
 export type RespectPropsOptionality<
-    T extends Record<string, SchemaBuilder<any, any>>
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
 > = {
     [K in RequiredProps<T>]: InferType<T[K]>;
 } & {
     [K in NotRequiredProps<T>]?: InferType<T[K]>;
 };
 
-type MakeChildrenRequired<T extends Record<string, SchemaBuilder<any, any>>> = {
+type RespectPropsOptionalityForInput<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = {
+    [K in RequiredInputProps<T>]: InferType<T[K]>;
+} & {
+    [K in NotRequiredInputProps<T>]?: InferType<T[K]>;
+};
+
+type MakeChildrenRequired<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = {
     [K in keyof T]: ReturnType<T[K]['required']>;
 };
 
-type MakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any>>> = {
+type MakeChildrenOptional<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = {
     [K in keyof T]: ReturnType<T[K]['optional']>;
 };
 
+/**
+ * Recursively maps each property to its optional form, descending into
+ * nested `ObjectSchemaBuilder` schemas.  All other schema types (arrays,
+ * unions, primitives) are only made optional at the top level.
+ */
+type DeepMakeChildrenOptional<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = {
+    [K in keyof T]: T[K] extends ObjectSchemaBuilder<
+        // biome-ignore lint/correctness/noUnusedVariables: used in extensions
+        infer P extends Record<string, SchemaBuilder<any, any, any, any, any>>,
+        any,
+        any,
+        any,
+        any,
+        any
+    >
+        ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']>
+        : ReturnType<T[K]['optional']>;
+};
+
 type MakeChildOptional<
-    T extends Record<any, SchemaBuilder<any, any>>,
+    T extends Record<any, SchemaBuilder<any, any, any, any, any>>,
     TProp extends keyof T
 > = {
     [K in keyof T]: K extends TProp ? ReturnType<T[K]['optional']> : T[K];
 };
 
 type MakeChildRequired<
-    T extends Record<any, SchemaBuilder<any, any>>,
+    T extends Record<any, SchemaBuilder<any, any, any, any, any>>,
     TProp extends keyof T
 > = {
     [K in keyof T]: K extends TProp ? ReturnType<T[K]['required']> : T[K];
 };
 
 type ModifyPropSchema<
-    T extends Record<any, SchemaBuilder<any, any>>,
+    T extends Record<any, SchemaBuilder<any, any, any, any, any>>,
     TProp extends keyof T,
-    TSchema extends SchemaBuilder<any, any>
+    TSchema extends SchemaBuilder<any, any, any, any, any>
 > = {
     [K in keyof T]: K extends TProp ? TSchema : T[K];
+};
+
+export type ObjectSchemaValidationResult<
+    T,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>,
+    TSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > = TRootSchema
+> = Omit<ValidationResult<T>, 'errors'> & {
+    /**
+     * A flat list of validation errors.
+     *
+     * @deprecated Use {@link ObjectSchemaValidationResult.getErrorsFor | getErrorsFor()} instead for
+     * per-property error inspection with type-safe property selectors. The `errors` array on
+     * `ObjectSchemaBuilder` validation results will be removed in a future major version.
+     */
+    errors?: ValidationError[];
+    /**
+     * Returns a nested validation error for the property selected by the `selector` function.
+     * This is the **recommended** way to inspect validation errors — it provides type-safe,
+     * per-property error details including `isValid`, `errors`, and `seenValue`.
+     *
+     * Prefer this over the deprecated `errors` array.
+     *
+     * @param selector a callback function to select property from the schema.
+     */
+    getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(
+        selector?: (
+            properties: PropertyDescriptorTree<TSchema, TRootSchema>
+        ) => PropertyDescriptor<
+            TRootSchema,
+            TPropertySchema,
+            TParentPropertyDescriptor
+        >
+    ): TPropertySchema extends ObjectSchemaBuilder<any, any, any, any, any, any>
+        ? PropertyValidationResult<
+              TPropertySchema,
+              TRootSchema,
+              TParentPropertyDescriptor
+          >
+        : NestedValidationResult<
+              TPropertySchema,
+              TRootSchema,
+              TParentPropertyDescriptor
+          >;
 };
 
 /**
@@ -76,7 +188,7 @@ type ModifyPropSchema<
  *    age: number()
  * });
  *
- * const result = await schema.validate({
+ * const result = schema.validate({
  *   name: 'John',
  *   age: 30
  * });
@@ -92,7 +204,7 @@ type ModifyPropSchema<
  *   age: number().optional()
  * });
  *
- * const result = await schema.validate({
+ * const result = schema.validate({
  *  name: 'John'
  * });
  * // result.valid === true
@@ -105,12 +217,13 @@ type ModifyPropSchema<
  *  name: string(),
  *  age: number();
  * });
- * const result = await schema.validate({
+ * const result = schema.validate({
  *  name: 'John'
  * });
  *
  * // result.valid === false
- * // result.errors[0].message === "is expected to have property 'age'"
+ * // result.errors is deprecated — use result.getErrorsFor() instead
+ * // result.getErrorsFor((p) => p.age).errors // ["is expected to have property 'age'"]
  * ```
  *
  * @example
@@ -122,7 +235,7 @@ type ModifyPropSchema<
  *     country: string()
  *   })
  * });
- * const result = await schema.validate({
+ * const result = schema.validate({
  * name: 'John',
  * address: {
  *    city: 'New York',
@@ -141,18 +254,36 @@ type ModifyPropSchema<
  * @see {@link object}
  */
 export class ObjectSchemaBuilder<
-    TProperties extends Record<string, SchemaBuilder<any, any>> = {},
+    TProperties extends Record<
+        string,
+        SchemaBuilder<any, any, any, any, any>
+    > = {},
     TRequired extends boolean = true,
-    TExplicitType = undefined
+    TNullable extends boolean = false,
+    TExplicitType = undefined,
+    THasDefault extends boolean = false,
+    TExtensions = {}
 > extends SchemaBuilder<
     undefined extends TExplicitType
         ? RespectPropsOptionality<TProperties>
         : TExplicitType,
-    TRequired
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
 > {
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
+    #propKeys: string[] = [];
 
+    /** Marks this builder as having sub-properties for descriptor tree recursion. */
+    readonly [SYMBOL_HAS_PROPERTIES] = true;
+
+    #propertyDescriptorTreeMap: PropertyDescriptorMap = new WeakMap() as any;
+
+    /**
+     * @hidden
+     */
     public static create<
         P extends Record<string, SchemaBuilder>,
         R extends boolean
@@ -170,11 +301,12 @@ export class ObjectSchemaBuilder<
         return ObjectSchemaBuilder.create(props as any) as any;
     }
 
-    private constructor(props: ObjectSchemaBuilderCreateProps) {
+    protected constructor(props: ObjectSchemaBuilderCreateProps) {
         super(props as any);
 
         if (typeof props.properties === 'object' && props.properties) {
             this.#properties = props.properties as any;
+            this.#propKeys = Object.keys(props.properties);
         }
 
         if (typeof props.acceptUnknownProps === 'boolean') {
@@ -202,34 +334,193 @@ export class ObjectSchemaBuilder<
     /**
      * @hidden
      */
-    public required(): ObjectSchemaBuilder<TProperties, true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): ObjectSchemaBuilder<
+        TProperties,
+        true,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.required(errorMessage);
     }
 
     /**
      * @hidden
      */
-    public optional(): ObjectSchemaBuilder<TProperties, false, TExplicitType> {
+    public optional(): ObjectSchemaBuilder<
+        TProperties,
+        false,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
     }
 
     /**
-     * Performs validion of object schema over the `object`.
-     * @param context Optional `ValidationContext` settings.
+     * @hidden
      */
-    public async validate(
-        object: undefined extends TExplicitType
+    public default(
+        value:
+            | (undefined extends TExplicitType
+                  ? RespectPropsOptionality<TProperties>
+                  : TExplicitType)
+            | (() => undefined extends TExplicitType
+                  ? RespectPropsOptionality<TProperties>
+                  : TExplicitType)
+    ): ObjectSchemaBuilder<
+        TProperties,
+        true,
+        TNullable,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
+        TExtensions {
+        return super.default(value as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TNullable,
+        (undefined extends TExplicitType
             ? RespectPropsOptionality<TProperties>
-            : TExplicitType,
-        context?: ValidationContext
-    ): Promise<
-        ValidationResult<
+            : TExplicitType) & { readonly [K in BRAND]: TBrand },
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
+    }
+
+    /**
+     * Marks the inferred type as `Readonly<T>` — all top-level properties
+     * become `readonly` at the type level. Validation behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TNullable,
+        Readonly<
             undefined extends TExplicitType
                 ? RespectPropsOptionality<TProperties>
                 : TExplicitType
+        >,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
+    }
+
+    #applyPropertyDescriptors(
+        result: PreValidationResult<any, { validatedObject: any }>
+    ): void {
+        if (
+            !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                result?.context?.rootPropertyDescriptor as any
+            )
+        ) {
+            (result.context.rootPropertyDescriptor as any) =
+                ObjectSchemaBuilder.getPropertiesFor(this as any);
+        }
+
+        if (
+            !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                result.context.currentPropertyDescriptor as any
+            )
+        ) {
+            result.context.currentPropertyDescriptor =
+                result.context.rootPropertyDescriptor;
+        }
+
+        if (
+            !result.context.rootValidationObject &&
+            result.transaction?.object?.validatedObject
+        ) {
+            result.context.rootValidationObject =
+                result.transaction.object.validatedObject;
+        }
+    }
+
+    protected preValidateSync(
+        object: any,
+        context?: ValidationContext<this>
+    ): PreValidationResult<
+        InferType<
+            SchemaBuilder<
+                undefined extends TExplicitType
+                    ? Id<RespectPropsOptionality<TProperties>>
+                    : TExplicitType,
+                TRequired
+            >
+        >,
+        { validatedObject: any }
+    > {
+        const result = super.preValidateSync(object, context);
+        this.#applyPropertyDescriptors(result);
+        return result;
+    }
+
+    protected async preValidateAsync(
+        object: any,
+        context?: ValidationContext<this>
+    ): Promise<
+        PreValidationResult<
+            InferType<
+                SchemaBuilder<
+                    undefined extends TExplicitType
+                        ? Id<RespectPropsOptionality<TProperties>>
+                        : TExplicitType,
+                    TRequired
+                >
+            >,
+            { validatedObject: any }
         >
     > {
-        const prevalidatedResult = await super.preValidate(object, context);
+        const result = await super.preValidateAsync(object, context);
+        this.#applyPropertyDescriptors(result);
+        return result;
+    }
+
+    /**
+     * Shared pre-property-validation setup for both `validate` and
+     * `validateAsync`.  Handles destructuring the prevalidated result,
+     * building the `addErrorFor` / `getErrorsFor` closures, and all early
+     * returns that happen before per-property validation.
+     */
+    #setupValidation(
+        prevalidatedResult: PreValidationResult<any, { validatedObject: any }>
+    ) {
         const {
             valid,
             context: prevalidationContext,
@@ -237,13 +528,133 @@ export class ObjectSchemaBuilder<
             errors: preValidationErrors
         } = prevalidatedResult;
 
-        const { path, doNotStopOnFirstError } = prevalidationContext;
-        let errors = prevalidatedResult.errors || [];
+        const propertyDescriptorToErrorMap = new WeakMap<
+            PropertyDescriptor<any, any, any>,
+            PropertyValidationResult<any, any>
+        >() as any;
 
-        if (!valid && !doNotStopOnFirstError) {
+        const { doNotStopOnFirstError, rootValidationObject } =
+            prevalidationContext;
+
+        const rootPropertyDescriptor: PropertyDescriptor<any, any, undefined> =
+            prevalidationContext.rootPropertyDescriptor as any;
+
+        const currentPropertyDescriptor: PropertyDescriptor<any, any, unknown> =
+            prevalidationContext.currentPropertyDescriptor as any;
+
+        const addErrorFor = (
+            propertyDescriptor: PropertyDescriptor<any, any, any>,
+            message: string,
+            parentPropertyDescriptor?: PropertyDescriptor<any, any, any>
+        ) => {
+            if (
+                !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    propertyDescriptor
+                )
+            ) {
+                throw new Error('invalid property descriptor');
+            }
+
+            let validationError: PropertyValidationResult<any, any> =
+                propertyDescriptorToErrorMap.has(propertyDescriptor)
+                    ? propertyDescriptorToErrorMap.get(propertyDescriptor)
+                    : (null as any);
+
+            if (!validationError) {
+                validationError = new PropertyValidationResult(
+                    propertyDescriptor as any,
+                    rootValidationObject
+                );
+
+                propertyDescriptorToErrorMap.set(
+                    propertyDescriptor,
+                    validationError
+                );
+            }
+
+            validationError.addError(message);
+
+            if (
+                parentPropertyDescriptor &&
+                ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    parentPropertyDescriptor
+                )
+            ) {
+                let parentValidationError: PropertyValidationResult<any, any> =
+                    propertyDescriptorToErrorMap.has(parentPropertyDescriptor)
+                        ? propertyDescriptorToErrorMap.get(
+                              parentPropertyDescriptor
+                          )
+                        : (null as any);
+
+                if (!parentValidationError) {
+                    parentValidationError = new PropertyValidationResult(
+                        parentPropertyDescriptor as any,
+                        rootValidationObject
+                    );
+                    propertyDescriptorToErrorMap.set(
+                        parentPropertyDescriptor,
+                        parentValidationError
+                    );
+                }
+
+                parentValidationError.addChildError(validationError);
+            }
+        };
+
+        const getErrorsFor = (<
+            TPropertySchema extends SchemaBuilder<any, any, any, any, any>
+        >(
+            selector?: (
+                properties: PropertyDescriptorTree<any>
+            ) => PropertyDescriptor<any, TPropertySchema, any>
+        ): PropertyValidationResult<any, any> => {
+            const descriptor: PropertyDescriptor<any, any, any> =
+                typeof selector === 'function'
+                    ? selector(currentPropertyDescriptor as any)
+                    : currentPropertyDescriptor;
+
+            if (
+                !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    descriptor as any
+                )
+            ) {
+                throw new Error('invalid property descriptor');
+            }
+
+            if (!propertyDescriptorToErrorMap.has(descriptor)) {
+                propertyDescriptorToErrorMap.set(
+                    descriptor,
+                    new PropertyValidationResult(
+                        descriptor as any,
+                        rootValidationObject
+                    )
+                );
+            }
+
+            return propertyDescriptorToErrorMap.get(descriptor);
+        }) as any;
+
+        const errors = prevalidatedResult.errors || [];
+
+        if (!valid && !doNotStopOnFirstError && preValidationErrors) {
+            if (
+                ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    currentPropertyDescriptor
+                )
+            ) {
+                for (const error of preValidationErrors) {
+                    addErrorFor(currentPropertyDescriptor, error.message);
+                }
+            }
+
             return {
-                valid,
-                errors: preValidationErrors
+                earlyReturn: true as const,
+                result: {
+                    valid,
+                    errors: preValidationErrors,
+                    getErrorsFor
+                }
             };
         }
 
@@ -252,109 +663,251 @@ export class ObjectSchemaBuilder<
         } = validationTransaction!;
 
         if (
-            !this.isRequired &&
-            (typeof objToValidate === 'undefined' || objToValidate === null)
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
-                valid: true,
-                object: validationTransaction!.commit().validatedObject
+                earlyReturn: true as const,
+                result: {
+                    valid: true,
+                    object: validationTransaction!.commit().validatedObject,
+                    getErrorsFor
+                }
             };
         }
 
         if (typeof objToValidate !== 'object') {
             errors.push({
-                message: 'must be an object',
-                path: path as string
+                message: MUST_BE_AN_OBJECT_ERROR_MESSSAGE
             });
+            addErrorFor(
+                currentPropertyDescriptor,
+                MUST_BE_AN_OBJECT_ERROR_MESSSAGE
+            );
 
             if (!doNotStopOnFirstError) {
                 if (validationTransaction) {
                     validationTransaction.rollback();
                 }
                 return {
-                    valid: false,
-                    errors: [errors[0]]
+                    earlyReturn: true as const,
+                    result: {
+                        valid: false,
+                        errors: [errors[0]],
+                        getErrorsFor
+                    }
                 };
             }
         }
 
-        const propKeys = Object.keys(this.#properties);
+        const propKeys = this.#propKeys;
         const objKeys = Object.keys(objToValidate as Object);
 
         if (propKeys.length === 0) {
             if (objKeys.length === 0) {
                 if (doNotStopOnFirstError && errors.length > 0) {
                     return {
-                        valid: false,
-                        errors
+                        earlyReturn: true as const,
+                        result: {
+                            valid: false,
+                            errors,
+                            getErrorsFor
+                        }
                     };
                 }
                 if (validationTransaction) {
                     validationTransaction.commit().validatedObject;
                 }
                 return {
-                    valid: true,
-                    object: {} as any
+                    earlyReturn: true as const,
+                    result: {
+                        valid: true,
+                        object: {} as any,
+                        getErrorsFor
+                    }
                 };
             }
+
+            if (!this.#acceptUnknownProps) {
+                for (let i = 0; i < objKeys.length; i++) {
+                    const message = `unknown property '${objKeys[i]}'`;
+                    errors.push({
+                        message
+                    });
+                    if (!doNotStopOnFirstError) {
+                        break;
+                    }
+                }
+                if (validationTransaction) {
+                    validationTransaction.rollback();
+                }
+                return {
+                    earlyReturn: true as const,
+                    result: {
+                        valid: false,
+                        errors: doNotStopOnFirstError ? errors : [errors[0]],
+                        getErrorsFor
+                    }
+                };
+            }
+
+            if (validationTransaction) {
+                validationTransaction.commit();
+            }
+            return {
+                earlyReturn: true as const,
+                result: {
+                    valid: true,
+                    object: { ...objToValidate } as any,
+                    getErrorsFor
+                }
+            };
         }
 
-        const validationResults = await Promise.all(
-            propKeys.map(async (key) => ({
-                key,
-                result: await this.#properties[key].validate(
-                    objToValidate[key],
-                    {
-                        ...context,
-                        path: `${path}.${key}`
+        return {
+            earlyReturn: false as const,
+            errors,
+            objToValidate,
+            propKeys,
+            objKeys,
+            addErrorFor,
+            getErrorsFor,
+            doNotStopOnFirstError: !!doNotStopOnFirstError,
+            rootPropertyDescriptor,
+            currentPropertyDescriptor,
+            validationTransaction: validationTransaction!
+        };
+    }
+
+    /**
+     * Shared post-property-validation processing for both `validate` and
+     * `validateAsync`.  Handles unknown-property checks, error aggregation,
+     * commit/rollback, and the final result construction.
+     */
+    #processResults(
+        setup: {
+            errors: any[];
+            objToValidate: any;
+            propKeys: string[];
+            objKeys: string[];
+            addErrorFor: (
+                propertyDescriptor: PropertyDescriptor<any, any, any>,
+                message: string,
+                parentPropertyDescriptor?: PropertyDescriptor<any, any, any>
+            ) => void;
+            getErrorsFor: any;
+            doNotStopOnFirstError: boolean;
+            rootPropertyDescriptor: any;
+            currentPropertyDescriptor: any;
+            validationTransaction: any;
+        },
+        validationResults: { key: string; result: ValidationResult<any> }[]
+    ): ObjectSchemaValidationResult<any, any> {
+        const {
+            objToValidate,
+            objKeys,
+            addErrorFor,
+            getErrorsFor,
+            doNotStopOnFirstError,
+            currentPropertyDescriptor,
+            validationTransaction
+        } = setup;
+
+        const errors = setup.errors;
+
+        let hasInvalid = false;
+        for (const { result } of validationResults) {
+            if (!result.valid) {
+                hasInvalid = true;
+                if (Array.isArray(result.errors)) {
+                    for (const error of result.errors) {
+                        errors.push(error);
                     }
-                )
-            }))
-        );
-
-        const notValidResults = validationResults.filter(
-            (res) => !res.result.valid
-        );
-
-        validationResults
-            .filter((res) => res.result.valid)
-            .forEach(({ key, result }) => {
-                objToValidate[key] = result.object;
-            });
-
-        errors = [
-            ...errors,
-            ...notValidResults.reduce(
-                (acc, val) => [...acc, ...(val?.result?.errors || [])],
-                []
-            )
-        ];
+                }
+            }
+        }
 
         for (let i = 0; i < objKeys.length; i++) {
             const key = objKeys[i];
             if (!(key in this.#properties) && !this.#acceptUnknownProps) {
+                const message = `unknown property '${key}'`;
                 errors.push({
-                    message: `unknown property '${key}'`,
-                    path: path as string
+                    message
                 });
+                addErrorFor(currentPropertyDescriptor, message);
                 if (!doNotStopOnFirstError) {
                     if (validationTransaction) {
                         validationTransaction.rollback();
                     }
                     return {
                         valid: false,
-                        errors: [errors[0]]
+                        errors: [errors[0]],
+                        getErrorsFor
                     };
                 }
             }
         }
 
-        if (notValidResults.length === 0 && errors.length === 0) {
-            const commited = validationTransaction!.commit();
+        if (!hasInvalid && errors.length === 0) {
+            const resultObject: Record<string, any> = {};
+            for (const { key, result } of validationResults) {
+                resultObject[key] = result.object;
+            }
+            if (this.#acceptUnknownProps) {
+                for (const key of objKeys) {
+                    if (!(key in this.#properties)) {
+                        resultObject[key] = objToValidate[key];
+                    }
+                }
+            }
             return {
                 valid: true,
-                object: commited.validatedObject
+                object: resultObject,
+                getErrorsFor
             };
+        }
+
+        for (const { key, result } of validationResults) {
+            if (!result.valid) {
+                const descriptor = (currentPropertyDescriptor as any)[key];
+                if (
+                    typeof (result as any).getErrorsFor === 'function' &&
+                    ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)
+                ) {
+                    ObjectSchemaBuilder.#propagateNestedErrors(
+                        result as any,
+                        descriptor,
+                        addErrorFor
+                    );
+                    // For extern schemas, also record errors on the extern
+                    // descriptor itself so getErrorsFor(t => t.extern) works,
+                    // and pass the parent so getErrorsFor(t => t) is aware.
+                    if (
+                        Array.isArray(
+                            (result as any).__externErrorPropertyNames
+                        ) &&
+                        Array.isArray(result.errors)
+                    ) {
+                        for (const error of result.errors) {
+                            addErrorFor(
+                                descriptor,
+                                error.message,
+                                currentPropertyDescriptor
+                            );
+                        }
+                    }
+                } else if (Array.isArray(result.errors)) {
+                    if (
+                        ObjectSchemaBuilder.isValidPropertyDescriptor(
+                            descriptor
+                        )
+                    ) {
+                        for (const error of result.errors) {
+                            addErrorFor(descriptor, error.message);
+                        }
+                    }
+                }
+            }
         }
 
         validationTransaction!.rollback();
@@ -364,9 +917,369 @@ export class ObjectSchemaBuilder<
             errors: doNotStopOnFirstError
                 ? errors
                 : errors[0]
-                ? [errors[0]]
-                : []
+                  ? [errors[0]]
+                  : [],
+            getErrorsFor
         };
+    }
+
+    /**
+     * Performs synchronous validation of object schema over the `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     *
+     * The returned result includes a `getErrorsFor()` method for type-safe,
+     * per-property error inspection.
+     *
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public validate(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): ObjectSchemaValidationResult<
+        undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionality<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        this
+    > {
+        return super.validate(object, context) as any;
+    }
+
+    /**
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    public async validateAsync(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): Promise<
+        ObjectSchemaValidationResult<
+            undefined extends TExplicitType
+                ? InferType<
+                      SchemaBuilder<
+                          undefined extends TExplicitType
+                              ? Id<RespectPropsOptionality<TProperties>>
+                              : TExplicitType,
+                          TRequired
+                      >
+                  >
+                : TExplicitType,
+            this
+        >
+    > {
+        return super.validateAsync(object, context) as any;
+    }
+
+    /**
+     * Performs synchronous validation of object schema over the `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     *
+     * The returned result includes a `getErrorsFor()` method for type-safe,
+     * per-property error inspection.
+     *
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected _validate(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): ObjectSchemaValidationResult<
+        undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionality<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        this
+    > {
+        // Fast path: skip preValidateSync + setupValidation when no preprocessors/validators
+        if (
+            this.canSkipPreValidation &&
+            !context?.doNotStopOnFirstError &&
+            !context?.rootPropertyDescriptor
+        ) {
+            // Required / optional check
+            if (typeof object === 'undefined' || object === null) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue() as typeof object;
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
+                    const self = this;
+                    return {
+                        valid: true,
+                        object: object,
+                        getErrorsFor(selector?: any) {
+                            return self
+                                .#validateFull(object, context)
+                                .getErrorsFor(selector);
+                        }
+                    } as any;
+                } else {
+                    const self = this;
+                    return {
+                        valid: false,
+                        errors: [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object as any
+                                )
+                            }
+                        ],
+                        getErrorsFor(selector?: any) {
+                            return self
+                                .#validateFull(object, context)
+                                .getErrorsFor(selector);
+                        }
+                    } as any;
+                }
+            } else if (typeof object === 'object') {
+                const propKeys = this.#propKeys;
+
+                // Check for unknown properties
+                if (!this.#acceptUnknownProps) {
+                    const objKeys = Object.keys(object as Record<string, any>);
+                    for (let i = 0; i < objKeys.length; i++) {
+                        if (!(objKeys[i] in this.#properties)) {
+                            const self = this;
+                            return {
+                                valid: false,
+                                errors: [
+                                    {
+                                        message: `unknown property '${objKeys[i]}'`
+                                    }
+                                ],
+                                getErrorsFor(selector?: any) {
+                                    return self
+                                        .#validateFull(object, context)
+                                        .getErrorsFor(selector);
+                                }
+                            } as any;
+                        }
+                    }
+                }
+
+                // Validate all properties inline — no path passed to children
+                const resultObject: Record<string, any> = {};
+                for (let i = 0; i < propKeys.length; i++) {
+                    const key = propKeys[i];
+                    const result = this.#properties[key].validate(
+                        (object as any)[key]
+                    );
+                    if (!result.valid) {
+                        const self = this;
+                        return {
+                            valid: false,
+                            errors:
+                                result.errors && result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getErrorsFor(selector?: any) {
+                                return self
+                                    .#validateFull(object, context)
+                                    .getErrorsFor(selector);
+                            }
+                        } as any;
+                    }
+                    resultObject[key] = result.object;
+                }
+
+                // Copy unknown props if accepted
+                if (this.#acceptUnknownProps) {
+                    const objKeys = Object.keys(object as Record<string, any>);
+                    for (let i = 0; i < objKeys.length; i++) {
+                        if (!(objKeys[i] in this.#properties)) {
+                            resultObject[objKeys[i]] = (object as any)[
+                                objKeys[i]
+                            ];
+                        }
+                    }
+                }
+
+                // Lazy getErrorsFor — only builds descriptors if called
+                const self = this;
+                return {
+                    valid: true,
+                    object: resultObject,
+                    getErrorsFor(selector?: any) {
+                        return self
+                            .#validateFull(object, context)
+                            .getErrorsFor(selector);
+                    }
+                } as any;
+            }
+        }
+
+        return this.#validateFull(object, context) as any;
+    }
+
+    /**
+     * Full validation path with complete error handling and property descriptors.
+     */
+    #validateFull(
+        object: any,
+        context?: ValidationContext<this>
+    ): ObjectSchemaValidationResult<any, any> {
+        const setup = this.#setupValidation(
+            this.preValidateSync(object, context)
+        );
+        if (setup.earlyReturn) return setup.result as any;
+
+        const {
+            propKeys,
+            objToValidate,
+            doNotStopOnFirstError,
+            rootPropertyDescriptor,
+            currentPropertyDescriptor
+        } = setup;
+
+        const validationResults: {
+            key: string;
+            result: ValidationResult<any>;
+        }[] = [];
+        for (const key of propKeys) {
+            const result = this.#properties[key].validate(objToValidate[key], {
+                ...context,
+                rootPropertyDescriptor: rootPropertyDescriptor as any,
+                currentPropertyDescriptor: (currentPropertyDescriptor as any)[
+                    key
+                ]
+            });
+            validationResults.push({ key, result });
+            if (!result.valid && !doNotStopOnFirstError) break;
+        }
+
+        return this.#processResults(setup, validationResults) as any;
+    }
+
+    /**
+     * Performs async validation of object schema over the `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     *
+     * @param object The object to validate against this schema.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected async _validateAsync(
+        object: undefined extends TExplicitType
+            ? InferType<
+                  SchemaBuilder<
+                      undefined extends TExplicitType
+                          ? Id<RespectPropsOptionalityForInput<TProperties>>
+                          : TExplicitType,
+                      TRequired
+                  >
+              >
+            : TExplicitType,
+        context?: ValidationContext<this>
+    ): Promise<
+        ObjectSchemaValidationResult<
+            undefined extends TExplicitType
+                ? InferType<
+                      SchemaBuilder<
+                          undefined extends TExplicitType
+                              ? Id<RespectPropsOptionality<TProperties>>
+                              : TExplicitType,
+                          TRequired
+                      >
+                  >
+                : TExplicitType,
+            this
+        >
+    > {
+        const setup = this.#setupValidation(
+            await this.preValidateAsync(object, context)
+        );
+        if (setup.earlyReturn) return setup.result as any;
+
+        const {
+            propKeys,
+            objToValidate,
+            doNotStopOnFirstError,
+            rootPropertyDescriptor,
+            currentPropertyDescriptor
+        } = setup;
+
+        const validationResults: {
+            key: string;
+            result: ValidationResult<any>;
+        }[] = [];
+
+        if (doNotStopOnFirstError) {
+            const results = await Promise.all(
+                propKeys.map(async key => {
+                    const result = await this.#properties[key].validateAsync(
+                        objToValidate[key],
+                        {
+                            ...context,
+                            rootPropertyDescriptor:
+                                rootPropertyDescriptor as any,
+                            currentPropertyDescriptor: (
+                                currentPropertyDescriptor as any
+                            )[key]
+                        }
+                    );
+                    return { key, result };
+                })
+            );
+            validationResults.push(...results);
+        } else {
+            for (const key of propKeys) {
+                const result = await this.#properties[key].validateAsync(
+                    objToValidate[key],
+                    {
+                        ...context,
+                        rootPropertyDescriptor: rootPropertyDescriptor as any,
+                        currentPropertyDescriptor: (
+                            currentPropertyDescriptor as any
+                        )[key]
+                    }
+                );
+                validationResults.push({ key, result });
+                if (!result.valid) break;
+            }
+        }
+
+        return this.#processResults(setup, validationResults) as any;
     }
 
     /**
@@ -376,12 +1289,16 @@ export class ObjectSchemaBuilder<
     public acceptUnknownProps(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             acceptUnknownProps: true
-        } as ObjectSchemaBuilderProps<TProperties, TRequired>) as any;
+        } as any) as any;
     }
 
     /**
@@ -391,33 +1308,52 @@ export class ObjectSchemaBuilder<
     public notAcceptUnknownProps(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             acceptUnknownProps: false
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public hasType<T>(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        notUsed?: T
-    ): ObjectSchemaBuilder<TProperties, TRequired, T> {
+        _notUsed?: T
+    ): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TNullable,
+        T,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
-    public clearHasType(): ObjectSchemaBuilder<TProperties, TRequired> {
+    public clearHasType(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TNullable,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
@@ -426,7 +1362,10 @@ export class ObjectSchemaBuilder<
      * @param propName name of the new property
      * @param schema schema builder of the new property
      */
-    public addProp<TType extends SchemaBuilder<any, any>, TName extends string>(
+    public addProp<
+        TType extends SchemaBuilder<any, any, any, any, any>,
+        TName extends string
+    >(
         propName: TName,
         schema: TType
     ): ObjectSchemaBuilder<
@@ -434,8 +1373,12 @@ export class ObjectSchemaBuilder<
             [k in TName]: TType;
         },
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         if (typeof propName !== 'string' || !propName) {
             throw new Error('propName must be a non empty string');
         }
@@ -474,7 +1417,11 @@ export class ObjectSchemaBuilder<
     public optimize(): SchemaBuilder<
         undefined extends TExplicitType
             ? Id<RespectPropsOptionality<TProperties>>
-            : TExplicitType
+            : TExplicitType,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
     > {
         return this.createFromProps({
             ...this.introspect()
@@ -487,31 +1434,41 @@ export class ObjectSchemaBuilder<
      * will be validated according to the provided schemas.
      * @param props a key/schema object map.
      */
-    public addProps<TProps extends Record<string, SchemaBuilder<any, any>>>(
+    public addProps<
+        TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>
+    >(
         props: TProps
-    ): ObjectSchemaBuilder<TProperties & TProps, true, undefined>;
+    ): ObjectSchemaBuilder<
+        TProperties & TProps,
+        TRequired,
+        TNullable,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
 
     /**
      * Adds all properties from the `schema` object schema to the current schema.
      * @param schema an instance of `ObjectSchemaBuilder`
      */
-    public addProps<K extends ObjectSchemaBuilder<any, any, any>>(
+    public addProps<
+        K extends ObjectSchemaBuilder<any, any, any, any, any, any>
+    >(
         schema: K
-    ): K extends ObjectSchemaBuilder<
-        infer TProp,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TReq,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TExpType
-    >
+    ): K extends ObjectSchemaBuilder<infer TProp, infer _, any, infer __>
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProp> & TProp,
               TRequired,
-              TExplicitType
-          >
+              TNullable,
+              TExplicitType,
+              THasDefault,
+              TExtensions
+          > &
+              TExtensions
         : never;
 
-    public addProps(props) {
+    public addProps(props: any) {
         if (props instanceof ObjectSchemaBuilder) {
             return this.addProps(props.introspect().properties);
         }
@@ -540,7 +1497,7 @@ export class ObjectSchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             properties: newProps
-        } as ObjectSchemaBuilderProps) as any;
+        } as any) as any;
     }
 
     /**
@@ -551,7 +1508,15 @@ export class ObjectSchemaBuilder<
      */
     public omit<K extends keyof TProperties>(
         properties: K[]
-    ): ObjectSchemaBuilder<Omit<TProperties, K>, TRequired, TExplicitType>;
+    ): ObjectSchemaBuilder<
+        Omit<TProperties, K>,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
     /**
      * Removes `propName` from the list of properties.
      * @param propName property name to remove. Schema should contain
@@ -562,8 +1527,12 @@ export class ObjectSchemaBuilder<
     ): ObjectSchemaBuilder<
         Omit<TProperties, TProperty>,
         TRequired,
-        TExplicitType
-    >;
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
     /**
      * Removes all properties of `schema` from the current schema.
      * `Omit<TSchema, keyof TAnotherSchema>` as a good illustration
@@ -575,16 +1544,21 @@ export class ObjectSchemaBuilder<
     ): T extends ObjectSchemaBuilder<
         infer TProps,
         infer TRequired,
+        any,
         infer TExplicitType
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps>,
               TRequired,
-              TExplicitType
-          >
+              TNullable,
+              TExplicitType,
+              THasDefault,
+              TExtensions
+          > &
+              TExtensions
         : never;
 
-    public omit(propNameOrArrayOrPropsOrBuilder): any {
+    public omit(propNameOrArrayOrPropsOrBuilder: any): any {
         if (typeof propNameOrArrayOrPropsOrBuilder === 'string') {
             // remove one field
             const propName =
@@ -610,7 +1584,7 @@ export class ObjectSchemaBuilder<
             >;
 
             const distinctKeys = new Map<keyof TProperties, true>();
-            propsArray.forEach((key) => {
+            propsArray.forEach(key => {
                 if (typeof key !== 'string' || !key) {
                     throw new Error('property name must be a string');
                 }
@@ -666,19 +1640,25 @@ export class ObjectSchemaBuilder<
      * in the TS type system.
      * @param schema an object schema to take properties from
      */
-    public intersect<T extends ObjectSchemaBuilder<any, any, any>>(
+    public intersect<
+        T extends ObjectSchemaBuilder<any, any, any, any, any, any>
+    >(
         schema: T
     ): T extends ObjectSchemaBuilder<
         infer TProps,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TReq,
+        infer _,
+        any,
         infer TExplType
     >
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof TProps> & TProps,
               TRequired,
-              TExplType
-          >
+              TNullable,
+              TExplType,
+              THasDefault,
+              TExtensions
+          > &
+              TExtensions
         : never {
         if (!(schema instanceof ObjectSchemaBuilder)) {
             throw new Error(
@@ -693,10 +1673,12 @@ export class ObjectSchemaBuilder<
         const newProps = Object.keys(localProps.properties).reduce(
             (acc, curr) => {
                 acc[curr] =
-                    curr in remoteProps ? remoteProps[curr] : localProps[curr];
+                    curr in remoteProps
+                        ? remoteProps[curr]
+                        : localProps.properties[curr];
                 return acc;
             },
-            {}
+            {} as Record<string, any>
         );
 
         return this.createFromProps({
@@ -713,8 +1695,12 @@ export class ObjectSchemaBuilder<
     public partial(): ObjectSchemaBuilder<
         MakeChildrenOptional<TProperties>,
         TRequired,
-        TExplicitType
-    >;
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
     /**
      * Marks all properties from `properties` as optional in the schema.
      * @param properties list of property names (string) to make optional
@@ -724,8 +1710,12 @@ export class ObjectSchemaBuilder<
     ): ObjectSchemaBuilder<
         Omit<TProperties, K> & Pick<MakeChildrenOptional<TProperties>, K>,
         TRequired,
-        TExplicitType
-    >;
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
     /**
      * Marks property `propName` as optional in the schema.
      * @param propName the name of the property (string).
@@ -736,21 +1726,28 @@ export class ObjectSchemaBuilder<
         Omit<TProperties, TProperty> &
             Pick<MakeChildrenOptional<TProperties>, TProperty>,
         TRequired,
-        TExplicitType
-    >;
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
 
-    public partial(propNameOrArray?): any {
+    public partial(propNameOrArray?: any): any {
         if (
             typeof propNameOrArray === 'undefined' ||
             propNameOrArray === null
         ) {
             return this.createFromProps({
                 ...this.introspect(),
-                properties: Object.keys(this.#properties).reduce((acc, key) => {
-                    acc[key] = this.#properties[key].optional();
-                    return acc;
-                }, {})
-            } as ObjectSchemaBuilderProps);
+                properties: Object.keys(this.#properties).reduce(
+                    (acc, key) => {
+                        acc[key] = this.#properties[key].optional();
+                        return acc;
+                    },
+                    {} as Record<string, any>
+                )
+            } as any);
         }
 
         if (Array.isArray(propNameOrArray)) {
@@ -761,9 +1758,9 @@ export class ObjectSchemaBuilder<
 
             const newProps = {
                 ...this.introspect()
-            } as ObjectSchemaBuilderProps<TProperties, TRequired>;
+            } as any;
 
-            propsArray.forEach((key) => {
+            propsArray.forEach(key => {
                 if (typeof key !== 'string') {
                     throw new Error(
                         'each propery in property list must be as string value'
@@ -785,11 +1782,100 @@ export class ObjectSchemaBuilder<
         if (typeof propNameOrArray === 'string') {
             return this.modifyPropSchema(
                 propNameOrArray as keyof TProperties,
-                (schema) => schema.optional()
+                schema => schema.optional()
             );
         }
 
         throw new Error('expecting string or string[] parameter');
+    }
+
+    /**
+     * Recursively marks all properties — and all properties of nested
+     * `object()` schemas — as optional.  Useful for PATCH API bodies
+     * and partial form state where every field at every level is optional.
+     *
+     * Only nested `ObjectSchemaBuilder` schemas are recursed into.
+     * Other schema types (arrays, unions, primitives, lazy) are made
+     * optional at the top level but their internals are not modified.
+     *
+     * @example
+     * ```ts
+     * const Address = object({
+     *   street: string(),
+     *   city:   string()
+     * });
+     *
+     * const User = object({
+     *   name:    string(),
+     *   address: Address
+     * });
+     *
+     * const PatchUser = User.deepPartial();
+     * // PatchUser infers as:
+     * // { name?: string; address?: { street?: string; city?: string } }
+     *
+     * PatchUser.validate({ address: { city: 'Paris' } }); // valid
+     * PatchUser.validate({});                              // valid
+     * ```
+     *
+     * @example
+     * ```ts
+     * // Three-level nesting
+     * const schema = object({
+     *   a: object({
+     *     b: object({ c: string() })
+     *   })
+     * }).deepPartial();
+     *
+     * schema.validate({});               // valid
+     * schema.validate({ a: {} });        // valid
+     * schema.validate({ a: { b: {} } }); // valid
+     * ```
+     *
+     * @example
+     * ```ts
+     * // PATCH API body
+     * const CreateBody = object({
+     *   profile: object({ displayName: string(), bio: string() }),
+     *   settings: object({ theme: string(), language: string() })
+     * });
+     *
+     * const PatchBody = CreateBody.deepPartial();
+     * // All fields are optional at every level —
+     * // send only what you want to update.
+     * ```
+     *
+     * @see {@link partial} for shallow-only property optionality.
+     */
+    public deepPartial(): ObjectSchemaBuilder<
+        DeepMakeChildrenOptional<TProperties>,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        const newProps: Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        > = {};
+        for (const key of Object.keys(this.#properties)) {
+            const prop = this.#properties[key];
+            if (prop instanceof ObjectSchemaBuilder) {
+                newProps[key] = (
+                    prop as ObjectSchemaBuilder<any, any, any, any, any>
+                )
+                    .deepPartial()
+                    .optional();
+            } else {
+                newProps[key] = prop.optional();
+            }
+        }
+        return this.createFromProps({
+            ...this.introspect(),
+            properties: newProps
+        } as any) as any;
     }
 
     /**
@@ -799,27 +1885,33 @@ export class ObjectSchemaBuilder<
      */
     public pick<K extends keyof TProperties>(
         properties: K[]
-    ): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, undefined>;
+    ): ObjectSchemaBuilder<
+        Pick<TProperties, K>,
+        TRequired,
+        TNullable,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
     /**
      * Returns new schema based on the current schema. This new schema
      * will consists only from properties which names are taken from the
      * `schema` object schema.
      * @param schema schema to take property names list from
      */
-    public pick<K extends ObjectSchemaBuilder<any, any, any>>(
+    public pick<K extends ObjectSchemaBuilder<any, any, any, any, any, any>>(
         schema: K
-    ): K extends ObjectSchemaBuilder<
-        infer TProps,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T1,
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer T2
-    >
+    ): K extends ObjectSchemaBuilder<infer TProps, infer _, any, infer __>
         ? ObjectSchemaBuilder<
               Omit<TProperties, keyof Omit<TProperties, keyof TProps>>,
               TRequired,
-              undefined
-          >
+              TNullable,
+              undefined,
+              THasDefault,
+              TExtensions
+          > &
+              TExtensions
         : never;
 
     /**
@@ -830,9 +1922,17 @@ export class ObjectSchemaBuilder<
      */
     public pick<K extends keyof TProperties>(
         property: K
-    ): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, undefined>;
+    ): ObjectSchemaBuilder<
+        Pick<TProperties, K>,
+        TRequired,
+        TNullable,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions;
 
-    public pick(properties): any {
+    public pick(properties: any): any {
         if (typeof properties === 'string') {
             const property = properties as string;
 
@@ -881,7 +1981,7 @@ export class ObjectSchemaBuilder<
 
             const props = Object.keys(
                 externalSchema.introspect().properties
-            ).filter((p) => typeof this.#properties[p] !== 'undefined');
+            ).filter(p => typeof this.#properties[p] !== 'undefined');
             if (props.length === 0) {
                 throw new Error(
                     'there are no common properties in provided schemas'
@@ -904,15 +2004,19 @@ export class ObjectSchemaBuilder<
      */
     public modifyPropSchema<
         K extends keyof TProperties,
-        R extends SchemaBuilder<any, any>
+        R extends SchemaBuilder<any, any, any, any, any>
     >(
         propName: K,
         callback: (builder: TProperties[K]) => R
     ): ObjectSchemaBuilder<
         ModifyPropSchema<TProperties, K, R>,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         if (typeof propName !== 'string' || !propName) {
             throw new Error('propName must be a non empty string');
         }
@@ -934,7 +2038,7 @@ export class ObjectSchemaBuilder<
 
         const props = {
             ...this.introspect()
-        } as ObjectSchemaBuilderProps;
+        } as any;
 
         props.properties = {
             ...props.properties,
@@ -953,9 +2057,13 @@ export class ObjectSchemaBuilder<
     ): ObjectSchemaBuilder<
         MakeChildOptional<TProperties, K>,
         TRequired,
-        TExplicitType
-    > {
-        return this.modifyPropSchema(prop, (builder) =>
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return this.modifyPropSchema(prop, builder =>
             builder.optional()
         ) as any;
     }
@@ -971,9 +2079,13 @@ export class ObjectSchemaBuilder<
     ): ObjectSchemaBuilder<
         MakeChildRequired<TProperties, K>,
         TRequired,
-        TExplicitType
-    > {
-        return this.modifyPropSchema(prop, (builder) =>
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return this.modifyPropSchema(prop, builder =>
             builder.required()
         ) as any;
     }
@@ -985,14 +2097,21 @@ export class ObjectSchemaBuilder<
     public makeAllPropsOptional(): ObjectSchemaBuilder<
         MakeChildrenOptional<TProperties>,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
-            properties: Object.keys(this.#properties).reduce((acc, curr) => {
-                acc[curr] = this.#properties[curr].optional();
-                return acc;
-            }, {})
+            properties: Object.keys(this.#properties).reduce(
+                (acc, curr) => {
+                    acc[curr] = this.#properties[curr].optional();
+                    return acc;
+                },
+                {} as Record<string, any>
+            )
         } as any) as any;
     }
 
@@ -1003,61 +2122,549 @@ export class ObjectSchemaBuilder<
     public makeAllPropsRequired(): ObjectSchemaBuilder<
         MakeChildrenRequired<TProperties>,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
-            properties: Object.keys(this.#properties).reduce((acc, curr) => {
-                acc[curr] = this.#properties[curr].required();
-                return acc;
-            }, {})
+            properties: Object.keys(this.#properties).reduce(
+                (acc, curr) => {
+                    acc[curr] = this.#properties[curr].required();
+                    return acc;
+                },
+                {} as Record<string, any>
+            )
         } as any) as any;
+    }
+
+    static #getPropertiesFor<
+        TProperties extends Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        > = {},
+        TRequired extends boolean = true,
+        TExplicitType = undefined,
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>
+    >(
+        schema: TSchema,
+        /* this is to make possibility to traverse the tree and select properties */
+        selector?: (arg1: any, arg2: any) => any,
+        /* parent object to have a possibility to get link to itself */
+        parentSelector?: any,
+        /* used to pass the needed property name if `parentSelector` is provided. */
+        currentName?: string,
+        parentDescriptor?: PropertyDescriptorInner<any, any, any>
+    ): PropertyDescriptorTree<TSchema> {
+        const introspected = schema.introspect();
+        if (!introspected.properties) {
+            return {} as any;
+        }
+
+        const propsNames = Object.keys(introspected.properties);
+
+        if (propsNames.length === 0) {
+            return {} as any;
+        }
+
+        if (typeof selector !== 'function') {
+            selector = o => o;
+        }
+        const result = createPropertyDescriptorFor(
+            (obj, createMissingStructure) =>
+                (parentSelector || selector)(obj, createMissingStructure),
+            currentName,
+            schema,
+            parentDescriptor
+        );
+
+        for (const propName of propsNames) {
+            const propSchema = introspected.properties[propName];
+            if (propSchema instanceof ObjectSchemaBuilder) {
+                const childProperties = propSchema.introspect().properties;
+                if (
+                    childProperties &&
+                    typeof childProperties === 'object' &&
+                    Object.keys(childProperties).length > 0
+                ) {
+                    (result as any)[propName] = (
+                        ObjectSchemaBuilder.#getPropertiesFor as any
+                    )(
+                        propSchema,
+                        (tree: any, createMissingStructure: any) => {
+                            const selectorResult = selector(
+                                tree,
+                                createMissingStructure
+                            );
+                            if (selectorResult) {
+                                if (
+                                    createMissingStructure &&
+                                    !selectorResult[propName]
+                                ) {
+                                    selectorResult[propName] = {};
+                                }
+                                return selectorResult[propName];
+                            }
+                            return null;
+                        },
+                        selector,
+                        propName,
+                        result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                    );
+                } else {
+                    (result as any)[propName] = createPropertyDescriptorFor(
+                        selector,
+                        propName,
+                        propSchema,
+                        result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                    );
+                }
+            } else if ((propSchema as any)[SYMBOL_HAS_PROPERTIES] === true) {
+                // Extern schema — create a Proxy-based descriptor that
+                // lazily creates child descriptors on property access.
+                const externBase = createPropertyDescriptorFor(
+                    selector,
+                    propName,
+                    propSchema,
+                    result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                );
+                const externValueSelector = (
+                    tree: any,
+                    createMissingStructure: boolean
+                ) => {
+                    const selectorResult = selector(
+                        tree,
+                        createMissingStructure
+                    );
+                    if (selectorResult) {
+                        if (
+                            createMissingStructure &&
+                            !selectorResult[propName]
+                        ) {
+                            selectorResult[propName] = {};
+                        }
+                        return selectorResult[propName];
+                    }
+                    return null;
+                };
+                (result as any)[propName] = createExternProxyDescriptor(
+                    externBase,
+                    externValueSelector
+                );
+            } else {
+                (result as any)[propName] = createPropertyDescriptorFor(
+                    selector,
+                    propName,
+                    propSchema,
+                    result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                );
+            }
+        }
+
+        return result as any;
+    }
+
+    public static getPropertiesFor<
+        TProperties extends Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        > = {},
+        TRequired extends boolean = true,
+        TExplicitType = undefined,
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>
+    >(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema> {
+        if (!(schema instanceof ObjectSchemaBuilder)) {
+            throw new Error(
+                'schema must be an instance of the ObjectSchemaBuilder class'
+            );
+        }
+
+        if (schema.#propertyDescriptorTreeMap.has(schema)) {
+            return schema.#propertyDescriptorTreeMap.get(schema) as any;
+        }
+
+        const result = ObjectSchemaBuilder.#getPropertiesFor(schema);
+        schema.#propertyDescriptorTreeMap.set(schema, result);
+
+        return result;
+    }
+
+    public static isValidPropertyDescriptor(
+        descriptor: PropertyDescriptor<any, any, any>
+    ) {
+        return (
+            typeof descriptor === 'object' &&
+            descriptor !== null &&
+            typeof descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] === 'object'
+        );
+    }
+
+    static #propagateNestedErrors(
+        result: any,
+        descriptor: any,
+        addErrorFor: (
+            descriptor: any,
+            message: string,
+            parentDescriptor?: any
+        ) => void
+    ): void {
+        const schema =
+            ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(descriptor);
+        const properties = (schema.introspect() as any).properties;
+
+        // Determine which property names to iterate:
+        // • For ObjectSchemaBuilder — use introspect().properties keys
+        // • For ExternSchemaBuilder — use __externErrorPropertyNames from the result
+        let propertyNames: string[];
+        if (properties) {
+            propertyNames = Object.keys(properties);
+        } else if (Array.isArray((result as any).__externErrorPropertyNames)) {
+            propertyNames = (result as any).__externErrorPropertyNames;
+        } else {
+            return;
+        }
+
+        for (const nestedPropertyName of propertyNames) {
+            const nestedPropertyDescriptor = descriptor[nestedPropertyName];
+            if (
+                !ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    nestedPropertyDescriptor
+                )
+            ) {
+                continue;
+            }
+            const nestedValidationError = result.getErrorsFor(
+                () => nestedPropertyDescriptor
+            );
+            if (!nestedValidationError.isValid) {
+                for (const validationError of nestedValidationError.errors) {
+                    addErrorFor(
+                        nestedPropertyDescriptor,
+                        validationError,
+                        descriptor
+                    );
+                }
+            }
+            // Recurse into nested object schemas (only when we have a property map)
+            if (properties) {
+                const nestedSchema = properties[nestedPropertyName];
+                if (
+                    (nestedSchema instanceof ObjectSchemaBuilder ||
+                        (nestedSchema as any)[SYMBOL_HAS_PROPERTIES] ===
+                            true) &&
+                    typeof result.getErrorsFor === 'function' &&
+                    ObjectSchemaBuilder.isValidPropertyDescriptor(
+                        nestedPropertyDescriptor
+                    )
+                ) {
+                    ObjectSchemaBuilder.#propagateNestedErrors(
+                        result,
+                        nestedPropertyDescriptor,
+                        addErrorFor
+                    );
+                }
+            }
+        }
+    }
+
+    static #getSchemaForPropertyDescriptor(
+        descriptor: PropertyDescriptor<any, any, any>
+    ): SchemaBuilder<any, any, any, any, any> {
+        if (!ObjectSchemaBuilder.isValidPropertyDescriptor(descriptor)) {
+            throw new Error('descriptor is not a valid property descriptor');
+        }
+
+        return descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].getSchema();
+    }
+
+    public nullable(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > {
+        return super.nullable() as any;
+    }
+
+    public notNullable(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > {
+        return super.notNullable() as any;
     }
 }
 
-/**
- * Defines a schema for empty object `{}`
- */
-export function object(): ObjectSchemaBuilder<{}, true>;
+export interface Object {
+    /**
+     * Defines a schema for empty object `{}`
+     */
+    (): ObjectSchemaBuilder<{}, true>;
+    /**
+     * Defines an object schema, properties definitions are takens from `props`.
+     * @param props key/schema object map for schema's properties.
+     */
+    <TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(
+        props: TProps
+    ): ObjectSchemaBuilder<TProps, true>;
+    /**
+     * Defines an object schema, properties definitions are takens from `props`.
+     * @param props key/schema object map for schema's properties.
+     */
+    <TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(
+        props?: TProps
+    ): ObjectSchemaBuilder<TProps, true>;
+    /**
+     * Returns a tree of property descriptors for the given `schema`.
+     * The structure of the tree is the same as the structure of the `schema`.
+     * Which gives you an opportunity to access property descriptors for each
+     * property in the schema in a useful and type-safe way.
+     * @param schema
+     */
+    getPropertiesFor<
+        TProperties extends Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        > = {},
+        TRequired extends boolean = true,
+        TExplicitType = undefined,
+        TSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any
+        > = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>
+    >(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema>;
 
-/**
- * Defines an object schema, properties definitions are takens from `props`.
- * @param props key/schema object map for schema's properties.
- */
-export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
-    props: TProps
-): ObjectSchemaBuilder<TProps, true>;
+    /**
+     * Verifies if the given `descriptor` is a valid property descriptor.
+     * @param descriptor a property descriptor to check
+     */
+    isValidPropertyDescriptor(
+        descriptor: PropertyDescriptor<any, any, any>
+    ): boolean;
+}
 
-export function object<TProps extends Record<string, SchemaBuilder<any, any>>>(
-    props?: TProps
-): ObjectSchemaBuilder<TProps, true> {
+const object = (props => {
     return ObjectSchemaBuilder.create({
         isRequired: true,
         properties: props
     }) as any;
-}
+}) as Object;
 
-type RequiredProps<T extends Record<string, SchemaBuilder<any, any>>> = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        infer TRes,
-        infer TReq
-    >
+type PropertyDescriptorMap = Map<
+    ObjectSchemaBuilder<any, any, any, any, any, any>,
+    PropertyDescriptorMap | PropertyDescriptorTree<any, any>
+>;
+
+const createPropertyDescriptorFor = (
+    selector: (arg0: any, arg1: boolean) => any,
+    propertyName?: string,
+    schema?: SchemaBuilder<any, any, any, any, any>,
+    parent?: PropertyDescriptorInner<any, any, any>
+) => ({
+    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+        setValue: (
+            obj: any,
+            newValue: any,
+            options?: PropertySetterOptions
+        ) => {
+            const selectorResult = selector(
+                obj,
+                !!options?.createMissingStructure
+            );
+            if (!selectorResult) return false;
+
+            if (typeof propertyName === 'string') {
+                selectorResult[propertyName] = newValue;
+            }
+
+            return true;
+        },
+        getValue: (obj: any) => {
+            const selectorResult = selector(obj, false);
+            if (!selectorResult)
+                return {
+                    success: false
+                };
+
+            if (typeof propertyName !== 'string') {
+                return {
+                    success: true,
+                    value: selectorResult
+                };
+            }
+
+            if (Object.hasOwn(selectorResult, propertyName)) {
+                return {
+                    success: true,
+                    value: selectorResult[propertyName]
+                };
+            }
+
+            return {
+                success: false
+            };
+        },
+
+        getSchema: () => schema,
+        parent
+    }
+});
+
+/**
+ * Creates a Proxy-wrapped property descriptor for an extern schema.
+ * Child descriptors are lazily created when accessed by name, enabling
+ * `getErrorsFor(t => t.order.id)` navigation without an explicit
+ * property map.
+ *
+ * Each child is also Proxy-wrapped for arbitrary-depth navigation.
+ *
+ * @param baseDescriptor - The base descriptor (with SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR)
+ * @param valueSelector  - Selector that navigates to the extern's VALUE in the root object
+ */
+const createExternProxyDescriptor = (
+    baseDescriptor: ReturnType<typeof createPropertyDescriptorFor>,
+    valueSelector: (obj: any, createMissingStructure: boolean) => any
+): any =>
+    new Proxy(baseDescriptor, {
+        get(target: any, prop: PropertyKey, receiver: any): any {
+            // Fast path for the descriptor symbol — no interception
+            if (prop === SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR) {
+                return target[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+            }
+
+            // For string keys, lazily create and cache child descriptors
+            if (typeof prop === 'string' && !(prop in target)) {
+                const child = createPropertyDescriptorFor(
+                    valueSelector,
+                    prop,
+                    undefined,
+                    target[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                );
+
+                // Build a value selector for the child's own children
+                const childValueSelector = (
+                    obj: any,
+                    createMissingStructure: boolean
+                ) => {
+                    const parentValue = valueSelector(
+                        obj,
+                        createMissingStructure
+                    );
+                    if (
+                        parentValue != null &&
+                        typeof parentValue === 'object'
+                    ) {
+                        if (createMissingStructure && !(prop in parentValue)) {
+                            parentValue[prop as string] = {};
+                        }
+                        return parentValue[prop as string];
+                    }
+                    return null;
+                };
+
+                // Recursively wrap so deeper paths like t.order.address.city work
+                target[prop] = createExternProxyDescriptor(
+                    child,
+                    childValueSelector
+                );
+            }
+
+            return Reflect.get(target, prop, receiver);
+        }
+    });
+
+(object as any).getPropertiesFor = <
+    TProperties extends Record<
+        string,
+        SchemaBuilder<any, any, any, any, any>
+    > = {},
+    TRequired extends boolean = true,
+    TExplicitType = undefined,
+    TSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any
+    > = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>
+>(
+    schema: ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>
+): PropertyDescriptorTree<TSchema, TSchema> =>
+    ObjectSchemaBuilder.getPropertiesFor(schema) as any;
+
+(object as any).isValidPropertyDescriptor =
+    ObjectSchemaBuilder.isValidPropertyDescriptor;
+
+export { object };
+
+type RequiredProps<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, any>
         ? TReq extends true
             ? k
             : never
         : never]: T[k];
 };
 
-type NotRequiredProps<T extends Record<string, SchemaBuilder<any, any>>> =
-    keyof {
-        [k in keyof T as T[k] extends SchemaBuilder<
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            infer TRes,
-            infer TReq
-        >
-            ? TReq extends true
+type NotRequiredProps<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, any>
+        ? TReq extends true
+            ? never
+            : k
+        : never]: T[k];
+};
+
+type RequiredInputProps<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<
+        any,
+        infer TReq,
+        any,
+        infer THasDef
+    >
+        ? TReq extends true
+            ? THasDef extends true
                 ? never
                 : k
-            : never]: T[k];
-    };
+            : never
+        : never]: T[k];
+};
+
+type NotRequiredInputProps<
+    T extends Record<string, SchemaBuilder<any, any, any, any, any>>
+> = keyof {
+    [k in keyof T as T[k] extends SchemaBuilder<
+        any,
+        infer TReq,
+        any,
+        infer THasDef
+    >
+        ? TReq extends true
+            ? THasDef extends true
+                ? k
+                : never
+            : k
+        : never]: T[k];
+};

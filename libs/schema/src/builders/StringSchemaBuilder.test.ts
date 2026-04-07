@@ -1,5 +1,6 @@
-import { expectType } from 'tsd';
-import { InferType } from './SchemaBuilder.js';
+import { expect, expectTypeOf, test } from 'vitest';
+
+import type { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 
 test('Clean', () => {
@@ -197,7 +198,7 @@ test('equals - 2', async () => {
 });
 
 test('equals - 3', () => {
-    expect(() => string().equals(2342 as any)).toThrowError();
+    expect(() => string().equals(2342 as any)).toThrow();
 });
 
 test('minLength - 1', async () => {
@@ -273,7 +274,7 @@ test('minLength - 2', async () => {
 });
 
 test('minLength - 3', () => {
-    expect(() => string().minLength('some str' as any)).toThrowError();
+    expect(() => string().minLength('some str' as any)).toThrow();
 });
 
 test('maxLength - 1', async () => {
@@ -349,7 +350,7 @@ test('maxLength - 2', async () => {
 });
 
 test('maxLength - 3', () => {
-    expect(() => string().maxLength('some str' as any)).toThrowError();
+    expect(() => string().maxLength('some str' as any)).toThrow();
 });
 
 test('hasType - 1', () => {
@@ -361,9 +362,9 @@ test('hasType - 1', () => {
     const typeSchema2: InferType<typeof schema2> = null as any;
     const typeSchema3: InferType<typeof schema3> = null as any;
 
-    expectType<string>(typeSchema1);
-    expectType<Date>(typeSchema2);
-    expectType<string>(typeSchema3);
+    expectTypeOf(typeSchema1).toBeString();
+    expectTypeOf(typeSchema2).toEqualTypeOf<Date>();
+    expectTypeOf(typeSchema3).toBeString();
 });
 
 test('startsWith - 1', async () => {
@@ -378,10 +379,7 @@ test('startsWith - 1', async () => {
         const schema2 = schema1.clearStartsWith();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-
-    {
-        expect(() => string().startsWith(123 as any)).toThrowError();
-    }
+    expect(() => string().startsWith(123 as any)).toThrow();
 
     {
         const schema = string().startsWith('abc');
@@ -389,6 +387,21 @@ test('startsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('abc');
+        if (typeof object !== 'undefined') {
+            expectTypeOf(object).toMatchTypeOf<`abc${string}`>();
+        }
+
+        const schema2 = schema.clearStartsWith();
+        const {
+            valid: valid2,
+            errors: errors2,
+            object: object2
+        } = await schema2.validate('abc');
+        expect(valid2).toEqual(true);
+        expect(errors2).toBeUndefined();
+        if (typeof object2 !== 'undefined') {
+            expectTypeOf(object2).toBeString();
+        }
     }
 
     {
@@ -401,7 +414,9 @@ test('startsWith - 1', async () => {
 
     {
         const schema = string().startsWith('abc');
-        const { valid, errors, object } = await schema.validate('invalid');
+        const { valid, errors, object } = await schema.validate(
+            'invalid' as any
+        );
         expect(valid).toEqual(false);
         expect(errors).toBeDefined();
         expect(object).toBeUndefined();
@@ -413,6 +428,17 @@ test('startsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('valid');
+    }
+});
+
+test('startsWith - regular string', async () => {
+    const value = 'abc';
+    const schema1 = string().startsWith(value);
+    const { valid, object } = await schema1.validate('abcdef' as any);
+
+    expect(valid).toEqual(true);
+    if (typeof object !== 'undefined') {
+        expectTypeOf(object).toMatchTypeOf<string>();
     }
 });
 
@@ -428,10 +454,7 @@ test('endsWith - 1', async () => {
         const schema2 = schema1.clearEndsWith();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-
-    {
-        expect(() => string().endsWith(123 as any)).toThrowError();
-    }
+    expect(() => string().endsWith(123 as any)).toThrow();
 
     {
         const schema = string().endsWith('abc');
@@ -447,11 +470,28 @@ test('endsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('defgabc');
+        if (typeof object !== 'undefined') {
+            expectTypeOf(object).toMatchTypeOf<`${string}abc`>();
+        }
+
+        const schema2 = schema.clearEndsWith();
+        const {
+            valid: valid2,
+            errors: errors2,
+            object: object2
+        } = await schema2.validate('cba');
+        expect(valid2).toEqual(true);
+        expect(errors2).toBeUndefined();
+        if (typeof object2 !== 'undefined') {
+            expectTypeOf(object2).toBeString();
+        }
     }
 
+    const schema = string().endsWith('abc');
     {
-        const schema = string().endsWith('abc');
-        const { valid, errors, object } = await schema.validate('invalid');
+        const { valid, errors, object } = await schema.validate(
+            'invalid' as any
+        );
         expect(valid).toEqual(false);
         expect(errors).toBeDefined();
         expect(object).toBeUndefined();
@@ -463,6 +503,17 @@ test('endsWith - 1', async () => {
         expect(valid).toEqual(true);
         expect(errors).toBeUndefined();
         expect(object).toEqual('valid');
+    }
+});
+
+test('endsWith - regular string', async () => {
+    const value = '456';
+    const schema1 = string().endsWith(value);
+    const { valid, object } = await schema1.validate('123456' as any);
+
+    expect(valid).toEqual(true);
+    if (typeof object !== 'undefined') {
+        expectTypeOf(object).toMatchTypeOf<string>();
     }
 });
 
@@ -478,10 +529,7 @@ test('matches - 1', async () => {
         const schema2 = schema1.clearMatches();
         expect((schema1 as any) === schema2).toEqual(false);
     }
-
-    {
-        expect(() => string().matches(123 as any)).toThrowError();
-    }
+    expect(() => string().matches(123 as any)).toThrow();
 
     {
         const schema = string().matches(/^abc\d+/);
@@ -508,4 +556,535 @@ test('matches - 1', async () => {
         expect(errors).toBeUndefined();
         expect(object).toEqual('abcdefg');
     }
+});
+
+test('endsWith - regular string', async () => {
+    const value = 'def';
+    const schema1 = string().endsWith(value + 'g');
+    const { valid, object } = await schema1.validate('abcdefg' as any);
+
+    expect(valid).toEqual(true);
+    if (typeof object !== 'undefined') {
+        expectTypeOf(object).toMatchTypeOf<string>();
+    }
+});
+
+test('startsWith and endsWith', async () => {
+    const schema = string().startsWith('abc').endsWith('def');
+
+    {
+        const { valid, errors, object } = await schema.validate('abcdef');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abcdef');
+
+        const val: InferType<typeof schema> = 'abc123def';
+        expectTypeOf(val).toMatchTypeOf<`abc${string}def`>();
+    }
+});
+
+test('equals with custom validation error message', async () => {
+    const schema = string().equals('abc', 'This is a custom error message');
+
+    {
+        const { valid, errors, object } = await schema.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+
+    const schema2 = schema.clearEquals().equals('abc');
+
+    {
+        const { valid, errors, object } = await schema2.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'is expected to be equal to "abc" but saw "abcd"'
+        );
+        expect(object).toBeUndefined();
+    }
+
+    const schema3 = schema2
+        .clearEquals()
+        .equals(
+            'abc',
+            seenValue => `This is a custom error message 2, saw "${seenValue}"`
+        );
+
+    {
+        const { valid, errors, object } = await schema3.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'This is a custom error message 2, saw "abcd"'
+        );
+        expect(object).toBeUndefined();
+    }
+
+    const schema4 = schema3
+        .clearEquals()
+        .equals('abc', () =>
+            Promise.resolve('This is a custom error message 3')
+        );
+
+    {
+        const { valid, errors, object } = await schema4.validateAsync(
+            'abcd' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 3');
+        expect(object).toBeUndefined();
+    }
+});
+
+test('minLength with custom validation error message', async () => {
+    const schema = string().minLength(5, 'This is a custom error message');
+
+    {
+        const { valid, errors, object } = await schema.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+
+    const schema2 = schema.clearMinLength().minLength(5);
+
+    {
+        const { valid, errors, object } = await schema2.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'is expected to have a length of at least 5 characters'
+        );
+        expect(object).toBeUndefined();
+    }
+
+    const schema3 = schema2
+        .clearMinLength()
+        .minLength(5, () => 'This is a custom error message 2');
+
+    {
+        const { valid, errors, object } = await schema3.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 2');
+        expect(object).toBeUndefined();
+    }
+
+    const schema4 = schema3
+        .clearMinLength()
+        .minLength(5, () =>
+            Promise.resolve('This is a custom error message 3')
+        );
+
+    {
+        const { valid, errors, object } = await schema4.validateAsync(
+            'abcd' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 3');
+        expect(object).toBeUndefined();
+    }
+});
+
+test('maxLength with custom validation error message', async () => {
+    const schema = string().maxLength(5, 'This is a custom error message');
+
+    {
+        const { valid, errors, object } = await schema.validate(
+            'abcdefg' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+
+    const schema2 = schema.clearMaxLength().maxLength(5);
+
+    {
+        const { valid, errors, object } = await schema2.validate(
+            'abcdefgh' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'is expected to have a length of no more than 5 characters'
+        );
+        expect(object).toBeUndefined();
+    }
+
+    const schema3 = schema2
+        .clearMaxLength()
+        .maxLength(5, () => 'This is a custom error message 2');
+
+    {
+        const { valid, errors, object } = await schema3.validate(
+            'abcdefghj' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 2');
+        expect(object).toBeUndefined();
+    }
+
+    const schema4 = schema3
+        .clearMaxLength()
+        .maxLength(5, () =>
+            Promise.resolve('This is a custom error message 3')
+        );
+
+    {
+        const { valid, errors, object } = await schema4.validateAsync(
+            'abcdxyz' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 3');
+        expect(object).toBeUndefined();
+    }
+});
+
+test('startsWith with custom validation error message', async () => {
+    const schema = string().startsWith('abc', 'This is a custom error message');
+
+    {
+        const { valid, errors, object } = await schema.validate(
+            'xyzabcdefg' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+
+    const schema2 = schema.clearStartsWith().startsWith('xyz');
+
+    {
+        const { valid, errors, object } = await schema2.validate(
+            'abcdefgh' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('is expected to start with "xyz"');
+        expect(object).toBeUndefined();
+    }
+
+    const schema3 = schema2
+        .clearStartsWith()
+        .startsWith('xyz', () => 'This is a custom error message 2');
+
+    {
+        const { valid, errors, object } = await schema3.validate(
+            'abcdefghj' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 2');
+        expect(object).toBeUndefined();
+    }
+
+    const schema4 = schema3
+        .clearStartsWith()
+        .startsWith('xyz', () =>
+            Promise.resolve('This is a custom error message 3')
+        );
+
+    {
+        const { valid, errors, object } = await schema4.validateAsync(
+            'abcdxyz' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 3');
+        expect(object).toBeUndefined();
+    }
+});
+
+test('endsWith with custom validation error message', async () => {
+    const schema = string().endsWith('abc', 'This is a custom error message');
+
+    {
+        const { valid, errors, object } = await schema.validate(
+            'xyzabcdefg' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+
+    const schema2 = schema.clearEndsWith().endsWith('xyz');
+
+    {
+        const { valid, errors, object } = await schema2.validate(
+            'abcdefgh' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('is expected to end with "xyz"');
+        expect(object).toBeUndefined();
+    }
+
+    const schema3 = schema2
+        .clearEndsWith()
+        .endsWith('xyz', () => 'This is a custom error message 2');
+
+    {
+        const { valid, errors, object } = await schema3.validate(
+            'abcdefghj' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 2');
+        expect(object).toBeUndefined();
+    }
+
+    const schema4 = schema3
+        .clearEndsWith()
+        .endsWith('xyz', () =>
+            Promise.resolve('This is a custom error message 3')
+        );
+
+    {
+        const { valid, errors, object } = await schema4.validateAsync(
+            'abcdxyzabc' as any
+        );
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 3');
+        expect(object).toBeUndefined();
+    }
+});
+
+test('matches with custom validation error message', async () => {
+    const schema = string().matches(
+        /^abc\d+/,
+        'This is a custom error message'
+    );
+
+    {
+        const { valid, errors, object } = await schema.validate('xyzabcdefg');
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+
+    const schema2 = schema.clearMatches().matches(/^xyz/);
+
+    {
+        const { valid, errors, object } = await schema2.validate('abcdefgh');
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'is expected to match the pattern /^xyz/'
+        );
+        expect(object).toBeUndefined();
+    }
+
+    const schema3 = schema2
+        .clearMatches()
+        .matches(/^xyz/, () => 'This is a custom error message 2');
+
+    {
+        const { valid, errors, object } = await schema3.validate('abcdefghj');
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 2');
+        expect(object).toBeUndefined();
+    }
+
+    const schema4 = schema3
+        .clearMatches()
+        .matches(/^xyz/, () =>
+            Promise.resolve('This is a custom error message 3')
+        );
+
+    {
+        const { valid, errors, object } =
+            await schema4.validateAsync('abcdxyzabc');
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message 3');
+        expect(object).toBeUndefined();
+    }
+});
+
+test('string(value)', async () => {
+    const schema = string('abc');
+
+    {
+        const { valid, errors, object } = await schema.validate('abc');
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+        expect(object).toEqual('abc');
+        if (typeof object !== 'undefined') {
+            expectTypeOf(object).toEqualTypeOf<'abc'>();
+        }
+    }
+
+    {
+        const { valid, errors, object } = await schema.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'is expected to be equal to "abc" but saw "abcd"'
+        );
+        expect(object).toBeUndefined();
+    }
+});
+
+test('string(value, customErrorMessage)', async () => {
+    const schema = string('abc', 'This is a custom error message');
+
+    {
+        const { valid, errors, object } = await schema.validate('abcd' as any);
+        expect(valid).toEqual(false);
+        expect(errors).toBeDefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('This is a custom error message');
+        expect(object).toBeUndefined();
+    }
+});
+
+test('required with default error message', async () => {
+    const schema = string();
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('is required');
+});
+
+test('required with custom string error message', async () => {
+    const schema = string().required('Name cannot be empty');
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('Name cannot be empty');
+});
+
+test('required with custom function error message', async () => {
+    const schema = string().required(
+        seenValue => `Expected a string but saw ${seenValue}`
+    );
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('Expected a string but saw null');
+});
+
+test('required with async function error message', async () => {
+    const schema = string().required(() =>
+        Promise.resolve('Async required message')
+    );
+
+    const { valid, errors } = await schema.validateAsync(undefined as any);
+    expect(valid).toEqual(false);
+    expect(errors).toBeDefined();
+    expect(errors?.length).toEqual(1);
+    expect(errors?.[0].message).toEqual('Async required message');
+});
+
+test('required custom message survives introspect round-trip', async () => {
+    const schema = string().required('Custom required');
+    const introspected = schema.introspect();
+    expect(introspected.requiredValidationErrorMessageProvider).toEqual(
+        'Custom required'
+    );
+
+    const { valid, errors } = await schema.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors?.[0].message).toEqual('Custom required');
+});
+
+test('required custom message preserved through optional().required()', async () => {
+    const schema = string().required('Custom required');
+    const schema2 = schema.optional().required();
+
+    const { valid, errors } = await schema2.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors?.[0].message).toEqual('Custom required');
+});
+
+test('required custom message overridden by new required() call', async () => {
+    const schema = string().required('Custom required');
+    const schema2 = schema.optional().required('Another message');
+
+    const { valid, errors } = await schema2.validate(null as any);
+    expect(valid).toEqual(false);
+    expect(errors?.[0].message).toEqual('Another message');
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 691)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from string schema', () => {
+    const schema = string().default('fallback').clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
 });

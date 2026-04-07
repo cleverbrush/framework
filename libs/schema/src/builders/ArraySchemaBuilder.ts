@@ -1,12 +1,75 @@
+import type {
+    ObjectSchemaBuilder,
+    ObjectSchemaValidationResult
+} from './ObjectSchemaBuilder.js';
 import {
+    type BRAND,
+    createHybridErrorArray,
+    type InferType,
+    type NestedValidationResult,
+    type PropertyDescriptor,
     SchemaBuilder,
-    ValidationResult,
-    ValidationContext,
-    InferType
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
+    type ValidationContext,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
 } from './SchemaBuilder.js';
 
+import type {
+    UnionSchemaBuilder,
+    UnionSchemaValidationResult
+} from './UnionSchemaBuilder.js';
+
+/**
+ * Maps an element schema type to the appropriate validation result type.
+ * Union schema elements get `UnionSchemaValidationResult`,
+ * Object schema elements get `ObjectSchemaValidationResult`,
+ * other types get `ValidationResult`.
+ */
+export type ElementValidationResult<
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>
+> =
+    TElementSchema extends UnionSchemaBuilder<
+        infer UOptions extends readonly SchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any
+        >[],
+        any,
+        any
+    >
+        ? UnionSchemaValidationResult<InferType<TElementSchema>, UOptions>
+        : TElementSchema extends ObjectSchemaBuilder<any, any, any, any, any>
+          ? ObjectSchemaValidationResult<
+                InferType<TElementSchema>,
+                TElementSchema
+            >
+          : ValidationResult<InferType<TElementSchema>>;
+
+/**
+ * Validation result type returned by `ArraySchemaBuilder.validate()`.
+ * Extends `ValidationResult` with `getNestedErrors` for root-level array
+ * errors and per-element validation results.
+ */
+export type ArraySchemaValidationResult<
+    TResult,
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>
+> = ValidationResult<TResult> & {
+    /**
+     * Returns root-level array validation errors combined with
+     * per-element validation results.
+     * The returned value has both `NestedValidationResult` properties
+     * (`errors`, `isValid`, `descriptor`, `seenValue`) and indexed
+     * element results (`[0]`, `[1]`, etc.).
+     */
+    getNestedErrors(): Array<ElementValidationResult<TElementSchema>> &
+        NestedValidationResult<any, any, any>;
+};
+
 type ArraySchemaBuilderCreateProps<
-    TElementSchema extends SchemaBuilder<any, any>,
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>,
     R extends boolean = true
 > = Partial<ReturnType<ArraySchemaBuilder<TElementSchema, R>['introspect']>>;
 
@@ -29,19 +92,46 @@ type ArraySchemaBuilderCreateProps<
  * @see {@link array}
  */
 export class ArraySchemaBuilder<
-    TElementSchema extends SchemaBuilder<any, any>,
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
+    TExtensions = {},
     TResult = TExplicitType extends undefined
         ? TElementSchema extends undefined
             ? Array<any>
             : TElementSchema extends SchemaBuilder<infer T1, infer T2>
-            ? Array<InferType<SchemaBuilder<T1, T2>>>
-            : never
+              ? Array<InferType<SchemaBuilder<T1, T2>>>
+              : never
         : TExplicitType
-> extends SchemaBuilder<TResult, TRequired> {
+> extends SchemaBuilder<
+    TResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #minLength?: number;
+    #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
+    > = function (this: ArraySchemaBuilder<any, any, any, any, any>) {
+        return `is expected to have no less than ${this.#minLength} elements`;
+    };
+    #minLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
+    > = this.#defaultMinLengthErrorMessageProvider;
+
     #maxLength?: number;
+    #defaultMaxLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
+    > = function (this: ArraySchemaBuilder<any, any, any, any, any>) {
+        return `is expected to have no more than ${this.#maxLength} elements`;
+    };
+    #maxLengthErrorMessageProvider: ValidationErrorMessageProvider<
+        ArraySchemaBuilder<TElementSchema, TRequired, TNullable, TExplicitType>
+    > = this.#defaultMaxLengthErrorMessageProvider;
+
     #elementSchema?: TElementSchema;
 
     /**
@@ -54,7 +144,7 @@ export class ArraySchemaBuilder<
         } as any);
     }
 
-    private constructor(
+    protected constructor(
         props: ArraySchemaBuilderCreateProps<TElementSchema, TRequired>
     ) {
         super(props as any);
@@ -63,9 +153,21 @@ export class ArraySchemaBuilder<
             this.#minLength = props.minLength;
         }
 
+        this.#minLengthErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.minLengthValidationErrorMessageProvider,
+                this.#defaultMinLengthErrorMessageProvider
+            );
+
         if (typeof props.maxLength === 'number') {
             this.#maxLength = props.maxLength;
         }
+
+        this.#maxLengthErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.maxLengthValidationErrorMessageProvider,
+                this.#defaultMaxLengthErrorMessageProvider
+            );
 
         if (props.elementSchema instanceof SchemaBuilder) {
             this.#elementSchema = props.elementSchema;
@@ -73,53 +175,87 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public hasType<T>(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        notUsed?: T
-    ): ArraySchemaBuilder<TElementSchema, true, T> {
+        _notUsed?: T
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TNullable,
+        T,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
     }
 
     /**
-     * @hidden
+     * @inheritdoc
      */
     public clearHasType(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
-        undefined
-    > {
+        TNullable,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
     }
 
-    /**
-     * Performs validion of the schema over `object`. Basically runs
-     * validators, preprocessors and checks for required (if schema is not optional).
-     * @param context Optional `ValidationContext` settings.
-     */
-    public async validate(
+    #createValidationSetup(
         object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
-
+        superResult: ReturnType<ArraySchemaBuilder<any, any>['preValidateSync']>
+    ) {
         const {
             valid,
             context: prevalidationContext,
             errors,
             transaction: preValidationTransaction
         } = superResult;
-        const { path } = prevalidationContext;
+
+        // Self-referencing property descriptor for the array root
+        const selfDescriptor: PropertyDescriptor<any, any, any> = {
+            [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+                setValue: () => false,
+                getValue: (obj: any) => ({
+                    success: true,
+                    value: obj
+                }),
+                getSchema: () => this,
+                parent: undefined
+            }
+        };
+
+        const rootErrors: string[] = [];
+
+        const elementResults = createHybridErrorArray(
+            [] as any[],
+            () => object,
+            () => rootErrors,
+            () => selfDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+        );
+
+        const getNestedErrors = (() => elementResults) as any;
 
         if (!valid) {
+            rootErrors.push(
+                ...(errors || []).map((e: any) => e.message || String(e))
+            );
             return {
-                valid,
-                errors
+                needsElementValidation: false as const,
+                result: {
+                    valid,
+                    errors,
+                    getNestedErrors
+                } as ArraySchemaValidationResult<TResult, TElementSchema>
             };
         }
 
@@ -128,53 +264,355 @@ export class ArraySchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
-                valid: true,
-                object: objToValidate
+                needsElementValidation: false as const,
+                result: {
+                    valid: true,
+                    object: objToValidate,
+                    getNestedErrors
+                } as ArraySchemaValidationResult<TResult, TElementSchema>
             };
         }
 
         if (!Array.isArray(objToValidate)) {
+            rootErrors.push('array expected');
             return {
-                valid: false,
-                errors: [{ message: 'array expected', path: path as string }]
+                needsElementValidation: false as const,
+                result: {
+                    valid: false,
+                    errors: [{ message: 'array expected' }],
+                    getNestedErrors
+                } as ArraySchemaValidationResult<TResult, TElementSchema>
             };
         }
 
+        return {
+            needsElementValidation: true as const,
+            objToValidate,
+            prevalidationContext,
+            getNestedErrors,
+            elementResults,
+            rootErrors
+        };
+    }
+
+    #getLengthViolation(objToValidate: any[]): { provider: any } | null {
         if (
             typeof this.#maxLength === 'number' &&
             objToValidate.length > this.#maxLength
         ) {
-            return {
-                valid: false,
-                errors: [
-                    {
-                        message: `cannot contain more than ${
-                            this.#maxLength
-                        } elements`,
-                        path: path as string
-                    }
-                ]
-            };
+            return { provider: this.#maxLengthErrorMessageProvider };
         }
 
         if (
             typeof this.#minLength === 'number' &&
             objToValidate.length < this.#minLength
         ) {
+            return { provider: this.#minLengthErrorMessageProvider };
+        }
+
+        return null;
+    }
+
+    #assembleDoNotStopResults(
+        results: any[],
+        elementResults: any,
+        getNestedErrors: any
+    ) {
+        let allValid = true;
+
+        for (let i = 0; i < results.length; i++) {
+            if (!results[i]?.valid) {
+                allValid = false;
+            }
+            elementResults[i] = results[i] as any;
+        }
+
+        return Object.assign(
+            {
+                valid: allValid,
+                getNestedErrors
+            },
+            allValid
+                ? {}
+                : {
+                      errors: results
+                          .map(r => r?.errors)
+                          .filter(r => r)
+                          .flatMap(e =>
+                              e?.map((r: any) => ({
+                                  ...r
+                              }))
+                          ) as any
+                  },
+            allValid
+                ? {
+                      object: results.map(r => r?.object)
+                  }
+                : {}
+        ) as any;
+    }
+
+    /**
+     * Performs synchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validate}
+     */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ArraySchemaValidationResult<TResult, TElementSchema> {
+        return super.validate(object, context) as ArraySchemaValidationResult<
+            TResult,
+            TElementSchema
+        >;
+    }
+
+    /**
+     * Performs asynchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validateAsync}
+     */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ArraySchemaValidationResult<TResult, TElementSchema>> {
+        return super.validateAsync(object, context) as Promise<
+            ArraySchemaValidationResult<TResult, TElementSchema>
+        >;
+    }
+
+    /**
+     * Performs synchronous validation of the schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected _validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ArraySchemaValidationResult<TResult, TElementSchema> {
+        // Fast path: no preprocessors/validators, default error mode, has element schema
+        if (
+            this.canSkipPreValidation &&
+            !context?.doNotStopOnFirstError &&
+            this.#elementSchema instanceof SchemaBuilder
+        ) {
+            // Required / optional check
+            if (typeof object === 'undefined' || object === null) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue();
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
+                    const self = this;
+                    return {
+                        valid: true,
+                        object: object,
+                        getNestedErrors() {
+                            return self
+                                .#validateArrayFull(object, context)
+                                .getNestedErrors();
+                        }
+                    } as any;
+                } else {
+                    return this.#validateArrayFull(object, context);
+                }
+            }
+
+            if (!Array.isArray(object)) {
+                return this.#validateArrayFull(object, context);
+            }
+
+            // Length constraints
+            if (this.#getLengthViolation(object as any)) {
+                return this.#validateArrayFull(object, context);
+            }
+
+            // Validate elements inline — no path passed to children
+            const len = (object as any).length;
+            if (len > 0) {
+                const resultArray = new Array(len);
+                for (let i = 0; i < len; i++) {
+                    const result = this.#elementSchema.validate(
+                        (object as any)[i]
+                    );
+                    if (!result.valid) {
+                        const self = this;
+                        return {
+                            valid: false,
+                            errors:
+                                result.errors && result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getNestedErrors() {
+                                return self
+                                    .#validateArrayFull(object, context)
+                                    .getNestedErrors();
+                            }
+                        } as any;
+                    }
+                    resultArray[i] = result.object;
+                }
+
+                // Lazy getNestedErrors
+                const self = this;
+                return {
+                    valid: true,
+                    object: resultArray as TResult,
+                    getNestedErrors() {
+                        return self
+                            .#validateArrayFull(object, context)
+                            .getNestedErrors();
+                    }
+                } as any;
+            }
+
+            const self = this;
+            return {
+                valid: true,
+                object: object as TResult,
+                getNestedErrors() {
+                    return self
+                        .#validateArrayFull(object, context)
+                        .getNestedErrors();
+                }
+            } as any;
+        }
+
+        return this.#validateArrayFull(object, context);
+    }
+
+    /**
+     * Full validation path with complete setup, error handling, and nested error support.
+     */
+    #validateArrayFull(
+        object: TResult,
+        context?: ValidationContext
+    ): ArraySchemaValidationResult<TResult, TElementSchema> {
+        const setup = this.#createValidationSetup(
+            object,
+            this.preValidateSync(object, context)
+        );
+
+        if (!setup.needsElementValidation) return setup.result;
+
+        const {
+            objToValidate,
+            prevalidationContext,
+            getNestedErrors,
+            elementResults,
+            rootErrors
+        } = setup;
+
+        const lengthViolation = this.#getLengthViolation(objToValidate);
+        if (lengthViolation) {
+            const msg = this.getValidationErrorMessageSync(
+                lengthViolation.provider,
+                objToValidate as TResult
+            );
+            rootErrors.push(msg);
             return {
                 valid: false,
-                errors: [
-                    {
-                        message: `cannot contain less than ${
-                            this.#minLength
-                        } elements`,
-                        path: path as string
+                errors: [{ message: msg }],
+                getNestedErrors
+            };
+        }
+
+        if (
+            objToValidate.length > 0 &&
+            this.#elementSchema instanceof SchemaBuilder
+        ) {
+            if (prevalidationContext.doNotStopOnFirstError) {
+                const results: any[] = [];
+
+                for (let i = 0; i < objToValidate.length; i++) {
+                    results.push(
+                        this.#elementSchema.validate(objToValidate[i], {
+                            ...prevalidationContext
+                        })
+                    );
+                }
+
+                return this.#assembleDoNotStopResults(
+                    results,
+                    elementResults,
+                    getNestedErrors
+                );
+            } else {
+                const resultArray = new Array(objToValidate.length);
+                for (let i = 0; i < objToValidate.length; i++) {
+                    const result = this.#elementSchema.validate(
+                        objToValidate[i],
+                        {
+                            ...prevalidationContext
+                        }
+                    );
+                    elementResults[i] = result as any;
+                    if (result.valid) {
+                        resultArray[i] = result.object;
+                    } else {
+                        return {
+                            valid: false,
+                            errors:
+                                Array.isArray(result.errors) &&
+                                result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getNestedErrors
+                        };
                     }
-                ]
+                }
+
+                return {
+                    valid: true,
+                    object: resultArray as TResult,
+                    getNestedErrors
+                };
+            }
+        }
+
+        return {
+            valid: true,
+            object: objToValidate as TResult,
+            getNestedErrors
+        };
+    }
+
+    /**
+     * Performs async validation of the schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected async _validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ArraySchemaValidationResult<TResult, TElementSchema>> {
+        const setup = this.#createValidationSetup(
+            object,
+            await super.preValidateAsync(object, context)
+        );
+
+        if (!setup.needsElementValidation) return setup.result;
+
+        const {
+            objToValidate,
+            prevalidationContext,
+            getNestedErrors,
+            elementResults,
+            rootErrors
+        } = setup;
+
+        const lengthViolation = this.#getLengthViolation(objToValidate);
+        if (lengthViolation) {
+            const msg = await this.getValidationErrorMessage(
+                lengthViolation.provider,
+                objToValidate as TResult
+            );
+            rootErrors.push(msg);
+            return {
+                valid: false,
+                errors: [{ message: msg }],
+                getNestedErrors
             };
         }
 
@@ -184,71 +622,56 @@ export class ArraySchemaBuilder<
         ) {
             if (prevalidationContext.doNotStopOnFirstError) {
                 const results = await Promise.all(
-                    objToValidate.map((o) =>
-                        this.#elementSchema?.validate(o, prevalidationContext)
+                    objToValidate.map(o =>
+                        this.#elementSchema?.validateAsync(
+                            o,
+                            prevalidationContext
+                        )
                     )
                 );
 
-                let valid = true;
-
-                for (let i = 0; i < results.length; i++) {
-                    if (!results[i]?.valid) {
-                        valid = false;
-                    }
-                }
-
-                return Object.assign(
-                    {
-                        valid
-                    },
-                    valid
-                        ? {}
-                        : {
-                              errors: results
-                                  .map((r) => r?.errors)
-                                  .filter((r) => r)
-                                  .map((e) =>
-                                      e?.map((r, index) => ({
-                                          ...r,
-                                          path: `${r.path}[${index}]`
-                                      }))
-                                  )
-                                  .flat() as any
-                          },
-                    valid
-                        ? {
-                              object: results.map((r) => r?.object)
-                          }
-                        : {}
-                ) as any;
+                return this.#assembleDoNotStopResults(
+                    results,
+                    elementResults,
+                    getNestedErrors
+                );
             } else {
+                const resultArray = new Array(objToValidate.length);
                 for (let i = 0; i < objToValidate.length; i++) {
-                    const {
-                        valid,
-                        errors,
-                        object: validatedItem
-                    } = await this.#elementSchema.validate(objToValidate[i], {
-                        ...prevalidationContext,
-                        path: `${path}[${i}]`
-                    });
-                    if (valid) {
-                        objToValidate[i] = validatedItem;
+                    const result = await this.#elementSchema.validateAsync(
+                        objToValidate[i],
+                        {
+                            ...prevalidationContext
+                        }
+                    );
+                    elementResults[i] = result as any;
+                    if (result.valid) {
+                        resultArray[i] = result.object;
                     } else {
                         return {
                             valid: false,
                             errors:
-                                Array.isArray(errors) && errors.length > 0
-                                    ? [errors[0]]
-                                    : []
+                                Array.isArray(result.errors) &&
+                                result.errors.length > 0
+                                    ? [result.errors[0]]
+                                    : [],
+                            getNestedErrors
                         };
                     }
                 }
+
+                return {
+                    valid: true,
+                    object: resultArray as TResult,
+                    getNestedErrors
+                };
             }
         }
 
         return {
             valid: true,
-            object: objToValidate as TResult
+            object: objToValidate as TResult,
+            getNestedErrors
         };
     }
 
@@ -264,8 +687,18 @@ export class ArraySchemaBuilder<
     /**
      * @hidden
      */
-    public required(): ArraySchemaBuilder<TElementSchema, true, TExplicitType> {
-        return super.required();
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.required(errorMessage);
     }
 
     /**
@@ -274,9 +707,85 @@ export class ArraySchemaBuilder<
     public optional(): ArraySchemaBuilder<
         TElementSchema,
         false,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TResult | (() => TResult)
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        true,
+        TNullable,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
+        TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TNullable,
+        TResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
+    }
+
+    /**
+     * Marks the inferred type as `ReadonlyArray<T>` — disables `push`,
+     * `pop`, and other mutating methods at the type level. Validation
+     * behaviour is unchanged.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TNullable,
+        ReadonlyArray<
+            TElementSchema extends SchemaBuilder<infer T1, infer T2>
+                ? InferType<SchemaBuilder<T1, T2>>
+                : any
+        >,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
     }
 
     public introspect() {
@@ -290,10 +799,25 @@ export class ArraySchemaBuilder<
              * Min length of a valid array
              */
             minLength: this.#minLength,
+
+            /**
+             * Min length validation error message provider.
+             * If not provided, default error message provider is used.
+             */
+            minLengthValidationErrorMessageProvider:
+                this.#minLengthErrorMessageProvider,
+
             /**
              * Max length of a valid array
              */
-            maxLength: this.#maxLength
+            maxLength: this.#maxLength,
+
+            /**
+             * Max length validation error message provider.
+             * If not provided, default error message provider is used.
+             */
+            maxLengthValidationErrorMessageProvider:
+                this.#maxLengthErrorMessageProvider
         };
     }
 
@@ -302,16 +826,36 @@ export class ArraySchemaBuilder<
      * Item of any type is allowed.
      * @param schema Schema that every array item has to satisfy
      */
-    public of<TSchema extends SchemaBuilder<any, any>>(
+    public of<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
-    ): ArraySchemaBuilder<TSchema, TRequired, TExplicitType> {
+    ): ArraySchemaBuilder<
+        TSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return ArraySchemaBuilder.create({
             ...this.introspect(),
             elementSchema: schema
         } as any) as any;
     }
 
-    public clearOf(): ArraySchemaBuilder<any, TRequired, TExplicitType> {
+    /**
+     * Clears the element schema set by `of()`. After this call,
+     * array items of any type will be accepted.
+     */
+    public clearOf(): ArraySchemaBuilder<
+        any,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return ArraySchemaBuilder.create({
             ...this.introspect(),
             elementSchema: undefined
@@ -322,13 +866,33 @@ export class ArraySchemaBuilder<
      * Set minimal length of the valid array value for schema.
      */
     public minLength<T extends number>(
-        length: T
-    ): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType> {
+        length: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            ArraySchemaBuilder<
+                TElementSchema,
+                TRequired,
+                TNullable,
+                TExplicitType
+            >
+        >
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
         return ArraySchemaBuilder.create({
             ...this.introspect(),
-            minLength: length
+            minLength: length,
+            minLengthValidationErrorMessageProvider: errorMessage
         } as any) as any;
     }
 
@@ -338,8 +902,12 @@ export class ArraySchemaBuilder<
     public clearMinLength(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         const schema = this.introspect();
         delete schema.minLength;
         return this.createFromProps({
@@ -351,13 +919,33 @@ export class ArraySchemaBuilder<
      * Set max length of the valid array value for schema.
      */
     public maxLength<T extends number>(
-        length: T
-    ): ArraySchemaBuilder<TElementSchema, TRequired, TExplicitType> {
+        length: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            ArraySchemaBuilder<
+                TElementSchema,
+                TRequired,
+                TNullable,
+                TExplicitType
+            >
+        >
+    ): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
         return ArraySchemaBuilder.create({
             ...this.introspect(),
-            maxLength: length
+            maxLength: length,
+            maxLengthValidationErrorMessageProvider: errorMessage
         } as any) as any;
     }
 
@@ -367,13 +955,47 @@ export class ArraySchemaBuilder<
     public clearMaxLength(): ArraySchemaBuilder<
         TElementSchema,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         const schema = this.introspect();
         delete schema.maxLength;
         return this.createFromProps({
             ...schema
         } as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): ArraySchemaBuilder<
+        TElementSchema,
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 
@@ -393,10 +1015,12 @@ export class ArraySchemaBuilder<
  *  // undefined - invalid
  * ```
  */
-export const array = <TElementSchema extends SchemaBuilder<any, any>>(
+export const array = <
+    TElementSchema extends SchemaBuilder<any, any, any, any, any>
+>(
     elementSchema?: TElementSchema
 ) =>
     ArraySchemaBuilder.create({
         isRequired: true,
         elementSchema
-    }) as ArraySchemaBuilder<TElementSchema, true>;
+    }) as unknown as ArraySchemaBuilder<TElementSchema, true>;

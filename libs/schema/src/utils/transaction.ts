@@ -2,6 +2,9 @@ const TRANSACTION_SYMBOL = Symbol('transaction');
 
 const defaultNonTransactionalTypes = [Error, RegExp, Date];
 
+/**
+ * Options for customizing transaction behavior.
+ */
 export type TransactionOptions = {
     /**
      * An optional callback returning boolean. Called for every
@@ -18,10 +21,15 @@ export type TransactionOptions = {
 };
 
 const defaultTransactionOptions: TransactionOptions = {
-    shouldNotWrapWithTransaction: (child) =>
-        !!defaultNonTransactionalTypes.find((t) => child instanceof t)
+    shouldNotWrapWithTransaction: child =>
+        !!defaultNonTransactionalTypes.find(t => child instanceof t)
 };
 
+/**
+ * A transaction wrapper around an object. Provides copy-on-write semantics:
+ * modifications to `object` are isolated from the original until `commit()` is called.
+ * Use `rollback()` to discard changes, and `isDirty()` to check for pending modifications.
+ */
 export type Transaction<T> = {
     /**
      * Transaction object you can modify (equals to `initial` right after the call).
@@ -40,19 +48,25 @@ export type Transaction<T> = {
      */
     rollback: () => T;
     /**
-     * Returns `true` if there are any changes to `object` which makes is different from `initial`
+     * Returns `true` if there are any changes to `object` which make it different from `initial`.
      */
     isDirty: () => boolean;
 };
 
 /**
- * Starts transaction over the `initial` object.
+ * Starts a transaction over the `initial` object. The returned `object` is a
+ * proxy (for plain objects) or a shallow copy (for arrays) that tracks mutations
+ * without modifying `initial`. Call `commit()` to apply or `rollback()` to discard changes.
+ *
+ * @param initial - the object or array to wrap in a transaction
+ * @param options - optional configuration to control which nested values are wrapped
+ * @returns a {@link Transaction} with `object`, `commit`, `rollback`, and `isDirty` members
  */
 export const transaction = <T extends {}>(
     initial: T,
     options?: TransactionOptions
 ): Transaction<T> => {
-    let newProperties = {};
+    let newProperties: Record<string | symbol, any> = {};
     let deletedProperties = new Map<keyof T, true>();
 
     options = Object.assign({}, defaultTransactionOptions, options || {});
@@ -61,20 +75,20 @@ export const transaction = <T extends {}>(
         options as Required<TransactionOptions>;
 
     const isDirty = () =>
-        !!Object.keys(newProperties).find((key) => {
-            if (newProperties[key] && newProperties[key][TRANSACTION_SYMBOL]) {
+        !!Object.keys(newProperties).find(key => {
+            if (newProperties[key]?.[TRANSACTION_SYMBOL]) {
                 return newProperties[key][TRANSACTION_SYMBOL].isDirty();
             }
             return true;
         }) || ((deletedProperties.size > 0) as any);
 
     const commit = () => {
-        const result = {} as Record<keyof T, any>;
-        Object.keys(initial).forEach((key) => {
-            result[key] = initial[key];
+        const result = {} as Record<string, any>;
+        Object.keys(initial).forEach(key => {
+            result[key] = (initial as any)[key];
         });
 
-        Object.keys(newProperties).forEach((key) => {
+        Object.keys(newProperties).forEach(key => {
             const value = newProperties[key];
             if (value[TRANSACTION_SYMBOL]) {
                 const { commit: childCommit } = value[TRANSACTION_SYMBOL];
@@ -85,13 +99,13 @@ export const transaction = <T extends {}>(
         });
 
         for (const key of deletedProperties.keys()) {
-            delete result[key];
+            delete result[key as string];
         }
 
         newProperties = {};
         deletedProperties = new Map<keyof T, true>();
 
-        return result;
+        return result as T;
     };
 
     const rollback = () => {
@@ -112,13 +126,13 @@ export const transaction = <T extends {}>(
     };
 
     if (Array.isArray(initial)) {
-        const result = initial.map((el) =>
+        const result = initial.map(el =>
             typeof el === 'object' && el && !shouldNotWrapWithTransaction(el)
                 ? transaction(el).object
                 : el
         );
         const commitArray = () =>
-            result.map((el) =>
+            result.map(el =>
                 el && typeof el[TRANSACTION_SYMBOL] === 'object'
                     ? el[TRANSACTION_SYMBOL].commit()
                     : el
@@ -153,7 +167,7 @@ export const transaction = <T extends {}>(
 
     const proxy = new Proxy<T>(initial, {
         set: (target, property, value) => {
-            if (target && target[property] === value) {
+            if (target && (target as any)[property] === value) {
                 delete newProperties[property];
                 return true;
             }
@@ -161,7 +175,7 @@ export const transaction = <T extends {}>(
             deletedProperties.delete(property as any);
             return true;
         },
-        ownKeys: (target) => {
+        ownKeys: target => {
             return [
                 ...Object.keys(target).filter(
                     (k: any) => !deletedProperties.has(k)
@@ -202,7 +216,7 @@ export const transaction = <T extends {}>(
                         isDirty
                     };
                 }
-                return target[prop];
+                return (target as any)[prop];
             }
 
             if (prop in newProperties) {
@@ -214,17 +228,17 @@ export const transaction = <T extends {}>(
             }
 
             if (
-                !isTransaction(target[prop]) &&
-                typeof target[prop] === 'object' &&
-                target[prop] &&
-                !shouldNotWrapWithTransaction(target[prop])
+                !isTransaction((target as any)[prop]) &&
+                typeof (target as any)[prop] === 'object' &&
+                (target as any)[prop] &&
+                !shouldNotWrapWithTransaction((target as any)[prop])
             ) {
-                const { object } = transaction(target[prop], options);
+                const { object } = transaction((target as any)[prop], options);
                 newProperties[prop] = object;
                 return object;
             }
 
-            return target[prop];
+            return (target as any)[prop];
         },
         deleteProperty: (target, p) => {
             if (p in newProperties) {
@@ -252,9 +266,24 @@ export const transaction = <T extends {}>(
 };
 
 /**
- * Checks if `obj` is instance of transaction
- * @param obj object to check if it's a transaction
- * @returns
+ * Creates a lightweight no-op transaction that wraps the `initial` value
+ * without any Proxy or copy-on-write overhead.  `commit()` and `rollback()`
+ * simply return the original object, and `isDirty()` is always `false`.
+ *
+ * Use this when no preprocessors or validators are defined — there is no
+ * risk of mutation, so the full transaction machinery can be skipped.
  */
-export const isTransaction = (obj) =>
+export const noopTransaction = <T extends {}>(initial: T): Transaction<T> => ({
+    object: initial,
+    commit: () => initial,
+    rollback: () => initial,
+    isDirty: () => false
+});
+
+/**
+ * Checks if `obj` is an instance of a transaction.
+ * @param obj object to check if it's a transaction
+ * @returns `true` if `obj` is a transaction, `false` otherwise
+ */
+export const isTransaction = (obj: any) =>
     obj && typeof obj === 'object' && Object.hasOwn(obj, TRANSACTION_SYMBOL);

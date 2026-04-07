@@ -1,0 +1,80 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the sections below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: Minimal code or steps to reproduce the issue.
+      placeholder: |
+        import { string } from '@cleverbrush/schema';
+
+        const schema = string();
+        const result = schema.validate('...');
+        // Expected: ...
+        // Actual: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include error messages if applicable.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Which package is affected?
+      options:
+        - "@cleverbrush/schema"
+        - "@cleverbrush/deep"
+        - "@cleverbrush/async"
+        - "@cleverbrush/mapper"
+        - "@cleverbrush/react-form"
+        - "@cleverbrush/scheduler"
+        - "@cleverbrush/knex-clickhouse"
+        - Other / Multiple
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js Version
+      placeholder: e.g. 22.0.0
+    validations:
+      required: false
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      placeholder: e.g. macOS 15, Ubuntu 24.04, Windows 11
+    validations:
+      required: false

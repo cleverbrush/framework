@@ -1,12 +1,13 @@
-import { expectType } from 'tsd';
+import { expect, expectTypeOf, test } from 'vitest';
+
 import { func } from './FunctionSchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 
 test('Func checks', async () => {
     const schema = func();
 
     const typeCheck: InferType<typeof schema> = () => null;
-    expectType<(...args: any[]) => any>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<(...args: any[]) => any>();
 
     {
         const obj = null;
@@ -84,7 +85,9 @@ test('Optional checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = () => 1;
-    expectType<(...args: any[]) => any | undefined>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<
+        (...args: any[]) => any | undefined
+    >();
 
     {
         const obj = null;
@@ -142,7 +145,7 @@ test('Required checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;
@@ -200,7 +203,7 @@ test('Has type checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;
@@ -257,6 +260,20 @@ test('Clear Has type - 1', () => {
 
     const typeCheck: InferType<typeof schema2> = () => null;
 
-    expectType<(...args: any[]) => any>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<(...args: any[]) => any>();
     expect(schema1 !== (schema2 as any)).toEqual(true);
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 246)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from function schema', () => {
+    const noop = () => null;
+    const schema = func()
+        .default(noop as any)
+        .clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
 });

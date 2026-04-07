@@ -1,7 +1,9 @@
 import {
+    type BRAND,
     SchemaBuilder,
-    ValidationResult,
-    ValidationContext
+    type ValidationContext,
+    type ValidationErrorMessageProvider,
+    type ValidationResult
 } from './SchemaBuilder.js';
 
 type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
@@ -19,19 +21,19 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  *
  * @example ```ts
  * const schema = boolean().equals(true);
- * const result = await schema.validate(true);
+ * const result = schema.validate(true);
  * // result.valid === true
  * // result.object === true
  * ```
  * @example ```ts
  * const schema = boolean().equals(false);
- * const result = await schema.validate(true);
+ * const result = schema.validate(true);
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be equal to 'false''
  * ```
  * @example ```ts
  * const schema = boolean().equals(true).optional();
- * const result = await schema.validate(undefined);
+ * const result = schema.validate(undefined);
  * // result.valid === true
  * // result.object === undefined
  * ```
@@ -41,11 +43,31 @@ type BooleanSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 export class BooleanSchemaBuilder<
     TResult = boolean,
     TRequired extends boolean = true,
+    TNullable extends boolean = false,
     TExplicitType = undefined,
+    THasDefault extends boolean = false,
+    TExtensions = {},
     TFinalResult = TExplicitType extends undefined ? TResult : TExplicitType
-> extends SchemaBuilder<TFinalResult, TRequired> {
+> extends SchemaBuilder<
+    TFinalResult,
+    TRequired,
+    TNullable,
+    THasDefault,
+    TExtensions
+> {
     #equalsTo?: boolean;
+    #defaultEqualsToErrorMessageProvider: ValidationErrorMessageProvider<
+        BooleanSchemaBuilder<TResult, TRequired>
+    > = function (this: BooleanSchemaBuilder) {
+        return `is expected to be equal ${this.#equalsTo}`;
+    };
+    #equalsToErrorMessageProvider: ValidationErrorMessageProvider<
+        BooleanSchemaBuilder<TResult, TRequired>
+    > = this.#defaultEqualsToErrorMessageProvider;
 
+    /**
+     * @hidden
+     */
     public static create(props: BooleanSchemaBuilderCreateProps<any>) {
         return new BooleanSchemaBuilder({
             type: 'boolean',
@@ -53,7 +75,7 @@ export class BooleanSchemaBuilder<
         });
     }
 
-    private constructor(props: BooleanSchemaBuilderCreateProps<TRequired>) {
+    protected constructor(props: BooleanSchemaBuilderCreateProps<TRequired>) {
         super(props as any);
 
         if (
@@ -62,6 +84,12 @@ export class BooleanSchemaBuilder<
         ) {
             this.#equalsTo = props.equalsTo;
         }
+
+        this.#equalsToErrorMessageProvider =
+            this.assureValidationErrorMessageProvider(
+                props.equalsToValidationErrorMessageProvider,
+                this.#defaultEqualsToErrorMessageProvider
+            );
     }
 
     public introspect() {
@@ -70,45 +98,86 @@ export class BooleanSchemaBuilder<
             /**
              * If set, restrict object to be equal to a certain value.
              */
-            equalsTo: this.#equalsTo
+            equalsTo: this.#equalsTo,
+            /**
+             * Equals to validation error message provider.
+             * If not provided, default error message will be used.
+             */
+            equalsToValidationErrorMessageProvider:
+                this.#equalsToErrorMessageProvider
         };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    public hasType<T>(notUsed?: T): BooleanSchemaBuilder<TResult, true, T> {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
-    }
-
-    public clearHasType(): BooleanSchemaBuilder<TResult, TRequired, undefined> {
+    /**
+     * @inheritdoc
+     */
+    public hasType<T>(
+        _notUsed?: T
+    ): BooleanSchemaBuilder<
+        TResult,
+        true,
+        TNullable,
+        T,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
     }
 
     /**
-     * Performs validion of the schema over `object`. Basically runs
-     * validators, preprocessors and checks for required (if schema is not optional).
-     * @param context Optional `ValidationContext` settings.
+     * @inheritdoc
      */
-    public async validate(
-        object: TResult,
-        context?: ValidationContext
-    ): Promise<ValidationResult<TResult>> {
-        const superResult = await super.preValidate(object, context);
+    public clearHasType(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        undefined,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return this.createFromProps({
+            ...this.introspect()
+        } as any) as any;
+    }
 
+    #getConstraintViolation(
+        objToValidate: any
+    ): { message: string } | { provider: any } | null {
+        if (typeof objToValidate !== 'boolean') {
+            return { message: 'expected to be boolean' };
+        }
+
+        if (
+            typeof this.#equalsTo !== 'undefined' &&
+            objToValidate !== this.#equalsTo
+        ) {
+            return { provider: this.#equalsToErrorMessageProvider };
+        }
+
+        return null;
+    }
+
+    #buildResult(
+        superResult: ReturnType<BooleanSchemaBuilder['preValidateSync']>
+    ):
+        | { done: true; result: ValidationResult<TResult> }
+        | {
+              done: false;
+              provider: any;
+              objToValidate: any;
+          } {
         const {
             valid,
-            context: prevalidationContext,
             transaction: preValidationTransaction,
             errors
         } = superResult;
 
-        const { path } = prevalidationContext;
-
         if (!valid) {
-            return { valid, errors };
+            return { done: true, result: { valid, errors } };
         }
 
         const {
@@ -116,47 +185,157 @@ export class BooleanSchemaBuilder<
         } = preValidationTransaction!;
 
         if (
-            (typeof objToValidate === 'undefined' || objToValidate === null) &&
-            this.isRequired === false
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
         ) {
             return {
-                valid: true,
-                object: objToValidate
+                done: true,
+                result: { valid: true, object: objToValidate }
             };
         }
 
-        if (typeof objToValidate !== 'boolean') {
+        const violation = this.#getConstraintViolation(objToValidate);
+
+        if (!violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: 'expected to be boolean',
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: { valid: true, object: objToValidate as TResult }
             };
         }
 
-        if (
-            typeof this.#equalsTo !== 'undefined' &&
-            objToValidate !== this.#equalsTo
-        ) {
+        if ('message' in violation) {
             return {
-                valid: false,
-                errors: [
-                    {
-                        message: `is expected to be equal to '${
-                            this.#equalsTo
-                        }'`,
-                        path: path as string
-                    }
-                ]
+                done: true,
+                result: {
+                    valid: false,
+                    errors: [{ message: violation.message }]
+                }
             };
         }
 
         return {
-            valid: true,
-            object: objToValidate as TResult
+            done: false,
+            provider: violation.provider,
+            objToValidate
+        };
+    }
+
+    /** {@inheritDoc SchemaBuilder.validate} */
+    public validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        return super.validate(object, context) as ValidationResult<TResult>;
+    }
+
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    public async validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        return super.validateAsync(object, context) as Promise<
+            ValidationResult<TResult>
+        >;
+    }
+
+    /**
+     * Performs synchronous validation of the schema over `object`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected _validate(
+        object: TResult,
+        context?: ValidationContext
+    ): ValidationResult<TResult> {
+        // Fast path: no preprocessors or custom validators
+        if (this.canSkipPreValidation) {
+            if (typeof object === 'undefined' || object === null) {
+                if (typeof object === 'undefined' && this.hasDefault) {
+                    object = this.resolveDefaultValue() as typeof object;
+                } else if (
+                    !this.isRequired ||
+                    (object === null && this.isNullable)
+                ) {
+                    return { valid: true, object: object };
+                } else {
+                    return {
+                        valid: false,
+                        errors: [
+                            {
+                                message: this.getValidationErrorMessageSync(
+                                    this.requiredErrorMessage,
+                                    object as TFinalResult
+                                )
+                            }
+                        ]
+                    };
+                }
+            }
+
+            const violation = this.#getConstraintViolation(object);
+
+            if (!violation) {
+                return { valid: true, object: object as TResult };
+            }
+
+            if ('message' in violation) {
+                return {
+                    valid: false,
+                    errors: [{ message: violation.message }]
+                };
+            }
+
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: this.getValidationErrorMessageSync(
+                            violation.provider,
+                            object as unknown as TFinalResult
+                        )
+                    }
+                ]
+            };
+        }
+
+        const r = this.#buildResult(this.preValidateSync(object, context));
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: this.getValidationErrorMessageSync(
+                        r.provider,
+                        r.objToValidate as TFinalResult
+                    )
+                }
+            ]
+        };
+    }
+
+    /**
+     * Performs async validation of the schema over `object`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional `ValidationContext` settings.
+     */
+    protected async _validateAsync(
+        object: TResult,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        const r = this.#buildResult(
+            await super.preValidateAsync(object, context)
+        );
+        if (r.done) return r.result;
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: await this.getValidationErrorMessage(
+                        r.provider,
+                        r.objToValidate as TFinalResult
+                    )
+                }
+            ]
         };
     }
 
@@ -166,37 +345,180 @@ export class BooleanSchemaBuilder<
         return BooleanSchemaBuilder.create(props as any) as any;
     }
 
-    public required(): BooleanSchemaBuilder<TResult, true, TExplicitType> {
-        return super.required();
+    /**
+     * @hidden
+     */
+    public required(
+        errorMessage?: ValidationErrorMessageProvider
+    ): BooleanSchemaBuilder<
+        TResult,
+        true,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.required(errorMessage);
     }
 
-    public optional(): BooleanSchemaBuilder<TResult, false, TExplicitType> {
+    /**
+     * @hidden
+     */
+    public optional(): BooleanSchemaBuilder<
+        TResult,
+        false,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return super.optional();
+    }
+
+    /**
+     * @hidden
+     */
+    public default(
+        value: TFinalResult | (() => TFinalResult)
+    ): BooleanSchemaBuilder<
+        TResult,
+        true,
+        TNullable,
+        TExplicitType,
+        true,
+        TExtensions
+    > &
+        TExtensions {
+        return super.default(value) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public clearDefault(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        false,
+        TExtensions
+    > &
+        TExtensions {
+        return super.clearDefault() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public brand<TBrand extends string | symbol>(
+        _name?: TBrand
+    ): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        TFinalResult & { readonly [K in BRAND]: TBrand },
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.brand(_name);
+    }
+
+    /**
+     * Marks the inferred type as `Readonly<boolean>`. Since booleans are
+     * already immutable this is an identity operation, but it sets the
+     * `isReadonly` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    public readonly(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        Readonly<TFinalResult>,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.readonly();
     }
 
     /**
      * Restricts object to be equal to `value`.
      */
-    public equals<T extends boolean>(value: T) {
+    public equals<T extends boolean>(
+        value: T,
+        /**
+         * Custom error message provider.
+         */
+        errorMessage?: ValidationErrorMessageProvider<
+            BooleanSchemaBuilder<TResult, TRequired>
+        >
+    ) {
         if (typeof value !== 'boolean') throw new Error('boolean expected');
         return this.createFromProps({
             ...this.introspect(),
-            equalsTo: value
-        } as any) as any as BooleanSchemaBuilder<T, TRequired, TExplicitType>;
+            equalsTo: value,
+            equalsToValidationErrorMessageProvider: errorMessage
+        } as any) as any as BooleanSchemaBuilder<
+            T,
+            TRequired,
+            TNullable,
+            TExplicitType,
+            THasDefault,
+            TExtensions
+        > &
+            TExtensions;
     }
 
     /**
-     * Removes a `value` defeined by `equals()` call.
+     * Removes a `value` defined by `equals()` call.
      */
     public clearEquals(): BooleanSchemaBuilder<
         boolean,
         TRequired,
-        TExplicitType
-    > {
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
         return this.createFromProps({
             ...this.introspect(),
             equalsTo: undefined
         } as any) as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public nullable(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        true,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.nullable() as any;
+    }
+
+    /**
+     * @hidden
+     */
+    public notNullable(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        false,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return super.notNullable() as any;
     }
 }
 

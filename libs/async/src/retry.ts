@@ -60,13 +60,13 @@ export const retry = <T>(
         const tryPromise = () => {
             fn()
                 .then(resolve)
-                .catch((error) => {
+                .catch(error => {
                     if (
                         retries < maxRetries &&
                         (!options?.shouldRetry || options.shouldRetry(error))
                     ) {
                         retries++;
-                        let delay = minDelay * Math.pow(delayFactor, retries);
+                        let delay = minDelay * delayFactor ** retries;
                         if (delayRandomizationPercent) {
                             delay -=
                                 delay *

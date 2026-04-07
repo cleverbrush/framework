@@ -1,0 +1,45 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "description": "Bidirectional JSON Schema (Draft 7 / 2020-12) interop for @cleverbrush/schema",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_schema-json.html",
+    "keywords": [
+        "json schema",
+        "schema",
+        "validation",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/schema-json",
+    "peerDependencies": {
+        "@cleverbrush/schema": "^2.0.0",
+        "@standard-schema/spec": "^1.1.0"
+    },
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/schema-json#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "2.0.0"
+}

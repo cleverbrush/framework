@@ -19,7 +19,7 @@ export function debounce<T extends (...args: any[]) => void>(
     let timeout: ReturnType<typeof setTimeout> | null;
     let initialCall = true;
 
-    return function (...args: Parameters<T>) {
+    return (...args: Parameters<T>) => {
         if (opts.immediate && initialCall) {
             initialCall = false;
             func(...args);

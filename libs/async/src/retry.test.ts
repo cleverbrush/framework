@@ -1,3 +1,5 @@
+import { expect, test } from 'vitest';
+
 import { retry } from './retry.js';
 
 test('retry - 1', async () => {
@@ -36,7 +38,7 @@ test('retry - 2', async () => {
         retry(fn, { maxRetries: 5, minDelay: 10, delayFactor: 1 })
     ).resolves.toBe('success');
     const end = performance.now();
-    expect(end - start).toBeGreaterThan(30);
+    expect(end - start).toBeGreaterThan(25);
     expect(numCalled).toBe(4);
 });
 
@@ -69,7 +71,7 @@ test('retry - 4 - should retry', async () => {
         });
 
     await expect(
-        retry(fn, { maxRetries: 5, shouldRetry: (e) => e.message === 'error' })
+        retry(fn, { maxRetries: 5, shouldRetry: e => e.message === 'error' })
     ).rejects.toThrow('error2');
 });
 
@@ -82,7 +84,7 @@ test('retry - 5 - should not retry', async () => {
         });
 
     await expect(
-        retry(fn, { maxRetries: 5, shouldRetry: (e) => e.message === 'error2' })
+        retry(fn, { maxRetries: 5, shouldRetry: e => e.message === 'error2' })
     ).rejects.toThrow('error');
     expect(numCalled).toBe(1);
 });

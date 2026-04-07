@@ -5,9 +5,10 @@
         "declaration": true,
         "target": "ES2022",
         "esModuleInterop": true,
-        "moduleResolution": "Node",
+        "moduleResolution": "bundler",
         "checkJs": true,
-        "strictNullChecks": true
+        "strictNullChecks": true,
+        "types": ["vitest/globals"]
     },
     "watchOptions": {
         "excludeDirectories": ["./dist"]

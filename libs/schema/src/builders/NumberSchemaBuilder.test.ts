@@ -1,6 +1,6 @@
-import { expectType } from 'tsd';
-import { InferType } from './SchemaBuilder.js';
+import { expect, expectTypeOf, test } from 'vitest';
 import { number } from './NumberSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 
 test('Clean', async () => {
     const builder = number();
@@ -10,7 +10,7 @@ test('Clean', async () => {
     expect(schema.type).toEqual('number');
 
     const typeCheck: InferType<typeof builder> = 0;
-    expectType<number>(typeCheck);
+    expectTypeOf(typeCheck).toBeNumber();
 
     {
         const { valid, errors, object } = await builder.validate(12345);
@@ -40,10 +40,10 @@ test('Optional', () => {
     expect(schema).toHaveProperty('isRequired', false);
 
     const typeCheck1: InferType<typeof builder> = 0 as any;
-    expectType<number>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeNumber();
 
     let typeCheck2: InferType<typeof builderOptional>;
-    expectType<number | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<number | undefined>();
 });
 
 test('Required', () => {
@@ -59,10 +59,10 @@ test('Required', () => {
     expect(schema).toHaveProperty('isRequired', true);
 
     const typeCheck1: InferType<typeof builder> = 0;
-    expectType<number>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeNumber();
 
     const typeCheck2: InferType<typeof builderOptional> = 0;
-    expectType<number | undefined>(typeCheck2);
+    expectTypeOf(typeCheck2).toMatchTypeOf<number | undefined>();
 });
 
 test('Optional - 2', async () => {
@@ -101,7 +101,7 @@ test('equals - 1', async () => {
     expect(newSchema.equalsTo).toEqual(10);
 
     const typeCheck1: InferType<typeof newBuilder> = 10;
-    expectType<10>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<10>();
 
     {
         const { valid, object, errors } = await newBuilder.validate(10);
@@ -124,7 +124,7 @@ test('equals - 2', async () => {
     expect(schema.equalsTo).toBeUndefined();
 
     const typeCheck1: InferType<typeof builder> = 10;
-    expectType<number>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeNumber();
 });
 
 test('equals - 3', () => {
@@ -394,7 +394,7 @@ test('min - 4', async () => {
 
 test('validator - 1', async () => {
     const builder = number();
-    const newBuilder = builder.addValidator((num) => {
+    const newBuilder = builder.addValidator(num => {
         return num & 1
             ? { valid: true }
             : { valid: false, errors: [{ message: 'value must be odd' }] };
@@ -416,12 +416,12 @@ test('validator - 1', async () => {
 test('validators - 1', async () => {
     const builder = number();
     const newBuilder = builder
-        .addValidator((num) => {
+        .addValidator(num => {
             return num & 1
                 ? { valid: true }
                 : { valid: false, errors: [{ message: 'value must be odd' }] };
         })
-        .addValidator((num) => {
+        .addValidator(num => {
             return num % 3 === 0
                 ? { valid: true }
                 : { valid: false, errors: [{ message: 'error message' }] };
@@ -443,7 +443,7 @@ test('validators - 1', async () => {
 test('preprocessor - 1', async () => {
     const builder = number();
     const newBuilder = builder
-        .addPreprocessor((num) => (num < 0 ? -num : num))
+        .addPreprocessor(num => (num < 0 ? -num : num))
         .min(5);
 
     expect(builder !== newBuilder).toEqual(true);
@@ -461,8 +461,8 @@ test('preprocessor - 1', async () => {
 
 test('preprocessors - 1', async () => {
     const builder = number()
-        .addPreprocessor((num) => (num < 0 ? -num : num))
-        .addPreprocessor((num) => num * num)
+        .addPreprocessor(num => (num < 0 ? -num : num))
+        .addPreprocessor(num => num * num)
         .min(5);
     {
         const { valid, object } = await builder.validate(-10);
@@ -479,13 +479,13 @@ test('preprocessors - 1', async () => {
 test('hasType - 1', () => {
     const builder = number().hasType<string>();
     const typeCheck1: InferType<typeof builder> = '123';
-    expectType<string>(typeCheck1);
+    expectTypeOf(typeCheck1).toBeString();
 });
 
 test('hasType - 2', () => {
     const builder = number().hasType(new Date());
     const typeCheck1: InferType<typeof builder> = new Date();
-    expectType<Date>(typeCheck1);
+    expectTypeOf(typeCheck1).toMatchTypeOf<Date>();
 });
 
 test('Clear Has type - 1', () => {
@@ -494,7 +494,7 @@ test('Clear Has type - 1', () => {
 
     const typeCheck: InferType<typeof schema2> = 123;
 
-    expectType<number>(typeCheck);
+    expectTypeOf(typeCheck).toBeNumber();
     expect(schema1 !== (schema2 as any)).toEqual(true);
 });
 
@@ -557,4 +557,515 @@ test('isInteger - 3', async () => {
         const { valid } = await builderNew.validate(Math.PI);
         expect(valid).toEqual(true);
     }
+});
+
+test('isInteger - 4', async () => {
+    const builder = number();
+    const schema = builder.introspect();
+
+    const builderNew = builder.clearIsInteger();
+    const schemaNew = builderNew.introspect();
+
+    expect(builder !== builderNew).toEqual(true);
+    expect(schemaNew.isInteger).toEqual(false);
+    expect(schema.isInteger).toEqual(true);
+
+    {
+        const { valid } = await builder.validate(10);
+        expect(valid).toEqual(true);
+    }
+
+    {
+        const { valid } = await builderNew.validate(Math.PI);
+        expect(valid).toEqual(true);
+    }
+});
+
+test('custom error message min()', async () => {
+    const schema = number().min(10, 'some custom error message');
+
+    {
+        const { valid, errors } = await schema.validate(5);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+
+    {
+        const { valid, errors } = await schema.validate(10);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema2 = schema.min(10, () => 'some custom error message new');
+
+    {
+        const { valid, errors } = await schema2.validate(5);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message new');
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(10);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema3 = schema2.clearMin();
+
+    {
+        const { valid, errors } = await schema3.validate(5);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema4 = schema3.min(10);
+
+    {
+        const { valid, errors } = await schema4.validate(5);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('expected to be at least 10');
+    }
+
+    const schema5 = schema4.clearMin();
+
+    {
+        const { valid, errors } = await schema5.validate(5);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema6 = schema5.min(
+        10,
+        (seenValue, schema) =>
+            `expected to be at least ${schema.introspect().min}, got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema6.validate(5);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be at least 10, got 5'
+        );
+    }
+
+    const schema7 = schema6.min(
+        20,
+        (seenValue, schema) =>
+            `expected to see at minimum ${schema.introspect().min}, but got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema7.validate(10);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to see at minimum 20, but got 10'
+        );
+    }
+
+    const schema8 = schema7.min(50);
+
+    {
+        const { valid, errors } = await schema8.validate(30);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('expected to be at least 50');
+    }
+});
+
+test('custom error message max()', async () => {
+    const schema = number().max(10, 'some custom error message');
+
+    {
+        const { valid, errors } = await schema.validate(50);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+
+    {
+        const { valid, errors } = await schema.validate(5);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema2 = schema.max(10, () => 'some custom error message new');
+
+    {
+        const { valid, errors } = await schema2.validate(50);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message new');
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(5);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema3 = schema2.clearMax();
+
+    {
+        const { valid, errors } = await schema3.validate(50);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema4 = schema3.max(10);
+
+    {
+        const { valid, errors } = await schema4.validate(50);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be no more than or equal to 10'
+        );
+    }
+
+    const schema5 = schema4.clearMax();
+
+    {
+        const { valid, errors } = await schema5.validate(5);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema6 = schema5.max(
+        10,
+        (seenValue, schema) =>
+            `expected to be no more than ${schema.introspect().max}, got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema6.validate(50);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be no more than 10, got 50'
+        );
+    }
+
+    const schema7 = schema6.max(
+        20,
+        (seenValue, schema) =>
+            `expected to see at maximum ${schema.introspect().max}, but got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema7.validate(30);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to see at maximum 20, but got 30'
+        );
+    }
+
+    const schema8 = schema7.max(50);
+
+    {
+        const { valid, errors } = await schema8.validate(300);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be no more than or equal to 50'
+        );
+    }
+});
+
+test('custom error message equals()', async () => {
+    const schema = number().equals(10, 'some custom error message');
+
+    {
+        const { valid, errors } = await schema.validate(50 as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+
+    {
+        const { valid, errors } = await schema.validate(10);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema2 = schema.equals(10, () => 'some custom error message new');
+
+    {
+        const { valid, errors } = await schema2.validate(50 as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message new');
+    }
+
+    {
+        const { valid, errors } = await schema2.validate(10);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema3 = schema2.clearEquals();
+
+    {
+        const { valid, errors } = await schema3.validate(50);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema4 = schema3.equals(10);
+
+    {
+        const { valid, errors } = await schema4.validate(50 as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('expected to be equal to 10');
+    }
+
+    const schema5 = schema4.clearEquals();
+
+    {
+        const { valid, errors } = await schema5.validate(10);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema6 = schema5.equals(
+        10,
+        (seenValue, schema) =>
+            `expected to be equal to value ${schema.introspect().equalsTo}, got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema6.validate(50 as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be equal to value 10, got 50'
+        );
+    }
+
+    const schema7 = schema6.equals(
+        20,
+        (seenValue, schema) =>
+            `expected to be ${schema.introspect().equalsTo}, but got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema7.validate(30 as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('expected to be 20, but got 30');
+    }
+
+    const schema8 = schema7.equals(50);
+
+    {
+        const { valid, errors } = await schema8.validate(300 as any);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('expected to be equal to 50');
+    }
+});
+
+test('custom error message notNaN()', async () => {
+    const schema = number().notNaN();
+
+    {
+        const { valid, errors } = await schema.validate(0 / 0);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('is not expected to be NaN');
+    }
+
+    const schema2 = schema.notNaN('some custom error message');
+
+    {
+        const { valid, errors } = await schema2.validate(0 / 0);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+
+    const schema3 = schema2.canBeNaN();
+
+    {
+        const { valid, errors } = await schema3.validate(0 / 0);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema4 = schema3.notNaN(
+        seenValue => `expected to be not NaN, but got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema4.validate(0 / 0);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be not NaN, but got NaN'
+        );
+    }
+
+    const schema5 = schema4.notNaN(() =>
+        Promise.resolve('some custom error message')
+    );
+
+    {
+        const { valid, errors } = await schema5.validateAsync(0 / 0);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+});
+
+test('custom error message isFinite()', async () => {
+    const schema = number().isFinite();
+
+    {
+        const { valid, errors } = await schema.validate(Infinity);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'is expected to be a finite number'
+        );
+    }
+
+    const schema2 = schema.isFinite('some custom error message');
+
+    {
+        const { valid, errors } = await schema2.validate(Infinity);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+
+    const schema3 = schema2.canBeInfinite();
+
+    {
+        const { valid, errors } = await schema3.validate(Infinity);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema4 = schema3.isFinite(
+        seenValue => `expected to be not Infinity, but got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema4.validate(Infinity);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be not Infinity, but got Infinity'
+        );
+    }
+
+    const schema5 = schema4.isFinite(() =>
+        Promise.resolve('some custom error message')
+    );
+
+    {
+        const { valid, errors } = await schema5.validateAsync(Infinity);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+});
+
+test('custom error message isInteger()', async () => {
+    const schema = number().isInteger();
+
+    {
+        const { valid, errors } = await schema.validate(Math.PI);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('is expected to be an integer');
+    }
+
+    const schema2 = schema.isInteger('some custom error message');
+
+    {
+        const { valid, errors } = await schema2.validate(Math.E);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+
+    const schema3 = schema2.clearIsInteger();
+
+    {
+        const { valid, errors } = await schema3.validate(Math.PI);
+        expect(valid).toEqual(true);
+        expect(errors).toBeUndefined();
+    }
+
+    const schema4 = schema3.isInteger(
+        seenValue => `expected to be an integer, but got ${seenValue}`
+    );
+
+    {
+        const { valid, errors } = await schema4.validate(1.23);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual(
+            'expected to be an integer, but got 1.23'
+        );
+    }
+
+    const schema5 = schema4.isInteger(() =>
+        Promise.resolve('some custom error message')
+    );
+
+    {
+        const { valid, errors } = await schema5.validateAsync(Math.E);
+        expect(valid).toEqual(false);
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors?.length).toEqual(1);
+        expect(errors?.[0].message).toEqual('some custom error message');
+    }
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 700)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from number schema', () => {
+    const schema = number().default(42).clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
 });

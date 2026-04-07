@@ -1,46 +1,66 @@
-# Deep operations on objects
+# @cleverbrush/deep
 
-This is yet another library which provides operations over JavaScript objects, like deep compare and deep merge.
+[![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
+[![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->
+![Coverage](https://img.shields.io/badge/coverage-95.6%25-brightgreen)
+<!-- coverage-badge-end -->
+
+A library for deep operations on JavaScript objects — deep equality, deep merge, and flattening.
 
 ## Installation
 
-    npm install @cleverbrush/deep
+```bash
+npm install @cleverbrush/deep
+```
 
 ## Usage
 
 ```typescript
-import deep from '@cleverbrush/deep';
-// or import functions individually
-import { deepEqual, deepExtend } from '@cleverbrush/deep';
+import { deepEqual, deepExtend, deepFlatten } from '@cleverbrush/deep';
 ```
 
-## Functions
+## API
 
-### deepEqual
+### `deepEqual(a, b, options?)`
 
-Takes two objects as parameters, compares it recursively and returns `true` if they are equal or `false` in other case.
+Recursively compares two values and returns `true` if they are deeply equal. Supports nested objects, arrays, `Date` instances, and handles circular references.
+
+**Parameters:**
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `a` | `any` | — | First value |
+| `b` | `any` | — | Second value |
+| `options.disregardArrayOrder` | `boolean` | `false` | When `true`, arrays are treated as equal regardless of element order |
 
 ```typescript
 import { deepEqual } from '@cleverbrush/deep';
 
-const equal1 = deepEqual({ a: { b: 1 } }, { a: { b: 1 } });
-// equal1 === true
+deepEqual({ a: { b: 1 } }, { a: { b: 1 } });
+// => true
 
-const equal2 = deepEqual({ a: { b: 1 } }, { a: { b: 20 } });
-// equal2 === false
+deepEqual({ a: { b: 1 } }, { a: { b: 20 } });
+// => false
 
-const equal3 = deepEqual({ a: { b: 1, c: 2 } }, { a: { b: 20 } });
-// equal3 === false
+deepEqual({ a: { b: 1, c: 2 } }, { a: { b: 1 } });
+// => false
+
+// Array order can be ignored
+deepEqual([1, 2, 3], [3, 1, 2], { disregardArrayOrder: true });
+// => true
 ```
 
-### deepExtend
+### `deepExtend(...objects)`
 
-Works similary to `Object.extend`, but respects the deep structure of objects.
+Deeply merges multiple objects. Works like `Object.assign`, but recursively merges nested objects instead of overwriting them. All arguments must be non-null objects.
+
+Returns a new object that is the deep merge of all provided objects.
 
 ```typescript
 import { deepExtend } from '@cleverbrush/deep';
 
-deepExtend(
+const result = deepExtend(
     {},
     {
         a: 'something',
@@ -54,25 +74,30 @@ deepExtend(
         }
     }
 );
+
+// result:
+// {
+//     a: 'something',
+//     name: {
+//         first: 'Ivan',
+//         last: 'Ivanov'
+//     }
+// }
 ```
 
-will return the following object:
+The result type is inferred from the input types using the `Merge<T>` utility type, which is also exported from the library.
 
-```typescript
-    {
-        a: 'something',
-        name: {
-            first: 'Ivan',
-            last: 'Ivanov'
-        }
-    }
-```
+### `deepFlatten(obj, delimiter?)`
 
-### deepFlatten
+Flattens a nested object to a single level, concatenating keys with the specified delimiter.
 
-Flattens an object to a single level. Accepts an optional separator as a second parameter.
-If no separator is provided, the default separator is `.`.
-Supports only objects with string keys. Supports nested objects of any depth.
+**Parameters:**
+
+| Name | Type | Default | Description |
+| --- | --- | --- | --- |
+| `obj` | `Record<string, any>` | — | Object to flatten |
+| `delimiter` | `string` | `'.'` | Separator used to join nested keys |
+
 Throws an error if the object contains circular references.
 
 ```typescript
@@ -85,7 +110,6 @@ deepFlatten({
     },
     d: 3
 });
-
 // => { 'a.b': 1, 'a.c': 2, d: 3 }
 
 deepFlatten(
@@ -102,6 +126,34 @@ deepFlatten(
     },
     '-'
 );
-
 // => { 'a-b': 1, 'a-c': 2, 'd-e-f': 3 }
 ```
+
+### `HashObject(obj, exclude?)`
+
+Generates a hash representation for an object. Useful for comparing objects by value.
+
+**Parameters:**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `obj` | `any` | The value to hash |
+| `exclude` | `any[]` | Optional list of values to exclude from hashing |
+
+```typescript
+import { HashObject } from '@cleverbrush/deep';
+
+const hash = HashObject({ name: 'John', age: 30 });
+```
+
+## Code Quality
+
+- **Linting:** [Biome](https://biomejs.dev/) — enforced on every PR via CI
+- **Type checking:** TypeScript strict mode
+- **Unit tests:** [Vitest](https://vitest.dev/) — covering deep equality edge cases (circular references, `Date` instances, array order), deep merge, flattening, and hashing
+- **CI:** Every pull request must pass lint + build + test before merge — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)
+
+## License
+
+BSD-3-Clause
+

@@ -1,3 +1,5 @@
+import { expect, test } from 'vitest';
+
 import { debounce } from './debounce.js';
 
 test('debounce - 1', async () => {
@@ -10,7 +12,7 @@ test('debounce - 1', async () => {
 
     debouncedFn();
     debouncedFn();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 100));
     expect(numCalled).toBe(1);
 });
 
@@ -24,9 +26,9 @@ test('debounce - 2', async () => {
 
     debouncedFn();
     debouncedFn();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await new Promise(resolve => setTimeout(resolve, 10));
     debouncedFn();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 100));
     expect(numCalled).toBe(1);
 });
 
@@ -41,9 +43,9 @@ test('debounce - 3', async () => {
     debouncedFn();
     debouncedFn();
     debouncedFn();
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 200));
     debouncedFn();
-    await new Promise((resolve) => setTimeout(resolve, 200));
+    await new Promise(resolve => setTimeout(resolve, 200));
     expect(numCalled).toBe(2);
 });
 
@@ -59,6 +61,6 @@ test('debounce - immediate', async () => {
     expect(numCalled).toBe(1);
     debouncedFn();
     debouncedFn();
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await new Promise(resolve => setTimeout(resolve, 100));
     expect(numCalled).toBe(2);
 });

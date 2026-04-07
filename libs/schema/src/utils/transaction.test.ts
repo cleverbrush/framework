@@ -1,4 +1,6 @@
-import { transaction } from './transaction.js';
+import { expect, test } from 'vitest';
+
+import { noopTransaction, transaction } from './transaction.js';
 
 test('The same obj shape returned initially', () => {
     const obj = {
@@ -288,7 +290,7 @@ test('error and regex are preserved', () => {
         field1: 1,
         field2: 'str',
         err: new Error(),
-        regex: new RegExp('aaa'),
+        regex: /aaa/,
         nested: {}
     };
 
@@ -311,7 +313,7 @@ test('shouldNotWrapWithTransaction - 1', () => {
     };
 
     const { object } = transaction(initial, {
-        shouldNotWrapWithTransaction: (item) => item instanceof customErr
+        shouldNotWrapWithTransaction: item => item instanceof customErr
     });
 
     expect(object.err === initial.err).toEqual(false);
@@ -677,4 +679,59 @@ test('isDirty - 4', () => {
     rollback();
 
     expect(isDirty()).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Array transactions — lines 146, 163
+// ---------------------------------------------------------------------------
+
+test('array transaction: isDirty when primitive element changes (line 146)', () => {
+    const arr = [1, 2, 3];
+    const { object, isDirty } = transaction(arr);
+
+    expect(isDirty()).toEqual(false);
+
+    (object as any)[1] = 99;
+
+    expect(isDirty()).toEqual(true);
+});
+
+test('array transaction: rollback returns initial (line 163)', () => {
+    const arr = [10, 20, 30];
+    const { object, rollback } = transaction(arr);
+
+    (object as any)[0] = 999;
+    const reverted = rollback();
+    expect(reverted).toEqual([10, 20, 30]);
+});
+
+test('array transaction: commit maps elements (line 162)', () => {
+    const arr = [1, 2, 3];
+    const { commit } = transaction(arr);
+    const committed = commit();
+    expect(committed).toEqual([1, 2, 3]);
+});
+
+// ---------------------------------------------------------------------------
+// noopTransaction — line 280
+// ---------------------------------------------------------------------------
+
+test('noopTransaction: object is identity, commit/rollback return initial, isDirty false (line 280)', () => {
+    const obj = { a: 1 };
+    const t = noopTransaction(obj);
+
+    expect(t.object).toBe(obj);
+    expect(t.commit()).toBe(obj);
+    expect(t.rollback()).toBe(obj);
+    expect(t.isDirty()).toBe(false);
+});
+
+test('delete nested transactional property triggers rollback on nested (line 245)', () => {
+    const { object } = transaction({ x: 1 });
+    // Assigning an object causes the nested value to be wrapped in a transaction
+    (object as any).sub = { a: 10 };
+    // Deleting the newly-assigned transactional property triggers line 245
+    delete (object as any).sub;
+    // After delete, the property is gone
+    expect((object as any).sub).toBeUndefined();
 });

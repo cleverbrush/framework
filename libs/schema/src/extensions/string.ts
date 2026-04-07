@@ -1,0 +1,578 @@
+/**
+ * Built-in string extensions for `@cleverbrush/schema`.
+ *
+ * Provides common string validators and preprocessors: {@link stringExtensions | email},
+ * {@link stringExtensions | url}, {@link stringExtensions | uuid},
+ * {@link stringExtensions | ip}, {@link stringExtensions | trim},
+ * {@link stringExtensions | toLowerCase}, {@link stringExtensions | nonempty},
+ * and {@link stringExtensions | oneOf}.
+ *
+ * These are pre-applied in the default `@cleverbrush/schema` import.
+ * Import from `@cleverbrush/schema/core` to get bare builders without these extensions.
+ *
+ * @module
+ */
+import type { ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
+import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
+import type { HiddenExtensionMethods } from '../extension.js';
+import { defineExtension } from '../extension.js';
+import { validationFail } from './util.js';
+
+// ---------------------------------------------------------------------------
+// Public interface — carries JSDoc into .d.ts for consumers
+// ---------------------------------------------------------------------------
+
+/** Return type shared by every method on {@link StringBuiltinExtensions}. */
+type StringExtReturn<T extends string = string> = StringSchemaBuilder<
+    T,
+    true,
+    false,
+    false,
+    StringBuiltinExtensions<T>
+> &
+    StringBuiltinExtensions<T> &
+    HiddenExtensionMethods;
+
+/**
+ * Methods added to `StringSchemaBuilder` by the built-in string extension pack.
+ *
+ * **WORKAROUND:** This interface duplicates the method signatures from
+ * `stringExtensions` so that JSDoc survives into the published `.d.ts`
+ * files. TypeScript strips JSDoc when method signatures are reconstructed
+ * through the `FixedMethods` mapped type (conditional `infer` loses
+ * comments). Remove this interface once TypeScript preserves JSDoc
+ * through mapped types / conditional type inference.
+ *
+ * @see https://github.com/microsoft/TypeScript/issues/50715
+ */
+export interface StringBuiltinExtensions<T extends string = string> {
+    /**
+     * Validates that the string is a well-formed email address.
+     *
+     * Uses the pattern `^[^\s@]+@[^\s@]+\.[^\s@]+$` for validation.
+     *
+     * @param errorMessage - custom error message or function to generate one
+     * @returns a new schema builder with the email validator applied
+     *
+     * @example
+     * ```ts
+     * string().email();
+     * string().email('Please enter a valid email');
+     * string().email((val) => `"${val}" is not a valid email`);
+     * ```
+     */
+    email(
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<T>;
+
+    /**
+     * Validates that the string is a well-formed URL.
+     *
+     * By default only `http` and `https` protocols are accepted.
+     * Pass `opts.protocols` to restrict or expand the allowed set.
+     *
+     * @param opts - optional configuration
+     * @param opts.protocols - allowed URL protocols (default: `['http', 'https']`)
+     * @param errorMessage - custom error message or function to generate one
+     * @returns a new schema builder with the URL validator applied
+     *
+     * @example
+     * ```ts
+     * string().url();
+     * string().url({ protocols: ['https'] });
+     * string().url('Must be a valid URL');
+     * string().url({ protocols: ['https'] }, 'Must be a valid URL');
+     * ```
+     */
+    url(
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<T>;
+    url(
+        opts?: { protocols?: string[] },
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<T>;
+
+    /**
+     * Validates that the string is a valid UUID (versions 1–5).
+     *
+     * @param errorMessage - custom error message or function to generate one
+     * @returns a new schema builder with the UUID validator applied
+     *
+     * @example
+     * ```ts
+     * string().uuid();
+     * string().uuid('Invalid identifier');
+     * ```
+     */
+    uuid(
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<T>;
+
+    /**
+     * Validates that the string is a valid IP address (IPv4 or IPv6).
+     *
+     * Pass `opts.version` to restrict validation to a specific IP version.
+     *
+     * @param opts - optional configuration
+     * @param opts.version - restrict to `'v4'` or `'v6'` (default: accept both)
+     * @param errorMessage - custom error message or function to generate one
+     * @returns a new schema builder with the IP validator applied
+     *
+     * @example
+     * ```ts
+     * string().ip();
+     * string().ip({ version: 'v4' });
+     * string().ip(undefined, 'Bad IP address');
+     * ```
+     */
+    ip(
+        opts?: { version?: 'v4' | 'v6' },
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<T>;
+
+    /**
+     * Preprocessor that trims leading and trailing whitespace before validation.
+     *
+     * @returns a new schema builder with the trim preprocessor applied
+     *
+     * @example
+     * ```ts
+     * string().trim().minLength(1); // '  hi  ' → 'hi'
+     * ```
+     */
+    trim(): StringExtReturn<T>;
+
+    /**
+     * Preprocessor that converts the string to lowercase before validation.
+     *
+     * @returns a new schema builder with the toLowerCase preprocessor applied
+     *
+     * @example
+     * ```ts
+     * string().toLowerCase(); // 'HELLO' → 'hello'
+     * ```
+     */
+    toLowerCase(): StringExtReturn<T>;
+
+    /**
+     * Validates that the string is not empty (length > 0).
+     *
+     * @param errorMessage - custom error message or function to generate one
+     * @returns a new schema builder with the nonempty validator applied
+     *
+     * @example
+     * ```ts
+     * string().nonempty();
+     * string().nonempty('Name is required');
+     * ```
+     */
+    nonempty(
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<T>;
+
+    /**
+     * Constrains the string to one of the specified literal values.
+     *
+     * Narrows the inferred type from `string` to the union of the
+     * provided literals.
+     *
+     * @param values - the allowed string literals
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * import { string, InferType } from '@cleverbrush/schema';
+     *
+     * const role = string().oneOf('admin', 'user', 'guest');
+     * type Role = InferType<typeof role>; // 'admin' | 'user' | 'guest'
+     *
+     * role.validate('admin');  // valid
+     * role.validate('other');  // invalid — "must be one of: admin, user, guest"
+     * ```
+     */
+    oneOf<V extends string>(...values: [V, ...V[]]): StringExtReturn<V>;
+
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with a custom error message or factory as the last argument.
+     *
+     * @example
+     * ```ts
+     * const role = string().oneOf('admin', 'user', (val) => `"${val}" is not allowed`);
+     * ```
+     */
+    oneOf<V extends string>(
+        ...args: [
+            ...[V, ...V[]],
+            ValidationErrorMessageProvider<StringSchemaBuilder>
+        ]
+    ): StringExtReturn<V>;
+
+    /**
+     * Constrains the string to one of the specified literal values,
+     * with an optional custom error message or factory.
+     *
+     * @param values - the allowed string literals as an array
+     * @param errorMessage - optional custom error message or factory function
+     * @returns a new schema builder restricted to the given values
+     *
+     * @example
+     * ```ts
+     * const role = string().oneOf(['admin', 'user', 'guest'], 'Invalid role');
+     * ```
+     */
+    oneOf<V extends string>(
+        values: readonly [V, ...V[]],
+        errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+    ): StringExtReturn<V>;
+}
+
+/**
+ * Subset of {@link StringBuiltinExtensions} containing only the `.oneOf()` overloads.
+ * Exported for backward compatibility.
+ */
+export type StringOneOfExtension = Pick<StringBuiltinExtensions, 'oneOf'>;
+
+const UUID_RE =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const IPV4_RE =
+    /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/;
+
+const IPV6_RE =
+    /^(?:[0-9a-f]{1,4}:){7}[0-9a-f]{1,4}$|^::(?:[0-9a-f]{1,4}:){0,5}[0-9a-f]{1,4}$|^(?:[0-9a-f]{1,4}:){1,6}:[0-9a-f]{1,4}$|^(?:[0-9a-f]{1,4}:){1,5}(?::[0-9a-f]{1,4}){1,2}$|^(?:[0-9a-f]{1,4}:){1,4}(?::[0-9a-f]{1,4}){1,3}$|^(?:[0-9a-f]{1,4}:){1,3}(?::[0-9a-f]{1,4}){1,4}$|^(?:[0-9a-f]{1,4}:){1,2}(?::[0-9a-f]{1,4}){1,5}$|^[0-9a-f]{1,4}:(?::[0-9a-f]{1,4}){1,6}$|^::$/i;
+
+/**
+ * Extension descriptor that adds common string validators and preprocessors
+ * to `StringSchemaBuilder`.
+ *
+ * Included methods: `email`, `url`, `uuid`, `ip`, `trim`, `toLowerCase`, `nonempty`, `oneOf`.
+ *
+ * @example
+ * ```ts
+ * import { withExtensions } from '@cleverbrush/schema/core';
+ * import { stringExtensions } from '@cleverbrush/schema';
+ *
+ * const s = withExtensions(stringExtensions);
+ * const schema = s.string().email().trim();
+ * ```
+ */
+export const stringExtensions = defineExtension({
+    string: {
+        /**
+         * Validates that the string is a well-formed email address.
+         *
+         * Uses the pattern `^[^\s@]+@[^\s@]+\.[^\s@]+$` for validation.
+         *
+         * @param errorMessage - custom error message or function to generate one
+         * @returns a new schema builder with the email validator applied
+         *
+         * @example
+         * ```ts
+         * string().email();
+         * string().email('Please enter a valid email');
+         * string().email((val) => `"${val}" is not a valid email`);
+         * ```
+         */
+        email(
+            this: StringSchemaBuilder,
+            errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+        ) {
+            return this.withExtension('email', true).addValidator(val => {
+                if (typeof val !== 'string')
+                    return validationFail(
+                        errorMessage,
+                        'must be a valid email',
+                        val,
+                        this
+                    );
+                const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+                if (valid) return { valid: true, errors: [] };
+                return validationFail(
+                    errorMessage,
+                    'must be a valid email',
+                    val,
+                    this
+                );
+            });
+        },
+
+        /**
+         * Validates that the string is a well-formed URL.
+         *
+         * By default only `http` and `https` protocols are accepted.
+         * Pass `opts.protocols` to restrict or expand the allowed set.
+         *
+         * @param opts - optional configuration
+         * @param opts.protocols - allowed URL protocols (default: `['http', 'https']`)
+         * @param errorMessage - custom error message or function to generate one
+         * @returns a new schema builder with the URL validator applied
+         *
+         * @example
+         * ```ts
+         * string().url();
+         * string().url({ protocols: ['https'] });
+         * string().url('Must be a valid URL');
+         * string().url({ protocols: ['https'] }, 'Must be a valid URL');
+         * ```
+         */
+        url(
+            this: StringSchemaBuilder,
+            optsOrError?:
+                | { protocols?: string[] }
+                | ValidationErrorMessageProvider<StringSchemaBuilder>,
+            errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+        ) {
+            let opts: { protocols?: string[] } | undefined;
+            if (
+                typeof optsOrError === 'string' ||
+                typeof optsOrError === 'function'
+            ) {
+                errorMessage = optsOrError;
+                opts = undefined;
+            } else {
+                opts = optsOrError;
+            }
+            if (
+                opts?.protocols !== undefined &&
+                (opts.protocols.length === 0 ||
+                    opts.protocols.some(p => !p || p.trim() === ''))
+            ) {
+                throw new Error(
+                    'url: opts.protocols must be a non-empty array of non-empty strings'
+                );
+            }
+            const protocols = opts?.protocols ?? ['http', 'https'];
+            const meta = opts?.protocols ? { protocols: opts.protocols } : true;
+
+            return this.withExtension('url', meta).addValidator(val => {
+                if (typeof val !== 'string')
+                    return validationFail(
+                        errorMessage,
+                        'must be a valid URL',
+                        val,
+                        this
+                    );
+                let valid = false;
+                let defaultMsg = 'must be a valid URL';
+                try {
+                    const parsed = new URL(val);
+                    const proto = parsed.protocol.replace(':', '');
+                    valid = protocols.includes(proto);
+                    if (!valid)
+                        defaultMsg = `protocol must be one of: ${protocols.join(', ')}`;
+                } catch {
+                    /* invalid URL */
+                }
+                if (valid) return { valid: true, errors: [] };
+                return validationFail(errorMessage, defaultMsg, val, this);
+            });
+        },
+
+        /**
+         * Validates that the string is a valid UUID (versions 1–5).
+         *
+         * @param errorMessage - custom error message or function to generate one
+         * @returns a new schema builder with the UUID validator applied
+         *
+         * @example
+         * ```ts
+         * string().uuid();
+         * string().uuid('Invalid identifier');
+         * ```
+         */
+        uuid(
+            this: StringSchemaBuilder,
+            errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+        ) {
+            return this.withExtension('uuid', true).addValidator(val => {
+                if (typeof val !== 'string')
+                    return validationFail(
+                        errorMessage,
+                        'must be a valid UUID',
+                        val,
+                        this
+                    );
+                const valid = UUID_RE.test(val);
+                if (valid) return { valid: true, errors: [] };
+                return validationFail(
+                    errorMessage,
+                    'must be a valid UUID',
+                    val,
+                    this
+                );
+            });
+        },
+
+        /**
+         * Validates that the string is a valid IP address (IPv4 or IPv6).
+         *
+         * Pass `opts.version` to restrict validation to a specific IP version.
+         *
+         * @param opts - optional configuration
+         * @param opts.version - restrict to `'v4'` or `'v6'` (default: accept both)
+         * @param errorMessage - custom error message or function to generate one
+         * @returns a new schema builder with the IP validator applied
+         *
+         * @example
+         * ```ts
+         * string().ip();
+         * string().ip({ version: 'v4' });
+         * string().ip(undefined, 'Bad IP address');
+         * ```
+         */
+        ip(
+            this: StringSchemaBuilder,
+            opts?: { version?: 'v4' | 'v6' },
+            errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+        ) {
+            const version = opts?.version;
+            const meta = version ? { version } : true;
+
+            return this.withExtension('ip', meta).addValidator(val => {
+                const defaultMsg = version
+                    ? `must be a valid ${version} IP address`
+                    : 'must be a valid IP address';
+                if (typeof val !== 'string')
+                    return validationFail(errorMessage, defaultMsg, val, this);
+                let valid: boolean;
+                if (version === 'v4') {
+                    valid = IPV4_RE.test(val);
+                } else if (version === 'v6') {
+                    valid = IPV6_RE.test(val);
+                } else {
+                    valid = IPV4_RE.test(val) || IPV6_RE.test(val);
+                }
+                if (valid) return { valid: true, errors: [] };
+                return validationFail(errorMessage, defaultMsg, val, this);
+            });
+        },
+
+        /**
+         * Preprocessor that trims leading and trailing whitespace before validation.
+         *
+         * @returns a new schema builder with the trim preprocessor applied
+         *
+         * @example
+         * ```ts
+         * string().trim().minLength(1); // '  hi  ' → 'hi'
+         * ```
+         */
+        trim(this: StringSchemaBuilder) {
+            return this.addPreprocessor(val =>
+                typeof val === 'string' ? val.trim() : val
+            );
+        },
+
+        /**
+         * Preprocessor that converts the string to lowercase before validation.
+         *
+         * @returns a new schema builder with the toLowerCase preprocessor applied
+         *
+         * @example
+         * ```ts
+         * string().toLowerCase(); // 'HELLO' → 'hello'
+         * ```
+         */
+        toLowerCase(this: StringSchemaBuilder) {
+            return this.addPreprocessor(val =>
+                typeof val === 'string' ? val.toLowerCase() : val
+            );
+        },
+
+        /**
+         * Validates that the string is not empty (length > 0).
+         *
+         * @param errorMessage - custom error message or function to generate one
+         * @returns a new schema builder with the nonempty validator applied
+         *
+         * @example
+         * ```ts
+         * string().nonempty();
+         * string().nonempty('Name is required');
+         * ```
+         */
+        nonempty(
+            this: StringSchemaBuilder,
+            errorMessage?: ValidationErrorMessageProvider<StringSchemaBuilder>
+        ) {
+            return this.withExtension('nonempty', true).addValidator(val => {
+                if (typeof val !== 'string')
+                    return validationFail(
+                        errorMessage,
+                        'must not be empty',
+                        val,
+                        this
+                    );
+                const valid = val.length > 0;
+                if (valid) return { valid: true, errors: [] };
+                return validationFail(
+                    errorMessage,
+                    'must not be empty',
+                    val,
+                    this
+                );
+            });
+        },
+
+        /**
+         * Constrains the string to one of the specified literal values.
+         *
+         * @param args - the allowed string literals, optionally followed by an error message
+         * @returns a new schema builder restricted to the given values
+         *
+         * @example
+         * ```ts
+         * string().oneOf('admin', 'user', 'guest');
+         * string().oneOf(['admin', 'user'], 'Invalid role');
+         * ```
+         */
+        oneOf(this: StringSchemaBuilder, ...args: any[]) {
+            let values: string[];
+            let errorMessage:
+                | ValidationErrorMessageProvider<StringSchemaBuilder>
+                | undefined;
+
+            if (args.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            if (Array.isArray(args[0])) {
+                // Array form: oneOf(['a', 'b', 'c'], errorMessage?)
+                values = args[0] as string[];
+                errorMessage = args[1] as
+                    | ValidationErrorMessageProvider<StringSchemaBuilder>
+                    | undefined;
+            } else {
+                // Rest params form: oneOf('a', 'b', 'c') or oneOf('a', 'b', errorFn)
+                // Last arg is a function → error message factory (unambiguous)
+                const lastArg = args[args.length - 1];
+                if (typeof lastArg === 'function') {
+                    values = args.slice(0, -1) as string[];
+                    errorMessage =
+                        lastArg as ValidationErrorMessageProvider<StringSchemaBuilder>;
+                } else {
+                    values = args as string[];
+                    errorMessage = undefined;
+                }
+            }
+
+            if (values.length === 0) {
+                throw new Error('oneOf requires at least one value');
+            }
+
+            const allowed = new Set(values);
+            return this.withExtension('oneOf', values).addValidator(val => {
+                if (typeof val === 'string' && allowed.has(val)) {
+                    return { valid: true, errors: [] };
+                }
+                return validationFail(
+                    errorMessage,
+                    `must be one of: ${values.join(', ')}`,
+                    val,
+                    this
+                );
+            });
+        }
+    }
+});

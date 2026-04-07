@@ -8,22 +8,6 @@
       "<node_internals>/**"
     ],
     "type": "node"
-  },
-		{
-			"type": "node",
-			"name": "vscode-jest-tests",
-			"request": "launch",
-			"console": "integratedTerminal",
-			"internalConsoleOptions": "neverOpen",
-			"cwd": "${workspaceFolder}",
-			"runtimeExecutable": "npm",
-			"args": [
-				"run",
-				"test",
-				"--",
-				"--runInBand",
-				"--watchAll=false"
-			]
-		}
+  }
 	]
 }

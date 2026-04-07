@@ -1,26 +1,47 @@
-export { AnySchemaBuilder } from './builders/AnySchemaBuilder.js';
-export { ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
-export { BooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
-export { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
-export { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
-export { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
-export { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
-export { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
-export { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
-export { SchemaBuilder } from './builders/SchemaBuilder.js';
+// Re-export all types, classes, and extension system from core
 
+export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
+export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
+export type {
+    TupleElementValidationResults,
+    TupleSchemaValidationResult
+} from './builders/TupleSchemaBuilder.js';
+export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
+export * from './core.js';
+// Override bare factory functions with augmented versions (extensions pre-applied).
+// Named re-exports shadow the identically-named exports from `export *` above.
+// Export extension descriptors for composition
 export {
-    InferType,
-    MakeOptional,
-    ValidationError,
-    ValidationResult
-} from './builders/SchemaBuilder.js';
-export { any } from './builders/AnySchemaBuilder.js';
-export { array } from './builders/ArraySchemaBuilder.js';
-export { boolean } from './builders/BooleanSchemaBuilder.js';
-export { date } from './builders/DateSchemaBuilder.js';
-export { func } from './builders/FunctionSchemaBuilder.js';
-export { number } from './builders/NumberSchemaBuilder.js';
-export { object } from './builders/ObjectSchemaBuilder.js';
-export { string } from './builders/StringSchemaBuilder.js';
-export { union } from './builders/UnionSchemaBuilder.js';
+    type ArrayBuiltinExtensions,
+    any,
+    array,
+    arrayExtensions,
+    boolean,
+    date,
+    type ExtendedAny,
+    type ExtendedArray,
+    type ExtendedBoolean,
+    type ExtendedDate,
+    type ExtendedFunc,
+    type ExtendedNumber,
+    type ExtendedObject,
+    type ExtendedRecord,
+    type ExtendedString,
+    type ExtendedTuple,
+    type ExtendedUnion,
+    enumOf,
+    func,
+    type NumberBuiltinExtensions,
+    type NumberOneOfExtension,
+    number,
+    numberExtensions,
+    object,
+    record,
+    type StringBuiltinExtensions,
+    type StringOneOfExtension,
+    string,
+    stringExtensions,
+    tuple,
+    union
+} from './extensions/index.js';

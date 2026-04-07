@@ -1,3 +1,5 @@
+import { expect, test } from 'vitest';
+
 import { deepExtend } from './deepExtend.js';
 
 test('deepExtend - 1', () => {

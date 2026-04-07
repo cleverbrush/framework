@@ -57,9 +57,9 @@ export default class Collector<
 
     #isTimedOut = false;
 
-    #promiseResolve: (...args: any[]) => any;
+    #promiseResolve!: (...args: any[]) => any;
 
-    #promiseReject: (...args: any[]) => any;
+    #promiseReject!: (...args: any[]) => any;
 
     /**
      *
@@ -106,7 +106,7 @@ export default class Collector<
         if (this.#isTimedOut) return this;
         // if value is Promise - await it and collect its result
         Promise.resolve(value)
-            .then((result) => {
+            .then(result => {
                 if (this.#isTimedOut) return;
                 if (key in this.#collectionResults)
                     throw new Error(
@@ -119,7 +119,7 @@ export default class Collector<
                     this.#onEnd();
                 }
             })
-            .catch((e) => {
+            .catch(e => {
                 if (typeof this.#promiseReject === 'function') {
                     this.#promiseReject({
                         reason: 'error',
@@ -133,7 +133,6 @@ export default class Collector<
                 }
             });
 
-        // eslint-disable-next-line
         return this;
     }
 

@@ -1,11 +1,11 @@
-import { expectType } from 'tsd';
+import { expect, expectTypeOf, test } from 'vitest';
 
 import { array } from './ArraySchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
-import { string } from './StringSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
+import { string } from './StringSchemaBuilder.js';
 import { union } from './UnionSchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
 
 test('Types - 1', async () => {
     const schema1 = array();
@@ -22,35 +22,35 @@ test('Types - 1', async () => {
     const val5: InferType<typeof schema5> = new Date();
     const val6: InferType<typeof schema6> = [];
 
-    expectType<Array<any>>(val1);
-    expectType<Array<number>>(val2);
-    expectType<Array<string>>(val3);
-    expectType<Array<any>>(val4);
-    expectType<Date>(val5);
-    expectType<Array<any>>(val6);
+    expectTypeOf(val1).toMatchTypeOf<Array<any>>();
+    expectTypeOf(val2).toMatchTypeOf<Array<number>>();
+    expectTypeOf(val3).toMatchTypeOf<Array<string>>();
+    expectTypeOf(val4).toMatchTypeOf<Array<any>>();
+    expectTypeOf(val5).toMatchTypeOf<Date>();
+    expectTypeOf(val6).toMatchTypeOf<Array<any>>();
 
     {
         const { object: res } = await schema1.validate([]);
         if (res) {
-            expectType<any[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<any>>();
         }
     }
     {
         const { object: res } = await schema2.validate([]);
         if (res) {
-            expectType<number[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<number>>();
         }
     }
     {
         const { object: res } = await schema3.validate([]);
         if (res) {
-            expectType<string[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<string>>();
         }
     }
     {
         const { object: res } = await schema4.validate([]);
         if (res) {
-            expectType<any[]>(res);
+            expectTypeOf(res).toMatchTypeOf<Array<any>>();
         }
     }
 
@@ -68,10 +68,10 @@ test('Types - 1', async () => {
     const optionalVal3: InferType<typeof optionalSchema3> = [];
     const optionalVal4: InferType<typeof optionalSchema4> = [];
 
-    expectType<Array<any> | undefined>(optionalVal1);
-    expectType<Array<number> | undefined>(optionalVal2);
-    expectType<Array<string> | undefined>(optionalVal3);
-    expectType<Array<any> | undefined>(optionalVal4);
+    expectTypeOf(optionalVal1).toMatchTypeOf<Array<any> | undefined>();
+    expectTypeOf(optionalVal2).toMatchTypeOf<Array<number> | undefined>();
+    expectTypeOf(optionalVal3).toMatchTypeOf<Array<string> | undefined>();
+    expectTypeOf(optionalVal4).toMatchTypeOf<Array<any> | undefined>();
 
     const arrayOfUnionSchema = array().of(
         union(number().equals(1)).or(string().equals('2'))
@@ -79,11 +79,11 @@ test('Types - 1', async () => {
 
     const arrayOfUnionVal: InferType<typeof arrayOfUnionSchema> = [];
 
-    expectType<Array<1 | '2'>>(arrayOfUnionVal);
+    expectTypeOf(arrayOfUnionVal).toMatchTypeOf<(1 | '2')[]>();
     {
         const { object: res } = await arrayOfUnionSchema.validate([]);
         if (res) {
-            expectType<(1 | '2')[]>(res);
+            expectTypeOf(res).toMatchTypeOf<(1 | '2')[]>();
         }
     }
 });
@@ -205,9 +205,9 @@ test('Min Length - 1', async () => {
     const schema1 = array();
     const schema2 = schema1.minLength(3);
 
-    expect(() => (schema1 as any).minLength()).toThrowError();
-    expect(() => schema1.minLength(-1)).toThrowError();
-    expect(() => schema1.minLength(undefined as any)).toThrowError();
+    expect(() => (schema1 as any).minLength()).toThrow();
+    expect(() => schema1.minLength(-1)).toThrow();
+    expect(() => schema1.minLength(undefined as any)).toThrow();
 
     expect(schema1 === (schema2 as any)).toEqual(false);
 
@@ -289,9 +289,9 @@ test('Max Length - 1', async () => {
     const schema1 = array();
     const schema2 = schema1.maxLength(3);
 
-    expect(() => (schema1 as any).maxLength()).toThrowError();
-    expect(() => schema1.maxLength(-1)).toThrowError();
-    expect(() => schema1.maxLength(undefined as any)).toThrowError();
+    expect(() => (schema1 as any).maxLength()).toThrow();
+    expect(() => schema1.maxLength(-1)).toThrow();
+    expect(() => schema1.maxLength(undefined as any)).toThrow();
 
     expect(schema1 === (schema2 as any)).toEqual(false);
 
@@ -489,12 +489,344 @@ test('One call to set elementSchema - 1', () => {
     const schema = array(number());
 
     const typeCheck: InferType<typeof schema> = [1, 2, 3, 4];
-    expectType<number[]>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<number[]>();
 });
 
 test('One call to set elementSchema - 2', () => {
     const schema = array(union(number(0)).or(number(1)).or(number(2)));
 
     const typeCheck: InferType<typeof schema> = [1, 2, 0];
-    expectType<(0 | 1 | 2)[]>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<(0 | 1 | 2)[]>();
+});
+
+test('Min Length With Custom Validation Error Message', async () => {
+    const schema = array().of(number()).minLength(3);
+
+    {
+        const { object: result, errors, valid } = await schema.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual(
+            'is expected to have no less than 3 elements'
+        );
+    }
+
+    const schema2 = schema
+        .clearMinLength()
+        .minLength(3, 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema2.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema3 = schema2
+        .clearMinLength()
+        .minLength(3, () => 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema3.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearMinLength()
+        .minLength(3, () => Promise.resolve('Custom error message'));
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema4.validateAsync([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+});
+
+test('Max Length With Custom Validation Error Message', async () => {
+    const schema = array().of(number()).maxLength(1);
+
+    {
+        const { object: result, errors, valid } = await schema.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual(
+            'is expected to have no more than 1 elements'
+        );
+    }
+
+    const schema2 = schema
+        .clearMaxLength()
+        .maxLength(1, 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema2.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema3 = schema2
+        .clearMaxLength()
+        .maxLength(1, () => 'Custom error message');
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema3.validate([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+
+    const schema4 = schema3
+        .clearMaxLength()
+        .maxLength(1, () => Promise.resolve('Custom error message'));
+    {
+        const {
+            object: result,
+            errors,
+            valid
+        } = await schema4.validateAsync([1, 2]);
+        expect(valid).toEqual(false);
+        expect(result).toBeUndefined();
+        expect(Array.isArray(errors)).toEqual(true);
+        expect(errors!.length).toEqual(1);
+        expect(errors![0].message).toEqual('Custom error message');
+    }
+});
+
+test('getNestedErrors - root errors on invalid array', async () => {
+    const schema = array().of(number());
+    const { valid, getNestedErrors } = await schema.validate(
+        'not-an-array' as any
+    );
+
+    expect(valid).toEqual(false);
+
+    const rootErrors = getNestedErrors();
+    expect(rootErrors.errors.length).toBeGreaterThan(0);
+    expect(rootErrors.seenValue).toEqual('not-an-array');
+});
+
+test('getNestedErrors - root errors on successful array', async () => {
+    const schema = array().of(number());
+    const { valid, getNestedErrors } = await schema.validate([1, 2, 3]);
+
+    expect(valid).toEqual(true);
+
+    const rootErrors = getNestedErrors();
+    expect(rootErrors.errors.length).toEqual(0);
+});
+
+test('getNestedErrors - descriptor returns schema', async () => {
+    const schema = array().of(number());
+    const { getNestedErrors } = await schema.validate([1]);
+
+    const rootErrors = getNestedErrors();
+    expect(rootErrors.descriptor.getSchema()).toBe(schema);
+});
+
+test('getNestedErrors - per-element errors with doNotStopOnFirstError', async () => {
+    const schema = array().of(number());
+    const { valid, getNestedErrors } = await schema.validate(
+        ['a', 2, 'b'] as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(valid).toEqual(false);
+
+    const elementResults = getNestedErrors();
+    expect(elementResults.length).toEqual(3);
+    expect(elementResults[0]!.valid).toEqual(false);
+    expect(elementResults[1]!.valid).toEqual(true);
+    expect(elementResults[2]!.valid).toEqual(false);
+});
+
+test('getNestedErrors - object elements with property navigation', async () => {
+    const schema = array().of(
+        object({
+            name: string().required(),
+            age: number().required()
+        })
+    );
+
+    const { valid, getNestedErrors } = await schema.validate(
+        [{ name: 'Alice', age: 'bad' as any }] as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(valid).toEqual(false);
+
+    const elementResults = getNestedErrors();
+    expect(elementResults.length).toEqual(1);
+
+    const first = elementResults[0]!;
+    expect(first.valid).toEqual(false);
+    expect(typeof first.getErrorsFor).toEqual('function');
+
+    const ageErrors = first.getErrorsFor(t => t.age);
+    expect(ageErrors.errors.length).toBeGreaterThan(0);
+});
+
+test('getNestedErrors - union elements', async () => {
+    const schema = array().of(union(string()).or(number()));
+
+    const { valid, getNestedErrors } = await schema.validate(
+        ['hello', true as any] as any,
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(valid).toEqual(false);
+
+    const elementResults = getNestedErrors();
+    expect(elementResults.length).toEqual(2);
+    expect(elementResults[0]!.valid).toEqual(true);
+    expect(elementResults[1]!.valid).toEqual(false);
+    expect(typeof elementResults[1]!.getNestedErrors).toEqual('function');
+});
+
+test('getNestedErrors - minLength error', async () => {
+    const schema = array().of(number()).minLength(3);
+    const { valid, getNestedErrors } = await schema.validate([1]);
+
+    expect(valid).toEqual(false);
+
+    const rootErrors = getNestedErrors();
+    expect(rootErrors.errors.length).toBeGreaterThan(0);
+});
+
+test('getNestedErrors - optional null returns valid', async () => {
+    const schema = array().of(number()).optional();
+    const { valid, getNestedErrors } = await schema.validate(null as any);
+
+    expect(valid).toEqual(true);
+
+    const rootErrors = getNestedErrors();
+    expect(rootErrors.errors.length).toEqual(0);
+});
+
+test('object with array of objects - invalid elements should not throw', () => {
+    const schema = object({
+        items: array().of(
+            object({
+                sku: string().minLength(3),
+                quantity: number().min(1),
+                price: number().min(0).clearIsInteger()
+            })
+        )
+    });
+
+    // Sync: invalid element must return {valid: false}, not throw
+    const result = schema.validate({
+        items: [{ sku: 'AB', quantity: 0, price: -5 }]
+    } as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('object with array of objects - invalid elements should not throw (async)', async () => {
+    const schema = object({
+        items: array().of(
+            object({
+                sku: string().minLength(3),
+                quantity: number().min(1),
+                price: number().min(0).clearIsInteger()
+            })
+        )
+    });
+
+    // Async: invalid element must return {valid: false}, not throw
+    const result = await schema.validateAsync({
+        items: [{ sku: 'Ab', quantity: 0, price: -5 }]
+    } as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('deeply nested object > array > object with invalid data returns valid:false', () => {
+    const schema = object({
+        order: object({
+            items: array().of(
+                object({
+                    name: string().minLength(1),
+                    qty: number().min(1)
+                })
+            )
+        })
+    });
+
+    const result = schema.validate({
+        order: {
+            items: [
+                { name: '', qty: 0 },
+                { name: 'ok', qty: 1 }
+            ]
+        }
+    } as any);
+    expect(result.valid).toEqual(false);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 748)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes the default value', () => {
+    const schema = array(string()).default(['a', 'b']).clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// Fast path lazy getNestedErrors — lines 448, 475
+// ---------------------------------------------------------------------------
+
+test('fast-path: invalid element → getNestedErrors() returns nested results (line 448)', () => {
+    const schema = array(number());
+    const result = schema.validate(['not-a-number'] as any);
+    expect(result.valid).toEqual(false);
+    // Calling getNestedErrors triggers the lazy evaluator at line 448
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
+    expect(Array.isArray(nested)).toEqual(true);
+});
+
+test('fast-path: empty array → getNestedErrors() returns empty (line 475)', () => {
+    const schema = array(number());
+    const result = schema.validate([] as any);
+    expect(result.valid).toEqual(true);
+    // Calling getNestedErrors triggers the lazy evaluator at line 475
+    const nested = result.getNestedErrors();
+    expect(nested).toBeDefined();
 });

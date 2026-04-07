@@ -1,16 +1,17 @@
-import { expectType } from 'tsd';
+import { expect, expectTypeOf, test } from 'vitest';
+
 import { any } from './AnySchemaBuilder.js';
-import { InferType } from './SchemaBuilder.js';
+import type { InferType } from './SchemaBuilder.js';
 
 test('Any checks', async () => {
     const schema = any();
 
     const typeCheck: InferType<typeof schema> = null;
-    expectType<any>(typeCheck);
+    expectTypeOf(typeCheck).toBeAny();
 
     {
         const obj = null;
-        const { valid, object: result, errors } = await schema.validate(obj);
+        const { valid, object: result, errors } = schema.validate(obj);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -18,7 +19,7 @@ test('Any checks', async () => {
 
     {
         const obj = undefined;
-        const { valid, object: result, errors } = await schema.validate(obj);
+        const { valid, object: result, errors } = schema.validate(obj);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -26,7 +27,7 @@ test('Any checks', async () => {
 
     {
         const obj = 0;
-        const { valid, object: result, errors } = await schema.validate(obj);
+        const { valid, object: result, errors } = schema.validate(obj);
         expect(valid).toEqual(true);
         expect(result).toEqual(0);
         expect(errors).not.toBeDefined();
@@ -34,7 +35,7 @@ test('Any checks', async () => {
 
     {
         const obj = 400;
-        const { valid, object: result, errors } = await schema.validate(obj);
+        const { valid, object: result, errors } = schema.validate(obj);
         expect(valid).toEqual(true);
         expect(result).toEqual(400);
         expect(errors).not.toBeDefined();
@@ -42,7 +43,7 @@ test('Any checks', async () => {
 
     {
         const obj = 'some string';
-        const { valid, object: result, errors } = await schema.validate(obj);
+        const { valid, object: result, errors } = schema.validate(obj);
         expect(valid).toEqual(true);
         expect(result).toEqual('some string');
         expect(errors).not.toBeDefined();
@@ -50,7 +51,7 @@ test('Any checks', async () => {
 
     {
         const obj = { obj: { nested: 'val' } };
-        const { valid, object: result, errors } = await schema.validate(obj);
+        const { valid, object: result, errors } = schema.validate(obj);
         expect(valid).toEqual(true);
         expect(result).toEqual(obj);
         expect(errors).not.toBeDefined();
@@ -64,15 +65,11 @@ test('Optional checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<any>(typeCheck);
+    expectTypeOf(typeCheck).toBeAny();
 
     {
         const obj = null;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(obj);
         expect(errors).not.toBeDefined();
@@ -80,11 +77,7 @@ test('Optional checks', async () => {
 
     {
         const obj = undefined;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(obj);
         expect(errors).not.toBeDefined();
@@ -92,11 +85,7 @@ test('Optional checks', async () => {
 
     {
         const obj = 0;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(0);
         expect(errors).not.toBeDefined();
@@ -104,11 +93,7 @@ test('Optional checks', async () => {
 
     {
         const obj = 400;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(400);
         expect(errors).not.toBeDefined();
@@ -116,11 +101,7 @@ test('Optional checks', async () => {
 
     {
         const obj = 'some string';
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual('some string');
         expect(errors).not.toBeDefined();
@@ -128,11 +109,7 @@ test('Optional checks', async () => {
 
     {
         const obj = { obj: { nested: 'val' } };
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(obj);
         expect(errors).not.toBeDefined();
@@ -146,15 +123,11 @@ test('Required checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -162,11 +135,7 @@ test('Required checks', async () => {
 
     {
         const obj = undefined;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -174,11 +143,7 @@ test('Required checks', async () => {
 
     {
         const obj = 0;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(0);
         expect(errors).not.toBeDefined();
@@ -186,11 +151,7 @@ test('Required checks', async () => {
 
     {
         const obj = 400;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(400);
         expect(errors).not.toBeDefined();
@@ -198,11 +159,7 @@ test('Required checks', async () => {
 
     {
         const obj = 'some string';
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual('some string');
         expect(errors).not.toBeDefined();
@@ -210,11 +167,7 @@ test('Required checks', async () => {
 
     {
         const obj = { obj: { nested: 'val' } };
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(obj);
         expect(errors).not.toBeDefined();
@@ -228,15 +181,11 @@ test('Has type checks', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -244,11 +193,7 @@ test('Has type checks', async () => {
 
     {
         const obj = undefined;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -256,11 +201,7 @@ test('Has type checks', async () => {
 
     {
         const obj = 0;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(0);
         expect(errors).not.toBeDefined();
@@ -268,11 +209,7 @@ test('Has type checks', async () => {
 
     {
         const obj = 400;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(400);
         expect(errors).not.toBeDefined();
@@ -280,11 +217,7 @@ test('Has type checks', async () => {
 
     {
         const obj = 'some string';
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual('some string');
         expect(errors).not.toBeDefined();
@@ -292,11 +225,7 @@ test('Has type checks', async () => {
 
     {
         const obj = { obj: { nested: 'val' } };
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result).toEqual(obj);
         expect(errors).not.toBeDefined();
@@ -309,7 +238,7 @@ test('Clear Has type - 1', () => {
 
     const typeCheck: InferType<typeof schema2> = 23;
 
-    expectType<any>(typeCheck);
+    expectTypeOf(typeCheck).toBeAny();
     expect(schema1 !== (schema2 as any)).toEqual(true);
 });
 
@@ -325,7 +254,7 @@ test('Preprocessors', async () => {
             }
             return value;
         })
-        .addValidator((value) => {
+        .addValidator(value => {
             if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
                 return {
                     valid: false,
@@ -338,15 +267,11 @@ test('Preprocessors', async () => {
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     const typeCheck: InferType<typeof schema2> = new Date();
-    expectType<Date>(typeCheck);
+    expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
         const obj = null;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -354,11 +279,7 @@ test('Preprocessors', async () => {
 
     {
         const obj = undefined;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -366,11 +287,7 @@ test('Preprocessors', async () => {
 
     {
         const obj = 0;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -378,11 +295,7 @@ test('Preprocessors', async () => {
 
     {
         const obj = 400;
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -390,11 +303,7 @@ test('Preprocessors', async () => {
 
     {
         const obj = 'some string';
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -402,11 +311,7 @@ test('Preprocessors', async () => {
 
     {
         const obj = { obj: { nested: 'val' } };
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(false);
         expect(result).not.toBeDefined();
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -415,13 +320,20 @@ test('Preprocessors', async () => {
     {
         const now = new Date();
         const obj = now.toJSON();
-        const {
-            valid,
-            object: result,
-            errors
-        } = await schema2.validate(obj as any);
+        const { valid, object: result, errors } = schema2.validate(obj as any);
         expect(valid).toEqual(true);
         expect(result?.getTime() === now.getTime()).toEqual(true);
         expect(errors).not.toBeDefined();
     }
+});
+
+// ---------------------------------------------------------------------------
+// clearDefault (line 205)
+// ---------------------------------------------------------------------------
+
+test('clearDefault - removes default value from any schema', () => {
+    const schema = any().default('fallback').clearDefault();
+    expect(schema.introspect().defaultValue).toBeUndefined();
+    const { valid } = schema.validate(undefined as any);
+    expect(valid).toEqual(false);
 });

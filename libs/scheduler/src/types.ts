@@ -1,16 +1,16 @@
 import {
-    InferType,
     array,
     boolean,
     date,
     func,
+    type InferType,
     number,
     object,
     string,
     union
 } from '@cleverbrush/schema';
 
-import { IJobRepository } from './jobRepository.js';
+import type { IJobRepository } from './jobRepository.js';
 
 const ScheduleSchemaBase = object({
     /** Number of intervals (days, months, minutes or weeks)
@@ -28,7 +28,7 @@ const ScheduleSchemaBase = object({
     maxOccurences: number().min(1).optional(),
     /** Skip this number of repeats. Min value is 1.  */
     skipFirst: number().min(1).optional()
-}).addValidator((val) => {
+}).addValidator(val => {
     if (
         'endsOn' in val &&
         'maxOccurences' in val &&
@@ -62,8 +62,8 @@ const ScheduleWeekSchema = ScheduleSchemaBase.addProps({
         .of(number().min(1).max(7))
         .minLength(1)
         .maxLength(7)
-        .addValidator((val) => {
-            const map = {};
+        .addValidator(val => {
+            const map: Record<number, boolean> = {};
             for (let i = 0; i < val.length; i++) {
                 if (map[val[i]]) {
                     return {
@@ -239,8 +239,11 @@ export type JobSchedulerProps = {
     persistRepository?: IJobRepository;
 };
 
+/** Lifecycle status of a job definition. */
 export type JobStatus = 'active' | 'disabled' | 'finished';
+/** Runtime status of the scheduler itself. */
 export type SchedulerStatus = 'started' | 'stopped';
+/** Status of a single job execution instance. */
 export type JobInstanceStatus =
     | 'running'
     | 'errored'
@@ -249,6 +252,10 @@ export type JobInstanceStatus =
     | 'timedout'
     | 'canceled';
 
+/**
+ * Pre-built `@cleverbrush/schema` schemas used internally by the scheduler.
+ * Exported for consumers who need to validate schedule/job payloads manually.
+ */
 export const Schemas = {
     ScheduleSchemaBase,
     ScheduleSchema,

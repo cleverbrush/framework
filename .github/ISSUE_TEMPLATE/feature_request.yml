@@ -1,0 +1,62 @@
+name: Feature Request
+description: Suggest a new feature or improvement
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement! Please fill out the sections below.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear description of the feature you'd like.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / Use Case
+      description: Why is this feature needed? What problem does it solve?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-api
+    attributes:
+      label: Proposed API
+      description: If you have ideas on what the API should look like, sketch it out here.
+      placeholder: |
+        import { string } from '@cleverbrush/schema';
+
+        const schema = string().myNewFeature();
+    validations:
+      required: false
+
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package
+      description: Which package does this relate to?
+      options:
+        - "@cleverbrush/schema"
+        - "@cleverbrush/deep"
+        - "@cleverbrush/async"
+        - "@cleverbrush/mapper"
+        - "@cleverbrush/react-form"
+        - "@cleverbrush/scheduler"
+        - "@cleverbrush/knex-clickhouse"
+        - New package
+        - Other / Multiple
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any workarounds or alternative approaches?
+    validations:
+      required: false

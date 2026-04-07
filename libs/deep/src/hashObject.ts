@@ -1,4 +1,4 @@
-const stringHash = (string, noType?) => {
+const stringHash = (string: string, noType?: boolean) => {
     let hashString = string;
     if (!noType) {
         hashString = `string${string}`;
@@ -12,7 +12,10 @@ const stringHash = (string, noType?) => {
     return hash;
 };
 
-function objectHash(obj, exclude) {
+function objectHash(
+    obj: Record<string, any>,
+    exclude: any[]
+): number | undefined {
     if (exclude.indexOf(obj) > -1) {
         return undefined;
     }
@@ -28,19 +31,30 @@ function objectHash(obj, exclude) {
     return stringHash(hash, true);
 }
 
-export function HashObject(unkType, exclude?) {
+/**
+ * Computes a 32-bit numeric hash for any value.
+ *
+ * Objects are hashed by recursively hashing their sorted keys and values;
+ * circular references are detected via an internal exclusion list.
+ *
+ * @param unkType - The value to hash (object, string, number, etc.).
+ * @param exclude - Internal array used for circular-reference detection.
+ * @returns A 32-bit integer hash code.
+ */
+export function HashObject(unkType: any, exclude?: any[]): number {
     let ex = exclude;
     if (ex === undefined) {
         ex = [];
     }
+    // biome-ignore lint/suspicious/noGlobalIsNan: intentional coercion — isNaN returns true for non-numeric types like objects
     if (!isNaN(unkType) && typeof unkType !== 'string') {
         return unkType;
     }
     switch (typeof unkType) {
         case 'object':
-            return objectHash(unkType, ex);
+            return objectHash(unkType, ex) as number;
         default:
-            return stringHash(String(unkType));
+            return stringHash(String(unkType)) as number;
     }
 }
 

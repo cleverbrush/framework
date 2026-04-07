@@ -10,13 +10,77 @@
     ],
     "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_schema.html",
     "keywords": [
-        "object schema validator",
         "schema",
-        "validate object",
+        "validation",
+        "typescript",
+        "type-safe",
+        "runtime-validation",
+        "zod-alternative",
+        "schema-validation",
+        "standard-schema",
         "cleverbrush"
     ],
     "license": "BSD 3-Clause",
     "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./core": {
+            "types": "./dist/core.d.ts",
+            "import": "./dist/core.js"
+        },
+        "./string": {
+            "types": "./dist/builders/StringSchemaBuilder.d.ts",
+            "import": "./dist/builders/StringSchemaBuilder.js"
+        },
+        "./number": {
+            "types": "./dist/builders/NumberSchemaBuilder.d.ts",
+            "import": "./dist/builders/NumberSchemaBuilder.js"
+        },
+        "./boolean": {
+            "types": "./dist/builders/BooleanSchemaBuilder.d.ts",
+            "import": "./dist/builders/BooleanSchemaBuilder.js"
+        },
+        "./object": {
+            "types": "./dist/builders/ObjectSchemaBuilder.d.ts",
+            "import": "./dist/builders/ObjectSchemaBuilder.js"
+        },
+        "./array": {
+            "types": "./dist/builders/ArraySchemaBuilder.d.ts",
+            "import": "./dist/builders/ArraySchemaBuilder.js"
+        },
+        "./date": {
+            "types": "./dist/builders/DateSchemaBuilder.d.ts",
+            "import": "./dist/builders/DateSchemaBuilder.js"
+        },
+        "./any": {
+            "types": "./dist/builders/AnySchemaBuilder.d.ts",
+            "import": "./dist/builders/AnySchemaBuilder.js"
+        },
+        "./union": {
+            "types": "./dist/builders/UnionSchemaBuilder.d.ts",
+            "import": "./dist/builders/UnionSchemaBuilder.js"
+        },
+        "./tuple": {
+            "types": "./dist/builders/TupleSchemaBuilder.d.ts",
+            "import": "./dist/builders/TupleSchemaBuilder.js"
+        },
+        "./record": {
+            "types": "./dist/builders/RecordSchemaBuilder.d.ts",
+            "import": "./dist/builders/RecordSchemaBuilder.js"
+        },
+        "./function": {
+            "types": "./dist/builders/FunctionSchemaBuilder.d.ts",
+            "import": "./dist/builders/FunctionSchemaBuilder.js"
+        },
+        "./extern": {
+            "types": "./dist/builders/ExternSchemaBuilder.d.ts",
+            "import": "./dist/builders/ExternSchemaBuilder.js"
+        }
+    },
+    "sideEffects": false,
     "name": "@cleverbrush/schema",
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/schema#readme",
     "repository": {
@@ -24,13 +88,17 @@
         "url": "github:cleverbrush/framework"
     },
     "scripts": {
-        "watch": "tsc --watch",
-        "build": "tsc"
+        "watch": "tsc --build --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "1.1.11",
+    "version": "2.0.0",
     "devDependencies": {
-        "@cleverbrush/deep": "1.1.11"
+        "@cleverbrush/deep": "^2.0.0"
+    },
+    "peerDependencies": {
+        "@standard-schema/spec": "^1.1.0"
     }
 }

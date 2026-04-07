@@ -1,4 +1,4 @@
-import { Schedule } from './types.js';
+import type { Schedule } from './types.js';
 
 const MS_IN_DAY = 1000 * 60 * 60 * 24;
 const MS_IN_WEEK = MS_IN_DAY * 7;
@@ -15,6 +15,31 @@ const getNumberOfDaysInMonth = (date: Date) => {
     ).getDate();
 };
 
+/**
+ * Iterates over the dates defined by a {@link Schedule}.
+ *
+ * Given a schedule configuration (e.g. every 2 days, every week on Monday/Friday,
+ * every month on the 15th) the calculator produces the sequence of `Date` objects
+ * that match that schedule. Use {@link hasNext} / {@link next} to walk through
+ * the sequence.
+ *
+ * @example
+ * ```ts
+ * const calc = new ScheduleCalculator({
+ *   every: 'day',
+ *   interval: 1,
+ *   hour: 9,
+ *   minute: 0,
+ *   startsOn: new Date('2025-01-01T00:00:00Z'),
+ *   maxOccurences: 5
+ * });
+ *
+ * while (calc.hasNext()) {
+ *   const { date, index } = calc.next();
+ *   console.log(`Run #${index} at ${date.toISOString()}`);
+ * }
+ * ```
+ */
 export class ScheduleCalculator {
     #schedule: Schedule;
     #currentDate = new Date();
@@ -26,6 +51,10 @@ export class ScheduleCalculator {
     #hasNext = false;
     #next: Date | undefined;
 
+    /**
+     * @param schedule - The schedule definition to iterate over.
+     * @throws If `schedule` is falsy.
+     */
     constructor(schedule: Schedule) {
         if (!schedule) throw new Error('schedule is required');
         this.#schedule = { ...schedule };
@@ -151,7 +180,7 @@ export class ScheduleCalculator {
                         if (Number.isNaN(dayOfWeek)) return;
                         for (let i = 0; i < 7 - dayOfWeek + 1; i++) {
                             date = new Date(
-                                date.getTime() + (i == 0 ? 0 : MS_IN_DAY)
+                                date.getTime() + (i === 0 ? 0 : MS_IN_DAY)
                             );
                             if (
                                 this.#schedule.endsOn &&
@@ -191,7 +220,7 @@ export class ScheduleCalculator {
                         date = new Date(
                             date.getTime() +
                                 MS_IN_DAY +
-                                (this.#repeatCount == 0
+                                (this.#repeatCount === 0
                                     ? 0
                                     : (this.#schedule.interval - 1) *
                                       MS_IN_WEEK)
@@ -319,6 +348,12 @@ export class ScheduleCalculator {
         return candidate;
     }
 
+    /**
+     * Returns `true` when the schedule has at least one more date.
+     *
+     * @param span - Optional millisecond window. When provided the method
+     *   returns `true` only if the next date falls within `span` ms from now.
+     */
     public hasNext(span?: number): boolean {
         if (!this.#hasNext) {
             return false;
@@ -327,9 +362,16 @@ export class ScheduleCalculator {
         if (typeof span !== 'number') return this.#hasNext;
 
         if (!this.#next) return false;
-        return this.#next.getTime() - new Date().getTime() <= span;
+        return this.#next.getTime() - Date.now() <= span;
     }
 
+    /**
+     * Advances to the next scheduled date and returns it together with
+     * its 1-based index in the sequence.
+     *
+     * @returns An object with the scheduled `date` and its `index`.
+     * @throws If the schedule has no more dates ({@link hasNext} is `false`).
+     */
     public next(): {
         date: Date;
         index: number;

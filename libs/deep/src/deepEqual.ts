@@ -1,6 +1,6 @@
 import { HashObject } from './hashObject.js';
 
-const isBothNaN = (v1, v2) => Number.isNaN(v1) && Number.isNaN(v2);
+const isBothNaN = (v1: any, v2: any) => Number.isNaN(v1) && Number.isNaN(v2);
 
 /**
  * Compares two objects and returns true if they
@@ -12,9 +12,9 @@ const isBothNaN = (v1, v2) => Number.isNaN(v1) && Number.isNaN(v2);
  * @param options additional options
  * @returns {boolean} `true` if the objects are equal, `false` otherwise
  */
-export const deepEqual = function (
-    p1,
-    p2,
+export const deepEqual = (
+    p1: any,
+    p2: any,
     options?: {
         /**
          * if true, the order of the elements in the array will be disregarded
@@ -22,32 +22,32 @@ export const deepEqual = function (
          */
         disregardArrayOrder?: boolean;
     }
-): boolean {
+): boolean => {
     const cache = new Map();
 
-    const compare = function (o1, o2) {
-        const arraysAreIdentical = function (a1, a2) {
+    const compare = (...args: any[]) => {
+        const arraysAreIdentical = (a1: any, a2: any) => {
             if (a1.length !== a2.length) return false;
             if (a1.length === 0 && a2.length === 0) return true;
 
             const c1 = options?.disregardArrayOrder
                 ? a1
-                      .map((t) => t)
-                      .sort((l, r) => {
+                      .map((t: any) => t)
+                      .sort((l: any, r: any) => {
                           const hash1 = HashObject(l);
                           const hash2 = HashObject(r);
                           return hash1 < hash2 ? 1 : -1;
                       })
-                : a1.map((t) => t);
+                : a1.map((t: any) => t);
             const c2 = options?.disregardArrayOrder
                 ? a2
-                      .map((t) => t)
-                      .sort((l, r) => {
+                      .map((t: any) => t)
+                      .sort((l: any, r: any) => {
                           const hash1 = HashObject(l);
                           const hash2 = HashObject(r);
                           return hash1 < hash2 ? 1 : -1;
                       })
-                : a2.map((t) => t);
+                : a2.map((t: any) => t);
 
             for (let i = 0; i < c1.length; i++) {
                 if (!compare(c1[i], c2[i])) return false;
@@ -55,7 +55,8 @@ export const deepEqual = function (
             return true;
         };
 
-        if (arguments.length !== 2) return false;
+        if (args.length !== 2) return false;
+        const [o1, o2] = args;
         if (o1 === o2) return true;
         if (typeof o1 !== typeof o2) return false;
         if (isBothNaN(o1, o2)) return true;
@@ -79,7 +80,9 @@ export const deepEqual = function (
 
             if (o1 instanceof Date && o2 instanceof Date) {
                 return (
+                    // biome-ignore lint/suspicious/noGlobalIsNan: isNaN coerces Date to number, which is the intended behavior here
                     !isNaN(o1 as any) &&
+                    // biome-ignore lint/suspicious/noGlobalIsNan: isNaN coerces Date to number, which is the intended behavior here
                     !isNaN(o2 as any) &&
                     o1.getTime() === o2.getTime()
                 );
@@ -87,7 +90,7 @@ export const deepEqual = function (
 
             const keys1 = Object.keys(o1);
             const keys2 = Object.keys(o2);
-            if (keys1.length != keys2.length) return false;
+            if (keys1.length !== keys2.length) return false;
 
             keys1.sort();
             keys2.sort();

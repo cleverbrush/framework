@@ -4,7 +4,8 @@
  *  because they are useful when it comes to write your own knex dialect
  */
 
-const charsRegex = /[\0\b\t\n\r\x1a"'\\]/g; // eslint-disable-line no-control-regex
+// biome-ignore lint/suspicious/noControlCharactersInRegex: intentional regex for escaping control characters in strings
+const charsRegex = /[\0\b\t\n\r\x1a"'\\]/g;
 const charsMap = {
     '\0': '\\0',
     '\b': '\\b',
@@ -17,28 +18,28 @@ const charsMap = {
     '\\': '\\\\'
 };
 
-const wrapEscape = (escapeFn) =>
-    function finalEscape(val, ctx = {}) {
+const wrapEscape = (escapeFn: (val: any, finalEscape: any, ctx: any) => any) =>
+    function finalEscape(val: any, ctx: any = {}) {
         return escapeFn(val, finalEscape, ctx);
     };
 
-const escapeObject = (val, finalEscape, ctx) => {
+const escapeObject = (val: any, _finalEscape: any, ctx: any) => {
     if (val && typeof val.toSQL === 'function') {
         return val.toSQL(ctx);
     }
     return JSON.stringify(val);
 };
 
-// eslint-disable-next-line
-const escapeString = (val) => {
-    // eslint-disable-next-line
-    let chunkIndex = (charsRegex.lastIndex = 0);
+const escapeString = (val: any) => {
+    charsRegex.lastIndex = 0;
+    let chunkIndex = 0;
     let escapedVal = '';
-    let match;
+    let match: RegExpExecArray | null = null;
 
-    // eslint-disable-next-line
+    // biome-ignore  lint/suspicious/noAssignInExpressions: intentional assignment in while condition to find matches in the string
     while ((match = charsRegex.exec(val))) {
-        escapedVal += val.slice(chunkIndex, match.index) + charsMap[match[0]];
+        escapedVal +=
+            val.slice(chunkIndex, match.index) + (charsMap as any)[match[0]];
         chunkIndex = charsRegex.lastIndex;
     }
 
@@ -54,15 +55,15 @@ const escapeString = (val) => {
     return `'${escapedVal}'`;
 };
 
-const bufferToString = (buffer) => `X${escapeString(buffer.toString('hex'))}`;
+const bufferToString = (buffer: Buffer) =>
+    `X${escapeString(buffer.toString('hex'))}`;
 
-const arrayToList = (array, finalEscape, ctx) => {
+const arrayToList = (array: any[], finalEscape: any, ctx: any) => {
     let sql = '';
     for (let i = 0; i < array.length; i++) {
         const val = array[i];
         if (Array.isArray(val)) {
             sql +=
-                // eslint-disable-next-line
                 (i === 0 ? '' : ', ') +
                 '(' +
                 arrayToList(val, finalEscape, ctx) +
@@ -74,23 +75,22 @@ const arrayToList = (array, finalEscape, ctx) => {
     return sql;
 };
 
-const zeroPad = (number, length) => {
-    number = number.toString();
-    while (number.length < length) {
-        number = `0${number}`;
+const zeroPad = (number: number, length: number) => {
+    let numberStr = number.toString();
+    while (numberStr.length < length) {
+        numberStr = `0${numberStr}`;
     }
-    return number;
+    return numberStr;
 };
 
-const convertTimezone = (tz) => {
+const convertTimezone = (tz: any) => {
     if (tz === 'Z') {
         return 0;
     }
     const m = tz.match(/([+\-\s])(\d\d):?(\d\d)?/);
     if (m) {
         return (
-            // eslint-disable-next-line
-            (m[1] == '-' ? -1 : 1) *
+            (m[1] === '-' ? -1 : 1) *
             (parseInt(m[2], 10) + (m[3] ? parseInt(m[3], 10) : 0) / 60) *
             60
         );
@@ -98,8 +98,7 @@ const convertTimezone = (tz) => {
     return false;
 };
 
-const dateToString = (date, finalEscape, ctx = {}) => {
-    // @ts-ignore
+const dateToString = (date: any, _finalEscape: any, ctx: any = {}) => {
     const timeZone = ctx.timeZone || 'local';
 
     const dt = new Date(date);
@@ -153,16 +152,14 @@ export const makeEscape = (config: any = {}) => {
     const finalEscapeObject = config.escapeObject || escapeObject;
     const finalWrap = config.wrap || wrapEscape;
 
-    function escapeFn(val, finalEscape, ctx) {
+    function escapeFn(val: any, finalEscape: any, ctx: any) {
         if (val === undefined || val === null) {
             return 'NULL';
         }
-        // eslint-disable-next-line
         switch (typeof val) {
             case 'boolean':
                 return val ? 'true' : 'false';
             case 'number':
-                // eslint-disable-next-line
                 return val + '';
             case 'object':
                 if (val instanceof Date) {
