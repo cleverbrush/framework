@@ -1,6 +1,6 @@
 # Improvement Plan & Growth Strategy
 
-> **Last updated:** April 5, 2026. **Status:** Pre-publication — all packages built, website ready, benchmarks show market-leading performance. Standard Schema v1 implemented. Shifting focus from features to publishing, ecosystem integration, and adoption.
+> **Last updated:** April 7, 2026. **Status:** Pre-publication — all packages built, website ready, benchmarks show market-leading performance. Standard Schema v1 implemented. Shifting focus from features to publishing, ecosystem integration, and adoption.
 
 ---
 
@@ -56,7 +56,7 @@
 | **Stars** | 42.3k | Pre-publish |
 | **Bundle size** | Zod v3: 14.4 KB gz; Zod v4: **41 KB gz** | **14 KB gz (full) / 4 KB gz (subpath)** |
 | **Standard Schema** | ✅ Yes (v3.24+) | ✅ Yes (v1) — [`~standard` on all builders](https://standardschema.dev/) |
-| **Runtime introspection** | ❌ Opaque schemas | ✅ **PropertyDescriptors** |
+| **Runtime introspection** | ~ Limited (`._def` / `._zod.def`, undocumented/unstable API) | ✅ **First-class stable `.introspect()` + PropertyDescriptors** |
 | **Extension system** | `.refine()` only (black box) | ✅ **`defineExtension()` — type-safe, composable, introspectable** |
 | **Ecosystem integrations** | 50+ tools via Standard Schema (tRPC, RHF, TanStack, Hono, T3 Env...) | ✅ **50+ tools via Standard Schema** + mapper + react-form + schema-json (broader than Zod's ecosystem) |
 | **AI/LLM support** | MCP server, llms.txt | ❌ None yet — **PropertyDescriptors are an advantage here** |
@@ -70,11 +70,12 @@
 ### Remaining Feature Gaps vs Zod
 
 | Feature | Zod API | Current workaround | Priority |
-|---------|---------|-------------------|----------|
+|---------|---------|-------------------|-----------|
 | **Transform/Pipe** | `.transform(fn)`, `.pipe(schema)` | `.addPreprocessor()` + `@cleverbrush/mapper` | Low — mapper covers ~90% of use cases |
 | **Coercion namespace** | `z.coerce.string()` | `.addPreprocessor()` | Low — preprocessors cover this |
 | **Literal builder** | `z.literal(42)` | `number().equals(42)` or `string().equals('x')` | Low — equality operators work |
-| **Map/Set/Promise** | `z.map()`, `z.set()`, `z.promise()` | `.hasType<Map<K,V>>()` | Low — niche |
+| **Map / Set** | `z.map()`, `z.set()` | ✅ `any().hasType(Map)` / `any().hasType(Set)` + custom validators | **Not a gap** — covered |
+| **Promise** | `z.promise()` | `.hasType<Promise<T>>()` | Low — niche |
 
 ---
 
@@ -269,7 +270,7 @@ Generate structured output / function-calling tool schemas from @cleverbrush/sch
 - Convert schema → OpenAI function-calling format
 - Convert schema → Anthropic tool-use format
 - `.describe()` annotations flow into tool parameter descriptions automatically
-- This is architecturally impossible with Zod (no runtime introspection of constraints)
+- Zod exposes some schema internals via undocumented `._def` / `._zod.def` properties, but these are unstable and untyped. `@cleverbrush/schema` provides a first-class, typed, stable `.introspect()` API and PropertyDescriptor tree — making schema-to-tool-description conversion far more reliable and maintainable.
 
 ---
 
@@ -353,7 +354,8 @@ Decide before or shortly after launch. Options: Discord, GitHub Discussions, or 
 | **Transform/Pipe** | `mapper` + `.addPreprocessor()` covers ~90% | Users need inline single-field type-changing |
 | **Coercion namespace** | `.addPreprocessor()` | Multiple users request it |
 | **Literal builder** | `number().equals(42)`, `string().equals('x')` | Ergonomics demand |
-| **Map/Set/Promise** | `.hasType<Map<K,V>>()` | Niche — unlikely |
+| **Map / Set** | ✅ `any().hasType(Map)` / `any().hasType(Set)` — **not a gap** | N/A |
+| **Promise** | `.hasType<Promise<T>>()` | Niche — unlikely |
 
 ---
 
