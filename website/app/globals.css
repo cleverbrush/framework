@@ -2745,6 +2745,7 @@ pre code {
     transition:
         border-color var(--transition-smooth),
         background var(--transition-smooth);
+    min-width: 0;
 }
 
 .schema-feature:hover {
@@ -3231,8 +3232,8 @@ pre code {
 }
 
 .vs-zod-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
     margin-bottom: 2rem;
 }
@@ -3326,10 +3327,6 @@ pre code {
 }
 
 @media (max-width: 900px) {
-    .vs-zod-grid {
-        grid-template-columns: 1fr;
-    }
-
     .vs-zod-metrics {
         grid-template-columns: repeat(2, 1fr);
     }
