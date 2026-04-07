@@ -1624,6 +1624,25 @@ pre code {
 }
 
 /* ══════════════════════════════════════════════════════════════════
+   Schema Docs Layout
+   ══════════════════════════════════════════════════════════════════ */
+
+.doc-layout {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg-primary);
+    padding-top: 65px; /* navbar height */
+}
+
+.doc-main {
+    flex: 1;
+    overflow-y: auto;
+    min-width: 0;
+    padding-bottom: 80px;
+}
+
+/* ══════════════════════════════════════════════════════════════════
    Interactive Playground
    ══════════════════════════════════════════════════════════════════ */
 
@@ -2558,6 +2577,13 @@ pre code {
 
 /* ── Responsive ──────────────────────────────────────────────────── */
 @media (max-width: 900px) {
+    .doc-layout {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+        overflow: visible;
+    }
+
     .pg-layout {
         flex-direction: column;
         height: auto;

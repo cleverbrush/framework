@@ -1,7 +1,7 @@
 import Link from 'next/link';
+import { fmtKB, loadBundleSizes } from '@/lib/bundleSizes';
 import { highlightTS } from '@/lib/highlight';
 import { BenchmarkSection } from './BenchmarkSection';
-import { loadBundleSizes, fmtKB } from '@/lib/bundleSizes';
 
 export default function HomePage() {
     const bundleSizes = loadBundleSizes();
