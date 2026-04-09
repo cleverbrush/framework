@@ -1,16 +1,21 @@
 import {
     type BRAND,
+    type InferType,
     SchemaBuilder,
     type ValidationContext,
     type ValidationErrorMessageProvider,
     type ValidationResult
 } from './SchemaBuilder.js';
 
-type AnySchemaBuilder = SchemaBuilder<any, any, any, any, any>;
-
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
     ReturnType<FunctionSchemaBuilder<R>['introspect']>
 >;
+
+type InferParameters<
+    TParams extends SchemaBuilder<any, any, any, any, any>[]
+> = {
+    [K in keyof TParams]: InferType<TParams[K]>;
+};
 
 /**
  * Schema builder for functions. Allows to define a schema for a function.
@@ -44,8 +49,16 @@ export class FunctionSchemaBuilder<
     TExplicitType = undefined,
     THasDefault extends boolean = false,
     TExtensions = {},
+    TParameters extends SchemaBuilder<any, any, any, any, any>[] = [],
+    TReturnTypeSchema extends
+        | SchemaBuilder<any, any, any, any, any>
+        | undefined = undefined,
     TResult = TExplicitType extends undefined
-        ? (...args: any[]) => any
+        ? (
+              ...args: InferParameters<TParameters>
+          ) => TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any>
+              ? InferType<TReturnTypeSchema>
+              : any
         : TExplicitType
 > extends SchemaBuilder<
     TResult,
@@ -54,8 +67,8 @@ export class FunctionSchemaBuilder<
     THasDefault,
     TExtensions
 > {
-    #parameters: AnySchemaBuilder[] = [];
-    #returnType?: AnySchemaBuilder;
+    #parameters: SchemaBuilder<any, any, any, any, any>[] = [];
+    #returnType?: SchemaBuilder<any, any, any, any, any>;
 
     /**
      * @hidden
@@ -86,7 +99,15 @@ export class FunctionSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): FunctionSchemaBuilder<true, TNullable, T, THasDefault, TExtensions> &
+    ): FunctionSchemaBuilder<
+        true,
+        TNullable,
+        T,
+        THasDefault,
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
+    > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -101,7 +122,9 @@ export class FunctionSchemaBuilder<
         TNullable,
         undefined,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return this.createFromProps({
@@ -228,7 +251,9 @@ export class FunctionSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.required(errorMessage);
@@ -242,7 +267,9 @@ export class FunctionSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.optional();
@@ -258,7 +285,9 @@ export class FunctionSchemaBuilder<
         TNullable,
         TExplicitType,
         true,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.default(value) as any;
@@ -272,7 +301,9 @@ export class FunctionSchemaBuilder<
         TNullable,
         TExplicitType,
         false,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.clearDefault() as any;
@@ -288,7 +319,9 @@ export class FunctionSchemaBuilder<
         TNullable,
         TResult & { readonly [K in BRAND]: TBrand },
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.brand(_name);
@@ -305,7 +338,9 @@ export class FunctionSchemaBuilder<
         TNullable,
         Readonly<TResult>,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.readonly();
@@ -319,7 +354,9 @@ export class FunctionSchemaBuilder<
         true,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.nullable() as any;
@@ -329,17 +366,22 @@ export class FunctionSchemaBuilder<
      * Adds a parameter schema to the function schema.
      * Each call appends the given schema to the list of parameter schemas.
      * The accumulated list is available via `introspect().parameters`.
+     * The inferred function type is updated to include the parameter type.
      *
      * @param schema The schema describing the parameter.
      */
-    public addParameter(
-        schema: AnySchemaBuilder
+    public addParameter<
+        TSchema extends SchemaBuilder<any, any, any, any, any>
+    >(
+        schema: TSchema
     ): FunctionSchemaBuilder<
         TRequired,
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        [...TParameters, TSchema],
+        TReturnTypeSchema
     > &
         TExtensions {
         return FunctionSchemaBuilder.create({
@@ -351,17 +393,22 @@ export class FunctionSchemaBuilder<
     /**
      * Sets the return type schema for the function schema.
      * The schema is available via `introspect().returnType`.
+     * The inferred function type is updated to reflect the return type.
      *
      * @param schema The schema describing the return type.
      */
-    public hasReturnType(
-        schema: AnySchemaBuilder
+    public hasReturnType<
+        TSchema extends SchemaBuilder<any, any, any, any, any>
+    >(
+        schema: TSchema
     ): FunctionSchemaBuilder<
         TRequired,
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TSchema
     > &
         TExtensions {
         return FunctionSchemaBuilder.create({
@@ -378,7 +425,9 @@ export class FunctionSchemaBuilder<
         false,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TParameters,
+        TReturnTypeSchema
     > &
         TExtensions {
         return super.notNullable() as any;
@@ -393,3 +442,4 @@ export const func = () =>
     FunctionSchemaBuilder.create({
         isRequired: true
     }) as FunctionSchemaBuilder<true>;
+
