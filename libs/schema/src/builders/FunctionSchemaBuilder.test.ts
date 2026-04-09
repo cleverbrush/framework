@@ -1,7 +1,9 @@
 import { expect, expectTypeOf, test } from 'vitest';
 
 import { func } from './FunctionSchemaBuilder.js';
+import { number } from './NumberSchemaBuilder.js';
 import type { InferType } from './SchemaBuilder.js';
+import { string } from './StringSchemaBuilder.js';
 
 test('Func checks', async () => {
     const schema = func();
@@ -276,4 +278,88 @@ test('clearDefault - removes default value from function schema', () => {
     expect(schema.introspect().defaultValue).toBeUndefined();
     const { valid } = schema.validate(undefined as any);
     expect(valid).toEqual(false);
+});
+
+// ---------------------------------------------------------------------------
+// addParameter
+// ---------------------------------------------------------------------------
+
+test('addParameter - starts with empty parameters list', () => {
+    const schema = func();
+    expect(schema.introspect().parameters).toEqual([]);
+});
+
+test('addParameter - adds a single parameter schema', () => {
+    const strSchema = string();
+    const schema = func().addParameter(strSchema);
+    const { parameters } = schema.introspect();
+    expect(parameters).toHaveLength(1);
+    expect(parameters[0]).toBe(strSchema);
+});
+
+test('addParameter - accumulates multiple parameter schemas', () => {
+    const strSchema = string();
+    const numSchema = number();
+    const schema = func().addParameter(strSchema).addParameter(numSchema);
+    const { parameters } = schema.introspect();
+    expect(parameters).toHaveLength(2);
+    expect(parameters[0]).toBe(strSchema);
+    expect(parameters[1]).toBe(numSchema);
+});
+
+test('addParameter - returns a new instance', () => {
+    const schema1 = func();
+    const schema2 = schema1.addParameter(string());
+    expect(schema1 === (schema2 as any)).toEqual(false);
+});
+
+test('addParameter - preserves existing parameters across chained calls', () => {
+    const s1 = string();
+    const s2 = number();
+    const s3 = string();
+    const schema = func().addParameter(s1).addParameter(s2).addParameter(s3);
+    const { parameters } = schema.introspect();
+    expect(parameters).toHaveLength(3);
+    expect(parameters[0]).toBe(s1);
+    expect(parameters[1]).toBe(s2);
+    expect(parameters[2]).toBe(s3);
+});
+
+// ---------------------------------------------------------------------------
+// hasReturnType
+// ---------------------------------------------------------------------------
+
+test('hasReturnType - starts with undefined returnType', () => {
+    const schema = func();
+    expect(schema.introspect().returnType).toBeUndefined();
+});
+
+test('hasReturnType - sets the return type schema', () => {
+    const strSchema = string();
+    const schema = func().hasReturnType(strSchema);
+    expect(schema.introspect().returnType).toBe(strSchema);
+});
+
+test('hasReturnType - returns a new instance', () => {
+    const schema1 = func();
+    const schema2 = schema1.hasReturnType(string());
+    expect(schema1 === (schema2 as any)).toEqual(false);
+});
+
+test('hasReturnType - overwrites a previously set return type', () => {
+    const numSchema = number();
+    const schema = func().hasReturnType(string()).hasReturnType(numSchema);
+    expect(schema.introspect().returnType).toBe(numSchema);
+});
+
+test('addParameter and hasReturnType - combined usage', () => {
+    const paramSchema = string();
+    const returnSchema = number();
+    const schema = func()
+        .addParameter(paramSchema)
+        .hasReturnType(returnSchema);
+    const { parameters, returnType } = schema.introspect();
+    expect(parameters).toHaveLength(1);
+    expect(parameters[0]).toBe(paramSchema);
+    expect(returnType).toBe(returnSchema);
 });

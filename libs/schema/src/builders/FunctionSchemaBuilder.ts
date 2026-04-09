@@ -6,6 +6,8 @@ import {
     type ValidationResult
 } from './SchemaBuilder.js';
 
+type AnySchemaBuilder = SchemaBuilder<any, any, any, any, any>;
+
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
     ReturnType<FunctionSchemaBuilder<R>['introspect']>
 >;
@@ -52,6 +54,9 @@ export class FunctionSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    #parameters: AnySchemaBuilder[] = [];
+    #returnType?: AnySchemaBuilder;
+
     /**
      * @hidden
      */
@@ -64,6 +69,16 @@ export class FunctionSchemaBuilder<
 
     protected constructor(props: FunctionSchemaBuilderCreateProps<TRequired>) {
         super(props as any);
+
+        if (Array.isArray(props.parameters)) {
+            this.#parameters = props.parameters.filter(
+                (p) => p instanceof SchemaBuilder
+            );
+        }
+
+        if (props.returnType instanceof SchemaBuilder) {
+            this.#returnType = props.returnType;
+        }
     }
 
     /**
@@ -92,6 +107,23 @@ export class FunctionSchemaBuilder<
         return this.createFromProps({
             ...this.introspect()
         } as any) as any;
+    }
+
+    /**
+     * Returns an object describing the schema configuration.
+     */
+    public introspect() {
+        return {
+            ...super.introspect(),
+            /**
+             * List of parameter schemas added via `addParameter()`
+             */
+            parameters: [...this.#parameters],
+            /**
+             * Return type schema set via `hasReturnType()`, or `undefined` if not set
+             */
+            returnType: this.#returnType
+        };
     }
 
     #buildResult(
@@ -291,6 +323,51 @@ export class FunctionSchemaBuilder<
     > &
         TExtensions {
         return super.nullable() as any;
+    }
+
+    /**
+     * Adds a parameter schema to the function schema.
+     * Each call appends the given schema to the list of parameter schemas.
+     * The accumulated list is available via `introspect().parameters`.
+     *
+     * @param schema The schema describing the parameter.
+     */
+    public addParameter(
+        schema: AnySchemaBuilder
+    ): FunctionSchemaBuilder<
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return FunctionSchemaBuilder.create({
+            ...this.introspect(),
+            parameters: [...this.#parameters, schema]
+        } as any) as any;
+    }
+
+    /**
+     * Sets the return type schema for the function schema.
+     * The schema is available via `introspect().returnType`.
+     *
+     * @param schema The schema describing the return type.
+     */
+    public hasReturnType(
+        schema: AnySchemaBuilder
+    ): FunctionSchemaBuilder<
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return FunctionSchemaBuilder.create({
+            ...this.introspect(),
+            returnType: schema
+        } as any) as any;
     }
 
     /**
