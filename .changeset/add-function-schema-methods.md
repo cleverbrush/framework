@@ -7,16 +7,16 @@ Add `addParameter()` and `hasReturnType()` to `FunctionSchemaBuilder`
 `func()` schemas can now describe their parameter types and return type using the fluent API:
 
 ```ts
-import { func, string, number } from '@cleverbrush/schema';
+import { func, string, number, InferType } from '@cleverbrush/schema';
 
 const greet = func()
   .addParameter(string())        // (param0: string, ...) => any
-  .addParameter(number().optional())  // (param0: string, param1?: number) => any
+  .addParameter(number().optional())  // (param0: string, param1: number | undefined) => any
   .hasReturnType(string());      // (...) => string
 
 // TypeScript infers the full signature
 type Greet = InferType<typeof greet>;
-// (param0: string, param1?: number) => string
+// (param0: string, param1: number | undefined) => string
 ```
 
 - **`addParameter(schema)`** — appends a parameter schema; each call extends the inferred tuple of parameter types. Chainable.
