@@ -1,4 +1,4 @@
-/** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it's intentionally */
+/** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it is intentional */
 import { InstallBanner } from '@/app/InstallBanner';
 import { highlightTS } from '@/lib/highlight';
 
