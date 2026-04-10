@@ -240,9 +240,7 @@ export const record: <
     valueSchema: TValueSchema
 ) => ExtendedRecord<TKeySchema, TValueSchema> = s.record as any;
 
-export const promise: <
-    TWrapped extends SchemaBuilder<any, any, any, any, any>
->(
+export const promise: <TWrapped extends SchemaBuilder<any, any, any, any, any>>(
     wrapped: TWrapped
 ) => ExtendedPromise<TWrapped> = s.promise as any;
 

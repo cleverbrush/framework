@@ -2335,8 +2335,9 @@ type NotRequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any,
     "file:///node_modules/@cleverbrush/schema/builders/PromiseSchemaBuilder.d.ts": `import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type PromiseSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<PromiseSchemaBuilder<R>['introspect']>>;
 /**
- * Schema builder for \`Promise\` values. Validates that a value is an instance
- * of \`Promise\` and optionally carries a typed resolved-value schema so that
+ * Schema builder for promise-like values. Validates that a value is a
+ * thenable (for example, an actual \`Promise\` or any object with a \`then\`
+ * function) and optionally carries a typed resolved-value schema so that
  * the inferred TypeScript type is \`Promise<T>\` instead of \`Promise<any>\`.
  *
  * **NOTE** this class is exported only to give opportunity to extend it
@@ -4767,6 +4768,7 @@ import { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 import { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
 import { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
+import { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
 import { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
@@ -4792,6 +4794,7 @@ type BuilderMap = {
     union: UnionSchemaBuilder<any, any, any, any, any, any>;
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any, any>;
+    promise: PromiseSchemaBuilder<any, any, any, any, any>;
 };
 type BuilderTypeName = keyof BuilderMap;
 /**
@@ -4918,6 +4921,7 @@ type ExtendedFuncFactory<TExt> = () => CleanExtended<FunctionSchemaBuilder<true,
 type ExtendedAnyFactory<TExt> = () => CleanExtended<AnySchemaBuilder<true, false, undefined, false, TExt>, TExt>;
 type ExtendedTupleFactory<TExt> = <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => CleanExtended<TupleSchemaBuilder<TElements, true, false, undefined, false, TExt>, TExt>;
 type ExtendedRecordFactory<TExt> = <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => CleanExtended<RecordSchemaBuilder<TKeySchema, TValueSchema, true, false, undefined, false, TExt>, TExt>;
+type ExtendedPromiseFactory<TExt> = <TSchema extends SchemaBuilder<any, any, any, any, any>>(resolvedTypeSchema?: TSchema) => CleanExtended<PromiseSchemaBuilder<true, false, undefined, false, TExt, TSchema>, TExt>;
 /**
  * The return type of {@link withExtensions}.
  *
@@ -4942,6 +4946,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     union: ExtendedUnionFactory<MergeExtensionMethods<TExts, 'union'>>;
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
+    promise: ExtendedPromiseFactory<MergeExtensionMethods<TExts, 'promise'>>;
 };
 /**
  * Defines an extension targeting one or more schema builder types.
@@ -5492,7 +5497,7 @@ export declare const func: () => ExtendedFunc;
 export declare const any: () => ExtendedAny;
 export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => ExtendedTuple<TElements>;
 export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => ExtendedRecord<TKeySchema, TValueSchema>;
-export { promise } from '../builders/PromiseSchemaBuilder.js';
+export declare const promise: <TWrapped extends SchemaBuilder<any, any, any, any, any>>(wrapped: TWrapped) => ExtendedPromise<TWrapped>;
 /**
  * Creates a string schema constrained to the given literal values.
  *
