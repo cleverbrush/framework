@@ -93,9 +93,9 @@ export class ServiceScope implements Disposable, AsyncDisposable {
      * Synchronously disposes all scoped services that implement
      * `Symbol.dispose`, in reverse creation order (LIFO).
      *
-     * Services that only implement `Symbol.asyncDispose` are skipped (a
-     * warning is logged to the console). Use {@link asyncDispose} to properly
-     * dispose all services including async ones.
+     * Services that only implement `Symbol.asyncDispose` are skipped during
+     * synchronous disposal. Use {@link asyncDispose} to properly dispose all
+     * services including async ones.
      *
      * @throws Re-throws the first error encountered during disposal, but
      *   still attempts to dispose remaining services.
