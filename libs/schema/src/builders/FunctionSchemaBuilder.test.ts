@@ -286,8 +286,8 @@ test('clearDefault - removes default value from function schema', () => {
 
 test('addParameter - starts with empty parameters list', () => {
     const schema = func();
-    const typeCheck: InferType<typeof schema> = () => null;
-    expectTypeOf(typeCheck).toMatchTypeOf<() => any>();
+    const typeCheck: InferType<typeof schema> = (..._args: any[]) => null;
+    expectTypeOf(typeCheck).toMatchTypeOf<(...args: any[]) => any>();
     expect(schema.introspect().parameters).toEqual([]);
 });
 
@@ -353,8 +353,8 @@ test('addParameter - preserves existing parameters across chained calls', () => 
 
 test('hasReturnType - starts with undefined returnType', () => {
     const schema = func();
-    const typeCheck: InferType<typeof schema> = () => null;
-    expectTypeOf(typeCheck).toMatchTypeOf<() => any>();
+    const typeCheck: InferType<typeof schema> = (..._args: any[]) => null;
+    expectTypeOf(typeCheck).toMatchTypeOf<(...args: any[]) => any>();
     expect(schema.introspect().returnType).toBeUndefined();
 });
 

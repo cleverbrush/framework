@@ -73,7 +73,9 @@ export class FunctionSchemaBuilder<
         | undefined = undefined,
     TResult = TExplicitType extends undefined
         ? (
-              ...args: InferParameters<TParameters>
+              ...args: TParameters extends []
+                  ? any[]
+                  : InferParameters<TParameters>
           ) => TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any>
               ? InferType<TReturnTypeSchema>
               : any
