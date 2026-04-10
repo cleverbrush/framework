@@ -84,9 +84,7 @@ export class PromiseSchemaBuilder<
         });
     }
 
-    protected constructor(
-        props: PromiseSchemaBuilderCreateProps<TRequired>
-    ) {
+    protected constructor(props: PromiseSchemaBuilderCreateProps<TRequired>) {
         super(props as any);
 
         if (props.resolvedType instanceof SchemaBuilder) {
@@ -458,14 +456,10 @@ export class PromiseSchemaBuilder<
  * @see {@link PromiseSchemaBuilder}
  */
 export function promise(): PromiseSchemaBuilder<true>;
-export function promise<
-    TSchema extends SchemaBuilder<any, any, any, any, any>
->(
+export function promise<TSchema extends SchemaBuilder<any, any, any, any, any>>(
     resolvedTypeSchema: TSchema
 ): PromiseSchemaBuilder<true, false, undefined, false, {}, TSchema>;
-export function promise<
-    TSchema extends SchemaBuilder<any, any, any, any, any>
->(
+export function promise<TSchema extends SchemaBuilder<any, any, any, any, any>>(
     resolvedTypeSchema?: TSchema
 ): PromiseSchemaBuilder<true> {
     return PromiseSchemaBuilder.create({

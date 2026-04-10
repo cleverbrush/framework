@@ -13,7 +13,7 @@ test('Promise checks — valid Promise', async () => {
     const schema = promise();
 
     const obj = Promise.resolve(42);
-    const { valid, object: result, errors } = await schema.validate(obj);
+    const { valid, object: result, errors } = schema.validate(obj);
     expect(valid).toEqual(true);
     expect(result).toBe(obj);
     expect(errors).not.toBeDefined();
@@ -22,7 +22,7 @@ test('Promise checks — valid Promise', async () => {
 test('Promise checks — null is rejected', async () => {
     const schema = promise();
 
-    const { valid, object: result, errors } = await schema.validate(null as any);
+    const { valid, object: result, errors } = schema.validate(null as any);
     expect(valid).toEqual(false);
     expect(result).not.toBeDefined();
     expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -31,11 +31,7 @@ test('Promise checks — null is rejected', async () => {
 test('Promise checks — undefined is rejected', async () => {
     const schema = promise();
 
-    const {
-        valid,
-        object: result,
-        errors
-    } = await schema.validate(undefined as any);
+    const { valid, object: result, errors } = schema.validate(undefined as any);
     expect(valid).toEqual(false);
     expect(result).not.toBeDefined();
     expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -44,7 +40,7 @@ test('Promise checks — undefined is rejected', async () => {
 test('Promise checks — number is rejected', async () => {
     const schema = promise();
 
-    const { valid, object: result, errors } = await schema.validate(0 as any);
+    const { valid, object: result, errors } = schema.validate(0 as any);
     expect(valid).toEqual(false);
     expect(result).not.toBeDefined();
     expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -57,7 +53,7 @@ test('Promise checks — string is rejected', async () => {
         valid,
         object: result,
         errors
-    } = await schema.validate('some string' as any);
+    } = schema.validate('some string' as any);
     expect(valid).toEqual(false);
     expect(result).not.toBeDefined();
     expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -70,7 +66,8 @@ test('Promise checks — plain object is rejected', async () => {
         valid,
         object: result,
         errors
-    } = await schema.validate({ then: 'not a function' } as any);
+        // biome-ignore lint/suspicious/noThenProperty: This is intentionally
+    } = schema.validate({ then: 'not a function' } as any);
     expect(valid).toEqual(false);
     expect(result).not.toBeDefined();
     expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -79,8 +76,11 @@ test('Promise checks — plain object is rejected', async () => {
 test('Promise checks — thenable (duck-typed Promise) is accepted', async () => {
     const schema = promise();
 
-    const thenable = { then: (res: any) => res(42) } as unknown as Promise<number>;
-    const { valid, object: result, errors } = await schema.validate(thenable);
+    const thenable = {
+        // biome-ignore lint/suspicious/noThenProperty: This is intentionally
+        then: (res: any) => res(42)
+    } as unknown as Promise<number>;
+    const { valid, object: result, errors } = schema.validate(thenable);
     expect(valid).toEqual(true);
     expect(result).toBe(thenable);
     expect(errors).not.toBeDefined();
@@ -116,7 +116,7 @@ test('Optional checks — undefined is accepted', async () => {
 test('Optional checks — null is accepted', async () => {
     const schema = promise().optional();
 
-    const { valid, object: result, errors } = await schema.validate(null as any);
+    const { valid, object: result, errors } = schema.validate(null as any);
     expect(valid).toEqual(true);
     expect(result).toEqual(null);
     expect(errors).not.toBeDefined();
@@ -126,7 +126,7 @@ test('Optional checks — valid Promise is still accepted', async () => {
     const schema = promise().optional();
 
     const obj = Promise.resolve(10);
-    const { valid, object: result, errors } = await schema.validate(obj);
+    const { valid, object: result, errors } = schema.validate(obj);
     expect(valid).toEqual(true);
     expect(result).toBe(obj);
     expect(errors).not.toBeDefined();
@@ -135,11 +135,7 @@ test('Optional checks — valid Promise is still accepted', async () => {
 test('Optional checks — non-promise value is rejected', async () => {
     const schema = promise().optional();
 
-    const {
-        valid,
-        object: result,
-        errors
-    } = await schema.validate(400 as any);
+    const { valid, object: result, errors } = schema.validate(400 as any);
     expect(valid).toEqual(false);
     expect(result).toBeUndefined();
     expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
@@ -156,20 +152,20 @@ test('Required checks — required after optional rejects undefined', async () =
     expect(schema1 === (schema2 as any)).toEqual(false);
 
     {
-        const { valid, errors } = await schema2.validate(null as any);
+        const { valid, errors } = schema2.validate(null as any);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
     }
 
     {
-        const { valid, errors } = await schema2.validate(undefined as any);
+        const { valid, errors } = schema2.validate(undefined as any);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
     }
 
     {
         const obj = Promise.resolve(true);
-        const { valid, object: result, errors } = await schema2.validate(obj);
+        const { valid, object: result, errors } = schema2.validate(obj);
         expect(valid).toEqual(true);
         expect(result).toBe(obj);
         expect(errors).not.toBeDefined();
@@ -190,14 +186,14 @@ test('Has type checks — hasType overrides inferred type', async () => {
     expectTypeOf(typeCheck).toMatchTypeOf<Date>();
 
     {
-        const { valid, errors } = await schema2.validate(null as any);
+        const { valid, errors } = schema2.validate(null as any);
         expect(valid).toEqual(false);
         expect(Array.isArray(errors) && errors.length > 0).toEqual(true);
     }
 
     {
         const obj = Promise.resolve(new Date()) as unknown as Date;
-        const { valid, object: result, errors } = await schema2.validate(obj);
+        const { valid, object: result, errors } = schema2.validate(obj);
         expect(valid).toEqual(true);
         expect(result).toBe(obj);
         expect(errors).not.toBeDefined();
@@ -259,7 +255,9 @@ test('hasResolvedType — returns a new instance', () => {
 
 test('hasResolvedType — overwrites a previously set resolved type', () => {
     const numSchema = number();
-    const schema = promise().hasResolvedType(string()).hasResolvedType(numSchema);
+    const schema = promise()
+        .hasResolvedType(string())
+        .hasResolvedType(numSchema);
     const typeCheck: InferType<typeof schema> = Promise.resolve(42);
     expectTypeOf(typeCheck).toMatchTypeOf<Promise<number>>();
     expect(schema.introspect().resolvedType).toBe(numSchema);

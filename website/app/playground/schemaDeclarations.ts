@@ -4679,11 +4679,11 @@ export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.j
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export { ExternSchemaBuilder, extern } from './builders/ExternSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
-export { PromiseSchemaBuilder, promise } from './builders/PromiseSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/ObjectSchemaBuilder.js';
+export { PromiseSchemaBuilder, promise } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type { PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
