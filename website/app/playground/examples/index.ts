@@ -1522,7 +1522,7 @@ const greet = func()
 
 // TypeScript infers the full signature automatically
 type Greet = InferType<typeof greet>;
-// → (param0: string, param1?: number) => string
+// → (param0: string, param1: number | undefined) => string
 
 // func() still only validates that the value IS a function at runtime
 const result1 = greet.validate((name: string) => \`Hello, \${name}!\`);
