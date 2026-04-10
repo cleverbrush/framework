@@ -78,6 +78,10 @@
         "./extern": {
             "types": "./dist/builders/ExternSchemaBuilder.d.ts",
             "import": "./dist/builders/ExternSchemaBuilder.js"
+        },
+        "./promise": {
+            "types": "./dist/builders/PromiseSchemaBuilder.d.ts",
+            "import": "./dist/builders/PromiseSchemaBuilder.js"
         }
     },
     "sideEffects": false,

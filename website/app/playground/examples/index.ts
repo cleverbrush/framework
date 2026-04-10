@@ -48,6 +48,10 @@ export const EXAMPLE_GROUPS = [
         label: 'Function Schemas',
         ids: ['function-schema', 'function-typed-params', 'function-in-object']
     },
+    {
+        label: 'Promise Schemas',
+        ids: ['promise-schema', 'promise-typed']
+    },
     { label: 'Validation', ids: ['validation-errors', 'custom-validators'] },
     {
         label: 'Error Scenarios',
@@ -1578,6 +1582,77 @@ const result = ButtonProps.validate({
 // { valid: true }
 `,
         testData: '{ "label": "Submit", "disabled": false }'
+    },
+
+    // ── Promise Schemas ─────────────────────────────
+    {
+        id: 'promise-schema',
+        title: 'Promise Schemas',
+        description:
+            'Use <code>promise()</code> to validate that a value is a JavaScript <code>Promise</code>. Like every other builder, it supports <code>.optional()</code>, <code>.nullable()</code>, <code>.default()</code>, and custom validators.',
+        group: 'Promise Schemas',
+        code: `import { promise } from '@cleverbrush/schema';
+
+// Basic — validates that the value is a Promise
+const anyPromise = promise();
+
+const result1 = anyPromise.validate(Promise.resolve(42));
+// { valid: true, object: Promise }
+
+const result2 = anyPromise.validate('not a promise' as any);
+// { valid: false, errors: [{ message: 'expected a Promise, but saw string' }] }
+
+// Optional — undefined is also accepted
+const optionalPromise = promise().optional();
+const result3 = optionalPromise.validate(undefined as any);
+// { valid: true, object: undefined }
+
+// Default value
+const withDefault = promise().default(() => Promise.resolve(0));
+const result4 = withDefault.validate(undefined as any);
+// { valid: true, object: Promise }
+
+const result = anyPromise.validate(Promise.resolve('hello'));
+`,
+        testData: 'null'
+    },
+    {
+        id: 'promise-typed',
+        title: 'Typed Promise Resolved Value',
+        description:
+            'Pass a schema to <code>promise(schema)</code> or call <code>.hasResolvedType(schema)</code> to annotate the type of the resolved value. TypeScript infers <code>Promise&lt;T&gt;</code> automatically \u2014 no separate type annotation required.',
+        group: 'Promise Schemas',
+        code: `import { promise, string, number, object, InferType } from '@cleverbrush/schema';
+
+// Typed resolved value via factory argument
+const stringPromise = promise(string());
+type StringPromise = InferType<typeof stringPromise>;
+// → Promise<string>
+
+// Typed resolved value via fluent method
+const numPromise = promise().hasResolvedType(number());
+type NumPromise = InferType<typeof numPromise>;
+// → Promise<number>
+
+// Introspect at runtime
+const info = numPromise.introspect();
+// info.resolvedType → NumberSchemaBuilder
+
+// Promise of an object
+const userFetch = promise(
+    object({ id: number(), name: string() })
+);
+type UserFetch = InferType<typeof userFetch>;
+// → Promise<{ id: number; name: string }>
+
+// Optional typed promise
+const optStringPromise = promise(string()).optional();
+type OptStringPromise = InferType<typeof optStringPromise>;
+// → Promise<string> | undefined
+
+const result = numPromise.validate(Promise.resolve(42));
+`,
+        testData: 'null'
     },
 
     // ── External Schema Interop ─────────────────────

@@ -75,6 +75,10 @@ import {
 } from './builders/FunctionSchemaBuilder.js';
 import { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder, object } from './builders/ObjectSchemaBuilder.js';
+import {
+    PromiseSchemaBuilder,
+    promise
+} from './builders/PromiseSchemaBuilder.js';
 import { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
@@ -105,6 +109,7 @@ type BuilderMap = {
     union: UnionSchemaBuilder<any, any, any, any, any, any>;
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any, any>;
+    promise: PromiseSchemaBuilder<any, any, any, any, any>;
 };
 
 type BuilderTypeName = keyof BuilderMap;
@@ -121,7 +126,8 @@ const builderClasses: Record<BuilderTypeName, typeof SchemaBuilder> = {
     record: RecordSchemaBuilder as any,
     union: UnionSchemaBuilder as any,
     func: FunctionSchemaBuilder as any,
-    any: AnySchemaBuilder as any
+    any: AnySchemaBuilder as any,
+    promise: PromiseSchemaBuilder as any
 };
 
 // Runtime mapping from type name to factory function
@@ -136,7 +142,8 @@ const builderFactories: Record<BuilderTypeName, (...args: any[]) => any> = {
     record,
     union,
     func,
-    any
+    any,
+    promise
 };
 
 // ---------------------------------------------------------------------------
@@ -385,6 +392,15 @@ type ExtendedRecordFactory<TExt> = <
     TExt
 >;
 
+type ExtendedPromiseFactory<TExt> = <
+    TSchema extends SchemaBuilder<any, any, any, any, any>
+>(
+    resolvedTypeSchema?: TSchema
+) => CleanExtended<
+    PromiseSchemaBuilder<true, false, undefined, false, TExt, TSchema>,
+    TExt
+>;
+
 /**
  * The return type of {@link withExtensions}.
  *
@@ -409,6 +425,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     union: ExtendedUnionFactory<MergeExtensionMethods<TExts, 'union'>>;
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
+    promise: ExtendedPromiseFactory<MergeExtensionMethods<TExts, 'promise'>>;
 };
 
 // ---------------------------------------------------------------------------

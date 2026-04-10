@@ -29,6 +29,10 @@ export {
     object,
     SchemaPropertySelector
 } from './builders/ObjectSchemaBuilder.js';
+export {
+    PromiseSchemaBuilder,
+    promise
+} from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type {
