@@ -20,8 +20,8 @@ export default function DiPage() {
                     command="npm install @cleverbrush/di"
                     note={
                         <>
-                            Requires <code>@cleverbrush/schema</code> as a peer
-                            dependency.
+                            Uses <code>@cleverbrush/schema</code> for
+                            schema-driven service registration.
                         </>
                     }
                 />
