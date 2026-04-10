@@ -436,7 +436,7 @@ export class FunctionSchemaBuilder<
         TReturnTypeSchema
     > &
         TExtensions {
-        return FunctionSchemaBuilder.create({
+        return this.createFromProps({
             ...this.introspect(),
             parameters: [...this.#parameters, schema]
         } as any) as any;
@@ -477,7 +477,7 @@ export class FunctionSchemaBuilder<
         TSchema
     > &
         TExtensions {
-        return FunctionSchemaBuilder.create({
+        return this.createFromProps({
             ...this.introspect(),
             returnType: schema
         } as any) as any;
