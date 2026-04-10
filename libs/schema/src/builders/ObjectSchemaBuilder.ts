@@ -1593,7 +1593,7 @@ export class ObjectSchemaBuilder<
      * type WithCtorType = InferType<typeof WithCtor>;
      * // → { new (p0: string): { name: string } } & { name: string }
      *
-     * const Plain = WithCtor.clearConstructor();
+     * const Plain = WithCtor.clearConstructors();
      *
      * type PlainType = InferType<typeof Plain>;
      * // → { name: string }
@@ -1601,7 +1601,7 @@ export class ObjectSchemaBuilder<
      * Plain.introspect().constructorSchemas; // []
      * ```
      */
-    public clearConstructor(): ObjectSchemaBuilder<
+    public clearConstructors(): ObjectSchemaBuilder<
         TProperties,
         TRequired,
         TNullable,

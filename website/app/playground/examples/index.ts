@@ -1624,7 +1624,7 @@ const { constructorSchemas } = FlexPersonSchema.introspect();
 // constructorSchemas.length → 2
 
 // Remove all constructor signatures
-const PlainSchema = FlexPersonSchema.clearConstructor();
+const PlainSchema = FlexPersonSchema.clearConstructors();
 type Plain = InferType<typeof PlainSchema>;
 // → { name: string; age: number }
 `,

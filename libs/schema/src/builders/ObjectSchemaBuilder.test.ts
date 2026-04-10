@@ -3206,7 +3206,7 @@ test('PropertyValidationResult: constructor with initial errors array (line 121)
 });
 
 // ---------------------------------------------------------------------------
-// addConstructor / clearConstructor
+// addConstructor / clearConstructors
 // ---------------------------------------------------------------------------
 
 test('addConstructor: inferred type includes construct signature (single constructor)', () => {
@@ -3265,10 +3265,10 @@ test('addConstructor: type is preserved through optional()', () => {
     >();
 });
 
-test('clearConstructor: reverts inferred type to plain props', () => {
+test('clearConstructors: reverts inferred type to plain props', () => {
     const schema = object({ name: string() })
         .addConstructor(func().addParameter(string()))
-        .clearConstructor();
+        .clearConstructors();
 
     type Inferred = InferType<typeof schema>;
 
@@ -3297,10 +3297,10 @@ test('addConstructor: chained calls accumulate constructorSchemas', () => {
     expect(constructorSchemas[1]).toBe(f2);
 });
 
-test('clearConstructor: introspect returns empty constructorSchemas', () => {
+test('clearConstructors: introspect returns empty constructorSchemas', () => {
     const schema = object({ name: string() })
         .addConstructor(func().addParameter(string()))
-        .clearConstructor();
+        .clearConstructors();
 
     const { constructorSchemas } = schema.introspect();
     expect(constructorSchemas).toHaveLength(0);

@@ -23,7 +23,7 @@ const instance = new Person('Alice');
 ```
 
 - **`addConstructor(funcSchema)`** — appends a constructor overload; each call extends the accumulated tuple of constructor schemas. Chainable.
-- **`clearConstructor()`** — resets constructor schemas to an empty list, removing all construct signatures from the inferred type.
+- **`clearConstructors()`** — resets constructor schemas to an empty list, removing all construct signatures from the inferred type.
 - **`introspect().constructorSchemas`** — array of all accumulated constructor `FunctionSchemaBuilder` schemas.
 - Constructor signatures are **type-only**: runtime `validate()` still validates plain objects as before.
 

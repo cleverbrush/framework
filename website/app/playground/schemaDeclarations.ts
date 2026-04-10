@@ -2550,7 +2550,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * type WithCtorType = InferType<typeof WithCtor>;
      * // → { new (p0: string): { name: string } } & { name: string }
      *
-     * const Plain = WithCtor.clearConstructor();
+     * const Plain = WithCtor.clearConstructors();
      *
      * type PlainType = InferType<typeof Plain>;
      * // → { name: string }
@@ -2558,7 +2558,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * Plain.introspect().constructorSchemas; // []
      * \`\`\`
      */
-    clearConstructor(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, [
+    clearConstructors(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, [
     ]> & TExtensions;
     /**
      * Adds a new property to the object schema. The new property
