@@ -969,13 +969,14 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
 };
 /**
  * Schema builder for functions. Allows to define a schema for a function.
- * It can be: required or optional.
+ * It can be required or optional, and may carry typed parameter and return-type
+ * schemas so that the inferred TypeScript function signature is fully typed.
  *
  * **NOTE** this class is exported only to give opportunity to extend it
  * by inheriting. It is not recommended to create an instance of this class
  * directly. Use {@link func | func()} function instead.
  *
- * @example
+ * @example Basic validation
  * \`\`\`ts
  * const schema = func();
  * const result = schema.validate(() => {});
@@ -983,12 +984,30 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  * // result.object === () => {}
  * \`\`\`
  *
- * @example
+ * @example Optional function schema
  * \`\`\`ts
  * const schema = func().optional();
  * const result = schema.validate(undefined);
  * // result.valid === true
  * // result.object === undefined
+ * \`\`\`
+ *
+ * @example Typed parameters and return type
+ * \`\`\`ts
+ * import { func, string, number, InferType } from '@cleverbrush/schema';
+ *
+ * const greet = func()
+ *     .addParameter(string())           // first param: string
+ *     .addParameter(number().optional()) // second param: number | undefined
+ *     .hasReturnType(string());          // return type: string
+ *
+ * type Greet = InferType<typeof greet>;
+ * // → (param0: string, param1?: number) => string
+ *
+ * // Introspect at runtime
+ * const info = greet.introspect();
+ * // info.parameters  → [StringSchemaBuilder, NumberSchemaBuilder]
+ * // info.returnType  → StringSchemaBuilder
  * \`\`\`
  *
  * @see {@link func}
@@ -1009,16 +1028,33 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
      */
     clearHasType(): FunctionSchemaBuilder<TRequired, TNullable, undefined, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
-     * Returns an object describing the schema configuration.
+     * Returns an object describing the current schema configuration.
+     *
+     * In addition to the base fields exposed by {@link SchemaBuilder.introspect},
+     * the following fields are included:
+     *
+     * - \`parameters\` — an array of {@link SchemaBuilder} instances accumulated via
+     *   {@link addParameter}. Each element describes one positional parameter of the
+     *   function in the order they were added.
+     * - \`returnType\` — the {@link SchemaBuilder} set via {@link hasReturnType}, or
+     *   \`undefined\` when no return-type schema has been configured.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = func()
+     *     .addParameter(string())
+     *     .addParameter(number())
+     *     .hasReturnType(boolean());
+     *
+     * const info = schema.introspect();
+     * // info.parameters.length === 2
+     * // info.returnType instanceof BooleanSchemaBuilder
+     * \`\`\`
      */
     introspect(): {
-        /**
-         * List of parameter schemas added via \`addParameter()\`
-         */
+        /** List of parameter schemas added via {@link addParameter}. */
         parameters: SchemaBuilder<any, any, any, any, any>[];
-        /**
-         * Return type schema set via \`hasReturnType()\`, or \`undefined\` if not set
-         */
+        /** Return type schema set via {@link hasReturnType}, or \`undefined\` if not set. */
         returnType: SchemaBuilder<any, any, any, any, any> | undefined;
         type: string;
         isRequired: boolean;
@@ -1087,12 +1123,29 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
      */
     nullable(): FunctionSchemaBuilder<TRequired, true, TExplicitType, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
-     * Adds a parameter schema to the function schema.
-     * Each call appends the given schema to the list of parameter schemas.
-     * The accumulated list is available via \`introspect().parameters\`.
-     * The inferred function type is updated to include the parameter type.
+     * Appends a positional parameter schema to the function schema.
      *
-     * @param schema The schema describing the parameter.
+     * Each call extends the inferred function signature by one parameter.
+     * The full list of parameter schemas is available at runtime via
+     * \`introspect().parameters\`.
+     *
+     * Parameter order matches the call order — the first \`addParameter()\` call
+     * defines the type of the first argument, the second call defines the second
+     * argument, and so on.
+     *
+     * @param schema - The schema describing the parameter. Pass an optional schema
+     *   (e.g. \`string().optional()\`) to make the corresponding argument optional.
+     *
+     * @example
+     * \`\`\`ts
+     * const fn = func()
+     *     .addParameter(string())          // (a: string, ...) => any
+     *     .addParameter(number().optional()) // (..., b?: number) => any
+     *     .addParameter(boolean());        // (..., c: boolean) => any
+     *
+     * type Fn = InferType<typeof fn>;
+     * // → (a: string, b: number | undefined, c: boolean) => any
+     * \`\`\`
      */
     addParameter<TSchema extends SchemaBuilder<any, any, any, any, any>>(schema: TSchema): FunctionSchemaBuilder<TRequired, TNullable, TExplicitType, THasDefault, TExtensions, [
         ...TParameters,
@@ -1100,10 +1153,24 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
     ], TReturnTypeSchema> & TExtensions;
     /**
      * Sets the return type schema for the function schema.
-     * The schema is available via \`introspect().returnType\`.
-     * The inferred function type is updated to reflect the return type.
      *
-     * @param schema The schema describing the return type.
+     * Replaces any previously set return type. The inferred function signature
+     * gains a concrete return type instead of \`any\`. The schema is accessible at
+     * runtime via \`introspect().returnType\`.
+     *
+     * @param schema - The schema describing the return type of the function.
+     *
+     * @example
+     * \`\`\`ts
+     * const fn = func()
+     *     .addParameter(string())
+     *     .hasReturnType(number());
+     *
+     * type Fn = InferType<typeof fn>;
+     * // → (param0: string) => number
+     *
+     * fn.introspect().returnType; // NumberSchemaBuilder
+     * \`\`\`
      */
     hasReturnType<TSchema extends SchemaBuilder<any, any, any, any, any>>(schema: TSchema): FunctionSchemaBuilder<TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TParameters, TSchema> & TExtensions;
     /**
@@ -1112,8 +1179,32 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
     notNullable(): FunctionSchemaBuilder<TRequired, false, TExplicitType, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
 }
 /**
- * Creates a \`function\` schema.
- * @returns {@link FunctionSchemaBuilder}
+ * Creates a \`function\` schema that validates the value is a JavaScript function.
+ *
+ * The returned builder is immutable and fully chainable. Use
+ * {@link FunctionSchemaBuilder.addParameter} to annotate the expected parameter
+ * types and {@link FunctionSchemaBuilder.hasReturnType} to annotate the return
+ * type — the inferred TypeScript function signature is updated automatically.
+ *
+ * @returns A new {@link FunctionSchemaBuilder} with \`isRequired\` set to \`true\`.
+ *
+ * @example
+ * \`\`\`ts
+ * import { func, string, number, InferType } from '@cleverbrush/schema';
+ *
+ * const schema = func()
+ *     .addParameter(string())
+ *     .addParameter(number().optional())
+ *     .hasReturnType(string());
+ *
+ * type Fn = InferType<typeof schema>;
+ * // → (param0: string, param1?: number) => string
+ *
+ * schema.validate(() => 'hello');  // { valid: true }
+ * schema.validate('not a fn');     // { valid: false }
+ * \`\`\`
+ *
+ * @see {@link FunctionSchemaBuilder}
  */
 export declare const func: () => FunctionSchemaBuilder<true>;
 export {};

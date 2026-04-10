@@ -44,6 +44,10 @@ export const EXAMPLE_GROUPS = [
             'nullable'
         ]
     },
+    {
+        label: 'Function Schemas',
+        ids: ['function-schema', 'function-typed-params', 'function-in-object']
+    },
     { label: 'Validation', ids: ['validation-errors', 'custom-validators'] },
     {
         label: 'Error Scenarios',
@@ -1468,6 +1472,112 @@ const chained = string().minLength(5).catch('short').optional();
 const result = schema.validate(42 as any);
 `,
         testData: '"hello"'
+    },
+
+    // ── Function Schemas ────────────────────────────
+    {
+        id: 'function-schema',
+        title: 'Function Schemas',
+        description:
+            'Use <code>func()</code> to validate that a value is a JavaScript function. Like every other builder, it supports <code>.optional()</code>, <code>.nullable()</code>, <code>.default()</code>, and custom validators.',
+        group: 'Function Schemas',
+        code: `import { func } from '@cleverbrush/schema';
+
+// Basic — validates that the value is a function
+const anyFn = func();
+
+const result1 = anyFn.validate(() => 42);
+// { valid: true, object: [Function] }
+
+const result2 = anyFn.validate('not a function' as any);
+// { valid: false, errors: [{ message: 'expected type function, but saw string' }] }
+
+// Optional — undefined is also accepted
+const optionalFn = func().optional();
+const result3 = optionalFn.validate(undefined as any);
+// { valid: true, object: undefined }
+
+// Default value
+const withDefault = func().default(() => () => 0);
+const result4 = withDefault.validate(undefined as any);
+// { valid: true, object: [Function] }
+
+const result = anyFn.validate(() => 'hello');
+`,
+        testData: 'null'
+    },
+    {
+        id: 'function-typed-params',
+        title: 'Typed Parameters & Return Type',
+        description:
+            'Use <code>.addParameter(schema)</code> to describe each positional argument and <code>.hasReturnType(schema)</code> to describe the return value. TypeScript infers the full function signature \u2014 no separate type annotation required.',
+        group: 'Function Schemas',
+        code: `import { func, string, number, boolean, InferType } from '@cleverbrush/schema';
+
+// Build up a typed signature one parameter at a time
+const greet = func()
+    .addParameter(string())            // first arg:  string
+    .addParameter(number().optional()) // second arg: number | undefined
+    .hasReturnType(string());          // return type: string
+
+// TypeScript infers the full signature automatically
+type Greet = InferType<typeof greet>;
+// → (param0: string, param1?: number) => string
+
+// func() still only validates that the value IS a function at runtime
+const result1 = greet.validate((name: string) => \`Hello, \${name}!\`);
+// { valid: true }
+
+const result2 = greet.validate('not a fn' as any);
+// { valid: false }
+
+// Introspect the schema at runtime
+const info = greet.introspect();
+// info.parameters.length  → 2
+// info.returnType         → StringSchemaBuilder
+
+const result = greet.validate((name: string) => \`Hi \${name}\`);
+`,
+        testData: 'null'
+    },
+    {
+        id: 'function-in-object',
+        title: 'Functions Inside Object Schemas',
+        description:
+            'Compose <code>func()</code> schemas inside <code>object()</code> to model callback props, event handlers, or service interfaces with fully typed signatures.',
+        group: 'Function Schemas',
+        code: `import { func, object, string, number, boolean, InferType } from '@cleverbrush/schema';
+
+// Model a component prop interface with typed callbacks
+const ButtonProps = object({
+    label: string().nonempty('Label is required'),
+    disabled: boolean().optional(),
+    onClick: func()
+        .hasReturnType(boolean())
+        .optional(),
+    onChange: func()
+        .addParameter(string())
+        .hasReturnType(boolean())
+        .optional(),
+});
+
+type Props = InferType<typeof ButtonProps>;
+// {
+//   label: string;
+//   disabled?: boolean;
+//   onClick?: () => boolean;
+//   onChange?: (param0: string) => boolean;
+// }
+
+// Validate a conforming props object
+const result = ButtonProps.validate({
+    label: 'Submit',
+    onClick: () => true,
+    onChange: (value: string) => value.length > 0,
+});
+// { valid: true }
+`,
+        testData: '{ "label": "Submit", "disabled": false }'
     },
 
     // ── External Schema Interop ─────────────────────
