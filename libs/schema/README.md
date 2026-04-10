@@ -3,7 +3,7 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- bundle-badge-start -->
-[![Bundle size](https://img.shields.io/badge/bundle-17.2%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![Bundle size](https://img.shields.io/badge/bundle-17.5%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
@@ -129,7 +129,7 @@ The following builder functions are available:
 | `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.oneOf(...values)`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `boolean()`     | Boolean value.                                    | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
 | `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
-| `func()`        | Function value.                                   | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
+| `func()`        | Function value. Supports typed parameter and return-type schemas. | `.addParameter(schema)`, `.hasReturnType(schema)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`, `.default(value)`                                                   |
 | `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`            |
 | `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.nullable()`, `.notNullable()`, `.default(value)` |
@@ -196,6 +196,50 @@ const TeamSchema = object({
 const IdOrEmail = union(string().minLength(1)).or(
     string().matches(/^[^@]+@[^@]+$/)
 );
+```
+
+## Function Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/function-schema)
+
+Use `func()` to validate that a value is a function. Two fluent methods let you annotate the expected signature — the inferred TypeScript type reflects both the parameter types and the return type:
+
+- **`.addParameter(schema)`** — appends a parameter schema. Each call extends the inferred tuple of parameter types. The schemas are accessible at runtime via `introspect().parameters`.
+- **`.hasReturnType(schema)`** — sets the return type schema. The inferred function type gains a concrete return type instead of `any`. Accessible via `introspect().returnType`.
+
+```typescript
+import { func, string, number, boolean, InferType } from '@cleverbrush/schema';
+
+// Plain function validator — accepts any () => any
+const anyFn = func();
+anyFn.validate(() => 42);   // { valid: true }
+anyFn.validate('not a fn'); // { valid: false }
+
+// Typed parameter and return type
+const greet = func()
+    .addParameter(string())             // first param: string
+    .addParameter(number().optional())  // second param: number | undefined
+    .hasReturnType(string());           // return type: string
+
+// InferType preserves the declared parameter types and return type.
+// Function schemas also remain compatible with callbacks of any arity.
+type Greet = InferType<typeof greet>;
+// → (param0: string, param1: number | undefined, ...args: any[]) => string
+
+// Introspect at runtime
+const info = greet.introspect();
+// info.parameters  → [StringSchemaBuilder, NumberSchemaBuilder]
+// info.returnType  → StringSchemaBuilder
+
+// Optional function schemas infer a union with undefined
+const optionalHandler = func()
+    .addParameter(string())
+    .addParameter(boolean())
+    .hasReturnType(boolean())
+    .optional();
+
+type OptionalHandler = InferType<typeof optionalHandler>;
+// → ((param0: string, param1: boolean, ...args: any[]) => boolean) | undefined
 ```
 
 ## Record Schemas

@@ -89,8 +89,14 @@ export default function ApiReferenceSection() {
                                 <td>
                                     <code>func()</code>
                                 </td>
-                                <td>Function schema builder</td>
                                 <td>
+                                    Function schema builder. Validates that the
+                                    value is a function. Supports typed
+                                    parameter and return-type schemas.
+                                </td>
+                                <td>
+                                    <code>.addParameter(schema)</code>,{' '}
+                                    <code>.hasReturnType(schema)</code>,{' '}
                                     <code>.optional()</code>,{' '}
                                     <code>.default(value)</code>,{' '}
                                     <code>.catch(value)</code>

@@ -108,10 +108,15 @@ export default function SchemaTypesSection() {
                                     <code>func()</code>
                                 </td>
                                 <td>
-                                    Function values. Useful for callback props
-                                    in component schemas.
+                                    Function values. Supports typed parameter
+                                    and return-type schemas via{' '}
+                                    <code>.addParameter()</code> and{' '}
+                                    <code>.hasReturnType()</code> — the inferred
+                                    TypeScript signature updates automatically.
                                 </td>
                                 <td>
+                                    <code>.addParameter(schema)</code>,{' '}
+                                    <code>.hasReturnType(schema)</code>,{' '}
                                     <code>.optional()</code>,{' '}
                                     <code>.default(value)</code>,{' '}
                                     <code>.catch(value)</code>,{' '}
