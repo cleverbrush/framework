@@ -962,8 +962,11 @@ export declare class ExternSchemaBuilder<TStandardSchema extends StandardSchemaV
 export declare const extern: <T extends StandardSchemaV1>(standardSchema: T) => ExternSchemaBuilder<T, true>;
 export {};
 `,
-    "file:///node_modules/@cleverbrush/schema/builders/FunctionSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+    "file:///node_modules/@cleverbrush/schema/builders/FunctionSchemaBuilder.d.ts": `import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<FunctionSchemaBuilder<R>['introspect']>>;
+type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> = {
+    [K in keyof TParams]: InferType<TParams[K]>;
+};
 /**
  * Schema builder for functions. Allows to define a schema for a function.
  * It can be: required or optional.
@@ -990,21 +993,49 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<Return
  *
  * @see {@link func}
  */
-export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? (...args: any[]) => any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TParameters extends SchemaBuilder<any, any, any, any, any>[] = [], TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? (...args: InferParameters<TParameters>) => TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> ? InferType<TReturnTypeSchema> : any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: FunctionSchemaBuilderCreateProps<any>): FunctionSchemaBuilder<true, false, undefined, false, {}, (...args: any[]) => any>;
+    static create(props: FunctionSchemaBuilderCreateProps<any>): FunctionSchemaBuilder<true, false, undefined, false, {}, [], undefined, () => any>;
     protected constructor(props: FunctionSchemaBuilderCreateProps<TRequired>);
     /**
      * @hidden
      */
-    hasType<T>(_notUsed?: T): FunctionSchemaBuilder<true, TNullable, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): FunctionSchemaBuilder<true, TNullable, T, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
      * @hidden
      */
-    clearHasType(): FunctionSchemaBuilder<TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): FunctionSchemaBuilder<TRequired, TNullable, undefined, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
+    /**
+     * Returns an object describing the schema configuration.
+     */
+    introspect(): {
+        /**
+         * List of parameter schemas added via \`addParameter()\`
+         */
+        parameters: SchemaBuilder<any, any, any, any, any>[];
+        /**
+         * Return type schema set via \`hasReturnType()\`, or \`undefined\` if not set
+         */
+        returnType: SchemaBuilder<any, any, any, any, any> | undefined;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+    };
     /** {@inheritDoc SchemaBuilder.validate} */
     validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
     /** {@inheritDoc SchemaBuilder.validateAsync} */
@@ -1025,40 +1056,60 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): FunctionSchemaBuilder<true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): FunctionSchemaBuilder<true, TNullable, TExplicitType, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
      * @hidden
      */
-    optional(): FunctionSchemaBuilder<false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): FunctionSchemaBuilder<false, TNullable, TExplicitType, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
      * @hidden
      */
-    default(value: TResult | (() => TResult)): FunctionSchemaBuilder<true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: TResult | (() => TResult)): FunctionSchemaBuilder<true, TNullable, TExplicitType, true, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): FunctionSchemaBuilder<TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): FunctionSchemaBuilder<TRequired, TNullable, TExplicitType, false, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
      * @hidden
      */
     brand<TBrand extends string | symbol>(_name?: TBrand): FunctionSchemaBuilder<TRequired, TNullable, TResult & {
         readonly [K in BRAND]: TBrand;
-    }, THasDefault, TExtensions> & TExtensions;
+    }, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
      * Marks the inferred type as \`Readonly<Function>\`. Sets the
      * \`isReadonly\` introspection flag for tooling consistency.
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): FunctionSchemaBuilder<TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+    readonly(): FunctionSchemaBuilder<TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
     /**
      * @hidden
      */
-    nullable(): FunctionSchemaBuilder<TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    nullable(): FunctionSchemaBuilder<TRequired, true, TExplicitType, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
+    /**
+     * Adds a parameter schema to the function schema.
+     * Each call appends the given schema to the list of parameter schemas.
+     * The accumulated list is available via \`introspect().parameters\`.
+     * The inferred function type is updated to include the parameter type.
+     *
+     * @param schema The schema describing the parameter.
+     */
+    addParameter<TSchema extends SchemaBuilder<any, any, any, any, any>>(schema: TSchema): FunctionSchemaBuilder<TRequired, TNullable, TExplicitType, THasDefault, TExtensions, [
+        ...TParameters,
+        TSchema
+    ], TReturnTypeSchema> & TExtensions;
+    /**
+     * Sets the return type schema for the function schema.
+     * The schema is available via \`introspect().returnType\`.
+     * The inferred function type is updated to reflect the return type.
+     *
+     * @param schema The schema describing the return type.
+     */
+    hasReturnType<TSchema extends SchemaBuilder<any, any, any, any, any>>(schema: TSchema): FunctionSchemaBuilder<TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TParameters, TSchema> & TExtensions;
     /**
      * @hidden
      */
-    notNullable(): FunctionSchemaBuilder<TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    notNullable(): FunctionSchemaBuilder<TRequired, false, TExplicitType, THasDefault, TExtensions, TParameters, TReturnTypeSchema> & TExtensions;
 }
 /**
  * Creates a \`function\` schema.
@@ -3319,7 +3370,7 @@ export declare abstract class SchemaBuilder<TResult = any, TRequired extends boo
      * const schema = string().catch('unknown');
      * schema.validate(42);        // { valid: true, object: 'unknown' }
      * schema.validate('hello');   // { valid: true, object: 'hello' }
-     * // validate() always returns valid: true when .catch() is set
+     * schema.parse(42);           // 'unknown'  (no throw)
      * \`\`\`
      *
      * @example

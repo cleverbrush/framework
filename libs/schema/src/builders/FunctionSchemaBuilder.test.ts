@@ -294,7 +294,7 @@ test('addParameter - starts with empty parameters list', () => {
 test('addParameter - adds a single parameter schema', () => {
     const strSchema = string();
     const schema = func().addParameter(strSchema);
-    const typeCheck: InferType<typeof schema> = (arg0: string) => null;
+    const typeCheck: InferType<typeof schema> = (_arg0: string) => null;
     expectTypeOf(typeCheck).toMatchTypeOf<(arg0: string) => any>();
     const { parameters } = schema.introspect();
     expect(parameters).toHaveLength(1);
@@ -305,9 +305,13 @@ test('addParameter - accumulates multiple parameter schemas', () => {
     const strSchema = string();
     const numSchema = number();
     const schema = func().addParameter(strSchema).addParameter(numSchema);
-    const typeCheck: InferType<typeof schema> = (arg0: string, arg1: number) =>
-        null;
-    expectTypeOf(typeCheck).toMatchTypeOf<(arg0: string, arg1: number) => any>();
+    const typeCheck: InferType<typeof schema> = (
+        _arg0: string,
+        _arg1: number
+    ) => null;
+    expectTypeOf(typeCheck).toMatchTypeOf<
+        (arg0: string, arg1: number) => any
+    >();
     const { parameters } = schema.introspect();
     expect(parameters).toHaveLength(2);
     expect(parameters[0]).toBe(strSchema);
@@ -329,9 +333,9 @@ test('addParameter - preserves existing parameters across chained calls', () => 
     const s3 = string();
     const schema = func().addParameter(s1).addParameter(s2).addParameter(s3);
     const typeCheck: InferType<typeof schema> = (
-        arg0: string,
-        arg1: number,
-        arg2: string
+        _arg0: string,
+        _arg1: number,
+        _arg2: string
     ) => null;
     expectTypeOf(typeCheck).toMatchTypeOf<
         (arg0: string, arg1: number, arg2: string) => any
@@ -380,10 +384,8 @@ test('hasReturnType - overwrites a previously set return type', () => {
 test('addParameter and hasReturnType - combined usage', () => {
     const paramSchema = string();
     const returnSchema = number();
-    const schema = func()
-        .addParameter(paramSchema)
-        .hasReturnType(returnSchema);
-    const typeCheck: InferType<typeof schema> = (arg0: string) => 42;
+    const schema = func().addParameter(paramSchema).hasReturnType(returnSchema);
+    const typeCheck: InferType<typeof schema> = (_arg0: string) => 42;
     expectTypeOf(typeCheck).toMatchTypeOf<(arg0: string) => number>();
     const { parameters, returnType } = schema.introspect();
     expect(parameters).toHaveLength(1);

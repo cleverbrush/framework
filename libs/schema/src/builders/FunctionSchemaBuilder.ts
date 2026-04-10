@@ -11,11 +11,10 @@ type FunctionSchemaBuilderCreateProps<R extends boolean = true> = Partial<
     ReturnType<FunctionSchemaBuilder<R>['introspect']>
 >;
 
-type InferParameters<
-    TParams extends SchemaBuilder<any, any, any, any, any>[]
-> = {
-    [K in keyof TParams]: InferType<TParams[K]>;
-};
+type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
+    {
+        [K in keyof TParams]: InferType<TParams[K]>;
+    };
 
 /**
  * Schema builder for functions. Allows to define a schema for a function.
@@ -85,7 +84,7 @@ export class FunctionSchemaBuilder<
 
         if (Array.isArray(props.parameters)) {
             this.#parameters = props.parameters.filter(
-                (p) => p instanceof SchemaBuilder
+                p => p instanceof SchemaBuilder
             );
         }
 
@@ -370,9 +369,7 @@ export class FunctionSchemaBuilder<
      *
      * @param schema The schema describing the parameter.
      */
-    public addParameter<
-        TSchema extends SchemaBuilder<any, any, any, any, any>
-    >(
+    public addParameter<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
     ): FunctionSchemaBuilder<
         TRequired,
@@ -442,4 +439,3 @@ export const func = () =>
     FunctionSchemaBuilder.create({
         isRequired: true
     }) as FunctionSchemaBuilder<true>;
-
