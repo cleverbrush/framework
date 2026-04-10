@@ -282,7 +282,7 @@ type OptPromise = InferType<typeof optPromise>;
 optPromise.validate(undefined as any); // { valid: true }
 ```
 
-
+## Record Schemas
 
 [▶ Open in Playground](https://docs.cleverbrush.com/playground/record-basics)
 
