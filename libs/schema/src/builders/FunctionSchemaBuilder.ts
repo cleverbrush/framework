@@ -51,7 +51,7 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  *     .hasReturnType(string());          // return type: string
  *
  * type Greet = InferType<typeof greet>;
- * // → (param0: string, param1?: number) => string
+ * // → (param0: string, param1: number | undefined) => string
  *
  * // Introspect at runtime
  * const info = greet.introspect();
