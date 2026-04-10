@@ -3,11 +3,11 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- bundle-badge-start -->
-[![Bundle size](https://img.shields.io/badge/bundle-17.6%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![Bundle size](https://img.shields.io/badge/bundle-18.3%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-98.5%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).
@@ -139,6 +139,7 @@ The following builder functions are available:
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                 |
 | `enumOf(...values)` | String enum — sugar for `string().oneOf(...)`. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
+| `generic(fn)`   | Parameterized schema template. Call `.apply(...schemas)` with concrete schemas to obtain a fully typed concrete schema builder. TypeScript infers the result type from the template function's own generic signature. Optionally pass a `defaults` array as the first argument to enable direct validation without calling `.apply()`. | `.apply(...schemas)`, `.optional()`, `.nullable()`, `.default(value)` |
 
 ## Immutability
 
@@ -199,6 +200,96 @@ const IdOrEmail = union(string().minLength(1)).or(
 );
 ```
 
+## Generic Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/generic-basic)
+
+Use `generic(fn)` to create a reusable, parameterized schema template. The template function accepts one or more schema builders as arguments and returns a concrete schema. Call `.apply(...schemas)` to instantiate the template — TypeScript infers the resulting type automatically from the function's own generic signature.
+
+**Single type parameter** — a paginated list that works for any element type:
+
+```typescript
+import {
+    generic, object, array, number, string,
+    type SchemaBuilder, type InferType
+} from '@cleverbrush/schema';
+
+const PaginatedList = generic(
+    <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+        object({
+            items: array(itemSchema),
+            total: number(),
+            page:  number(),
+        })
+);
+
+const PaginatedUsers = PaginatedList.apply(
+    object({ name: string(), age: number() })
+);
+
+type PaginatedUsersType = InferType<typeof PaginatedUsers>;
+// → { items: { name: string; age: number }[]; total: number; page: number }
+
+PaginatedUsers.validate({
+    items: [{ name: 'Alice', age: 30 }],
+    total: 1,
+    page:  1,
+}); // { valid: true }
+```
+
+**Multiple type parameters** — a Result / Either type:
+
+```typescript
+import {
+    generic, object, boolean, string, number,
+    type SchemaBuilder, type InferType
+} from '@cleverbrush/schema';
+
+const Result = generic(
+    <
+        T extends SchemaBuilder<any, any, any, any, any>,
+        E extends SchemaBuilder<any, any, any, any, any>
+    >(
+        valueSchema: T,
+        errorSchema: E
+    ) =>
+        object({
+            ok:    boolean(),
+            value: valueSchema.optional(),
+            error: errorSchema.optional(),
+        })
+);
+
+const StringResult = Result.apply(string(), number());
+// InferType → { ok: boolean; value?: string; error?: number }
+
+StringResult.validate({ ok: true,  value: 'hello' }); // valid
+StringResult.validate({ ok: false, error: 404 });     // valid
+```
+
+**Default arguments** — pass a `defaults` array as the first argument so the template can be validated directly without calling `.apply()` first:
+
+```typescript
+import {
+    generic, object, array, number, any,
+    type SchemaBuilder
+} from '@cleverbrush/schema';
+
+const AnyList = generic(
+    [any()],  // default for the single type parameter
+    <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+        object({ items: array(itemSchema), total: number() })
+);
+
+// Validate directly — uses the any() default
+AnyList.validate({ items: [1, 'two', true], total: 3 }); // valid
+
+// Or apply a stricter schema first
+AnyList.apply(string()).validate({ items: ['a', 'b'], total: 2 }); // valid
+```
+
+> **Tip:** Each call to `.apply()` returns an independent schema builder. You can chain `.optional()`, `.addValidator()`, `.default(value)`, and every other fluent method on the result.
+
 ## Function Schemas
 
 [▶ Open in Playground](https://docs.cleverbrush.com/playground/function-schema)
@@ -241,6 +332,51 @@ const optionalHandler = func()
 
 type OptionalHandler = InferType<typeof optionalHandler>;
 // → ((param0: string, param1: boolean, ...args: any[]) => boolean) | undefined
+```
+
+## Constructor Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/constructor-schema)
+
+Use `.addConstructor(funcSchema)` on an `object()` schema to declare one or more constructor overloads. Each call appends a `FunctionSchemaBuilder` to an accumulated list; the inferred TypeScript type becomes an intersection of all construct signatures and the plain instance type.
+
+- **`.addConstructor(funcSchema)`** — appends a constructor overload. Each call extends the inferred tuple of constructor schemas. Chainable.
+- **`.clearConstructors()`** — resets constructor schemas to an empty list, removing all construct signatures from the inferred type.
+- **`introspect().constructorSchemas`** — array of all accumulated constructor `FunctionSchemaBuilder` schemas.
+
+Constructor signatures are **type-only**: runtime `validate()` continues to validate plain objects as before.
+
+```typescript
+import { object, func, string, number, InferType } from '@cleverbrush/schema';
+
+// Single constructor overload
+const PersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()));
+
+type Person = InferType<typeof PersonSchema>;
+// → { new(p0: string): { name: string; age: number } } & { name: string; age: number }
+
+// Multiple chained constructors → overloaded construct signatures
+const FlexPersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()))
+    .addConstructor(func().addParameter(string()).addParameter(number()));
+
+type FlexPerson = InferType<typeof FlexPersonSchema>;
+// → { new(p0: string): { name: string; age: number } }
+// & { new(p0: string, p1: number): { name: string; age: number } }
+// & { name: string; age: number }
+
+// Runtime validation is unchanged — plain objects still validate
+FlexPersonSchema.validate({ name: 'Alice', age: 30 }); // { valid: true }
+
+// Introspect constructor schemas at runtime
+const { constructorSchemas } = FlexPersonSchema.introspect();
+// constructorSchemas.length → 2
+
+// Remove all constructor signatures
+const PlainSchema = FlexPersonSchema.clearConstructors();
+type Plain = InferType<typeof PlainSchema>;
+// → { name: string; age: number }
 ```
 
 ## Promise Schemas

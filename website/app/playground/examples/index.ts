@@ -27,7 +27,8 @@ export const EXAMPLE_GROUPS = [
             'composing-schemas',
             'immutability',
             'deep-partial',
-            'recursive-schemas'
+            'recursive-schemas',
+            'constructor-schema'
         ]
     },
     {
@@ -51,6 +52,10 @@ export const EXAMPLE_GROUPS = [
     {
         label: 'Promise Schemas',
         ids: ['promise-schema', 'promise-typed']
+    },
+    {
+        label: 'Generic Schemas',
+        ids: ['generic-basic', 'generic-multi-param', 'generic-with-defaults']
     },
     { label: 'Validation', ids: ['validation-errors', 'custom-validators'] },
     {
@@ -1584,6 +1589,48 @@ const result = ButtonProps.validate({
         testData: '{ "label": "Submit", "disabled": false }'
     },
 
+    // ── Constructor Schemas ─────────────────────────────
+    {
+        id: 'constructor-schema',
+        title: 'Constructor Schemas',
+        description:
+            'Use <code>.addConstructor(funcSchema)</code> to declare one or more constructor overloads on an <code>object()</code> schema. The inferred TypeScript type becomes an intersection of all construct signatures and the plain instance type. Constructor signatures are type-only — runtime validation is unchanged.',
+        group: 'Objects & Composition',
+        code: `import { object, func, string, number, InferType } from '@cleverbrush/schema';
+
+// Single constructor overload
+const PersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()));
+
+type Person = InferType<typeof PersonSchema>;
+// → { new(p0: string): { name: string; age: number } } & { name: string; age: number }
+
+// Multiple chained constructors → overloaded construct signatures
+const FlexPersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()))
+    .addConstructor(func().addParameter(string()).addParameter(number()));
+
+type FlexPerson = InferType<typeof FlexPersonSchema>;
+// → { new(p0: string): { name: string; age: number } }
+// & { new(p0: string, p1: number): { name: string; age: number } }
+// & { name: string; age: number }
+
+// Runtime validation is unchanged — plain objects still validate
+const result = FlexPersonSchema.validate({ name: 'Alice', age: 30 });
+// { valid: true }
+
+// Introspect constructor schemas at runtime
+const { constructorSchemas } = FlexPersonSchema.introspect();
+// constructorSchemas.length → 2
+
+// Remove all constructor signatures
+const PlainSchema = FlexPersonSchema.clearConstructors();
+type Plain = InferType<typeof PlainSchema>;
+// → { name: string; age: number }
+`,
+        testData: '{ "name": "Alice", "age": 30 }'
+    },
+
     // ── Promise Schemas ─────────────────────────────
     {
         id: 'promise-schema',
@@ -1691,6 +1738,115 @@ const result = OrderSchema.validate(
 `,
         testData:
             '{ "address": { "street": "5th Ave", "city": "NYC", "zip": "10001" }, "totalCents": 4999 }'
+    },
+
+    // ── Generic Schemas ─────────────────────────────
+    {
+        id: 'generic-basic',
+        title: 'Generic Schema — Single Type Parameter',
+        description:
+            'Use <code>generic(fn)</code> to create a reusable schema template. Call <code>.apply(schema)</code> with a concrete schema — TypeScript infers the resulting type from the template function&apos;s own generic signature.',
+        group: 'Generic Schemas',
+        code: `import {
+    generic, object, array, number, string,
+    type SchemaBuilder, type InferType
+} from '@cleverbrush/schema';
+
+// A paginated list that works for any element type
+const PaginatedList = generic(
+    <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+        object({
+            items: array(itemSchema),
+            total: number(),
+            page:  number(),
+        })
+);
+
+// Instantiate with a concrete element schema
+const PaginatedUsers = PaginatedList.apply(
+    object({ name: string(), age: number() })
+);
+
+type PaginatedUsersType = InferType<typeof PaginatedUsers>;
+// → { items: { name: string; age: number }[]; total: number; page: number }
+
+const result = PaginatedUsers.validate({
+    items: [{ name: 'Alice', age: 30 }, { name: 'Bob', age: 25 }],
+    total: 2,
+    page:  1,
+});
+`,
+        testData:
+            '{ "items": [{ "name": "Alice", "age": 30 }], "total": 1, "page": 1 }'
+    },
+    {
+        id: 'generic-multi-param',
+        title: 'Generic Schema — Multiple Type Parameters',
+        description:
+            'The template function can accept any number of schema parameters. TypeScript infers each independently, so the resulting type is fully typed for every parameter position.',
+        group: 'Generic Schemas',
+        code: `import {
+    generic, object, boolean, string, number,
+    type SchemaBuilder, type InferType
+} from '@cleverbrush/schema';
+
+// Result / Either type — independent value and error schemas
+const Result = generic(
+    <
+        T extends SchemaBuilder<any, any, any, any, any>,
+        E extends SchemaBuilder<any, any, any, any, any>
+    >(
+        valueSchema: T,
+        errorSchema: E
+    ) =>
+        object({
+            ok:    boolean(),
+            value: valueSchema.optional(),
+            error: errorSchema.optional(),
+        })
+);
+
+const StringResult = Result.apply(string(), number());
+
+type StringResultType = InferType<typeof StringResult>;
+// → { ok: boolean; value?: string; error?: number }
+
+const ok  = StringResult.validate({ ok: true,  value: 'hello' });
+const err = StringResult.validate({ ok: false, error: 404    });
+`,
+        testData: '{ "ok": true, "value": "hello" }'
+    },
+    {
+        id: 'generic-with-defaults',
+        title: 'Generic Schema — With Default Arguments',
+        description:
+            'Pass a <em>defaults</em> array as the first argument so the template can be validated directly — without calling <code>.apply()</code>. The template function is called once with the defaults and the result is cached.',
+        group: 'Generic Schemas',
+        code: `import {
+    generic, object, array, number, string, any,
+    type SchemaBuilder
+} from '@cleverbrush/schema';
+
+// Provide 'any()' as the default for the single type parameter
+const AnyList = generic(
+    [any()],  // one default per template parameter
+    <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+        object({ items: array(itemSchema), total: number() })
+);
+
+// Validate directly using the any() default
+const r1 = AnyList.validate({ items: [1, 'two', true], total: 3 });
+// { valid: true }
+
+// Or apply a stricter schema first
+const StringList = AnyList.apply(string());
+const r2 = StringList.validate({ items: ['a', 'b'], total: 2 });
+// { valid: true }
+
+const r3 = StringList.validate({ items: [1, 2], total: 2 });
+// { valid: false }  — numbers don't satisfy string()
+`,
+        testData: '{ "items": ["a", "b", "c"], "total": 3 }'
     }
 ];
 

@@ -7,6 +7,7 @@
         { "path": "libs/knex-clickhouse" },
         { "path": "libs/mapper/tsconfig.build.json" },
         { "path": "libs/react-form" },
-        { "path": "libs/scheduler" }
+        { "path": "libs/scheduler" },
+        { "path": "libs/di" }
     ]
 }

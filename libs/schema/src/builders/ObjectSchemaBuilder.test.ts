@@ -1,6 +1,7 @@
 import { expect, expectTypeOf, test } from 'vitest';
 import { array } from './ArraySchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
+import { func } from './FunctionSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder, object } from './ObjectSchemaBuilder.js';
 import { PropertyValidationResult } from './PropertyValidationResult.js';
@@ -3202,4 +3203,129 @@ test('PropertyValidationResult: constructor with initial errors array (line 121)
         ['pre-existing error']
     );
     expect(pvr.errors).toEqual(['pre-existing error']);
+});
+
+// ---------------------------------------------------------------------------
+// addConstructor / clearConstructors
+// ---------------------------------------------------------------------------
+
+test('addConstructor: inferred type includes construct signature (single constructor)', () => {
+    const schema = object({ name: string() }).addConstructor(
+        func().addParameter(string())
+    );
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: string): { name: string };
+    }>();
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{ name: string }>();
+});
+
+test('addConstructor: inferred type supports two chained constructors', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .addConstructor(func().addParameter(string()).addParameter(number()));
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: string): { name: string };
+    }>();
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: string, p1: number): { name: string };
+    }>();
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{ name: string }>();
+});
+
+test('addConstructor: type is preserved through addProp', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(number()))
+        .addProp('age', number());
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: number): { name: string; age: number };
+    }>();
+});
+
+test('addConstructor: type is preserved through optional()', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .optional();
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<
+        ({ new (p0: string): { name: string } } & { name: string }) | undefined
+    >();
+});
+
+test('clearConstructors: reverts inferred type to plain props', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .clearConstructors();
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toEqualTypeOf<{ name: string }>();
+});
+
+test('addConstructor: introspect exposes constructorSchemas', () => {
+    const funcSchema = func().addParameter(string());
+    const schema = object({ name: string() }).addConstructor(funcSchema);
+
+    const { constructorSchemas } = schema.introspect();
+    expect(constructorSchemas).toHaveLength(1);
+    expect(constructorSchemas[0]).toBe(funcSchema);
+});
+
+test('addConstructor: chained calls accumulate constructorSchemas', () => {
+    const f1 = func().addParameter(string());
+    const f2 = func().addParameter(number());
+    const schema = object({ name: string() })
+        .addConstructor(f1)
+        .addConstructor(f2);
+
+    const { constructorSchemas } = schema.introspect();
+    expect(constructorSchemas).toHaveLength(2);
+    expect(constructorSchemas[0]).toBe(f1);
+    expect(constructorSchemas[1]).toBe(f2);
+});
+
+test('clearConstructors: introspect returns empty constructorSchemas', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .clearConstructors();
+
+    const { constructorSchemas } = schema.introspect();
+    expect(constructorSchemas).toHaveLength(0);
+});
+
+test('addConstructor: validate still works with plain objects', async () => {
+    const schema = object({ name: string() }).addConstructor(
+        func().addParameter(string())
+    );
+
+    const { valid } = await schema.validate({ name: 'Alice' });
+    expect(valid).toBe(true);
+});
+
+test('addConstructor: validate rejects invalid plain objects', async () => {
+    const schema = object({ name: string() }).addConstructor(
+        func().addParameter(string())
+    );
+
+    const { valid } = await schema.validate({ name: 123 } as any);
+    expect(valid).toBe(false);
+});
+
+test('addConstructor: no effect on empty constructor list for inferred type', () => {
+    const schema = object({ name: string() });
+    type Inferred = InferType<typeof schema>;
+    expectTypeOf<Inferred>().toEqualTypeOf<{ name: string }>();
 });

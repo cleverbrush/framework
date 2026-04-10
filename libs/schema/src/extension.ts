@@ -73,6 +73,10 @@ import {
     FunctionSchemaBuilder,
     func
 } from './builders/FunctionSchemaBuilder.js';
+import {
+    GenericSchemaBuilder,
+    generic
+} from './builders/GenericSchemaBuilder.js';
 import { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder, object } from './builders/ObjectSchemaBuilder.js';
 import {
@@ -102,7 +106,7 @@ type BuilderMap = {
     number: NumberSchemaBuilder<any, any, any, any, any>;
     boolean: BooleanSchemaBuilder<any, any, any, any, any, any, any>;
     date: DateSchemaBuilder<any, any, any, any, any>;
-    object: ObjectSchemaBuilder<any, any, any, any, any, any>;
+    object: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
     array: ArraySchemaBuilder<any, any, any, any, any, any, any>;
     tuple: TupleSchemaBuilder<any, any, any, any, any, any, any>;
     record: RecordSchemaBuilder<any, any, any, any, any, any, any>;
@@ -110,6 +114,7 @@ type BuilderMap = {
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any, any>;
     promise: PromiseSchemaBuilder<any, any, any, any, any>;
+    generic: GenericSchemaBuilder<any, any, any, any, any, any>;
 };
 
 type BuilderTypeName = keyof BuilderMap;
@@ -127,7 +132,8 @@ const builderClasses: Record<BuilderTypeName, typeof SchemaBuilder> = {
     union: UnionSchemaBuilder as any,
     func: FunctionSchemaBuilder as any,
     any: AnySchemaBuilder as any,
-    promise: PromiseSchemaBuilder as any
+    promise: PromiseSchemaBuilder as any,
+    generic: GenericSchemaBuilder as any
 };
 
 // Runtime mapping from type name to factory function
@@ -143,7 +149,8 @@ const builderFactories: Record<BuilderTypeName, (...args: any[]) => any> = {
     union,
     func,
     any,
-    promise
+    promise,
+    generic
 };
 
 // ---------------------------------------------------------------------------
@@ -332,7 +339,7 @@ type ExtendedObjectFactory<TExt> = <
 >(
     properties?: P
 ) => CleanExtended<
-    ObjectSchemaBuilder<P, true, false, undefined, false, TExt>,
+    ObjectSchemaBuilder<P, true, false, undefined, false, TExt, []>,
     TExt
 >;
 
@@ -401,6 +408,15 @@ type ExtendedPromiseFactory<TExt> = <
     TExt
 >;
 
+type ExtendedGenericFactory<TExt> = <
+    TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>
+>(
+    templateFn: TFn
+) => CleanExtended<
+    GenericSchemaBuilder<TFn, true, false, undefined, false, TExt>,
+    TExt
+>;
+
 /**
  * The return type of {@link withExtensions}.
  *
@@ -426,6 +442,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
     promise: ExtendedPromiseFactory<MergeExtensionMethods<TExts, 'promise'>>;
+    generic: ExtendedGenericFactory<MergeExtensionMethods<TExts, 'generic'>>;
 };
 
 // ---------------------------------------------------------------------------

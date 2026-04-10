@@ -1209,6 +1209,299 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
 export declare const func: () => FunctionSchemaBuilder<true>;
 export {};
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/GenericSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+type GenericSchemaBuilderCreateProps<TRequired extends boolean = true> = Partial<ReturnType<GenericSchemaBuilder<any, TRequired>['introspect']>>;
+/**
+ * Schema builder that wraps a generic template function, enabling reusable
+ * parameterized schemas. Call {@link GenericSchemaBuilder.apply | \`.apply()\`}
+ * with concrete schema arguments to obtain a fully typed concrete schema
+ * builder whose TypeScript type is inferred from the template function's
+ * generic signature.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link generic | generic()} function instead.
+ *
+ * @example Single type parameter
+ * \`\`\`ts
+ * import { generic, object, array, number, string, InferType } from '@cleverbrush/schema';
+ *
+ * const PaginatedList = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({
+ *       items: array(itemSchema),
+ *       total: number(),
+ *       page:  number(),
+ *     })
+ * );
+ *
+ * const userSchema = object({ name: string(), age: number() });
+ * const PaginatedUsers = PaginatedList.apply(userSchema);
+ *
+ * type PaginatedUsersType = InferType<typeof PaginatedUsers>;
+ * // → { items: { name: string; age: number }[]; total: number; page: number }
+ * \`\`\`
+ *
+ * @example Multiple type parameters
+ * \`\`\`ts
+ * const Result = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>,
+ *    E extends SchemaBuilder<any, any, any, any, any>>(
+ *     valueSchema: T,
+ *     errorSchema: E
+ *   ) =>
+ *     object({
+ *       ok:    boolean(),
+ *       value: valueSchema.optional(),
+ *       error: errorSchema.optional(),
+ *     })
+ * );
+ *
+ * const StringResult = Result.apply(string(), number());
+ * // InferType → { ok: boolean; value?: string; error?: number }
+ * \`\`\`
+ *
+ * @example With default arguments (enables direct \`.validate()\` on the template)
+ * \`\`\`ts
+ * const AnyList = generic(
+ *   [any()],   // default args — one per template parameter
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({ items: array(itemSchema), total: number() })
+ * );
+ *
+ * // Validate directly using defaults:
+ * AnyList.validate({ items: [1, 'two', true], total: 3 }); // valid
+ *
+ * // Or apply concrete schemas first:
+ * AnyList.apply(string()).validate({ items: ['a', 'b'], total: 2 }); // valid
+ * \`\`\`
+ *
+ * @see {@link generic}
+ *
+ * @typeParam TFn - The generic template function type. Its return type
+ *   determines \`TResult\` (the validated value type) when no explicit type
+ *   override has been applied via \`.hasType<T>()\`.
+ * @typeParam TRequired - \`true\` when the schema is required (default),
+ *   \`false\` after calling \`.optional()\`. Governs whether \`undefined\` is a
+ *   valid value.
+ * @typeParam TNullable - \`true\` after calling \`.nullable()\`. Governs whether
+ *   \`null\` is a valid value.
+ * @typeParam TExplicitType - Type override set via \`.hasType<T>()\`. When
+ *   \`undefined\` (the default), \`TResult\` is derived from \`TFn\`'s return type.
+ * @typeParam THasDefault - \`true\` after calling \`.default(value)\`. Governs
+ *   whether \`InferType\` emits \`T\` instead of \`T | undefined\` for optional
+ *   schemas with a default.
+ * @typeParam TExtensions - Object type carrying extension methods added via
+ *   \`withExtensions()\`. Defaults to \`{}\`.
+ * @typeParam TResult - The inferred result type: \`TExplicitType\` when set,
+ *   otherwise the value type inferred from \`ReturnType<TFn>\`.
+ */
+export declare class GenericSchemaBuilder<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? ReturnType<TFn> extends SchemaBuilder<infer R, any, any, any, any> ? R : any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+    #private;
+    /**
+     * Applies the template function with concrete schema arguments, returning
+     * a fully typed concrete schema builder. TypeScript infers the result type
+     * from the template function's own generic signature.
+     *
+     * The returned builder is independent of this \`GenericSchemaBuilder\` and
+     * can be used like any other schema: \`.validate()\`, \`.optional()\`, etc.
+     *
+     * @example
+     * \`\`\`ts
+     * const Wrapper = generic(
+     *   <T extends SchemaBuilder<any, any, any, any, any>>(schema: T) =>
+     *     object({ data: schema })
+     * );
+     *
+     * const s = Wrapper.apply(string());
+     * // InferType<typeof s> → { data: string }
+     * s.validate({ data: 'hello' }); // { valid: true }
+     * \`\`\`
+     */
+    readonly apply: TFn;
+    /**
+     * @hidden
+     */
+    static create(props: GenericSchemaBuilderCreateProps<any>): GenericSchemaBuilder<(...args: any[]) => SchemaBuilder<any, any, any, any, any>, true, false, undefined, false, {}, any>;
+    protected constructor(props: GenericSchemaBuilderCreateProps<TRequired>);
+    /**
+     * Returns an object describing the current schema configuration.
+     *
+     * In addition to the base fields exposed by {@link SchemaBuilder.introspect},
+     * the following fields are included:
+     *
+     * - \`templateFn\` — the template function passed to {@link generic}.
+     * - \`defaults\` — the default argument list passed to the two-argument
+     *   form of {@link generic}, or \`undefined\` when no defaults were provided.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = generic([string()], <T>(s: T) => object({ data: s }));
+     *
+     * const info = schema.introspect();
+     * // info.type         → 'generic'
+     * // info.templateFn   → [Function]
+     * // info.defaults     → [StringSchemaBuilder]
+     * \`\`\`
+     */
+    introspect(): {
+        /** Template function passed to {@link generic}. */
+        templateFn: ((...args: any[]) => SchemaBuilder<any, any, any, any, any>) | undefined;
+        /** Default positional arguments for the template function, or \`undefined\`. */
+        defaults: readonly any[] | undefined;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+    };
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    /**
+     * Performs synchronous validation of the schema over \`object\`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /**
+     * Performs async validation of the schema over \`object\`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected createFromProps<TReq extends boolean>(props: GenericSchemaBuilderCreateProps<TReq>): this;
+    /**
+     * @hidden
+     */
+    hasType<T>(_notUsed?: T): GenericSchemaBuilder<TFn, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearHasType(): GenericSchemaBuilder<TFn, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): GenericSchemaBuilder<TFn, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): GenericSchemaBuilder<TFn, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): GenericSchemaBuilder<TFn, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): GenericSchemaBuilder<TFn, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): GenericSchemaBuilder<TFn, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): GenericSchemaBuilder<TFn, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): GenericSchemaBuilder<TFn, TRequired, TNullable, TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    readonly(): GenericSchemaBuilder<TFn, TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+}
+/**
+ * Creates a generic schema template — a reusable, parameterized schema factory
+ * whose TypeScript type is inferred from the template function's generic
+ * signature.
+ *
+ * Call {@link GenericSchemaBuilder.apply | \`.apply()\`} on the returned builder
+ * to instantiate the template with concrete schema arguments and receive a
+ * fully typed concrete schema.
+ *
+ * There are two overloads:
+ *
+ * 1. **\`generic(templateFn)\`** — Provide only the template function. The
+ *    template must be called via \`.apply()\` before validation.
+ * 2. **\`generic(defaults, templateFn)\`** — Provide positional default arguments
+ *    followed by the template function. The template can be validated directly
+ *    using those defaults (without calling \`.apply()\` first).
+ *
+ * @param templateFn - A (generic) function that accepts schema arguments and
+ *   returns a concrete schema. TypeScript infers the result type from this
+ *   function's generic signature when \`.apply()\` is called.
+ *
+ * @returns A new {@link GenericSchemaBuilder} with \`isRequired\` set to \`true\`.
+ *
+ * @example Single type parameter
+ * \`\`\`ts
+ * import { generic, object, array, number, string, any, InferType } from '@cleverbrush/schema';
+ *
+ * const PaginatedList = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({ items: array(itemSchema), total: number(), page: number() })
+ * );
+ *
+ * const UserList = PaginatedList.apply(object({ name: string() }));
+ * type UserListType = InferType<typeof UserList>;
+ * // → { items: { name: string }[]; total: number; page: number }
+ *
+ * UserList.validate({ items: [{ name: 'Alice' }], total: 1, page: 1 }); // valid
+ * \`\`\`
+ *
+ * @example Multiple type parameters
+ * \`\`\`ts
+ * const Result = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>,
+ *    E extends SchemaBuilder<any, any, any, any, any>>(
+ *     valueSchema: T,
+ *     errorSchema: E
+ *   ) =>
+ *     union(
+ *       object({ ok: boolean().equalsTo(true),  value: valueSchema }),
+ *       object({ ok: boolean().equalsTo(false), error: errorSchema })
+ *     )
+ * );
+ *
+ * const StringResult = Result.apply(string(), number());
+ * \`\`\`
+ *
+ * @example With defaults (enables direct validation on the template)
+ * \`\`\`ts
+ * const AnyList = generic(
+ *   [any()],   // default args — positional, one per template parameter
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({ items: array(itemSchema), total: number() })
+ * );
+ *
+ * // Validate directly — uses the default any() schema:
+ * AnyList.validate({ items: [1, 'two'], total: 2 }); // valid
+ *
+ * // Or apply concrete schemas first:
+ * AnyList.apply(string()).validate({ items: ['x'], total: 1 }); // valid
+ * \`\`\`
+ *
+ * @see {@link GenericSchemaBuilder}
+ */
+export declare function generic<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>>(templateFn: TFn): GenericSchemaBuilder<TFn, true, false, undefined, false, {}>;
+export declare function generic<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>>(defaults: readonly any[], templateFn: TFn): GenericSchemaBuilder<TFn, true, false, undefined, false, {}>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/LazySchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type LazySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<LazySchemaBuilder<any, R>['introspect']>>;
 /**
@@ -1822,12 +2115,78 @@ import { type BRAND, type InferType, type NestedValidationResult, type PreValida
  * from the schema for the further usage. e.g. to select source and destination
  * properties for object mappings
  */
-export type SchemaPropertySelector<TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>, TPropertySchema extends SchemaBuilder<any, any, any, any, any>, TAssignableTo = any, TParentPropertyDescriptor = undefined> = (l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>) => PropertyDescriptor<TSchema, TPropertySchema, TParentPropertyDescriptor>;
+export type SchemaPropertySelector<TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>, TPropertySchema extends SchemaBuilder<any, any, any, any, any>, TAssignableTo = any, TParentPropertyDescriptor = undefined> = (l: PropertyDescriptorTree<TSchema, TSchema, TAssignableTo>) => PropertyDescriptor<TSchema, TPropertySchema, TParentPropertyDescriptor>;
 type ObjectSchemaBuilderProps<T extends Record<string, SchemaBuilder> = {}, TRequired extends boolean = true> = ReturnType<ObjectSchemaBuilder<T, TRequired>['introspect']>;
 type ObjectSchemaBuilderCreateProps<T extends Record<string, SchemaBuilder> = {}, TRequired extends boolean = true> = Partial<ObjectSchemaBuilderProps<T, TRequired>>;
 type Id<T> = T extends infer U ? {
     [K in keyof U]: U[K];
 } : never;
+/**
+ * Extracts the positional argument types from a schema whose inferred type is a
+ * function.  When the branded \`InferType<T>\` resolves to a function type the
+ * parameter tuple is extracted; otherwise \`any[]\` is used as a safe fallback.
+ *
+ * @example
+ * \`\`\`ts
+ * type Args = ConstructorParams<typeof func().addParameter(string()).addParameter(number())>;
+ * // → [string, number]
+ * \`\`\`
+ */
+type ConstructorParams<T extends SchemaBuilder<any, any, any, any, any>> = InferType<T> extends (...args: infer A) => any ? A : any[];
+/**
+ * Converts a tuple of \`FunctionSchemaBuilder\`s into an intersection of
+ * \`new (...args) => TInstance\` call signatures, producing overloaded
+ * construct signatures in the inferred type.
+ *
+ * The recursion peels schemas off the front of \`TSchemas\` one at a time,
+ * each contributing one construct overload to the intersection.
+ *
+ * @example
+ * \`\`\`ts
+ * type Sigs = ConstructorSignatures<
+ *   [typeof func().addParameter(string()), typeof func().addParameter(number())],
+ *   { name: string }
+ * >;
+ * // → { new (p0: string): { name: string } }
+ * //   & { new (p0: number): { name: string } }
+ * \`\`\`
+ */
+type ConstructorSignatures<TSchemas extends SchemaBuilder<any, any, any, any, any>[], TInstance> = TSchemas extends [
+    infer THead extends SchemaBuilder<any, any, any, any, any>,
+    ...infer TTail extends SchemaBuilder<any, any, any, any, any>[]
+] ? {
+    new (...args: ConstructorParams<THead>): TInstance;
+} & ConstructorSignatures<TTail, TInstance> : unknown;
+/**
+ * Wraps \`TInstance\` with constructor overload signatures derived from
+ * \`TSchemas\`.  When the tuple is empty the type is returned unchanged
+ * (no-op); otherwise the result is an intersection of all construct
+ * signatures with \`TInstance\`.
+ *
+ * This is the type projected onto \`InferType<ObjectSchemaBuilder>\` when one
+ * or more constructors have been registered via \`.addConstructor()\`.
+ *
+ * @example
+ * \`\`\`ts
+ * // No constructors — passthrough
+ * type A = WithConstructors<[], { name: string }>;
+ * // → { name: string }
+ *
+ * // One constructor
+ * type B = WithConstructors<[typeof func().addParameter(string())], { name: string }>;
+ * // → { new (p0: string): { name: string } } & { name: string }
+ *
+ * // Two constructors → overloaded construct signatures
+ * type C = WithConstructors<
+ *   [typeof func().addParameter(string()), typeof func().addParameter(number())],
+ *   { name: string }
+ * >;
+ * // → { new (p0: string): { name: string } }
+ * //   & { new (p0: number): { name: string } }
+ * //   & { name: string }
+ * \`\`\`
+ */
+type WithConstructors<TSchemas extends SchemaBuilder<any, any, any, any, any>[], TInstance> = TSchemas extends [] ? TInstance : ConstructorSignatures<TSchemas, TInstance> & TInstance;
 export type RespectPropsOptionality<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = {
     [K in RequiredProps<T>]: InferType<T[K]>;
 } & {
@@ -1850,7 +2209,7 @@ type MakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any, 
  * unions, primitives) are only made optional at the top level.
  */
 type DeepMakeChildrenOptional<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = {
-    [K in keyof T]: T[K] extends ObjectSchemaBuilder<infer P extends Record<string, SchemaBuilder<any, any, any, any, any>>, any, any, any, any, any> ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']> : ReturnType<T[K]['optional']>;
+    [K in keyof T]: T[K] extends ObjectSchemaBuilder<infer P extends Record<string, SchemaBuilder<any, any, any, any, any>>, any, any, any, any, any, any> ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']> : ReturnType<T[K]['optional']>;
 };
 type MakeChildOptional<T extends Record<any, SchemaBuilder<any, any, any, any, any>>, TProp extends keyof T> = {
     [K in keyof T]: K extends TProp ? ReturnType<T[K]['optional']> : T[K];
@@ -1861,7 +2220,7 @@ type MakeChildRequired<T extends Record<any, SchemaBuilder<any, any, any, any, a
 type ModifyPropSchema<T extends Record<any, SchemaBuilder<any, any, any, any, any>>, TProp extends keyof T, TSchema extends SchemaBuilder<any, any, any, any, any>> = {
     [K in keyof T]: K extends TProp ? TSchema : T[K];
 };
-export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>, TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any> = TRootSchema> = Omit<ValidationResult<T>, 'errors'> & {
+export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>, TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any> = TRootSchema> = Omit<ValidationResult<T>, 'errors'> & {
     /**
      * A flat list of validation errors.
      *
@@ -1879,7 +2238,7 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
      *
      * @param selector a callback function to select property from the schema.
      */
-    getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(selector?: (properties: PropertyDescriptorTree<TSchema, TRootSchema>) => PropertyDescriptor<TRootSchema, TPropertySchema, TParentPropertyDescriptor>): TPropertySchema extends ObjectSchemaBuilder<any, any, any, any, any, any> ? PropertyValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor> : NestedValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor>;
+    getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(selector?: (properties: PropertyDescriptorTree<TSchema, TRootSchema>) => PropertyDescriptor<TRootSchema, TPropertySchema, TParentPropertyDescriptor>): TPropertySchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any> ? PropertyValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor> : NestedValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor>;
 };
 /**
  * Object schema builder class. Similar to the \`object\` type
@@ -1967,14 +2326,14 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  * \`\`\`
  * @see {@link object}
  */
-export declare class ObjectSchemaBuilder<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
+export declare class ObjectSchemaBuilder<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TConstructorSchemas extends SchemaBuilder<any, any, any, any, any>[] = []> extends SchemaBuilder<undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /** Marks this builder as having sub-properties for descriptor tree recursion. */
     readonly [SYMBOL_HAS_PROPERTIES] = true;
     /**
      * @hidden
      */
-    static create<P extends Record<string, SchemaBuilder>, R extends boolean>(props: ObjectSchemaBuilderCreateProps<P, R>): ObjectSchemaBuilder<{}, true, false, undefined, false, {}>;
+    static create<P extends Record<string, SchemaBuilder>, R extends boolean>(props: ObjectSchemaBuilderCreateProps<P, R>): ObjectSchemaBuilder<{}, true, false, undefined, false, {}, []>;
     protected createFromProps<T extends Record<string, SchemaBuilder>, R extends boolean = true>(props: ObjectSchemaBuilderCreateProps<T, R>): this;
     protected constructor(props: ObjectSchemaBuilderCreateProps);
     introspect(): {
@@ -1989,51 +2348,58 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
          * Set to \`false\` by default
          */
         acceptUnknownProps: boolean;
+        /**
+         * The list of constructor schemas registered via \`.addConstructor()\`.
+         * Each element is a \`FunctionSchemaBuilder\` whose inferred function
+         * type provides one overloaded construct signature in \`InferType\`.
+         * Empty array when no constructors have been added.
+         */
+        constructorSchemas: TConstructorSchemas;
         type: string;
         isRequired: boolean;
         isNullable: boolean;
         isReadonly: boolean;
-        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
-        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>[];
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType>[];
         requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
         extensions: {
             [x: string]: unknown;
         };
         hasDefault: boolean;
-        defaultValue: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | undefined;
+        defaultValue: (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
         description: string | undefined;
         hasCatch: boolean;
-        catchValue: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | undefined;
+        catchValue: (undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | (() => undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, RespectPropsOptionality<TProperties>> : TExplicitType) | undefined;
     };
     /**
      * @hidden
      */
-    required(errorMessage?: ValidationErrorMessageProvider): ObjectSchemaBuilder<TProperties, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    required(errorMessage?: ValidationErrorMessageProvider): ObjectSchemaBuilder<TProperties, true, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * @hidden
      */
-    optional(): ObjectSchemaBuilder<TProperties, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    optional(): ObjectSchemaBuilder<TProperties, false, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * @hidden
      */
-    default(value: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType)): ObjectSchemaBuilder<TProperties, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
+    default(value: (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) | (() => undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType)): ObjectSchemaBuilder<TProperties, true, TNullable, TExplicitType, true, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * @hidden
      */
-    clearDefault(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
+    clearDefault(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, false, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * @hidden
      */
     brand<TBrand extends string | symbol>(_name?: TBrand): ObjectSchemaBuilder<TProperties, TRequired, TNullable, (undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType) & {
         readonly [K in BRAND]: TBrand;
-    }, THasDefault, TExtensions> & TExtensions;
+    }, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Marks the inferred type as \`Readonly<T>\` — all top-level properties
      * become \`readonly\` at the type level. Validation behaviour is unchanged.
      *
      * @see {@link SchemaBuilder.readonly}
      */
-    readonly(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, Readonly<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
+    readonly(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, Readonly<undefined extends TExplicitType ? RespectPropsOptionality<TProperties> : TExplicitType>, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     protected preValidateSync(object: any, context?: ValidationContext<this>): PreValidationResult<InferType<SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired>>, {
         validatedObject: any;
     }>;
@@ -2079,20 +2445,121 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * Fields not defined in \`properties\` will not be validated
      * and will be passed through the validation.
      */
-    acceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    acceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Fields not defined in \`properties\` will be considered
      * as schema violation. This is the default behavior.
      */
-    notAcceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    notAcceptUnknownProps(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * @inheritdoc
      */
-    hasType<T>(_notUsed?: T): ObjectSchemaBuilder<TProperties, TRequired, TNullable, T, THasDefault, TExtensions> & TExtensions;
+    hasType<T>(_notUsed?: T): ObjectSchemaBuilder<TProperties, TRequired, TNullable, T, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * @inheritdoc
      */
-    clearHasType(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    clearHasType(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, undefined, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
+    /**
+     * Appends a constructor overload to the object schema.
+     *
+     * Each call extends the set of construct signatures on the inferred type by
+     * one overload.  The accumulated argument lists are taken from the
+     * \`FunctionSchemaBuilder\` passed in — specifically from the positional
+     * parameter schemas registered via \`.addParameter()\`.
+     *
+     * At **runtime** the schema continues to validate plain objects; the
+     * constructor information is purely a TypeScript-level annotation and is
+     * stored in \`introspect().constructorSchemas\` for tooling use.
+     *
+     * Multiple calls are supported and produce **overloaded** construct
+     * signatures in the inferred type, modelling a class that exposes several
+     * constructor overloads.
+     *
+     * @param schema - A \`FunctionSchemaBuilder\` describing one constructor
+     *   overload.  Use \`.addParameter()\` on the function schema to declare the
+     *   parameter types.  The return type, if set via \`.hasReturnType()\`, is
+     *   ignored — the return type of a constructor is always the instance type
+     *   derived from the object schema's properties.
+     *
+     * @returns A new \`ObjectSchemaBuilder\` whose \`TConstructorSchemas\` tuple has
+     *   been extended by \`schema\`, updating \`InferType\` to include the new
+     *   construct signature.
+     *
+     * @example
+     * \`\`\`ts
+     * import { object, string, number, func, InferType } from '@cleverbrush/schema';
+     *
+     * // Single constructor
+     * const PersonSchema = object({ name: string(), age: number() })
+     *     .addConstructor(
+     *         func().addParameter(string()).addParameter(number())
+     *     );
+     *
+     * type Person = InferType<typeof PersonSchema>;
+     * // → { new (p0: string, p1: number): { name: string; age: number } }
+     * //   & { name: string; age: number }
+     * \`\`\`
+     *
+     * @example
+     * \`\`\`ts
+     * import { object, string, number, func, InferType } from '@cleverbrush/schema';
+     *
+     * // Multiple constructors via chained calls → overloaded signatures
+     * const PointSchema = object({ x: number(), y: number() })
+     *     .addConstructor(func())                                     // no-arg ctor
+     *     .addConstructor(func().addParameter(number()).addParameter(number())); // (x, y) ctor
+     *
+     * type Point = InferType<typeof PointSchema>;
+     * // → { new (): { x: number; y: number } }
+     * //   & { new (p0: number, p1: number): { x: number; y: number } }
+     * //   & { x: number; y: number }
+     *
+     * // Validation still operates on plain objects — the constructor type is
+     * // a compile-time annotation only.
+     * const result = PointSchema.validate({ x: 1, y: 2 });
+     * // result.valid === true
+     *
+     * // Introspect the registered constructor schemas at runtime:
+     * const info = PointSchema.introspect();
+     * // info.constructorSchemas.length === 2
+     * \`\`\`
+     */
+    addConstructor<TFunc extends SchemaBuilder<any, any, any, any, any>>(schema: TFunc): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, [
+        ...TConstructorSchemas,
+        TFunc
+    ]> & TExtensions;
+    /**
+     * Removes all constructor overloads previously registered via
+     * \`.addConstructor()\`, resetting the \`TConstructorSchemas\` tuple to \`[]\`.
+     *
+     * After calling this method \`InferType\` reverts to the plain object type
+     * derived from the schema's properties — no construct signatures are
+     * included.
+     *
+     * \`introspect().constructorSchemas\` will return an empty array.
+     *
+     * @returns A new \`ObjectSchemaBuilder\` with \`TConstructorSchemas = []\`.
+     *
+     * @example
+     * \`\`\`ts
+     * import { object, string, func, InferType } from '@cleverbrush/schema';
+     *
+     * const WithCtor = object({ name: string() })
+     *     .addConstructor(func().addParameter(string()));
+     *
+     * type WithCtorType = InferType<typeof WithCtor>;
+     * // → { new (p0: string): { name: string } } & { name: string }
+     *
+     * const Plain = WithCtor.clearConstructors();
+     *
+     * type PlainType = InferType<typeof Plain>;
+     * // → { name: string }
+     *
+     * Plain.introspect().constructorSchemas; // []
+     * \`\`\`
+     */
+    clearConstructors(): ObjectSchemaBuilder<TProperties, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, [
+    ]> & TExtensions;
     /**
      * Adds a new property to the object schema. The new property
      * will be validated according to the provided schema.
@@ -2101,7 +2568,7 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      */
     addProp<TType extends SchemaBuilder<any, any, any, any, any>, TName extends string>(propName: TName, schema: TType): ObjectSchemaBuilder<TProperties & {
         [k in TName]: TType;
-    }, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    }, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * @hidden
      * @deprecated this is for internal use, do not use if you are
@@ -2116,62 +2583,62 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * comments were lost. Hopefully it will be fixed in the future by Typescript team or somebody will
      * find a workaround/fix and create a pull request.
      */
-    optimize(): SchemaBuilder<undefined extends TExplicitType ? Id<RespectPropsOptionality<TProperties>> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions>;
+    optimize(): SchemaBuilder<undefined extends TExplicitType ? WithConstructors<TConstructorSchemas, Id<RespectPropsOptionality<TProperties>>> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions>;
     /**
      * Adds new properties to the object schema. The same as \`.addProp()\` but
      * allows to add multiple properties with one call. The new properties
      * will be validated according to the provided schemas.
      * @param props a key/schema object map.
      */
-    addProps<TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(props: TProps): ObjectSchemaBuilder<TProperties & TProps, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    addProps<TProps extends Record<string, SchemaBuilder<any, any, any, any, any>>>(props: TProps): ObjectSchemaBuilder<TProperties & TProps, TRequired, TNullable, undefined, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Adds all properties from the \`schema\` object schema to the current schema.
      * @param schema an instance of \`ObjectSchemaBuilder\`
      */
-    addProps<K extends ObjectSchemaBuilder<any, any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProp, infer _, any, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProp> & TProp, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
+    addProps<K extends ObjectSchemaBuilder<any, any, any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProp, infer _, any, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProp> & TProp, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions : never;
     /**
      * Omits properties listed in \`properties\` from the schema.
      * Consider \`Omit<Type, 'prop1'|'prop2'...>\` as a good illustration
      * from the TS world.
      * @param properties - array of property names (strings) to remove from the schema.
      */
-    omit<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    omit<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Removes \`propName\` from the list of properties.
      * @param propName property name to remove. Schema should contain
      * this property. An error will be thrown otherwise.
      */
-    omit<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    omit<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Removes all properties of \`schema\` from the current schema.
      * \`Omit<TSchema, keyof TAnotherSchema>\` as a good illustration
      * from the TS world.
      * @param schema schema builder to take properties from.
      */
-    omit<T>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer TRequired, any, infer TExplicitType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions : never;
+    omit<T>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer TRequired, any, infer TExplicitType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions : never;
     /**
      * Adds all properties from \`schema\` to the current schema.
      * \`TSchema & TAnotherSchema\` is a good example of the similar concept
      * in the TS type system.
      * @param schema an object schema to take properties from
      */
-    intersect<T extends ObjectSchemaBuilder<any, any, any, any, any, any>>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer _, any, infer TExplType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps> & TProps, TRequired, TNullable, TExplType, THasDefault, TExtensions> & TExtensions : never;
+    intersect<T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>>(schema: T): T extends ObjectSchemaBuilder<infer TProps, infer _, any, infer TExplType> ? ObjectSchemaBuilder<Omit<TProperties, keyof TProps> & TProps, TRequired, TNullable, TExplType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions : never;
     /**
      * Marks all properties in the current schema as optional.
      * It is the same as call \`.optional('propname')\` where \`propname\` is the name
      * of every property in the schema.
      */
-    partial(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    partial(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Marks all properties from \`properties\` as optional in the schema.
      * @param properties list of property names (string) to make optional
      */
-    partial<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K> & Pick<MakeChildrenOptional<TProperties>, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    partial<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Omit<TProperties, K> & Pick<MakeChildrenOptional<TProperties>, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Marks property \`propName\` as optional in the schema.
      * @param propName the name of the property (string).
      */
-    partial<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty> & Pick<MakeChildrenOptional<TProperties>, TProperty>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    partial<TProperty extends keyof TProperties>(propName: TProperty): ObjectSchemaBuilder<Omit<TProperties, TProperty> & Pick<MakeChildrenOptional<TProperties>, TProperty>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Recursively marks all properties — and all properties of nested
      * \`object()\` schemas — as optional.  Useful for PATCH API bodies
@@ -2230,27 +2697,27 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      *
      * @see {@link partial} for shallow-only property optionality.
      */
-    deepPartial(): ObjectSchemaBuilder<DeepMakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    deepPartial(): ObjectSchemaBuilder<DeepMakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Returns a new schema containing only properties listed in
      * \`properties\` array.
      * @param properties array of property names (strings)
      */
-    pick<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    pick<K extends keyof TProperties>(properties: K[]): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, TNullable, undefined, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Returns new schema based on the current schema. This new schema
      * will consists only from properties which names are taken from the
      * \`schema\` object schema.
      * @param schema schema to take property names list from
      */
-    pick<K extends ObjectSchemaBuilder<any, any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProps, infer _, any, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof Omit<TProperties, keyof TProps>>, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions : never;
+    pick<K extends ObjectSchemaBuilder<any, any, any, any, any, any, any>>(schema: K): K extends ObjectSchemaBuilder<infer TProps, infer _, any, infer __> ? ObjectSchemaBuilder<Omit<TProperties, keyof Omit<TProperties, keyof TProps>>, TRequired, TNullable, undefined, THasDefault, TExtensions, TConstructorSchemas> & TExtensions : never;
     /**
      * Returns a new schema consisting of only one property
      * (taken from the \`property\` property name). If the property
      * does not exists in the current schema, an error will be thrown.
      * @param property the name of the property (string).
      */
-    pick<K extends keyof TProperties>(property: K): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    pick<K extends keyof TProperties>(property: K): ObjectSchemaBuilder<Pick<TProperties, K>, TRequired, TNullable, undefined, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Modify schema for \`propName\` and return a new schema.
      * Could be useful if you want to leave all schema intact, but
@@ -2260,33 +2727,33 @@ export declare class ObjectSchemaBuilder<TProperties extends Record<string, Sche
      * you will receive an old schema for \`propName\`.
      * @returns
      */
-    modifyPropSchema<K extends keyof TProperties, R extends SchemaBuilder<any, any, any, any, any>>(propName: K, callback: (builder: TProperties[K]) => R): ObjectSchemaBuilder<ModifyPropSchema<TProperties, K, R>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    modifyPropSchema<K extends keyof TProperties, R extends SchemaBuilder<any, any, any, any, any>>(propName: K, callback: (builder: TProperties[K]) => R): ObjectSchemaBuilder<ModifyPropSchema<TProperties, K, R>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * An alias for \`.partial(prop: string)\`
      * @param prop name of the property
      */
-    makePropOptional<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildOptional<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    makePropOptional<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildOptional<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * Marks \`prop\` as required property.
      * If \`prop\` does not exists in the current schema,
      * an error will be thrown.
      * @param prop name of the property
      */
-    makePropRequired<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildRequired<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    makePropRequired<K extends keyof TProperties>(prop: K): ObjectSchemaBuilder<MakeChildRequired<TProperties, K>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * \`Partial<T>\` would be a good example of the
      * same operation in the TS world.
      */
-    makeAllPropsOptional(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    makeAllPropsOptional(): ObjectSchemaBuilder<MakeChildrenOptional<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     /**
      * \`Required<T>\` would be a good example of the
      * same operation in the TS world.
      */
-    makeAllPropsRequired(): ObjectSchemaBuilder<MakeChildrenRequired<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    makeAllPropsRequired(): ObjectSchemaBuilder<MakeChildrenRequired<TProperties>, TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TConstructorSchemas> & TExtensions;
     static getPropertiesFor<TProperties extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}, TRequired extends boolean = true, TExplicitType = undefined, TSchema extends ObjectSchemaBuilder<any, any, any, any> = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>>(schema: TSchema): PropertyDescriptorTree<TSchema, TSchema>;
     static isValidPropertyDescriptor(descriptor: PropertyDescriptor<any, any, any>): boolean;
-    nullable(): ObjectSchemaBuilder<TProperties, TRequired, true, TExplicitType, THasDefault, TExtensions>;
-    notNullable(): ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType, THasDefault, TExtensions>;
+    nullable(): ObjectSchemaBuilder<TProperties, TRequired, true, TExplicitType, THasDefault, TExtensions, TConstructorSchemas>;
+    notNullable(): ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType, THasDefault, TExtensions, TConstructorSchemas>;
 }
 export interface Object {
     /**
@@ -4680,6 +5147,7 @@ export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.j
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export { ExternSchemaBuilder, extern } from './builders/ExternSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
+export { GenericSchemaBuilder, generic } from './builders/GenericSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
@@ -4766,6 +5234,7 @@ import { ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
 import { BooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
 import { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 import { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
+import { GenericSchemaBuilder } from './builders/GenericSchemaBuilder.js';
 import { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 import { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
@@ -4787,7 +5256,7 @@ type BuilderMap = {
     number: NumberSchemaBuilder<any, any, any, any, any>;
     boolean: BooleanSchemaBuilder<any, any, any, any, any, any, any>;
     date: DateSchemaBuilder<any, any, any, any, any>;
-    object: ObjectSchemaBuilder<any, any, any, any, any, any>;
+    object: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
     array: ArraySchemaBuilder<any, any, any, any, any, any, any>;
     tuple: TupleSchemaBuilder<any, any, any, any, any, any, any>;
     record: RecordSchemaBuilder<any, any, any, any, any, any, any>;
@@ -4795,6 +5264,7 @@ type BuilderMap = {
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any, any>;
     promise: PromiseSchemaBuilder<any, any, any, any, any>;
+    generic: GenericSchemaBuilder<any, any, any, any, any, any>;
 };
 type BuilderTypeName = keyof BuilderMap;
 /**
@@ -4914,7 +5384,7 @@ type ExtendedNumberFactory<TExt> = {
 };
 type ExtendedBooleanFactory<TExt> = () => CleanExtended<BooleanSchemaBuilder<boolean, true, false, undefined, false, TExt>, TExt>;
 type ExtendedDateFactory<TExt> = () => CleanExtended<DateSchemaBuilder<Date, true, false, false, TExt>, TExt>;
-type ExtendedObjectFactory<TExt> = <P extends Record<string, SchemaBuilder<any, any, any, any, any>>>(properties?: P) => CleanExtended<ObjectSchemaBuilder<P, true, false, undefined, false, TExt>, TExt>;
+type ExtendedObjectFactory<TExt> = <P extends Record<string, SchemaBuilder<any, any, any, any, any>>>(properties?: P) => CleanExtended<ObjectSchemaBuilder<P, true, false, undefined, false, TExt, []>, TExt>;
 type ExtendedArrayFactory<TExt> = <TElementSchema extends SchemaBuilder<any, any, any, any, any>>(elementSchema?: TElementSchema) => CleanExtended<ArraySchemaBuilder<TElementSchema, true, false, undefined, false, TExt>, TExt>;
 type ExtendedUnionFactory<TExt> = <T extends SchemaBuilder<any, any, any, any, any>>(schema: T) => CleanExtended<UnionSchemaBuilder<[T], true, false, undefined, false, TExt>, TExt>;
 type ExtendedFuncFactory<TExt> = () => CleanExtended<FunctionSchemaBuilder<true, false, undefined, false, TExt>, TExt>;
@@ -4922,6 +5392,7 @@ type ExtendedAnyFactory<TExt> = () => CleanExtended<AnySchemaBuilder<true, false
 type ExtendedTupleFactory<TExt> = <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => CleanExtended<TupleSchemaBuilder<TElements, true, false, undefined, false, TExt>, TExt>;
 type ExtendedRecordFactory<TExt> = <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => CleanExtended<RecordSchemaBuilder<TKeySchema, TValueSchema, true, false, undefined, false, TExt>, TExt>;
 type ExtendedPromiseFactory<TExt> = <TSchema extends SchemaBuilder<any, any, any, any, any>>(resolvedTypeSchema?: TSchema) => CleanExtended<PromiseSchemaBuilder<true, false, undefined, false, TExt, TSchema>, TExt>;
+type ExtendedGenericFactory<TExt> = <TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>>(templateFn: TFn) => CleanExtended<GenericSchemaBuilder<TFn, true, false, undefined, false, TExt>, TExt>;
 /**
  * The return type of {@link withExtensions}.
  *
@@ -4947,6 +5418,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
     promise: ExtendedPromiseFactory<MergeExtensionMethods<TExts, 'promise'>>;
+    generic: ExtendedGenericFactory<MergeExtensionMethods<TExts, 'generic'>>;
 };
 /**
  * Defines an extension targeting one or more schema builder types.
@@ -5463,7 +5935,7 @@ export type ExtendedBoolean = BooleanSchemaBuilder<boolean, true, false, undefin
 /** A \`DateSchemaBuilder\` with built-in extension methods. */
 export type ExtendedDate = DateSchemaBuilder<Date, true, false, false, {}> & HiddenExtensionMethods;
 /** An \`ObjectSchemaBuilder\` with built-in extension methods. */
-export type ExtendedObject<TProps extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}> = ObjectSchemaBuilder<TProps, true, false, undefined, false, {}> & HiddenExtensionMethods;
+export type ExtendedObject<TProps extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}> = ObjectSchemaBuilder<TProps, true, false, undefined, false, {}, []> & HiddenExtensionMethods;
 /** A \`UnionSchemaBuilder\` with built-in extension methods. */
 export type ExtendedUnion<TOptions extends readonly SchemaBuilder<any, any, any, any, any>[]> = UnionSchemaBuilder<TOptions, true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`FunctionSchemaBuilder\` with built-in extension methods. */
