@@ -34,7 +34,9 @@ function toRelative(filepath) {
 
     // Different machine: find the first known repo top-level directory
     // (libs, website, scripts, …) in the absolute path and use that as
-    // the relative root.
+    // the relative root. This is only needed when bench-results.json was
+    // generated on a machine with a different repo checkout path.
+    // Add more top-level dirs here if the project structure changes.
     const knownRoots = ['libs/', 'website/', 'scripts/', 'examples/'];
     for (const prefix of knownRoots) {
         const idx = filepath.indexOf('/' + prefix);
