@@ -18,7 +18,8 @@ type Person = InferType<typeof PersonSchema>;
 // & { new(p0: string, p1: number): { name: string; age: number } }
 // & { name: string; age: number }
 
-const instance = new PersonSchema['constructor']('Alice');
+declare const Person: Person;
+const instance = new Person('Alice');
 ```
 
 - **`addConstructor(funcSchema)`** — appends a constructor overload; each call extends the accumulated tuple of constructor schemas. Chainable.
