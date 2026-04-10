@@ -103,7 +103,11 @@ describe('ServiceCollection', () => {
     test('addSingletonInstance registers a function value without invoking it as a factory', () => {
         const IHandler = object({ greet: func() });
         let callCount = 0;
-        const handler = { greet: () => { callCount++; } };
+        const handler = {
+            greet: () => {
+                callCount++;
+            }
+        };
 
         const services = new ServiceCollection();
         services.addSingletonInstance(IHandler, handler);
@@ -120,7 +124,9 @@ describe('ServiceCollection', () => {
     test('addSingletonInstance with a raw function value (func() schema)', () => {
         const IFn = func();
         let invoked = false;
-        const myFn = () => { invoked = true; };
+        const myFn = () => {
+            invoked = true;
+        };
 
         const services = new ServiceCollection();
         // addSingleton would call myFn() as a factory; addSingletonInstance must not

@@ -327,7 +327,10 @@ export class GenericSchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): ValidationResult<TResult> {
-        return this.#buildResult(this.preValidateSync(object, context), context);
+        return this.#buildResult(
+            this.preValidateSync(object, context),
+            context
+        );
     }
 
     /**
