@@ -18,7 +18,7 @@
         "changeset": "changeset",
         "version": "changeset version",
         "release": "npm run clean && npm run build && changeset publish",
-        "publish:beta": "npm run clean && npm run build && changeset publish --tag beta",
+        "publish:beta": "npm run clean && npm run build && changeset version --snapshot beta && changeset publish --tag beta --no-git-tag",
         "run_scheduler": "node ./libs/scheduler/dist/index.js",
         "test": "vitest --run --typecheck",
         "test:coverage": "vitest --run --coverage && node scripts/update-coverage-badges.js",
