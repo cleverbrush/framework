@@ -12,8 +12,9 @@ type PromiseSchemaBuilderCreateProps<R extends boolean = true> = Partial<
 >;
 
 /**
- * Schema builder for `Promise` values. Validates that a value is an instance
- * of `Promise` and optionally carries a typed resolved-value schema so that
+ * Schema builder for promise-like values. Validates that a value is a
+ * thenable (for example, an actual `Promise` or any object with a `then`
+ * function) and optionally carries a typed resolved-value schema so that
  * the inferred TypeScript type is `Promise<T>` instead of `Promise<any>`.
  *
  * **NOTE** this class is exported only to give opportunity to extend it
