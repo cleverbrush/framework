@@ -10,6 +10,7 @@ const NAV_ITEMS = [
     { href: '/playground', label: 'Playground', highlight: true },
     { href: '/migrating-from-zod', label: 'vs Zod' },
     { href: '/mapper', label: 'Mapper' },
+    { href: '/di', label: 'DI' },
     { href: '/react-form', label: 'React Form' },
     { href: '/schema-json', label: 'Schema JSON' },
     { href: '/showcases', label: 'Showcases' },
