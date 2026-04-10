@@ -8,7 +8,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_deep.html",
+    "homepage": "https://docs.cleverbrush.com/",
     "keywords": [
         "deep operations on objects",
         "deep equal",
