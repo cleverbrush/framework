@@ -27,7 +27,8 @@ export const EXAMPLE_GROUPS = [
             'composing-schemas',
             'immutability',
             'deep-partial',
-            'recursive-schemas'
+            'recursive-schemas',
+            'constructor-schema'
         ]
     },
     {
@@ -1582,6 +1583,48 @@ const result = ButtonProps.validate({
 // { valid: true }
 `,
         testData: '{ "label": "Submit", "disabled": false }'
+    },
+
+    // ── Constructor Schemas ─────────────────────────────
+    {
+        id: 'constructor-schema',
+        title: 'Constructor Schemas',
+        description:
+            'Use <code>.addConstructor(funcSchema)</code> to declare one or more constructor overloads on an <code>object()</code> schema. The inferred TypeScript type becomes an intersection of all construct signatures and the plain instance type. Constructor signatures are type-only — runtime validation is unchanged.',
+        group: 'Objects & Composition',
+        code: `import { object, func, string, number, InferType } from '@cleverbrush/schema';
+
+// Single constructor overload
+const PersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()));
+
+type Person = InferType<typeof PersonSchema>;
+// → { new(p0: string): { name: string; age: number } } & { name: string; age: number }
+
+// Multiple chained constructors → overloaded construct signatures
+const FlexPersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()))
+    .addConstructor(func().addParameter(string()).addParameter(number()));
+
+type FlexPerson = InferType<typeof FlexPersonSchema>;
+// → { new(p0: string): { name: string; age: number } }
+// & { new(p0: string, p1: number): { name: string; age: number } }
+// & { name: string; age: number }
+
+// Runtime validation is unchanged — plain objects still validate
+const result = FlexPersonSchema.validate({ name: 'Alice', age: 30 });
+// { valid: true }
+
+// Introspect constructor schemas at runtime
+const { constructorSchemas } = FlexPersonSchema.introspect();
+// constructorSchemas.length → 2
+
+// Remove all constructor signatures
+const PlainSchema = FlexPersonSchema.clearConstructor();
+type Plain = InferType<typeof PlainSchema>;
+// → { name: string; age: number }
+`,
+        testData: '{ "name": "Alice", "age": 30 }'
     },
 
     // ── Promise Schemas ─────────────────────────────

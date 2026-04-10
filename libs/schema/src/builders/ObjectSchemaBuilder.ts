@@ -26,7 +26,7 @@ const MUST_BE_AN_OBJECT_ERROR_MESSSAGE = 'must be an object';
  * properties for object mappings
  */
 export type SchemaPropertySelector<
-    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>,
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TPropertySchema extends SchemaBuilder<any, any, any, any, any>,
     TAssignableTo = any,
     TParentPropertyDescriptor = undefined
@@ -45,6 +45,86 @@ type ObjectSchemaBuilderCreateProps<
 > = Partial<ObjectSchemaBuilderProps<T, TRequired>>;
 
 type Id<T> = T extends infer U ? { [K in keyof U]: U[K] } : never;
+
+/**
+ * Extracts the positional argument types from a schema whose inferred type is a
+ * function.  When the branded `InferType<T>` resolves to a function type the
+ * parameter tuple is extracted; otherwise `any[]` is used as a safe fallback.
+ *
+ * @example
+ * ```ts
+ * type Args = ConstructorParams<typeof func().addParameter(string()).addParameter(number())>;
+ * // → [string, number]
+ * ```
+ */
+type ConstructorParams<T extends SchemaBuilder<any, any, any, any, any>> =
+    InferType<T> extends (...args: infer A) => any ? A : any[];
+
+/**
+ * Converts a tuple of `FunctionSchemaBuilder`s into an intersection of
+ * `new (...args) => TInstance` call signatures, producing overloaded
+ * construct signatures in the inferred type.
+ *
+ * The recursion peels schemas off the front of `TSchemas` one at a time,
+ * each contributing one construct overload to the intersection.
+ *
+ * @example
+ * ```ts
+ * type Sigs = ConstructorSignatures<
+ *   [typeof func().addParameter(string()), typeof func().addParameter(number())],
+ *   { name: string }
+ * >;
+ * // → { new (p0: string): { name: string } }
+ * //   & { new (p0: number): { name: string } }
+ * ```
+ */
+type ConstructorSignatures<
+    TSchemas extends SchemaBuilder<any, any, any, any, any>[],
+    TInstance
+> = TSchemas extends [
+    infer THead extends SchemaBuilder<any, any, any, any, any>,
+    ...infer TTail extends SchemaBuilder<any, any, any, any, any>[]
+]
+    ? {
+          new (...args: ConstructorParams<THead>): TInstance;
+      } & ConstructorSignatures<TTail, TInstance>
+    : unknown;
+
+/**
+ * Wraps `TInstance` with constructor overload signatures derived from
+ * `TSchemas`.  When the tuple is empty the type is returned unchanged
+ * (no-op); otherwise the result is an intersection of all construct
+ * signatures with `TInstance`.
+ *
+ * This is the type projected onto `InferType<ObjectSchemaBuilder>` when one
+ * or more constructors have been registered via `.addConstructor()`.
+ *
+ * @example
+ * ```ts
+ * // No constructors — passthrough
+ * type A = WithConstructors<[], { name: string }>;
+ * // → { name: string }
+ *
+ * // One constructor
+ * type B = WithConstructors<[typeof func().addParameter(string())], { name: string }>;
+ * // → { new (p0: string): { name: string } } & { name: string }
+ *
+ * // Two constructors → overloaded construct signatures
+ * type C = WithConstructors<
+ *   [typeof func().addParameter(string()), typeof func().addParameter(number())],
+ *   { name: string }
+ * >;
+ * // → { new (p0: string): { name: string } }
+ * //   & { new (p0: number): { name: string } }
+ * //   & { name: string }
+ * ```
+ */
+type WithConstructors<
+    TSchemas extends SchemaBuilder<any, any, any, any, any>[],
+    TInstance
+> = TSchemas extends []
+    ? TInstance
+    : ConstructorSignatures<TSchemas, TInstance> & TInstance;
 
 export type RespectPropsOptionality<
     T extends Record<string, SchemaBuilder<any, any, any, any, any>>
@@ -89,6 +169,7 @@ type DeepMakeChildrenOptional<
         any,
         any,
         any,
+        any,
         any
     >
         ? ReturnType<ReturnType<T[K]['deepPartial']>['optional']>
@@ -119,8 +200,9 @@ type ModifyPropSchema<
 
 export type ObjectSchemaValidationResult<
     T,
-    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any, any>,
+    TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TSchema extends ObjectSchemaBuilder<
+        any,
         any,
         any,
         any,
@@ -154,7 +236,15 @@ export type ObjectSchemaValidationResult<
             TPropertySchema,
             TParentPropertyDescriptor
         >
-    ): TPropertySchema extends ObjectSchemaBuilder<any, any, any, any, any, any>
+    ): TPropertySchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >
         ? PropertyValidationResult<
               TPropertySchema,
               TRootSchema,
@@ -262,10 +352,14 @@ export class ObjectSchemaBuilder<
     TNullable extends boolean = false,
     TExplicitType = undefined,
     THasDefault extends boolean = false,
-    TExtensions = {}
+    TExtensions = {},
+    TConstructorSchemas extends SchemaBuilder<any, any, any, any, any>[] = []
 > extends SchemaBuilder<
     undefined extends TExplicitType
-        ? RespectPropsOptionality<TProperties>
+        ? WithConstructors<
+              TConstructorSchemas,
+              RespectPropsOptionality<TProperties>
+          >
         : TExplicitType,
     TRequired,
     TNullable,
@@ -275,6 +369,7 @@ export class ObjectSchemaBuilder<
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
     #propKeys: string[] = [];
+    #constructorSchemas: SchemaBuilder<any, any, any, any, any>[] = [];
 
     /** Marks this builder as having sub-properties for descriptor tree recursion. */
     readonly [SYMBOL_HAS_PROPERTIES] = true;
@@ -312,6 +407,18 @@ export class ObjectSchemaBuilder<
         if (typeof props.acceptUnknownProps === 'boolean') {
             this.#acceptUnknownProps = props.acceptUnknownProps;
         }
+
+        if (Array.isArray(props.constructorSchemas)) {
+            this.#constructorSchemas = (
+                props.constructorSchemas as SchemaBuilder<
+                    any,
+                    any,
+                    any,
+                    any,
+                    any
+                >[]
+            ).filter(s => s instanceof SchemaBuilder);
+        }
     }
 
     public introspect() {
@@ -327,7 +434,16 @@ export class ObjectSchemaBuilder<
              * are not defined in the schema `properties`.
              * Set to `false` by default
              */
-            acceptUnknownProps: this.#acceptUnknownProps
+            acceptUnknownProps: this.#acceptUnknownProps,
+            /**
+             * The list of constructor schemas registered via `.addConstructor()`.
+             * Each element is a `FunctionSchemaBuilder` whose inferred function
+             * type provides one overloaded construct signature in `InferType`.
+             * Empty array when no constructors have been added.
+             */
+            constructorSchemas: [
+                ...this.#constructorSchemas
+            ] as TConstructorSchemas
         };
     }
 
@@ -342,7 +458,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return super.required(errorMessage);
@@ -357,7 +474,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return super.optional();
@@ -380,7 +498,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         true,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return super.default(value as any) as any;
@@ -395,7 +514,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         false,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return super.clearDefault() as any;
@@ -414,7 +534,8 @@ export class ObjectSchemaBuilder<
             ? RespectPropsOptionality<TProperties>
             : TExplicitType) & { readonly [K in BRAND]: TBrand },
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return super.brand(_name);
@@ -436,7 +557,8 @@ export class ObjectSchemaBuilder<
                 : TExplicitType
         >,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return super.readonly();
@@ -1292,7 +1414,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.createFromProps({
@@ -1311,7 +1434,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.createFromProps({
@@ -1331,7 +1455,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         T,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.createFromProps({
@@ -1348,11 +1473,147 @@ export class ObjectSchemaBuilder<
         TNullable,
         undefined,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
+        } as any) as any;
+    }
+
+    /**
+     * Appends a constructor overload to the object schema.
+     *
+     * Each call extends the set of construct signatures on the inferred type by
+     * one overload.  The accumulated argument lists are taken from the
+     * `FunctionSchemaBuilder` passed in — specifically from the positional
+     * parameter schemas registered via `.addParameter()`.
+     *
+     * At **runtime** the schema continues to validate plain objects; the
+     * constructor information is purely a TypeScript-level annotation and is
+     * stored in `introspect().constructorSchemas` for tooling use.
+     *
+     * Multiple calls are supported and produce **overloaded** construct
+     * signatures in the inferred type, modelling a class that exposes several
+     * constructor overloads.
+     *
+     * @param schema - A `FunctionSchemaBuilder` describing one constructor
+     *   overload.  Use `.addParameter()` on the function schema to declare the
+     *   parameter types.  The return type, if set via `.hasReturnType()`, is
+     *   ignored — the return type of a constructor is always the instance type
+     *   derived from the object schema's properties.
+     *
+     * @returns A new `ObjectSchemaBuilder` whose `TConstructorSchemas` tuple has
+     *   been extended by `schema`, updating `InferType` to include the new
+     *   construct signature.
+     *
+     * @example
+     * ```ts
+     * import { object, string, number, func, InferType } from '@cleverbrush/schema';
+     *
+     * // Single constructor
+     * const PersonSchema = object({ name: string(), age: number() })
+     *     .addConstructor(
+     *         func().addParameter(string()).addParameter(number())
+     *     );
+     *
+     * type Person = InferType<typeof PersonSchema>;
+     * // → { new (p0: string, p1: number): { name: string; age: number } }
+     * //   & { name: string; age: number }
+     * ```
+     *
+     * @example
+     * ```ts
+     * import { object, string, number, func, InferType } from '@cleverbrush/schema';
+     *
+     * // Multiple constructors via chained calls → overloaded signatures
+     * const PointSchema = object({ x: number(), y: number() })
+     *     .addConstructor(func())                                     // no-arg ctor
+     *     .addConstructor(func().addParameter(number()).addParameter(number())); // (x, y) ctor
+     *
+     * type Point = InferType<typeof PointSchema>;
+     * // → { new (): { x: number; y: number } }
+     * //   & { new (p0: number, p1: number): { x: number; y: number } }
+     * //   & { x: number; y: number }
+     *
+     * // Validation still operates on plain objects — the constructor type is
+     * // a compile-time annotation only.
+     * const result = PointSchema.validate({ x: 1, y: 2 });
+     * // result.valid === true
+     *
+     * // Introspect the registered constructor schemas at runtime:
+     * const info = PointSchema.introspect();
+     * // info.constructorSchemas.length === 2
+     * ```
+     */
+    public addConstructor<TFunc extends SchemaBuilder<any, any, any, any, any>>(
+        schema: TFunc
+    ): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions,
+        [...TConstructorSchemas, TFunc]
+    > &
+        TExtensions {
+        if (!(schema instanceof SchemaBuilder)) {
+            throw new Error(
+                'schema must be an instance of the SchemaBuilder class'
+            );
+        }
+
+        return this.createFromProps({
+            ...this.introspect(),
+            constructorSchemas: [...this.#constructorSchemas, schema]
+        } as any) as any;
+    }
+
+    /**
+     * Removes all constructor overloads previously registered via
+     * `.addConstructor()`, resetting the `TConstructorSchemas` tuple to `[]`.
+     *
+     * After calling this method `InferType` reverts to the plain object type
+     * derived from the schema's properties — no construct signatures are
+     * included.
+     *
+     * `introspect().constructorSchemas` will return an empty array.
+     *
+     * @returns A new `ObjectSchemaBuilder` with `TConstructorSchemas = []`.
+     *
+     * @example
+     * ```ts
+     * import { object, string, func, InferType } from '@cleverbrush/schema';
+     *
+     * const WithCtor = object({ name: string() })
+     *     .addConstructor(func().addParameter(string()));
+     *
+     * type WithCtorType = InferType<typeof WithCtor>;
+     * // → { new (p0: string): { name: string } } & { name: string }
+     *
+     * const Plain = WithCtor.clearConstructor();
+     *
+     * type PlainType = InferType<typeof Plain>;
+     * // → { name: string }
+     *
+     * Plain.introspect().constructorSchemas; // []
+     * ```
+     */
+    public clearConstructor(): ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions,
+        []
+    > &
+        TExtensions {
+        return this.createFromProps({
+            ...this.introspect(),
+            constructorSchemas: []
         } as any) as any;
     }
 
@@ -1376,7 +1637,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         if (typeof propName !== 'string' || !propName) {
@@ -1416,7 +1678,10 @@ export class ObjectSchemaBuilder<
      */
     public optimize(): SchemaBuilder<
         undefined extends TExplicitType
-            ? Id<RespectPropsOptionality<TProperties>>
+            ? WithConstructors<
+                  TConstructorSchemas,
+                  Id<RespectPropsOptionality<TProperties>>
+              >
             : TExplicitType,
         TRequired,
         TNullable,
@@ -1444,7 +1709,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         undefined,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
 
@@ -1453,7 +1719,7 @@ export class ObjectSchemaBuilder<
      * @param schema an instance of `ObjectSchemaBuilder`
      */
     public addProps<
-        K extends ObjectSchemaBuilder<any, any, any, any, any, any>
+        K extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
         schema: K
     ): K extends ObjectSchemaBuilder<infer TProp, infer _, any, infer __>
@@ -1463,7 +1729,8 @@ export class ObjectSchemaBuilder<
               TNullable,
               TExplicitType,
               THasDefault,
-              TExtensions
+              TExtensions,
+              TConstructorSchemas
           > &
               TExtensions
         : never;
@@ -1514,7 +1781,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
     /**
@@ -1530,7 +1798,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
     /**
@@ -1553,7 +1822,8 @@ export class ObjectSchemaBuilder<
               TNullable,
               TExplicitType,
               THasDefault,
-              TExtensions
+              TExtensions,
+              TConstructorSchemas
           > &
               TExtensions
         : never;
@@ -1641,7 +1911,7 @@ export class ObjectSchemaBuilder<
      * @param schema an object schema to take properties from
      */
     public intersect<
-        T extends ObjectSchemaBuilder<any, any, any, any, any, any>
+        T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
         schema: T
     ): T extends ObjectSchemaBuilder<
@@ -1656,7 +1926,8 @@ export class ObjectSchemaBuilder<
               TNullable,
               TExplType,
               THasDefault,
-              TExtensions
+              TExtensions,
+              TConstructorSchemas
           > &
               TExtensions
         : never {
@@ -1698,7 +1969,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
     /**
@@ -1713,7 +1985,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
     /**
@@ -1729,7 +2002,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
 
@@ -1853,7 +2127,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         const newProps: Record<
@@ -1891,7 +2166,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         undefined,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
     /**
@@ -1900,7 +2176,9 @@ export class ObjectSchemaBuilder<
      * `schema` object schema.
      * @param schema schema to take property names list from
      */
-    public pick<K extends ObjectSchemaBuilder<any, any, any, any, any, any>>(
+    public pick<
+        K extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    >(
         schema: K
     ): K extends ObjectSchemaBuilder<infer TProps, infer _, any, infer __>
         ? ObjectSchemaBuilder<
@@ -1909,7 +2187,8 @@ export class ObjectSchemaBuilder<
               TNullable,
               undefined,
               THasDefault,
-              TExtensions
+              TExtensions,
+              TConstructorSchemas
           > &
               TExtensions
         : never;
@@ -1928,7 +2207,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         undefined,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions;
 
@@ -2014,7 +2294,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         if (typeof propName !== 'string' || !propName) {
@@ -2060,7 +2341,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.modifyPropSchema(prop, builder =>
@@ -2082,7 +2364,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.modifyPropSchema(prop, builder =>
@@ -2100,7 +2383,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.createFromProps({
@@ -2125,7 +2409,8 @@ export class ObjectSchemaBuilder<
         TNullable,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > &
         TExtensions {
         return this.createFromProps({
@@ -2395,7 +2680,8 @@ export class ObjectSchemaBuilder<
         true,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > {
         return super.nullable() as any;
     }
@@ -2406,7 +2692,8 @@ export class ObjectSchemaBuilder<
         false,
         TExplicitType,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TConstructorSchemas
     > {
         return super.notNullable() as any;
     }
@@ -2470,7 +2757,7 @@ const object = (props => {
 }) as Object;
 
 type PropertyDescriptorMap = Map<
-    ObjectSchemaBuilder<any, any, any, any, any, any>,
+    ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     PropertyDescriptorMap | PropertyDescriptorTree<any, any>
 >;
 
@@ -2603,8 +2890,19 @@ const createExternProxyDescriptor = (
         any,
         any,
         any,
+        any,
+        any,
+        any,
         any
-    > = ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>
+    > = ObjectSchemaBuilder<
+        TProperties,
+        TRequired,
+        false,
+        TExplicitType,
+        false,
+        {},
+        []
+    >
 >(
     schema: ObjectSchemaBuilder<TProperties, TRequired, false, TExplicitType>
 ): PropertyDescriptorTree<TSchema, TSchema> =>

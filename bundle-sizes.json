@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-04-10T13:42:57.032Z",
+  "generatedAt": "2026-04-10T14:32:14.748Z",
   "entries": [
     {
       "label": "@cleverbrush/schema",
       "description": "full",
       "import": "@cleverbrush/schema",
-      "gzip": 15729,
-      "brotli": 13606
+      "gzip": 15781,
+      "brotli": 13629
     },
     {
       "label": "@cleverbrush/schema/core",
       "description": "no built-in extensions",
       "import": "@cleverbrush/schema/core",
-      "gzip": 14508,
-      "brotli": 12494
+      "gzip": 14560,
+      "brotli": 12538
     },
     {
       "label": "@cleverbrush/schema/string",
@@ -33,8 +33,8 @@
       "label": "@cleverbrush/schema/object",
       "description": "",
       "import": "@cleverbrush/schema/object",
-      "gzip": 6432,
-      "brotli": 5828
+      "gzip": 6492,
+      "brotli": 5880
     },
     {
       "label": "@cleverbrush/schema/array",

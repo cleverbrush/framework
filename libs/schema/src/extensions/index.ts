@@ -118,7 +118,7 @@ export type ExtendedDate = DateSchemaBuilder<Date, true, false, false, {}> &
 /** An `ObjectSchemaBuilder` with built-in extension methods. */
 export type ExtendedObject<
     TProps extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}
-> = ObjectSchemaBuilder<TProps, true, false, undefined, false, {}> &
+> = ObjectSchemaBuilder<TProps, true, false, undefined, false, {}, []> &
     HiddenExtensionMethods;
 
 /** A `UnionSchemaBuilder` with built-in extension methods. */

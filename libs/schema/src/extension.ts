@@ -102,7 +102,7 @@ type BuilderMap = {
     number: NumberSchemaBuilder<any, any, any, any, any>;
     boolean: BooleanSchemaBuilder<any, any, any, any, any, any, any>;
     date: DateSchemaBuilder<any, any, any, any, any>;
-    object: ObjectSchemaBuilder<any, any, any, any, any, any>;
+    object: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
     array: ArraySchemaBuilder<any, any, any, any, any, any, any>;
     tuple: TupleSchemaBuilder<any, any, any, any, any, any, any>;
     record: RecordSchemaBuilder<any, any, any, any, any, any, any>;
@@ -332,7 +332,7 @@ type ExtendedObjectFactory<TExt> = <
 >(
     properties?: P
 ) => CleanExtended<
-    ObjectSchemaBuilder<P, true, false, undefined, false, TExt>,
+    ObjectSchemaBuilder<P, true, false, undefined, false, TExt, []>,
     TExt
 >;
 

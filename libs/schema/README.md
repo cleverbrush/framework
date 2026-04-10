@@ -3,11 +3,11 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- bundle-badge-start -->
-[![Bundle size](https://img.shields.io/badge/bundle-17.6%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![Bundle size](https://img.shields.io/badge/bundle-17.7%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-98.5%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-98.4%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).
@@ -241,6 +241,51 @@ const optionalHandler = func()
 
 type OptionalHandler = InferType<typeof optionalHandler>;
 // → ((param0: string, param1: boolean, ...args: any[]) => boolean) | undefined
+```
+
+## Constructor Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/constructor-schema)
+
+Use `.addConstructor(funcSchema)` on an `object()` schema to declare one or more constructor overloads. Each call appends a `FunctionSchemaBuilder` to an accumulated list; the inferred TypeScript type becomes an intersection of all construct signatures and the plain instance type.
+
+- **`.addConstructor(funcSchema)`** — appends a constructor overload. Each call extends the inferred tuple of constructor schemas. Chainable.
+- **`.clearConstructor()`** — resets constructor schemas to an empty list, removing all construct signatures from the inferred type.
+- **`introspect().constructorSchemas`** — array of all accumulated constructor `FunctionSchemaBuilder` schemas.
+
+Constructor signatures are **type-only**: runtime `validate()` continues to validate plain objects as before.
+
+```typescript
+import { object, func, string, number, InferType } from '@cleverbrush/schema';
+
+// Single constructor overload
+const PersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()));
+
+type Person = InferType<typeof PersonSchema>;
+// → { new(p0: string): { name: string; age: number } } & { name: string; age: number }
+
+// Multiple chained constructors → overloaded construct signatures
+const FlexPersonSchema = object({ name: string(), age: number() })
+    .addConstructor(func().addParameter(string()))
+    .addConstructor(func().addParameter(string()).addParameter(number()));
+
+type FlexPerson = InferType<typeof FlexPersonSchema>;
+// → { new(p0: string): { name: string; age: number } }
+// & { new(p0: string, p1: number): { name: string; age: number } }
+// & { name: string; age: number }
+
+// Runtime validation is unchanged — plain objects still validate
+FlexPersonSchema.validate({ name: 'Alice', age: 30 }); // { valid: true }
+
+// Introspect constructor schemas at runtime
+const { constructorSchemas } = FlexPersonSchema.introspect();
+// constructorSchemas.length → 2
+
+// Remove all constructor signatures
+const PlainSchema = FlexPersonSchema.clearConstructor();
+type Plain = InferType<typeof PlainSchema>;
+// → { name: string; age: number }
 ```
 
 ## Promise Schemas
