@@ -2332,6 +2332,217 @@ type NotRequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any,
     [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, infer THasDef> ? TReq extends true ? THasDef extends true ? k : never : k : never]: T[k];
 };
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/PromiseSchemaBuilder.d.ts": `import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+type PromiseSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<PromiseSchemaBuilder<R>['introspect']>>;
+/**
+ * Schema builder for \`Promise\` values. Validates that a value is an instance
+ * of \`Promise\` and optionally carries a typed resolved-value schema so that
+ * the inferred TypeScript type is \`Promise<T>\` instead of \`Promise<any>\`.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link promise | promise()} function instead.
+ *
+ * @example Basic validation
+ * \`\`\`ts
+ * const schema = promise();
+ * const result = schema.validate(Promise.resolve(42));
+ * // result.valid === true
+ * \`\`\`
+ *
+ * @example Optional promise schema
+ * \`\`\`ts
+ * const schema = promise().optional();
+ * const result = schema.validate(undefined);
+ * // result.valid === true
+ * // result.object === undefined
+ * \`\`\`
+ *
+ * @example Typed resolved value
+ * \`\`\`ts
+ * import { promise, string, InferType } from '@cleverbrush/schema';
+ *
+ * const schema = promise(string());
+ *
+ * type PromiseResult = InferType<typeof schema>;
+ * // → Promise<string>
+ *
+ * // Introspect at runtime
+ * const info = schema.introspect();
+ * // info.resolvedType → StringSchemaBuilder
+ * \`\`\`
+ *
+ * @see {@link promise}
+ */
+export declare class PromiseSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResolvedTypeSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? TResolvedTypeSchema extends SchemaBuilder<any, any, any, any, any> ? Promise<InferType<TResolvedTypeSchema>> : Promise<any> : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+    #private;
+    /**
+     * @hidden
+     */
+    static create(props: PromiseSchemaBuilderCreateProps<any>): PromiseSchemaBuilder<true, false, undefined, false, {}, undefined, Promise<any>>;
+    protected constructor(props: PromiseSchemaBuilderCreateProps<TRequired>);
+    /**
+     * @hidden
+     */
+    hasType<T>(_notUsed?: T): PromiseSchemaBuilder<true, TNullable, T, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearHasType(): PromiseSchemaBuilder<TRequired, TNullable, undefined, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * Returns an object describing the current schema configuration.
+     *
+     * In addition to the base fields exposed by {@link SchemaBuilder.introspect},
+     * the following field is included:
+     *
+     * - \`resolvedType\` — the {@link SchemaBuilder} set via {@link hasResolvedType},
+     *   or \`undefined\` when no resolved-type schema has been configured.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = promise(string());
+     *
+     * const info = schema.introspect();
+     * // info.resolvedType instanceof StringSchemaBuilder
+     * \`\`\`
+     */
+    introspect(): {
+        /** Resolved-value schema set via {@link hasResolvedType}, or \`undefined\` if not set. */
+        resolvedType: SchemaBuilder<any, any, any, any, any> | undefined;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+    };
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    /**
+     * Performs synchronous validation of the schema over \`object\`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /**
+     * Performs async validation of the schema over \`object\`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected createFromProps<TReq extends boolean>(props: PromiseSchemaBuilderCreateProps<TReq>): this;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): PromiseSchemaBuilder<true, TNullable, TExplicitType, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): PromiseSchemaBuilder<false, TNullable, TExplicitType, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): PromiseSchemaBuilder<true, TNullable, TExplicitType, true, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): PromiseSchemaBuilder<TRequired, TNullable, TExplicitType, false, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): PromiseSchemaBuilder<TRequired, TNullable, TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * Marks the inferred type as \`Readonly<Promise<T>>\`. Sets the
+     * \`isReadonly\` introspection flag for tooling consistency.
+     *
+     * @see {@link SchemaBuilder.readonly}
+     */
+    readonly(): PromiseSchemaBuilder<TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): PromiseSchemaBuilder<TRequired, true, TExplicitType, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): PromiseSchemaBuilder<TRequired, false, TExplicitType, THasDefault, TExtensions, TResolvedTypeSchema> & TExtensions;
+    /**
+     * Sets the schema for the resolved value of the \`Promise\`.
+     *
+     * The inferred TypeScript type becomes \`Promise<T>\` where \`T\` is the type
+     * produced by \`schema\`. The schema is accessible at runtime via
+     * \`introspect().resolvedType\`.
+     *
+     * @param schema - The schema describing the resolved value of the promise.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = promise().hasResolvedType(string());
+     *
+     * type Resolved = InferType<typeof schema>;
+     * // → Promise<string>
+     *
+     * schema.introspect().resolvedType; // StringSchemaBuilder
+     * \`\`\`
+     */
+    hasResolvedType<TSchema extends SchemaBuilder<any, any, any, any, any>>(schema: TSchema): PromiseSchemaBuilder<TRequired, TNullable, TExplicitType, THasDefault, TExtensions, TSchema> & TExtensions;
+}
+/**
+ * Creates a \`promise\` schema that validates the value is a JavaScript \`Promise\`.
+ *
+ * The returned builder is immutable and fully chainable. Pass an optional
+ * schema to {@link promise} to annotate the type of the resolved value —
+ * the inferred TypeScript type becomes \`Promise<T>\`.
+ *
+ * Alternatively, call {@link PromiseSchemaBuilder.hasResolvedType} on the
+ * returned builder to set or replace the resolved-value schema at any point
+ * in the chain.
+ *
+ * @param resolvedTypeSchema - Optional schema describing the resolved value of
+ *   the promise. When provided, \`InferType<typeof schema>\` becomes
+ *   \`Promise<InferType<typeof resolvedTypeSchema>>\`.
+ *
+ * @returns A new {@link PromiseSchemaBuilder} with \`isRequired\` set to \`true\`.
+ *
+ * @example
+ * \`\`\`ts
+ * import { promise, string, number, InferType } from '@cleverbrush/schema';
+ *
+ * // Untyped — accepts any Promise
+ * const anyPromise = promise();
+ * type AnyPromise = InferType<typeof anyPromise>; // Promise<any>
+ *
+ * anyPromise.validate(Promise.resolve(42));  // { valid: true }
+ * anyPromise.validate('not a promise' as any); // { valid: false }
+ *
+ * // Typed resolved value
+ * const stringPromise = promise(string());
+ * type StringPromise = InferType<typeof stringPromise>; // Promise<string>
+ *
+ * // Optional promise
+ * const optPromise = promise(number()).optional();
+ * type OptPromise = InferType<typeof optPromise>; // Promise<number> | undefined
+ * \`\`\`
+ *
+ * @see {@link PromiseSchemaBuilder}
+ */
+export declare function promise(): PromiseSchemaBuilder<true>;
+export declare function promise<TSchema extends SchemaBuilder<any, any, any, any, any>>(resolvedTypeSchema: TSchema): PromiseSchemaBuilder<true, false, undefined, false, {}, TSchema>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/PropertyValidationResult.d.ts": `import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 import { type InferType, type NestedValidationResult, type PropertyDescriptorInner, type PropertyDescriptorTree } from './SchemaBuilder.js';
 /**
@@ -4468,6 +4679,7 @@ export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.j
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export { ExternSchemaBuilder, extern } from './builders/ExternSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
+export { PromiseSchemaBuilder, promise } from './builders/PromiseSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
@@ -5222,6 +5434,7 @@ import type { DateSchemaBuilder } from '../builders/DateSchemaBuilder.js';
 import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js';
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
+import type { PromiseSchemaBuilder } from '../builders/PromiseSchemaBuilder.js';
 import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
 import type { SchemaBuilder, ValidationErrorMessageProvider } from '../builders/SchemaBuilder.js';
 import type { StringSchemaBuilder } from '../builders/StringSchemaBuilder.js';
@@ -5250,6 +5463,8 @@ export type ExtendedObject<TProps extends Record<string, SchemaBuilder<any, any,
 export type ExtendedUnion<TOptions extends readonly SchemaBuilder<any, any, any, any, any>[]> = UnionSchemaBuilder<TOptions, true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`FunctionSchemaBuilder\` with built-in extension methods. */
 export type ExtendedFunc = FunctionSchemaBuilder<true, false, undefined, false, {}> & HiddenExtensionMethods;
+/** A \`PromiseSchemaBuilder\` with built-in extension methods. */
+export type ExtendedPromise<TResolvedTypeSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined> = PromiseSchemaBuilder<true, false, undefined, false, {}, TResolvedTypeSchema> & HiddenExtensionMethods;
 /** An \`AnySchemaBuilder\` with built-in extension methods. */
 export type ExtendedAny = AnySchemaBuilder<true, false, undefined, false, {}> & HiddenExtensionMethods;
 /** A \`TupleSchemaBuilder\` with built-in extension methods. */
@@ -5277,6 +5492,7 @@ export declare const func: () => ExtendedFunc;
 export declare const any: () => ExtendedAny;
 export declare const tuple: <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => ExtendedTuple<TElements>;
 export declare const record: <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => ExtendedRecord<TKeySchema, TValueSchema>;
+export { promise } from '../builders/PromiseSchemaBuilder.js';
 /**
  * Creates a string schema constrained to the given literal values.
  *
@@ -5947,12 +6163,13 @@ export declare function resolveErrorMessageAsync(provider: ValidationErrorMessag
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/index.d.ts": `export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';
 export { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 export * from './core.js';
-export { type ArrayBuiltinExtensions, any, array, arrayExtensions, boolean, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, enumOf, func, type NumberBuiltinExtensions, type NumberOneOfExtension, number, numberExtensions, object, record, type StringBuiltinExtensions, type StringOneOfExtension, string, stringExtensions, tuple, union } from './extensions/index.js';
+export { type ArrayBuiltinExtensions, any, array, arrayExtensions, boolean, date, type ExtendedAny, type ExtendedArray, type ExtendedBoolean, type ExtendedDate, type ExtendedFunc, type ExtendedNumber, type ExtendedObject, type ExtendedPromise, type ExtendedRecord, type ExtendedString, type ExtendedTuple, type ExtendedUnion, enumOf, func, type NumberBuiltinExtensions, type NumberOneOfExtension, number, numberExtensions, object, promise, record, type StringBuiltinExtensions, type StringOneOfExtension, string, stringExtensions, tuple, union } from './extensions/index.js';
 `,
     "file:///node_modules/@cleverbrush/schema/utils/transaction.d.ts": `/**
  * Options for customizing transaction behavior.

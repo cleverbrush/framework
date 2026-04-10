@@ -15,7 +15,8 @@ export default defineConfig({
         'src/builders/FunctionSchemaBuilder.ts',
         'src/builders/TupleSchemaBuilder.ts',
         'src/builders/RecordSchemaBuilder.ts',
-        'src/builders/ExternSchemaBuilder.ts'
+        'src/builders/ExternSchemaBuilder.ts',
+        'src/builders/PromiseSchemaBuilder.ts'
     ],
     format: ['esm'],
     tsconfig: './tsconfig.build.json',

@@ -130,6 +130,7 @@ The following builder functions are available:
 | `boolean()`     | Boolean value.                                    | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
 | `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
 | `func()`        | Function value. Supports typed parameter and return-type schemas. | `.addParameter(schema)`, `.hasReturnType(schema)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
+| `promise(schema?)` | JavaScript `Promise`. Optionally typed resolved value via `promise(schema)` or `.hasResolvedType(schema)`. | `.hasResolvedType(schema)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`, `.default(value)`                                                   |
 | `object(props)` | Object with typed properties. Supports nesting.   | `.validate(data)`, `.addProps({...})`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`            |
 | `array()`       | Array with optional element schema (via `.of()`). | `.minLength(n)`, `.maxLength(n)`, `.of(schema)`, `.nonempty()`, `.unique()`, `.nullable()`, `.notNullable()`, `.default(value)` |
@@ -242,7 +243,46 @@ type OptionalHandler = InferType<typeof optionalHandler>;
 // → ((param0: string, param1: boolean, ...args: any[]) => boolean) | undefined
 ```
 
-## Record Schemas
+## Promise Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/promise-schema)
+
+Use `promise()` to validate that a value is a JavaScript `Promise`. Pass an optional schema to type the resolved value — the inferred TypeScript type becomes `Promise<T>`. You can also call `.hasResolvedType(schema)` on the returned builder to set or replace the resolved-value schema.
+
+- **`promise(schema?)`** — factory shorthand. When `schema` is provided the inferred type is `Promise<InferType<typeof schema>>`.
+- **`.hasResolvedType(schema)`** — sets the resolved-value schema; replaces any previously set one. Accessible via `introspect().resolvedType`.
+
+```typescript
+import { promise, string, number, InferType } from '@cleverbrush/schema';
+
+// Untyped — validates that the value is any Promise
+const anyPromise = promise();
+anyPromise.validate(Promise.resolve(42));     // { valid: true }
+anyPromise.validate('not a promise' as any); // { valid: false }
+
+// Typed resolved value via factory argument
+const stringPromise = promise(string());
+type StringPromise = InferType<typeof stringPromise>;
+// → Promise<string>
+
+// Typed resolved value via fluent method
+const numPromise = promise().hasResolvedType(number());
+type NumPromise = InferType<typeof numPromise>;
+// → Promise<number>
+
+// Introspect at runtime
+const info = numPromise.introspect();
+// info.resolvedType → NumberSchemaBuilder
+
+// Optional promise — undefined is also accepted
+const optPromise = promise(string()).optional();
+type OptPromise = InferType<typeof optPromise>;
+// → Promise<string> | undefined
+
+optPromise.validate(undefined as any); // { valid: true }
+```
+
+
 
 [▶ Open in Playground](https://docs.cleverbrush.com/playground/record-basics)
 
@@ -1299,9 +1339,9 @@ Define a schema once and use it for runtime validation, object mapping between d
 
 ## Exports
 
-**Builder functions:** `any`, `lazy`, `string`, `number`, `boolean`, `func`, `object`, `date`, `array`, `union`
+**Builder functions:** `any`, `lazy`, `string`, `number`, `boolean`, `func`, `promise`, `object`, `date`, `array`, `union`
 
-**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
+**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `PromiseSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
 
 **Extension system:** `defineExtension`, `withExtensions`, `stringExtensions`, `numberExtensions`, `arrayExtensions`, `nullableExtension`
 
