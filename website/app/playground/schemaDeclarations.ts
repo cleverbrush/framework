@@ -1209,6 +1209,299 @@ export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNu
 export declare const func: () => FunctionSchemaBuilder<true>;
 export {};
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/GenericSchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+type GenericSchemaBuilderCreateProps<TRequired extends boolean = true> = Partial<ReturnType<GenericSchemaBuilder<any, TRequired>['introspect']>>;
+/**
+ * Schema builder that wraps a generic template function, enabling reusable
+ * parameterized schemas. Call {@link GenericSchemaBuilder.apply | \`.apply()\`}
+ * with concrete schema arguments to obtain a fully typed concrete schema
+ * builder whose TypeScript type is inferred from the template function's
+ * generic signature.
+ *
+ * **NOTE** this class is exported only to give opportunity to extend it
+ * by inheriting. It is not recommended to create an instance of this class
+ * directly. Use {@link generic | generic()} function instead.
+ *
+ * @example Single type parameter
+ * \`\`\`ts
+ * import { generic, object, array, number, string, InferType } from '@cleverbrush/schema';
+ *
+ * const PaginatedList = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({
+ *       items: array(itemSchema),
+ *       total: number(),
+ *       page:  number(),
+ *     })
+ * );
+ *
+ * const userSchema = object({ name: string(), age: number() });
+ * const PaginatedUsers = PaginatedList.apply(userSchema);
+ *
+ * type PaginatedUsersType = InferType<typeof PaginatedUsers>;
+ * // → { items: { name: string; age: number }[]; total: number; page: number }
+ * \`\`\`
+ *
+ * @example Multiple type parameters
+ * \`\`\`ts
+ * const Result = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>,
+ *    E extends SchemaBuilder<any, any, any, any, any>>(
+ *     valueSchema: T,
+ *     errorSchema: E
+ *   ) =>
+ *     object({
+ *       ok:    boolean(),
+ *       value: valueSchema.optional(),
+ *       error: errorSchema.optional(),
+ *     })
+ * );
+ *
+ * const StringResult = Result.apply(string(), number());
+ * // InferType → { ok: boolean; value?: string; error?: number }
+ * \`\`\`
+ *
+ * @example With default arguments (enables direct \`.validate()\` on the template)
+ * \`\`\`ts
+ * const AnyList = generic(
+ *   [any()],   // default args — one per template parameter
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({ items: array(itemSchema), total: number() })
+ * );
+ *
+ * // Validate directly using defaults:
+ * AnyList.validate({ items: [1, 'two', true], total: 3 }); // valid
+ *
+ * // Or apply concrete schemas first:
+ * AnyList.apply(string()).validate({ items: ['a', 'b'], total: 2 }); // valid
+ * \`\`\`
+ *
+ * @see {@link generic}
+ *
+ * @typeParam TFn - The generic template function type. Its return type
+ *   determines \`TResult\` (the validated value type) when no explicit type
+ *   override has been applied via \`.hasType<T>()\`.
+ * @typeParam TRequired - \`true\` when the schema is required (default),
+ *   \`false\` after calling \`.optional()\`. Governs whether \`undefined\` is a
+ *   valid value.
+ * @typeParam TNullable - \`true\` after calling \`.nullable()\`. Governs whether
+ *   \`null\` is a valid value.
+ * @typeParam TExplicitType - Type override set via \`.hasType<T>()\`. When
+ *   \`undefined\` (the default), \`TResult\` is derived from \`TFn\`'s return type.
+ * @typeParam THasDefault - \`true\` after calling \`.default(value)\`. Governs
+ *   whether \`InferType\` emits \`T\` instead of \`T | undefined\` for optional
+ *   schemas with a default.
+ * @typeParam TExtensions - Object type carrying extension methods added via
+ *   \`withExtensions()\`. Defaults to \`{}\`.
+ * @typeParam TResult - The inferred result type: \`TExplicitType\` when set,
+ *   otherwise the value type inferred from \`ReturnType<TFn>\`.
+ */
+export declare class GenericSchemaBuilder<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TResult = TExplicitType extends undefined ? ReturnType<TFn> extends SchemaBuilder<infer R, any, any, any, any> ? R : any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+    #private;
+    /**
+     * Applies the template function with concrete schema arguments, returning
+     * a fully typed concrete schema builder. TypeScript infers the result type
+     * from the template function's own generic signature.
+     *
+     * The returned builder is independent of this \`GenericSchemaBuilder\` and
+     * can be used like any other schema: \`.validate()\`, \`.optional()\`, etc.
+     *
+     * @example
+     * \`\`\`ts
+     * const Wrapper = generic(
+     *   <T extends SchemaBuilder<any, any, any, any, any>>(schema: T) =>
+     *     object({ data: schema })
+     * );
+     *
+     * const s = Wrapper.apply(string());
+     * // InferType<typeof s> → { data: string }
+     * s.validate({ data: 'hello' }); // { valid: true }
+     * \`\`\`
+     */
+    readonly apply: TFn;
+    /**
+     * @hidden
+     */
+    static create(props: GenericSchemaBuilderCreateProps<any>): GenericSchemaBuilder<(...args: any[]) => SchemaBuilder<any, any, any, any, any>, true, false, undefined, false, {}, any>;
+    protected constructor(props: GenericSchemaBuilderCreateProps<TRequired>);
+    /**
+     * Returns an object describing the current schema configuration.
+     *
+     * In addition to the base fields exposed by {@link SchemaBuilder.introspect},
+     * the following fields are included:
+     *
+     * - \`templateFn\` — the template function passed to {@link generic}.
+     * - \`defaults\` — the default argument list passed to the two-argument
+     *   form of {@link generic}, or \`undefined\` when no defaults were provided.
+     *
+     * @example
+     * \`\`\`ts
+     * const schema = generic([string()], <T>(s: T) => object({ data: s }));
+     *
+     * const info = schema.introspect();
+     * // info.type         → 'generic'
+     * // info.templateFn   → [Function]
+     * // info.defaults     → [StringSchemaBuilder]
+     * \`\`\`
+     */
+    introspect(): {
+        /** Template function passed to {@link generic}. */
+        templateFn: ((...args: any[]) => SchemaBuilder<any, any, any, any, any>) | undefined;
+        /** Default positional arguments for the template function, or \`undefined\`. */
+        defaults: readonly any[] | undefined;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+    };
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    /**
+     * Performs synchronous validation of the schema over \`object\`.
+     * Throws if any preprocessor, validator, or error message provider returns a Promise.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    protected _validate(object: TResult, context?: ValidationContext): ValidationResult<TResult>;
+    /**
+     * Performs async validation of the schema over \`object\`.
+     * Supports async preprocessors, validators, and error message providers.
+     * @param context Optional \`ValidationContext\` settings.
+     */
+    protected _validateAsync(object: TResult, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected createFromProps<TReq extends boolean>(props: GenericSchemaBuilderCreateProps<TReq>): this;
+    /**
+     * @hidden
+     */
+    hasType<T>(_notUsed?: T): GenericSchemaBuilder<TFn, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearHasType(): GenericSchemaBuilder<TFn, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): GenericSchemaBuilder<TFn, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): GenericSchemaBuilder<TFn, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): GenericSchemaBuilder<TFn, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): GenericSchemaBuilder<TFn, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): GenericSchemaBuilder<TFn, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): GenericSchemaBuilder<TFn, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): GenericSchemaBuilder<TFn, TRequired, TNullable, TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    readonly(): GenericSchemaBuilder<TFn, TRequired, TNullable, Readonly<TResult>, THasDefault, TExtensions> & TExtensions;
+}
+/**
+ * Creates a generic schema template — a reusable, parameterized schema factory
+ * whose TypeScript type is inferred from the template function's generic
+ * signature.
+ *
+ * Call {@link GenericSchemaBuilder.apply | \`.apply()\`} on the returned builder
+ * to instantiate the template with concrete schema arguments and receive a
+ * fully typed concrete schema.
+ *
+ * There are two overloads:
+ *
+ * 1. **\`generic(templateFn)\`** — Provide only the template function. The
+ *    template must be called via \`.apply()\` before validation.
+ * 2. **\`generic(defaults, templateFn)\`** — Provide positional default arguments
+ *    followed by the template function. The template can be validated directly
+ *    using those defaults (without calling \`.apply()\` first).
+ *
+ * @param templateFn - A (generic) function that accepts schema arguments and
+ *   returns a concrete schema. TypeScript infers the result type from this
+ *   function's generic signature when \`.apply()\` is called.
+ *
+ * @returns A new {@link GenericSchemaBuilder} with \`isRequired\` set to \`true\`.
+ *
+ * @example Single type parameter
+ * \`\`\`ts
+ * import { generic, object, array, number, string, any, InferType } from '@cleverbrush/schema';
+ *
+ * const PaginatedList = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({ items: array(itemSchema), total: number(), page: number() })
+ * );
+ *
+ * const UserList = PaginatedList.apply(object({ name: string() }));
+ * type UserListType = InferType<typeof UserList>;
+ * // → { items: { name: string }[]; total: number; page: number }
+ *
+ * UserList.validate({ items: [{ name: 'Alice' }], total: 1, page: 1 }); // valid
+ * \`\`\`
+ *
+ * @example Multiple type parameters
+ * \`\`\`ts
+ * const Result = generic(
+ *   <T extends SchemaBuilder<any, any, any, any, any>,
+ *    E extends SchemaBuilder<any, any, any, any, any>>(
+ *     valueSchema: T,
+ *     errorSchema: E
+ *   ) =>
+ *     union(
+ *       object({ ok: boolean().equalsTo(true),  value: valueSchema }),
+ *       object({ ok: boolean().equalsTo(false), error: errorSchema })
+ *     )
+ * );
+ *
+ * const StringResult = Result.apply(string(), number());
+ * \`\`\`
+ *
+ * @example With defaults (enables direct validation on the template)
+ * \`\`\`ts
+ * const AnyList = generic(
+ *   [any()],   // default args — positional, one per template parameter
+ *   <T extends SchemaBuilder<any, any, any, any, any>>(itemSchema: T) =>
+ *     object({ items: array(itemSchema), total: number() })
+ * );
+ *
+ * // Validate directly — uses the default any() schema:
+ * AnyList.validate({ items: [1, 'two'], total: 2 }); // valid
+ *
+ * // Or apply concrete schemas first:
+ * AnyList.apply(string()).validate({ items: ['x'], total: 1 }); // valid
+ * \`\`\`
+ *
+ * @see {@link GenericSchemaBuilder}
+ */
+export declare function generic<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>>(templateFn: TFn): GenericSchemaBuilder<TFn, true, false, undefined, false, {}>;
+export declare function generic<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>>(defaults: readonly any[], templateFn: TFn): GenericSchemaBuilder<TFn, true, false, undefined, false, {}>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/LazySchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type LazySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<LazySchemaBuilder<any, R>['introspect']>>;
 /**
@@ -4854,6 +5147,7 @@ export { BooleanSchemaBuilder, boolean } from './builders/BooleanSchemaBuilder.j
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export { ExternSchemaBuilder, extern } from './builders/ExternSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
+export { GenericSchemaBuilder, generic } from './builders/GenericSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
@@ -4940,6 +5234,7 @@ import { ArraySchemaBuilder } from './builders/ArraySchemaBuilder.js';
 import { BooleanSchemaBuilder } from './builders/BooleanSchemaBuilder.js';
 import { DateSchemaBuilder } from './builders/DateSchemaBuilder.js';
 import { FunctionSchemaBuilder } from './builders/FunctionSchemaBuilder.js';
+import { GenericSchemaBuilder } from './builders/GenericSchemaBuilder.js';
 import { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 import { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
@@ -4969,6 +5264,7 @@ type BuilderMap = {
     func: FunctionSchemaBuilder<any, any, any, any, any>;
     any: AnySchemaBuilder<any, any, any, any, any, any>;
     promise: PromiseSchemaBuilder<any, any, any, any, any>;
+    generic: GenericSchemaBuilder<any, any, any, any, any, any>;
 };
 type BuilderTypeName = keyof BuilderMap;
 /**
@@ -5096,6 +5392,7 @@ type ExtendedAnyFactory<TExt> = () => CleanExtended<AnySchemaBuilder<true, false
 type ExtendedTupleFactory<TExt> = <const TElements extends readonly SchemaBuilder<any, any, any, any, any>[]>(elements: [...TElements]) => CleanExtended<TupleSchemaBuilder<TElements, true, false, undefined, false, TExt>, TExt>;
 type ExtendedRecordFactory<TExt> = <TKeySchema extends StringSchemaBuilder<any, any, any, any>, TValueSchema extends SchemaBuilder<any, any, any, any, any>>(keySchema: TKeySchema, valueSchema: TValueSchema) => CleanExtended<RecordSchemaBuilder<TKeySchema, TValueSchema, true, false, undefined, false, TExt>, TExt>;
 type ExtendedPromiseFactory<TExt> = <TSchema extends SchemaBuilder<any, any, any, any, any>>(resolvedTypeSchema?: TSchema) => CleanExtended<PromiseSchemaBuilder<true, false, undefined, false, TExt, TSchema>, TExt>;
+type ExtendedGenericFactory<TExt> = <TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>>(templateFn: TFn) => CleanExtended<GenericSchemaBuilder<TFn, true, false, undefined, false, TExt>, TExt>;
 /**
  * The return type of {@link withExtensions}.
  *
@@ -5121,6 +5418,7 @@ type WithExtensionsResult<TExts extends readonly ExtensionDescriptor<any>[]> = {
     func: ExtendedFuncFactory<MergeExtensionMethods<TExts, 'func'>>;
     any: ExtendedAnyFactory<MergeExtensionMethods<TExts, 'any'>>;
     promise: ExtendedPromiseFactory<MergeExtensionMethods<TExts, 'promise'>>;
+    generic: ExtendedGenericFactory<MergeExtensionMethods<TExts, 'generic'>>;
 };
 /**
  * Defines an extension targeting one or more schema builder types.

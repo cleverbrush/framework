@@ -4,7 +4,7 @@
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](./LICENSE)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-97.1%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-96.9%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A monorepo of production-quality TypeScript libraries. Written with zero runtime dependencies, strict types, and a strong focus on correctness — every package ships with unit tests, full TypeScript type coverage, and automated CI on every pull request.

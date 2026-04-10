@@ -1,19 +1,19 @@
 {
-  "generatedAt": "2026-04-10T14:32:14.748Z",
+  "generatedAt": "2026-04-10T15:08:48.820Z",
   "entries": [
     {
       "label": "@cleverbrush/schema",
       "description": "full",
       "import": "@cleverbrush/schema",
-      "gzip": 15781,
-      "brotli": 13629
+      "gzip": 16089,
+      "brotli": 13893
     },
     {
       "label": "@cleverbrush/schema/core",
       "description": "no built-in extensions",
       "import": "@cleverbrush/schema/core",
-      "gzip": 14560,
-      "brotli": 12538
+      "gzip": 14840,
+      "brotli": 12789
     },
     {
       "label": "@cleverbrush/schema/string",

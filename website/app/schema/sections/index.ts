@@ -11,7 +11,12 @@ export const SECTION_GROUPS = [
     },
     {
         label: 'Composition',
-        slugs: ['immutability', 'discriminated-unions', 'recursive-schemas']
+        slugs: [
+            'immutability',
+            'discriminated-unions',
+            'recursive-schemas',
+            'generic-schemas'
+        ]
     },
     {
         label: 'Validation',
@@ -51,6 +56,11 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
     {
         slug: 'recursive-schemas',
         title: 'Recursive Schemas',
+        group: 'Composition'
+    },
+    {
+        slug: 'generic-schemas',
+        title: 'Generic Schemas',
         group: 'Composition'
     },
     { slug: 'validation', title: 'Validation', group: 'Validation' },
