@@ -311,9 +311,8 @@ export class ServiceCollection {
     }
 
     /**
-     * Freezes the service registrations and creates an immutable
-     * {@link ServiceProvider}. No further registrations can be made on this
-     * collection after calling this method.
+     * Creates a new {@link ServiceProvider} from the registrations currently
+     * contained in this collection.
      *
      * @param options - Optional {@link ServiceProviderOptions} to control
      *   provider behaviour (e.g. scope validation).
