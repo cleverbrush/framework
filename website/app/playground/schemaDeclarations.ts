@@ -1002,7 +1002,7 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  *     .hasReturnType(string());          // return type: string
  *
  * type Greet = InferType<typeof greet>;
- * // → (param0: string, param1?: number) => string
+ * // → (param0: string, param1: number | undefined) => string
  *
  * // Introspect at runtime
  * const info = greet.introspect();
@@ -1012,12 +1012,12 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  *
  * @see {@link func}
  */
-export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TParameters extends SchemaBuilder<any, any, any, any, any>[] = [], TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? (...args: InferParameters<TParameters>) => TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> ? InferType<TReturnTypeSchema> : any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+export declare class FunctionSchemaBuilder<TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}, TParameters extends SchemaBuilder<any, any, any, any, any>[] = [], TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> | undefined = undefined, TResult = TExplicitType extends undefined ? (...args: TParameters extends [] ? any[] : InferParameters<TParameters>) => TReturnTypeSchema extends SchemaBuilder<any, any, any, any, any> ? InferType<TReturnTypeSchema> : any : TExplicitType> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
     #private;
     /**
      * @hidden
      */
-    static create(props: FunctionSchemaBuilderCreateProps<any>): FunctionSchemaBuilder<true, false, undefined, false, {}, [], undefined, () => any>;
+    static create(props: FunctionSchemaBuilderCreateProps<any>): FunctionSchemaBuilder<true, false, undefined, false, {}, [], undefined, (...args: any[]) => any>;
     protected constructor(props: FunctionSchemaBuilderCreateProps<TRequired>);
     /**
      * @hidden
