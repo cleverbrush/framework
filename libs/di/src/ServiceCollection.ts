@@ -185,6 +185,44 @@ export class ServiceCollection {
     }
 
     /**
+     * Registers a pre-created instance as a {@link ServiceLifetime.Singleton | Singleton}.
+     * Unlike {@link addSingleton}, the second argument is always treated as the
+     * service value — never as a factory function. This makes it safe to
+     * register a function-typed service (e.g. a schema backed by `func()`)
+     * without the container accidentally invoking it as a factory.
+     *
+     * @param schema - The schema used as the service identifier.
+     * @param instance - The pre-created value to register. Can be any type
+     *   including a function.
+     * @param options - Optional {@link ServiceRegistrationOptions}.
+     * @returns `this` for chaining.
+     *
+     * @example Register a plain object instance
+     * ```ts
+     * const config = { port: 3000, host: 'localhost' };
+     * services.addSingletonInstance(IConfig, config);
+     * ```
+     *
+     * @example Register a function value (impossible with {@link addSingleton})
+     * ```ts
+     * const IHandler = func();
+     * const myHandler = (req: Request) => new Response('ok');
+     * services.addSingletonInstance(IHandler, myHandler);
+     * ```
+     *
+     * @see {@link addSingleton}
+     */
+    public addSingletonInstance<
+        TSchema extends SchemaBuilder<any, any, any, any, any>
+    >(
+        schema: TSchema,
+        instance: InferType<TSchema>,
+        options?: ServiceRegistrationOptions
+    ): this {
+        return this.#addInstance(schema, instance, options);
+    }
+
+    /**
      * Registers a {@link ServiceLifetime.Singleton | Singleton} service whose
      * dependencies are described by a {@link FunctionSchemaBuilder}. The
      * container resolves each parameter schema from the registry and passes
@@ -352,6 +390,23 @@ export class ServiceCollection {
         this.#descriptors.set(schema, {
             schema,
             lifetime,
+            factory,
+            validate: options?.validate ?? false
+        });
+
+        return this;
+    }
+
+    #addInstance<TSchema extends SchemaBuilder<any, any, any, any, any>>(
+        schema: TSchema,
+        instance: InferType<TSchema>,
+        options?: ServiceRegistrationOptions
+    ): this {
+        const factory: ServiceFactory<InferType<TSchema>> = () => instance;
+
+        this.#descriptors.set(schema, {
+            schema,
+            lifetime: ServiceLifetime.Singleton,
             factory,
             validate: options?.validate ?? false
         });

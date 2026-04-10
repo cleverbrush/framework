@@ -100,6 +100,40 @@ describe('ServiceCollection', () => {
         expect(result).toBe(services);
     });
 
+    test('addSingletonInstance registers a function value without invoking it as a factory', () => {
+        const IHandler = object({ greet: func() });
+        let callCount = 0;
+        const handler = { greet: () => { callCount++; } };
+
+        const services = new ServiceCollection();
+        services.addSingletonInstance(IHandler, handler);
+
+        const provider = services.buildServiceProvider({
+            validateScopes: false
+        });
+        const resolved = provider.get(IHandler);
+        expect(resolved).toBe(handler);
+        // The handler object itself must not have been invoked as a factory
+        expect(callCount).toBe(0);
+    });
+
+    test('addSingletonInstance with a raw function value (func() schema)', () => {
+        const IFn = func();
+        let invoked = false;
+        const myFn = () => { invoked = true; };
+
+        const services = new ServiceCollection();
+        // addSingleton would call myFn() as a factory; addSingletonInstance must not
+        services.addSingletonInstance(IFn, myFn as any);
+
+        const provider = services.buildServiceProvider({
+            validateScopes: false
+        });
+        const resolved = provider.get(IFn);
+        expect(resolved).toBe(myFn);
+        expect(invoked).toBe(false);
+    });
+
     test('addSingletonFromSchema resolves function schema parameters', () => {
         const IGreeter = object({ greeting: string() });
         const greeterDeps = func().addParameter(IConfig);

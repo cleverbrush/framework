@@ -211,7 +211,8 @@ export class GenericSchemaBuilder<
     #buildResult(
         superResult: ReturnType<
             GenericSchemaBuilder<TFn, TRequired>['preValidateSync']
-        >
+        >,
+        context?: ValidationContext
     ): ValidationResult<TResult> {
         const {
             valid,
@@ -253,6 +254,52 @@ export class GenericSchemaBuilder<
         ) as ValidationResult<TResult>;
     }
 
+    async #buildAsyncResult(
+        superResult: Awaited<
+            ReturnType<GenericSchemaBuilder<TFn, TRequired>['preValidateAsync']>
+        >,
+        context?: ValidationContext
+    ): Promise<ValidationResult<TResult>> {
+        const {
+            valid,
+            transaction: preValidationTransaction,
+            errors
+        } = superResult;
+
+        if (!valid) {
+            return { valid, errors };
+        }
+
+        const {
+            object: { validatedObject: objToValidate }
+        } = preValidationTransaction!;
+
+        if (
+            (typeof objToValidate === 'undefined' && !this.isRequired) ||
+            (objToValidate === null && (!this.isRequired || this.isNullable))
+        ) {
+            return { valid: true, object: objToValidate };
+        }
+
+        const defaultSchema = this.#getOrCreateDefaultSchema();
+        if (!defaultSchema) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message:
+                            'This is a generic schema template. Call .apply() with concrete schemas to get a validatable schema, or provide default arguments to generic().'
+                    }
+                ]
+            };
+        }
+
+        return (await defaultSchema.validateAsync(
+            objToValidate,
+            context
+        )) as ValidationResult<TResult>;
+    }
+
     /** {@inheritDoc SchemaBuilder.validate} */
     public validate(
         object: TResult,
@@ -280,7 +327,7 @@ export class GenericSchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): ValidationResult<TResult> {
-        return this.#buildResult(this.preValidateSync(object, context));
+        return this.#buildResult(this.preValidateSync(object, context), context);
     }
 
     /**
@@ -292,7 +339,10 @@ export class GenericSchemaBuilder<
         object: TResult,
         context?: ValidationContext
     ): Promise<ValidationResult<TResult>> {
-        return this.#buildResult(await super.preValidateAsync(object, context));
+        return this.#buildAsyncResult(
+            await super.preValidateAsync(object, context),
+            context
+        );
     }
 
     protected createFromProps<TReq extends boolean>(
