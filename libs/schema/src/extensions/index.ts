@@ -240,7 +240,11 @@ export const record: <
     valueSchema: TValueSchema
 ) => ExtendedRecord<TKeySchema, TValueSchema> = s.record as any;
 
-export { promise } from '../builders/PromiseSchemaBuilder.js';
+export const promise: <
+    TWrapped extends SchemaBuilder<any, any, any, any, any>
+>(
+    wrapped: TWrapped
+) => ExtendedPromise<TWrapped> = s.promise as any;
 
 /**
  * Creates a string schema constrained to the given literal values.
