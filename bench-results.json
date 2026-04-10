@@ -1,7 +1,7 @@
 {
   "files": [
     {
-      "filepath": "/home/andrew/projects/framework/libs/benchmarks/src/array.bench.ts",
+      "filepath": "libs/benchmarks/src/array.bench.ts",
       "groups": [
         {
           "fullName": "src/array.bench.ts > Array of 100 objects (valid input)",
@@ -216,7 +216,7 @@
       ]
     },
     {
-      "filepath": "/home/andrew/projects/framework/libs/benchmarks/src/complex.bench.ts",
+      "filepath": "libs/benchmarks/src/complex.bench.ts",
       "groups": [
         {
           "fullName": "src/complex.bench.ts > Complex \"Create Order\" (valid input)",
@@ -431,7 +431,7 @@
       ]
     },
     {
-      "filepath": "/home/andrew/projects/framework/libs/benchmarks/src/object-flat.bench.ts",
+      "filepath": "libs/benchmarks/src/object-flat.bench.ts",
       "groups": [
         {
           "fullName": "src/object-flat.bench.ts > Flat object validation (valid input)",
@@ -646,7 +646,7 @@
       ]
     },
     {
-      "filepath": "/home/andrew/projects/framework/libs/benchmarks/src/object-nested.bench.ts",
+      "filepath": "libs/benchmarks/src/object-nested.bench.ts",
       "groups": [
         {
           "fullName": "src/object-nested.bench.ts > Nested object validation (valid input)",
@@ -861,7 +861,7 @@
       ]
     },
     {
-      "filepath": "/home/andrew/projects/framework/libs/benchmarks/src/primitive.bench.ts",
+      "filepath": "libs/benchmarks/src/primitive.bench.ts",
       "groups": [
         {
           "fullName": "src/primitive.bench.ts > String validation (valid input)",
@@ -1286,7 +1286,7 @@
       ]
     },
     {
-      "filepath": "/home/andrew/projects/framework/libs/benchmarks/src/union.bench.ts",
+      "filepath": "libs/benchmarks/src/union.bench.ts",
       "groups": [
         {
           "fullName": "src/union.bench.ts > Union — match first branch (text)",

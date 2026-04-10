@@ -23,7 +23,7 @@
         "test": "vitest --run --typecheck",
         "test:coverage": "vitest --run --coverage && node scripts/update-coverage-badges.js",
         "bench": "vitest bench --run",
-        "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks"
+        "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json"
     },
     "workspaces": [
         "./libs/*"
