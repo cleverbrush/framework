@@ -16,7 +16,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "CHANGE ME",
+    "homepage": "https://docs.cleverbrush.com/knex-clickhouse",
     "keywords": [
         "knex",
         "query builder",

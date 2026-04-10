@@ -11,7 +11,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_mapper.html",
+    "homepage": "https://docs.cleverbrush.com/mapper",
     "keywords": [
         "object mapper",
         "schema mapping",
