@@ -217,27 +217,29 @@ anyFn.validate('not a fn'); // { valid: false }
 
 // Typed parameter and return type
 const greet = func()
-    .addParameter(string())          // first param: string
-    .addParameter(number().optional()) // second param: number | undefined
-    .hasReturnType(string());        // return type: string
+    .addParameter(string())             // first param: string
+    .addParameter(number().optional())  // second param: number | undefined
+    .hasReturnType(string());           // return type: string
 
-// InferType infers the full signature
+// InferType preserves the declared parameter types and return type.
+// Function schemas also remain compatible with callbacks of any arity.
 type Greet = InferType<typeof greet>;
-// → (param0: string, param1?: number) => string
+// → (param0: string, param1: number | undefined, ...args: any[]) => string
 
 // Introspect at runtime
 const info = greet.introspect();
 // info.parameters  → [StringSchemaBuilder, NumberSchemaBuilder]
 // info.returnType  → StringSchemaBuilder
 
-// Works inside object schemas
-const HandlerSchema = object({
-    onSubmit: func()
-        .addParameter(string())
-        .addParameter(boolean())
-        .hasReturnType(boolean())
-        .optional()
-});
+// Optional function schemas infer a union with undefined
+const optionalHandler = func()
+    .addParameter(string())
+    .addParameter(boolean())
+    .hasReturnType(boolean())
+    .optional();
+
+type OptionalHandler = InferType<typeof optionalHandler>;
+// → ((param0: string, param1: boolean, ...args: any[]) => boolean) | undefined
 ```
 
 ## Record Schemas
