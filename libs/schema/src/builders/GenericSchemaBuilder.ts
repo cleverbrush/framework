@@ -248,7 +248,8 @@ export class GenericSchemaBuilder<
         }
 
         return defaultSchema.validate(
-            objToValidate
+            objToValidate,
+            context
         ) as ValidationResult<TResult>;
     }
 
