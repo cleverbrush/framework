@@ -11,7 +11,7 @@ import { ContentNegotiator } from './ContentNegotiator.js';
 import { createController } from './ControllerFactory.js';
 import { HttpError } from './HttpError.js';
 import { MiddlewarePipeline } from './MiddlewarePipeline.js';
-import { resolveParameters } from './ParameterResolver.js';
+import { needsBody, resolveContextObject } from './ParameterResolver.js';
 import {
     createProblemDetails,
     PROBLEM_JSON_CONTENT_TYPE,
@@ -239,10 +239,28 @@ export class Server {
             await pipeline.execute(ctx, async () => {
                 if (ctx.responded) return;
 
+                // Get the func schema for the method
+                const controllerIntrospection =
+                    registration.schema.introspect();
+                const properties = (controllerIntrospection as any)
+                    .properties as Record<string, any> | undefined;
+
+                let funcSchema: FunctionSchemaBuilder<
+                    any,
+                    any,
+                    any,
+                    any,
+                    any,
+                    any
+                > | null = null;
+                if (properties?.[methodName]) {
+                    funcSchema = properties[methodName];
+                }
+
                 // Parse body if needed
                 let parsedBody: unknown;
-                const sources = routeDef.params ?? [];
-                const hasBodySource = sources.some(s => s.from === 'body');
+                const hasBodySource =
+                    funcSchema != null && needsBody(funcSchema);
 
                 if (hasBodySource) {
                     const contentType = req.headers['content-type'];
@@ -268,30 +286,11 @@ export class Server {
                     }
                 }
 
-                // Get the func schema for the method
-                const controllerIntrospection =
-                    registration.schema.introspect();
-                const properties = (controllerIntrospection as any)
-                    .properties as Record<string, any> | undefined;
-
-                let funcSchema: FunctionSchemaBuilder<
-                    any,
-                    any,
-                    any,
-                    any,
-                    any,
-                    any
-                > | null = null;
-                if (properties?.[methodName]) {
-                    funcSchema = properties[methodName];
-                }
-
                 // Resolve parameters
                 let args: unknown[] = [];
-                if (funcSchema && sources.length > 0) {
-                    const result = await resolveParameters(
+                if (funcSchema) {
+                    const result = await resolveContextObject(
                         funcSchema,
-                        sources,
                         match,
                         ctx,
                         parsedBody

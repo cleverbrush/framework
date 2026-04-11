@@ -10,15 +10,10 @@ import {
 } from '@cleverbrush/schema';
 import {
     ActionResult,
-    body,
-    context,
     createServer,
     defineController,
-    header,
     type Middleware,
     NotFoundError,
-    path,
-    query,
     type RequestContext,
     route,
     type Server
@@ -92,23 +87,25 @@ describe('Integration: Todo CRUD lifecycle', () => {
     const TodoControllerSchema = object({
         list: func().hasReturnType(promise(any())),
         getById: func()
-            .addParameter(object({ id: number() }))
+            .addParameter(object({ params: object({ id: number() }) }))
             .hasReturnType(promise(any())),
         create: func()
-            .addParameter(object({ title: string() }))
+            .addParameter(object({ body: object({ title: string() }) }))
             .hasReturnType(promise(any())),
         update: func()
-            .addParameter(object({ id: number() }))
             .addParameter(
                 object({
-                    /** new to do item title */
-                    title: string().optional(),
-                    completed: any().optional()
+                    params: object({ id: number() }),
+                    body: object({
+                        /** new to do item title */
+                        title: string().optional(),
+                        completed: any().optional()
+                    })
                 })
             )
             .hasReturnType(promise(any())),
         remove: func()
-            .addParameter(object({ id: number() }))
+            .addParameter(object({ params: object({ id: number() }) }))
             .hasReturnType(promise(any()))
     });
 
@@ -119,24 +116,24 @@ describe('Integration: Todo CRUD lifecycle', () => {
         async list() {
             return [...todos.values()];
         },
-        async getById({ id }) {
+        async getById({ params: { id } }) {
             const todo = todos.get(id);
             if (!todo) throw new NotFoundError(`Todo ${id} not found`);
             return todo;
         },
-        async create({ title }) {
+        async create({ body: { title } }) {
             const todo = { id: nextId++, title, completed: false };
             todos.set(todo.id, todo);
             return ActionResult.created(todo, `/api/todos/${todo.id}`);
         },
-        async update({ id }, patch) {
+        async update({ params: { id }, body: patch }) {
             const todo = todos.get(id);
             if (!todo) throw new NotFoundError(`Todo ${id} not found`);
             if (patch.title !== undefined) todo.title = patch.title;
             if (patch.completed !== undefined) todo.completed = patch.completed;
             return todo;
         },
-        async remove({ id }) {
+        async remove({ params: { id } }) {
             const todo = todos.get(id);
             if (!todo) throw new NotFoundError(`Todo ${id} not found`);
             todos.delete(id);
@@ -152,27 +149,11 @@ describe('Integration: Todo CRUD lifecycle', () => {
             .controller(TodoControllerSchema, TodoController, r =>
                 r
                     .basePath('/api/todos')
-                    .get(t => t.list, '/')
-                    .get(
-                        t => t.getById,
-                        TodoByIdPath,
-                        p => p.path()
-                    )
-                    .post(
-                        t => t.create,
-                        '/',
-                        p => p.body()
-                    )
-                    .patch(
-                        t => t.update,
-                        TodoByIdPath,
-                        p => p.path().body()
-                    )
-                    .delete(
-                        t => t.remove,
-                        TodoByIdPath,
-                        p => p.path()
-                    )
+                    .get('/', t => t.list)
+                    .get(TodoByIdPath, t => t.getById)
+                    .post('/', t => t.create)
+                    .patch(TodoByIdPath, t => t.update)
+                    .delete(TodoByIdPath, t => t.remove)
             )
             .listen(0);
     });
@@ -328,12 +309,18 @@ describe('Integration: query parameters', () => {
     it('resolves named query parameters', async () => {
         const Schema = object({
             search: func()
-                .addParameter(string())
-                .addParameter(number().coerce())
+                .addParameter(
+                    object({
+                        query: object({
+                            q: string(),
+                            limit: number().coerce()
+                        })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
         class Controller {
-            async search(q: string, limit: number) {
+            async search({ query: { q, limit } }: any) {
                 return { q, limit };
             }
         }
@@ -344,8 +331,7 @@ describe('Integration: query parameters', () => {
                 routes: {
                     search: {
                         method: 'GET',
-                        path: '/search',
-                        params: [query('q'), query('limit')]
+                        path: '/search'
                     }
                 }
             })
@@ -374,11 +360,17 @@ describe('Integration: header parameters', () => {
 
     it('resolves named header parameters', async () => {
         const Schema = object({
-            check: func().addParameter(string()).hasReturnType(any())
+            check: func()
+                .addParameter(
+                    object({
+                        headers: object({ 'x-api-key': string() })
+                    })
+                )
+                .hasReturnType(any())
         });
         class Controller {
-            check(token: string) {
-                return { token };
+            check({ headers }: any) {
+                return { token: headers['x-api-key'] };
             }
         }
 
@@ -388,8 +380,7 @@ describe('Integration: header parameters', () => {
                 routes: {
                     check: {
                         method: 'GET',
-                        path: '/check',
-                        params: [header('x-api-key')]
+                        path: '/check'
                     }
                 }
             })
@@ -414,12 +405,14 @@ describe('Integration: context injection', () => {
         await server.close();
     });
 
-    it('injects RequestContext via context() param source', async () => {
+    it('injects RequestContext via context key', async () => {
         const Schema = object({
-            info: func().addParameter(any()).hasReturnType(any())
+            info: func()
+                .addParameter(object({ context: any() }))
+                .hasReturnType(any())
         });
         class Controller {
-            info(ctx: RequestContext) {
+            info({ context: ctx }: { context: RequestContext }) {
                 return {
                     method: ctx.method,
                     path: ctx.url.pathname,
@@ -434,8 +427,7 @@ describe('Integration: context injection', () => {
                 routes: {
                     info: {
                         method: 'GET',
-                        path: '/info',
-                        params: [context()]
+                        path: '/info'
                     }
                 }
             })
@@ -569,11 +561,13 @@ describe('Integration: middleware', () => {
 
     it('middleware can store data in context items for the handler', async () => {
         const Schema = object({
-            get: func().addParameter(any()).hasReturnType(any())
+            get: func()
+                .addParameter(object({ context: any() }))
+                .hasReturnType(any())
         });
 
         class Controller {
-            get(ctx: RequestContext) {
+            get({ context: ctx }: { context: RequestContext }) {
                 return { user: ctx.items.get('userId') };
             }
         }
@@ -590,8 +584,7 @@ describe('Integration: middleware', () => {
                 routes: {
                     get: {
                         method: 'GET',
-                        path: '/whoami',
-                        params: [context()]
+                        path: '/whoami'
                     }
                 }
             })
@@ -847,7 +840,11 @@ describe('Integration: error handling', () => {
     it('returns 400 with validation errors for invalid body', async () => {
         const Schema = object({
             create: func()
-                .addParameter(object({ name: string(), age: number() }))
+                .addParameter(
+                    object({
+                        body: object({ name: string(), age: number() })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
         class Controller {
@@ -862,8 +859,7 @@ describe('Integration: error handling', () => {
                 routes: {
                     create: {
                         method: 'POST',
-                        path: '/users',
-                        params: [body()]
+                        path: '/users'
                     }
                 }
             })
@@ -1139,11 +1135,11 @@ describe('Integration: parseString path parameters', () => {
         const ByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             get: func()
-                .addParameter(object({ id: number() }))
+                .addParameter(object({ params: object({ id: number() }) }))
                 .hasReturnType(any())
         });
         class Controller {
-            get({ id }: { id: number }) {
+            get({ params: { id } }: any) {
                 return { id, type: typeof id };
             }
         }
@@ -1154,8 +1150,7 @@ describe('Integration: parseString path parameters', () => {
                 routes: {
                     get: {
                         method: 'GET',
-                        path: ByIdPath,
-                        params: [path()]
+                        path: ByIdPath
                     }
                 }
             })
@@ -1173,11 +1168,18 @@ describe('Integration: parseString path parameters', () => {
         })`/${t => t.orgId}/teams/${t => t.teamId}`;
         const Schema = object({
             get: func()
-                .addParameter(object({ orgId: number(), teamId: number() }))
+                .addParameter(
+                    object({
+                        params: object({
+                            orgId: number(),
+                            teamId: number()
+                        })
+                    })
+                )
                 .hasReturnType(any())
         });
         class Controller {
-            get(params: { orgId: number; teamId: number }) {
+            get({ params }: any) {
                 return params;
             }
         }
@@ -1188,8 +1190,7 @@ describe('Integration: parseString path parameters', () => {
                 routes: {
                     get: {
                         method: 'GET',
-                        path: NestedPath,
-                        params: [path()]
+                        path: NestedPath
                     }
                 }
             })
@@ -1204,11 +1205,11 @@ describe('Integration: parseString path parameters', () => {
         const ByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             get: func()
-                .addParameter(object({ id: number() }))
+                .addParameter(object({ params: object({ id: number() }) }))
                 .hasReturnType(any())
         });
         class Controller {
-            get({ id }: { id: number }) {
+            get({ params: { id } }: any) {
                 return { id };
             }
         }
@@ -1219,8 +1220,7 @@ describe('Integration: parseString path parameters', () => {
                 routes: {
                     get: {
                         method: 'GET',
-                        path: ByIdPath,
-                        params: [path()]
+                        path: ByIdPath
                     }
                 }
             })
@@ -1504,25 +1504,24 @@ describe('Integration: mixed parameter sources', () => {
 
         const Schema = object({
             update: func()
-                .addParameter(object({ id: number() }))
-                .addParameter(object({ name: string() }))
-                .addParameter(string())
-                .addParameter(string())
+                .addParameter(
+                    object({
+                        params: object({ id: number() }),
+                        body: object({ name: string() }),
+                        query: object({ format: string() }),
+                        headers: object({ authorization: string() })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
 
         class Controller {
-            async update(
-                pathParams: { id: number },
-                bodyData: { name: string },
-                format: string,
-                auth: string
-            ) {
+            async update({ params, body: bodyData, query, headers }: any) {
                 return {
-                    id: pathParams.id,
+                    id: params.id,
                     name: bodyData.name,
-                    format,
-                    auth
+                    format: query.format,
+                    auth: headers.authorization
                 };
             }
         }
@@ -1533,13 +1532,7 @@ describe('Integration: mixed parameter sources', () => {
                 routes: {
                     update: {
                         method: 'PUT',
-                        path: ByIdPath,
-                        params: [
-                            path(),
-                            body(),
-                            query('format'),
-                            header('authorization')
-                        ]
+                        path: ByIdPath
                     }
                 }
             })
@@ -1573,7 +1566,11 @@ describe('Integration: Parameter validation', () => {
     it('returns RFC 9457 problem details for invalid body', async () => {
         const Schema = object({
             create: func()
-                .addParameter(object({ name: string(), age: number() }))
+                .addParameter(
+                    object({
+                        body: object({ name: string(), age: number() })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
         class Ctrl {
@@ -1587,8 +1584,7 @@ describe('Integration: Parameter validation', () => {
                 routes: {
                     create: {
                         method: 'POST',
-                        path: '/users',
-                        params: [body()]
+                        path: '/users'
                     }
                 }
             })
@@ -1615,11 +1611,13 @@ describe('Integration: Parameter validation', () => {
 
     it('returns validation errors for invalid query parameter', async () => {
         const Schema = object({
-            search: func().addParameter(number()).hasReturnType(promise(any()))
+            search: func()
+                .addParameter(object({ query: object({ page: number() }) }))
+                .hasReturnType(promise(any()))
         });
         class Ctrl {
-            async search(_page: number) {
-                return { page: _page };
+            async search({ query: { page } }: any) {
+                return { page };
             }
         }
 
@@ -1628,8 +1626,7 @@ describe('Integration: Parameter validation', () => {
                 routes: {
                     search: {
                         method: 'GET',
-                        path: '/items',
-                        params: [query('page')]
+                        path: '/items'
                     }
                 }
             })
@@ -1648,11 +1645,15 @@ describe('Integration: Parameter validation', () => {
 
     it('returns validation errors for invalid header parameter', async () => {
         const Schema = object({
-            get: func().addParameter(number()).hasReturnType(promise(any()))
+            get: func()
+                .addParameter(
+                    object({ headers: object({ 'x-count': number() }) })
+                )
+                .hasReturnType(promise(any()))
         });
         class Ctrl {
-            async get(_count: number) {
-                return { count: _count };
+            async get({ headers }: any) {
+                return { count: headers['x-count'] };
             }
         }
 
@@ -1661,8 +1662,7 @@ describe('Integration: Parameter validation', () => {
                 routes: {
                     get: {
                         method: 'GET',
-                        path: '/data',
-                        params: [header('x-count')]
+                        path: '/data'
                     }
                 }
             })
@@ -1682,12 +1682,16 @@ describe('Integration: Parameter validation', () => {
     it('aggregates errors from body and query simultaneously', async () => {
         const Schema = object({
             create: func()
-                .addParameter(object({ name: string(), email: string() }))
-                .addParameter(number())
+                .addParameter(
+                    object({
+                        body: object({ name: string(), email: string() }),
+                        query: object({ page: number() })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
         class Ctrl {
-            async create(_data: any, _page: number) {
+            async create(_data: any) {
                 return { ok: true };
             }
         }
@@ -1697,8 +1701,7 @@ describe('Integration: Parameter validation', () => {
                 routes: {
                     create: {
                         method: 'POST',
-                        path: '/items',
-                        params: [body(), query('page')]
+                        path: '/items'
                     }
                 }
             })
@@ -1718,11 +1721,15 @@ describe('Integration: Parameter validation', () => {
     it('passes valid parameters through to controller', async () => {
         const Schema = object({
             create: func()
-                .addParameter(object({ name: string(), age: number() }))
+                .addParameter(
+                    object({
+                        body: object({ name: string(), age: number() })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
         class Ctrl {
-            async create(data: { name: string; age: number }) {
+            async create({ body: data }: any) {
                 return { received: data };
             }
         }
@@ -1732,8 +1739,7 @@ describe('Integration: Parameter validation', () => {
                 routes: {
                     create: {
                         method: 'POST',
-                        path: '/users',
-                        params: [body()]
+                        path: '/users'
                     }
                 }
             })
@@ -1752,14 +1758,22 @@ describe('Integration: Parameter validation', () => {
         const ItemPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             get: func()
-                .addParameter(object({ id: number() }))
-                .addParameter(number())
-                .addParameter(string())
+                .addParameter(
+                    object({
+                        params: object({ id: number() }),
+                        query: object({ page: number() }),
+                        headers: object({ 'x-token': string() })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
         class Ctrl {
-            async get(pathObj: { id: number }, page: number, token: string) {
-                return { id: pathObj.id, page, token };
+            async get({ params, query, headers }: any) {
+                return {
+                    id: params.id,
+                    page: query.page,
+                    token: headers['x-token']
+                };
             }
         }
 
@@ -1768,8 +1782,7 @@ describe('Integration: Parameter validation', () => {
                 routes: {
                     get: {
                         method: 'GET',
-                        path: ItemPath,
-                        params: [path(), query('page'), header('x-token')]
+                        path: ItemPath
                     }
                 }
             })
@@ -1790,18 +1803,22 @@ describe('Integration: Parameter validation', () => {
         const ItemPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             update: func()
-                .addParameter(object({ id: number() }))
-                .addParameter(object({ title: string() }))
-                .addParameter(string())
+                .addParameter(
+                    object({
+                        params: object({ id: number() }),
+                        body: object({ title: string() }),
+                        headers: object({ authorization: string() })
+                    })
+                )
                 .hasReturnType(promise(any()))
         });
         class Ctrl {
-            async update(
-                pathObj: { id: number },
-                bodyData: { title: string },
-                auth: string
-            ) {
-                return { id: pathObj.id, title: bodyData.title, auth };
+            async update({ params, body: bodyData, headers }: any) {
+                return {
+                    id: params.id,
+                    title: bodyData.title,
+                    auth: headers.authorization
+                };
             }
         }
 
@@ -1810,8 +1827,7 @@ describe('Integration: Parameter validation', () => {
                 routes: {
                     update: {
                         method: 'PUT',
-                        path: ItemPath,
-                        params: [path(), body(), header('authorization')]
+                        path: ItemPath
                     }
                 }
             })
