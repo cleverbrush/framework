@@ -7,28 +7,6 @@ import { object } from './ObjectSchemaBuilder.js';
 import type { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 
-// Helpers — preprocessors that coerce raw strings captured from the template.
-// In real usage the consumer adds these; here we define short-hands for tests.
-const numFromStr = () =>
-    number().addPreprocessor((v: any) => Number(v), { mutates: true });
-const boolFromStr = () =>
-    boolean().addPreprocessor(
-        (v: any) => {
-            if (v === 'true') return true;
-            if (v === 'false') return false;
-            return v;
-        },
-        { mutates: true }
-    );
-const dateFromStr = () =>
-    date().addPreprocessor(
-        (v: any) => {
-            const d = new Date(v);
-            return Number.isNaN(d.getTime()) ? v : d;
-        },
-        { mutates: true }
-    );
-
 // ---------------------------------------------------------------------------
 // Basic creation & introspection
 // ---------------------------------------------------------------------------
@@ -55,9 +33,12 @@ test('introspect returns correct metadata', () => {
 
 test('basic: single number param', () => {
     const schema = interpolatedString(
-        object({ id: numFromStr() }),
+        object({ id: number().coerce() }),
         $t => $t`/orders/${t => t.id}`
     );
+
+    const typeCheck: InferType<typeof schema> = { id: 0 };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ id: number }>();
 
     const result = schema.validate('/orders/123');
     expect(result.valid).toEqual(true);
@@ -70,6 +51,9 @@ test('basic: single string param', () => {
         $t => $t`/hello/${t => t.name}`
     );
 
+    const typeCheck: InferType<typeof schema> = { name: '' };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ name: string }>();
+
     const result = schema.validate('/hello/world');
     expect(result.valid).toEqual(true);
     expect(result.object).toEqual({ name: 'world' });
@@ -81,9 +65,12 @@ test('basic: single string param', () => {
 
 test('multiple params', () => {
     const schema = interpolatedString(
-        object({ userId: string(), id: numFromStr() }),
+        object({ userId: string(), id: number().coerce() }),
         $t => $t`/orders/${t => t.id}/${t => t.userId}`
     );
+
+    const typeCheck: InferType<typeof schema> = { userId: '', id: 0 };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ userId: string; id: number }>();
 
     const result = schema.validate(
         '/orders/1234/550e8400-e29b-41d4-a716-446655440000'
@@ -115,7 +102,7 @@ test('InferType produces correct object type', () => {
 
 test('validate returns correctly typed object', () => {
     const schema = interpolatedString(
-        object({ count: numFromStr(), label: string() }),
+        object({ count: number().coerce(), label: string() }),
         $t => $t`${t => t.count}x-${t => t.label}`
     );
 
@@ -135,11 +122,20 @@ test('validate returns correctly typed object', () => {
 test('nested object properties', () => {
     const schema = interpolatedString(
         object({
-            order: object({ id: numFromStr() }),
+            order: object({ id: number().coerce() }),
             user: object({ name: string() })
         }),
         $t => $t`/orders/${t => t.order.id}/by/${t => t.user.name}`
     );
+
+    const typeCheck: InferType<typeof schema> = {
+        order: { id: 0 },
+        user: { name: '' }
+    };
+    expectTypeOf(typeCheck).toEqualTypeOf<{
+        order: { id: number };
+        user: { name: string };
+    }>();
 
     const result = schema.validate('/orders/42/by/alice');
     expect(result.valid).toEqual(true);
@@ -183,7 +179,7 @@ test('pattern mismatch returns error', () => {
 
 test('segment validation failure for non-numeric string', () => {
     const schema = interpolatedString(
-        object({ id: numFromStr() }),
+        object({ id: number().coerce() }),
         $t => $t`/orders/${t => t.id}`
     );
 
@@ -194,7 +190,7 @@ test('segment validation failure for non-numeric string', () => {
 
 test('segment schema validation failure', () => {
     const schema = interpolatedString(
-        object({ id: numFromStr().min(10) }),
+        object({ id: number().coerce().min(10) }),
         $t => $t`/orders/${t => t.id}`
     );
 
@@ -220,9 +216,12 @@ test('non-string input returns error', () => {
 
 test('preprocessor coercion: number', () => {
     const schema = interpolatedString(
-        object({ val: numFromStr() }),
+        object({ val: number().coerce() }),
         $t => $t`v=${t => t.val}`
     );
+
+    const typeCheck: InferType<typeof schema> = { val: 0 };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ val: number }>();
 
     const result = schema.validate('v=42');
     expect(result.valid).toEqual(true);
@@ -231,9 +230,12 @@ test('preprocessor coercion: number', () => {
 
 test('preprocessor coercion: boolean true', () => {
     const schema = interpolatedString(
-        object({ flag: boolFromStr() }),
+        object({ flag: boolean().coerce() }),
         $t => $t`flag=${t => t.flag}`
     );
+
+    const typeCheck: InferType<typeof schema> = { flag: true };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ flag: boolean }>();
 
     const result = schema.validate('flag=true');
     expect(result.valid).toEqual(true);
@@ -242,7 +244,7 @@ test('preprocessor coercion: boolean true', () => {
 
 test('preprocessor coercion: boolean false', () => {
     const schema = interpolatedString(
-        object({ flag: boolFromStr() }),
+        object({ flag: boolean().coerce() }),
         $t => $t`flag=${t => t.flag}`
     );
 
@@ -253,7 +255,7 @@ test('preprocessor coercion: boolean false', () => {
 
 test('preprocessor coercion: boolean invalid', () => {
     const schema = interpolatedString(
-        object({ flag: boolFromStr() }),
+        object({ flag: boolean().coerce() }),
         $t => $t`flag=${t => t.flag}`
     );
 
@@ -264,9 +266,12 @@ test('preprocessor coercion: boolean invalid', () => {
 
 test('preprocessor coercion: date', () => {
     const schema = interpolatedString(
-        object({ when: dateFromStr() }),
+        object({ when: date().coerce() }),
         $t => $t`at=${t => t.when}`
     );
+
+    const typeCheck: InferType<typeof schema> = { when: new Date() };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ when: Date }>();
 
     const result = schema.validate('at=2024-01-15');
     expect(result.valid).toEqual(true);
@@ -276,7 +281,7 @@ test('preprocessor coercion: date', () => {
 
 test('preprocessor coercion: invalid date', () => {
     const schema = interpolatedString(
-        object({ when: dateFromStr() }),
+        object({ when: date().coerce() }),
         $t => $t`at=${t => t.when}`
     );
 
@@ -328,6 +333,9 @@ test('optional accepts undefined', () => {
         $t => $t`/orders/${t => t.id}`
     ).optional();
 
+    type Result = InferType<typeof schema>;
+    expectTypeOf<Result>().toEqualTypeOf<{ id: number } | undefined>();
+
     const result = schema.validate(undefined as any);
     expect(result.valid).toEqual(true);
     expect(result.object).toBeUndefined();
@@ -339,6 +347,9 @@ test('nullable accepts null', () => {
         $t => $t`/orders/${t => t.id}`
     ).nullable();
 
+    type Result = InferType<typeof schema>;
+    expectTypeOf<Result>().toEqualTypeOf<{ id: number } | null>();
+
     const result = schema.validate(null as any);
     expect(result.valid).toEqual(true);
     expect(result.object).toBeNull();
@@ -349,6 +360,9 @@ test('default returns default value for undefined input', () => {
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     ).default({ id: 0 });
+
+    const typeCheck: InferType<typeof schema> = { id: 0 };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ id: number }>();
 
     const result = schema.validate(undefined as any);
     expect(result.valid).toEqual(true);
@@ -443,9 +457,12 @@ test('duplicate property selector throws at creation', () => {
 
 test('validateAsync works', async () => {
     const schema = interpolatedString(
-        object({ id: numFromStr(), name: string() }),
+        object({ id: number().coerce(), name: string() }),
         $t => $t`/users/${t => t.id}/${t => t.name}`
     );
+
+    const typeCheck: InferType<typeof schema> = { id: 0, name: '' };
+    expectTypeOf(typeCheck).toEqualTypeOf<{ id: number; name: string }>();
 
     const result = await schema.validateAsync('/users/42/alice');
     expect(result.valid).toEqual(true);
@@ -499,6 +516,18 @@ test('immutability: optional returns new instance', () => {
 // ---------------------------------------------------------------------------
 // InferType with optional/nullable
 // ---------------------------------------------------------------------------
+
+test('nullable + optional combined', () => {
+    const schema = interpolatedString(
+        object({ id: number() }),
+        $t => $t`/orders/${t => t.id}`
+    )
+        .optional()
+        .nullable();
+
+    type Result = InferType<typeof schema>;
+    expectTypeOf<Result>().toEqualTypeOf<{ id: number } | null | undefined>();
+});
 
 test('InferType with optional', () => {
     const schema = interpolatedString(
