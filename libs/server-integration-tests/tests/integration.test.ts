@@ -5,7 +5,6 @@ import {
     func,
     number,
     object,
-    parseString,
     promise,
     string
 } from '@cleverbrush/schema';
@@ -21,6 +20,7 @@ import {
     path,
     query,
     type RequestContext,
+    route,
     type Server
 } from '@cleverbrush/server';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -87,10 +87,7 @@ function json(res: { body: string }) {
 describe('Integration: Todo CRUD lifecycle', () => {
     let server: Server;
 
-    const TodoByIdPath = parseString(
-        object({ id: number().coerce() }),
-        $t => $t`/${t => t.id}`
-    );
+    const TodoByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
 
     const TodoControllerSchema = object({
         list: func().hasReturnType(promise(any())),
@@ -1139,10 +1136,7 @@ describe('Integration: parseString path parameters', () => {
     });
 
     it('parses single numeric path segment with coercion', async () => {
-        const ByIdPath = parseString(
-            object({ id: number().coerce() }),
-            $t => $t`/${t => t.id}`
-        );
+        const ByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             get: func()
                 .addParameter(object({ id: number() }))
@@ -1173,13 +1167,10 @@ describe('Integration: parseString path parameters', () => {
     });
 
     it('parses multi-segment path', async () => {
-        const NestedPath = parseString(
-            object({
-                orgId: number().coerce(),
-                teamId: number().coerce()
-            }),
-            $t => $t`/${t => t.orgId}/teams/${t => t.teamId}`
-        );
+        const NestedPath = route({
+            orgId: number().coerce(),
+            teamId: number().coerce()
+        })`/${t => t.orgId}/teams/${t => t.teamId}`;
         const Schema = object({
             get: func()
                 .addParameter(object({ orgId: number(), teamId: number() }))
@@ -1210,10 +1201,7 @@ describe('Integration: parseString path parameters', () => {
     });
 
     it('returns 404 when path segment does not match pattern', async () => {
-        const ByIdPath = parseString(
-            object({ id: number().coerce() }),
-            $t => $t`/${t => t.id}`
-        );
+        const ByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             get: func()
                 .addParameter(object({ id: number() }))
@@ -1240,6 +1228,92 @@ describe('Integration: parseString path parameters', () => {
 
         const res = await request(server, 'GET', '/items/abc/extra');
         expect(res.status).toBe(404);
+    });
+});
+
+// ===========================================================================
+// 10b. route() static path variants
+// ===========================================================================
+
+describe('Integration: route() static path variants', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('route`/static` — tagged template directly on route', async () => {
+        const StaticPath = route`/hello`;
+        const Schema = object({
+            get: func().hasReturnType(any())
+        });
+        class Controller {
+            get() {
+                return { msg: 'world' };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    get: { method: 'GET', path: StaticPath }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/hello');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ msg: 'world' });
+    });
+
+    it('route()`/static` — called with no args then tagged template', async () => {
+        const StaticPath = route()`/hello`;
+        const Schema = object({
+            get: func().hasReturnType(any())
+        });
+        class Controller {
+            get() {
+                return { msg: 'world' };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    get: { method: 'GET', path: StaticPath }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/hello');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ msg: 'world' });
+    });
+
+    it('plain string path — "/static"', async () => {
+        const Schema = object({
+            get: func().hasReturnType(any())
+        });
+        class Controller {
+            get() {
+                return { msg: 'world' };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    get: { method: 'GET', path: '/hello' }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/hello');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ msg: 'world' });
     });
 });
 
@@ -1426,10 +1500,7 @@ describe('Integration: mixed parameter sources', () => {
     });
 
     it('combines path, body, query, and header params in one route', async () => {
-        const ByIdPath = parseString(
-            object({ id: number().coerce() }),
-            $t => $t`/${t => t.id}`
-        );
+        const ByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
 
         const Schema = object({
             update: func()
@@ -1678,10 +1749,7 @@ describe('Integration: Parameter validation', () => {
     });
 
     it('validates query and header while path comes from parseString', async () => {
-        const ItemPath = parseString(
-            object({ id: number().coerce() }),
-            $t => $t`/${t => t.id}`
-        );
+        const ItemPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             get: func()
                 .addParameter(object({ id: number() }))
@@ -1719,10 +1787,7 @@ describe('Integration: Parameter validation', () => {
     });
 
     it('returns valid response when all param sources pass validation', async () => {
-        const ItemPath = parseString(
-            object({ id: number().coerce() }),
-            $t => $t`/${t => t.id}`
-        );
+        const ItemPath = route({ id: number().coerce() })`/${t => t.id}`;
         const Schema = object({
             update: func()
                 .addParameter(object({ id: number() }))
