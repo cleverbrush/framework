@@ -92,7 +92,7 @@ describe('Integration: Todo CRUD lifecycle', () => {
         $t => $t`/${t => t.id}`
     );
 
-    const TodoSchema = object({
+    const TodoControllerSchema = object({
         list: func().hasReturnType(promise(any())),
         getById: func()
             .addParameter(object({ id: number() }))
@@ -117,7 +117,7 @@ describe('Integration: Todo CRUD lifecycle', () => {
     let todos: Map<number, { id: number; title: string; completed: boolean }>;
     let nextId: number;
 
-    const TodoController = defineController(TodoSchema, {
+    const TodoController = defineController(TodoControllerSchema, {
         async list() {
             return [...todos.values()];
         },
@@ -151,32 +151,31 @@ describe('Integration: Todo CRUD lifecycle', () => {
         nextId = 1;
 
         server = await createServer()
-            .controller(TodoSchema, TodoController, {
-                basePath: '/api/todos',
-                routes: {
-                    list: { method: 'GET', path: '/' },
-                    getById: {
-                        method: 'GET',
-                        path: TodoByIdPath,
-                        params: [path()]
-                    },
-                    create: {
-                        method: 'POST',
-                        path: '/',
-                        params: [body()]
-                    },
-                    update: {
-                        method: 'PATCH',
-                        path: TodoByIdPath,
-                        params: [path(), body()]
-                    },
-                    remove: {
-                        method: 'DELETE',
-                        path: TodoByIdPath,
-                        params: [path()]
-                    }
-                }
-            })
+            .controller(TodoControllerSchema, TodoController, r =>
+                r
+                    .basePath('/api/todos')
+                    .get(t => t.list, '/')
+                    .get(
+                        t => t.getById,
+                        TodoByIdPath,
+                        p => p.path()
+                    )
+                    .post(
+                        t => t.create,
+                        '/',
+                        p => p.body()
+                    )
+                    .patch(
+                        t => t.update,
+                        TodoByIdPath,
+                        p => p.path().body()
+                    )
+                    .delete(
+                        t => t.remove,
+                        TodoByIdPath,
+                        p => p.path()
+                    )
+            )
             .listen(0);
     });
 
