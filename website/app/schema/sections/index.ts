@@ -16,7 +16,7 @@ export const SECTION_GROUPS = [
             'discriminated-unions',
             'recursive-schemas',
             'generic-schemas',
-            'interpolated-strings'
+            'parse-string'
         ]
     },
     {
@@ -65,8 +65,8 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
         group: 'Composition'
     },
     {
-        slug: 'interpolated-strings',
-        title: 'Interpolated Strings & Coercion',
+        slug: 'parse-string',
+        title: 'Parse String & Coercion',
         group: 'Composition'
     },
     { slug: 'validation', title: 'Validation', group: 'Validation' },

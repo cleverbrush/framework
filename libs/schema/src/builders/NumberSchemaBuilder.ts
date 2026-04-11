@@ -825,7 +825,7 @@ export class NumberSchemaBuilder<
     /**
      * Adds a preprocessor that coerces a string value to a number
      * using `Number(value)`. Useful when the input is captured from
-     * a string source (e.g. an interpolated string schema, URL parameter,
+     * a string source (e.g. a parse-string schema, URL parameter,
      * or form input).
      *
      * @example ```ts

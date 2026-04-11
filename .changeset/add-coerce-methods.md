@@ -4,7 +4,7 @@
 
 Add `.coerce()` to `number()`, `boolean()`, and `date()` builders
 
-A new fluent `.coerce()` method on three schema builders that adds a preprocessor to convert string values to the target type. Useful when input comes from string sources like URL parameters, form inputs, or interpolated string schemas.
+A new fluent `.coerce()` method on three schema builders that adds a preprocessor to convert string values to the target type. Useful when input comes from string sources like URL parameters, form inputs, or parse-string schemas.
 
 ### `number().coerce()`
 

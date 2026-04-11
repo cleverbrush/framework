@@ -2,16 +2,16 @@
 '@cleverbrush/schema': minor
 ---
 
-Add `interpolatedString()` schema builder
+Add `parseString()` schema builder
 
-A new `InterpolatedStringSchemaBuilder` and `interpolatedString()` factory that validates a string against a template pattern and parses it into a strongly-typed object. Uses a tagged-template syntax with type-safe property selectors.
+A new `ParseStringSchemaBuilder` and `parseString()` factory that validates a string against a template pattern and parses it into a strongly-typed object. Uses a tagged-template syntax with type-safe property selectors.
 
 ### Basic Usage
 
 ```ts
-import { interpolatedString, object, string, number, type InferType } from '@cleverbrush/schema';
+import { parseString, object, string, number, type InferType } from '@cleverbrush/schema';
 
-const RouteSchema = interpolatedString(
+const RouteSchema = parseString(
   object({ userId: string().uuid(), id: number().coerce() }),
   $t => $t`/orders/${t => t.id}/${t => t.userId}`
 );

@@ -17,7 +17,7 @@ export default defineConfig({
         'src/builders/RecordSchemaBuilder.ts',
         'src/builders/ExternSchemaBuilder.ts',
         'src/builders/PromiseSchemaBuilder.ts',
-        'src/builders/InterpolatedStringSchemaBuilder.ts'
+        'src/builders/ParseStringSchemaBuilder.ts'
     ],
     format: ['esm'],
     tsconfig: './tsconfig.build.json',

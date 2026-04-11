@@ -3,7 +3,7 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- bundle-badge-start -->
-[![Bundle size](https://img.shields.io/badge/bundle-19.6%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![Bundle size](https://img.shields.io/badge/bundle-19.5%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
@@ -140,7 +140,7 @@ The following builder functions are available:
 | `enumOf(...values)` | String enum — sugar for `string().oneOf(...)`. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 | `generic(fn)`   | Parameterized schema template. Call `.apply(...schemas)` with concrete schemas to obtain a fully typed concrete schema builder. TypeScript infers the result type from the template function's own generic signature. Optionally pass a `defaults` array as the first argument to enable direct validation without calling `.apply()`. | `.apply(...schemas)`, `.optional()`, `.nullable()`, `.default(value)` |
-| `interpolatedString(objectSchema, templateFn)` | Validates a string against a template pattern and parses it into a strongly-typed object. Property schemas handle their own coercion (e.g. `number().coerce()`). | `.optional()`, `.nullable()`, `.default(value)`, `.readonly()`, `.brand()` |
+| `parseString(objectSchema, templateFn)` | Validates a string against a template pattern and parses it into a strongly-typed object. Property schemas handle their own coercion (e.g. `number().coerce()`). | `.optional()`, `.nullable()`, `.default(value)`, `.readonly()`, `.brand()` |
 
 ## Immutability
 
@@ -483,16 +483,16 @@ if (!result.valid) {
 }
 ```
 
-## Interpolated String Schemas
+## Parse String Schemas
 
-[▶ Open in Playground](https://docs.cleverbrush.com/playground/interpolated-string-basic)
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/parse-string-basic)
 
-Use `interpolatedString(objectSchema, templateFn)` to validate a string against a template pattern and parse it into a strongly-typed object. The template expression uses a tagged-template syntax with type-safe property selectors — you get full IntelliSense in the selector lambdas.
+Use `parseString(objectSchema, templateFn)` to validate a string against a template pattern and parse it into a strongly-typed object. The template expression uses a tagged-template syntax with type-safe property selectors — you get full IntelliSense in the selector lambdas.
 
 ```typescript
-import { interpolatedString, object, string, number, type InferType } from '@cleverbrush/schema';
+import { parseString, object, string, number, type InferType } from '@cleverbrush/schema';
 
-const RouteSchema = interpolatedString(
+const RouteSchema = parseString(
     object({ userId: string().uuid(), id: number().coerce() }),
     $t => $t`/orders/${t => t.id}/${t => t.userId}`
 );
@@ -508,7 +508,7 @@ const result = RouteSchema.validate('/orders/42/550e8400-e29b-41d4-a716-44665544
 **Nested objects** — navigate deep properties via `t => t.parent.child`:
 
 ```typescript
-const schema = interpolatedString(
+const schema = parseString(
     object({
         order: object({ id: number().coerce() }),
         user:  object({ name: string() })
@@ -524,7 +524,7 @@ schema.validate('/orders/42/by/Alice');
 **Coercion** is the property schema's responsibility — the builder passes the raw captured substring directly to each property schema's `validate()`. Use `.coerce()` on `number()`, `boolean()`, or `date()` to convert from strings:
 
 ```typescript
-const LogEntry = interpolatedString(
+const LogEntry = parseString(
     object({
         level:   string(),
         ts:      date().coerce(),
@@ -543,7 +543,7 @@ const result = RouteSchema.validate('/orders/abc/bad-uuid');
 
 ## Coercion
 
-The `number()`, `boolean()`, and `date()` builders each have a `.coerce()` method that adds a preprocessor to convert string values to the target type. This is especially useful with interpolated string schemas where captured segments are always strings, but also works standalone for URL parameters, form inputs, or any other string source.
+The `number()`, `boolean()`, and `date()` builders each have a `.coerce()` method that adds a preprocessor to convert string values to the target type. This is especially useful with parse-string schemas where captured segments are always strings, but also works standalone for URL parameters, form inputs, or any other string source.
 
 ```typescript
 import { number, boolean, date } from '@cleverbrush/schema';
@@ -1556,9 +1556,9 @@ Define a schema once and use it for runtime validation, object mapping between d
 
 ## Exports
 
-**Builder functions:** `any`, `lazy`, `string`, `number`, `boolean`, `func`, `promise`, `object`, `date`, `array`, `union`, `interpolatedString`
+**Builder functions:** `any`, `lazy`, `string`, `number`, `boolean`, `func`, `promise`, `object`, `date`, `array`, `union`, `parseString`
 
-**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `InterpolatedStringSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `PromiseSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
+**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `ParseStringSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `PromiseSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
 
 **Extension system:** `defineExtension`, `withExtensions`, `stringExtensions`, `numberExtensions`, `arrayExtensions`, `nullableExtension`
 

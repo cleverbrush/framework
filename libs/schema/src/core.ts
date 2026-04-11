@@ -25,11 +25,6 @@ export {
     GenericSchemaBuilder,
     generic
 } from './builders/GenericSchemaBuilder.js';
-export type { InterpolatedTemplateTag } from './builders/InterpolatedStringSchemaBuilder.js';
-export {
-    InterpolatedStringSchemaBuilder,
-    interpolatedString
-} from './builders/InterpolatedStringSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
@@ -38,6 +33,11 @@ export {
     object,
     SchemaPropertySelector
 } from './builders/ObjectSchemaBuilder.js';
+export type { ParseStringTemplateTag } from './builders/ParseStringSchemaBuilder.js';
+export {
+    ParseStringSchemaBuilder,
+    parseString
+} from './builders/ParseStringSchemaBuilder.js';
 export {
     PromiseSchemaBuilder,
     promise

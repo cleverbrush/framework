@@ -1,19 +1,18 @@
 import { highlightTS } from '@/lib/highlight';
 
-export default function InterpolatedStringsSection() {
+export default function ParseStringSection() {
     return (
         <>
             <div className="card">
-                <h2>Interpolated String Schemas</h2>
+                <h2>Parse String Schemas</h2>
                 <a
-                    href="/playground/interpolated-string-basic"
+                    href="/playground/parse-string-basic"
                     className="playground-link"
                 >
                     ▶ Open in Playground
                 </a>
                 <p>
-                    Use{' '}
-                    <code>interpolatedString(objectSchema, templateFn)</code> to
+                    Use <code>parseString(objectSchema, templateFn)</code> to
                     validate a string against a template pattern and parse it
                     into a strongly-typed object. The template expression uses a
                     tagged-template syntax with type-safe property selectors —
@@ -23,9 +22,9 @@ export default function InterpolatedStringsSection() {
                     <code
                         // biome-ignore lint/security/noDangerouslySetInnerHtml: static content
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { interpolatedString, object, string, number, type InferType } from '@cleverbrush/schema';
+                            __html: highlightTS(`import { parseString, object, string, number, type InferType } from '@cleverbrush/schema';
 
-const RouteSchema = interpolatedString(
+const RouteSchema = parseString(
     object({ userId: string().uuid(), id: number().coerce() }),
     $t => $t\`/orders/\${t => t.id}/\${t => t.userId}\`
 );
@@ -50,7 +49,7 @@ const result = RouteSchema.validate('/orders/42/550e8400-e29b-41d4-a716-44665544
                     <code
                         // biome-ignore lint/security/noDangerouslySetInnerHtml: static content
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`const schema = interpolatedString(
+                            __html: highlightTS(`const schema = parseString(
     object({
         order: object({ id: number().coerce() }),
         user:  object({ name: string() })
@@ -76,7 +75,7 @@ schema.validate('/orders/42/by/Alice');
                     <code
                         // biome-ignore lint/security/noDangerouslySetInnerHtml: static content
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`const LogEntry = interpolatedString(
+                            __html: highlightTS(`const LogEntry = parseString(
     object({
         level:   string(),
         ts:      date().coerce(),
@@ -173,9 +172,8 @@ schema.validate('/orders/42/by/Alice');
                     <code>date()</code> builders each have a{' '}
                     <code>.coerce()</code> method that adds a preprocessor to
                     convert string values to the target type. This is especially
-                    useful with interpolated string schemas, but also works
-                    standalone for URL parameters, form inputs, or any other
-                    string source.
+                    useful with parse-string schemas, but also works standalone
+                    for URL parameters, form inputs, or any other string source.
                 </p>
                 <pre>
                     <code

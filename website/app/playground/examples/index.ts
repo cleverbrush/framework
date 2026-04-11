@@ -100,12 +100,8 @@ export const EXAMPLE_GROUPS = [
         ids: ['extern-basic']
     },
     {
-        label: 'Interpolated Strings',
-        ids: [
-            'interpolated-string-basic',
-            'interpolated-string-nested',
-            'coerce-methods'
-        ]
+        label: 'Parse String',
+        ids: ['parse-string-basic', 'parse-string-nested', 'coerce-methods']
     }
 ];
 
@@ -1857,17 +1853,17 @@ const r3 = StringList.validate({ items: [1, 2], total: 2 });
         testData: '{ "items": ["a", "b", "c"], "total": 3 }'
     },
 
-    // ── Interpolated Strings ─────────────────────────────
+    // ── Parse String ─────────────────────────────
     {
-        id: 'interpolated-string-basic',
-        title: 'Interpolated String — Basic',
+        id: 'parse-string-basic',
+        title: 'Parse String — Basic',
         description:
-            'Use <code>interpolatedString()</code> to validate a string against a template and parse it into a typed object. Property selectors provide full IntelliSense.',
-        group: 'Interpolated Strings',
-        code: `import { interpolatedString, object, string, number, type InferType } from '@cleverbrush/schema';
+            'Use <code>parseString()</code> to validate a string against a template and parse it into a typed object. Property selectors provide full IntelliSense.',
+        group: 'Parse String',
+        code: `import { parseString, object, string, number, type InferType } from '@cleverbrush/schema';
 
 // Define the result shape and the template pattern
-const RouteSchema = interpolatedString(
+const RouteSchema = parseString(
     object({
         /** UUID of the user */
         userId: string().uuid(),
@@ -1889,20 +1885,20 @@ const result = RouteSchema.validate(
 // Validate a non-matching string
 const bad = RouteSchema.validate('/users/abc');
 // bad.valid === false
-// bad.errors[0].message → "does not match the interpolated string pattern /orders/{id}/{userId}"
+// bad.errors[0].message → "does not match the parse-string pattern /orders/{id}/{userId}"
 `,
         testData: '"/orders/42/550e8400-e29b-41d4-a716-446655440000"'
     },
     {
-        id: 'interpolated-string-nested',
-        title: 'Interpolated String — Nested Objects',
+        id: 'parse-string-nested',
+        title: 'Parse String — Nested Objects',
         description:
             'Navigate deep properties via <code>t => t.parent.child</code>. The builder automatically constructs the nested result object.',
-        group: 'Interpolated Strings',
-        code: `import { interpolatedString, object, string, number, boolean, date, type InferType } from '@cleverbrush/schema';
+        group: 'Parse String',
+        code: `import { parseString, object, string, number, boolean, date, type InferType } from '@cleverbrush/schema';
 
 // Nested objects — selectors navigate the full property tree
-const ApiRoute = interpolatedString(
+const ApiRoute = parseString(
     object({
         order: object({ id: number().coerce() }),
         user:  object({ name: string() })
@@ -1917,7 +1913,7 @@ const result = ApiRoute.validate('/orders/42/by/Alice');
 // result.object → { order: { id: 42 }, user: { name: 'Alice' } }
 
 // Log entry with date coercion
-const LogEntry = interpolatedString(
+const LogEntry = parseString(
     object({
         level:   string(),
         ts:      date().coerce(),
@@ -1936,8 +1932,8 @@ const log = LogEntry.validate('[INFO] 2024-06-15T10:30:00.000Z Server started');
         id: 'coerce-methods',
         title: 'Coercion — .coerce()',
         description:
-            '<code>number()</code>, <code>boolean()</code>, and <code>date()</code> each have a <code>.coerce()</code> method that converts strings to the target type. Works standalone or with interpolated strings.',
-        group: 'Interpolated Strings',
+            '<code>number()</code>, <code>boolean()</code>, and <code>date()</code> each have a <code>.coerce()</code> method that converts strings to the target type. Works standalone or with parse-string schemas.',
+        group: 'Parse String',
         code: `import { number, boolean, date } from '@cleverbrush/schema';
 
 // ── number().coerce() ────────────────────────────────────────

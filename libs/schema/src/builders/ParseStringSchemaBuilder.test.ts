@@ -1,9 +1,9 @@
 import { expect, expectTypeOf, test } from 'vitest';
 import { boolean } from './BooleanSchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
-import { interpolatedString } from './InterpolatedStringSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
+import { parseString } from './ParseStringSchemaBuilder.js';
 import type { InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 
@@ -12,13 +12,13 @@ import { string } from './StringSchemaBuilder.js';
 // ---------------------------------------------------------------------------
 
 test('introspect returns correct metadata', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     );
 
     const info = schema.introspect();
-    expect(info.type).toEqual('interpolatedString');
+    expect(info.type).toEqual('parseString');
     expect(info.isRequired).toEqual(true);
     expect(info.templateDefinition).toBeDefined();
     expect(info.templateDefinition.literals).toEqual(['/orders/', '']);
@@ -32,7 +32,7 @@ test('introspect returns correct metadata', () => {
 // ---------------------------------------------------------------------------
 
 test('basic: single number param', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number().coerce() }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -46,7 +46,7 @@ test('basic: single number param', () => {
 });
 
 test('basic: single string param', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ name: string() }),
         $t => $t`/hello/${t => t.name}`
     );
@@ -64,7 +64,7 @@ test('basic: single string param', () => {
 // ---------------------------------------------------------------------------
 
 test('multiple params', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ userId: string(), id: number().coerce() }),
         $t => $t`/orders/${t => t.id}/${t => t.userId}`
     );
@@ -87,7 +87,7 @@ test('multiple params', () => {
 // ---------------------------------------------------------------------------
 
 test('InferType produces correct object type', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ userId: string(), id: number() }),
         $t => $t`/orders/${t => t.id}/${t => t.userId}`
     );
@@ -101,7 +101,7 @@ test('InferType produces correct object type', () => {
 });
 
 test('validate returns correctly typed object', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ count: number().coerce(), label: string() }),
         $t => $t`${t => t.count}x-${t => t.label}`
     );
@@ -120,7 +120,7 @@ test('validate returns correctly typed object', () => {
 // ---------------------------------------------------------------------------
 
 test('nested object properties', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({
             order: object({ id: number().coerce() }),
             user: object({ name: string() })
@@ -146,7 +146,7 @@ test('nested object properties', () => {
 });
 
 test('InferType with nested objects', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({
             order: object({ id: number() }),
             user: object({ name: string() })
@@ -166,7 +166,7 @@ test('InferType with nested objects', () => {
 // ---------------------------------------------------------------------------
 
 test('pattern mismatch returns error', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -174,11 +174,11 @@ test('pattern mismatch returns error', () => {
     const result = schema.validate('/users/123');
     expect(result.valid).toEqual(false);
     expect(result.errors).toBeDefined();
-    expect(result.errors![0].message).toContain('interpolated string pattern');
+    expect(result.errors![0].message).toContain('parse-string pattern');
 });
 
 test('segment validation failure for non-numeric string', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number().coerce() }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -189,7 +189,7 @@ test('segment validation failure for non-numeric string', () => {
 });
 
 test('segment schema validation failure', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number().coerce().min(10) }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -200,7 +200,7 @@ test('segment schema validation failure', () => {
 });
 
 test('non-string input returns error', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -215,7 +215,7 @@ test('non-string input returns error', () => {
 // ---------------------------------------------------------------------------
 
 test('preprocessor coercion: number', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ val: number().coerce() }),
         $t => $t`v=${t => t.val}`
     );
@@ -229,7 +229,7 @@ test('preprocessor coercion: number', () => {
 });
 
 test('preprocessor coercion: boolean true', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ flag: boolean().coerce() }),
         $t => $t`flag=${t => t.flag}`
     );
@@ -243,7 +243,7 @@ test('preprocessor coercion: boolean true', () => {
 });
 
 test('preprocessor coercion: boolean false', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ flag: boolean().coerce() }),
         $t => $t`flag=${t => t.flag}`
     );
@@ -254,7 +254,7 @@ test('preprocessor coercion: boolean false', () => {
 });
 
 test('preprocessor coercion: boolean invalid', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ flag: boolean().coerce() }),
         $t => $t`flag=${t => t.flag}`
     );
@@ -265,7 +265,7 @@ test('preprocessor coercion: boolean invalid', () => {
 });
 
 test('preprocessor coercion: date', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ when: date().coerce() }),
         $t => $t`at=${t => t.when}`
     );
@@ -280,7 +280,7 @@ test('preprocessor coercion: date', () => {
 });
 
 test('preprocessor coercion: invalid date', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ when: date().coerce() }),
         $t => $t`at=${t => t.when}`
     );
@@ -291,7 +291,7 @@ test('preprocessor coercion: invalid date', () => {
 });
 
 test('string passes through without preprocessor', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ tag: string() }),
         $t => $t`#${t => t.tag}`
     );
@@ -306,7 +306,7 @@ test('string passes through without preprocessor', () => {
 // ---------------------------------------------------------------------------
 
 test('property schema constraints are applied', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ name: string().minLength(3) }),
         $t => $t`/user/${t => t.name}`
     );
@@ -328,7 +328,7 @@ test('property schema constraints are applied', () => {
 // ---------------------------------------------------------------------------
 
 test('optional accepts undefined', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     ).optional();
@@ -342,7 +342,7 @@ test('optional accepts undefined', () => {
 });
 
 test('nullable accepts null', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     ).nullable();
@@ -356,7 +356,7 @@ test('nullable accepts null', () => {
 });
 
 test('default returns default value for undefined input', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     ).default({ id: 0 });
@@ -370,7 +370,7 @@ test('default returns default value for undefined input', () => {
 });
 
 test('required rejects undefined', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -384,7 +384,7 @@ test('required rejects undefined', () => {
 // ---------------------------------------------------------------------------
 
 test('literals with regex special characters are escaped', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ q: string() }),
         $t => $t`search?q=${t => t.q}&page=1`
     );
@@ -395,7 +395,7 @@ test('literals with regex special characters are escaped', () => {
 });
 
 test('literals with dots and brackets', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ version: string() }),
         $t => $t`file[${t => t.version}].tar.gz`
     );
@@ -410,14 +410,14 @@ test('literals with dots and brackets', () => {
 // ---------------------------------------------------------------------------
 
 test('no params — acts as string equality check', () => {
-    const schema = interpolatedString(object({}), $t => $t`/health`);
+    const schema = parseString(object({}), $t => $t`/health`);
 
     expect(schema.validate('/health').valid).toEqual(true);
     expect(schema.validate('/other').valid).toEqual(false);
 });
 
 test('single param with no surrounding literals', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ val: string() }),
         $t => $t`${t => t.val}`
     );
@@ -428,7 +428,7 @@ test('single param with no surrounding literals', () => {
 });
 
 test('param at start with trailing literal', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ name: string() }),
         $t => $t`${t => t.name}.json`
     );
@@ -444,7 +444,7 @@ test('param at start with trailing literal', () => {
 
 test('duplicate property selector throws at creation', () => {
     expect(() =>
-        interpolatedString(
+        parseString(
             object({ id: number() }),
             $t => $t`${t => t.id}/${t => t.id}`
         )
@@ -456,7 +456,7 @@ test('duplicate property selector throws at creation', () => {
 // ---------------------------------------------------------------------------
 
 test('validateAsync works', async () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number().coerce(), name: string() }),
         $t => $t`/users/${t => t.id}/${t => t.name}`
     );
@@ -470,7 +470,7 @@ test('validateAsync works', async () => {
 });
 
 test('validateAsync with failure', async () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -484,7 +484,7 @@ test('validateAsync with failure', async () => {
 // ---------------------------------------------------------------------------
 
 test('doNotStopOnFirstError collects all segment errors', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ a: number(), b: number() }),
         $t => $t`${t => t.a}/${t => t.b}`
     );
@@ -503,7 +503,7 @@ test('doNotStopOnFirstError collects all segment errors', () => {
 // ---------------------------------------------------------------------------
 
 test('immutability: optional returns new instance', () => {
-    const original = interpolatedString(
+    const original = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     );
@@ -518,7 +518,7 @@ test('immutability: optional returns new instance', () => {
 // ---------------------------------------------------------------------------
 
 test('nullable + optional combined', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     )
@@ -530,7 +530,7 @@ test('nullable + optional combined', () => {
 });
 
 test('InferType with optional', () => {
-    const schema = interpolatedString(
+    const schema = parseString(
         object({ id: number() }),
         $t => $t`/orders/${t => t.id}`
     ).optional();

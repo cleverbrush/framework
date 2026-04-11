@@ -27,7 +27,7 @@ type SegmentDef = {
 };
 
 /** Internal data captured by the `$template` tagged-template invocation. */
-type InterpolatedTemplateDefinition = {
+type ParseStringTemplateDefinition = {
     /** Literal string fragments from the tagged template. */
     literals: readonly string[];
     /** One segment per interpolation expression, in order. */
@@ -39,7 +39,7 @@ type InterpolatedTemplateDefinition = {
 // ---------------------------------------------------------------------------
 
 /**
- * The typed tagged-template function passed to the `interpolatedString`
+ * The typed tagged-template function passed to the `parseString`
  * callback. Template expressions must be property-selector lambdas that
  * navigate the {@link PropertyDescriptorTree} of the object schema.
  *
@@ -47,7 +47,7 @@ type InterpolatedTemplateDefinition = {
  * are selectable — nested `ObjectSchemaBuilder` children are navigable but
  * not themselves endpoints.
  */
-export type InterpolatedTemplateTag<
+export type ParseStringTemplateTag<
     TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = (
     strings: TemplateStringsArray,
@@ -60,12 +60,12 @@ export type InterpolatedTemplateTag<
             >
         ) => PropertyDescriptor<TSchema, any, any>
     >
-) => InterpolatedTemplateDefinition;
+) => ParseStringTemplateDefinition;
 
-type InterpolatedStringSchemaBuilderCreateProps<
+type ParseStringSchemaBuilderCreateProps<
     T = any,
     R extends boolean = true
-> = Partial<ReturnType<InterpolatedStringSchemaBuilder<T, R>['introspect']>>;
+> = Partial<ReturnType<ParseStringSchemaBuilder<T, R>['introspect']>>;
 
 // ---------------------------------------------------------------------------
 // Regex helper
@@ -134,13 +134,13 @@ function createPathTrackingProxy(tree: any): {
 // ---------------------------------------------------------------------------
 
 /**
- * Validates a string against an interpolated template pattern and parses it
+ * Validates a string against a template pattern and parses it
  * into a strongly-typed object.
  *
- * Created via the {@link interpolatedString} factory:
+ * Created via the {@link parseString} factory:
  *
  * ```ts
- * const RouteSchema = interpolatedString(
+ * const RouteSchema = parseString(
  *   object({ userId: string().uuid(), id: number() }),
  *   $t => $t`/orders/${t => t.id}/${t => t.userId}`
  * );
@@ -149,9 +149,9 @@ function createPathTrackingProxy(tree: any): {
  * // result.object === { id: 42, userId: '550e8400-...' }
  * ```
  *
- * @see {@link interpolatedString}
+ * @see {@link parseString}
  */
-export class InterpolatedStringSchemaBuilder<
+export class ParseStringSchemaBuilder<
     TResult = any,
     TRequired extends boolean = true,
     TNullable extends boolean = false,
@@ -165,20 +165,20 @@ export class InterpolatedStringSchemaBuilder<
     TExtensions
 > {
     #objectSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
-    #templateDef: InterpolatedTemplateDefinition;
+    #templateDef: ParseStringTemplateDefinition;
     #compiledRegex: RegExp | null = null;
 
     /**
      * @hidden
      */
-    public static create(props: InterpolatedStringSchemaBuilderCreateProps) {
-        return new InterpolatedStringSchemaBuilder({
-            type: 'interpolatedString',
+    public static create(props: ParseStringSchemaBuilderCreateProps) {
+        return new ParseStringSchemaBuilder({
+            type: 'parseString',
             ...props
         });
     }
 
-    protected constructor(props: InterpolatedStringSchemaBuilderCreateProps) {
+    protected constructor(props: ParseStringSchemaBuilderCreateProps) {
         super(props as any);
 
         this.#objectSchema = props.objectSchema!;
@@ -369,7 +369,7 @@ export class InterpolatedStringSchemaBuilder<
                 valid: false,
                 errors: [
                     {
-                        message: `does not match the interpolated string pattern ${this.#humanPattern()}`
+                        message: `does not match the parse-string pattern ${this.#humanPattern()}`
                     }
                 ]
             } as any;
@@ -471,13 +471,7 @@ export class InterpolatedStringSchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): InterpolatedStringSchemaBuilder<
-        T,
-        true,
-        TNullable,
-        THasDefault,
-        TExtensions
-    > &
+    ): ParseStringSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -487,7 +481,7 @@ export class InterpolatedStringSchemaBuilder<
     /**
      * @inheritdoc
      */
-    public clearHasType(): InterpolatedStringSchemaBuilder<
+    public clearHasType(): ParseStringSchemaBuilder<
         any,
         TRequired,
         TNullable,
@@ -503,7 +497,7 @@ export class InterpolatedStringSchemaBuilder<
     /**
      * @hidden
      */
-    public nullable(): InterpolatedStringSchemaBuilder<
+    public nullable(): ParseStringSchemaBuilder<
         TResult,
         TRequired,
         true,
@@ -517,7 +511,7 @@ export class InterpolatedStringSchemaBuilder<
     /**
      * @hidden
      */
-    public notNullable(): InterpolatedStringSchemaBuilder<
+    public notNullable(): ParseStringSchemaBuilder<
         TResult,
         TRequired,
         false,
@@ -533,7 +527,7 @@ export class InterpolatedStringSchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): InterpolatedStringSchemaBuilder<
+    ): ParseStringSchemaBuilder<
         TResult,
         true,
         TNullable,
@@ -547,7 +541,7 @@ export class InterpolatedStringSchemaBuilder<
     /**
      * @hidden
      */
-    public optional(): InterpolatedStringSchemaBuilder<
+    public optional(): ParseStringSchemaBuilder<
         TResult,
         false,
         TNullable,
@@ -563,13 +557,7 @@ export class InterpolatedStringSchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): InterpolatedStringSchemaBuilder<
-        TResult,
-        true,
-        TNullable,
-        true,
-        TExtensions
-    > &
+    ): ParseStringSchemaBuilder<TResult, true, TNullable, true, TExtensions> &
         TExtensions {
         return super.default(value) as any;
     }
@@ -577,7 +565,7 @@ export class InterpolatedStringSchemaBuilder<
     /**
      * @hidden
      */
-    public clearDefault(): InterpolatedStringSchemaBuilder<
+    public clearDefault(): ParseStringSchemaBuilder<
         TResult,
         TRequired,
         TNullable,
@@ -593,7 +581,7 @@ export class InterpolatedStringSchemaBuilder<
      */
     public brand<TBrand extends string | symbol>(
         _name?: TBrand
-    ): InterpolatedStringSchemaBuilder<
+    ): ParseStringSchemaBuilder<
         TResult & { readonly [K in BRAND]: TBrand },
         TRequired,
         TNullable,
@@ -607,7 +595,7 @@ export class InterpolatedStringSchemaBuilder<
     /**
      * @hidden
      */
-    public readonly(): InterpolatedStringSchemaBuilder<
+    public readonly(): ParseStringSchemaBuilder<
         Readonly<TResult>,
         TRequired,
         TNullable,
@@ -619,9 +607,9 @@ export class InterpolatedStringSchemaBuilder<
     }
 
     protected createFromProps<T, TReq extends boolean>(
-        props: InterpolatedStringSchemaBuilderCreateProps<T, TReq>
+        props: ParseStringSchemaBuilderCreateProps<T, TReq>
     ): this {
-        return InterpolatedStringSchemaBuilder.create(props as any) as any;
+        return ParseStringSchemaBuilder.create(props as any) as any;
     }
 }
 
@@ -630,7 +618,7 @@ export class InterpolatedStringSchemaBuilder<
 // ---------------------------------------------------------------------------
 
 /**
- * Creates an interpolated string schema that validates a string against a
+ * Creates a parse-string schema that validates a string against a
  * template pattern and parses it into a strongly-typed object.
  *
  * The first argument defines the result shape via `object(...)`, and the
@@ -639,7 +627,7 @@ export class InterpolatedStringSchemaBuilder<
  *
  * @example
  * ```ts
- * const RouteSchema = interpolatedString(
+ * const RouteSchema = parseString(
  *   object({
  *     userId: string().uuid(),
  *     id: number()
@@ -657,7 +645,7 @@ export class InterpolatedStringSchemaBuilder<
  *
  * @example Nested objects
  * ```ts
- * const schema = interpolatedString(
+ * const schema = parseString(
  *   object({
  *     order: object({ id: number() }),
  *     user: object({ name: string() })
@@ -670,17 +658,17 @@ export class InterpolatedStringSchemaBuilder<
  *   per-property validation schemas.
  * @param templateBuilder - Callback receiving the typed `$template`
  *   tagged-template function. Must return the result of invoking `$template`.
- * @returns An `InterpolatedStringSchemaBuilder` whose `validate()` accepts a
+ * @returns A `ParseStringSchemaBuilder` whose `validate()` accepts a
  *   string and whose `InferType` is the object schema's inferred type.
  */
-export function interpolatedString<
+export function parseString<
     TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 >(
     objectSchema: TSchema,
     templateBuilder: (
-        $template: InterpolatedTemplateTag<TSchema>
-    ) => InterpolatedTemplateDefinition
-): InterpolatedStringSchemaBuilder<InferType<TSchema>> {
+        $template: ParseStringTemplateTag<TSchema>
+    ) => ParseStringTemplateDefinition
+): ParseStringSchemaBuilder<InferType<TSchema>> {
     if (!(objectSchema instanceof ObjectSchemaBuilder)) {
         throw new Error(
             'First argument must be an ObjectSchemaBuilder instance'
@@ -694,7 +682,7 @@ export function interpolatedString<
     const $template = ((
         strings: TemplateStringsArray,
         ...selectors: Array<(t: any) => any>
-    ): InterpolatedTemplateDefinition => {
+    ): ParseStringTemplateDefinition => {
         const seenPaths = new Set<string>();
         const segments: SegmentDef[] = [];
 
@@ -750,11 +738,11 @@ export function interpolatedString<
             literals: [...strings],
             segments
         };
-    }) as InterpolatedTemplateTag<TSchema>;
+    }) as ParseStringTemplateTag<TSchema>;
 
     const templateDef = templateBuilder($template);
 
-    return InterpolatedStringSchemaBuilder.create({
+    return ParseStringSchemaBuilder.create({
         isRequired: true,
         objectSchema: objectSchema as any,
         templateDefinition: templateDef
