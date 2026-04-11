@@ -1,0 +1,48 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^2.0.0",
+        "@cleverbrush/di": "^2.0.0"
+    },
+    "description": "Schema-first HTTP server framework — schema-driven controllers, DI, auto-validation, RFC 9457 errors",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/server",
+    "keywords": [
+        "http",
+        "server",
+        "schema",
+        "dependency injection",
+        "validation",
+        "typescript",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/server",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/server#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "1.0.0"
+}

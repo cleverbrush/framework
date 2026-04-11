@@ -9,6 +9,7 @@
         { "path": "libs/knex-schema/tsconfig.build.json" },
         { "path": "libs/react-form" },
         { "path": "libs/scheduler" },
-        { "path": "libs/di" }
+        { "path": "libs/di" },
+        { "path": "libs/server" }
     ]
 }

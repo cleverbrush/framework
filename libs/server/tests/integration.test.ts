@@ -1,0 +1,1360 @@
+import http from 'node:http';
+import {
+    any,
+    func,
+    number,
+    object,
+    parseString,
+    promise,
+    string
+} from '@cleverbrush/schema';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { NotFoundError } from '../src/HttpError.js';
+import { HttpResponse } from '../src/HttpResponse.js';
+import type { RequestContext } from '../src/RequestContext.js';
+import { createServer, type Server } from '../src/Server.js';
+import type { Middleware } from '../src/types.js';
+import { body, context, header, path, query } from '../src/types.js';
+
+// ---------------------------------------------------------------------------
+// Shared HTTP request helper
+// ---------------------------------------------------------------------------
+
+function request(
+    server: Server,
+    method: string,
+    urlPath: string,
+    options: { body?: unknown; headers?: Record<string, string> } = {}
+): Promise<{
+    status: number;
+    headers: http.IncomingHttpHeaders;
+    body: string;
+}> {
+    const addr = server.address!;
+    return new Promise((resolve, reject) => {
+        const reqHeaders: Record<string, string> = {
+            ...(options.headers ?? {})
+        };
+        if (options.body !== undefined && !reqHeaders['content-type']) {
+            reqHeaders['content-type'] = 'application/json';
+        }
+
+        const req = http.request(
+            {
+                hostname: addr.host === '0.0.0.0' ? '127.0.0.1' : addr.host,
+                port: addr.port,
+                path: urlPath,
+                method,
+                headers: reqHeaders
+            },
+            res => {
+                const chunks: Buffer[] = [];
+                res.on('data', (chunk: Buffer) => chunks.push(chunk));
+                res.on('end', () => {
+                    resolve({
+                        status: res.statusCode!,
+                        headers: res.headers,
+                        body: Buffer.concat(chunks).toString()
+                    });
+                });
+            }
+        );
+        req.on('error', reject);
+        if (options.body !== undefined) {
+            req.write(JSON.stringify(options.body));
+        }
+        req.end();
+    });
+}
+
+function json(res: { body: string }) {
+    return JSON.parse(res.body);
+}
+
+// ===========================================================================
+// 1. Todo CRUD lifecycle — realistic multi-endpoint integration
+// ===========================================================================
+
+describe('Integration: Todo CRUD lifecycle', () => {
+    let server: Server;
+
+    const TodoByIdPath = parseString(
+        object({ id: number().coerce() }),
+        $t => $t`/${t => t.id}`
+    );
+
+    const TodoSchema = object({
+        list: func().hasReturnType(promise(any())),
+        getById: func()
+            .addParameter(object({ id: number() }))
+            .hasReturnType(promise(any())),
+        create: func()
+            .addParameter(object({ title: string() }))
+            .hasReturnType(promise(any())),
+        update: func()
+            .addParameter(object({ id: number() }))
+            .addParameter(
+                object({
+                    title: string().optional(),
+                    completed: any().optional()
+                })
+            )
+            .hasReturnType(promise(any())),
+        remove: func()
+            .addParameter(object({ id: number() }))
+            .hasReturnType(promise(any()))
+    });
+
+    let todos: Map<number, { id: number; title: string; completed: boolean }>;
+    let nextId: number;
+
+    class TodoController {
+        async list() {
+            return [...todos.values()];
+        }
+        async getById({ id }: { id: number }) {
+            const todo = todos.get(id);
+            if (!todo) throw new NotFoundError(`Todo ${id} not found`);
+            return todo;
+        }
+        async create({ title }: { title: string }) {
+            const todo = { id: nextId++, title, completed: false };
+            todos.set(todo.id, todo);
+            return HttpResponse.created(todo, `/api/todos/${todo.id}`);
+        }
+        async update(
+            { id }: { id: number },
+            patch: { title?: string; completed?: boolean }
+        ) {
+            const todo = todos.get(id);
+            if (!todo) throw new NotFoundError(`Todo ${id} not found`);
+            if (patch.title !== undefined) todo.title = patch.title;
+            if (patch.completed !== undefined) todo.completed = patch.completed;
+            return todo;
+        }
+        async remove({ id }: { id: number }) {
+            const todo = todos.get(id);
+            if (!todo) throw new NotFoundError(`Todo ${id} not found`);
+            todos.delete(id);
+            return HttpResponse.noContent();
+        }
+    }
+
+    beforeEach(async () => {
+        todos = new Map();
+        nextId = 1;
+
+        server = await createServer()
+            .controller(TodoSchema, TodoController, {
+                basePath: '/api/todos',
+                routes: {
+                    list: { method: 'GET', path: '/' },
+                    getById: {
+                        method: 'GET',
+                        path: TodoByIdPath,
+                        params: [path()]
+                    },
+                    create: {
+                        method: 'POST',
+                        path: '/',
+                        params: [body()]
+                    },
+                    update: {
+                        method: 'PATCH',
+                        path: TodoByIdPath,
+                        params: [path(), body()]
+                    },
+                    remove: {
+                        method: 'DELETE',
+                        path: TodoByIdPath,
+                        params: [path()]
+                    }
+                }
+            })
+            .listen(0);
+    });
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('starts with an empty list', async () => {
+        const res = await request(server, 'GET', '/api/todos/');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual([]);
+    });
+
+    it('creates a todo and returns 201 with location header', async () => {
+        const res = await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Buy milk' }
+        });
+        expect(res.status).toBe(201);
+        expect(res.headers['location']).toBe('/api/todos/1');
+        const todo = json(res);
+        expect(todo).toEqual({ id: 1, title: 'Buy milk', completed: false });
+    });
+
+    it('lists created todos', async () => {
+        await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Buy milk' }
+        });
+        await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Walk the dog' }
+        });
+
+        const res = await request(server, 'GET', '/api/todos/');
+        expect(res.status).toBe(200);
+        const list = json(res);
+        expect(list).toHaveLength(2);
+        expect(list[0].title).toBe('Buy milk');
+        expect(list[1].title).toBe('Walk the dog');
+    });
+
+    it('gets a todo by id', async () => {
+        await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Buy milk' }
+        });
+        const res = await request(server, 'GET', '/api/todos/1');
+        expect(res.status).toBe(200);
+        expect(json(res).title).toBe('Buy milk');
+    });
+
+    it('updates a todo (partial patch)', async () => {
+        await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Buy milk' }
+        });
+
+        const res = await request(server, 'PATCH', '/api/todos/1', {
+            body: { completed: true }
+        });
+        expect(res.status).toBe(200);
+        const todo = json(res);
+        expect(todo.completed).toBe(true);
+        expect(todo.title).toBe('Buy milk');
+    });
+
+    it('renames a todo', async () => {
+        await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Buy milk' }
+        });
+        const res = await request(server, 'PATCH', '/api/todos/1', {
+            body: { title: 'Buy oat milk' }
+        });
+        expect(res.status).toBe(200);
+        expect(json(res).title).toBe('Buy oat milk');
+    });
+
+    it('deletes a todo with 204', async () => {
+        await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Buy milk' }
+        });
+        const res = await request(server, 'DELETE', '/api/todos/1');
+        expect(res.status).toBe(204);
+        expect(res.body).toBe('');
+
+        const list = await request(server, 'GET', '/api/todos/');
+        expect(json(list)).toEqual([]);
+    });
+
+    it('returns 404 for non-existent todo', async () => {
+        const res = await request(server, 'GET', '/api/todos/999');
+        expect(res.status).toBe(404);
+        const pd = json(res);
+        expect(pd.title).toBe('Not Found');
+        expect(pd.detail).toBe('Todo 999 not found');
+    });
+
+    it('returns 400 when required body field is missing', async () => {
+        const res = await request(server, 'POST', '/api/todos/', {
+            body: {}
+        });
+        expect(res.status).toBe(400);
+        const pd = json(res);
+        expect(pd.status).toBe(400);
+        expect(pd.errors).toBeDefined();
+    });
+
+    it('returns 405 for unsupported method on a route', async () => {
+        const res = await request(server, 'PUT', '/api/todos/1', {
+            body: { title: 'x' }
+        });
+        expect(res.status).toBe(405);
+        expect(res.headers['allow']).toBeDefined();
+    });
+
+    it('full lifecycle: create, read, update, delete, verify gone', async () => {
+        const c = await request(server, 'POST', '/api/todos/', {
+            body: { title: 'Test item' }
+        });
+        expect(c.status).toBe(201);
+        const id = json(c).id;
+
+        const r = await request(server, 'GET', `/api/todos/${id}`);
+        expect(r.status).toBe(200);
+        expect(json(r).title).toBe('Test item');
+
+        const u = await request(server, 'PATCH', `/api/todos/${id}`, {
+            body: { completed: true, title: 'Updated' }
+        });
+        expect(u.status).toBe(200);
+        expect(json(u)).toMatchObject({
+            id,
+            title: 'Updated',
+            completed: true
+        });
+
+        const d = await request(server, 'DELETE', `/api/todos/${id}`);
+        expect(d.status).toBe(204);
+
+        const g = await request(server, 'GET', `/api/todos/${id}`);
+        expect(g.status).toBe(404);
+    });
+});
+
+// ===========================================================================
+// 2. Query parameter extraction
+// ===========================================================================
+
+describe('Integration: query parameters', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('resolves named query parameters', async () => {
+        const Schema = object({
+            search: func()
+                .addParameter(string())
+                .addParameter(number().coerce())
+                .hasReturnType(promise(any()))
+        });
+        class Controller {
+            async search(q: string, limit: number) {
+                return { q, limit };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    search: {
+                        method: 'GET',
+                        path: '/search',
+                        params: [query('q'), query('limit')]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(
+            server,
+            'GET',
+            '/api/search?q=hello&limit=10'
+        );
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ q: 'hello', limit: 10 });
+    });
+});
+
+// ===========================================================================
+// 3. Header parameter extraction
+// ===========================================================================
+
+describe('Integration: header parameters', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('resolves named header parameters', async () => {
+        const Schema = object({
+            check: func().addParameter(string()).hasReturnType(any())
+        });
+        class Controller {
+            check(token: string) {
+                return { token };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    check: {
+                        method: 'GET',
+                        path: '/check',
+                        params: [header('x-api-key')]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/check', {
+            headers: { 'x-api-key': 'secret-123' }
+        });
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ token: 'secret-123' });
+    });
+});
+
+// ===========================================================================
+// 4. Context injection
+// ===========================================================================
+
+describe('Integration: context injection', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('injects RequestContext via context() param source', async () => {
+        const Schema = object({
+            info: func().addParameter(any()).hasReturnType(any())
+        });
+        class Controller {
+            info(ctx: RequestContext) {
+                return {
+                    method: ctx.method,
+                    path: ctx.url.pathname,
+                    host: ctx.headers['host']
+                };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    info: {
+                        method: 'GET',
+                        path: '/info',
+                        params: [context()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/info');
+        expect(res.status).toBe(200);
+        const data = json(res);
+        expect(data.method).toBe('GET');
+        expect(data.path).toBe('/api/info');
+    });
+});
+
+// ===========================================================================
+// 5. Middleware (global and controller-level)
+// ===========================================================================
+
+describe('Integration: middleware', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('global middleware executes in registration order (onion model)', async () => {
+        const Schema = object({ get: func().hasReturnType(any()) });
+        const order: string[] = [];
+
+        class Controller {
+            get() {
+                order.push('handler');
+                return 'ok';
+            }
+        }
+
+        const mw1: Middleware = async (_ctx, next) => {
+            order.push('global-1-before');
+            await next();
+            order.push('global-1-after');
+        };
+        const mw2: Middleware = async (_ctx, next) => {
+            order.push('global-2-before');
+            await next();
+            order.push('global-2-after');
+        };
+
+        server = await createServer()
+            .use(mw1)
+            .use(mw2)
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/test' } }
+            })
+            .listen(0);
+
+        await request(server, 'GET', '/api/test');
+        expect(order).toEqual([
+            'global-1-before',
+            'global-2-before',
+            'handler',
+            'global-2-after',
+            'global-1-after'
+        ]);
+    });
+
+    it('controller-level middleware runs after global middleware', async () => {
+        const Schema = object({ get: func().hasReturnType(any()) });
+        const order: string[] = [];
+
+        class Controller {
+            get() {
+                order.push('handler');
+                return 'ok';
+            }
+        }
+
+        const globalMw: Middleware = async (_ctx, next) => {
+            order.push('global');
+            await next();
+        };
+        const controllerMw: Middleware = async (_ctx, next) => {
+            order.push('controller');
+            await next();
+        };
+
+        server = await createServer()
+            .use(globalMw)
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/test' } },
+                middlewares: [controllerMw]
+            })
+            .listen(0);
+
+        await request(server, 'GET', '/api/test');
+        expect(order).toEqual(['global', 'controller', 'handler']);
+    });
+
+    it('middleware can short-circuit by not calling next()', async () => {
+        const Schema = object({ get: func().hasReturnType(any()) });
+        let handlerCalled = false;
+
+        class Controller {
+            get() {
+                handlerCalled = true;
+                return 'should not reach';
+            }
+        }
+
+        const authMw: Middleware = async (ctx, _next) => {
+            ctx.response.writeHead(401, {
+                'content-type': 'application/json'
+            });
+            ctx.response.end(JSON.stringify({ error: 'Unauthorized' }));
+            ctx.responded = true;
+        };
+
+        server = await createServer()
+            .use(authMw)
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/secure' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/secure');
+        expect(res.status).toBe(401);
+        expect(json(res)).toEqual({ error: 'Unauthorized' });
+        expect(handlerCalled).toBe(false);
+    });
+
+    it('middleware can store data in context items for the handler', async () => {
+        const Schema = object({
+            get: func().addParameter(any()).hasReturnType(any())
+        });
+
+        class Controller {
+            get(ctx: RequestContext) {
+                return { user: ctx.items.get('userId') };
+            }
+        }
+
+        const authMw: Middleware = async (ctx, next) => {
+            ctx.items.set('userId', 'user-42');
+            await next();
+        };
+
+        server = await createServer()
+            .use(authMw)
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    get: {
+                        method: 'GET',
+                        path: '/whoami',
+                        params: [context()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/whoami');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ user: 'user-42' });
+    });
+});
+
+// ===========================================================================
+// 6. DI (dependency injection) integration
+// ===========================================================================
+
+describe('Integration: dependency injection', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('injects singleton dependency into controller', async () => {
+        const IConfig = object({ dbUrl: string() });
+        const Schema = object({
+            getConfig: func().hasReturnType(any())
+        }).addConstructor(func().addParameter(IConfig));
+
+        class Controller {
+            #config: any;
+            constructor(config: any) {
+                this.#config = config;
+            }
+            getConfig() {
+                return { dbUrl: this.#config.dbUrl };
+            }
+        }
+
+        server = await createServer()
+            .services(svc => {
+                svc.addSingleton(IConfig, {
+                    dbUrl: 'postgres://localhost/test'
+                });
+            })
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    getConfig: { method: 'GET', path: '/config' }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/config');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ dbUrl: 'postgres://localhost/test' });
+    });
+
+    it('injects multiple dependencies', async () => {
+        const ILogger = object({ name: string() });
+        const IDb = object({ host: string() });
+        const Schema = object({
+            info: func().hasReturnType(any())
+        }).addConstructor(func().addParameter(ILogger).addParameter(IDb));
+
+        class Controller {
+            #logger: any;
+            #db: any;
+            constructor(logger: any, db: any) {
+                this.#logger = logger;
+                this.#db = db;
+            }
+            info() {
+                return {
+                    logger: this.#logger.name,
+                    db: this.#db.host
+                };
+            }
+        }
+
+        server = await createServer()
+            .services(svc => {
+                svc.addSingleton(ILogger, { name: 'app-logger' });
+                svc.addSingleton(IDb, { host: 'db.local' });
+            })
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { info: { method: 'GET', path: '/info' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/info');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({
+            logger: 'app-logger',
+            db: 'db.local'
+        });
+    });
+});
+
+// ===========================================================================
+// 7. Multiple controllers
+// ===========================================================================
+
+describe('Integration: multiple controllers', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('routes requests to the correct controller', async () => {
+        const UsersSchema = object({
+            list: func().hasReturnType(any())
+        });
+        const PostsSchema = object({
+            list: func().hasReturnType(any())
+        });
+
+        class UsersController {
+            list() {
+                return [{ name: 'Alice' }];
+            }
+        }
+        class PostsController {
+            list() {
+                return [{ title: 'Hello World' }];
+            }
+        }
+
+        server = await createServer()
+            .controller(UsersSchema, UsersController, {
+                basePath: '/api/users',
+                routes: { list: { method: 'GET', path: '/' } }
+            })
+            .controller(PostsSchema, PostsController, {
+                basePath: '/api/posts',
+                routes: { list: { method: 'GET', path: '/' } }
+            })
+            .listen(0);
+
+        const users = await request(server, 'GET', '/api/users/');
+        const posts = await request(server, 'GET', '/api/posts/');
+        expect(json(users)).toEqual([{ name: 'Alice' }]);
+        expect(json(posts)).toEqual([{ title: 'Hello World' }]);
+    });
+});
+
+// ===========================================================================
+// 8. Error handling
+// ===========================================================================
+
+describe('Integration: error handling', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('returns RFC 9457 ProblemDetails for HttpError subclasses', async () => {
+        const Schema = object({
+            get: func().hasReturnType(promise(any()))
+        });
+        class Controller {
+            async get() {
+                throw new NotFoundError('Resource not found');
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/missing' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/missing');
+        expect(res.status).toBe(404);
+        expect(res.headers['content-type']).toContain(
+            'application/problem+json'
+        );
+        const pd = json(res);
+        expect(pd.status).toBe(404);
+        expect(pd.title).toBe('Not Found');
+        expect(pd.detail).toBe('Resource not found');
+    });
+
+    it('returns 500 ProblemDetails for unexpected errors without leaking details', async () => {
+        const Schema = object({ get: func() });
+        class Controller {
+            get() {
+                throw new Error('database connection lost');
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/crash' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/crash');
+        expect(res.status).toBe(500);
+        expect(res.headers['content-type']).toContain(
+            'application/problem+json'
+        );
+        const pd = json(res);
+        expect(pd.status).toBe(500);
+        expect(pd.detail).toBeUndefined();
+    });
+
+    it('returns 404 for completely unknown path', async () => {
+        const Schema = object({ get: func() });
+        class Controller {
+            get() {
+                return 'ok';
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/known' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/nothing-here');
+        expect(res.status).toBe(404);
+    });
+
+    it('returns 405 with Allow header listing valid methods', async () => {
+        const Schema = object({
+            list: func(),
+            create: func()
+        });
+        class Controller {
+            list() {
+                return [];
+            }
+            create() {
+                return {};
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    list: { method: 'GET', path: '/items' },
+                    create: { method: 'POST', path: '/items' }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'DELETE', '/api/items');
+        expect(res.status).toBe(405);
+        const allow = res.headers['allow'];
+        expect(allow).toBeDefined();
+        expect(allow).toContain('GET');
+        expect(allow).toContain('POST');
+    });
+
+    it('returns 400 with validation errors for invalid body', async () => {
+        const Schema = object({
+            create: func()
+                .addParameter(object({ name: string(), age: number() }))
+                .hasReturnType(promise(any()))
+        });
+        class Controller {
+            async create(_data: any) {
+                return { ok: true };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    create: {
+                        method: 'POST',
+                        path: '/users',
+                        params: [body()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'POST', '/api/users', {
+            body: { name: 123 }
+        });
+        expect(res.status).toBe(400);
+        const pd = json(res);
+        expect(pd.status).toBe(400);
+        expect(pd.errors.length).toBeGreaterThan(0);
+    });
+});
+
+// ===========================================================================
+// 9. HttpResponse static factories
+// ===========================================================================
+
+describe('Integration: HttpResponse', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('HttpResponse.ok() returns 200', async () => {
+        const Schema = object({ get: func() });
+        class Controller {
+            get() {
+                return HttpResponse.ok({ message: 'hello' });
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/ok' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/ok');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ message: 'hello' });
+    });
+
+    it('HttpResponse.created() returns 201 with location', async () => {
+        const Schema = object({ create: func() });
+        class Controller {
+            create() {
+                return HttpResponse.created({ id: 5 }, '/api/resources/5');
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { create: { method: 'POST', path: '/resources' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'POST', '/api/resources');
+        expect(res.status).toBe(201);
+        expect(res.headers['location']).toBe('/api/resources/5');
+        expect(json(res)).toEqual({ id: 5 });
+    });
+
+    it('HttpResponse.noContent() returns 204 with empty body', async () => {
+        const Schema = object({ del: func() });
+        class Controller {
+            del() {
+                return HttpResponse.noContent();
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { del: { method: 'DELETE', path: '/item' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'DELETE', '/api/item');
+        expect(res.status).toBe(204);
+        expect(res.body).toBe('');
+    });
+
+    it('HttpResponse.redirect() returns 302', async () => {
+        const Schema = object({ go: func() });
+        class Controller {
+            go() {
+                return HttpResponse.redirect('/api/new-location');
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { go: { method: 'GET', path: '/old' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/old');
+        expect(res.status).toBe(302);
+        expect(res.headers['location']).toBe('/api/new-location');
+    });
+
+    it('null return produces 204', async () => {
+        const Schema = object({ noop: func() });
+        class Controller {
+            noop() {
+                return null;
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { noop: { method: 'POST', path: '/noop' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'POST', '/api/noop');
+        expect(res.status).toBe(204);
+    });
+});
+
+// ===========================================================================
+// 10. parseString path parameters
+// ===========================================================================
+
+describe('Integration: parseString path parameters', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('parses single numeric path segment with coercion', async () => {
+        const ByIdPath = parseString(
+            object({ id: number().coerce() }),
+            $t => $t`/${t => t.id}`
+        );
+        const Schema = object({
+            get: func()
+                .addParameter(object({ id: number() }))
+                .hasReturnType(any())
+        });
+        class Controller {
+            get({ id }: { id: number }) {
+                return { id, type: typeof id };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/items',
+                routes: {
+                    get: {
+                        method: 'GET',
+                        path: ByIdPath,
+                        params: [path()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/items/42');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ id: 42, type: 'number' });
+    });
+
+    it('parses multi-segment path', async () => {
+        const NestedPath = parseString(
+            object({
+                orgId: number().coerce(),
+                teamId: number().coerce()
+            }),
+            $t => $t`/${t => t.orgId}/teams/${t => t.teamId}`
+        );
+        const Schema = object({
+            get: func()
+                .addParameter(object({ orgId: number(), teamId: number() }))
+                .hasReturnType(any())
+        });
+        class Controller {
+            get(params: { orgId: number; teamId: number }) {
+                return params;
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: {
+                    get: {
+                        method: 'GET',
+                        path: NestedPath,
+                        params: [path()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/10/teams/3');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ orgId: 10, teamId: 3 });
+    });
+
+    it('returns 404 when path segment does not match pattern', async () => {
+        const ByIdPath = parseString(
+            object({ id: number().coerce() }),
+            $t => $t`/${t => t.id}`
+        );
+        const Schema = object({
+            get: func()
+                .addParameter(object({ id: number() }))
+                .hasReturnType(any())
+        });
+        class Controller {
+            get({ id }: { id: number }) {
+                return { id };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/items',
+                routes: {
+                    get: {
+                        method: 'GET',
+                        path: ByIdPath,
+                        params: [path()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/items/abc/extra');
+        expect(res.status).toBe(404);
+    });
+});
+
+// ===========================================================================
+// 11. Server lifecycle
+// ===========================================================================
+
+describe('Integration: server lifecycle', () => {
+    it('listen(0) assigns a random available port', async () => {
+        const Schema = object({ ping: func() });
+        class Controller {
+            ping() {
+                return 'pong';
+            }
+        }
+
+        const server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { ping: { method: 'GET', path: '/ping' } }
+            })
+            .listen(0);
+
+        try {
+            const addr = server.address;
+            expect(addr).not.toBeNull();
+            expect(addr!.port).toBeGreaterThan(0);
+        } finally {
+            await server.close();
+        }
+    });
+
+    it('close() stops accepting connections', async () => {
+        const Schema = object({ ping: func() });
+        class Controller {
+            ping() {
+                return 'pong';
+            }
+        }
+
+        const server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { ping: { method: 'GET', path: '/ping' } }
+            })
+            .listen(0);
+
+        const addr = server.address!;
+        await server.close();
+
+        await expect(
+            new Promise((resolve, reject) => {
+                const req = http.request(
+                    {
+                        hostname: '127.0.0.1',
+                        port: addr.port,
+                        path: '/api/ping'
+                    },
+                    resolve
+                );
+                req.on('error', reject);
+                req.end();
+            })
+        ).rejects.toThrow();
+    });
+
+    it('close() is idempotent', async () => {
+        const Schema = object({ ping: func() });
+        class Controller {
+            ping() {
+                return 'pong';
+            }
+        }
+
+        const server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { ping: { method: 'GET', path: '/ping' } }
+            })
+            .listen(0);
+
+        await server.close();
+        await expect(server.close()).resolves.toBeUndefined();
+    });
+});
+
+// ===========================================================================
+// 12. Content negotiation
+// ===========================================================================
+
+describe('Integration: content negotiation', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('returns application/json by default', async () => {
+        const Schema = object({ get: func().hasReturnType(any()) });
+        class Controller {
+            get() {
+                return { ok: true };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/data' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/data');
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('application/json');
+        expect(json(res)).toEqual({ ok: true });
+    });
+
+    it('returns JSON for Accept: */*', async () => {
+        const Schema = object({ get: func().hasReturnType(any()) });
+        class Controller {
+            get() {
+                return { ok: true };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/data' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/data', {
+            headers: { accept: '*/*' }
+        });
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('application/json');
+    });
+
+    it('supports registering custom content type handlers', async () => {
+        const Schema = object({
+            get: func().hasReturnType(any())
+        });
+        class Controller {
+            get() {
+                return { name: 'Alice', age: 30 };
+            }
+        }
+
+        server = await createServer()
+            .contentType({
+                mimeType: 'text/plain',
+                serialize(value: unknown) {
+                    return String(value);
+                },
+                deserialize(raw: string) {
+                    return raw;
+                }
+            })
+            .controller(Schema, Controller, {
+                basePath: '/api',
+                routes: { get: { method: 'GET', path: '/data' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/data', {
+            headers: { accept: 'text/plain' }
+        });
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('text/plain');
+    });
+});
+
+// ===========================================================================
+// 13. Mixed parameter sources (path + body + query + header)
+// ===========================================================================
+
+describe('Integration: mixed parameter sources', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('combines path, body, query, and header params in one route', async () => {
+        const ByIdPath = parseString(
+            object({ id: number().coerce() }),
+            $t => $t`/${t => t.id}`
+        );
+
+        const Schema = object({
+            update: func()
+                .addParameter(object({ id: number() }))
+                .addParameter(object({ name: string() }))
+                .addParameter(string())
+                .addParameter(string())
+                .hasReturnType(promise(any()))
+        });
+
+        class Controller {
+            async update(
+                pathParams: { id: number },
+                bodyData: { name: string },
+                format: string,
+                auth: string
+            ) {
+                return {
+                    id: pathParams.id,
+                    name: bodyData.name,
+                    format,
+                    auth
+                };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                basePath: '/api/items',
+                routes: {
+                    update: {
+                        method: 'PUT',
+                        path: ByIdPath,
+                        params: [
+                            path(),
+                            body(),
+                            query('format'),
+                            header('authorization')
+                        ]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'PUT', '/api/items/7?format=json', {
+            body: { name: 'Widget' },
+            headers: { authorization: 'Bearer xyz' }
+        });
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({
+            id: 7,
+            name: 'Widget',
+            format: 'json',
+            auth: 'Bearer xyz'
+        });
+    });
+});
