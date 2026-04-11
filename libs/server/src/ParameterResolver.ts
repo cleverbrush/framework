@@ -1,200 +1,123 @@
-import type { FunctionSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
+import type { SchemaBuilder } from '@cleverbrush/schema';
+import type { EndpointMetadata } from './Endpoint.js';
 import type { ProblemDetails, ValidationErrorItem } from './ProblemDetails.js';
 import { createValidationProblemDetails } from './ProblemDetails.js';
 import type { RequestContext } from './RequestContext.js';
-import type { ParameterSource, RouteMatch } from './types.js';
-
-const WELL_KNOWN_KEYS = new Set([
-    'params',
-    'body',
-    'query',
-    'headers',
-    'context'
-]);
 
 export type ResolveResult =
     | { valid: true; args: unknown[] }
     | { valid: false; problemDetails: ProblemDetails };
 
 /**
- * Returns true if the given func schema has a single parameter whose
- * properties include `body` — used to decide whether to parse the
- * request body before invoking the resolver.
+ * Returns true if the endpoint declares a body schema.
  */
-export function needsBody(
-    funcSchema: FunctionSchemaBuilder<any, any, any, any, any, any>
-): boolean {
-    const params = funcSchema.introspect().parameters as SchemaBuilder<
-        any,
-        any,
-        any,
-        any,
-        any
-    >[];
-    if (params.length !== 1) return false;
-    const intro = params[0].introspect() as any;
-    if (intro.type !== 'object' || !intro.properties) return false;
-    return 'body' in intro.properties;
+export function needsBody(meta: EndpointMetadata): boolean {
+    return meta.bodySchema != null;
 }
 
 /**
- * Resolve a single context object for a controller method.
+ * Resolve the action context object for an endpoint-based handler.
  *
- * The func schema's first (and only) parameter must be an ObjectSchemaBuilder
- * whose property keys are a subset of the well-known keys:
- * `params`, `body`, `query`, `headers`, `context`.
- *
- * Each key is resolved from the corresponding HTTP source.
+ * Builds `{ context, params?, body?, query?, headers? }` based on
+ * what the endpoint declares.
  */
-export async function resolveContextObject(
-    funcSchema: FunctionSchemaBuilder<any, any, any, any, any, any>,
-    routeMatch: RouteMatch,
+export async function resolveArgs(
+    meta: EndpointMetadata,
+    parsedPath: Record<string, any> | null,
     context: RequestContext,
     parsedBody: unknown
 ): Promise<ResolveResult> {
-    const paramSchemas = funcSchema.introspect().parameters as SchemaBuilder<
-        any,
-        any,
-        any,
-        any,
-        any
-    >[];
-
-    // No parameters → no args
-    if (paramSchemas.length === 0) {
-        return { valid: true, args: [] };
-    }
-
-    const paramSchema = paramSchemas[0];
-    const intro = paramSchema.introspect() as any;
-
-    if (intro.type !== 'object' || !intro.properties) {
-        throw new Error(
-            'Controller method parameter must be an object schema with well-known keys (params, body, query, headers, context).'
-        );
-    }
-
-    const properties = intro.properties as Record<
-        string,
-        SchemaBuilder<any, any, any, any, any>
-    >;
-    const keys = Object.keys(properties);
-
-    // Validate all keys are well-known
-    for (const key of keys) {
-        if (!WELL_KNOWN_KEYS.has(key)) {
-            throw new Error(
-                `Unknown key "${key}" in controller method parameter schema. ` +
-                    `Valid keys are: ${[...WELL_KNOWN_KEYS].join(', ')}.`
-            );
-        }
-    }
-
     const errors: ValidationErrorItem[] = [];
     const contextObj: Record<string, unknown> = {};
 
-    for (const key of keys) {
-        const subSchema = properties[key];
+    // Always provide context
+    contextObj.context = context;
 
-        switch (key) {
-            case 'params': {
-                // Already validated by parseString during routing
-                contextObj.params = routeMatch.parsedPath;
-                break;
-            }
+    // Params — from parsed path (already validated by ParseStringSchemaBuilder)
+    if (parsedPath && Object.keys(parsedPath).length > 0) {
+        contextObj.params = parsedPath;
+    }
 
-            case 'context': {
-                contextObj.context = context;
-                break;
-            }
-
-            case 'body': {
-                const result = await subSchema.validateAsync(parsedBody, {
-                    doNotStopOnFirstError: true
+    // Body — validate against endpoint's body schema
+    if (meta.bodySchema) {
+        const result = await meta.bodySchema.validateAsync(parsedBody, {
+            doNotStopOnFirstError: true
+        });
+        if (result.valid) {
+            contextObj.body = result.object;
+        } else {
+            for (const err of result.errors ?? []) {
+                errors.push({
+                    pointer: '/body',
+                    detail: err.message
                 });
-                if (result.valid) {
-                    contextObj.body = result.object;
-                } else {
-                    for (const err of result.errors ?? []) {
-                        errors.push({
-                            pointer: '/body',
-                            detail: err.message
-                        });
-                    }
-                }
-                break;
-            }
-
-            case 'query': {
-                // Build query object from sub-schema properties
-                const queryIntro = subSchema.introspect() as any;
-                if (queryIntro.type !== 'object' || !queryIntro.properties) {
-                    throw new Error(
-                        'The "query" key must be an object schema whose properties map to query parameter names.'
-                    );
-                }
-                const queryProps = queryIntro.properties as Record<
-                    string,
-                    SchemaBuilder<any, any, any, any, any>
-                >;
-                const queryObj: Record<string, unknown> = {};
-                for (const [qName, qSchema] of Object.entries(queryProps)) {
-                    const raw = context.queryParams[qName];
-                    const coerced = coerceValue(raw, qSchema);
-                    const result = await qSchema.validateAsync(coerced, {
-                        doNotStopOnFirstError: true
-                    });
-                    if (result.valid) {
-                        queryObj[qName] = result.object;
-                    } else {
-                        for (const err of result.errors ?? []) {
-                            errors.push({
-                                pointer: `/query/${qName}`,
-                                detail: err.message
-                            });
-                        }
-                    }
-                }
-                contextObj.query = queryObj;
-                break;
-            }
-
-            case 'headers': {
-                // Build headers object from sub-schema properties
-                const headersIntro = subSchema.introspect() as any;
-                if (
-                    headersIntro.type !== 'object' ||
-                    !headersIntro.properties
-                ) {
-                    throw new Error(
-                        'The "headers" key must be an object schema whose properties map to header names.'
-                    );
-                }
-                const headerProps = headersIntro.properties as Record<
-                    string,
-                    SchemaBuilder<any, any, any, any, any>
-                >;
-                const headersObj: Record<string, unknown> = {};
-                for (const [hName, hSchema] of Object.entries(headerProps)) {
-                    const raw = context.headers[hName.toLowerCase()];
-                    const result = await hSchema.validateAsync(raw, {
-                        doNotStopOnFirstError: true
-                    });
-                    if (result.valid) {
-                        headersObj[hName] = result.object;
-                    } else {
-                        for (const err of result.errors ?? []) {
-                            errors.push({
-                                pointer: `/headers/${hName}`,
-                                detail: err.message
-                            });
-                        }
-                    }
-                }
-                contextObj.headers = headersObj;
-                break;
             }
         }
+    }
+
+    // Query — validate against endpoint's query schema
+    if (meta.querySchema) {
+        const queryIntro = meta.querySchema.introspect() as any;
+        if (queryIntro.type !== 'object' || !queryIntro.properties) {
+            throw new Error(
+                'Endpoint query schema must be an object schema whose properties map to query parameter names.'
+            );
+        }
+        const queryProps = queryIntro.properties as Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        >;
+        const queryObj: Record<string, unknown> = {};
+        for (const [qName, qSchema] of Object.entries(queryProps)) {
+            const raw = context.queryParams[qName];
+            const coerced = coerceValue(raw, qSchema);
+            const result = await qSchema.validateAsync(coerced, {
+                doNotStopOnFirstError: true
+            });
+            if (result.valid) {
+                queryObj[qName] = result.object;
+            } else {
+                for (const err of result.errors ?? []) {
+                    errors.push({
+                        pointer: `/query/${qName}`,
+                        detail: err.message
+                    });
+                }
+            }
+        }
+        contextObj.query = queryObj;
+    }
+
+    // Headers — validate against endpoint's header schema
+    if (meta.headerSchema) {
+        const headersIntro = meta.headerSchema.introspect() as any;
+        if (headersIntro.type !== 'object' || !headersIntro.properties) {
+            throw new Error(
+                'Endpoint headers schema must be an object schema whose properties map to header names.'
+            );
+        }
+        const headerProps = headersIntro.properties as Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        >;
+        const headersObj: Record<string, unknown> = {};
+        for (const [hName, hSchema] of Object.entries(headerProps)) {
+            const raw = context.headers[hName.toLowerCase()];
+            const result = await hSchema.validateAsync(raw, {
+                doNotStopOnFirstError: true
+            });
+            if (result.valid) {
+                headersObj[hName] = result.object;
+            } else {
+                for (const err of result.errors ?? []) {
+                    errors.push({
+                        pointer: `/headers/${hName}`,
+                        detail: err.message
+                    });
+                }
+            }
+        }
+        contextObj.headers = headersObj;
     }
 
     if (errors.length > 0) {
@@ -205,115 +128,6 @@ export async function resolveContextObject(
     }
 
     return { valid: true, args: [contextObj] };
-}
-
-/**
- * Resolve positional arguments for a controller method using explicit
- * ParameterSource descriptors. Each source[i] maps to parameter[i] of
- * the func schema. Missing sources produce an undefined argument.
- */
-export async function resolveParameters(
-    funcSchema: FunctionSchemaBuilder<any, any, any, any, any, any>,
-    sources: ParameterSource[],
-    routeMatch: RouteMatch,
-    ctx: RequestContext,
-    parsedBody: unknown
-): Promise<ResolveResult> {
-    const paramSchemas = funcSchema.introspect().parameters as SchemaBuilder<
-        any,
-        any,
-        any,
-        any,
-        any
-    >[];
-
-    const errors: ValidationErrorItem[] = [];
-    const args: unknown[] = [];
-
-    for (let i = 0; i < paramSchemas.length; i++) {
-        const source = sources[i];
-        if (source === undefined) {
-            args.push(undefined);
-            continue;
-        }
-
-        const paramSchema = paramSchemas[i];
-
-        switch (source.from) {
-            case 'path': {
-                args.push(routeMatch.parsedPath);
-                break;
-            }
-
-            case 'context': {
-                args.push(ctx);
-                break;
-            }
-
-            case 'body': {
-                const result = await paramSchema.validateAsync(parsedBody, {
-                    doNotStopOnFirstError: true
-                });
-                if (result.valid) {
-                    args.push(result.object);
-                } else {
-                    for (const err of result.errors ?? []) {
-                        errors.push({ pointer: '/body', detail: err.message });
-                    }
-                    args.push(undefined);
-                }
-                break;
-            }
-
-            case 'query': {
-                const raw = ctx.queryParams[source.name];
-                const coerced = coerceValue(raw, paramSchema);
-                const result = await paramSchema.validateAsync(coerced, {
-                    doNotStopOnFirstError: true
-                });
-                if (result.valid) {
-                    args.push(result.object);
-                } else {
-                    for (const err of result.errors ?? []) {
-                        errors.push({
-                            pointer: `/query/${source.name}`,
-                            detail: err.message
-                        });
-                    }
-                    args.push(undefined);
-                }
-                break;
-            }
-
-            case 'header': {
-                const raw = ctx.headers[source.name.toLowerCase()];
-                const result = await paramSchema.validateAsync(raw, {
-                    doNotStopOnFirstError: true
-                });
-                if (result.valid) {
-                    args.push(result.object);
-                } else {
-                    for (const err of result.errors ?? []) {
-                        errors.push({
-                            pointer: `/headers/${source.name}`,
-                            detail: err.message
-                        });
-                    }
-                    args.push(undefined);
-                }
-                break;
-            }
-        }
-    }
-
-    if (errors.length > 0) {
-        return {
-            valid: false,
-            problemDetails: createValidationProblemDetails(errors)
-        };
-    }
-
-    return { valid: true, args };
 }
 
 function coerceValue(

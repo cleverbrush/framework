@@ -1,62 +1,35 @@
 import * as http from 'node:http';
 import * as https from 'node:https';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
-import type {
-    FunctionSchemaBuilder,
-    ObjectSchemaBuilder
-} from '@cleverbrush/schema';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
-import { createController } from './ControllerFactory.js';
+import type { EndpointBuilder, Handler } from './Endpoint.js';
 import { HttpError } from './HttpError.js';
 import { MiddlewarePipeline } from './MiddlewarePipeline.js';
-import { needsBody, resolveContextObject } from './ParameterResolver.js';
+import { needsBody, resolveArgs } from './ParameterResolver.js';
 import {
     createProblemDetails,
     PROBLEM_JSON_CONTENT_TYPE,
     serializeProblemDetails
 } from './ProblemDetails.js';
 import { RequestContext } from './RequestContext.js';
-import { RouteBuilder } from './RouteBuilder.js';
 import { Router } from './Router.js';
 import type {
     ContentTypeHandler,
-    ControllerConfig,
-    ControllerRegistration,
+    EndpointRegistration,
     Middleware,
     ServerOptions
 } from './types.js';
 
 export class ServerBuilder {
     readonly #serviceCollection = new ServiceCollection();
-    readonly #registrations: ControllerRegistration[] = [];
+    readonly #registrations: EndpointRegistration[] = [];
     readonly #globalMiddlewares: Middleware[] = [];
     readonly #contentNegotiator = new ContentNegotiator();
     #options: ServerOptions = {};
 
     services(configureFn: (svc: ServiceCollection) => void): this {
         configureFn(this.#serviceCollection);
-        return this;
-    }
-
-    controller<
-        TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-    >(
-        schema: TSchema,
-        implementation: new (...args: any[]) => any,
-        config:
-            | ControllerConfig
-            | ((builder: RouteBuilder<TSchema>) => RouteBuilder<TSchema>)
-    ): this {
-        const resolved =
-            typeof config === 'function'
-                ? config(new RouteBuilder(schema)).build()
-                : config;
-        this.#registrations.push({
-            schema,
-            implementation,
-            config: resolved
-        });
         return this;
     }
 
@@ -70,16 +43,24 @@ export class ServerBuilder {
         return this;
     }
 
+    handle<E extends EndpointBuilder<any, any, any, any>>(
+        endpointDef: E,
+        handler: Handler<E>,
+        options?: { middlewares?: Middleware[] }
+    ): this {
+        this.#registrations.push({
+            endpoint: endpointDef.introspect(),
+            handler,
+            middlewares: options?.middlewares
+        });
+        return this;
+    }
+
     async listen(port?: number, host?: string): Promise<Server> {
         const router = new Router();
 
-        // Register all routes
         for (const reg of this.#registrations) {
-            for (const [methodName, routeDef] of Object.entries(
-                reg.config.routes
-            )) {
-                router.addRoute(reg, methodName, routeDef);
-            }
+            router.addRoute(reg);
         }
 
         const serviceProvider = this.#serviceCollection.buildServiceProvider({
@@ -90,8 +71,7 @@ export class ServerBuilder {
             router,
             serviceProvider,
             this.#contentNegotiator,
-            this.#globalMiddlewares,
-            this.#registrations
+            this.#globalMiddlewares
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -113,8 +93,7 @@ export class Server {
         router: Router,
         serviceProvider: ServiceProvider,
         contentNegotiator: ContentNegotiator,
-        globalMiddlewares: Middleware[],
-        _registrations: ControllerRegistration[]
+        globalMiddlewares: Middleware[]
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
@@ -176,18 +155,13 @@ export class Server {
         req: http.IncomingMessage,
         res: http.ServerResponse
     ): Promise<void> {
-        // Create DI scope
         const scope = this.#serviceProvider.createScope();
 
         try {
-            // Build RequestContext
             const ctx = new RequestContext(req, res);
-
-            // Parse URL path (strip query string)
             const urlPath = ctx.url.pathname;
             const method = ctx.method;
 
-            // Match route
             const routeResult = this.#router.match(method, urlPath);
 
             if (!routeResult.match) {
@@ -209,8 +183,8 @@ export class Server {
                 return;
             }
 
-            const match = routeResult.match;
-            const { registration, methodName, parsedPath } = match;
+            const { registration, parsedPath } = routeResult.match;
+            const meta = registration.endpoint;
 
             // Set path params on context (raw string form for middleware)
             if (parsedPath) {
@@ -219,8 +193,6 @@ export class Server {
                 ctx.pathParams = rawParams;
             }
 
-            // Register RequestContext as scoped service
-            // We manually register it so it's available in the DI scope
             ctx.services = scope.serviceProvider;
 
             // Build middleware pipeline
@@ -228,53 +200,30 @@ export class Server {
             for (const mw of this.#globalMiddlewares) {
                 pipeline.add(mw);
             }
-            if (registration.config.middlewares) {
-                for (const mw of registration.config.middlewares) {
+            if (registration.middlewares) {
+                for (const mw of registration.middlewares) {
                     pipeline.add(mw);
                 }
             }
 
-            // Execute pipeline with final handler
             await pipeline.execute(ctx, async () => {
                 if (ctx.responded) return;
 
-                // Get the func schema for the method
-                const controllerIntrospection =
-                    registration.schema.introspect();
-                const properties = (controllerIntrospection as any)
-                    .properties as Record<string, any> | undefined;
-
-                let funcSchema: FunctionSchemaBuilder<
-                    any,
-                    any,
-                    any,
-                    any,
-                    any,
-                    any
-                > | null = null;
-                if (properties?.[methodName]) {
-                    funcSchema = properties[methodName];
-                }
-
                 // Parse body if needed
                 let parsedBody: unknown;
-                const hasBodySource =
-                    funcSchema != null && needsBody(funcSchema);
-
-                if (hasBodySource) {
+                if (needsBody(meta)) {
                     const contentType = req.headers['content-type'];
-                    const handler =
+                    const ctHandler =
                         this.#contentNegotiator.selectRequestHandler(
                             contentType
                         );
-                    if (handler) {
+                    if (ctHandler) {
                         const rawBody = await ctx.body();
                         const bodyText = rawBody.toString('utf-8');
                         if (bodyText.length > 0) {
-                            parsedBody = handler.deserialize(bodyText);
+                            parsedBody = ctHandler.deserialize(bodyText);
                         }
                     } else if (contentType) {
-                        // Unknown content type → 415
                         const pd = createProblemDetails(415);
                         res.writeHead(415, {
                             'content-type': PROBLEM_JSON_CONTENT_TYPE
@@ -286,66 +235,31 @@ export class Server {
                 }
 
                 // Resolve parameters
-                let args: unknown[] = [];
-                if (funcSchema) {
-                    const result = await resolveContextObject(
-                        funcSchema,
-                        match,
-                        ctx,
-                        parsedBody
-                    );
-                    if (!result.valid) {
-                        res.writeHead(400, {
-                            'content-type': PROBLEM_JSON_CONTENT_TYPE
-                        });
-                        res.end(serializeProblemDetails(result.problemDetails));
-                        ctx.responded = true;
-                        return;
-                    }
-                    args = result.args;
-                }
-
-                // Create controller
-                const controller = createController(
-                    registration.schema,
-                    registration.implementation,
-                    scope.serviceProvider
+                const resolveResult = await resolveArgs(
+                    meta,
+                    parsedPath,
+                    ctx,
+                    parsedBody
                 );
-
-                // Validate method exists
-                if (typeof controller[methodName] !== 'function') {
-                    throw new Error(
-                        `Controller method '${methodName}' is not a function`
+                if (!resolveResult.valid) {
+                    res.writeHead(400, {
+                        'content-type': PROBLEM_JSON_CONTENT_TYPE
+                    });
+                    res.end(
+                        serializeProblemDetails(resolveResult.problemDetails)
                     );
+                    ctx.responded = true;
+                    return;
                 }
 
-                // Call method
-                let result = controller[methodName](...args);
+                // Call handler
+                let result = registration.handler(...resolveResult.args);
                 if (result instanceof Promise) {
                     result = await result;
                 }
 
-                // Send response
                 if (ctx.responded) return;
-
-                if (result instanceof ActionResult) {
-                    await result.executeAsync(
-                        req,
-                        res,
-                        this.#contentNegotiator
-                    );
-                } else if (result === null || result === undefined) {
-                    res.writeHead(204);
-                    res.end();
-                } else {
-                    // Plain object — wrap in JsonResult for content-negotiated JSON
-                    await new JsonResult(result, 200).executeAsync(
-                        req,
-                        res,
-                        this.#contentNegotiator
-                    );
-                }
-
+                await this.#sendResult(req, res, result);
                 ctx.responded = true;
             });
         } catch (err) {
@@ -365,7 +279,6 @@ export class Server {
                 res.end(serializeProblemDetails(pd));
             }
         } finally {
-            // Dispose DI scope (LIFO cleanup)
             try {
                 await scope.asyncDispose();
             } catch {
@@ -373,12 +286,30 @@ export class Server {
             }
         }
     }
+
+    async #sendResult(
+        req: http.IncomingMessage,
+        res: http.ServerResponse,
+        result: unknown
+    ): Promise<void> {
+        if (result instanceof ActionResult) {
+            await result.executeAsync(req, res, this.#contentNegotiator);
+        } else if (result === null || result === undefined) {
+            res.writeHead(204);
+            res.end();
+        } else {
+            await new JsonResult(result, 200).executeAsync(
+                req,
+                res,
+                this.#contentNegotiator
+            );
+        }
+    }
 }
 
 export function createServer(options?: ServerOptions): ServerBuilder {
     const builder = new ServerBuilder();
     if (options) {
-        // Store options for later use
         (builder as any).__options = options;
     }
     return builder;
