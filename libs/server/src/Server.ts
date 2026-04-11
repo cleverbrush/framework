@@ -272,7 +272,7 @@ export class Server {
                 // Resolve parameters
                 let args: unknown[] = [];
                 if (funcSchema && sources.length > 0) {
-                    const result = resolveParameters(
+                    const result = await resolveParameters(
                         funcSchema,
                         sources,
                         match,

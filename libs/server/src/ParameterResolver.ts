@@ -8,13 +8,13 @@ export type ResolveResult =
     | { valid: true; args: unknown[] }
     | { valid: false; problemDetails: ProblemDetails };
 
-export function resolveParameters(
+export async function resolveParameters(
     funcSchema: FunctionSchemaBuilder<any, any, any, any, any, any>,
     sources: readonly ParameterSource[],
     routeMatch: RouteMatch,
     context: RequestContext,
     parsedBody: unknown
-): ResolveResult {
+): Promise<ResolveResult> {
     const paramSchemas = funcSchema.introspect().parameters as SchemaBuilder<
         any,
         any,
@@ -49,7 +49,7 @@ export function resolveParameters(
             }
 
             case 'body': {
-                const result = schema.validate(parsedBody, {
+                const result = await schema.validateAsync(parsedBody, {
                     doNotStopOnFirstError: true
                 });
                 if (result.valid) {
@@ -69,7 +69,7 @@ export function resolveParameters(
             case 'query': {
                 const raw = context.queryParams[source.name!];
                 const coerced = coerceValue(raw, schema);
-                const result = schema.validate(coerced, {
+                const result = await schema.validateAsync(coerced, {
                     doNotStopOnFirstError: true
                 });
                 if (result.valid) {
@@ -88,7 +88,7 @@ export function resolveParameters(
 
             case 'header': {
                 const raw = context.headers[source.name!];
-                const result = schema.validate(raw, {
+                const result = await schema.validateAsync(raw, {
                     doNotStopOnFirstError: true
                 });
                 if (result.valid) {

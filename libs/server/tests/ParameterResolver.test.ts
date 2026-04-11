@@ -45,13 +45,13 @@ function createRouteMatch(parsedPath: Record<string, any> | null): RouteMatch {
 }
 
 describe('ParameterResolver', () => {
-    it('resolves path parameter', () => {
+    it('resolves path parameter', async () => {
         const schema = func().addParameter(object({ id: number() }));
         const sources: ParameterSource[] = [path()];
         const match = createRouteMatch({ id: 42 });
         const ctx = createMockContext();
 
-        const result = resolveParameters(
+        const result = await resolveParameters(
             schema,
             sources,
             match,
@@ -64,13 +64,13 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('resolves context parameter', () => {
+    it('resolves context parameter', async () => {
         const schema = func().addParameter(object({}));
         const sources: ParameterSource[] = [context()];
         const match = createRouteMatch(null);
         const ctx = createMockContext();
 
-        const result = resolveParameters(
+        const result = await resolveParameters(
             schema,
             sources,
             match,
@@ -83,14 +83,14 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('resolves body parameter with validation', () => {
+    it('resolves body parameter with validation', async () => {
         const BodySchema = object({ name: string(), age: number() });
         const schema = func().addParameter(BodySchema);
         const sources: ParameterSource[] = [body()];
         const match = createRouteMatch(null);
         const ctx = createMockContext();
 
-        const result = resolveParameters(schema, sources, match, ctx, {
+        const result = await resolveParameters(schema, sources, match, ctx, {
             name: 'Alice',
             age: 30
         });
@@ -100,14 +100,14 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('returns validation errors for invalid body', () => {
+    it('returns validation errors for invalid body', async () => {
         const BodySchema = object({ name: string(), age: number() });
         const schema = func().addParameter(BodySchema);
         const sources: ParameterSource[] = [body()];
         const match = createRouteMatch(null);
         const ctx = createMockContext();
 
-        const result = resolveParameters(schema, sources, match, ctx, {
+        const result = await resolveParameters(schema, sources, match, ctx, {
             name: 123
         });
         expect(result.valid).toBe(false);
@@ -119,13 +119,13 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('resolves query parameter with number coercion', () => {
+    it('resolves query parameter with number coercion', async () => {
         const schema = func().addParameter(number());
         const sources: ParameterSource[] = [query('page')];
         const match = createRouteMatch(null);
         const ctx = createMockContext({ queryParams: { page: '5' } });
 
-        const result = resolveParameters(
+        const result = await resolveParameters(
             schema,
             sources,
             match,
@@ -138,13 +138,13 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('resolves query parameter with boolean coercion', () => {
+    it('resolves query parameter with boolean coercion', async () => {
         const schema = func().addParameter(boolean());
         const sources: ParameterSource[] = [query('active')];
         const match = createRouteMatch(null);
         const ctx = createMockContext({ queryParams: { active: 'true' } });
 
-        const result = resolveParameters(
+        const result = await resolveParameters(
             schema,
             sources,
             match,
@@ -157,7 +157,7 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('resolves header parameter', () => {
+    it('resolves header parameter', async () => {
         const schema = func().addParameter(string());
         const sources: ParameterSource[] = [header('x-request-id')];
         const match = createRouteMatch(null);
@@ -165,7 +165,7 @@ describe('ParameterResolver', () => {
             headers: { 'x-request-id': 'abc-123' }
         });
 
-        const result = resolveParameters(
+        const result = await resolveParameters(
             schema,
             sources,
             match,
@@ -178,7 +178,7 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('resolves mixed parameter sources', () => {
+    it('resolves mixed parameter sources', async () => {
         const schema = func()
             .addParameter(object({ id: number() }))
             .addParameter(string());
@@ -188,7 +188,7 @@ describe('ParameterResolver', () => {
             headers: { authorization: 'Bearer token' }
         });
 
-        const result = resolveParameters(
+        const result = await resolveParameters(
             schema,
             sources,
             match,
@@ -202,13 +202,13 @@ describe('ParameterResolver', () => {
         }
     });
 
-    it('handles missing source (undefined arg)', () => {
+    it('handles missing source (undefined arg)', async () => {
         const schema = func().addParameter(string()).addParameter(number());
         const sources: ParameterSource[] = [header('x-id')];
         const match = createRouteMatch(null);
         const ctx = createMockContext({ headers: { 'x-id': 'test' } });
 
-        const result = resolveParameters(
+        const result = await resolveParameters(
             schema,
             sources,
             match,
@@ -219,6 +219,111 @@ describe('ParameterResolver', () => {
         if (result.valid) {
             expect(result.args[0]).toBe('test');
             expect(result.args[1]).toBeUndefined();
+        }
+    });
+
+    it('returns validation error for invalid query parameter', async () => {
+        const schema = func().addParameter(number());
+        const sources: ParameterSource[] = [query('page')];
+        const match = createRouteMatch(null);
+        const ctx = createMockContext({
+            queryParams: { page: 'not-a-number' }
+        });
+
+        const result = await resolveParameters(
+            schema,
+            sources,
+            match,
+            ctx,
+            undefined
+        );
+        expect(result.valid).toBe(false);
+        if (!result.valid) {
+            expect(result.problemDetails.status).toBe(400);
+            expect(result.problemDetails.title).toBe('Bad Request');
+            expect(result.problemDetails.detail).toBe(
+                'One or more validation errors occurred.'
+            );
+            const errors = (result.problemDetails as any).errors;
+            expect(errors).toHaveLength(1);
+            expect(errors[0].pointer).toBe('/query/page');
+        }
+    });
+
+    it('returns validation error for invalid header parameter', async () => {
+        // number schema expects a number, but headers are strings
+        const schema = func().addParameter(number());
+        const sources: ParameterSource[] = [header('x-count')];
+        const match = createRouteMatch(null);
+        const ctx = createMockContext({
+            headers: { 'x-count': 'not-a-number' }
+        });
+
+        const result = await resolveParameters(
+            schema,
+            sources,
+            match,
+            ctx,
+            undefined
+        );
+        expect(result.valid).toBe(false);
+        if (!result.valid) {
+            const errors = (result.problemDetails as any).errors;
+            expect(errors.length).toBeGreaterThan(0);
+            expect(errors[0].pointer).toBe('/headers/x-count');
+        }
+    });
+
+    it('collects errors from multiple parameters', async () => {
+        const schema = func()
+            .addParameter(object({ name: string(), age: number() }))
+            .addParameter(number());
+        const sources: ParameterSource[] = [body(), query('page')];
+        const match = createRouteMatch(null);
+        const ctx = createMockContext({
+            queryParams: { page: 'bad' }
+        });
+
+        const result = await resolveParameters(
+            schema,
+            sources,
+            match,
+            ctx,
+            { name: 123 } // invalid body: name should be string, age is missing
+        );
+        expect(result.valid).toBe(false);
+        if (!result.valid) {
+            const errors = (result.problemDetails as any).errors;
+            // should have errors from both body and query
+            const pointers = errors.map((e: any) => e.pointer);
+            expect(pointers).toContain('/body');
+            expect(pointers).toContain('/query/page');
+        }
+    });
+
+    it('returns RFC 9457 compliant problem details on validation failure', async () => {
+        const BodySchema = object({ email: string() });
+        const schema = func().addParameter(BodySchema);
+        const sources: ParameterSource[] = [body()];
+        const match = createRouteMatch(null);
+        const ctx = createMockContext();
+
+        const result = await resolveParameters(schema, sources, match, ctx, {
+            email: 42
+        });
+        expect(result.valid).toBe(false);
+        if (!result.valid) {
+            const pd = result.problemDetails;
+            expect(pd.type).toBe('https://httpstatuses.com/400');
+            expect(pd.status).toBe(400);
+            expect(pd.title).toBe('Bad Request');
+            expect(pd.detail).toBe('One or more validation errors occurred.');
+            expect((pd as any).errors).toBeInstanceOf(Array);
+            expect((pd as any).errors.length).toBeGreaterThan(0);
+            for (const err of (pd as any).errors) {
+                expect(err).toHaveProperty('pointer');
+                expect(err).toHaveProperty('detail');
+            }
         }
     });
 });
