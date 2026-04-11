@@ -9,13 +9,21 @@ import {
     promise,
     string
 } from '@cleverbrush/schema';
+import {
+    ActionResult,
+    body,
+    context,
+    createServer,
+    defineController,
+    header,
+    type Middleware,
+    NotFoundError,
+    path,
+    query,
+    type RequestContext,
+    type Server
+} from '@cleverbrush/server';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { ActionResult } from '../src/ActionResult.js';
-import { NotFoundError } from '../src/HttpError.js';
-import type { RequestContext } from '../src/RequestContext.js';
-import { createServer, type Server } from '../src/Server.js';
-import type { Middleware } from '../src/types.js';
-import { body, context, header, path, query } from '../src/types.js';
 
 // ---------------------------------------------------------------------------
 // Shared HTTP request helper
@@ -109,37 +117,34 @@ describe('Integration: Todo CRUD lifecycle', () => {
     let todos: Map<number, { id: number; title: string; completed: boolean }>;
     let nextId: number;
 
-    class TodoController {
+    const TodoController = defineController(TodoSchema, {
         async list() {
             return [...todos.values()];
-        }
-        async getById({ id }: { id: number }) {
+        },
+        async getById({ id }) {
             const todo = todos.get(id);
             if (!todo) throw new NotFoundError(`Todo ${id} not found`);
             return todo;
-        }
-        async create({ title }: { title: string }) {
+        },
+        async create({ title }) {
             const todo = { id: nextId++, title, completed: false };
             todos.set(todo.id, todo);
             return ActionResult.created(todo, `/api/todos/${todo.id}`);
-        }
-        async update(
-            { id }: { id: number },
-            patch: { title?: string; completed?: boolean }
-        ) {
+        },
+        async update({ id }, patch) {
             const todo = todos.get(id);
             if (!todo) throw new NotFoundError(`Todo ${id} not found`);
             if (patch.title !== undefined) todo.title = patch.title;
             if (patch.completed !== undefined) todo.completed = patch.completed;
             return todo;
-        }
-        async remove({ id }: { id: number }) {
+        },
+        async remove({ id }) {
             const todo = todos.get(id);
             if (!todo) throw new NotFoundError(`Todo ${id} not found`);
             todos.delete(id);
             return ActionResult.noContent();
         }
-    }
+    });
 
     beforeEach(async () => {
         todos = new Map();
@@ -618,15 +623,11 @@ describe('Integration: dependency injection', () => {
             getConfig: func().hasReturnType(any())
         }).addConstructor(func().addParameter(IConfig));
 
-        class Controller {
-            #config: any;
-            constructor(config: any) {
-                this.#config = config;
-            }
+        const Controller = defineController(Schema, config => ({
             getConfig() {
-                return { dbUrl: this.#config.dbUrl };
+                return { dbUrl: config.dbUrl };
             }
-        }
+        }));
 
         server = await createServer()
             .services(svc => {
@@ -654,20 +655,14 @@ describe('Integration: dependency injection', () => {
             info: func().hasReturnType(any())
         }).addConstructor(func().addParameter(ILogger).addParameter(IDb));
 
-        class Controller {
-            #logger: any;
-            #db: any;
-            constructor(logger: any, db: any) {
-                this.#logger = logger;
-                this.#db = db;
-            }
+        const Controller = defineController(Schema, (logger, db) => ({
             info() {
                 return {
-                    logger: this.#logger.name,
-                    db: this.#db.host
+                    logger: logger.name,
+                    db: db.host
                 };
             }
-        }
+        }));
 
         server = await createServer()
             .services(svc => {
