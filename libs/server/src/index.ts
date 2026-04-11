@@ -24,6 +24,7 @@ export {
     type ValidationErrorItem
 } from './ProblemDetails.js';
 export { IRequestContext, RequestContext } from './RequestContext.js';
+export { ParamBuilder, RouteBuilder } from './RouteBuilder.js';
 export { createServer, Server, ServerBuilder } from './Server.js';
 export type {
     ContentTypeHandler,

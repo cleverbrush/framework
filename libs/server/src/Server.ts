@@ -1,7 +1,11 @@
 import * as http from 'node:http';
 import * as https from 'node:https';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
-import type { FunctionSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
+import type {
+    FunctionSchemaBuilder,
+    ObjectSchemaBuilder,
+    SchemaBuilder
+} from '@cleverbrush/schema';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
 import { createController } from './ControllerFactory.js';
@@ -14,6 +18,7 @@ import {
     serializeProblemDetails
 } from './ProblemDetails.js';
 import { RequestContext } from './RequestContext.js';
+import { RouteBuilder } from './RouteBuilder.js';
 import { Router } from './Router.js';
 import type {
     ContentTypeHandler,
@@ -35,12 +40,24 @@ export class ServerBuilder {
         return this;
     }
 
-    controller(
-        schema: SchemaBuilder<any, any, any, any, any>,
+    controller<
+        TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    >(
+        schema: TSchema,
         implementation: new (...args: any[]) => any,
-        config: ControllerConfig
+        config:
+            | ControllerConfig
+            | ((builder: RouteBuilder<TSchema>) => RouteBuilder<TSchema>)
     ): this {
-        this.#registrations.push({ schema, implementation, config });
+        const resolved =
+            typeof config === 'function'
+                ? config(new RouteBuilder(schema)).build()
+                : config;
+        this.#registrations.push({
+            schema,
+            implementation,
+            config: resolved
+        });
         return this;
     }
 
