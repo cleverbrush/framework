@@ -2,7 +2,7 @@ import type { FunctionSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
 import type { ProblemDetails, ValidationErrorItem } from './ProblemDetails.js';
 import { createValidationProblemDetails } from './ProblemDetails.js';
 import type { RequestContext } from './RequestContext.js';
-import type { RouteMatch } from './types.js';
+import type { ParameterSource, RouteMatch } from './types.js';
 
 const WELL_KNOWN_KEYS = new Set([
     'params',
@@ -205,6 +205,115 @@ export async function resolveContextObject(
     }
 
     return { valid: true, args: [contextObj] };
+}
+
+/**
+ * Resolve positional arguments for a controller method using explicit
+ * ParameterSource descriptors. Each source[i] maps to parameter[i] of
+ * the func schema. Missing sources produce an undefined argument.
+ */
+export async function resolveParameters(
+    funcSchema: FunctionSchemaBuilder<any, any, any, any, any, any>,
+    sources: ParameterSource[],
+    routeMatch: RouteMatch,
+    ctx: RequestContext,
+    parsedBody: unknown
+): Promise<ResolveResult> {
+    const paramSchemas = funcSchema.introspect().parameters as SchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any
+    >[];
+
+    const errors: ValidationErrorItem[] = [];
+    const args: unknown[] = [];
+
+    for (let i = 0; i < paramSchemas.length; i++) {
+        const source = sources[i];
+        if (source === undefined) {
+            args.push(undefined);
+            continue;
+        }
+
+        const paramSchema = paramSchemas[i];
+
+        switch (source.from) {
+            case 'path': {
+                args.push(routeMatch.parsedPath);
+                break;
+            }
+
+            case 'context': {
+                args.push(ctx);
+                break;
+            }
+
+            case 'body': {
+                const result = await paramSchema.validateAsync(parsedBody, {
+                    doNotStopOnFirstError: true
+                });
+                if (result.valid) {
+                    args.push(result.object);
+                } else {
+                    for (const err of result.errors ?? []) {
+                        errors.push({ pointer: '/body', detail: err.message });
+                    }
+                    args.push(undefined);
+                }
+                break;
+            }
+
+            case 'query': {
+                const raw = ctx.queryParams[source.name];
+                const coerced = coerceValue(raw, paramSchema);
+                const result = await paramSchema.validateAsync(coerced, {
+                    doNotStopOnFirstError: true
+                });
+                if (result.valid) {
+                    args.push(result.object);
+                } else {
+                    for (const err of result.errors ?? []) {
+                        errors.push({
+                            pointer: `/query/${source.name}`,
+                            detail: err.message
+                        });
+                    }
+                    args.push(undefined);
+                }
+                break;
+            }
+
+            case 'header': {
+                const raw = ctx.headers[source.name.toLowerCase()];
+                const result = await paramSchema.validateAsync(raw, {
+                    doNotStopOnFirstError: true
+                });
+                if (result.valid) {
+                    args.push(result.object);
+                } else {
+                    for (const err of result.errors ?? []) {
+                        errors.push({
+                            pointer: `/headers/${source.name}`,
+                            detail: err.message
+                        });
+                    }
+                    args.push(undefined);
+                }
+                break;
+            }
+        }
+    }
+
+    if (errors.length > 0) {
+        return {
+            valid: false,
+            problemDetails: createValidationProblemDetails(errors)
+        };
+    }
+
+    return { valid: true, args };
 }
 
 function coerceValue(

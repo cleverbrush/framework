@@ -149,11 +149,11 @@ describe('Integration: Todo CRUD lifecycle', () => {
             .controller(TodoControllerSchema, TodoController, r =>
                 r
                     .basePath('/api/todos')
-                    .get('/', t => t.list)
-                    .get(TodoByIdPath, t => t.getById)
-                    .post('/', t => t.create)
-                    .patch(TodoByIdPath, t => t.update)
-                    .delete(TodoByIdPath, t => t.remove)
+                    .get(t => t.list, '/')
+                    .get(t => t.getById, TodoByIdPath)
+                    .post(t => t.create, '/')
+                    .patch(t => t.update, TodoByIdPath)
+                    .delete(t => t.remove, TodoByIdPath)
             )
             .listen(0);
     });

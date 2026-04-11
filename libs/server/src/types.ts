@@ -5,12 +5,44 @@ import type {
 import type { RequestContext } from './RequestContext.js';
 
 // ---------------------------------------------------------------------------
+// Parameter Sources
+// ---------------------------------------------------------------------------
+
+export type ParameterSource =
+    | { readonly from: 'path' }
+    | { readonly from: 'body' }
+    | { readonly from: 'query'; readonly name: string }
+    | { readonly from: 'header'; readonly name: string }
+    | { readonly from: 'context' };
+
+export function path(): ParameterSource {
+    return { from: 'path' };
+}
+
+export function body(): ParameterSource {
+    return { from: 'body' };
+}
+
+export function query(name: string): ParameterSource {
+    return { from: 'query', name };
+}
+
+export function header(name: string): ParameterSource {
+    return { from: 'header', name };
+}
+
+export function context(): ParameterSource {
+    return { from: 'context' };
+}
+
+// ---------------------------------------------------------------------------
 // Route Definition
 // ---------------------------------------------------------------------------
 
 export interface RouteDefinition {
     readonly method: string;
     readonly path: string | ParseStringSchemaBuilder<any, any, any, any, any>;
+    readonly params?: readonly ParameterSource[];
 }
 
 export interface ControllerRoutes {

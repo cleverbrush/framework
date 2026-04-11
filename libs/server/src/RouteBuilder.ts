@@ -8,8 +8,46 @@ import type {
     ControllerConfig,
     ControllerRoutes,
     Middleware,
+    ParameterSource,
     RouteDefinition
 } from './types.js';
+
+// ---------------------------------------------------------------------------
+// ParamBuilder — fluent builder for per-route parameter sources
+// ---------------------------------------------------------------------------
+
+export class ParamBuilder {
+    readonly #sources: ParameterSource[] = [];
+
+    path(): this {
+        this.#sources.push({ from: 'path' });
+        return this;
+    }
+
+    body(): this {
+        this.#sources.push({ from: 'body' });
+        return this;
+    }
+
+    query(name: string): this {
+        this.#sources.push({ from: 'query', name });
+        return this;
+    }
+
+    header(name: string): this {
+        this.#sources.push({ from: 'header', name: name.toLowerCase() });
+        return this;
+    }
+
+    context(): this {
+        this.#sources.push({ from: 'context' });
+        return this;
+    }
+
+    build(): ParameterSource[] {
+        return [...this.#sources];
+    }
+}
 
 // ---------------------------------------------------------------------------
 // RouteBuilder — fluent route configuration with PropertyDescriptor selectors
@@ -56,32 +94,60 @@ export class RouteBuilder<
         return this;
     }
 
-    get(path: RoutePath, selector: MethodSelector<TSchema>): this {
-        return this.#route('GET', selector, path);
+    get(
+        selector: MethodSelector<TSchema>,
+        path: RoutePath,
+        params?: (b: ParamBuilder) => ParamBuilder
+    ): this {
+        return this.#route('GET', selector, path, params);
     }
 
-    post(path: RoutePath, selector: MethodSelector<TSchema>): this {
-        return this.#route('POST', selector, path);
+    post(
+        selector: MethodSelector<TSchema>,
+        path: RoutePath,
+        params?: (b: ParamBuilder) => ParamBuilder
+    ): this {
+        return this.#route('POST', selector, path, params);
     }
 
-    put(path: RoutePath, selector: MethodSelector<TSchema>): this {
-        return this.#route('PUT', selector, path);
+    put(
+        selector: MethodSelector<TSchema>,
+        path: RoutePath,
+        params?: (b: ParamBuilder) => ParamBuilder
+    ): this {
+        return this.#route('PUT', selector, path, params);
     }
 
-    patch(path: RoutePath, selector: MethodSelector<TSchema>): this {
-        return this.#route('PATCH', selector, path);
+    patch(
+        selector: MethodSelector<TSchema>,
+        path: RoutePath,
+        params?: (b: ParamBuilder) => ParamBuilder
+    ): this {
+        return this.#route('PATCH', selector, path, params);
     }
 
-    delete(path: RoutePath, selector: MethodSelector<TSchema>): this {
-        return this.#route('DELETE', selector, path);
+    delete(
+        selector: MethodSelector<TSchema>,
+        path: RoutePath,
+        params?: (b: ParamBuilder) => ParamBuilder
+    ): this {
+        return this.#route('DELETE', selector, path, params);
     }
 
-    head(path: RoutePath, selector: MethodSelector<TSchema>): this {
-        return this.#route('HEAD', selector, path);
+    head(
+        selector: MethodSelector<TSchema>,
+        path: RoutePath,
+        params?: (b: ParamBuilder) => ParamBuilder
+    ): this {
+        return this.#route('HEAD', selector, path, params);
     }
 
-    options(path: RoutePath, selector: MethodSelector<TSchema>): this {
-        return this.#route('OPTIONS', selector, path);
+    options(
+        selector: MethodSelector<TSchema>,
+        path: RoutePath,
+        params?: (b: ParamBuilder) => ParamBuilder
+    ): this {
+        return this.#route('OPTIONS', selector, path, params);
     }
 
     build(): ControllerConfig {
@@ -100,7 +166,8 @@ export class RouteBuilder<
     #route(
         method: string,
         selector: MethodSelector<TSchema>,
-        path: RoutePath
+        path: RoutePath,
+        paramsCallback?: (b: ParamBuilder) => ParamBuilder
     ): this {
         const descriptor = selector(this.#tree);
         const methodName = this.#reverseMap.get(descriptor);
@@ -112,7 +179,10 @@ export class RouteBuilder<
 
         const routeDef: RouteDefinition = {
             method,
-            path
+            path,
+            ...(paramsCallback !== undefined
+                ? { params: paramsCallback(new ParamBuilder()).build() }
+                : {})
         };
 
         this.#routes[methodName] = routeDef;
