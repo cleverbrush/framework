@@ -2,10 +2,10 @@ import * as http from 'node:http';
 import * as https from 'node:https';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
 import type { FunctionSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
+import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
 import { createController } from './ControllerFactory.js';
 import { HttpError } from './HttpError.js';
-import { HttpResponse } from './HttpResponse.js';
 import { MiddlewarePipeline } from './MiddlewarePipeline.js';
 import { resolveParameters } from './ParameterResolver.js';
 import {
@@ -313,46 +313,22 @@ export class Server {
                 // Send response
                 if (ctx.responded) return;
 
-                if (result instanceof HttpResponse) {
-                    for (const [key, value] of Object.entries(result.headers)) {
-                        res.setHeader(key, value);
-                    }
-                    if (result.body === null || result.body === undefined) {
-                        res.writeHead(result.status);
-                        res.end();
-                    } else {
-                        const ct = result.contentType ?? 'application/json';
-                        const responseHandler =
-                            this.#contentNegotiator.selectResponseHandler(ct);
-                        const body = responseHandler
-                            ? responseHandler.serialize(result.body)
-                            : JSON.stringify(result.body);
-                        res.writeHead(result.status, { 'content-type': ct });
-                        res.end(body);
-                    }
+                if (result instanceof ActionResult) {
+                    await result.executeAsync(
+                        req,
+                        res,
+                        this.#contentNegotiator
+                    );
                 } else if (result === null || result === undefined) {
                     res.writeHead(204);
                     res.end();
                 } else {
-                    // Determine response content type via Accept header
-                    const acceptHeader = req.headers['accept'];
-                    const responseHandler =
-                        this.#contentNegotiator.selectResponseHandler(
-                            acceptHeader as string | undefined
-                        );
-                    if (responseHandler) {
-                        const body = responseHandler.serialize(result);
-                        res.writeHead(200, {
-                            'content-type': responseHandler.mimeType
-                        });
-                        res.end(body);
-                    } else {
-                        // Fallback to JSON
-                        res.writeHead(200, {
-                            'content-type': 'application/json'
-                        });
-                        res.end(JSON.stringify(result));
-                    }
+                    // Plain object — wrap in JsonResult for content-negotiated JSON
+                    await new JsonResult(result, 200).executeAsync(
+                        req,
+                        res,
+                        this.#contentNegotiator
+                    );
                 }
 
                 ctx.responded = true;

@@ -1,4 +1,5 @@
 import http from 'node:http';
+import { Readable } from 'node:stream';
 import {
     any,
     func,
@@ -9,8 +10,8 @@ import {
     string
 } from '@cleverbrush/schema';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { ActionResult } from '../src/ActionResult.js';
 import { NotFoundError } from '../src/HttpError.js';
-import { HttpResponse } from '../src/HttpResponse.js';
 import type { RequestContext } from '../src/RequestContext.js';
 import { createServer, type Server } from '../src/Server.js';
 import type { Middleware } from '../src/types.js';
@@ -120,7 +121,7 @@ describe('Integration: Todo CRUD lifecycle', () => {
         async create({ title }: { title: string }) {
             const todo = { id: nextId++, title, completed: false };
             todos.set(todo.id, todo);
-            return HttpResponse.created(todo, `/api/todos/${todo.id}`);
+            return ActionResult.created(todo, `/api/todos/${todo.id}`);
         }
         async update(
             { id }: { id: number },
@@ -136,7 +137,7 @@ describe('Integration: Todo CRUD lifecycle', () => {
             const todo = todos.get(id);
             if (!todo) throw new NotFoundError(`Todo ${id} not found`);
             todos.delete(id);
-            return HttpResponse.noContent();
+            return ActionResult.noContent();
         }
     }
 
@@ -887,21 +888,21 @@ describe('Integration: error handling', () => {
 });
 
 // ===========================================================================
-// 9. HttpResponse static factories
+// 9. ActionResult factories
 // ===========================================================================
 
-describe('Integration: HttpResponse', () => {
+describe('Integration: ActionResult', () => {
     let server: Server;
 
     afterEach(async () => {
         await server.close();
     });
 
-    it('HttpResponse.ok() returns 200', async () => {
+    it('ActionResult.ok() returns 200', async () => {
         const Schema = object({ get: func() });
         class Controller {
             get() {
-                return HttpResponse.ok({ message: 'hello' });
+                return ActionResult.ok({ message: 'hello' });
             }
         }
 
@@ -917,11 +918,11 @@ describe('Integration: HttpResponse', () => {
         expect(json(res)).toEqual({ message: 'hello' });
     });
 
-    it('HttpResponse.created() returns 201 with location', async () => {
+    it('ActionResult.created() returns 201 with location', async () => {
         const Schema = object({ create: func() });
         class Controller {
             create() {
-                return HttpResponse.created({ id: 5 }, '/api/resources/5');
+                return ActionResult.created({ id: 5 }, '/api/resources/5');
             }
         }
 
@@ -938,11 +939,11 @@ describe('Integration: HttpResponse', () => {
         expect(json(res)).toEqual({ id: 5 });
     });
 
-    it('HttpResponse.noContent() returns 204 with empty body', async () => {
+    it('ActionResult.noContent() returns 204 with empty body', async () => {
         const Schema = object({ del: func() });
         class Controller {
             del() {
-                return HttpResponse.noContent();
+                return ActionResult.noContent();
             }
         }
 
@@ -958,11 +959,11 @@ describe('Integration: HttpResponse', () => {
         expect(res.body).toBe('');
     });
 
-    it('HttpResponse.redirect() returns 302', async () => {
+    it('ActionResult.redirect() returns 302', async () => {
         const Schema = object({ go: func() });
         class Controller {
             go() {
-                return HttpResponse.redirect('/api/new-location');
+                return ActionResult.redirect('/api/new-location');
             }
         }
 
@@ -995,6 +996,139 @@ describe('Integration: HttpResponse', () => {
 
         const res = await request(server, 'POST', '/api/noop');
         expect(res.status).toBe(204);
+    });
+
+    it('ActionResult.json() sets explicit status', async () => {
+        const Schema = object({ get: func() });
+        class Controller {
+            get() {
+                return ActionResult.json({ partial: true }, 206);
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                routes: { get: { method: 'GET', path: '/partial' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/partial');
+        expect(res.status).toBe(206);
+        expect(json(res)).toEqual({ partial: true });
+    });
+
+    it('ActionResult.redirect() permanent returns 301', async () => {
+        const Schema = object({ go: func() });
+        class Controller {
+            go() {
+                return ActionResult.redirect('/new', true);
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                routes: { go: { method: 'GET', path: '/old' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/old');
+        expect(res.status).toBe(301);
+        expect(res.headers['location']).toBe('/new');
+    });
+
+    it('ActionResult.status() returns bare status code', async () => {
+        const Schema = object({ ping: func() });
+        class Controller {
+            ping() {
+                return ActionResult.status(202, { 'x-queued': 'true' });
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                routes: { ping: { method: 'POST', path: '/ping' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'POST', '/ping');
+        expect(res.status).toBe(202);
+        expect(res.headers['x-queued']).toBe('true');
+        expect(res.body).toBe('');
+    });
+
+    it('ActionResult.file() sends binary with content-disposition', async () => {
+        const Schema = object({ download: func() });
+        class Controller {
+            download() {
+                const content = Buffer.from('hello,world\n1,2\n');
+                return ActionResult.file(content, 'report.csv', 'text/csv');
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                routes: { download: { method: 'GET', path: '/report' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/report');
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('text/csv');
+        expect(res.headers['content-disposition']).toBe(
+            'attachment; filename="report.csv"'
+        );
+        expect(res.body).toContain('hello,world');
+    });
+
+    it('ActionResult.content() serves HTML', async () => {
+        const Schema = object({ page: func() });
+        class Controller {
+            page() {
+                return ActionResult.content(
+                    '<html><body>Hi</body></html>',
+                    'text/html'
+                );
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                routes: { page: { method: 'GET', path: '/page' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/page');
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('text/html');
+        expect(res.body).toContain('<html>');
+    });
+
+    it('ActionResult.stream() pipes a readable to the response', async () => {
+        const Schema = object({ data: func() });
+        class Controller {
+            data() {
+                const readable = Readable.from(['line1\n', 'line2\n']);
+                return ActionResult.stream(
+                    readable,
+                    'text/plain',
+                    'output.txt'
+                );
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Controller, {
+                routes: { data: { method: 'GET', path: '/data' } }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/data');
+        expect(res.status).toBe(200);
+        expect(res.headers['content-type']).toBe('text/plain');
+        expect(res.headers['content-disposition']).toBe(
+            'attachment; filename="output.txt"'
+        );
+        expect(res.body).toBe('line1\nline2\n');
     });
 });
 
