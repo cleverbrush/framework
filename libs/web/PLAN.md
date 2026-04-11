@@ -10,13 +10,13 @@ Create a new `@cleverbrush/server` library — a schema-first HTTP/HTTPS server 
 
 ```
 HTTP Request
-  → Router.match(method, path) → RouteMatch
+  → Router.match(method, path) → RouteMatch (path validated + parsed via parseString)
   → Create DI Scope for request
   → Build RequestContext (register as scoped in DI under IRequestContext)
   → Run middleware pipeline (before)
   → Parse request body (Content-Type aware)
-  → ParameterResolver: extract params from path/pathParams/query/body/headers/context
-  → Validate params against func() schema → 400 ProblemDetails on failure
+  → ParameterResolver: inject parsed path params, extract query/body/headers/context
+  → Validate non-path params against func() schema → 400 ProblemDetails on failure
   → ControllerFactory: introspect constructorSchemas → resolve deps from DI scope → new Controller(...)
   → Call controller.method(...validatedArgs)
   → Run middleware pipeline (after)
@@ -127,65 +127,75 @@ export const IRequestContext = object({
 
 `RequestContext` (the concrete class) implements this schema and additionally holds the Node.js `IncomingMessage`, `ServerResponse`, and the scoped `IServiceProvider`. Those internal properties are not part of the schema — they are implementation details.
 
-### 5. Strongly-typed path parameters
+### 5. Route paths via `parseString` schemas
 
-Path parameters have two access patterns — **raw** (from `IRequestContext.pathParams`) and **typed** (as validated method parameters). The framework supports two parameter sources for path data:
-
-#### `path('name')` — single scalar extraction
-
-For methods with a single path segment mapped to a scalar parameter:
+Route paths are defined using `parseString` schemas from `@cleverbrush/schema`. A `parseString` schema combines a URL pattern template with per-segment validation into a single schema that both **matches** and **parses** a URL path:
 
 ```typescript
-const UserControllerSchema = object({
-  getUser: func()
-    .addParameter(number())                    // slot 0: the :id segment, coerced to number
-    .hasReturnType(promise(UserSchema)),
-});
-
-routes: {
-  getUser: { method: 'GET', path: '/:id', params: [path('id')] },
-}
+const GetUserPath = parseString(
+  object({ id: number() }),
+  $t => $t`/${t => t.id}`
+);
+// Validates: "/42" → { valid: true, object: { id: 42 } }
+// Rejects:   "/abc" → { valid: false, errors: [...] }
 ```
 
-`path('id')` extracts the `:id` segment as a string, then coerces it to the target parameter schema type (here `number()`). Validation failure → 400 ProblemDetails.
+This replaces custom `:param` syntax and dedicated path-extraction helpers. Benefits:
+- **Single source of truth** — the pattern, the parameter names, and the validation rules live in one place
+- **Type-safe** — the parsed result is fully typed via `InferType`
+- **Composable** — uses the same schema validation pipeline as everything else
+- **Regex-compiled** — the template compiles to a RegExp at schema creation time for efficient matching
 
-#### `pathParams()` — typed object extraction
+Route paths can be either:
+- A `ParseStringSchemaBuilder` — for routes with dynamic segments (primary case)
+- A plain `string` — for static routes with no path parameters
 
-For methods with multiple path segments, define a dedicated params schema:
+The router strips the controller's `basePath` prefix from the incoming URL, then validates the remainder against the route's `parseString` schema. The parsed object is injected into the controller method via the `path()` parameter source (no arguments — the full parsed object is passed).
+
+#### Multi-segment example
 
 ```typescript
-const GetPostParams = object({
-  userId: number(),
-  postId: number(),
-});
+const GetPostPath = parseString(
+  object({ userId: number(), postId: number() }),
+  $t => $t`/${t => t.userId}/posts/${t => t.postId}`
+);
 
-const PostControllerSchema = object({
-  getPost: func()
-    .addParameter(GetPostParams)               // slot 0: all path params as typed object
-    .hasReturnType(promise(PostSchema)),
-});
-
-routes: {
-  getPost: { method: 'GET', path: '/:userId/posts/:postId', params: [pathParams()] },
+// Controller config:
+{
+  basePath: '/api',
+  routes: {
+    getPost: { method: 'GET', path: GetPostPath, params: [path()] },
+  }
 }
+// URL "/api/5/posts/42" → strip basePath → "/5/posts/42" → parseString → { userId: 5, postId: 42 }
 ```
 
-`pathParams()` collects **all** path segments (`:userId`, `:postId`) into a plain object `{ userId: "5", postId: "42" }`, then validates + coerces it against the target parameter schema (`GetPostParams`). The result is a fully typed `{ userId: number; postId: number }`.
+#### Nested object paths
+
+`parseString` supports nested object schemas, so deeply structured route params work out of the box:
+
+```typescript
+const NestedPath = parseString(
+  object({
+    order: object({ id: number() }),
+    user: object({ name: string() })
+  }),
+  $t => $t`/orders/${t => t.order.id}/by/${t => t.user.name}`
+);
+// "/orders/42/by/alice" → { order: { id: 42 }, user: { name: 'alice' } }
+```
 
 #### IRequestContext provides raw access
 
-`IRequestContext.pathParams` is always `Record<string, string>` — untyped, uncoerced. This is intentional:
-- **Middleware** accesses `ctx.pathParams` for logging, auth checks, etc. — no schema needed.
-- **Controller methods** receive typed, validated params via `path()` or `pathParams()` sources.
-- **Services** that need path data should receive it as a method argument from the controller, not access raw context.
+`IRequestContext.pathParams` still provides a raw `Record<string, string>` for middleware that needs untyped access (logging, auth checks, etc.). Controller methods receive the fully typed, validated object via `path()`.
 
 ---
 
 ## Target Developer Experience
 
 ```typescript
-import { object, string, number, func, array, promise, InferType } from '@cleverbrush/schema';
-import { createServer, path, pathParams, query, body, header, context, IRequestContext } from '@cleverbrush/server';
+import { object, string, number, func, array, promise, parseString, InferType } from '@cleverbrush/schema';
+import { createServer, path, query, body, header, context, IRequestContext } from '@cleverbrush/server';
 
 // 1. Define data schemas
 const UserSchema = object({
@@ -206,10 +216,16 @@ const IUserRepo = object({
   findAll: func().hasReturnType(promise(array().of(UserSchema))),
 });
 
-// 3. Define controller schema (methods + constructor deps)
+// 3. Define route path schemas (parseString = pattern + parsing + validation in one schema)
+const GetUserPath = parseString(
+  object({ id: number() }),
+  $t => $t`/${t => t.id}`
+);
+
+// 4. Define controller schema (methods + constructor deps)
 const UserControllerSchema = object({
   getUser: func()
-    .addParameter(number())
+    .addParameter(object({ id: number() }))   // receives parsed path object
     .hasReturnType(promise(UserSchema)),
   createUser: func()
     .addParameter(CreateUserInput)
@@ -220,13 +236,13 @@ const UserControllerSchema = object({
   func().addParameter(IUserRepo)  // DI: resolve IUserRepo
 );
 
-// 4. Implement controller — IDE scaffolds all methods via "implement interface"
+// 5. Implement controller — IDE scaffolds all methods via "implement interface"
 class UserController implements InferType<typeof UserControllerSchema> {
   #repo: InferType<typeof IUserRepo>;
   constructor(repo: InferType<typeof IUserRepo>) {
     this.#repo = repo;
   }
-  async getUser(id: number) {
+  async getUser({ id }: InferType<typeof GetUserPath>) {
     const user = await this.#repo.findById(id);
     if (!user) throw new NotFoundError('User not found');
     return user;
@@ -239,11 +255,11 @@ class UserController implements InferType<typeof UserControllerSchema> {
   }
 }
 
-// 5. Multi-path-param example
-const GetPostParams = object({
-  userId: number(),
-  postId: number(),
-});
+// 6. Multi-path-param example using parseString
+const GetPostPath = parseString(
+  object({ userId: number(), postId: number() }),
+  $t => $t`/${t => t.userId}/posts/${t => t.postId}`
+);
 
 const PostSchema = object({
   id: number(),
@@ -254,20 +270,20 @@ const PostSchema = object({
 
 const PostControllerSchema = object({
   getPost: func()
-    .addParameter(GetPostParams)
+    .addParameter(object({ userId: number(), postId: number() }))
     .hasReturnType(promise(PostSchema)),
 }).addConstructor(func().addParameter(IUserRepo));
 
 class PostController implements InferType<typeof PostControllerSchema> {
   #repo: InferType<typeof IUserRepo>;
   constructor(repo: InferType<typeof IUserRepo>) { this.#repo = repo; }
-  async getPost(params: InferType<typeof GetPostParams>) {
-    // params is { userId: number; postId: number } — fully typed + validated
-    return this.#repo.findPostByIds(params.userId, params.postId);
+  async getPost({ userId, postId }: InferType<typeof GetPostPath>) {
+    // fully typed + validated by parseString before the method is called
+    return this.#repo.findPostByIds(userId, postId);
   }
 }
 
-// 6. Configure and start
+// 7. Configure and start
 const server = createServer()
   .services(svc => {
     svc.addSingleton(IUserRepo, () => new InMemoryUserRepo());
@@ -275,15 +291,15 @@ const server = createServer()
   .controller(UserControllerSchema, UserController, {
     basePath: '/api/users',
     routes: {
-      getUser:    { method: 'GET',  path: '/:id', params: [path('id')] },
-      createUser: { method: 'POST', path: '/',    params: [body()] },
+      getUser:    { method: 'GET',  path: GetUserPath, params: [path()] },
+      createUser: { method: 'POST', path: '/',         params: [body()] },
       listUsers:  { method: 'GET',  path: '/' },
     }
   })
   .controller(PostControllerSchema, PostController, {
     basePath: '/api/users',
     routes: {
-      getPost: { method: 'GET', path: '/:userId/posts/:postId', params: [pathParams()] },
+      getPost: { method: 'GET', path: GetPostPath, params: [path()] },
     }
   })
   .use(loggingMiddleware)   // global middleware
@@ -305,14 +321,14 @@ const server = createServer()
 - Add to Vitest project list in `vite.config.mts`
 
 **Step 2. Core types** (`src/types.ts`) — Define all interfaces and types:
-- `ParameterSource`: `{ from: 'path' | 'pathParams' | 'query' | 'body' | 'header' | 'context'; name?: string }`
-- `RouteDefinition`: `{ method, path, handler (property name string), parameterSources }`
+- `ParameterSource`: `{ from: 'path' | 'query' | 'body' | 'header' | 'context'; name?: string }`
+- `RouteDefinition`: `{ method, path (string | ParseStringSchemaBuilder), handler (property name string), parameterSources }`
 - `ControllerRegistration`: `{ schema, implementation (class), basePath?, routes, middlewares? }`
-- `RouteMatch`: `{ route, pathParams, controllerRegistration }`
+- `RouteMatch`: `{ route, parsedPath (object from parseString or null), controllerRegistration }`
 - `ContentTypeHandler`: `{ mimeType, serialize, deserialize }`
 - `Middleware`: `(context: RequestContext, next: () => Promise<void>) => Promise<void>`
 - `ServerOptions`: `{ port?, host?, https? { key, cert } }`
-- Helper factories: `path(name)`, `pathParams()`, `query(name)`, `body()`, `header(name)`, `context()` — return ParameterSource objects
+- Helper factories: `path()`, `query(name)`, `body()`, `header(name)`, `context()` — return ParameterSource objects. `path()` takes no arguments — it injects the parsed path object from the route's `parseString` schema
 
 **Step 3. RFC 9457 ProblemDetails** (`src/ProblemDetails.ts` + `src/ProblemDetails.test.ts`):
 - `ProblemDetails` interface: `{ type, status, title, detail?, instance?, [extensions] }`
@@ -332,13 +348,14 @@ const server = createServer()
 ### Phase 2: Request Processing (steps 5–7, all parallel)
 
 **Step 5. Router** (`src/Router.ts` + `src/Router.test.ts`):
-- Trie-based URL pattern matcher
-- `addRoute(method, pattern, metadata)` — registers route with path pattern parsing
-- `match(method, url)` → `{ metadata, pathParams } | null`
-- Pattern parsing: static segments (`/users`), dynamic segments (`/:id`), wildcards (`/*rest`) for future
+- Routes grouped by HTTP method; matching iterates registered routes in order (first match wins)
+- `addRoute(method, basePath, routePath, metadata)` — registers route; `routePath` is either a `string` (static) or a `ParseStringSchemaBuilder` (dynamic)
+- `match(method, url)` → `{ metadata, parsedPath } | null`
+- For `ParseStringSchemaBuilder` paths: strip `basePath` prefix from URL, call `schema.validate(remainder)` — the schema's compiled regex handles matching; segment schemas handle parsing/validation
+- For string paths: exact match after stripping `basePath`
 - Method matching: exact match, auto 405 (matched path, wrong method)
 - Path normalization: strip trailing slashes, decode URI components
-- **Tests**: static routes, dynamic params, multiple params, overlapping paths, method matching, 405 detection, URL decoding, edge cases
+- **Tests**: static routes, dynamic params via parseString, multiple params, overlapping paths, method matching, 405 detection, URL decoding, nested object paths, edge cases
 
 **Step 6. ContentNegotiator** (`src/ContentNegotiator.ts` + test):
 - `register(handler: ContentTypeHandler)` — add custom handler
@@ -349,17 +366,16 @@ const server = createServer()
 - **Tests**: Accept header parsing, quality values, fallback to JSON, unknown types → 415
 
 **Step 7. ParameterResolver** (`src/ParameterResolver.ts` + test):
-- `resolve(funcSchema, sources, extractionContext)` → `{ valid: true, args[] } | { valid: false, problemDetails }`
+- `resolve(funcSchema, sources, routeMatch)` → `{ valid: true, args[] } | { valid: false, problemDetails }`
 - **Parameter source types**:
-  - `path`: extract named segment from URL path params, auto-coerce to number/boolean if target schema requires it
-  - `pathParams`: collect ALL path segments into an object, validate + coerce against the target parameter's object schema
-  - `query`: extract from URL query string, auto-coerce same as path
+  - `path`: inject the already-parsed path object from the route match (`routeMatch.parsedPath`) — no additional validation needed, the `parseString` schema already validated during routing
+  - `query`: extract from URL query string, auto-coerce to number/boolean if target schema requires it
   - `body`: extract from parsed request body (already deserialized via Content-Type handler)
   - `header`: extract from request headers
   - `context`: inject the RequestContext instance directly (no validation needed)
-- **Validation**: call `schema.validate(coercedValue, { doNotStopOnFirstError: true })` per parameter (skip for `context` source)
+- **Validation**: call `schema.validate(coercedValue, { doNotStopOnFirstError: true })` per parameter (skip for `context` and `path` sources — path is pre-validated by parseString)
 - **Error aggregation**: collect all validation errors across all params, create single RFC 9457 `ProblemDetails`
-- **Tests**: extraction per source type including pathParams, coercion, context injection, validation failures, optional params, mixed sources
+- **Tests**: extraction per source type, path object injection, query coercion, context injection, validation failures, optional params, mixed sources
 
 ### Phase 3: Controller & Middleware (depends on Phase 2)
 
@@ -431,7 +447,7 @@ const server = createServer()
 - **Integration tests**:
   - Full request/response cycle (200 JSON)
   - Path/body validation → 400 ProblemDetails with errors array
-  - `pathParams()` multi-param extraction and validation
+  - `parseString` path parsing + validation (single param, multi-param, nested objects)
   - Missing route → 404, wrong method → 405 with Allow header
   - Controller DI resolution + scoped isolation
   - `context()` parameter source injects RequestContext
@@ -450,7 +466,7 @@ const server = createServer()
 - `HttpResponse`
 - `ProblemDetails`, `createProblemDetails`, `createValidationProblemDetails`
 - `ContentTypeHandler`, `Middleware`
-- Helper factories: `path`, `pathParams`, `query`, `body`, `header`, `context`
+- Helper factories: `path`, `query`, `body`, `header`, `context`
 - All core types
 
 **Step 13. README.md**
@@ -483,6 +499,7 @@ const server = createServer()
 - `libs/di/src/ServiceCollection.ts` — `#addFromSchema()`: constructor introspection
 - `libs/schema/src/builders/ObjectSchemaBuilder.ts` — `introspect().constructorSchemas`
 - `libs/schema/src/builders/FunctionSchemaBuilder.ts` — `introspect().parameters`
+- `libs/schema/src/builders/ParseStringSchemaBuilder.ts` — `parseString()` factory, regex-compiled URL pattern matching + validation
 - `libs/schema/src/builders/PromiseSchemaBuilder.ts` — `promise(resolvedTypeSchema)` factory
 - `libs/schema-json/src/Core.ts` — `toJsonSchema()` for future OpenAPI
 
@@ -494,7 +511,7 @@ const server = createServer()
 2. `tsc --noEmit` — monorepo type-checks
 3. `turbo run build` → `libs/server/dist/index.js` + `index.d.ts`
 4. `biome check ./libs/server` — lint passes
-5. Integration tests verify: 200/400/404/405/500 responses, DI scope isolation, middleware order, `context()` injection, `pathParams()` typed extraction, content types, graceful shutdown
+5. Integration tests verify: 200/400/404/405/500 responses, DI scope isolation, middleware order, `context()` injection, `parseString` path parsing + validation, content types, graceful shutdown
 
 ---
 
@@ -506,8 +523,8 @@ const server = createServer()
 - **RequestContext**: NOT a constructor dep. Injected via `context()` method param source or resolved as scoped DI service
 - **IRequestContext**: Explicitly defined object schema with `method`, `url`, `pathParams`, `queryParams`, `headers`, `items`, `body`, `json`, `responded` — serves as both DI key and type definition
 - **Async return types**: `promise(schema)` on all async methods
-- **Path parameters**: Two sources — `path('name')` for single scalar extraction; `pathParams()` for typed object extraction with multi-segment support. `IRequestContext.pathParams` provides raw `Record<string, string>` for middleware
-- **Parameter coercion**: path/query strings auto-coerced to number/boolean; body parsed via Content-Type
+- **Path parameters**: Route paths defined via `parseString` schemas from `@cleverbrush/schema` — combines URL pattern matching with type-safe parsing and per-segment validation in a single schema. `path()` parameter source (no arguments) injects the parsed path object. Plain strings supported for static routes. `IRequestContext.pathParams` provides raw `Record<string, string>` for middleware
+- **Parameter coercion**: query strings auto-coerced to number/boolean; body parsed via Content-Type; path params coerced + validated by `parseString` segment schemas
 - **Middleware**: `(context, next) => Promise<void>` — global + per-controller + per-route
 - **Libraries HTTP-agnostic**: No changes to schema/di/mapper
 - **Future OpenAPI**: architecture supports it via schema-json, deferred to v2
