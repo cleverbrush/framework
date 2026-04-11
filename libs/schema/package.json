@@ -82,6 +82,10 @@
         "./promise": {
             "types": "./dist/builders/PromiseSchemaBuilder.d.ts",
             "import": "./dist/builders/PromiseSchemaBuilder.js"
+        },
+        "./interpolated-string": {
+            "types": "./dist/builders/InterpolatedStringSchemaBuilder.d.ts",
+            "import": "./dist/builders/InterpolatedStringSchemaBuilder.js"
         }
     },
     "sideEffects": false,

@@ -1,5 +1,10 @@
 // Re-export all types, classes, and extension system from core
 
+export type { InterpolatedTemplateTag } from './builders/InterpolatedStringSchemaBuilder.js';
+export {
+    InterpolatedStringSchemaBuilder,
+    interpolatedString
+} from './builders/InterpolatedStringSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
