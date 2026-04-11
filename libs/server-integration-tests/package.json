@@ -1,0 +1,11 @@
+{
+    "name": "@cleverbrush/server-integration-tests",
+    "private": true,
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+        "@cleverbrush/server": "^1.0.0",
+        "@cleverbrush/schema": "^2.0.0",
+        "@cleverbrush/di": "^2.0.0"
+    }
+}

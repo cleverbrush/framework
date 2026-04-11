@@ -8,6 +8,7 @@ export {
     StatusCodeResult,
     StreamResult
 } from './ActionResult.js';
+export { defineController } from './ControllerDef.js';
 export {
     BadRequestError,
     ConflictError,
