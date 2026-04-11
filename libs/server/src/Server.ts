@@ -3,8 +3,7 @@ import * as https from 'node:https';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
 import type {
     FunctionSchemaBuilder,
-    ObjectSchemaBuilder,
-    SchemaBuilder
+    ObjectSchemaBuilder
 } from '@cleverbrush/schema';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
@@ -211,7 +210,7 @@ export class Server {
             }
 
             const match = routeResult.match;
-            const { registration, methodName, routeDef, parsedPath } = match;
+            const { registration, methodName, parsedPath } = match;
 
             // Set path params on context (raw string form for middleware)
             if (parsedPath) {

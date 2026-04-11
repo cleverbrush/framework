@@ -1,12 +1,12 @@
 import {
     type InferType,
-    object,
     type ObjectSchemaBuilder,
+    object,
     type ParseStringSchemaBuilder,
-    parseString,
     type ParseStringTemplateTag,
     type PropertyDescriptor,
     type PropertyDescriptorTree,
+    parseString,
     type SchemaBuilder
 } from '@cleverbrush/schema';
 
