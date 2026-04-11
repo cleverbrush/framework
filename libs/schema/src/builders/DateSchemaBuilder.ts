@@ -872,6 +872,43 @@ export class DateSchemaBuilder<
     }
 
     /**
+     * Adds a preprocessor that coerces a string value to a Date
+     * using `new Date(value)`. If the string does not represent a
+     * valid date the original value is left unchanged so the date
+     * schema rejects it.
+     *
+     * This is a convenient alias for common string→Date coercion.
+     * For more specific parsing, see {@link acceptJsonString} and
+     * {@link acceptEpoch}.
+     *
+     * @example ```ts
+     * const schema = date().coerce();
+     * const result = schema.validate('2024-01-15');
+     * // result.valid === true
+     * // result.object instanceof Date === true
+     * ```
+     */
+    public coerce(): DateSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return this.addPreprocessor(
+            ((v: any) => {
+                if (typeof v === 'string') {
+                    const d = new Date(v);
+                    return Number.isNaN(d.getTime()) ? v : d;
+                }
+                return v;
+            }) as any,
+            { mutates: true }
+        ) as any;
+    }
+
+    /**
      * Accepts JSON string as a valid Date.
      * String must be in ISO format and will be parsed using `JSON.parse()`.
      */

@@ -15,7 +15,8 @@ export const SECTION_GROUPS = [
             'immutability',
             'discriminated-unions',
             'recursive-schemas',
-            'generic-schemas'
+            'generic-schemas',
+            'parse-string'
         ]
     },
     {
@@ -61,6 +62,11 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
     {
         slug: 'generic-schemas',
         title: 'Generic Schemas',
+        group: 'Composition'
+    },
+    {
+        slug: 'parse-string',
+        title: 'Parse String & Coercion',
         group: 'Composition'
     },
     { slug: 'validation', title: 'Validation', group: 'Validation' },

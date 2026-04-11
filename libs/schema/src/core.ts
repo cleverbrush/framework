@@ -33,6 +33,11 @@ export {
     object,
     SchemaPropertySelector
 } from './builders/ObjectSchemaBuilder.js';
+export type { ParseStringTemplateTag } from './builders/ParseStringSchemaBuilder.js';
+export {
+    ParseStringSchemaBuilder,
+    parseString
+} from './builders/ParseStringSchemaBuilder.js';
 export {
     PromiseSchemaBuilder,
     promise

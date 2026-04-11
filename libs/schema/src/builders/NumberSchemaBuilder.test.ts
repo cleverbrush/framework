@@ -1069,3 +1069,56 @@ test('clearDefault - removes default value from number schema', () => {
     const { valid } = schema.validate(undefined as any);
     expect(valid).toEqual(false);
 });
+
+// ---------------------------------------------------------------------------
+// coerce()
+// ---------------------------------------------------------------------------
+
+test('coerce - converts string to number', () => {
+    const schema = number().coerce();
+    const result = schema.validate('42' as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(42);
+
+    const typeCheck: InferType<typeof schema> = 0;
+    expectTypeOf(typeCheck).toBeNumber();
+});
+
+test('coerce - converts string float to number', () => {
+    const schema = number().clearIsInteger().coerce();
+    const result = schema.validate('3.14' as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(3.14);
+});
+
+test('coerce - non-numeric string produces NaN and fails validation', () => {
+    const schema = number().coerce();
+    const result = schema.validate('hello' as any);
+    expect(result.valid).toEqual(false);
+});
+
+test('coerce - passes through non-string values unchanged', () => {
+    const schema = number().coerce();
+    const result = schema.validate(7);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(7);
+});
+
+test('coerce - empty string converts to 0', () => {
+    const schema = number().coerce();
+    const result = schema.validate('' as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(0);
+});
+
+test('coerce - immutability: does not mutate original schema', () => {
+    const original = number();
+    const coerced = original.coerce();
+    expect((original as any) !== (coerced as any)).toEqual(true);
+    // original should reject strings
+    const r1 = original.validate('42' as any);
+    expect(r1.valid).toEqual(false);
+    // coerced should accept strings
+    const r2 = coerced.validate('42' as any);
+    expect(r2.valid).toEqual(true);
+});

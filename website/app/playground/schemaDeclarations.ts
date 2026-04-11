@@ -469,6 +469,19 @@ export declare class BooleanSchemaBuilder<TResult = boolean, TRequired extends b
      */
     clearEquals(): BooleanSchemaBuilder<boolean, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
     /**
+     * Adds a preprocessor that coerces a string value to a boolean.
+     * Accepts \`"true"\` → \`true\` and \`"false"\` → \`false\`; other values are
+     * left unchanged so the boolean schema rejects them.
+     *
+     * @example \`\`\`ts
+     * const schema = boolean().coerce();
+     * const result = schema.validate('true');
+     * // result.valid === true
+     * // result.object === true
+     * \`\`\`
+     */
+    coerce(): BooleanSchemaBuilder<TResult, TRequired, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
      * @hidden
      */
     nullable(): BooleanSchemaBuilder<TResult, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
@@ -728,6 +741,24 @@ export declare class DateSchemaBuilder<TResult = Date, TRequired extends boolean
      * Clear \`max()\` call.
      */
     clearMax(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Adds a preprocessor that coerces a string value to a Date
+     * using \`new Date(value)\`. If the string does not represent a
+     * valid date the original value is left unchanged so the date
+     * schema rejects it.
+     *
+     * This is a convenient alias for common string→Date coercion.
+     * For more specific parsing, see {@link acceptJsonString} and
+     * {@link acceptEpoch}.
+     *
+     * @example \`\`\`ts
+     * const schema = date().coerce();
+     * const result = schema.validate('2024-01-15');
+     * // result.valid === true
+     * // result.object instanceof Date === true
+     * \`\`\`
+     */
+    coerce(): DateSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
      * Accepts JSON string as a valid Date.
      * String must be in ISO format and will be parsed using \`JSON.parse()\`.
@@ -2064,6 +2095,20 @@ export declare class NumberSchemaBuilder<TResult = number, TRequired extends boo
      */
     canBeInfinite(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
     /**
+     * Adds a preprocessor that coerces a string value to a number
+     * using \`Number(value)\`. Useful when the input is captured from
+     * a string source (e.g. a parse-string schema, URL parameter,
+     * or form input).
+     *
+     * @example \`\`\`ts
+     * const schema = number().coerce();
+     * const result = schema.validate('42');
+     * // result.valid === true
+     * // result.object === 42
+     * \`\`\`
+     */
+    coerce(): NumberSchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
      * Restrict number to be at least \`minValue\`.
      */
     min(minValue: number, 
@@ -2798,6 +2843,178 @@ type RequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any, an
 type NotRequiredInputProps<T extends Record<string, SchemaBuilder<any, any, any, any, any>>> = keyof {
     [k in keyof T as T[k] extends SchemaBuilder<any, infer TReq, any, infer THasDef> ? TReq extends true ? THasDef extends true ? k : never : k : never]: T[k];
 };
+`,
+    "file:///node_modules/@cleverbrush/schema/builders/ParseStringSchemaBuilder.d.ts": `import { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
+import { type BRAND, type InferType, type PropertyDescriptor, type PropertyDescriptorInner, type PropertyDescriptorTree, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
+/** Descriptor for a single interpolation segment captured at creation time. */
+type SegmentDef = {
+    /** The property schema for this segment. */
+    schema: SchemaBuilder<any, any, any, any, any>;
+    /** Dot-separated property path (e.g. \`'order.id'\`) — used in error messages. */
+    path: string;
+    /** The property descriptor inner — used to set parsed values on the result object. */
+    descriptor: PropertyDescriptorInner<any, any, any>;
+};
+/** Internal data captured by the \`$template\` tagged-template invocation. */
+type ParseStringTemplateDefinition = {
+    /** Literal string fragments from the tagged template. */
+    literals: readonly string[];
+    /** One segment per interpolation expression, in order. */
+    segments: readonly SegmentDef[];
+};
+/**
+ * The typed tagged-template function passed to the \`parseString\`
+ * callback. Template expressions must be property-selector lambdas that
+ * navigate the {@link PropertyDescriptorTree} of the object schema.
+ *
+ * Only properties whose inferred type extends \`string | number | boolean | Date\`
+ * are selectable — nested \`ObjectSchemaBuilder\` children are navigable but
+ * not themselves endpoints.
+ */
+export type ParseStringTemplateTag<TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>> = (strings: TemplateStringsArray, ...selectors: Array<(tree: PropertyDescriptorTree<TSchema, TSchema, string | number | boolean | Date>) => PropertyDescriptor<TSchema, any, any>>) => ParseStringTemplateDefinition;
+type ParseStringSchemaBuilderCreateProps<T = any, R extends boolean = true> = Partial<ReturnType<ParseStringSchemaBuilder<T, R>['introspect']>>;
+/**
+ * Validates a string against a template pattern and parses it
+ * into a strongly-typed object.
+ *
+ * Created via the {@link parseString} factory:
+ *
+ * \`\`\`ts
+ * const RouteSchema = parseString(
+ *   object({ userId: string().uuid(), id: number() }),
+ *   $t => $t\`/orders/\${t => t.id}/\${t => t.userId}\`
+ * );
+ *
+ * const result = RouteSchema.validate('/orders/42/550e8400-...');
+ * // result.object === { id: 42, userId: '550e8400-...' }
+ * \`\`\`
+ *
+ * @see {@link parseString}
+ */
+export declare class ParseStringSchemaBuilder<TResult = any, TRequired extends boolean = true, TNullable extends boolean = false, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TResult, TRequired, TNullable, THasDefault, TExtensions> {
+    #private;
+    /**
+     * @hidden
+     */
+    static create(props: ParseStringSchemaBuilderCreateProps): ParseStringSchemaBuilder<any, true, false, false, {}>;
+    protected constructor(props: ParseStringSchemaBuilderCreateProps);
+    introspect(): {
+        /** The object schema defining the result shape. */
+        objectSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+        /** The template definition (literals + segments). */
+        templateDefinition: ParseStringTemplateDefinition;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TResult>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TResult>[];
+        requiredValidationErrorMessageProvider: ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: TResult | (() => TResult) | undefined;
+        description: string | undefined;
+        hasCatch: boolean;
+        catchValue: TResult | (() => TResult) | undefined;
+    };
+    /** {@inheritDoc SchemaBuilder.validate} */
+    validate(object: string, context?: ValidationContext): ValidationResult<TResult>;
+    /** {@inheritDoc SchemaBuilder.validateAsync} */
+    validateAsync(object: string, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    protected _validate(object: any, context?: ValidationContext): ValidationResult<TResult>;
+    protected _validateAsync(object: any, context?: ValidationContext): Promise<ValidationResult<TResult>>;
+    /**
+     * @inheritdoc
+     */
+    hasType<T>(_notUsed?: T): ParseStringSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    clearHasType(): ParseStringSchemaBuilder<any, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): ParseStringSchemaBuilder<TResult, TRequired, true, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): ParseStringSchemaBuilder<TResult, TRequired, false, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: ValidationErrorMessageProvider): ParseStringSchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): ParseStringSchemaBuilder<TResult, false, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: TResult | (() => TResult)): ParseStringSchemaBuilder<TResult, true, TNullable, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): ParseStringSchemaBuilder<TResult, TRequired, TNullable, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): ParseStringSchemaBuilder<TResult & {
+        readonly [K in BRAND]: TBrand;
+    }, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    readonly(): ParseStringSchemaBuilder<Readonly<TResult>, TRequired, TNullable, THasDefault, TExtensions> & TExtensions;
+    protected createFromProps<T, TReq extends boolean>(props: ParseStringSchemaBuilderCreateProps<T, TReq>): this;
+}
+/**
+ * Creates a parse-string schema that validates a string against a
+ * template pattern and parses it into a strongly-typed object.
+ *
+ * The first argument defines the result shape via \`object(...)\`, and the
+ * second argument is a callback receiving a typed \`$template\` tagged-template
+ * function whose template expressions are type-safe property selectors.
+ *
+ * @example
+ * \`\`\`ts
+ * const RouteSchema = parseString(
+ *   object({
+ *     userId: string().uuid(),
+ *     id: number()
+ *   }),
+ *   $t => $t\`/orders/\${t => t.id}/\${t => t.userId}\`
+ * );
+ *
+ * const result = RouteSchema.validate('/orders/42/550e8400-e29b-41d4-a716-446655440000');
+ * // result.valid === true
+ * // result.object === { id: 42, userId: '550e8400-e29b-41d4-a716-446655440000' }
+ *
+ * type Route = InferType<typeof RouteSchema>;
+ * // { id: number; userId: string }
+ * \`\`\`
+ *
+ * @example Nested objects
+ * \`\`\`ts
+ * const schema = parseString(
+ *   object({
+ *     order: object({ id: number() }),
+ *     user: object({ name: string() })
+ *   }),
+ *   $t => $t\`/orders/\${t => t.order.id}/by/\${t => t.user.name}\`
+ * );
+ * \`\`\`
+ *
+ * @param objectSchema - An \`ObjectSchemaBuilder\` defining the result type and
+ *   per-property validation schemas.
+ * @param templateBuilder - Callback receiving the typed \`$template\`
+ *   tagged-template function. Must return the result of invoking \`$template\`.
+ * @returns A \`ParseStringSchemaBuilder\` whose \`validate()\` accepts a
+ *   string and whose \`InferType\` is the object schema's inferred type.
+ */
+export declare function parseString<TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>>(objectSchema: TSchema, templateBuilder: ($template: ParseStringTemplateTag<TSchema>) => ParseStringTemplateDefinition): ParseStringSchemaBuilder<InferType<TSchema>>;
+export {};
 `,
     "file:///node_modules/@cleverbrush/schema/builders/PromiseSchemaBuilder.d.ts": `import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type PromiseSchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<PromiseSchemaBuilder<R>['introspect']>>;
@@ -5152,6 +5369,8 @@ export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
 export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/ObjectSchemaBuilder.js';
+export type { ParseStringTemplateTag } from './builders/ParseStringSchemaBuilder.js';
+export { ParseStringSchemaBuilder, parseString } from './builders/ParseStringSchemaBuilder.js';
 export { PromiseSchemaBuilder, promise } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
@@ -6640,6 +6859,8 @@ export declare function resolveErrorMessageAsync(provider: ValidationErrorMessag
 export {};
 `,
     "file:///node_modules/@cleverbrush/schema/index.d.ts": `export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export type { ParseStringTemplateTag } from './builders/ParseStringSchemaBuilder.js';
+export { ParseStringSchemaBuilder, parseString } from './builders/ParseStringSchemaBuilder.js';
 export { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';

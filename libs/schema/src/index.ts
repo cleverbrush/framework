@@ -1,6 +1,11 @@
 // Re-export all types, classes, and extension system from core
 
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
+export type { ParseStringTemplateTag } from './builders/ParseStringSchemaBuilder.js';
+export {
+    ParseStringSchemaBuilder,
+    parseString
+} from './builders/ParseStringSchemaBuilder.js';
 export { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';

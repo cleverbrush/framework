@@ -82,6 +82,10 @@
         "./promise": {
             "types": "./dist/builders/PromiseSchemaBuilder.d.ts",
             "import": "./dist/builders/PromiseSchemaBuilder.js"
+        },
+        "./parse-string": {
+            "types": "./dist/builders/ParseStringSchemaBuilder.d.ts",
+            "import": "./dist/builders/ParseStringSchemaBuilder.js"
         }
     },
     "sideEffects": false,

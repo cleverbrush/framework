@@ -492,6 +492,37 @@ export class BooleanSchemaBuilder<
     }
 
     /**
+     * Adds a preprocessor that coerces a string value to a boolean.
+     * Accepts `"true"` → `true` and `"false"` → `false`; other values are
+     * left unchanged so the boolean schema rejects them.
+     *
+     * @example ```ts
+     * const schema = boolean().coerce();
+     * const result = schema.validate('true');
+     * // result.valid === true
+     * // result.object === true
+     * ```
+     */
+    public coerce(): BooleanSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return this.addPreprocessor(
+            ((v: any) => {
+                if (v === 'true') return true;
+                if (v === 'false') return false;
+                return v;
+            }) as any,
+            { mutates: true }
+        ) as any;
+    }
+
+    /**
      * @hidden
      */
     public nullable(): BooleanSchemaBuilder<
