@@ -1,18 +1,12 @@
 import type { ParseStringSchemaBuilder } from '@cleverbrush/schema';
-import type {
-    ControllerRegistration,
-    RouteDefinition,
-    RouteMatch
-} from './types.js';
+import type { EndpointRegistration, RouteMatch } from './types.js';
 
 interface RegisteredRoute {
     readonly basePath: string;
     readonly routePath:
         | string
         | ParseStringSchemaBuilder<any, any, any, any, any>;
-    readonly registration: ControllerRegistration;
-    readonly methodName: string;
-    readonly routeDef: RouteDefinition;
+    readonly registration: EndpointRegistration;
 }
 
 function normalizePath(p: string): string {
@@ -32,40 +26,22 @@ function isParseStringSchema(
 
 export class Router {
     readonly #routes: Map<string, RegisteredRoute[]> = new Map();
-    /** All unique paths (for 405 detection) mapped to allowed methods */
-    readonly #pathMethods: Map<string, Set<string>> = new Map();
 
-    addRoute(
-        registration: ControllerRegistration,
-        methodName: string,
-        routeDef: RouteDefinition
-    ): void {
-        const method = routeDef.method.toUpperCase();
-        const basePath = normalizePath(registration.config.basePath ?? '');
+    addRoute(registration: EndpointRegistration): void {
+        const { method, basePath, pathTemplate } = registration.endpoint;
+        const upperMethod = method.toUpperCase();
+        const normalizedBase = normalizePath(basePath);
 
         const route: RegisteredRoute = {
-            basePath,
-            routePath: routeDef.path,
-            registration,
-            methodName,
-            routeDef
+            basePath: normalizedBase,
+            routePath: pathTemplate,
+            registration
         };
 
-        if (!this.#routes.has(method)) {
-            this.#routes.set(method, []);
+        if (!this.#routes.has(upperMethod)) {
+            this.#routes.set(upperMethod, []);
         }
-        this.#routes.get(method)!.push(route);
-
-        // Track path patterns for 405 detection
-        const patternKey =
-            typeof routeDef.path === 'string'
-                ? `${basePath}${normalizePath(routeDef.path)}`
-                : `${basePath}/__dynamic_${this.#routes.get(method)!.length}`;
-
-        if (!this.#pathMethods.has(patternKey)) {
-            this.#pathMethods.set(patternKey, new Set());
-        }
-        this.#pathMethods.get(patternKey)!.add(method);
+        this.#routes.get(upperMethod)!.push(route);
     }
 
     match(
@@ -111,8 +87,7 @@ export class Router {
         route: RegisteredRoute,
         normalizedUrl: string
     ): RouteMatch | null {
-        const { basePath, routePath, registration, methodName, routeDef } =
-            route;
+        const { basePath, routePath } = route;
 
         // Check basePath prefix
         if (basePath && !normalizedUrl.startsWith(basePath)) {
@@ -128,9 +103,7 @@ export class Router {
             const result = routePath.validate(remainder);
             if (result.valid) {
                 return {
-                    registration,
-                    methodName,
-                    routeDef,
+                    registration: route.registration,
                     parsedPath: result.object as Record<string, any>
                 };
             }
@@ -143,9 +116,7 @@ export class Router {
 
         if (normalizedRemainder === normalizedRoutePath) {
             return {
-                registration,
-                methodName,
-                routeDef,
+                registration: route.registration,
                 parsedPath: null
             };
         }

@@ -1,38 +1,42 @@
 import { number, object, parseString, string } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
+import type { EndpointMetadata } from '../src/Endpoint.js';
 import { Router } from '../src/Router.js';
-import type { ControllerRegistration, RouteDefinition } from '../src/types.js';
+import type { EndpointRegistration } from '../src/types.js';
 
 function makeRegistration(
+    method: string,
     basePath: string,
-    routes: Record<string, RouteDefinition>
-): ControllerRegistration {
+    pathTemplate: EndpointMetadata['pathTemplate'] = '/'
+): EndpointRegistration {
     return {
-        schema: object({}),
-        implementation: class {},
-        config: { basePath, routes }
+        endpoint: {
+            method,
+            basePath,
+            pathTemplate,
+            bodySchema: null,
+            querySchema: null,
+            headerSchema: null
+        },
+        handler: () => {}
     };
 }
 
 describe('Router', () => {
     it('matches static routes', () => {
         const router = new Router();
-        const reg = makeRegistration('/api/users', {
-            list: { method: 'GET', path: '/' }
-        });
-        router.addRoute(reg, 'list', reg.config.routes['list']);
+        const reg = makeRegistration('GET', '/api/users');
+        router.addRoute(reg);
 
         const result = router.match('GET', '/api/users');
         expect(result.match).not.toBeNull();
-        expect(result.match!.methodName).toBe('list');
+        expect(result.match!.registration).toBe(reg);
     });
 
     it('matches static routes with trailing slash', () => {
         const router = new Router();
-        const reg = makeRegistration('/api/users', {
-            list: { method: 'GET', path: '/' }
-        });
-        router.addRoute(reg, 'list', reg.config.routes['list']);
+        const reg = makeRegistration('GET', '/api/users');
+        router.addRoute(reg);
 
         const result = router.match('GET', '/api/users/');
         expect(result.match).not.toBeNull();
@@ -45,15 +49,12 @@ describe('Router', () => {
         );
 
         const router = new Router();
-        const reg = makeRegistration('/api/users', {
-            getUser: { method: 'GET', path: GetUserPath }
-        });
-        router.addRoute(reg, 'getUser', reg.config.routes['getUser']);
+        const reg = makeRegistration('GET', '/api/users', GetUserPath);
+        router.addRoute(reg);
 
         const result = router.match('GET', '/api/users/42');
         expect(result.match).not.toBeNull();
         expect(result.match!.parsedPath).toEqual({ id: 42 });
-        expect(result.match!.methodName).toBe('getUser');
     });
 
     it('matches multi-param parseString routes', () => {
@@ -63,10 +64,8 @@ describe('Router', () => {
         );
 
         const router = new Router();
-        const reg = makeRegistration('/api', {
-            getPost: { method: 'GET', path: GetPostPath }
-        });
-        router.addRoute(reg, 'getPost', reg.config.routes['getPost']);
+        const reg = makeRegistration('GET', '/api', GetPostPath);
+        router.addRoute(reg);
 
         const result = router.match('GET', '/api/5/posts/42');
         expect(result.match).not.toBeNull();
@@ -75,10 +74,8 @@ describe('Router', () => {
 
     it('returns 405 for wrong method', () => {
         const router = new Router();
-        const reg = makeRegistration('/api/users', {
-            list: { method: 'GET', path: '/' }
-        });
-        router.addRoute(reg, 'list', reg.config.routes['list']);
+        const reg = makeRegistration('GET', '/api/users');
+        router.addRoute(reg);
 
         const result = router.match('POST', '/api/users');
         expect(result.match).toBeNull();
@@ -88,10 +85,8 @@ describe('Router', () => {
 
     it('returns 404 for unmatched path', () => {
         const router = new Router();
-        const reg = makeRegistration('/api/users', {
-            list: { method: 'GET', path: '/' }
-        });
-        router.addRoute(reg, 'list', reg.config.routes['list']);
+        const reg = makeRegistration('GET', '/api/users');
+        router.addRoute(reg);
 
         const result = router.match('GET', '/api/orders');
         expect(result.match).toBeNull();
@@ -105,10 +100,8 @@ describe('Router', () => {
         );
 
         const router = new Router();
-        const reg = makeRegistration('/users', {
-            getByName: { method: 'GET', path: ByNamePath }
-        });
-        router.addRoute(reg, 'getByName', reg.config.routes['getByName']);
+        const reg = makeRegistration('GET', '/users', ByNamePath);
+        router.addRoute(reg);
 
         const result = router.match('GET', '/users/John%20Doe');
         expect(result.match).not.toBeNull();
@@ -117,25 +110,19 @@ describe('Router', () => {
 
     it('matches first route when multiple routes exist', () => {
         const router = new Router();
-        const reg1 = makeRegistration('/api', {
-            first: { method: 'GET', path: '/items' }
-        });
-        const reg2 = makeRegistration('/api', {
-            second: { method: 'GET', path: '/items' }
-        });
-        router.addRoute(reg1, 'first', reg1.config.routes['first']);
-        router.addRoute(reg2, 'second', reg2.config.routes['second']);
+        const reg1 = makeRegistration('GET', '/api/items');
+        const reg2 = makeRegistration('GET', '/api/items');
+        router.addRoute(reg1);
+        router.addRoute(reg2);
 
         const result = router.match('GET', '/api/items');
-        expect(result.match!.methodName).toBe('first');
+        expect(result.match!.registration).toBe(reg1);
     });
 
     it('handles basePath without trailing slash', () => {
         const router = new Router();
-        const reg = makeRegistration('/api', {
-            list: { method: 'GET', path: '/users' }
-        });
-        router.addRoute(reg, 'list', reg.config.routes['list']);
+        const reg = makeRegistration('GET', '/api', '/users');
+        router.addRoute(reg);
 
         const result = router.match('GET', '/api/users');
         expect(result.match).not.toBeNull();
@@ -143,10 +130,8 @@ describe('Router', () => {
 
     it('handles empty basePath', () => {
         const router = new Router();
-        const reg = makeRegistration('', {
-            root: { method: 'GET', path: '/' }
-        });
-        router.addRoute(reg, 'root', reg.config.routes['root']);
+        const reg = makeRegistration('GET', '');
+        router.addRoute(reg);
 
         const result = router.match('GET', '/');
         expect(result.match).not.toBeNull();
@@ -162,10 +147,8 @@ describe('Router', () => {
         );
 
         const router = new Router();
-        const reg = makeRegistration('', {
-            get: { method: 'GET', path: NestedPath }
-        });
-        router.addRoute(reg, 'get', reg.config.routes['get']);
+        const reg = makeRegistration('GET', '', NestedPath);
+        router.addRoute(reg);
 
         const result = router.match('GET', '/orders/42/by/alice');
         expect(result.match).not.toBeNull();
@@ -177,10 +160,8 @@ describe('Router', () => {
 
     it('case-insensitive method matching', () => {
         const router = new Router();
-        const reg = makeRegistration('/api', {
-            create: { method: 'POST', path: '/items' }
-        });
-        router.addRoute(reg, 'create', reg.config.routes['create']);
+        const reg = makeRegistration('POST', '/api/items');
+        router.addRoute(reg);
 
         const result = router.match('post', '/api/items');
         expect(result.match).not.toBeNull();

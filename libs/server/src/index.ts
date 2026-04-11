@@ -8,7 +8,12 @@ export {
     StatusCodeResult,
     StreamResult
 } from './ActionResult.js';
-export { defineController } from './ControllerDef.js';
+export {
+    endpoint,
+    EndpointBuilder,
+    type ActionContext,
+    type Handler
+} from './Endpoint.js';
 export {
     BadRequestError,
     ConflictError,
@@ -24,14 +29,11 @@ export {
     type ValidationErrorItem
 } from './ProblemDetails.js';
 export { IRequestContext, RequestContext } from './RequestContext.js';
-export { RouteBuilder } from './RouteBuilder.js';
 export { route } from './route.js';
 export { createServer, Server, ServerBuilder } from './Server.js';
 export type {
     ContentTypeHandler,
-    ControllerConfig,
-    ControllerRegistration,
+    EndpointRegistration,
     Middleware,
-    RouteDefinition,
     ServerOptions
 } from './types.js';
