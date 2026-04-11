@@ -2,8 +2,7 @@ import {
     ObjectSchemaBuilder,
     type ParseStringSchemaBuilder,
     type PropertyDescriptor,
-    type PropertyDescriptorTree,
-    type SchemaBuilder
+    type PropertyDescriptorTree
 } from '@cleverbrush/schema';
 import type {
     ControllerConfig,
@@ -27,7 +26,6 @@ type MethodSelector<
 export class RouteBuilder<
     TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > {
-    readonly #schema: TSchema;
     readonly #tree: PropertyDescriptorTree<TSchema>;
     readonly #reverseMap = new Map<unknown, string>();
     readonly #routes: Record<string, RouteDefinition> = {};
@@ -35,7 +33,6 @@ export class RouteBuilder<
     #basePath: string | undefined;
 
     constructor(schema: TSchema) {
-        this.#schema = schema;
         this.#tree = ObjectSchemaBuilder.getPropertiesFor(
             schema
         ) as PropertyDescriptorTree<TSchema>;
