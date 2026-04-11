@@ -1,4 +1,14 @@
 export {
+    ActionResult,
+    ContentResult,
+    FileResult,
+    JsonResult,
+    NoContentResult,
+    RedirectResult,
+    StatusCodeResult,
+    StreamResult
+} from './ActionResult.js';
+export {
     BadRequestError,
     ConflictError,
     ForbiddenError,
@@ -6,7 +16,6 @@ export {
     NotFoundError,
     UnauthorizedError
 } from './HttpError.js';
-export { HttpResponse } from './HttpResponse.js';
 export {
     createProblemDetails,
     createValidationProblemDetails,
