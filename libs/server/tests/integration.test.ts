@@ -1358,3 +1358,280 @@ describe('Integration: mixed parameter sources', () => {
         });
     });
 });
+
+// ===========================================================================
+// 14. Parameter validation (validateAsync + RFC 9457 ProblemDetails)
+// ===========================================================================
+
+describe('Integration: Parameter validation', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('returns RFC 9457 problem details for invalid body', async () => {
+        const Schema = object({
+            create: func()
+                .addParameter(object({ name: string(), age: number() }))
+                .hasReturnType(promise(any()))
+        });
+        class Ctrl {
+            async create(_data: any) {
+                return { ok: true };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Ctrl, {
+                routes: {
+                    create: {
+                        method: 'POST',
+                        path: '/users',
+                        params: [body()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'POST', '/users', {
+            body: { name: 123 }
+        });
+        expect(res.status).toBe(400);
+        expect(res.headers['content-type']).toBe('application/problem+json');
+
+        const pd = json(res);
+        expect(pd.type).toBe('https://httpstatuses.com/400');
+        expect(pd.status).toBe(400);
+        expect(pd.title).toBe('Bad Request');
+        expect(pd.detail).toBe('One or more validation errors occurred.');
+        expect(pd.errors).toBeInstanceOf(Array);
+        expect(pd.errors.length).toBeGreaterThan(0);
+        for (const err of pd.errors) {
+            expect(err).toHaveProperty('pointer');
+            expect(err).toHaveProperty('detail');
+        }
+    });
+
+    it('returns validation errors for invalid query parameter', async () => {
+        const Schema = object({
+            search: func().addParameter(number()).hasReturnType(promise(any()))
+        });
+        class Ctrl {
+            async search(_page: number) {
+                return { page: _page };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Ctrl, {
+                routes: {
+                    search: {
+                        method: 'GET',
+                        path: '/items',
+                        params: [query('page')]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/items?page=abc');
+        expect(res.status).toBe(400);
+
+        const pd = json(res);
+        expect(pd.status).toBe(400);
+        expect(pd.errors).toBeInstanceOf(Array);
+        expect(pd.errors.some((e: any) => e.pointer === '/query/page')).toBe(
+            true
+        );
+    });
+
+    it('returns validation errors for invalid header parameter', async () => {
+        const Schema = object({
+            get: func().addParameter(number()).hasReturnType(promise(any()))
+        });
+        class Ctrl {
+            async get(_count: number) {
+                return { count: _count };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Ctrl, {
+                routes: {
+                    get: {
+                        method: 'GET',
+                        path: '/data',
+                        params: [header('x-count')]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'GET', '/data', {
+            headers: { 'x-count': 'not-a-number' }
+        });
+        expect(res.status).toBe(400);
+
+        const pd = json(res);
+        expect(
+            pd.errors.some((e: any) => e.pointer === '/headers/x-count')
+        ).toBe(true);
+    });
+
+    it('aggregates errors from body and query simultaneously', async () => {
+        const Schema = object({
+            create: func()
+                .addParameter(object({ name: string(), email: string() }))
+                .addParameter(number())
+                .hasReturnType(promise(any()))
+        });
+        class Ctrl {
+            async create(_data: any, _page: number) {
+                return { ok: true };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Ctrl, {
+                routes: {
+                    create: {
+                        method: 'POST',
+                        path: '/items',
+                        params: [body(), query('page')]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'POST', '/items?page=bad', {
+            body: { name: 42 } // invalid name, missing email
+        });
+        expect(res.status).toBe(400);
+
+        const pd = json(res);
+        const pointers = pd.errors.map((e: any) => e.pointer);
+        expect(pointers).toContain('/body');
+        expect(pointers).toContain('/query/page');
+    });
+
+    it('passes valid parameters through to controller', async () => {
+        const Schema = object({
+            create: func()
+                .addParameter(object({ name: string(), age: number() }))
+                .hasReturnType(promise(any()))
+        });
+        class Ctrl {
+            async create(data: { name: string; age: number }) {
+                return { received: data };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Ctrl, {
+                routes: {
+                    create: {
+                        method: 'POST',
+                        path: '/users',
+                        params: [body()]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'POST', '/users', {
+            body: { name: 'Alice', age: 30 }
+        });
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({
+            received: { name: 'Alice', age: 30 }
+        });
+    });
+
+    it('validates query and header while path comes from parseString', async () => {
+        const ItemPath = parseString(
+            object({ id: number().coerce() }),
+            $t => $t`/${t => t.id}`
+        );
+        const Schema = object({
+            get: func()
+                .addParameter(object({ id: number() }))
+                .addParameter(number())
+                .addParameter(string())
+                .hasReturnType(promise(any()))
+        });
+        class Ctrl {
+            async get(pathObj: { id: number }, page: number, token: string) {
+                return { id: pathObj.id, page, token };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Ctrl, {
+                routes: {
+                    get: {
+                        method: 'GET',
+                        path: ItemPath,
+                        params: [path(), query('page'), header('x-token')]
+                    }
+                }
+            })
+            .listen(0);
+
+        // Invalid query, valid header
+        const res = await request(server, 'GET', '/42?page=xyz', {
+            headers: { 'x-token': 'my-token' }
+        });
+        expect(res.status).toBe(400);
+        const pd = json(res);
+        expect(pd.errors.some((e: any) => e.pointer === '/query/page')).toBe(
+            true
+        );
+    });
+
+    it('returns valid response when all param sources pass validation', async () => {
+        const ItemPath = parseString(
+            object({ id: number().coerce() }),
+            $t => $t`/${t => t.id}`
+        );
+        const Schema = object({
+            update: func()
+                .addParameter(object({ id: number() }))
+                .addParameter(object({ title: string() }))
+                .addParameter(string())
+                .hasReturnType(promise(any()))
+        });
+        class Ctrl {
+            async update(
+                pathObj: { id: number },
+                bodyData: { title: string },
+                auth: string
+            ) {
+                return { id: pathObj.id, title: bodyData.title, auth };
+            }
+        }
+
+        server = await createServer()
+            .controller(Schema, Ctrl, {
+                routes: {
+                    update: {
+                        method: 'PUT',
+                        path: ItemPath,
+                        params: [path(), body(), header('authorization')]
+                    }
+                }
+            })
+            .listen(0);
+
+        const res = await request(server, 'PUT', '/5', {
+            body: { title: 'Updated' },
+            headers: { authorization: 'Bearer abc' }
+        });
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({
+            id: 5,
+            title: 'Updated',
+            auth: 'Bearer abc'
+        });
+    });
+});
