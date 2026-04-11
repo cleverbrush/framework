@@ -104,6 +104,7 @@ describe('Integration: Todo CRUD lifecycle', () => {
             .addParameter(object({ id: number() }))
             .addParameter(
                 object({
+                    /** new to do item title */
                     title: string().optional(),
                     completed: any().optional()
                 })
