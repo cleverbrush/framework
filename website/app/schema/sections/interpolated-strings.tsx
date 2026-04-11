@@ -120,7 +120,8 @@ schema.validate('/orders/42/by/Alice');
                                     <code>.optional()</code>
                                 </td>
                                 <td>
-                                    Accepts <code>undefined</code>
+                                    Accepts <code>undefined</code> and{' '}
+                                    <code>null</code>
                                 </td>
                             </tr>
                             <tr>
