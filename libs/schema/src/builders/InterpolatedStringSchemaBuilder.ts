@@ -197,7 +197,7 @@ export class InterpolatedStringSchemaBuilder<
             // trailing literal is empty (nothing to anchor to).
             const isLast = i === segments.length - 1;
             const trailingLiteral = literals[i + 1] ?? '';
-            pattern += isLast && trailingLiteral === '' ? '(.+)' : '(.+?)';
+            pattern += isLast && trailingLiteral === '' ? '(.*)' : '(.*?)';
         }
         // Append the trailing literal (after all segments)
         pattern += escapeRegex(literals[segments.length] ?? '');
