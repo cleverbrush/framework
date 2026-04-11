@@ -98,6 +98,14 @@ export const EXAMPLE_GROUPS = [
     {
         label: 'External Schema Interop',
         ids: ['extern-basic']
+    },
+    {
+        label: 'Interpolated Strings',
+        ids: [
+            'interpolated-string-basic',
+            'interpolated-string-nested',
+            'coerce-methods'
+        ]
     }
 ];
 
@@ -1847,6 +1855,128 @@ const r3 = StringList.validate({ items: [1, 2], total: 2 });
 // { valid: false }  — numbers don't satisfy string()
 `,
         testData: '{ "items": ["a", "b", "c"], "total": 3 }'
+    },
+
+    // ── Interpolated Strings ─────────────────────────────
+    {
+        id: 'interpolated-string-basic',
+        title: 'Interpolated String — Basic',
+        description:
+            'Use <code>interpolatedString()</code> to validate a string against a template and parse it into a typed object. Property selectors provide full IntelliSense.',
+        group: 'Interpolated Strings',
+        code: `import { interpolatedString, object, string, number, type InferType } from '@cleverbrush/schema';
+
+// Define the result shape and the template pattern
+const RouteSchema = interpolatedString(
+    object({
+        /** UUID of the user */
+        userId: string().uuid(),
+        /** Numeric order ID — .coerce() converts the captured string to a number */
+        id: number().coerce()
+    }),
+    $t => $t\`/orders/\${t => t.id}/\${t => t.userId}\`
+);
+
+// TypeScript infers the result type automatically
+type Route = InferType<typeof RouteSchema>;
+// { userId: string; id: number }
+
+// Validate a matching string
+const result = RouteSchema.validate(
+    '/orders/42/550e8400-e29b-41d4-a716-446655440000'
+);
+
+// Validate a non-matching string
+const bad = RouteSchema.validate('/users/abc');
+// bad.valid === false
+// bad.errors[0].message → "does not match the interpolated string pattern /orders/{id}/{userId}"
+`,
+        testData: '"/orders/42/550e8400-e29b-41d4-a716-446655440000"'
+    },
+    {
+        id: 'interpolated-string-nested',
+        title: 'Interpolated String — Nested Objects',
+        description:
+            'Navigate deep properties via <code>t => t.parent.child</code>. The builder automatically constructs the nested result object.',
+        group: 'Interpolated Strings',
+        code: `import { interpolatedString, object, string, number, boolean, date, type InferType } from '@cleverbrush/schema';
+
+// Nested objects — selectors navigate the full property tree
+const ApiRoute = interpolatedString(
+    object({
+        order: object({ id: number().coerce() }),
+        user:  object({ name: string() })
+    }),
+    $t => $t\`/orders/\${t => t.order.id}/by/\${t => t.user.name}\`
+);
+
+type ApiRouteType = InferType<typeof ApiRoute>;
+// { order: { id: number }; user: { name: string } }
+
+const result = ApiRoute.validate('/orders/42/by/Alice');
+// result.object → { order: { id: 42 }, user: { name: 'Alice' } }
+
+// Log entry with date coercion
+const LogEntry = interpolatedString(
+    object({
+        level:   string(),
+        ts:      date().coerce(),
+        message: string()
+    }),
+    $t => $t\`[\${t => t.level}] \${t => t.ts} \${t => t.message}\`
+);
+
+const log = LogEntry.validate('[INFO] 2024-06-15T10:30:00.000Z Server started');
+// log.object.level === 'INFO'
+// log.object.ts instanceof Date === true
+`,
+        testData: '"/orders/42/by/Alice"'
+    },
+    {
+        id: 'coerce-methods',
+        title: 'Coercion — .coerce()',
+        description:
+            '<code>number()</code>, <code>boolean()</code>, and <code>date()</code> each have a <code>.coerce()</code> method that converts strings to the target type. Works standalone or with interpolated strings.',
+        group: 'Interpolated Strings',
+        code: `import { number, boolean, date } from '@cleverbrush/schema';
+
+// ── number().coerce() ────────────────────────────────────────
+// Uses Number(value) under the hood
+const numSchema = number().coerce();
+const n1 = numSchema.validate('42' as any);
+// n1.valid === true, n1.object === 42
+
+const n2 = numSchema.validate('hello' as any);
+// n2.valid === false — NaN fails number validation
+
+const n3 = numSchema.validate(7);
+// n3.valid === true, n3.object === 7 — non-string passes through
+
+// ── boolean().coerce() ──────────────────────────────────────
+// "true" → true, "false" → false, anything else passes through
+const boolSchema = boolean().coerce();
+const b1 = boolSchema.validate('true' as any);
+// b1.valid === true, b1.object === true
+
+const b2 = boolSchema.validate('false' as any);
+// b2.valid === true, b2.object === false
+
+const b3 = boolSchema.validate('yes' as any);
+// b3.valid === false — unrecognized string
+
+// ── date().coerce() ─────────────────────────────────────────
+// new Date(value) if valid, else leaves unchanged
+const dateSchema = date().coerce();
+const d1 = dateSchema.validate('2024-01-15' as any);
+// d1.valid === true, d1.object instanceof Date
+
+const d2 = dateSchema.validate('not-a-date' as any);
+// d2.valid === false — invalid date string
+
+const d3 = dateSchema.validate(new Date());
+// d3.valid === true — Date passes through unchanged
+`,
+        testData: '"42"'
     }
 ];
 

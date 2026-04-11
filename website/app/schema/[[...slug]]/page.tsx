@@ -11,6 +11,7 @@ import GenericSchemasSection from '../sections/generic-schemas';
 import GettingStartedSection from '../sections/getting-started';
 import ImmutabilitySection from '../sections/immutability';
 import { SCHEMA_SECTIONS } from '../sections/index';
+import InterpolatedStringsSection from '../sections/interpolated-strings';
 import PropertyDescriptorsSection from '../sections/property-descriptors';
 import ReadonlySection from '../sections/readonly';
 import RecursiveSchemasSection from '../sections/recursive-schemas';
@@ -30,6 +31,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     'discriminated-unions': DiscriminatedUnionsSection,
     'recursive-schemas': RecursiveSchemasSection,
     'generic-schemas': GenericSchemasSection,
+    'interpolated-strings': InterpolatedStringsSection,
     validation: ValidationSection,
     'property-descriptors': PropertyDescriptorsSection,
     'default-values': DefaultValuesSection,

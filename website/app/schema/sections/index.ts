@@ -15,7 +15,8 @@ export const SECTION_GROUPS = [
             'immutability',
             'discriminated-unions',
             'recursive-schemas',
-            'generic-schemas'
+            'generic-schemas',
+            'interpolated-strings'
         ]
     },
     {
@@ -61,6 +62,11 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
     {
         slug: 'generic-schemas',
         title: 'Generic Schemas',
+        group: 'Composition'
+    },
+    {
+        slug: 'interpolated-strings',
+        title: 'Interpolated Strings & Coercion',
         group: 'Composition'
     },
     { slug: 'validation', title: 'Validation', group: 'Validation' },

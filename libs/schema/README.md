@@ -3,11 +3,11 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- bundle-badge-start -->
-[![Bundle size](https://img.shields.io/badge/bundle-18.3%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![Bundle size](https://img.shields.io/badge/bundle-19.3%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-97.2%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).
@@ -126,9 +126,9 @@ The following builder functions are available:
 | --------------- | ------------------------------------------------- | --------------------------------------------------------------- |
 | `any()`         | Any value. Similar to TypeScript's `any` type.    | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`, `.addValidator(fn)`                              |
 | `string()`      | String value with constraints.                    | `.minLength(n)`, `.maxLength(n)`, `.matches(re)`, `.email()`, `.url()`, `.uuid()`, `.ip()`, `.trim()`, `.toLowerCase()`, `.nonempty()`, `.oneOf(...values)`, `.nullable()`, `.notNullable()`, `.default(value)` |
-| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.oneOf(...values)`, `.nullable()`, `.notNullable()`, `.default(value)` |
-| `boolean()`     | Boolean value.                                    | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
-| `date()`        | JavaScript `Date` instance.                       | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
+| `number()`      | Numeric value with constraints.                   | `.min(n)`, `.max(n)`, `.integer()`, `.positive()`, `.negative()`, `.finite()`, `.multipleOf(n)`, `.coerce()`, `.oneOf(...values)`, `.nullable()`, `.notNullable()`, `.default(value)` |
+| `boolean()`     | Boolean value.                                    | `.coerce()`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
+| `date()`        | JavaScript `Date` instance.                       | `.coerce()`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                                                   |
 | `func()`        | Function value. Supports typed parameter and return-type schemas. | `.addParameter(schema)`, `.hasReturnType(schema)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `promise(schema?)` | JavaScript `Promise`. Optionally typed resolved value via `promise(schema)` or `.hasResolvedType(schema)`. | `.hasResolvedType(schema)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `nul()`         | Exactly `null`. Useful in nullable unions.        | `.optional()`, `.default(value)`                                                   |
@@ -140,6 +140,7 @@ The following builder functions are available:
 | `enumOf(...values)` | String enum — sugar for `string().oneOf(...)`. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 | `generic(fn)`   | Parameterized schema template. Call `.apply(...schemas)` with concrete schemas to obtain a fully typed concrete schema builder. TypeScript infers the result type from the template function's own generic signature. Optionally pass a `defaults` array as the first argument to enable direct validation without calling `.apply()`. | `.apply(...schemas)`, `.optional()`, `.nullable()`, `.default(value)` |
+| `interpolatedString(objectSchema, templateFn)` | Validates a string against a template pattern and parses it into a strongly-typed object. Property schemas handle their own coercion (e.g. `number().coerce()`). | `.optional()`, `.nullable()`, `.default(value)`, `.readonly()`, `.brand()` |
 
 ## Immutability
 
@@ -481,6 +482,86 @@ if (!result.valid) {
     descriptor.setValue(result.object, 0); // fixes the value in-place
 }
 ```
+
+## Interpolated String Schemas
+
+[▶ Open in Playground](https://docs.cleverbrush.com/playground/interpolated-string-basic)
+
+Use `interpolatedString(objectSchema, templateFn)` to validate a string against a template pattern and parse it into a strongly-typed object. The template expression uses a tagged-template syntax with type-safe property selectors — you get full IntelliSense in the selector lambdas.
+
+```typescript
+import { interpolatedString, object, string, number, type InferType } from '@cleverbrush/schema';
+
+const RouteSchema = interpolatedString(
+    object({ userId: string().uuid(), id: number().coerce() }),
+    $t => $t`/orders/${t => t.id}/${t => t.userId}`
+);
+
+type Route = InferType<typeof RouteSchema>;
+// { userId: string; id: number }
+
+const result = RouteSchema.validate('/orders/42/550e8400-e29b-41d4-a716-446655440000');
+// result.valid === true
+// result.object === { id: 42, userId: '550e8400-...' }
+```
+
+**Nested objects** — navigate deep properties via `t => t.parent.child`:
+
+```typescript
+const schema = interpolatedString(
+    object({
+        order: object({ id: number().coerce() }),
+        user:  object({ name: string() })
+    }),
+    $t => $t`/orders/${t => t.order.id}/by/${t => t.user.name}`
+);
+// InferType → { order: { id: number }; user: { name: string } }
+
+schema.validate('/orders/42/by/Alice');
+// { valid: true, object: { order: { id: 42 }, user: { name: 'Alice' } } }
+```
+
+**Coercion** is the property schema's responsibility — the builder passes the raw captured substring directly to each property schema's `validate()`. Use `.coerce()` on `number()`, `boolean()`, or `date()` to convert from strings:
+
+```typescript
+const LogEntry = interpolatedString(
+    object({
+        level:   string(),
+        ts:      date().coerce(),
+        message: string()
+    }),
+    $t => $t`[${t => t.level}] ${t => t.ts} ${t => t.message}`
+);
+```
+
+Error messages include the property path for easy debugging:
+
+```typescript
+const result = RouteSchema.validate('/orders/abc/bad-uuid');
+// result.errors[0].message → "id: expected an integer number"
+```
+
+## Coercion
+
+The `number()`, `boolean()`, and `date()` builders each have a `.coerce()` method that adds a preprocessor to convert string values to the target type. This is especially useful with interpolated string schemas where captured segments are always strings, but also works standalone for URL parameters, form inputs, or any other string source.
+
+```typescript
+import { number, boolean, date } from '@cleverbrush/schema';
+
+// number().coerce() — uses Number(value)
+number().coerce().validate('42');    // { valid: true, object: 42 }
+number().coerce().validate('hello'); // { valid: false } — NaN fails
+
+// boolean().coerce() — "true" → true, "false" → false
+boolean().coerce().validate('true');  // { valid: true, object: true }
+boolean().coerce().validate('yes');   // { valid: false } — unrecognized
+
+// date().coerce() — new Date(value) if valid
+date().coerce().validate('2024-01-15'); // { valid: true, object: Date }
+date().coerce().validate('nope');       // { valid: false } — invalid date
+```
+
+Non-string values pass through unchanged, so `.coerce()` is safe to chain even when the input might already be the correct type. All three methods return a new immutable schema instance.
 
 ## Recursive Schemas
 
@@ -1475,9 +1556,9 @@ Define a schema once and use it for runtime validation, object mapping between d
 
 ## Exports
 
-**Builder functions:** `any`, `lazy`, `string`, `number`, `boolean`, `func`, `promise`, `object`, `date`, `array`, `union`
+**Builder functions:** `any`, `lazy`, `string`, `number`, `boolean`, `func`, `promise`, `object`, `date`, `array`, `union`, `interpolatedString`
 
-**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `PromiseSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
+**Builder classes** (for extending): `SchemaBuilder`, `AnySchemaBuilder`, `ArraySchemaBuilder`, `BooleanSchemaBuilder`, `DateSchemaBuilder`, `FunctionSchemaBuilder`, `InterpolatedStringSchemaBuilder`, `LazySchemaBuilder`, `NumberSchemaBuilder`, `ObjectSchemaBuilder`, `PromiseSchemaBuilder`, `StringSchemaBuilder`, `UnionSchemaBuilder`
 
 **Extension system:** `defineExtension`, `withExtensions`, `stringExtensions`, `numberExtensions`, `arrayExtensions`, `nullableExtension`
 
