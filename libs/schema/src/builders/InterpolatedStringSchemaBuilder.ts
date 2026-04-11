@@ -377,10 +377,38 @@ export class InterpolatedStringSchemaBuilder<
 
         const doNotStop = context?.doNotStopOnFirstError ?? false;
 
-        // Build an array of segment validation results (sync or Promise)
-        const segResults: R[] = [];
-        for (let i = 0; i < segments.length; i++) {
-            segResults.push(validateSegment(segments[i].schema, match[i + 1]));
+        // Compute segment validation results lazily so fail-fast mode can
+        // short-circuit without eagerly validating later segments. When
+        // doNotStopOnFirstError is enabled, prestart all validations to
+        // preserve the existing eager/parallel behavior.
+        const segResults = new Proxy([] as R[], {
+            get: (target, prop, receiver) => {
+                if (prop === 'length') return segments.length;
+
+                const index =
+                    typeof prop === 'string' ? Number(prop) : Number.NaN;
+                if (
+                    Number.isInteger(index) &&
+                    index >= 0 &&
+                    index < segments.length
+                ) {
+                    if (!(index in target)) {
+                        target[index] = validateSegment(
+                            segments[index].schema,
+                            match[index + 1]
+                        );
+                    }
+                    return target[index];
+                }
+
+                return Reflect.get(target, prop, receiver);
+            }
+        }) as R[];
+
+        if (doNotStop) {
+            for (let i = 0; i < segments.length; i++) {
+                void segResults[i];
+            }
         }
 
         // If first result is a promise, the whole pipeline is async
