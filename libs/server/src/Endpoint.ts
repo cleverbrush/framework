@@ -282,6 +282,45 @@ function createEndpoint(
     );
 }
 
+type ScopedEndpointFactory = {
+    get<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<TParams>;
+    post<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<TParams>;
+    put<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<TParams>;
+    patch<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<TParams>;
+    delete<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<TParams>;
+    head<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<TParams>;
+    options<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<TParams>;
+};
+
+function createScopedFactory(basePath: string): ScopedEndpointFactory {
+    return {
+        get: (pathTemplate?) => createEndpoint('GET', basePath, pathTemplate),
+        post: (pathTemplate?) => createEndpoint('POST', basePath, pathTemplate),
+        put: (pathTemplate?) => createEndpoint('PUT', basePath, pathTemplate),
+        patch: (pathTemplate?) =>
+            createEndpoint('PATCH', basePath, pathTemplate),
+        delete: (pathTemplate?) =>
+            createEndpoint('DELETE', basePath, pathTemplate),
+        head: (pathTemplate?) => createEndpoint('HEAD', basePath, pathTemplate),
+        options: (pathTemplate?) =>
+            createEndpoint('OPTIONS', basePath, pathTemplate)
+    };
+}
+
 type EndpointFactory = {
     get<TParams = {}>(
         basePath: string,
@@ -311,6 +350,7 @@ type EndpointFactory = {
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
     ): EndpointBuilder<TParams>;
+    resource(basePath: string): ScopedEndpointFactory;
 };
 
 export const endpoint: EndpointFactory = {
@@ -327,5 +367,6 @@ export const endpoint: EndpointFactory = {
     head: (basePath, pathTemplate?) =>
         createEndpoint('HEAD', basePath, pathTemplate),
     options: (basePath, pathTemplate?) =>
-        createEndpoint('OPTIONS', basePath, pathTemplate)
+        createEndpoint('OPTIONS', basePath, pathTemplate),
+    resource: createScopedFactory
 };
