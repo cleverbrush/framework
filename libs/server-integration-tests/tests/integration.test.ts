@@ -79,19 +79,18 @@ describe('Endpoint: Todo CRUD lifecycle', () => {
     let server: Server;
 
     const ByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
+    const todosApi = endpoint.resource('/api/todos');
 
-    const listTodos = endpoint.get('/api/todos');
-    const getTodoById = endpoint.get('/api/todos', ByIdPath);
-    const createTodoEp = endpoint
-        .post('/api/todos')
-        .body(object({ title: string() }));
-    const updateTodoEp = endpoint.patch('/api/todos', ByIdPath).body(
+    const listTodos = todosApi.get();
+    const getTodoById = todosApi.get(ByIdPath);
+    const createTodoEp = todosApi.post().body(object({ title: string() }));
+    const updateTodoEp = todosApi.patch(ByIdPath).body(
         object({
             title: string().optional(),
             completed: any().optional()
         })
     );
-    const deleteTodoEp = endpoint.delete('/api/todos', ByIdPath);
+    const deleteTodoEp = todosApi.delete(ByIdPath);
 
     let todos: Map<number, { id: number; title: string; completed: boolean }>;
     let nextId: number;
