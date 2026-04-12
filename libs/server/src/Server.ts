@@ -107,6 +107,22 @@ export class ServerBuilder {
         return this;
     }
 
+    /**
+     * Returns a snapshot of all registered endpoints.
+     * Useful for generating OpenAPI specs or other documentation.
+     */
+    getRegistrations(): readonly EndpointRegistration[] {
+        return [...this.#registrations];
+    }
+
+    /**
+     * Returns the authentication configuration, or `null` if
+     * `useAuthentication()` has not been called.
+     */
+    getAuthenticationConfig(): AuthenticationConfig | null {
+        return this.#authConfig;
+    }
+
     async listen(port?: number, host?: string): Promise<Server> {
         const router = new Router();
 

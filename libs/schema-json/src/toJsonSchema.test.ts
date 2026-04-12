@@ -378,3 +378,116 @@ test('toJsonSchema - 39: tuple([boolean(), string()]) → prefixItems order pres
         items: false
     });
 });
+
+// ---------------------------------------------------------------------------
+// nullable
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 40: string().nullable() → type: [string, null]', () => {
+    const result = toJsonSchema(string().nullable(), { $schema: false });
+    expect(result).toEqual({ type: ['string', 'null'] });
+});
+
+test('toJsonSchema - 41: number().nullable() → type: [integer, null]', () => {
+    const result = toJsonSchema(number().nullable(), { $schema: false });
+    expect(result).toEqual({ type: ['integer', 'null'] });
+});
+
+test('toJsonSchema - 42: number().isInteger().nullable() → type: [integer, null]', () => {
+    const result = toJsonSchema(number().isInteger().nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: ['integer', 'null'] });
+});
+
+test('toJsonSchema - 43: object({...}).nullable() → type with null', () => {
+    const result = toJsonSchema(object({ name: string() }).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: ['object', 'null'],
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false
+    });
+});
+
+test('toJsonSchema - 44: array(string()).nullable()', () => {
+    const result = toJsonSchema(array(string()).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: ['array', 'null'],
+        items: { type: 'string' }
+    });
+});
+
+test('toJsonSchema - 45: union nullable adds null to anyOf', () => {
+    const result = toJsonSchema(union(string()).or(number()).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        anyOf: [{ type: 'string' }, { type: 'integer' }, { type: 'null' }]
+    });
+});
+
+test('toJsonSchema - 46: union with nul() + nullable does not duplicate null', () => {
+    const result = toJsonSchema(union(string()).or(nul()).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        anyOf: [{ type: 'string' }, { type: 'null' }]
+    });
+});
+
+// ---------------------------------------------------------------------------
+// default
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 47: string().default("hello") → default: "hello"', () => {
+    const result = toJsonSchema(string().default('hello'), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'string', default: 'hello' });
+});
+
+test('toJsonSchema - 48: number().default(42) → default: 42', () => {
+    const result = toJsonSchema(number().default(42), { $schema: false });
+    expect(result).toEqual({ type: 'integer', default: 42 });
+});
+
+test('toJsonSchema - 49: boolean().default(false) → default: false', () => {
+    const result = toJsonSchema(boolean().default(false), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'boolean', default: false });
+});
+
+test('toJsonSchema - 50: string().default(() => "x") → no default (factory)', () => {
+    const result = toJsonSchema(
+        string().default(() => 'x'),
+        {
+            $schema: false
+        }
+    );
+    expect(result).toEqual({ type: 'string' });
+    expect(result).not.toHaveProperty('default');
+});
+
+// ---------------------------------------------------------------------------
+// oneOf extension → enum
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 51: string().oneOf("a","b","c") → enum', () => {
+    const result = toJsonSchema(string().oneOf('a', 'b', 'c'), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'string', enum: ['a', 'b', 'c'] });
+});
+
+test('toJsonSchema - 52: number().oneOf(1,2,3) → enum', () => {
+    const result = toJsonSchema(number().oneOf(1, 2, 3), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'integer', enum: [1, 2, 3] });
+});

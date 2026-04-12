@@ -16,7 +16,15 @@ function makeRegistration(
             pathTemplate,
             bodySchema: null,
             querySchema: null,
-            headerSchema: null
+            headerSchema: null,
+            serviceSchemas: null,
+            authRoles: null,
+            summary: null,
+            description: null,
+            tags: [],
+            operationId: null,
+            deprecated: false,
+            responseSchema: null
         },
         handler: () => {}
     };
