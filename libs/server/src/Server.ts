@@ -57,6 +57,7 @@ export class ServerBuilder {
     #options: ServerOptions = {};
     #authConfig: AuthenticationConfig | null = null;
     #authzConfig: AuthorizationConfig | null = null;
+    #healthcheck = false;
 
     services(configureFn: (svc: ServiceCollection) => void): this {
         configureFn(this.#serviceCollection);
@@ -91,6 +92,11 @@ export class ServerBuilder {
      */
     useAuthorization(config?: AuthorizationConfig): this {
         this.#authzConfig = config ?? {};
+        return this;
+    }
+
+    withHealthcheck(): this {
+        this.#healthcheck = true;
         return this;
     }
 
@@ -167,7 +173,8 @@ export class ServerBuilder {
             router,
             serviceProvider,
             this.#contentNegotiator,
-            allMiddlewares
+            allMiddlewares,
+            this.#healthcheck
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -183,18 +190,21 @@ export class Server {
     readonly #serviceProvider: ServiceProvider;
     readonly #contentNegotiator: ContentNegotiator;
     readonly #globalMiddlewares: Middleware[];
+    readonly #healthcheck: boolean;
     #httpServer: http.Server | https.Server | null = null;
 
     constructor(
         router: Router,
         serviceProvider: ServiceProvider,
         contentNegotiator: ContentNegotiator,
-        globalMiddlewares: Middleware[]
+        globalMiddlewares: Middleware[],
+        healthcheck = false
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
         this.#contentNegotiator = contentNegotiator;
         this.#globalMiddlewares = globalMiddlewares;
+        this.#healthcheck = healthcheck;
     }
 
     async start(
@@ -257,6 +267,16 @@ export class Server {
             const ctx = new RequestContext(req, res);
             const urlPath = ctx.url.pathname;
             const method = ctx.method;
+
+            if (
+                this.#healthcheck &&
+                method === 'GET' &&
+                urlPath === '/health'
+            ) {
+                res.writeHead(200);
+                res.end();
+                return;
+            }
 
             const routeResult = this.#router.match(method, urlPath);
 

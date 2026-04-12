@@ -852,3 +852,47 @@ describe('Endpoint: dependency injection via .inject()', () => {
         expect(json(res)).toEqual({ ok: true });
     });
 });
+
+// ===========================================================================
+// Healthcheck
+// ===========================================================================
+
+describe('withHealthcheck()', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server?.close();
+    });
+
+    it('responds 200 to GET /health when enabled', async () => {
+        server = await createServer().withHealthcheck().listen(0);
+        const res = await request(server, 'GET', '/health');
+        expect(res.status).toBe(200);
+    });
+
+    it('returns 404 for GET /health when not enabled', async () => {
+        server = await createServer().listen(0);
+        const res = await request(server, 'GET', '/health');
+        expect(res.status).toBe(404);
+    });
+
+    it('does not interfere with other routes when enabled', async () => {
+        const ep = endpoint.get('/api/ping');
+        server = await createServer()
+            .withHealthcheck()
+            .handle(ep, () => ({ pong: true }))
+            .listen(0);
+
+        const health = await request(server, 'GET', '/health');
+        expect(health.status).toBe(200);
+
+        const api = await request(server, 'GET', '/api/ping');
+        expect(api.status).toBe(200);
+        expect(json(api)).toEqual({ pong: true });
+    });
+
+    it('withHealthcheck() is chainable', () => {
+        const builder = createServer();
+        expect(builder.withHealthcheck()).toBe(builder);
+    });
+});
