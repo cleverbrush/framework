@@ -200,7 +200,7 @@ describe('ParameterResolver', () => {
             if (!result.valid) {
                 const errors = (result.problemDetails as any).errors;
                 const pointers = errors.map((e: any) => e.pointer);
-                expect(pointers).toContain('/body');
+                expect(pointers).toContain('/body/name');
                 expect(pointers).toContain('/query/page');
             }
         });
@@ -244,6 +244,48 @@ describe('ParameterResolver', () => {
             expect(result.valid).toBe(true);
             if (result.valid) {
                 expect(result.args[0]).not.toHaveProperty('body');
+            }
+        });
+
+        it('returns nested body error pointers for deeply nested schemas', async () => {
+            const meta = makeMeta({
+                bodySchema: object({
+                    address: object({
+                        city: string(),
+                        zip: number()
+                    })
+                })
+            });
+            const ctx = createMockContext();
+
+            const result = await resolveArgs(meta, null, ctx, {
+                address: { city: 123, zip: 'bad' }
+            });
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                const pointers = (result.problemDetails as any).errors.map(
+                    (e: any) => e.pointer
+                );
+                expect(pointers).toContain('/body/address/city');
+                expect(pointers).toContain('/body/address/zip');
+            }
+        });
+
+        it('returns /body pointer for root-level body error (null body)', async () => {
+            const meta = makeMeta({
+                bodySchema: object({
+                    name: string()
+                })
+            });
+            const ctx = createMockContext();
+
+            const result = await resolveArgs(meta, null, ctx, null);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                const pointers = (result.problemDetails as any).errors.map(
+                    (e: any) => e.pointer
+                );
+                expect(pointers).toContain('/body');
             }
         });
     });

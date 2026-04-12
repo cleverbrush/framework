@@ -3329,3 +3329,120 @@ test('addConstructor: no effect on empty constructor list for inferred type', ()
     type Inferred = InferType<typeof schema>;
     expectTypeOf<Inferred>().toEqualTypeOf<{ name: string }>();
 });
+
+// ---------------------------------------------------------------------------
+// Regression: Object.keys(null) crash when doNotStopOnFirstError is true
+// Prior to the fix, passing null to a required object schema with
+// doNotStopOnFirstError:true would throw "Cannot convert undefined or null
+// to object" at Object.keys() inside #setupValidation.
+// ---------------------------------------------------------------------------
+
+test('regression: null input with doNotStopOnFirstError:true does not throw', async () => {
+    const schema = object({ msg: string().required() });
+    const result = await schema.validateAsync(null as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toBe(false);
+    expect(Array.isArray(result.errors)).toBe(true);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('regression: null input with doNotStopOnFirstError:false does not throw', async () => {
+    const schema = object({ msg: string().required() });
+    const result = await schema.validateAsync(null as any, {
+        doNotStopOnFirstError: false
+    });
+    expect(result.valid).toBe(false);
+    expect(Array.isArray(result.errors)).toBe(true);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('toJsonPointer returns correct path for nested descriptors', () => {
+    const schema = object({
+        name: string(),
+        address: object({
+            city: string(),
+            country: string()
+        })
+    });
+
+    const props = ObjectSchemaBuilder.getPropertiesFor(schema);
+    expect(props[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()).toBe('');
+    expect(
+        (props as any).name[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()
+    ).toBe('/name');
+    expect(
+        (props as any).address[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ].toJsonPointer()
+    ).toBe('/address');
+    expect(
+        (props as any).address.city[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ].toJsonPointer()
+    ).toBe('/address/city');
+});
+
+test('toJsonPointer escapes ~ and / in property names per RFC 6901', () => {
+    const schema = object({
+        'a/b': string(),
+        'c~d': string()
+    });
+
+    const props = ObjectSchemaBuilder.getPropertiesFor(schema);
+    expect(
+        (props as any)['a/b'][SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()
+    ).toBe('/a~1b');
+    expect(
+        (props as any)['c~d'][SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()
+    ).toBe('/c~0d');
+});
+
+test('getInvalidProperties returns entries with correct toJsonPointer for nested errors', async () => {
+    const schema = object({
+        name: string(),
+        address: object({
+            city: string(),
+            zip: number()
+        })
+    });
+
+    const result = await schema.validateAsync(
+        { name: 'Leo', address: { city: 123, zip: 'bad' } } as any,
+        { doNotStopOnFirstError: true }
+    );
+    expect(result.valid).toBe(false);
+    expect(typeof result.getInvalidProperties).toBe('function');
+
+    const invalid = result.getInvalidProperties();
+    expect(invalid.length).toBeGreaterThanOrEqual(2);
+
+    const pointers = invalid.map(r => r.descriptor.toJsonPointer());
+    expect(pointers).toContain('/address/city');
+    expect(pointers).toContain('/address/zip');
+});
+
+test('getInvalidProperties returns root-level error for non-object body', async () => {
+    const schema = object({ name: string() });
+
+    const result = await schema.validateAsync('not an object' as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toBe(false);
+
+    const invalid = result.getInvalidProperties();
+    expect(invalid.length).toBeGreaterThanOrEqual(1);
+    expect(invalid.some(r => r.descriptor.toJsonPointer() === '')).toBe(true);
+});
+
+test('getInvalidProperties returns empty array when validation passes', async () => {
+    const schema = object({ name: string() });
+
+    const result = await schema.validateAsync({ name: 'Leo' } as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toBe(true);
+
+    const invalid = result.getInvalidProperties();
+    expect(invalid).toEqual([]);
+});

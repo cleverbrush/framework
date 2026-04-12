@@ -10,6 +10,8 @@ import {
     listTodosEp,
     listUsersEp,
     loginEp,
+    SomeRouteGet,
+    SomeRoutePost,
     updateTodoEp
 } from './endpoints.js';
 import { deleteAllTodos, listUsers } from './handlers/admin.js';
@@ -75,6 +77,12 @@ const builder = createServer()
     .handle(createTodoEp, createTodo)
     .handle(updateTodoEp, updateTodo)
     .handle(deleteTodoEp, deleteTodo)
+    .handle(
+        SomeRouteGet,
+        async ({ context: _context, params }) =>
+            `Hello world! You requested id: ${params.id}`
+    )
+    .handle(SomeRoutePost, async ({ body }) => `You said: ${body.msg}`)
 
     // --- Admin ----------------------------------------------------------
     .handle(deleteAllTodosEp, deleteAllTodos)

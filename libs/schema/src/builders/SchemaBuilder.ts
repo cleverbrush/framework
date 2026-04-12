@@ -457,6 +457,21 @@ export type PropertyDescriptorInner<
     // >
     //     ? TParentPropertyDescriptor
     //     : never;
+
+    /**
+     * The name of this property within its parent object, or `undefined`
+     * for the root descriptor.
+     */
+    propertyName: string | undefined;
+
+    /**
+     * Returns a JSON Pointer (RFC 6901) string representing this
+     * property's path from the root descriptor.
+     *
+     * Property names are escaped per RFC 6901 (`~` → `~0`, `/` → `~1`).
+     * The root descriptor returns an empty string (`''`).
+     */
+    toJsonPointer: () => string;
 };
 
 /**

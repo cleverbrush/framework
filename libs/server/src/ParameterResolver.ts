@@ -51,11 +51,34 @@ export async function resolveArgs(
         if (result.valid) {
             contextObj.body = result.object;
         } else {
-            for (const err of result.errors ?? []) {
-                errors.push({
-                    pointer: '/body',
-                    detail: err.message
-                });
+            const getInvalidProperties =
+                typeof (result as any).getInvalidProperties === 'function'
+                    ? ((result as any)
+                          .getInvalidProperties as () => ReadonlyArray<{
+                          errors: ReadonlyArray<string>;
+                          descriptor: { toJsonPointer: () => string };
+                      }>)
+                    : null;
+
+            let errorsAdded = false;
+            if (getInvalidProperties) {
+                for (const prop of getInvalidProperties()) {
+                    const pointer = prop.descriptor.toJsonPointer();
+                    for (const msg of prop.errors) {
+                        errors.push({
+                            pointer: `/body${pointer}`,
+                            detail: msg
+                        });
+                        errorsAdded = true;
+                    }
+                }
+            }
+            // Fallback: required-check failures surface in result.errors
+            // but not in the property descriptor map (e.g. null body)
+            if (!errorsAdded) {
+                for (const err of result.errors ?? []) {
+                    errors.push({ pointer: '/body', detail: err.message });
+                }
             }
         }
     }

@@ -255,6 +255,18 @@ export type ObjectSchemaValidationResult<
               TRootSchema,
               TParentPropertyDescriptor
           >;
+
+    /**
+     * Returns a list of all property validation results that have direct
+     * validation errors. Each entry exposes `.descriptor` (with
+     * `.toJsonPointer()` for the property's path) and `.errors`.
+     *
+     * This is useful for collecting all errors with their full JSON Pointer
+     * paths, e.g. for building RFC 9457 Problem Details responses.
+     */
+    getInvalidProperties(): ReadonlyArray<
+        NestedValidationResult<any, TRootSchema, any>
+    >;
 };
 
 /**
@@ -655,6 +667,8 @@ export class ObjectSchemaBuilder<
             PropertyValidationResult<any, any>
         >() as any;
 
+        const invalidResults = new Set<PropertyValidationResult<any, any>>();
+
         const { doNotStopOnFirstError, rootValidationObject } =
             prevalidationContext;
 
@@ -695,6 +709,7 @@ export class ObjectSchemaBuilder<
             }
 
             validationError.addError(message);
+            invalidResults.add(validationError);
 
             if (
                 parentPropertyDescriptor &&
@@ -757,6 +772,9 @@ export class ObjectSchemaBuilder<
             return propertyDescriptorToErrorMap.get(descriptor);
         }) as any;
 
+        const getInvalidProperties = () =>
+            [...invalidResults].filter(r => r.errors.length > 0);
+
         const errors = prevalidatedResult.errors || [];
 
         if (!valid && !doNotStopOnFirstError && preValidationErrors) {
@@ -775,7 +793,8 @@ export class ObjectSchemaBuilder<
                 result: {
                     valid,
                     errors: preValidationErrors,
-                    getErrorsFor
+                    getErrorsFor,
+                    getInvalidProperties
                 }
             };
         }
@@ -793,33 +812,36 @@ export class ObjectSchemaBuilder<
                 result: {
                     valid: true,
                     object: validationTransaction!.commit().validatedObject,
-                    getErrorsFor
+                    getErrorsFor,
+                    getInvalidProperties
                 }
             };
         }
 
-        if (typeof objToValidate !== 'object') {
-            errors.push({
-                message: MUST_BE_AN_OBJECT_ERROR_MESSSAGE
-            });
-            addErrorFor(
-                currentPropertyDescriptor,
-                MUST_BE_AN_OBJECT_ERROR_MESSSAGE
-            );
-
-            if (!doNotStopOnFirstError) {
-                if (validationTransaction) {
-                    validationTransaction.rollback();
-                }
-                return {
-                    earlyReturn: true as const,
-                    result: {
-                        valid: false,
-                        errors: [errors[0]],
-                        getErrorsFor
-                    }
-                };
+        if (typeof objToValidate !== 'object' || objToValidate === null) {
+            // Only add "must be an object" when there is no prior error (e.g.
+            // a required-violation error already pushed by preValidateAsync).
+            if (errors.length === 0) {
+                errors.push({
+                    message: MUST_BE_AN_OBJECT_ERROR_MESSSAGE
+                });
+                addErrorFor(
+                    currentPropertyDescriptor,
+                    MUST_BE_AN_OBJECT_ERROR_MESSSAGE
+                );
             }
+            if (validationTransaction) {
+                validationTransaction.rollback();
+            }
+            return {
+                earlyReturn: true as const,
+                result: {
+                    valid: false,
+                    errors: doNotStopOnFirstError ? errors : [errors[0]],
+                    getErrorsFor,
+                    getInvalidProperties
+                }
+            };
         }
 
         const propKeys = this.#propKeys;
@@ -833,7 +855,8 @@ export class ObjectSchemaBuilder<
                         result: {
                             valid: false,
                             errors,
-                            getErrorsFor
+                            getErrorsFor,
+                            getInvalidProperties
                         }
                     };
                 }
@@ -845,7 +868,8 @@ export class ObjectSchemaBuilder<
                     result: {
                         valid: true,
                         object: {} as any,
-                        getErrorsFor
+                        getErrorsFor,
+                        getInvalidProperties
                     }
                 };
             }
@@ -868,7 +892,8 @@ export class ObjectSchemaBuilder<
                     result: {
                         valid: false,
                         errors: doNotStopOnFirstError ? errors : [errors[0]],
-                        getErrorsFor
+                        getErrorsFor,
+                        getInvalidProperties
                     }
                 };
             }
@@ -881,7 +906,8 @@ export class ObjectSchemaBuilder<
                 result: {
                     valid: true,
                     object: { ...objToValidate } as any,
-                    getErrorsFor
+                    getErrorsFor,
+                    getInvalidProperties
                 }
             };
         }
@@ -894,6 +920,7 @@ export class ObjectSchemaBuilder<
             objKeys,
             addErrorFor,
             getErrorsFor,
+            getInvalidProperties,
             doNotStopOnFirstError: !!doNotStopOnFirstError,
             rootPropertyDescriptor,
             currentPropertyDescriptor,
@@ -918,6 +945,7 @@ export class ObjectSchemaBuilder<
                 parentPropertyDescriptor?: PropertyDescriptor<any, any, any>
             ) => void;
             getErrorsFor: any;
+            getInvalidProperties: any;
             doNotStopOnFirstError: boolean;
             rootPropertyDescriptor: any;
             currentPropertyDescriptor: any;
@@ -930,6 +958,7 @@ export class ObjectSchemaBuilder<
             objKeys,
             addErrorFor,
             getErrorsFor,
+            getInvalidProperties,
             doNotStopOnFirstError,
             currentPropertyDescriptor,
             validationTransaction
@@ -964,7 +993,8 @@ export class ObjectSchemaBuilder<
                     return {
                         valid: false,
                         errors: [errors[0]],
-                        getErrorsFor
+                        getErrorsFor,
+                        getInvalidProperties
                     };
                 }
             }
@@ -985,7 +1015,8 @@ export class ObjectSchemaBuilder<
             return {
                 valid: true,
                 object: resultObject,
-                getErrorsFor
+                getErrorsFor,
+                getInvalidProperties
             };
         }
 
@@ -1041,7 +1072,8 @@ export class ObjectSchemaBuilder<
                 : errors[0]
                   ? [errors[0]]
                   : [],
-            getErrorsFor
+            getErrorsFor,
+            getInvalidProperties
         };
     }
 
@@ -1174,6 +1206,11 @@ export class ObjectSchemaBuilder<
                             return self
                                 .#validateFull(object, context)
                                 .getErrorsFor(selector);
+                        },
+                        getInvalidProperties() {
+                            return self
+                                .#validateFull(object, context)
+                                .getInvalidProperties();
                         }
                     } as any;
                 } else {
@@ -1192,6 +1229,11 @@ export class ObjectSchemaBuilder<
                             return self
                                 .#validateFull(object, context)
                                 .getErrorsFor(selector);
+                        },
+                        getInvalidProperties() {
+                            return self
+                                .#validateFull(object, context)
+                                .getInvalidProperties();
                         }
                     } as any;
                 }
@@ -1215,6 +1257,11 @@ export class ObjectSchemaBuilder<
                                     return self
                                         .#validateFull(object, context)
                                         .getErrorsFor(selector);
+                                },
+                                getInvalidProperties() {
+                                    return self
+                                        .#validateFull(object, context)
+                                        .getInvalidProperties();
                                 }
                             } as any;
                         }
@@ -1240,6 +1287,11 @@ export class ObjectSchemaBuilder<
                                 return self
                                     .#validateFull(object, context)
                                     .getErrorsFor(selector);
+                            },
+                            getInvalidProperties() {
+                                return self
+                                    .#validateFull(object, context)
+                                    .getInvalidProperties();
                             }
                         } as any;
                     }
@@ -1267,6 +1319,11 @@ export class ObjectSchemaBuilder<
                         return self
                             .#validateFull(object, context)
                             .getErrorsFor(selector);
+                    },
+                    getInvalidProperties() {
+                        return self
+                            .#validateFull(object, context)
+                            .getInvalidProperties();
                     }
                 } as any;
             }
@@ -2812,7 +2869,29 @@ const createPropertyDescriptorFor = (
         },
 
         getSchema: () => schema,
-        parent
+        parent,
+        propertyName,
+        toJsonPointer: () => {
+            const segments: string[] = [];
+            if (typeof propertyName === 'string') {
+                segments.push(
+                    propertyName.replace(/~/g, '~0').replace(/\//g, '~1')
+                );
+            }
+            let ancestor = parent;
+            while (ancestor) {
+                if (typeof ancestor.propertyName === 'string') {
+                    segments.push(
+                        ancestor.propertyName
+                            .replace(/~/g, '~0')
+                            .replace(/\//g, '~1')
+                    );
+                }
+                ancestor = ancestor.parent as any;
+            }
+            segments.reverse();
+            return segments.length > 0 ? '/' + segments.join('/') : '';
+        }
     }
 });
 
