@@ -330,11 +330,11 @@ describe('mapObject', () => {
 });
 
 describe('clearRow', () => {
-    it('removes row_number from the row', () => {
-        const row = { id: 1, name: 'test', row_number: 5 };
+    it('passes through rows without modification when no specs', () => {
+        const row = { id: 1, name: 'test' };
         const result = clearRow(row, [], []);
-        expect(result).not.toHaveProperty('row_number');
         expect(result).toHaveProperty('id', 1);
+        expect(result).toHaveProperty('name', 'test');
     });
 
     it('applies mappers to single joined objects', () => {
@@ -360,12 +360,12 @@ describe('clearRow', () => {
         expect(result.department.created).toBeInstanceOf(Date);
     });
 
-    it('applies mappers to collection items and removes row_number', () => {
+    it('applies mappers to collection items', () => {
         const row = {
             id: 1,
             posts: [
-                { id: 1, title: 'Hello', row_number: 1, score: '5' },
-                { id: 2, title: 'World', row_number: 2, score: '10' }
+                { id: 1, title: 'Hello', score: '5' },
+                { id: 2, title: 'World', score: '10' }
             ]
         };
         const result = clearRow(
@@ -385,7 +385,6 @@ describe('clearRow', () => {
                 }
             ]
         );
-        expect(result.posts[0]).not.toHaveProperty('row_number');
         expect(result.posts[0].score).toBe(5);
         expect(result.posts[1].score).toBe(10);
     });

@@ -250,19 +250,10 @@ export class RelationBuilder<
         const resultQuery = knex
             .queryBuilder()
             .with('originalQuery', this.#baseQuery)
-            .with(
-                'originalQueryIdentity',
-                knex
-                    .from('originalQuery')
-                    .select([
-                        knex.raw('row_number() over () as row_number'),
-                        'originalQuery.*'
-                    ])
-            )
-            .select('originalQueryIdentity.*')
+            .select('originalQuery.*')
             .from(
-                knex.raw(':originalQueryIdentity:', {
-                    originalQueryIdentity: 'originalQueryIdentity'
+                knex.raw(':originalQuery:', {
+                    originalQuery: 'originalQuery'
                 })
             );
 
@@ -297,24 +288,17 @@ export class RelationBuilder<
             );
         }
 
+        // SELECT: extract the first (only) element from the jsonb array
         resultQuery.select(
-            knex.raw(
-                'CASE WHEN NULLIF(:relationAlias:.:as:, NULL) is NULL THEN NULL ELSE :relationAlias:.:as:->0 END as :as:',
-                { relationAlias, as: spec.as }
-            )
+            knex.raw(':relationAlias:.:as:->0 as :as:', {
+                relationAlias,
+                as: spec.as
+            })
         );
 
+        // Subquery: aggregate foreign rows into a jsonb array grouped by join column
         const subquery = knex
             .from(foreignTable.as(foreignTableName))
-            .select(
-                knex.raw(
-                    'row_number() over(partition by :foreignTable:.:foreignColumn:) as "rn"',
-                    {
-                        foreignTable: foreignTableName,
-                        foreignColumn: spec.foreignColumn
-                    }
-                )
-            )
             .select(
                 knex.raw(':foreignTable:.:foreignColumn:', {
                     foreignTable: foreignTableName,
@@ -337,9 +321,9 @@ export class RelationBuilder<
         resultQuery[joinMethod](subquery, function () {
             this.on(
                 knex.raw(
-                    ':relationAlias:.:foreignColumn: = :originalQueryIdentity:.:localColumn: and :relationAlias:."rn" = 1',
+                    ':relationAlias:.:foreignColumn: = :originalQuery:.:localColumn:',
                     {
-                        originalQueryIdentity: 'originalQueryIdentity',
+                        originalQuery: 'originalQuery',
                         relationAlias,
                         foreignColumn: spec.foreignColumn,
                         localColumn: spec.localColumn
@@ -358,39 +342,69 @@ export class RelationBuilder<
         const knex = this.#knex;
         const filterName = `withFilter${i}`;
 
+        const hasLimitOffset =
+            (spec.limit !== null && spec.limit > 0) ||
+            (spec.offset !== null && spec.offset > 0);
+
         const orderByColumn = spec.orderBy
             ? spec.orderBy.column
             : spec.foreignColumn;
         const orderByDirection = spec.orderBy ? spec.orderBy.direction : 'asc';
 
-        const innerRelation = knex
-            .from(
+        // -- CTE: withFilterN — clone the foreign query filtered to matching local keys
+        if (hasLimitOffset) {
+            // With limit/offset: add row_number for per-group pagination
+            resultQuery.with(
+                filterName,
                 knex
-                    .from(filterName)
+                    .from(
+                        spec.foreignQuery
+                            .clone()
+                            .whereIn(
+                                spec.foreignColumn,
+                                knex
+                                    .from(
+                                        knex.raw(':originalQuery:', {
+                                            originalQuery: 'originalQuery'
+                                        })
+                                    )
+                                    .distinct(spec.localColumn)
+                            )
+                            .as(`__wf_inner_${i}`)
+                    )
+                    .select(`__wf_inner_${i}.*`)
                     .select(
                         knex.raw(
-                            `row_number() over(partition by :foreignColumn: order by :order_by_column: ${orderByDirection}) as "row_number"`,
+                            `row_number() over(partition by :foreignColumn: order by :orderByColumn: ${orderByDirection}) as "__rn__"`,
                             {
                                 foreignColumn: spec.foreignColumn,
-                                order_by_column: orderByColumn
+                                orderByColumn
                             }
                         )
                     )
-                    .select(`${filterName}.*`)
-                    .orderBy(
-                        knex.raw(':row_number:', { row_number: 'row_number' }),
-                        'desc'
-                    )
-                    .as(`inner${i}`)
-            )
-            .select(knex.raw(':inner:.*', { inner: `inner${i}` }))
-            .orderBy(knex.raw(':row_number:', { row_number: 'row_number' }))
-            .as(`${relationAlias}Outer`);
+            );
+        } else {
+            // Without limit/offset: simple filtered CTE
+            resultQuery.with(
+                filterName,
+                spec.foreignQuery.clone().whereIn(
+                    spec.foreignColumn,
+                    knex
+                        .from(
+                            knex.raw(':originalQuery:', {
+                                originalQuery: 'originalQuery'
+                            })
+                        )
+                        .distinct(spec.localColumn)
+                )
+            );
+        }
 
-        if (
-            (spec.limit !== null && spec.limit > 0) ||
-            (spec.offset !== null && spec.offset > 0)
-        ) {
+        // -- Aggregation subquery: group by foreign key, produce jsonb array
+        const aggSubquery = knex.from(filterName);
+
+        if (hasLimitOffset) {
+            // Apply limit/offset filter on __rn__
             const hasLimit = spec.limit !== null && spec.limit > 0;
             const hasOffset = spec.offset !== null && spec.offset > 0;
             const effectiveOffset = spec.offset ?? 0;
@@ -398,89 +412,74 @@ export class RelationBuilder<
 
             const condition =
                 hasLimit && hasOffset
-                    ? ':innerTable:.:row_number: > :offset and :innerTable:.:row_number: <= :limit'
+                    ? '"__rn__" > :offset and "__rn__" <= :limit'
                     : hasLimit
-                      ? ':innerTable:.:row_number: <= :limit'
-                      : ':innerTable:.:row_number: > :offset';
+                      ? '"__rn__" <= :limit'
+                      : '"__rn__" > :offset';
 
-            innerRelation.whereRaw(condition, {
+            aggSubquery.whereRaw(condition, {
                 limit: effectiveLimit,
-                offset: effectiveOffset,
-                row_number: 'row_number',
-                innerTable: `inner${i}`
+                offset: effectiveOffset
             });
+
+            // Aggregate with to_jsonb() - '__rn__' to strip internal column, ordered by __rn__
+            aggSubquery.select(
+                knex.raw(':foreignColumn:', {
+                    foreignColumn: spec.foreignColumn
+                })
+            );
+            aggSubquery.select(
+                knex.raw(
+                    "coalesce(jsonb_agg(to_jsonb(:filterName:) - '__rn__' order by \"__rn__\"), '[]'::jsonb) as :as:",
+                    { filterName, as: spec.as }
+                )
+            );
+        } else {
+            // Simple aggregation — optionally ordered
+            aggSubquery.select(
+                knex.raw(':foreignColumn:', {
+                    foreignColumn: spec.foreignColumn
+                })
+            );
+
+            const orderClause = spec.orderBy
+                ? `jsonb_agg(:filterName: order by :filterName:.:orderByColumn: ${orderByDirection})`
+                : 'jsonb_agg(:filterName:)';
+
+            aggSubquery.select(
+                knex.raw(
+                    `coalesce(${orderClause}, '[]'::jsonb) as :as:`,
+                    spec.orderBy
+                        ? { filterName, orderByColumn, as: spec.as }
+                        : { filterName, as: spec.as }
+                )
+            );
         }
 
-        const relation = knex
-            .from(
-                knex.raw(':originalQueryIdentity:', {
-                    originalQueryIdentity: 'originalQueryIdentity'
-                })
-            )
-            .select(
-                knex.raw(':originalQueryIdentity:.:row_number:', {
-                    originalQueryIdentity: 'originalQueryIdentity',
-                    row_number: 'row_number'
-                })
-            )
-            .select(
-                knex.raw(
-                    "coalesce(jsonb_agg(:foreignTable: order by :foreignTable:.:row_number:),'[]'::jsonb) as :as:",
-                    {
-                        row_number: 'row_number',
-                        foreignTable: `${relationAlias}Outer`,
-                        as: spec.as
-                    }
-                )
-            )
-            .leftJoin(innerRelation, function () {
-                this.on(
-                    knex.raw(
-                        ':innerTable:.:foreignColumn: = :outerTable:.:localColumn:',
-                        {
-                            innerTable: `${relationAlias}Outer`,
-                            foreignColumn: spec.foreignColumn,
-                            outerTable: 'originalQueryIdentity',
-                            localColumn: spec.localColumn
-                        }
-                    )
-                );
-            })
-            .groupByRaw(':originalQueryIdentity:.:row_number:', {
-                originalQueryIdentity: 'originalQueryIdentity',
-                row_number: 'row_number'
-            })
-            .as(relationAlias);
+        aggSubquery.groupByRaw(':foreignColumn:', {
+            foreignColumn: spec.foreignColumn
+        });
 
-        resultQuery.with(
-            filterName,
-            spec.foreignQuery.clone().whereIn(
-                spec.foreignColumn,
-                knex
-                    .from(
-                        knex.raw(':originalQueryIdentity:', {
-                            originalQueryIdentity: 'originalQueryIdentity'
-                        })
-                    )
-                    .distinct(spec.localColumn)
-            )
-        );
+        const subquery = aggSubquery.as(relationAlias);
 
+        // -- SELECT the aggregated array column
         resultQuery.select(
-            knex.raw(
-                "case when jsonb_array_length(:relationAlias:.:as:) = 1 and :relationAlias:.:as:->0 = :null then '[]'::jsonb else :relationAlias:.:as: end as :as:",
-                { null: 'null', relationAlias, as: spec.as }
-            )
+            knex.raw("coalesce(:relationAlias:.:as:, '[]'::jsonb) as :as:", {
+                relationAlias,
+                as: spec.as
+            })
         );
 
-        resultQuery.join(relation, function () {
+        // -- LEFT JOIN on the actual foreign key
+        resultQuery.leftJoin(subquery, function () {
             this.on(
                 knex.raw(
-                    ':relationAlias:.:row_number: = :originalQueryIdentity:.:row_number:',
+                    ':relationAlias:.:foreignColumn: = :originalQuery:.:localColumn:',
                     {
-                        originalQueryIdentity: 'originalQueryIdentity',
                         relationAlias,
-                        row_number: 'row_number'
+                        foreignColumn: spec.foreignColumn,
+                        originalQuery: 'originalQuery',
+                        localColumn: spec.localColumn
                     }
                 )
             );

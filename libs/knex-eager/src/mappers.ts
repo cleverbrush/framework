@@ -53,10 +53,6 @@ export function clearRow(
     oneSpecs: Array<ValidatedSpec & { type: 'one' }>,
     manySpecs: Array<ValidatedSpec & { type: 'many' }>
 ): Record<string, any> {
-    if (typeof row.row_number !== 'undefined') {
-        delete row.row_number;
-    }
-
     // Apply mappers to single joined objects
     for (const spec of oneSpecs) {
         const fieldName = spec.as;
@@ -75,7 +71,6 @@ export function clearRow(
         if (Array.isArray(row[fieldName])) {
             for (let k = 0; k < row[fieldName].length; k++) {
                 if (row[fieldName][k]) {
-                    delete row[fieldName][k].row_number;
                     if (spec.mappers) {
                         row[fieldName][k] = mapObject(
                             row[fieldName][k],

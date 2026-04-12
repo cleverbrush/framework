@@ -95,8 +95,8 @@ describe('@cleverbrush/knex-eager examples', () => {
 
         // SQL assertions
         expect(sql).toContain('originalQuery');
-        expect(sql).toContain('originalQueryIdentity');
-        expect(sql).toContain('row_number() over ()');
+        expect(sql).not.toContain('originalQueryIdentity');
+        expect(sql).not.toContain('row_number() over ()');
         expect(sql).toContain('jsonb_agg');
         expect(sql).toContain('"eagerRelation0"');
         // Required joinOne uses INNER JOIN
@@ -123,7 +123,6 @@ describe('@cleverbrush/knex-eager examples', () => {
         expect(sql).toContain('originalQuery');
         expect(sql).toContain('jsonb_agg');
         expect(sql).toContain('withFilter0');
-        expect(sql).toContain('row_number() over(partition by');
         expect(sql).toContain('coalesce(');
     });
 
@@ -158,6 +157,7 @@ describe('@cleverbrush/knex-eager examples', () => {
         expect(sql).toContain('"eagerRelation0"');
         expect(sql).toContain('"eagerRelation1"');
         expect(sql).toContain('withFilter1');
+        expect(sql).not.toContain('originalQueryIdentity');
     });
 
     // -----------------------------------------------------------------------
@@ -192,8 +192,8 @@ describe('@cleverbrush/knex-eager examples', () => {
 
         // Optional joinOne uses LEFT JOIN
         expect(sql).toContain('left join');
-        // Limit should produce row_number filtering
-        expect(sql).toContain('"row_number" <= 5');
+        // Limit should produce __rn__ filtering
+        expect(sql).toContain('"__rn__" <= 5');
     });
 
     // -----------------------------------------------------------------------
@@ -234,9 +234,9 @@ describe('@cleverbrush/knex-eager examples', () => {
 
         const sql = query.toQuery();
 
-        // Offset + limit should produce: row_number > 10 AND row_number <= 15
-        expect(sql).toContain('"row_number" > 10');
-        expect(sql).toContain('"row_number" <= 15');
+        // Offset + limit should produce: __rn__ > 10 AND __rn__ <= 15
+        expect(sql).toContain('"__rn__" > 10');
+        expect(sql).toContain('"__rn__" <= 15');
     });
 
     // -----------------------------------------------------------------------
@@ -583,6 +583,7 @@ describe('chained Knex methods', () => {
 
         const sql = query.toQuery();
         expect(sql).toContain('originalQuery');
-        expect(sql).toContain('row_number() over(partition by');
+        expect(sql).toContain('jsonb_agg');
+        expect(sql).toContain('withFilter0');
     });
 });
