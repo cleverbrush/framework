@@ -1,0 +1,565 @@
+/// clear Row.js
+
+import { mapObject } from './map.js';
+
+export const clearRow = (row, subObjects, subCollections) => {
+    if (typeof row.row_number !== 'undefined') {
+        delete row.row_number;
+    }
+
+    // map single joined objects
+    for (let i = 0; i < subObjects.length; i++) {
+        const fieldName = subObjects[i].foreignObjectFieldName;
+        const { mappers } = subObjects[i];
+        if (mappers) {
+            if (typeof row[fieldName] !== 'undefined') {
+                if (typeof row.row_number !== 'undefined')
+                    delete row.row_number;
+                row[fieldName] = mapObject(row[fieldName], mappers);
+            }
+        }
+    }
+
+    // map multiple joined objects
+    for (let j = 0; j < subCollections.length; j++) {
+        const fieldName = subCollections[j].foreignObjectFieldName;
+        const { mappers } = subCollections[j];
+        if (Array.isArray(row[fieldName])) {
+            for (let k = 0; k < row[fieldName].length; k++) {
+                if (row[fieldName][k]) {
+                    delete row[fieldName][k].row_number;
+                    if (mappers) {
+                        row[fieldName][k] = mapObject(
+                            row[fieldName][k],
+                            mappers
+                        );
+                    }
+                }
+            }
+        }
+    }
+    return row;
+};
+
+
+/// index.js
+import Knex from 'knex';
+
+import { clearRow } from './clearRow.js';
+import { validateForeignObject } from './validate.js';
+
+/**
+ *
+ * @typedef {Object} ForeignObjectSpec
+ * @prop {string} localColumn
+ * @prop {QueryBuilder<{}, {}>} foreignTable
+ * @prop {string} foreignColumn
+ * @prop {string} foreignObjectFieldName
+ * @prop {boolean} isSingle
+ * @prop {required} [required]
+ * @prop {number} offset
+ * @prop {number} limit
+ * @prop {{ [k: string] : ((any) => any) | string}} mappers
+ */
+
+/**
+ *
+ * @param {import('knex').Knex} knex
+ */
+const extension = (knex) => {
+    Knex.QueryBuilder.extend(
+        'loadForeignObject',
+        // eslint-disable-next-line
+        function (s) {
+            const specificationToAdd = validateForeignObject(s);
+            if (!Array.isArray(this._foreignSpecs)) {
+                this._foreignSpecs = [];
+            }
+
+            this._foreignSpecs.push(specificationToAdd);
+
+            if (this._foreignSpecs.length === 1) {
+                const that = this;
+
+                const getResultQuery = () => {
+                    const resultQuery = knex(that._single.table);
+
+                    // wrap original query with CTE and add
+                    // some magic with Postgres's jsonb
+                    resultQuery
+                        .with('originalQuery', that)
+                        .with(
+                            'originalQueryIdentity',
+                            knex
+                                .from('originalQuery')
+                                .select([
+                                    knex.raw(
+                                        'row_number() over () as row_number'
+                                    ),
+                                    'originalQuery.*'
+                                ])
+                        )
+                        .select('originalQueryIdentity.*')
+                        .from(
+                            knex.raw(':originalQueryIdentity:', {
+                                originalQueryIdentity: 'originalQueryIdentity'
+                            })
+                        );
+
+                    for (let i = 0; i < that._foreignSpecs.length; i++) {
+                        const spec = that._foreignSpecs[i];
+                        const relationAlias = `foreignObject${i}`;
+                        if (spec.isSingle) {
+                            // we're joining just one object per row
+                            resultQuery
+                                .select(
+                                    knex.raw(
+                                        'CASE WHEN NULLIF(:relationAlias:.:foreignObjectFieldName:, NULL) is NULL THEN NULL else :relationAlias:.:foreignObjectFieldName:->0 end as :foreignObjectFieldName:',
+                                        {
+                                            relationAlias,
+                                            foreignObjectFieldName:
+                                                spec.foreignObjectFieldName
+                                        }
+                                    )
+                                )
+                                [spec.required ? 'join' : 'leftJoin'](
+                                    knex
+                                        .from(
+                                            spec.foreignTable.as(
+                                                spec.foreignTable._single.table
+                                            )
+                                        )
+                                        .select(
+                                            knex.raw(
+                                                'row_number() over(partition by :foreignTable:.:foreignColumn:) as "rn"',
+                                                {
+                                                    foreignTable:
+                                                        spec.foreignTable
+                                                            ._single.table,
+                                                    foreignColumn:
+                                                        spec.foreignColumn
+                                                }
+                                            )
+                                        )
+                                        .select(
+                                            knex.raw(
+                                                ':foreignTable:.:foreignColumn:',
+                                                {
+                                                    foreignTable:
+                                                        spec.foreignTable
+                                                            ._single.table,
+                                                    foreignColumn:
+                                                        spec.foreignColumn
+                                                }
+                                            )
+                                        )
+                                        .select(
+                                            knex.raw(
+                                                'jsonb_agg(:foreignTable:) as :foreignObjectFieldName:',
+                                                {
+                                                    foreignTable:
+                                                        spec.foreignTable
+                                                            ._single.table,
+                                                    foreignObjectFieldName:
+                                                        spec.foreignObjectFieldName
+                                                }
+                                            )
+                                        )
+                                        .groupByRaw(
+                                            ':foreignTable:.:foreignColumn:',
+                                            {
+                                                foreignTable:
+                                                    spec.foreignTable._single
+                                                        .table,
+                                                foreignColumn:
+                                                    spec.foreignColumn
+                                            }
+                                        )
+                                        .as(relationAlias),
+                                    // eslint-disable-next-line
+                                    function () {
+                                        this.on(
+                                            knex.raw(
+                                                ':relationAlias:.:foreignColumn: = :originalQueryIdentity:.:localColumn: and :relationAlias:."rn" = 1',
+                                                {
+                                                    originalQueryIdentity:
+                                                        'originalQueryIdentity',
+                                                    relationAlias,
+                                                    foreignColumn:
+                                                        spec.foreignColumn,
+                                                    localColumn:
+                                                        spec.localColumn
+                                                }
+                                            )
+                                        );
+                                    }
+                                );
+                        } else {
+                            // unfortunately row_number() over partition doesn't guarantee the
+                            // order to be keeped if not explicitly specified by "order by" clause
+                            // so, let's take a sort column from the subbilder passed to us in config
+                            // NOTE: that might not work with complex orders (by expression or multiple columns)
+                            const filterOrder =
+                                spec.foreignTable.getCurrentOrder();
+
+                            const innerRelation = knex
+                                .from(
+                                    knex
+                                        .from(`withFilter${i}`)
+                                        .select(
+                                            knex.raw(
+                                                // here is the trick with order by, to keep the desired order
+                                                `row_number() over(partition by :foreignColumnName: order by :order_by_column: ${
+                                                    filterOrder
+                                                        ? filterOrder.direction
+                                                        : 'asc'
+                                                }) as "row_number"`,
+                                                {
+                                                    foreignColumnName:
+                                                        spec.foreignColumn,
+                                                    order_by_column: filterOrder
+                                                        ? filterOrder.column
+                                                        : spec.foreignColumn
+                                                }
+                                            )
+                                        )
+                                        .select(`withFilter${i}.*`)
+                                        .orderBy(
+                                            knex.raw(':row_number:', {
+                                                row_number: 'row_number'
+                                            }),
+                                            'desc'
+                                        )
+                                        .as(`inner${i}`)
+                                )
+                                .select(
+                                    knex.raw(':inner:.*', {
+                                        inner: `inner${i}`
+                                    })
+                                )
+
+                                .orderBy(
+                                    knex.raw(':row_number:', {
+                                        row_number: 'row_number'
+                                    })
+                                )
+                                .as(`${relationAlias}Outer`);
+
+                            // limit / offset
+                            if (spec.limit > 0 || spec.offset > 0) {
+                                innerRelation.whereRaw(
+                                    // eslint-disable-next-line
+                                    spec.limit > 0 && spec.offset > 0
+                                        ? ':innerTable:.:row_number: > :offset and :innerTable:.:row_number: <= :limit'
+                                        : spec.limit > 0
+                                        ? ':innerTable:.:row_number: <= :limit'
+                                        : ':innerTable:.:row_number: > :offset',
+                                    {
+                                        limit:
+                                            (spec.offset ? spec.offset : 0) +
+                                            (spec.limit ? spec.limit : 0),
+                                        offset: spec.offset ? spec.offset : 0,
+                                        row_number: 'row_number',
+                                        innerTable: `inner${i}`
+                                    }
+                                );
+                            }
+
+                            const relation = knex
+                                .from(
+                                    knex.raw(':originalQueryIdentity:', {
+                                        originalQueryIdentity:
+                                            'originalQueryIdentity'
+                                    })
+                                )
+                                .select(
+                                    knex.raw(
+                                        ':originalQueryIdentity:.:row_number:',
+                                        {
+                                            originalQueryIdentity:
+                                                'originalQueryIdentity',
+                                            row_number: 'row_number'
+                                        }
+                                    )
+                                )
+                                .select(
+                                    knex.raw(
+                                        "coalesce(jsonb_agg(:foreignTable: order by :foreignTable:.:row_number:),'[]'::jsonb) as :foreignObjectFieldName:",
+                                        {
+                                            row_number: 'row_number',
+                                            foreignTable: `${relationAlias}Outer`,
+                                            foreignObjectFieldName:
+                                                spec.foreignObjectFieldName
+                                        }
+                                    )
+                                )
+                                .leftJoin(
+                                    innerRelation,
+                                    // eslint-disable-next-line
+                                    function () {
+                                        this.on(
+                                            knex.raw(
+                                                ':innerTable:.:foreignColumn: = :outerTable:.:localColumn:',
+                                                {
+                                                    innerTable: `${relationAlias}Outer`,
+                                                    foreignColumn:
+                                                        spec.foreignColumn,
+                                                    outerTable:
+                                                        'originalQueryIdentity',
+                                                    localColumn:
+                                                        spec.localColumn
+                                                }
+                                            )
+                                        );
+                                    }
+                                )
+                                .groupByRaw(
+                                    ':originalQueryIdentity:.:row_number:',
+                                    {
+                                        originalQueryIdentity:
+                                            'originalQueryIdentity',
+                                        row_number: 'row_number'
+                                    }
+                                )
+                                .as(relationAlias);
+
+                            resultQuery
+                                .with(
+                                    `withFilter${i}`,
+                                    spec.foreignTable
+                                        .clone()
+                                        // let's add join column implicitly if it is not included in
+                                        // the result field set, it's required to join tables
+                                        .ensureColumnInResultColumnList(
+                                            spec.foreignColumn
+                                        )
+                                        .whereIn(
+                                            spec.foreignColumn,
+                                            knex
+                                                .from(
+                                                    knex.raw(
+                                                        ':originalQueryIdentity:',
+                                                        {
+                                                            originalQueryIdentity:
+                                                                'originalQueryIdentity'
+                                                        }
+                                                    )
+                                                )
+                                                .distinct(spec.localColumn)
+                                        )
+                                )
+                                .select(
+                                    knex.raw(
+                                        "case when jsonb_array_length(:relationAlias:.:foreignObjectFieldName:) = 1 and :relationAlias:.:foreignObjectFieldName:->0 = :null then '[]'::jsonb else :relationAlias:.:foreignObjectFieldName: end as :foreignObjectFieldName:",
+                                        {
+                                            null: 'null',
+                                            relationAlias,
+                                            foreignObjectFieldName:
+                                                spec.foreignObjectFieldName
+                                        }
+                                    )
+                                )
+                                .join(
+                                    relation,
+                                    // eslint-disable-next-line
+                                    function () {
+                                        this.on(
+                                            knex.raw(
+                                                ':relationAlias:.:row_number: = :originalQueryIdentity:.:row_number:',
+                                                {
+                                                    originalQueryIdentity:
+                                                        'originalQueryIdentity',
+                                                    relationAlias,
+                                                    row_number: 'row_number'
+                                                }
+                                            )
+                                        );
+                                    }
+                                );
+                        }
+                    }
+
+                    if (that._method === 'first') {
+                        resultQuery.first();
+                    }
+
+                    return resultQuery;
+                };
+
+                this.toQuery = () => getResultQuery().toQuery();
+                this.toString = () => getResultQuery().toString();
+
+                this.then = (callback) => {
+                    const resultQuery = getResultQuery();
+
+                    resultQuery.then((resultWithRowCountField) => {
+                        if (!resultWithRowCountField) {
+                            return callback(resultWithRowCountField);
+                        }
+                        const subCollections = that._foreignSpecs.filter(
+                            (sp) => !sp.isSingle
+                        );
+                        const subObjects = that._foreignSpecs.filter(
+                            (sp) => sp.isSingle
+                        );
+                        // unfortunately there is no good way to get rid of this property (row_number)
+                        // via SQL query so cleaning it up here manually to avoid it getting to the outer space
+                        if (Array.isArray(resultWithRowCountField)) {
+                            const res = resultWithRowCountField.map((row) =>
+                                clearRow(row, subObjects, subCollections)
+                            );
+                            return callback(res);
+                        }
+
+                        delete resultWithRowCountField.row_number;
+                        return callback(
+                            clearRow(
+                                resultWithRowCountField,
+                                subObjects,
+                                subCollections
+                            )
+                        );
+                    });
+                };
+            }
+            return this;
+        }
+    );
+};
+
+export default extension;
+
+/// map.js
+export const MAPPERS = {
+    date_from_json: (value) => {
+        if (!value) return value;
+        return new Date(Date.parse(value));
+    }
+};
+
+/**
+ *
+ * @param {(any)=>any | string} mapper
+ * @param {any} value
+ */
+export const mapValue = (mapper, value) => {
+    if (typeof mapper === 'string') {
+        if (typeof MAPPERS[mapper] !== 'function')
+            throw new Error(`unknown mapper ${mapper}`);
+        return MAPPERS[mapper](value);
+    }
+    if (typeof mapper === 'function') {
+        return mapper(value);
+    }
+
+    throw new Error("couldn't map value");
+};
+
+/**
+ *
+ * @param {Object} obj
+ * @returns {Object}
+ */
+export const mapObject = (obj, mappers) => {
+    if (!mappers) throw new Error('mappers should be an object');
+    if (!obj || typeof obj !== 'object' || obj == null) return obj;
+    return Object.keys(obj).reduce(
+        // eslint-disable-next-line
+        (a, c) => {
+            a[c] = mappers[c] ? mapValue(mappers[c], obj[c]) : obj[c];
+            return a;
+        },
+        {}
+    );
+};
+
+/// validate.js
+import { MAPPERS } from './map.js';
+
+export const validateForeignObject = ({
+    localColumn,
+    foreignTable,
+    foreignColumn,
+    foreignObjectFieldName,
+    isSingle,
+    required,
+    offset,
+    limit,
+    mappers
+}) => {
+    if (typeof localColumn !== 'string' || !localColumn)
+        throw new Error('localColumn must be a non empty string');
+    if (!foreignTable)
+        throw new Error(
+            'foreignTable must be an instance of knex QueryBuilder'
+        );
+    if (!foreignColumn) foreignColumn = localColumn;
+    if (typeof foreignObjectFieldName !== 'string' || !foreignObjectFieldName)
+        throw new Error('foreignObjectFieldName must be a non empty string');
+
+    if (typeof isSingle === 'undefined') isSingle = false;
+    if (isSingle && typeof required === 'undefined') required = true;
+
+    if (
+        typeof mappers !== 'undefined' &&
+        (typeof mappers !== 'object' ||
+            !Object.keys(mappers).every(
+                (m) =>
+                    typeof m === 'function' ||
+                    (typeof m === 'string' &&
+                        typeof MAPPERS[mappers[m]] === 'function')
+            ))
+    )
+        throw new Error(
+            'mappers expected to be an object with mapping functions as values or strings for default mappers'
+        );
+
+    return {
+        localColumn,
+        foreignTable,
+        foreignColumn,
+        foreignObjectFieldName,
+        isSingle: !!isSingle,
+        required: isSingle ? required === true : false,
+        offset: Number.isFinite(offset) && offset > 0 ? offset : null,
+        limit: Number.isFinite(limit) && limit > 0 ? limit : null,
+        mappers
+    };
+};
+
+/**
+ *
+ * @returns {ForeignObjectSpec[]}
+ */
+export const validateForeignObjects = (foreignObjects) => {
+    try {
+        if (typeof foreignObjects === 'undefined')
+            throw new Error('foreignObjects is required');
+        if (!Array.isArray(foreignObjects)) {
+            try {
+                return validateForeignObjects([foreignObjects]);
+            } catch (e) {
+                throw new Error(
+                    `Wrong foreign object specification: ${e.message}`
+                );
+            }
+        }
+
+        const res = foreignObjects.map((i) => validateForeignObject(i));
+        const dedupMap = new Map();
+        res.forEach((e) => {
+            if (dedupMap.has(e.foreignObjectFieldName))
+                throw new Error(
+                    `duplicate field name: ${e.foreignObjectFieldName}`
+                );
+            dedupMap.set(e.foreignObjectFieldName, 1);
+        });
+        return res;
+    } catch (e) {
+        throw new Error(
+            `expected an array of valid foreign object specs ${
+                e.message ? `, but: ${e.message}` : ''
+            }`
+        );
+    }
+};
