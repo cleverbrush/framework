@@ -1,181 +1,26 @@
-import { defineRoles, jwtScheme, signJwt } from '@cleverbrush/auth';
-import { array, boolean, number, object, string } from '@cleverbrush/schema';
-import {
-    ActionResult,
-    createServer,
-    endpoint,
-    ForbiddenError,
-    type Middleware,
-    NotFoundError,
-    route
-} from '@cleverbrush/server';
+import { jwtScheme } from '@cleverbrush/auth';
+import { createServer, type Middleware } from '@cleverbrush/server';
 import { createOpenApiEndpoint } from '@cleverbrush/server-openapi';
-
-// ---------------------------------------------------------------------------
-// Config
-// ---------------------------------------------------------------------------
-
-const PORT = Number(process.env.PORT) || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'todo-app-dev-secret';
-
-// ---------------------------------------------------------------------------
-// Roles & Principal
-// ---------------------------------------------------------------------------
-
-const Roles = defineRoles({ user: 'user', admin: 'admin' });
-
-const IPrincipal = object({
-    userId: string(),
-    name: string(),
-    role: string()
-});
-
-// ---------------------------------------------------------------------------
-// In-memory store
-// ---------------------------------------------------------------------------
-
-interface Todo {
-    id: number;
-    title: string;
-    completed: boolean;
-    ownerId: string;
-}
-
-let nextId = 1;
-const todos = new Map<number, Todo>();
-
-// ---------------------------------------------------------------------------
-// Schemas
-// ---------------------------------------------------------------------------
-
-const CreateTodoBody = object({
-    title: string().minLength(1).maxLength(200)
-});
-
-const UpdateTodoBody = object({
-    title: string().minLength(1).maxLength(200).optional(),
-    completed: boolean().optional()
-});
-
-const TodoSchema = object({
-    id: number(),
-    title: string(),
-    completed: boolean(),
-    ownerId: string()
-});
-
-const TodoListSchema = array(TodoSchema);
-
-// ---------------------------------------------------------------------------
-// Route helpers
-// ---------------------------------------------------------------------------
-
-const ById = route({ id: number().coerce() })`/${t => t.id}`;
-
-// ---------------------------------------------------------------------------
-// Endpoints
-// ---------------------------------------------------------------------------
-
-// Public
-const loginEp = endpoint
-    .post('/api/auth/login')
-    .body(object({ username: string(), password: string() }))
-    .summary('Authenticate and receive a JWT')
-    .tags('Auth')
-    .operationId('login')
-    .returns(object({ token: string() }));
-
-// Authenticated (any role)
-const listTodosEp = endpoint
-    .resource('/api/todos')
-    .get()
-    .authorize(IPrincipal, Roles.user, Roles.admin)
-    .query(object({ ownerId: string().optional() }))
-    .summary('List todos')
-    .description(
-        'Returns todos visible to the caller. Regular users see only their own; admins can filter by ownerId.'
-    )
-    .tags('Todos')
-    .operationId('listTodos')
-    .returns(TodoListSchema);
-
-const getTodoEp = endpoint
-    .resource('/api/todos')
-    .get(ById)
-    .authorize(IPrincipal, Roles.user, Roles.admin)
-    .summary('Get a todo by id')
-    .tags('Todos')
-    .operationId('getTodo')
-    .returns(TodoSchema);
-
-const createTodoEp = endpoint
-    .resource('/api/todos')
-    .post()
-    .authorize(IPrincipal, Roles.user, Roles.admin)
-    .body(CreateTodoBody)
-    .summary('Create a new todo')
-    .tags('Todos')
-    .operationId('createTodo')
-    .returns(TodoSchema);
-
-const updateTodoEp = endpoint
-    .resource('/api/todos')
-    .patch(ById)
-    .authorize(IPrincipal, Roles.user, Roles.admin)
-    .body(UpdateTodoBody)
-    .summary('Update a todo')
-    .tags('Todos')
-    .operationId('updateTodo')
-    .returns(TodoSchema);
-
-const deleteTodoEp = endpoint
-    .resource('/api/todos')
-    .delete(ById)
-    .authorize(IPrincipal, Roles.user, Roles.admin)
-    .summary('Delete a todo')
-    .tags('Todos')
-    .operationId('deleteTodo');
-
-// Admin-only
-const deleteAllTodosEp = endpoint
-    .delete('/api/admin/todos')
-    .authorize(IPrincipal, Roles.admin)
-    .summary('Delete all todos (admin)')
-    .tags('Admin')
-    .operationId('deleteAllTodos');
-
-const listUsersEp = endpoint
-    .get('/api/admin/users')
-    .authorize(IPrincipal, Roles.admin)
-    .summary('List known user ids')
-    .description('Returns the set of unique owner ids from all todos.')
-    .tags('Admin')
-    .operationId('listUsers')
-    .returns(array(string()));
-
-// ---------------------------------------------------------------------------
-// Fake user database (for the login endpoint)
-// ---------------------------------------------------------------------------
-
-const USERS: Record<string, { password: string; name: string; role: string }> =
-    {
-        alice: { password: 'alice123', name: 'Alice', role: 'admin' },
-        bob: { password: 'bob123', name: 'Bob', role: 'user' },
-        carol: { password: 'carol123', name: 'Carol', role: 'user' }
-    };
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function assertCanAccess(
-    principal: { userId: string; role: string },
-    todo: Todo
-): void {
-    if (principal.role !== 'admin' && todo.ownerId !== principal.userId) {
-        throw new ForbiddenError('You can only access your own todos');
-    }
-}
+import { JWT_SECRET, PORT } from './config.js';
+import {
+    createTodoEp,
+    deleteAllTodosEp,
+    deleteTodoEp,
+    getTodoEp,
+    listTodosEp,
+    listUsersEp,
+    loginEp,
+    updateTodoEp
+} from './endpoints.js';
+import { deleteAllTodos, listUsers } from './handlers/admin.js';
+import { login } from './handlers/auth.js';
+import {
+    createTodo,
+    deleteTodo,
+    getTodo,
+    listTodos,
+    updateTodo
+} from './handlers/todos.js';
 
 // ---------------------------------------------------------------------------
 // CORS middleware (permissive, for local dev)
@@ -222,82 +67,20 @@ const builder = createServer()
     .useAuthorization()
 
     // --- Auth -----------------------------------------------------------
-    .handle(loginEp, ({ body: { username, password } }) => {
-        const user = USERS[username];
-        if (!user || user.password !== password) {
-            return ActionResult.json(
-                { error: 'Invalid username or password' },
-                401
-            );
-        }
-        const token = signJwt(
-            { sub: username, name: user.name, role: user.role },
-            JWT_SECRET
-        );
-        return { token };
-    })
+    .handle(loginEp, login)
 
     // --- Todos ----------------------------------------------------------
-    .handle(listTodosEp, ({ principal, query }) => {
-        const all = [...todos.values()];
-        if (principal.role === 'admin' && query.ownerId) {
-            return all.filter(t => t.ownerId === query.ownerId);
-        }
-        if (principal.role !== 'admin') {
-            return all.filter(t => t.ownerId === principal.userId);
-        }
-        return all;
-    })
-
-    .handle(getTodoEp, ({ params, principal }) => {
-        const todo = todos.get(params.id);
-        if (!todo) throw new NotFoundError(`Todo ${params.id} not found`);
-        assertCanAccess(principal, todo);
-        return todo;
-    })
-
-    .handle(createTodoEp, ({ body, principal }) => {
-        const todo: Todo = {
-            id: nextId++,
-            title: body.title,
-            completed: false,
-            ownerId: principal.userId
-        };
-        todos.set(todo.id, todo);
-        return ActionResult.created(todo, `/api/todos/${todo.id}`);
-    })
-
-    .handle(updateTodoEp, ({ params, body, principal }) => {
-        const todo = todos.get(params.id);
-        if (!todo) throw new NotFoundError(`Todo ${params.id} not found`);
-        assertCanAccess(principal, todo);
-        if (body.title !== undefined) todo.title = body.title;
-        if (body.completed !== undefined) todo.completed = body.completed;
-        return todo;
-    })
-
-    .handle(deleteTodoEp, ({ params, principal }) => {
-        const todo = todos.get(params.id);
-        if (!todo) throw new NotFoundError(`Todo ${params.id} not found`);
-        assertCanAccess(principal, todo);
-        todos.delete(params.id);
-        return ActionResult.noContent();
-    })
+    .handle(listTodosEp, listTodos)
+    .handle(getTodoEp, getTodo)
+    .handle(createTodoEp, createTodo)
+    .handle(updateTodoEp, updateTodo)
+    .handle(deleteTodoEp, deleteTodo)
 
     // --- Admin ----------------------------------------------------------
-    .handle(deleteAllTodosEp, () => {
-        todos.clear();
-        nextId = 1;
-        return ActionResult.noContent();
-    })
+    .handle(deleteAllTodosEp, deleteAllTodos)
+    .handle(listUsersEp, listUsers);
 
-    .handle(listUsersEp, () => {
-        const owners = new Set<string>();
-        for (const t of todos.values()) owners.add(t.ownerId);
-        return [...owners];
-    });
-
-// --- OpenAPI endpoint (must be registered after all other .handle() calls) ---
+// --- OpenAPI endpoint (registered after all other handlers) ----------------
 const { endpoint: openApiEp, handler: openApiHandler } = createOpenApiEndpoint({
     getRegistrations: () => builder.getRegistrations(),
     info: {
