@@ -4,6 +4,7 @@ import type {
     ParseStringSchemaBuilder,
     SchemaBuilder
 } from '@cleverbrush/schema';
+import type { ActionResult } from './ActionResult.js';
 import type { RequestContext } from './RequestContext.js';
 
 // ---------------------------------------------------------------------------
@@ -34,6 +35,7 @@ export type ActionContext<E> =
         infer THeaders,
         any,
         infer TPrincipal,
+        any,
         any
     >
         ? Simplify<
@@ -52,9 +54,32 @@ type InferServices<T> = {
 };
 
 export type ServiceSchemas<E> =
-    E extends EndpointBuilder<any, any, any, any, infer TServices, any, any>
+    E extends EndpointBuilder<
+        any,
+        any,
+        any,
+        any,
+        infer TServices,
+        any,
+        any,
+        any
+    >
         ? TServices
         : {};
+
+type ResponseType<E> =
+    E extends EndpointBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        infer TResponse
+    >
+        ? TResponse
+        : any;
 
 // ---------------------------------------------------------------------------
 // Handler — the action function type, inferred from an endpoint
@@ -65,8 +90,16 @@ export type Handler<E> =
         ? (
               arg: ActionContext<E>,
               services: Simplify<InferServices<ServiceSchemas<E>>>
-          ) => any | Promise<any>
-        : (arg: ActionContext<E>) => any | Promise<any>;
+          ) =>
+              | ResponseType<E>
+              | ActionResult
+              | Promise<ResponseType<E> | ActionResult>
+        : (
+              arg: ActionContext<E>
+          ) =>
+              | ResponseType<E>
+              | ActionResult
+              | Promise<ResponseType<E> | ActionResult>;
 
 // ---------------------------------------------------------------------------
 // EndpointBuilder — immutable builder for endpoint definitions
@@ -117,7 +150,8 @@ export class EndpointBuilder<
     THeaders = {},
     TServices = {},
     TPrincipal = undefined,
-    TRoles extends string = string
+    TRoles extends string = string,
+    TResponse = any
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -195,7 +229,8 @@ export class EndpointBuilder<
         THeaders,
         TServices,
         TPrincipal,
-        TRoles
+        TRoles,
+        TResponse
     > {
         return new EndpointBuilder(
             this.#method,
@@ -220,7 +255,8 @@ export class EndpointBuilder<
         THeaders,
         TServices,
         TPrincipal,
-        TRoles
+        TRoles,
+        TResponse
     > {
         return new EndpointBuilder(
             this.#method,
@@ -245,7 +281,8 @@ export class EndpointBuilder<
         InferType<TSchema>,
         TServices,
         TPrincipal,
-        TRoles
+        TRoles,
+        TResponse
     > {
         return new EndpointBuilder(
             this.#method,
@@ -270,7 +307,8 @@ export class EndpointBuilder<
         THeaders,
         TSchemas,
         TPrincipal,
-        TRoles
+        TRoles,
+        TResponse
     > {
         return new EndpointBuilder(
             this.#method,
@@ -303,7 +341,8 @@ export class EndpointBuilder<
         THeaders,
         TServices,
         InferType<TSchema>,
-        TRoles
+        TRoles,
+        TResponse
     >;
     authorize(
         ...roles: TRoles[]
@@ -314,7 +353,8 @@ export class EndpointBuilder<
         THeaders,
         TServices,
         unknown,
-        TRoles
+        TRoles,
+        TResponse
     >;
     authorize(
         ...args: unknown[]
@@ -325,7 +365,8 @@ export class EndpointBuilder<
         THeaders,
         TServices,
         any,
-        TRoles
+        TRoles,
+        TResponse
     > {
         let roles: string[];
         if (
@@ -353,6 +394,34 @@ export class EndpointBuilder<
             this.#serviceSchemas,
             merged
         );
+    }
+
+    returns<T>(): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        T
+    >;
+    returns<TSchema extends SchemaBuilder<any, any, any, any, any>>(
+        schema: TSchema
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        InferType<TSchema>
+    >;
+    returns(
+        _schema?: unknown
+    ): EndpointBuilder<any, any, any, any, any, any, any, any> {
+        return this as any;
     }
 
     introspect(): EndpointMetadata {
