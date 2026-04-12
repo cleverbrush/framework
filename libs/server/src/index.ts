@@ -10,6 +10,7 @@ export {
 } from './ActionResult.js';
 export {
     type ActionContext,
+    createEndpoints,
     EndpointBuilder,
     endpoint,
     type Handler,

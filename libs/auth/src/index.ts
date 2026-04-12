@@ -30,3 +30,23 @@ export {
     signJwt
 } from './JwtScheme.js';
 export { Principal } from './Principal.js';
+
+// Helpers
+
+/**
+ * Define application roles as a typed constant object.
+ * The returned object is frozen and its values form the role
+ * string-literal union used by `createEndpoints()`.
+ *
+ * @example
+ * ```ts
+ * const Roles = defineRoles({ admin: 'admin', editor: 'editor' });
+ * const ep = createEndpoints(Roles);
+ * ep.get('/api/admin').authorize(IPrincipal, 'admin'); // ✓
+ * ```
+ */
+export function defineRoles<const T extends Record<string, string>>(
+    roles: T
+): Readonly<T> {
+    return Object.freeze(roles);
+}

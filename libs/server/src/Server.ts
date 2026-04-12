@@ -94,7 +94,7 @@ export class ServerBuilder {
         return this;
     }
 
-    handle<E extends EndpointBuilder<any, any, any, any>>(
+    handle<E extends EndpointBuilder<any, any, any, any, any, any, any>>(
         endpointDef: E,
         handler: Handler<E>,
         options?: { middlewares?: Middleware[] }

@@ -33,7 +33,8 @@ export type ActionContext<E> =
         infer TQuery,
         infer THeaders,
         any,
-        infer TPrincipal
+        infer TPrincipal,
+        any
     >
         ? Simplify<
               ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal>
@@ -51,7 +52,7 @@ type InferServices<T> = {
 };
 
 export type ServiceSchemas<E> =
-    E extends EndpointBuilder<any, any, any, any, infer TServices>
+    E extends EndpointBuilder<any, any, any, any, infer TServices, any, any>
         ? TServices
         : {};
 
@@ -115,7 +116,8 @@ export class EndpointBuilder<
     TQuery = {},
     THeaders = {},
     TServices = {},
-    TPrincipal = undefined
+    TPrincipal = undefined,
+    TRoles extends string = string
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -192,7 +194,8 @@ export class EndpointBuilder<
         TQuery,
         THeaders,
         TServices,
-        TPrincipal
+        TPrincipal,
+        TRoles
     > {
         return new EndpointBuilder(
             this.#method,
@@ -216,7 +219,8 @@ export class EndpointBuilder<
         InferType<TSchema>,
         THeaders,
         TServices,
-        TPrincipal
+        TPrincipal,
+        TRoles
     > {
         return new EndpointBuilder(
             this.#method,
@@ -240,7 +244,8 @@ export class EndpointBuilder<
         TQuery,
         InferType<TSchema>,
         TServices,
-        TPrincipal
+        TPrincipal,
+        TRoles
     > {
         return new EndpointBuilder(
             this.#method,
@@ -258,7 +263,15 @@ export class EndpointBuilder<
         TSchemas extends Record<string, SchemaBuilder<any, any, any, any, any>>
     >(
         schemas: TSchemas
-    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TSchemas, TPrincipal> {
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TSchemas,
+        TPrincipal,
+        TRoles
+    > {
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
@@ -282,21 +295,38 @@ export class EndpointBuilder<
      */
     authorize<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         principalSchema: TSchema,
-        ...roles: string[]
+        ...roles: TRoles[]
     ): EndpointBuilder<
         TParams,
         TBody,
         TQuery,
         THeaders,
         TServices,
-        InferType<TSchema>
+        InferType<TSchema>,
+        TRoles
     >;
     authorize(
-        ...roles: string[]
-    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TServices, unknown>;
+        ...roles: TRoles[]
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        unknown,
+        TRoles
+    >;
     authorize(
         ...args: unknown[]
-    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TServices, any> {
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        any,
+        TRoles
+    > {
         let roles: string[];
         if (
             args.length > 0 &&
@@ -372,44 +402,50 @@ function createEndpoint(
 // ScopedEndpointFactory — resource-scoped endpoint creation
 // ---------------------------------------------------------------------------
 
-type ScopedEndpointFactoryMethods<TPrincipal> = {
+type ScopedEndpointFactoryMethods<
+    TPrincipal,
+    TRoles extends string = string
+> = {
     get<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
     post<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
     put<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
     patch<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
     delete<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
     head<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
     options<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
 };
 
-export type ScopedEndpointFactory = ScopedEndpointFactoryMethods<undefined> & {
-    /**
-     * Returns a new resource factory where all endpoints inherit
-     * the given authorization requirements.
-     *
-     * - `authorize(principalSchema, ...roles)` — typed principal
-     * - `authorize(...roles)` — untyped principal
-     */
-    authorize<TSchema extends SchemaBuilder<any, any, any, any, any>>(
-        principalSchema: TSchema,
-        ...roles: string[]
-    ): ScopedEndpointFactoryMethods<InferType<TSchema>>;
-    authorize(...roles: string[]): ScopedEndpointFactoryMethods<unknown>;
-};
+export type ScopedEndpointFactory<TRoles extends string = string> =
+    ScopedEndpointFactoryMethods<undefined, TRoles> & {
+        /**
+         * Returns a new resource factory where all endpoints inherit
+         * the given authorization requirements.
+         *
+         * - `authorize(principalSchema, ...roles)` — typed principal
+         * - `authorize(...roles)` — untyped principal
+         */
+        authorize<TSchema extends SchemaBuilder<any, any, any, any, any>>(
+            principalSchema: TSchema,
+            ...roles: TRoles[]
+        ): ScopedEndpointFactoryMethods<InferType<TSchema>, TRoles>;
+        authorize(
+            ...roles: TRoles[]
+        ): ScopedEndpointFactoryMethods<unknown, TRoles>;
+    };
 
 function createScopedFactoryMethods(
     basePath: string,
@@ -457,37 +493,56 @@ function createScopedFactory(basePath: string): ScopedEndpointFactory {
 // EndpointFactory — top-level endpoint creation
 // ---------------------------------------------------------------------------
 
-type EndpointFactory = {
+type EndpointFactory<TRoles extends string = string> = {
     get<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
     post<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
     put<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
     patch<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
     delete<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
     head<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
     options<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
-    resource(basePath: string): ScopedEndpointFactory;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    resource(basePath: string): ScopedEndpointFactory<TRoles>;
 };
+
+/**
+ * Create a role-constrained endpoint factory. Roles are defined as a plain
+ * `as const` object whose *values* become the string-literal union accepted
+ * by `authorize()`.
+ *
+ * @example
+ * ```ts
+ * const Roles = { admin: 'admin', editor: 'editor' } as const;
+ * const ep = createEndpoints(Roles);
+ * ep.get('/api/admin').authorize(IPrincipal, 'admin'); // ✓
+ * ep.get('/api/admin').authorize(IPrincipal, 'typo');  // ✗ type error
+ * ```
+ */
+export function createEndpoints<const T extends Record<string, string>>(
+    _roles: T
+): EndpointFactory<T[keyof T]> {
+    return endpoint as EndpointFactory<T[keyof T]>;
+}
 
 export const endpoint: EndpointFactory = {
     get: (basePath, pathTemplate?) =>

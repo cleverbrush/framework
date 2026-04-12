@@ -4,12 +4,14 @@ import {
     type AuthenticationResult,
     type AuthenticationScheme,
     cookieScheme,
+    defineRoles,
     jwtScheme,
     Principal,
     signJwt
 } from '@cleverbrush/auth';
 import { number, object, string } from '@cleverbrush/schema';
 import {
+    createEndpoints,
     createServer,
     endpoint,
     type Handler,
@@ -81,7 +83,7 @@ const JWT_SECRET = 'integration-test-secret-key-long-enough';
 
 const IPrincipal = object({
     userId: string(),
-    role: string()
+    role: string().oneOf('admin', 'user')
 });
 
 // ===========================================================================
@@ -109,7 +111,7 @@ describe('Auth: JWT authentication', () => {
                         secret: JWT_SECRET,
                         mapClaims: c => ({
                             userId: c.sub as string,
-                            role: c.role as string
+                            role: c.role
                         })
                     })
                 ]
@@ -608,5 +610,119 @@ describe('Auth: authorize() without principal schema', () => {
         });
         expect(res.status).toBe(200);
         expect(json(res)).toEqual({ received: true });
+    });
+});
+
+// ===========================================================================
+// A9. Strongly-typed roles via createEndpoints()
+// ===========================================================================
+
+describe('Auth: Strongly-typed roles via createEndpoints()', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server?.close();
+    });
+
+    it('constrains roles and works end-to-end', async () => {
+        const Roles = defineRoles({ admin: 'admin', editor: 'editor' });
+        const ep = createEndpoints(Roles);
+
+        const adminEp = ep.get('/api/admin').authorize(IPrincipal, 'admin');
+        const editorEp = ep.get('/api/editor').authorize(IPrincipal, 'editor');
+
+        const adminHandler: Handler<typeof adminEp> = ({ principal }) => {
+            return { zone: 'admin', userId: principal.userId };
+        };
+        const editorHandler: Handler<typeof editorEp> = ({ principal }) => {
+            return { zone: 'editor', userId: principal.userId };
+        };
+
+        server = await createServer()
+            .useAuthentication({
+                defaultScheme: 'jwt',
+                schemes: [
+                    jwtScheme({
+                        secret: JWT_SECRET,
+                        mapClaims: c => ({
+                            userId: c.sub as string,
+                            role: c.role as string
+                        })
+                    })
+                ]
+            })
+            .useAuthorization()
+            .handle(adminEp, adminHandler)
+            .handle(editorEp, editorHandler)
+            .listen(0);
+
+        // Admin token → admin ok, editor forbidden
+        const adminToken = signJwt({ sub: 'u1', role: 'admin' }, JWT_SECRET);
+        const r1 = await request(server, 'GET', '/api/admin', {
+            headers: { authorization: `Bearer ${adminToken}` }
+        });
+        expect(r1.status).toBe(200);
+        expect(json(r1)).toEqual({ zone: 'admin', userId: 'u1' });
+
+        const r2 = await request(server, 'GET', '/api/editor', {
+            headers: { authorization: `Bearer ${adminToken}` }
+        });
+        expect(r2.status).toBe(403);
+
+        // Editor token → editor ok, admin forbidden
+        const editorToken = signJwt({ sub: 'u2', role: 'editor' }, JWT_SECRET);
+        const r3 = await request(server, 'GET', '/api/editor', {
+            headers: { authorization: `Bearer ${editorToken}` }
+        });
+        expect(r3.status).toBe(200);
+        expect(json(r3)).toEqual({ zone: 'editor', userId: 'u2' });
+
+        const r4 = await request(server, 'GET', '/api/admin', {
+            headers: { authorization: `Bearer ${editorToken}` }
+        });
+        expect(r4.status).toBe(403);
+    });
+
+    it('resource-level authorize with typed roles', async () => {
+        const Roles = defineRoles({ admin: 'admin', viewer: 'viewer' });
+        const ep = createEndpoints(Roles);
+
+        const adminApi = ep
+            .resource('/api/admin')
+            .authorize(IPrincipal, 'admin');
+        const listEp = adminApi.get();
+        const listHandler: Handler<typeof listEp> = () => ({ items: [] });
+
+        server = await createServer()
+            .useAuthentication({
+                defaultScheme: 'jwt',
+                schemes: [
+                    jwtScheme({
+                        secret: JWT_SECRET,
+                        mapClaims: c => ({
+                            userId: c.sub as string,
+                            role: c.role as string
+                        })
+                    })
+                ]
+            })
+            .useAuthorization()
+            .handle(listEp, listHandler)
+            .listen(0);
+
+        // Viewer cannot access admin resource
+        const viewerToken = signJwt({ sub: 'v1', role: 'viewer' }, JWT_SECRET);
+        const r1 = await request(server, 'GET', '/api/admin', {
+            headers: { authorization: `Bearer ${viewerToken}` }
+        });
+        expect(r1.status).toBe(403);
+
+        // Admin can access
+        const adminToken = signJwt({ sub: 'a1', role: 'admin' }, JWT_SECRET);
+        const r2 = await request(server, 'GET', '/api/admin', {
+            headers: { authorization: `Bearer ${adminToken}` }
+        });
+        expect(r2.status).toBe(200);
+        expect(json(r2)).toEqual({ items: [] });
     });
 });
