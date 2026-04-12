@@ -45,6 +45,14 @@ export class RequestContext {
     #jsonParsed = false;
     responded = false;
 
+    /**
+     * The authenticated principal for this request.
+     * Set by authentication middleware; typed as `unknown` at the
+     * RequestContext level — handlers receive a fully typed version
+     * via `ActionContext.principal`.
+     */
+    principal: unknown = undefined;
+
     constructor(request: IncomingMessage, response: ServerResponse) {
         this.request = request;
         this.response = response;

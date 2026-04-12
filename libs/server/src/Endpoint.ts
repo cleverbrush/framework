@@ -18,12 +18,13 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
 type HasKeys<T> = keyof T extends never ? false : true;
 
-type ActionContextParts<TParams, TBody, TQuery, THeaders> = {
+type ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal> = {
     context: RequestContext;
 } & (HasKeys<TParams> extends true ? { params: TParams } : {}) &
     (TBody extends undefined ? {} : { body: TBody }) &
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
-    (HasKeys<THeaders> extends true ? { headers: THeaders } : {});
+    (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
+    (TPrincipal extends undefined ? {} : { principal: TPrincipal });
 
 export type ActionContext<E> =
     E extends EndpointBuilder<
@@ -31,9 +32,12 @@ export type ActionContext<E> =
         infer TBody,
         infer TQuery,
         infer THeaders,
-        any
+        any,
+        infer TPrincipal
     >
-        ? Simplify<ActionContextParts<TParams, TBody, TQuery, THeaders>>
+        ? Simplify<
+              ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal>
+          >
         : never;
 
 // ---------------------------------------------------------------------------
@@ -96,6 +100,13 @@ export interface EndpointMetadata {
         string,
         SchemaBuilder<any, any, any, any, any>
     > | null;
+    /**
+     * Authorization roles required for this endpoint.
+     * - `null` → no authorization required (public)
+     * - `[]` → any authenticated user
+     * - `['admin', ...]` → user must have at least one of these roles
+     */
+    readonly authRoles: readonly string[] | null;
 }
 
 export class EndpointBuilder<
@@ -103,7 +114,8 @@ export class EndpointBuilder<
     TBody = undefined,
     TQuery = {},
     THeaders = {},
-    TServices = {}
+    TServices = {},
+    TPrincipal = undefined
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -131,6 +143,7 @@ export class EndpointBuilder<
         string,
         SchemaBuilder<any, any, any, any, any>
     > | null;
+    readonly #authRoles: readonly string[] | null;
 
     constructor(
         method: string,
@@ -158,7 +171,8 @@ export class EndpointBuilder<
         serviceSchemas: Record<
             string,
             SchemaBuilder<any, any, any, any, any>
-        > | null = null
+        > | null = null,
+        authRoles: readonly string[] | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -167,6 +181,7 @@ export class EndpointBuilder<
         this.#querySchema = querySchema;
         this.#headerSchema = headerSchema;
         this.#serviceSchemas = serviceSchemas;
+        this.#authRoles = authRoles;
     }
 
     body<TSchema extends SchemaBuilder<any, any, any, any, any>>(
@@ -176,7 +191,8 @@ export class EndpointBuilder<
         InferType<TSchema>,
         TQuery,
         THeaders,
-        TServices
+        TServices,
+        TPrincipal
     > {
         return new EndpointBuilder(
             this.#method,
@@ -185,7 +201,8 @@ export class EndpointBuilder<
             schema,
             this.#querySchema,
             this.#headerSchema,
-            this.#serviceSchemas
+            this.#serviceSchemas,
+            this.#authRoles
         );
     }
 
@@ -198,7 +215,8 @@ export class EndpointBuilder<
         TBody,
         InferType<TSchema>,
         THeaders,
-        TServices
+        TServices,
+        TPrincipal
     > {
         return new EndpointBuilder(
             this.#method,
@@ -207,7 +225,8 @@ export class EndpointBuilder<
             this.#bodySchema,
             schema,
             this.#headerSchema,
-            this.#serviceSchemas
+            this.#serviceSchemas,
+            this.#authRoles
         );
     }
 
@@ -215,7 +234,14 @@ export class EndpointBuilder<
         TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
         schema: TSchema
-    ): EndpointBuilder<TParams, TBody, TQuery, InferType<TSchema>, TServices> {
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        InferType<TSchema>,
+        TServices,
+        TPrincipal
+    > {
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
@@ -223,7 +249,8 @@ export class EndpointBuilder<
             this.#bodySchema,
             this.#querySchema,
             schema,
-            this.#serviceSchemas
+            this.#serviceSchemas,
+            this.#authRoles
         );
     }
 
@@ -231,7 +258,7 @@ export class EndpointBuilder<
         TSchemas extends Record<string, SchemaBuilder<any, any, any, any, any>>
     >(
         schemas: TSchemas
-    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TSchemas> {
+    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TSchemas, TPrincipal> {
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
@@ -239,7 +266,62 @@ export class EndpointBuilder<
             this.#bodySchema,
             this.#querySchema,
             this.#headerSchema,
-            schemas
+            schemas,
+            this.#authRoles
+        );
+    }
+
+    /**
+     * Mark this endpoint as requiring authorization.
+     *
+     * Overloads:
+     * - `authorize(principalSchema, ...roles)` — typed principal, optional role requirements
+     * - `authorize(...roles)` — untyped principal (`unknown`), optional role requirements
+     *
+     * If no roles are specified, any authenticated user is allowed.
+     */
+    authorize<TSchema extends SchemaBuilder<any, any, any, any, any>>(
+        principalSchema: TSchema,
+        ...roles: string[]
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        InferType<TSchema>
+    >;
+    authorize(
+        ...roles: string[]
+    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TServices, unknown>;
+    authorize(
+        ...args: unknown[]
+    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TServices, any> {
+        let roles: string[];
+        if (
+            args.length > 0 &&
+            typeof args[0] === 'object' &&
+            args[0] !== null &&
+            'introspect' in args[0]
+        ) {
+            // First argument is a schema — remaining are roles
+            roles = args.slice(1) as string[];
+        } else {
+            roles = args as string[];
+        }
+
+        // Merge with inherited auth roles
+        const merged = this.#authRoles ? [...this.#authRoles, ...roles] : roles;
+
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            merged
         );
     }
 
@@ -251,7 +333,8 @@ export class EndpointBuilder<
             bodySchema: this.#bodySchema,
             querySchema: this.#querySchema,
             headerSchema: this.#headerSchema,
-            serviceSchemas: this.#serviceSchemas
+            serviceSchemas: this.#serviceSchemas,
+            authRoles: this.#authRoles
         };
     }
 }
@@ -263,13 +346,15 @@ export class EndpointBuilder<
 function createEndpoint<TParams>(
     method: string,
     basePath: string,
-    pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>,
+    authRoles?: readonly string[] | null
 ): EndpointBuilder<TParams extends undefined ? {} : TParams>;
 
 function createEndpoint(
     method: string,
     basePath: string,
-    pathTemplate?: RoutePath
+    pathTemplate?: RoutePath,
+    authRoles?: readonly string[] | null
 ): EndpointBuilder<any> {
     return new EndpointBuilder(
         method,
@@ -278,48 +363,99 @@ function createEndpoint(
         null,
         null,
         null,
-        null
+        null,
+        authRoles ?? null
     );
 }
 
-type ScopedEndpointFactory = {
+// ---------------------------------------------------------------------------
+// ScopedEndpointFactory — resource-scoped endpoint creation
+// ---------------------------------------------------------------------------
+
+type ScopedEndpointFactoryMethods<TPrincipal> = {
     get<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
     post<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
     put<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
     patch<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
     delete<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
     head<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
     options<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams>;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal>;
 };
+
+export type ScopedEndpointFactory = ScopedEndpointFactoryMethods<undefined> & {
+    /**
+     * Returns a new resource factory where all endpoints inherit
+     * the given authorization requirements.
+     *
+     * - `authorize(principalSchema, ...roles)` — typed principal
+     * - `authorize(...roles)` — untyped principal
+     */
+    authorize<TSchema extends SchemaBuilder<any, any, any, any, any>>(
+        principalSchema: TSchema,
+        ...roles: string[]
+    ): ScopedEndpointFactoryMethods<InferType<TSchema>>;
+    authorize(...roles: string[]): ScopedEndpointFactoryMethods<unknown>;
+};
+
+function createScopedFactoryMethods(
+    basePath: string,
+    authRoles: readonly string[] | null
+): ScopedEndpointFactoryMethods<any> {
+    return {
+        get: (pathTemplate?) =>
+            createEndpoint('GET', basePath, pathTemplate, authRoles),
+        post: (pathTemplate?) =>
+            createEndpoint('POST', basePath, pathTemplate, authRoles),
+        put: (pathTemplate?) =>
+            createEndpoint('PUT', basePath, pathTemplate, authRoles),
+        patch: (pathTemplate?) =>
+            createEndpoint('PATCH', basePath, pathTemplate, authRoles),
+        delete: (pathTemplate?) =>
+            createEndpoint('DELETE', basePath, pathTemplate, authRoles),
+        head: (pathTemplate?) =>
+            createEndpoint('HEAD', basePath, pathTemplate, authRoles),
+        options: (pathTemplate?) =>
+            createEndpoint('OPTIONS', basePath, pathTemplate, authRoles)
+    };
+}
 
 function createScopedFactory(basePath: string): ScopedEndpointFactory {
     return {
-        get: (pathTemplate?) => createEndpoint('GET', basePath, pathTemplate),
-        post: (pathTemplate?) => createEndpoint('POST', basePath, pathTemplate),
-        put: (pathTemplate?) => createEndpoint('PUT', basePath, pathTemplate),
-        patch: (pathTemplate?) =>
-            createEndpoint('PATCH', basePath, pathTemplate),
-        delete: (pathTemplate?) =>
-            createEndpoint('DELETE', basePath, pathTemplate),
-        head: (pathTemplate?) => createEndpoint('HEAD', basePath, pathTemplate),
-        options: (pathTemplate?) =>
-            createEndpoint('OPTIONS', basePath, pathTemplate)
+        ...createScopedFactoryMethods(basePath, null),
+        authorize(...args: unknown[]): ScopedEndpointFactoryMethods<any> {
+            let roles: string[];
+            if (
+                args.length > 0 &&
+                typeof args[0] === 'object' &&
+                args[0] !== null &&
+                'introspect' in args[0]
+            ) {
+                roles = args.slice(1) as string[];
+            } else {
+                roles = args as string[];
+            }
+            return createScopedFactoryMethods(basePath, roles);
+        }
     };
 }
+
+// ---------------------------------------------------------------------------
+// EndpointFactory — top-level endpoint creation
+// ---------------------------------------------------------------------------
 
 type EndpointFactory = {
     get<TParams = {}>(

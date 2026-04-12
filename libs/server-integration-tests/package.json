@@ -6,6 +6,7 @@
     "dependencies": {
         "@cleverbrush/server": "^1.0.0",
         "@cleverbrush/schema": "^2.0.0",
-        "@cleverbrush/di": "^2.0.0"
+        "@cleverbrush/di": "^2.0.0",
+        "@cleverbrush/auth": "^1.0.0"
     }
 }
