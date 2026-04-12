@@ -7,6 +7,10 @@ export {
     type OpenApiServer
 } from './generateOpenApiSpec.js';
 export {
+    createOpenApiEndpoint,
+    type OpenApiEndpointOptions
+} from './openApiEndpoint.js';
+export {
     type PathParameterInfo,
     type ResolvedPath,
     resolvePath
