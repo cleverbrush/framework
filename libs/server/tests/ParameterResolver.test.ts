@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
-import { any, number, object, string } from '@cleverbrush/schema';
+import { number, object, string } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
 import type { EndpointMetadata } from '../src/Endpoint.js';
 import { needsBody, resolveArgs } from '../src/ParameterResolver.js';
@@ -37,6 +37,7 @@ function makeMeta(overrides: Partial<EndpointMetadata> = {}): EndpointMetadata {
         bodySchema: null,
         querySchema: null,
         headerSchema: null,
+        serviceSchemas: null,
         ...overrides
     };
 }
