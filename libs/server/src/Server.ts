@@ -1,5 +1,17 @@
 import * as http from 'node:http';
 import * as https from 'node:https';
+import type {
+    AuthenticationContext,
+    AuthenticationScheme,
+    AuthorizationPolicy
+} from '@cleverbrush/auth';
+import {
+    AuthorizationService,
+    PolicyBuilder,
+    Principal,
+    parseCookies,
+    requireRole
+} from '@cleverbrush/auth';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
@@ -21,12 +33,30 @@ import type {
     ServerOptions
 } from './types.js';
 
+// ---------------------------------------------------------------------------
+// Authentication / Authorization Config Types
+// ---------------------------------------------------------------------------
+
+export interface AuthenticationConfig {
+    /** Name of the default scheme to use (must match a scheme's `name`). */
+    defaultScheme: string;
+    /** Registered authentication schemes. */
+    schemes: AuthenticationScheme<any>[];
+}
+
+export interface AuthorizationConfig {
+    /** Named policies (looked up by `authorize('policy-name')` — future use). */
+    policies?: Record<string, (builder: PolicyBuilder) => void>;
+}
+
 export class ServerBuilder {
     readonly #serviceCollection = new ServiceCollection();
     readonly #registrations: EndpointRegistration[] = [];
     readonly #globalMiddlewares: Middleware[] = [];
     readonly #contentNegotiator = new ContentNegotiator();
     #options: ServerOptions = {};
+    #authConfig: AuthenticationConfig | null = null;
+    #authzConfig: AuthorizationConfig | null = null;
 
     services(configureFn: (svc: ServiceCollection) => void): this {
         configureFn(this.#serviceCollection);
@@ -40,6 +70,27 @@ export class ServerBuilder {
 
     contentType(handler: ContentTypeHandler): this {
         this.#contentNegotiator.register(handler);
+        return this;
+    }
+
+    /**
+     * Enable authentication with one or more schemes.
+     * Registers a global middleware that authenticates every request and
+     * sets `ctx.principal`.
+     */
+    useAuthentication(config: AuthenticationConfig): this {
+        this.#authConfig = config;
+        return this;
+    }
+
+    /**
+     * Enable authorization enforcement.
+     * Registers a global middleware that checks endpoint `authorize()`
+     * metadata against the authenticated principal.
+     * Must be called after `useAuthentication()`.
+     */
+    useAuthorization(config?: AuthorizationConfig): this {
+        this.#authzConfig = config ?? {};
         return this;
     }
 
@@ -67,11 +118,40 @@ export class ServerBuilder {
             validateScopes: false
         });
 
+        // Build auth middleware stack
+        const authMiddlewares: Middleware[] = [];
+
+        if (this.#authConfig) {
+            authMiddlewares.push(
+                createAuthenticationMiddleware(this.#authConfig)
+            );
+        }
+
+        if (this.#authzConfig !== null) {
+            const policies = new Map<string, AuthorizationPolicy>();
+            if (this.#authzConfig.policies) {
+                for (const [name, configureFn] of Object.entries(
+                    this.#authzConfig.policies
+                )) {
+                    const builder = new PolicyBuilder();
+                    configureFn(builder);
+                    policies.set(name, builder.build(name));
+                }
+            }
+            const authzService = new AuthorizationService(policies);
+            authMiddlewares.push(
+                createAuthorizationMiddleware(authzService, this.#authConfig)
+            );
+        }
+
+        // Auth middlewares go before user-registered global middlewares
+        const allMiddlewares = [...authMiddlewares, ...this.#globalMiddlewares];
+
         const server = new Server(
             router,
             serviceProvider,
             this.#contentNegotiator,
-            this.#globalMiddlewares
+            allMiddlewares
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -194,6 +274,9 @@ export class Server {
             }
 
             ctx.services = scope.serviceProvider;
+
+            // Store endpoint metadata for authorization middleware
+            ctx.items.set('__endpoint_meta', meta);
 
             // Build middleware pipeline
             const pipeline = new MiddlewarePipeline();
@@ -333,4 +416,119 @@ function flattenToStrings(
             result[fullKey] = String(value);
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Authentication Middleware
+// ---------------------------------------------------------------------------
+
+function createAuthenticationMiddleware(
+    config: AuthenticationConfig
+): Middleware {
+    const schemeMap = new Map<string, AuthenticationScheme<any>>();
+    for (const scheme of config.schemes) {
+        schemeMap.set(scheme.name, scheme);
+    }
+
+    return async (ctx, next) => {
+        const scheme = schemeMap.get(config.defaultScheme);
+        if (!scheme) {
+            // No matching scheme — leave principal as anonymous
+            ctx.principal = Principal.anonymous();
+            await next();
+            return;
+        }
+
+        // Build transport-agnostic auth context
+        const authCtx: AuthenticationContext = {
+            headers: ctx.headers,
+            cookies: parseCookies(ctx.headers['cookie'] ?? ''),
+            items: ctx.items
+        };
+
+        const result = await scheme.authenticate(authCtx);
+
+        if (result.succeeded) {
+            ctx.principal = result.principal;
+        } else {
+            ctx.principal = Principal.anonymous();
+        }
+
+        await next();
+    };
+}
+
+// ---------------------------------------------------------------------------
+// Authorization Middleware
+// ---------------------------------------------------------------------------
+
+function createAuthorizationMiddleware(
+    authzService: AuthorizationService,
+    authConfig: AuthenticationConfig | null
+): Middleware {
+    // Collect challenge headers from schemes for 401 responses
+    const challengeHeaders: Record<string, string> = {};
+    if (authConfig) {
+        for (const scheme of authConfig.schemes) {
+            if (scheme.challenge) {
+                const ch = scheme.challenge();
+                challengeHeaders[ch.headerName.toLowerCase()] = ch.headerValue;
+            }
+        }
+    }
+
+    return async (ctx, next) => {
+        const meta = ctx.items.get('__endpoint_meta') as
+            | import('./Endpoint.js').EndpointMetadata
+            | undefined;
+
+        // No auth metadata or authRoles is null → public endpoint
+        if (!meta || meta.authRoles === null) {
+            await next();
+            return;
+        }
+
+        // Endpoint requires auth — check principal
+        const principal = ctx.principal;
+
+        if (
+            !principal ||
+            !(principal instanceof Principal) ||
+            !principal.isAuthenticated
+        ) {
+            // 401 Unauthorized
+            const pd = createProblemDetails(401, 'Unauthorized');
+            const headers: Record<string, string> = {
+                'content-type': PROBLEM_JSON_CONTENT_TYPE,
+                ...challengeHeaders
+            };
+            ctx.response.writeHead(401, headers);
+            ctx.response.end(serializeProblemDetails(pd));
+            ctx.responded = true;
+            return;
+        }
+
+        // If roles are specified, check them
+        if (meta.authRoles.length > 0) {
+            const result = await authzService.authorize(principal, [
+                requireRole(...meta.authRoles)
+            ]);
+            if (!result.allowed) {
+                const pd = createProblemDetails(403, 'Forbidden');
+                ctx.response.writeHead(403, {
+                    'content-type': PROBLEM_JSON_CONTENT_TYPE
+                });
+                ctx.response.end(serializeProblemDetails(pd));
+                ctx.responded = true;
+                return;
+            }
+        }
+
+        // For typed handler access — set the principal value
+        if (principal instanceof Principal) {
+            ctx.principal = principal.value;
+        }
+
+        await next();
+    };
 }

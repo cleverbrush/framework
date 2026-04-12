@@ -5,21 +5,19 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^2.0.0",
-        "@cleverbrush/di": "^2.0.0",
-        "@cleverbrush/auth": "^1.0.0"
+        "@cleverbrush/schema": "^2.0.0"
     },
-    "description": "Schema-first HTTP server framework — schema-driven controllers, DI, auto-validation, RFC 9457 errors",
+    "description": "Transport-agnostic authentication & authorization — JWT, cookies, role-based policies, schema-typed principals",
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/server",
+    "homepage": "https://docs.cleverbrush.com/auth",
     "keywords": [
-        "http",
-        "server",
-        "schema",
-        "dependency injection",
-        "validation",
+        "authentication",
+        "authorization",
+        "jwt",
+        "cookies",
+        "roles",
         "typescript",
         "cleverbrush"
     ],
@@ -32,8 +30,8 @@
         }
     },
     "sideEffects": false,
-    "name": "@cleverbrush/server",
-    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/server#readme",
+    "name": "@cleverbrush/auth",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/auth#readme",
     "repository": {
         "type": "git",
         "url": "github:cleverbrush/framework"

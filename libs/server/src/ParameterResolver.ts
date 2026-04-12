@@ -33,6 +33,11 @@ export async function resolveArgs(
     // Always provide context
     contextObj.context = context;
 
+    // Principal — from authentication middleware (if endpoint requires auth)
+    if (meta.authRoles !== null && context.principal !== undefined) {
+        contextObj.principal = context.principal;
+    }
+
     // Params — from parsed path (already validated by ParseStringSchemaBuilder)
     if (parsedPath && Object.keys(parsedPath).length > 0) {
         contextObj.params = parsedPath;

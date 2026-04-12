@@ -10,6 +10,7 @@
         { "path": "libs/react-form" },
         { "path": "libs/scheduler" },
         { "path": "libs/di" },
+        { "path": "libs/auth" },
         { "path": "libs/server" }
     ]
 }

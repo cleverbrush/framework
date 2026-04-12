@@ -12,7 +12,8 @@ export {
     type ActionContext,
     EndpointBuilder,
     endpoint,
-    type Handler
+    type Handler,
+    type ScopedEndpointFactory
 } from './Endpoint.js';
 export {
     BadRequestError,
@@ -30,7 +31,13 @@ export {
 } from './ProblemDetails.js';
 export { IRequestContext, RequestContext } from './RequestContext.js';
 export { route } from './route.js';
-export { createServer, Server, ServerBuilder } from './Server.js';
+export {
+    type AuthenticationConfig,
+    type AuthorizationConfig,
+    createServer,
+    Server,
+    ServerBuilder
+} from './Server.js';
 export type {
     ContentTypeHandler,
     EndpointRegistration,
