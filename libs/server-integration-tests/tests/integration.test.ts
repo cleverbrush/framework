@@ -700,3 +700,156 @@ describe('Endpoint: parseString path parameters', () => {
         expect(json(res)).toEqual({ orgId: 10, teamId: 3 });
     });
 });
+
+// ===========================================================================
+// E9. Endpoint dependency injection via .inject()
+// ===========================================================================
+
+describe('Endpoint: dependency injection via .inject()', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server.close();
+    });
+
+    it('injects a singleton service into the handler as second param', async () => {
+        const IGreeter = any();
+
+        const ep = endpoint.get('/api/greet').inject({ greeter: IGreeter });
+
+        const handler: Handler<typeof ep> = (_ctx, { greeter }) => {
+            return { message: greeter.greet('World') };
+        };
+
+        server = await createServer()
+            .services(svc => {
+                svc.addSingleton(IGreeter, {
+                    greet: (name: string) => `Hello, ${name}!`
+                });
+            })
+            .handle(ep, handler)
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/greet');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ message: 'Hello, World!' });
+    });
+
+    it('injects multiple services', async () => {
+        const IConfig = any();
+        const IFormatter = any();
+
+        const ep = endpoint
+            .get('/api/info')
+            .inject({ config: IConfig, formatter: IFormatter });
+
+        const handler: Handler<typeof ep> = (_ctx, { config, formatter }) => {
+            return { result: formatter.format(config.appName) };
+        };
+
+        server = await createServer()
+            .services(svc => {
+                svc.addSingleton(IConfig, { appName: 'TestApp' });
+                svc.addSingleton(IFormatter, {
+                    format: (s: string) => s.toUpperCase()
+                });
+            })
+            .handle(ep, handler)
+            .listen(0);
+
+        const res = await request(server, 'GET', '/api/info');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ result: 'TESTAPP' });
+    });
+
+    it('scoped services are isolated per request', async () => {
+        const ICounter = any();
+        let instanceCount = 0;
+
+        const ep = endpoint.get('/api/count').inject({ counter: ICounter });
+
+        const handler: Handler<typeof ep> = (_ctx, { counter }) => {
+            counter.value++;
+            return { value: counter.value };
+        };
+
+        server = await createServer()
+            .services(svc => {
+                svc.addScoped(ICounter, () => {
+                    instanceCount++;
+                    return { value: 0 };
+                });
+            })
+            .handle(ep, handler)
+            .listen(0);
+
+        const r1 = await request(server, 'GET', '/api/count');
+        const r2 = await request(server, 'GET', '/api/count');
+        expect(json(r1)).toEqual({ value: 1 });
+        expect(json(r2)).toEqual({ value: 1 }); // Fresh instance per request
+        expect(instanceCount).toBe(2);
+    });
+
+    it('works alongside params, body, query, and headers', async () => {
+        const IStore = any();
+        const ByIdPath = route({ id: number().coerce() })`/${t => t.id}`;
+
+        const ep = endpoint
+            .patch('/api/items', ByIdPath)
+            .body(object({ value: string() }))
+            .query(object({ verbose: string().optional() }))
+            .headers(object({ 'x-trace': string() }))
+            .inject({ store: IStore });
+
+        const handler: Handler<typeof ep> = (
+            { params, body, query, headers },
+            { store }
+        ) => {
+            store.set(params.id, body.value);
+            return {
+                id: params.id,
+                value: body.value,
+                verbose: query.verbose,
+                trace: headers['x-trace'],
+                storeSize: store.size
+            };
+        };
+
+        const store = new Map<number, string>();
+
+        server = await createServer()
+            .services(svc => {
+                svc.addSingleton(IStore, store);
+            })
+            .handle(ep, handler)
+            .listen(0);
+
+        const res = await request(server, 'PATCH', '/api/items/7?verbose=yes', {
+            body: { value: 'hello' },
+            headers: { 'x-trace': 'abc-123' }
+        });
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({
+            id: 7,
+            value: 'hello',
+            verbose: 'yes',
+            trace: 'abc-123',
+            storeSize: 1
+        });
+        expect(store.get(7)).toBe('hello');
+    });
+
+    it('handler without .inject() still works (backwards compatible)', async () => {
+        const ep = endpoint.get('/api/simple');
+
+        const handler: Handler<typeof ep> = () => {
+            return { ok: true };
+        };
+
+        server = await createServer().handle(ep, handler).listen(0);
+
+        const res = await request(server, 'GET', '/api/simple');
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ ok: true });
+    });
+});

@@ -126,5 +126,20 @@ export async function resolveArgs(
         };
     }
 
+    // Services — resolve declared dependencies from the DI container
+    if (meta.serviceSchemas) {
+        if (!context.services) {
+            throw new Error(
+                'Endpoint declares .inject() dependencies but no service provider is available. ' +
+                    'Register services via createServer().services() before handling this endpoint.'
+            );
+        }
+        const servicesObj: Record<string, unknown> = {};
+        for (const [name, schema] of Object.entries(meta.serviceSchemas)) {
+            servicesObj[name] = context.services.get(schema);
+        }
+        return { valid: true, args: [contextObj, servicesObj] };
+    }
+
     return { valid: true, args: [contextObj] };
 }

@@ -9,9 +9,9 @@ export {
     StreamResult
 } from './ActionResult.js';
 export {
-    endpoint,
-    EndpointBuilder,
     type ActionContext,
+    EndpointBuilder,
+    endpoint,
     type Handler
 } from './Endpoint.js';
 export {

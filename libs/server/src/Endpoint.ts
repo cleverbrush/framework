@@ -30,16 +30,38 @@ export type ActionContext<E> =
         infer TParams,
         infer TBody,
         infer TQuery,
-        infer THeaders
+        infer THeaders,
+        any
     >
         ? Simplify<ActionContextParts<TParams, TBody, TQuery, THeaders>>
         : never;
 
 // ---------------------------------------------------------------------------
+// InferServices — maps { name: SchemaBuilder } to { name: InferType<Schema> }
+// ---------------------------------------------------------------------------
+
+type InferServices<T> = {
+    [K in keyof T]: T[K] extends SchemaBuilder<any, any, any, any, any>
+        ? InferType<T[K]>
+        : never;
+};
+
+export type ServiceSchemas<E> =
+    E extends EndpointBuilder<any, any, any, any, infer TServices>
+        ? TServices
+        : {};
+
+// ---------------------------------------------------------------------------
 // Handler — the action function type, inferred from an endpoint
 // ---------------------------------------------------------------------------
 
-export type Handler<E> = (arg: ActionContext<E>) => any | Promise<any>;
+export type Handler<E> =
+    HasKeys<ServiceSchemas<E>> extends true
+        ? (
+              arg: ActionContext<E>,
+              services: Simplify<InferServices<ServiceSchemas<E>>>
+          ) => any | Promise<any>
+        : (arg: ActionContext<E>) => any | Promise<any>;
 
 // ---------------------------------------------------------------------------
 // EndpointBuilder — immutable builder for endpoint definitions
@@ -70,13 +92,18 @@ export interface EndpointMetadata {
         any,
         any
     > | null;
+    readonly serviceSchemas: Record<
+        string,
+        SchemaBuilder<any, any, any, any, any>
+    > | null;
 }
 
 export class EndpointBuilder<
     TParams = {},
     TBody = undefined,
     TQuery = {},
-    THeaders = {}
+    THeaders = {},
+    TServices = {}
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -99,6 +126,10 @@ export class EndpointBuilder<
         any,
         any,
         any
+    > | null;
+    readonly #serviceSchemas: Record<
+        string,
+        SchemaBuilder<any, any, any, any, any>
     > | null;
 
     constructor(
@@ -123,7 +154,11 @@ export class EndpointBuilder<
             any,
             any,
             any
-        > | null
+        > | null,
+        serviceSchemas: Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        > | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -131,18 +166,26 @@ export class EndpointBuilder<
         this.#bodySchema = bodySchema;
         this.#querySchema = querySchema;
         this.#headerSchema = headerSchema;
+        this.#serviceSchemas = serviceSchemas;
     }
 
     body<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
-    ): EndpointBuilder<TParams, InferType<TSchema>, TQuery, THeaders> {
+    ): EndpointBuilder<
+        TParams,
+        InferType<TSchema>,
+        TQuery,
+        THeaders,
+        TServices
+    > {
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
             this.#pathTemplate,
             schema,
             this.#querySchema,
-            this.#headerSchema
+            this.#headerSchema,
+            this.#serviceSchemas
         );
     }
 
@@ -150,14 +193,21 @@ export class EndpointBuilder<
         TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
         schema: TSchema
-    ): EndpointBuilder<TParams, TBody, InferType<TSchema>, THeaders> {
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        InferType<TSchema>,
+        THeaders,
+        TServices
+    > {
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
             this.#pathTemplate,
             this.#bodySchema,
             schema,
-            this.#headerSchema
+            this.#headerSchema,
+            this.#serviceSchemas
         );
     }
 
@@ -165,14 +215,31 @@ export class EndpointBuilder<
         TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
         schema: TSchema
-    ): EndpointBuilder<TParams, TBody, TQuery, InferType<TSchema>> {
+    ): EndpointBuilder<TParams, TBody, TQuery, InferType<TSchema>, TServices> {
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
             this.#pathTemplate,
             this.#bodySchema,
             this.#querySchema,
-            schema
+            schema,
+            this.#serviceSchemas
+        );
+    }
+
+    inject<
+        TSchemas extends Record<string, SchemaBuilder<any, any, any, any, any>>
+    >(
+        schemas: TSchemas
+    ): EndpointBuilder<TParams, TBody, TQuery, THeaders, TSchemas> {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            schemas
         );
     }
 
@@ -183,7 +250,8 @@ export class EndpointBuilder<
             pathTemplate: this.#pathTemplate,
             bodySchema: this.#bodySchema,
             querySchema: this.#querySchema,
-            headerSchema: this.#headerSchema
+            headerSchema: this.#headerSchema,
+            serviceSchemas: this.#serviceSchemas
         };
     }
 }
@@ -207,6 +275,7 @@ function createEndpoint(
         method,
         basePath,
         pathTemplate ?? '/',
+        null,
         null,
         null,
         null
