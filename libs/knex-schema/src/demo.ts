@@ -2,13 +2,7 @@
 // Run: npx tsx libs/knex-schema/src/demo.ts
 
 import Knex from 'knex';
-import {
-    date,
-    number,
-    object,
-    query,
-    string
-} from './index.js';
+import { date, number, object, query, string } from './index.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Schema definitions
@@ -50,7 +44,9 @@ const knex = Knex({ client: 'pg' });
 // ═══════════════════════════════════════════════════════════════════════════
 
 function show(label: string, sql: string) {
-    console.log(`\n\x1b[36m── ${label} ${'─'.repeat(60 - label.length)}\x1b[0m`);
+    console.log(
+        `\n\x1b[36m── ${label} ${'─'.repeat(60 - label.length)}\x1b[0m`
+    );
     console.log(sql);
 }
 
@@ -58,10 +54,7 @@ function show(label: string, sql: string) {
 // 1. Basic SELECT
 // ═══════════════════════════════════════════════════════════════════════════
 
-show(
-    'SELECT * (all users)',
-    query(knex, User).toQuery()
-);
+show('SELECT * (all users)', query(knex, User).toQuery());
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 2. WHERE with property descriptor accessor
@@ -80,9 +73,7 @@ show(
 
 show(
     'WHERE via string key',
-    query(knex, User)
-        .where('fullName', '=', 'Alice')
-        .toQuery()
+    query(knex, User).where('fullName', '=', 'Alice').toQuery()
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -91,9 +82,7 @@ show(
 
 show(
     'WHERE via record { key: value }',
-    query(knex, User)
-        .where({ fullName: 'Alice', role: 'admin' })
-        .toQuery()
+    query(knex, User).where({ fullName: 'Alice', role: 'admin' }).toQuery()
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -144,7 +133,10 @@ show(
 show(
     'SELECT specific columns',
     query(knex, User)
-        .select(t => t.fullName, t => t.email)
+        .select(
+            t => t.fullName,
+            t => t.email
+        )
         .toQuery()
 );
 
@@ -176,14 +168,13 @@ show(
 // 10. Aggregates
 // ═══════════════════════════════════════════════════════════════════════════
 
-show(
-    'COUNT',
-    query(knex, User).count().toQuery()
-);
+show('COUNT', query(knex, User).count().toQuery());
 
 show(
     'MAX (created_at)',
-    query(knex, User).max(t => t.createdAt).toQuery()
+    query(knex, User)
+        .max(t => t.createdAt)
+        .toQuery()
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -206,9 +197,7 @@ show(
 
 show(
     'whereRaw',
-    query(knex, User)
-        .whereRaw('full_name ILIKE ?', '%alice%')
-        .toQuery()
+    query(knex, User).whereRaw('full_name ILIKE ?', '%alice%').toQuery()
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
