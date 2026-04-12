@@ -100,11 +100,9 @@ describe('Endpoint: Todo CRUD lifecycle', () => {
         return [...todos.values()];
     };
 
-    const getByIdHandler: Handler<typeof getTodoById> = async ({
-        params: { id }
-    }) => {
-        const todo = todos.get(id);
-        if (!todo) throw new NotFoundError(`Todo ${id} not found`);
+    const getByIdHandler: Handler<typeof getTodoById> = async ({ params }) => {
+        const todo = todos.get(params.id);
+        if (!todo) throw new NotFoundError(`Todo ${params.id} not found`);
         return todo;
     };
 
