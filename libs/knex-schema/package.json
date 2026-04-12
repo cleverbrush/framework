@@ -10,19 +10,20 @@
     "peerDependencies": {
         "knex": ">=3.1.0"
     },
-    "description": "Type-safe eager loading of relations for Knex using @cleverbrush/schema — strongly typed joinOne/joinMany with compile-time column validation",
+    "description": "Type-safe schema-driven query builder for Knex using @cleverbrush/schema — strongly typed CRUD, eager loading, and column mapping for PostgreSQL",
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/knex-eager",
+    "homepage": "https://docs.cleverbrush.com/knex-schema",
     "keywords": [
         "knex",
-        "eager loading",
-        "relations",
+        "query builder",
         "schema",
         "typescript",
         "type-safe",
         "postgresql",
+        "orm",
+        "eager loading",
         "cleverbrush"
     ],
     "license": "BSD 3-Clause",
@@ -34,8 +35,8 @@
         }
     },
     "sideEffects": false,
-    "name": "@cleverbrush/knex-eager",
-    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/knex-eager#readme",
+    "name": "@cleverbrush/knex-schema",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/knex-schema#readme",
     "repository": {
         "type": "git",
         "url": "github:cleverbrush/framework"
@@ -47,5 +48,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "2.0.0"
+    "version": "1.0.0"
 }

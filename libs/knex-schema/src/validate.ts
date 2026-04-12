@@ -1,73 +1,37 @@
-import {
-    ObjectSchemaBuilder,
-    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-} from '@cleverbrush/schema';
+// @cleverbrush/knex-schema — Validation of join specs
+
+import type { ObjectSchemaBuilder } from '@cleverbrush/schema';
+import type { Knex } from 'knex';
+import { resolveColumnRef } from './columns.js';
+import { getTableName } from './extension.js';
 import type {
-    ColumnRef,
     JoinManySpec,
     JoinOneSpec,
     ValidatedJoinManySpec,
     ValidatedJoinOneSpec
 } from './types.js';
 
-// ---------------------------------------------------------------------------
-// Resolve a ColumnRef (string | accessor) to a plain string column name
-// ---------------------------------------------------------------------------
-export function resolveColumnRef(
-    ref: ColumnRef<any>,
-    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-    label: string
-): string {
-    if (typeof ref === 'string') {
-        if (!ref) throw new Error(`${label} must be a non-empty string`);
-        return ref;
-    }
+/**
+ * Resolve foreignQuery: use the provided one, or auto-derive from
+ * the foreign schema's tableName extension.
+ */
+function resolveForeignQuery(
+    spec: {
+        foreignQuery?: Knex.QueryBuilder;
+        foreignSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+    },
+    knex: Knex
+): Knex.QueryBuilder {
+    if (spec.foreignQuery) return spec.foreignQuery;
 
-    if (typeof ref === 'function') {
-        const tree = ObjectSchemaBuilder.getPropertiesFor(schema as any);
-        const descriptor = ref(tree as any);
-
-        if (
-            !descriptor ||
-            typeof descriptor !== 'object' ||
-            !(SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in descriptor)
-        ) {
-            throw new Error(
-                `${label} accessor must return a valid property descriptor`
-            );
-        }
-
-        const inner = (descriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
-
-        // Walk the introspected properties to find the matching descriptor
-        const introspected = schema.introspect() as any;
-        if (introspected.properties) {
-            for (const propName of Object.keys(introspected.properties)) {
-                const propDescriptor = (tree as any)[propName];
-                if (
-                    propDescriptor &&
-                    (propDescriptor as any)[
-                        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-                    ] === inner
-                ) {
-                    return propName;
-                }
-            }
-        }
-
-        throw new Error(
-            `${label} accessor did not match any property in the schema`
-        );
-    }
-
-    throw new Error(
-        `${label} must be a string or a property descriptor accessor function`
-    );
+    const tableName = getTableName(spec.foreignSchema);
+    return knex(tableName);
 }
 
 export function validateJoinOne(
     spec: JoinOneSpec<any, any, any, any>,
-    localSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    localSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    knex: Knex
 ): ValidatedJoinOneSpec {
     const localColumn = resolveColumnRef(
         spec.localColumn,
@@ -82,10 +46,8 @@ export function validateJoinOne(
     if (typeof spec.as !== 'string' || !spec.as) {
         throw new Error('as must be a non-empty string');
     }
-    if (!spec.foreignQuery) {
-        throw new Error('foreignQuery must be a Knex QueryBuilder instance');
-    }
 
+    const foreignQuery = resolveForeignQuery(spec, knex);
     const required = spec.required !== false;
 
     if (spec.mappers !== undefined) {
@@ -97,14 +59,15 @@ export function validateJoinOne(
         foreignColumn,
         as: spec.as,
         required,
-        foreignQuery: spec.foreignQuery,
+        foreignQuery,
         mappers: spec.mappers as Record<string, (value: any) => any> | undefined
     };
 }
 
 export function validateJoinMany(
     spec: JoinManySpec<any, any, any>,
-    localSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    localSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    knex: Knex
 ): ValidatedJoinManySpec {
     const localColumn = resolveColumnRef(
         spec.localColumn,
@@ -119,9 +82,8 @@ export function validateJoinMany(
     if (typeof spec.as !== 'string' || !spec.as) {
         throw new Error('as must be a non-empty string');
     }
-    if (!spec.foreignQuery) {
-        throw new Error('foreignQuery must be a Knex QueryBuilder instance');
-    }
+
+    const foreignQuery = resolveForeignQuery(spec, knex);
 
     if (spec.mappers !== undefined) {
         validateMappers(spec.mappers);
@@ -150,7 +112,7 @@ export function validateJoinMany(
         localColumn,
         foreignColumn,
         as: spec.as,
-        foreignQuery: spec.foreignQuery,
+        foreignQuery,
         limit,
         offset,
         orderBy,

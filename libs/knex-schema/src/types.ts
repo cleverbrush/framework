@@ -1,3 +1,5 @@
+// @cleverbrush/knex-schema — Type definitions
+
 import type {
     InferType,
     ObjectSchemaBuilder,
@@ -47,8 +49,8 @@ export interface JoinOneSpec<
     as: TFieldName;
     /** If true (default), uses INNER JOIN; if false, uses LEFT JOIN (result may be null) */
     required?: TRequired;
-    /** Optional Knex query builder for the foreign table (with filters, column selection, etc.) */
-    foreignQuery: Knex.QueryBuilder;
+    /** Optional Knex query builder for the foreign table — auto-derived from foreignSchema's tableName if omitted */
+    foreignQuery?: Knex.QueryBuilder;
     /** Foreign schema for type inference */
     foreignSchema: TForeignSchema;
     /** Optional post-load value transformers per foreign column */
@@ -77,8 +79,8 @@ export interface JoinManySpec<
     foreignColumn: ColumnRef<TForeignSchema>;
     /** Name of the field that will hold the loaded array in the result */
     as: TFieldName;
-    /** Optional Knex query builder for the foreign table (with filters, column selection, etc.) */
-    foreignQuery: Knex.QueryBuilder;
+    /** Optional Knex query builder for the foreign table — auto-derived from foreignSchema's tableName if omitted */
+    foreignQuery?: Knex.QueryBuilder;
     /** Foreign schema for type inference */
     foreignSchema: TForeignSchema;
     /** Maximum number of related items to load per parent row */
@@ -161,3 +163,10 @@ export interface ValidatedJoinManySpec {
 export type ValidatedSpec =
     | ({ type: 'one' } & ValidatedJoinOneSpec)
     | ({ type: 'many' } & ValidatedJoinManySpec);
+
+// ---------------------------------------------------------------------------
+// InsertType — like InferType but makes optional properties omittable
+// ---------------------------------------------------------------------------
+export type InsertType<
+    T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> = InferType<T>;

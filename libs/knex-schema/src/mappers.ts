@@ -1,7 +1,9 @@
+// @cleverbrush/knex-schema — Post-load value transformers (from knex-eager)
+
 import type { ValidatedSpec } from './types.js';
 
 // ---------------------------------------------------------------------------
-// Built-in named mappers (same concept as the old MAPPERS registry)
+// Built-in named mappers
 // ---------------------------------------------------------------------------
 export const MAPPERS: Record<string, (value: any) => any> = {
     date_from_json: (value: any) => {
@@ -46,14 +48,13 @@ export function mapObject<T extends Record<string, any>>(
 }
 
 // ---------------------------------------------------------------------------
-// clearRow — remove internal row_number field, apply mappers to joined data
+// clearRow — apply mappers to joined data in a result row
 // ---------------------------------------------------------------------------
 export function clearRow(
     row: Record<string, any>,
     oneSpecs: Array<ValidatedSpec & { type: 'one' }>,
     manySpecs: Array<ValidatedSpec & { type: 'many' }>
 ): Record<string, any> {
-    // Apply mappers to single joined objects
     for (const spec of oneSpecs) {
         const fieldName = spec.as;
         if (
@@ -65,7 +66,6 @@ export function clearRow(
         }
     }
 
-    // Apply mappers to collection joined objects
     for (const spec of manySpecs) {
         const fieldName = spec.as;
         if (Array.isArray(row[fieldName])) {
