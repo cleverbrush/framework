@@ -340,7 +340,20 @@ export class Server {
                         const rawBody = await ctx.body();
                         const bodyText = rawBody.toString('utf-8');
                         if (bodyText.length > 0) {
-                            parsedBody = ctHandler.deserialize(bodyText);
+                            try {
+                                parsedBody = ctHandler.deserialize(bodyText);
+                            } catch {
+                                const pd = createProblemDetails(
+                                    400,
+                                    'Malformed request body'
+                                );
+                                res.writeHead(400, {
+                                    'content-type': PROBLEM_JSON_CONTENT_TYPE
+                                });
+                                res.end(serializeProblemDetails(pd));
+                                ctx.responded = true;
+                                return;
+                            }
                         }
                     } else if (contentType) {
                         const pd = createProblemDetails(415);
@@ -391,6 +404,7 @@ export class Server {
                 });
                 res.end(serializeProblemDetails(pd));
             } else {
+                console.error('[server] Unhandled error:', err);
                 const pd = createProblemDetails(500);
                 res.writeHead(500, {
                     'content-type': PROBLEM_JSON_CONTENT_TYPE

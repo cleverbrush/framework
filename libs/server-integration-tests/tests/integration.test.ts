@@ -232,7 +232,10 @@ describe('Endpoint: Todo CRUD lifecycle', () => {
         expect(res.status).toBe(400);
         const pd = json(res);
         expect(pd.status).toBe(400);
-        expect(pd.errors).toBeDefined();
+        expect(Array.isArray(pd.errors)).toBe(true);
+        expect(pd.errors.length).toBeGreaterThan(0);
+        // The pointer must name the missing field, not just /body
+        expect(pd.errors[0].pointer).toBe('/body/title');
     });
 
     it('returns 405 for unsupported method on a route', async () => {
@@ -582,6 +585,10 @@ describe('Endpoint: error handling', () => {
         const pd = json(res);
         expect(pd.status).toBe(400);
         expect(pd.errors.length).toBeGreaterThan(0);
+        // Each error must point to its specific field
+        const pointers = pd.errors.map((e: any) => e.pointer) as string[];
+        expect(pointers.every(p => p.startsWith('/body/'))).toBe(true);
+        expect(pointers).toContain('/body/name');
     });
 });
 

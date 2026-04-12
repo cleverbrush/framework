@@ -9,6 +9,12 @@ import {
     UpdateTodoBody
 } from './schemas.js';
 
+const SomeRoute = endpoint.resource('/some/api');
+export const SomeRouteGet = SomeRoute.get(ById).returns(string());
+export const SomeRoutePost = SomeRoute.post(ById)
+    .body(object({ msg: string().required() }))
+    .returns(string());
+
 // --- Auth ---------------------------------------------------------------
 
 export const loginEp = endpoint
