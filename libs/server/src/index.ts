@@ -12,6 +12,8 @@ export {
     type ActionContext,
     createEndpoints,
     EndpointBuilder,
+    type EndpointMetadata,
+    type EndpointMetadataDescriptors,
     endpoint,
     type Handler,
     type ScopedEndpointFactory

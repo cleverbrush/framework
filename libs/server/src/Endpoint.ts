@@ -141,6 +141,12 @@ export interface EndpointMetadata {
      * - `['admin', ...]` → user must have at least one of these roles
      */
     readonly authRoles: readonly string[] | null;
+    readonly summary: string | null;
+    readonly description: string | null;
+    readonly tags: readonly string[];
+    readonly operationId: string | null;
+    readonly deprecated: boolean;
+    readonly responseSchema: SchemaBuilder<any, any, any, any, any> | null;
 }
 
 export class EndpointBuilder<
@@ -180,6 +186,12 @@ export class EndpointBuilder<
         SchemaBuilder<any, any, any, any, any>
     > | null;
     readonly #authRoles: readonly string[] | null;
+    readonly #summary: string | null;
+    readonly #description: string | null;
+    readonly #tags: readonly string[];
+    readonly #operationId: string | null;
+    readonly #deprecated: boolean;
+    readonly #responseSchema: SchemaBuilder<any, any, any, any, any> | null;
 
     constructor(
         method: string,
@@ -208,7 +220,13 @@ export class EndpointBuilder<
             string,
             SchemaBuilder<any, any, any, any, any>
         > | null = null,
-        authRoles: readonly string[] | null = null
+        authRoles: readonly string[] | null = null,
+        summary: string | null = null,
+        description: string | null = null,
+        tags: readonly string[] = [],
+        operationId: string | null = null,
+        deprecated: boolean = false,
+        responseSchema: SchemaBuilder<any, any, any, any, any> | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -218,6 +236,12 @@ export class EndpointBuilder<
         this.#headerSchema = headerSchema;
         this.#serviceSchemas = serviceSchemas;
         this.#authRoles = authRoles;
+        this.#summary = summary;
+        this.#description = description;
+        this.#tags = tags;
+        this.#operationId = operationId;
+        this.#deprecated = deprecated;
+        this.#responseSchema = responseSchema;
     }
 
     body<TSchema extends SchemaBuilder<any, any, any, any, any>>(
@@ -240,7 +264,13 @@ export class EndpointBuilder<
             this.#querySchema,
             this.#headerSchema,
             this.#serviceSchemas,
-            this.#authRoles
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
         );
     }
 
@@ -266,7 +296,13 @@ export class EndpointBuilder<
             schema,
             this.#headerSchema,
             this.#serviceSchemas,
-            this.#authRoles
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
         );
     }
 
@@ -292,7 +328,13 @@ export class EndpointBuilder<
             this.#querySchema,
             schema,
             this.#serviceSchemas,
-            this.#authRoles
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
         );
     }
 
@@ -318,7 +360,13 @@ export class EndpointBuilder<
             this.#querySchema,
             this.#headerSchema,
             schemas,
-            this.#authRoles
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
         );
     }
 
@@ -392,7 +440,13 @@ export class EndpointBuilder<
             this.#querySchema,
             this.#headerSchema,
             this.#serviceSchemas,
-            merged
+            merged,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
         );
     }
 
@@ -421,7 +475,176 @@ export class EndpointBuilder<
     returns(
         _schema?: unknown
     ): EndpointBuilder<any, any, any, any, any, any, any, any> {
-        return this as any;
+        const schema =
+            _schema != null &&
+            typeof _schema === 'object' &&
+            'introspect' in _schema
+                ? (_schema as SchemaBuilder<any, any, any, any, any>)
+                : null;
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            schema ?? this.#responseSchema
+        );
+    }
+
+    summary(
+        text: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            text,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
+        );
+    }
+
+    description(
+        text: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            text,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
+        );
+    }
+
+    tags(
+        ...tags: string[]
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema
+        );
+    }
+
+    operationId(
+        id: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            id,
+            this.#deprecated,
+            this.#responseSchema
+        );
+    }
+
+    deprecated(): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            true,
+            this.#responseSchema
+        );
     }
 
     introspect(): EndpointMetadata {
@@ -433,7 +656,13 @@ export class EndpointBuilder<
             querySchema: this.#querySchema,
             headerSchema: this.#headerSchema,
             serviceSchemas: this.#serviceSchemas,
-            authRoles: this.#authRoles
+            authRoles: this.#authRoles,
+            summary: this.#summary,
+            description: this.#description,
+            tags: this.#tags,
+            operationId: this.#operationId,
+            deprecated: this.#deprecated,
+            responseSchema: this.#responseSchema
         };
     }
 }
@@ -442,18 +671,28 @@ export class EndpointBuilder<
 // endpoint factory — creates EndpointBuilder instances
 // ---------------------------------------------------------------------------
 
+export type EndpointMetadataDescriptors = {
+    readonly summary?: string;
+    readonly description?: string;
+    readonly tags?: string[];
+    readonly operationId?: string;
+    readonly deprecated?: boolean;
+};
+
 function createEndpoint<TParams>(
     method: string,
     basePath: string,
     pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>,
-    authRoles?: readonly string[] | null
+    authRoles?: readonly string[] | null,
+    meta?: EndpointMetadataDescriptors
 ): EndpointBuilder<TParams extends undefined ? {} : TParams>;
 
 function createEndpoint(
     method: string,
     basePath: string,
     pathTemplate?: RoutePath,
-    authRoles?: readonly string[] | null
+    authRoles?: readonly string[] | null,
+    meta?: EndpointMetadataDescriptors
 ): EndpointBuilder<any> {
     return new EndpointBuilder(
         method,
@@ -463,7 +702,13 @@ function createEndpoint(
         null,
         null,
         null,
-        authRoles ?? null
+        authRoles ?? null,
+        meta?.summary ?? null,
+        meta?.description ?? null,
+        meta?.tags ?? [],
+        meta?.operationId ?? null,
+        meta?.deprecated ?? false,
+        null
     );
 }
 

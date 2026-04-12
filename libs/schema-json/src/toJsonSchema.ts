@@ -49,6 +49,8 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
             } else if (info.endsWith !== undefined) {
                 out['pattern'] = `${escapeRegex(info.endsWith)}$`;
             }
+            if (Array.isArray(ext['oneOf']) && ext['oneOf'].length > 0)
+                out['enum'] = ext['oneOf'];
             return out;
         }
 
@@ -65,6 +67,8 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 out['multipleOf'] = ext['multipleOf'];
             if (ext['positive'] === true) out['exclusiveMinimum'] = 0;
             if (ext['negative'] === true) out['exclusiveMaximum'] = 0;
+            if (Array.isArray(ext['oneOf']) && ext['oneOf'].length > 0)
+                out['enum'] = ext['oneOf'];
             return out;
         }
 
@@ -161,6 +165,38 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
     const info = schema.introspect() as any;
     if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
+
+    // Emit default for serializable primitives (not factory functions)
+    if (
+        info.hasDefault === true &&
+        info.defaultValue !== undefined &&
+        typeof info.defaultValue !== 'function'
+    ) {
+        out['default'] = info.defaultValue;
+    }
+
+    // Handle nullable — JSON Schema 2020-12 style: type becomes an array
+    if (info.isNullable === true) {
+        if (out['anyOf'] !== undefined) {
+            // Union type — add { type: 'null' } to anyOf if not already present
+            const anyOf = out['anyOf'] as Out[];
+            const hasNull = anyOf.some(o => o['type'] === 'null');
+            if (!hasNull) anyOf.push({ type: 'null' });
+        } else if (out['enum'] !== undefined) {
+            // Enum — add null to enum values if not already present
+            const enumValues = out['enum'] as unknown[];
+            if (!enumValues.includes(null)) enumValues.push(null);
+        } else if (typeof out['type'] === 'string') {
+            // Simple type — make it an array: ["string", "null"]
+            out['type'] = [out['type'], 'null'];
+        } else if (out['const'] !== undefined) {
+            // Const value — convert to oneOf with null
+            const constVal = out['const'];
+            delete out['const'];
+            out['anyOf'] = [{ const: constVal }, { type: 'null' }];
+        }
+    }
+
     return out;
 }
 

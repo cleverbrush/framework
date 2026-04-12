@@ -1,0 +1,49 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "peerDependencies": {
+        "@cleverbrush/server": "^1.0.0",
+        "@cleverbrush/schema": "^2.0.0",
+        "@cleverbrush/schema-json": "^2.0.0",
+        "@cleverbrush/auth": "^1.0.0"
+    },
+    "description": "OpenAPI 3.1 spec generation for @cleverbrush/server — automatic endpoint documentation",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/server-openapi",
+    "keywords": [
+        "openapi",
+        "swagger",
+        "server",
+        "schema",
+        "documentation",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/server-openapi",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/server-openapi#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "1.0.0"
+}
