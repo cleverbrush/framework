@@ -70,8 +70,7 @@ export async function resolveArgs(
         const queryObj: Record<string, unknown> = {};
         for (const [qName, qSchema] of Object.entries(queryProps)) {
             const raw = context.queryParams[qName];
-            const coerced = coerceValue(raw, qSchema);
-            const result = await qSchema.validateAsync(coerced, {
+            const result = await qSchema.validateAsync(raw, {
                 doNotStopOnFirstError: true
             });
             if (result.valid) {
@@ -128,23 +127,4 @@ export async function resolveArgs(
     }
 
     return { valid: true, args: [contextObj] };
-}
-
-function coerceValue(
-    raw: string | undefined,
-    schema: SchemaBuilder<any, any, any, any, any>
-): unknown {
-    if (raw === undefined) return undefined;
-
-    const type = schema.introspect().type;
-    if (type === 'number') {
-        const n = Number(raw);
-        return Number.isNaN(n) ? raw : n;
-    }
-    if (type === 'boolean') {
-        if (raw === 'true') return true;
-        if (raw === 'false') return false;
-        return raw;
-    }
-    return raw;
 }
