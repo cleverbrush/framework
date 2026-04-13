@@ -16,6 +16,10 @@ import {
 // Options
 // ---------------------------------------------------------------------------
 
+/**
+ * API metadata included in the OpenAPI `info` object.
+ * Maps directly to the OpenAPI 3.1 Info Object.
+ */
 export interface OpenApiInfo {
     readonly title: string;
     readonly version: string;
@@ -32,11 +36,18 @@ export interface OpenApiInfo {
     };
 }
 
+/**
+ * A server entry in the OpenAPI `servers` array.
+ * Describes a base URL where the API is accessible.
+ */
 export interface OpenApiServer {
     readonly url: string;
     readonly description?: string;
 }
 
+/**
+ * Options passed to {@link generateOpenApiSpec}.
+ */
 export interface OpenApiOptions {
     readonly registrations: readonly EndpointRegistration[];
     readonly info: OpenApiInfo;
@@ -49,6 +60,10 @@ export interface OpenApiOptions {
 // OpenAPI Document (partial typing — plain objects for flexibility)
 // ---------------------------------------------------------------------------
 
+/**
+ * A generated OpenAPI 3.1 document. Typed as a plain object map to allow
+ * any extension fields without requiring a full OpenAPI type library.
+ */
 export type OpenApiDocument = Record<string, unknown>;
 
 // ---------------------------------------------------------------------------

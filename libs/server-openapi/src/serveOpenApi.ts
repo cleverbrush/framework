@@ -11,6 +11,9 @@ import {
 } from './generateOpenApiSpec.js';
 import type { OpenApiSecurityScheme } from './securityMapper.js';
 
+/**
+ * Options for the {@link serveOpenApi} middleware.
+ */
 export interface ServeOpenApiOptions {
     /** Function that returns endpoint registrations. */
     readonly getRegistrations: () => readonly EndpointRegistration[];

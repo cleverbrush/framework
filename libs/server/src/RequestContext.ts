@@ -27,6 +27,20 @@ export const IRequestContext = object({
     responded: boolean()
 });
 
+/**
+ * Per-request context object passed to every middleware and endpoint handler.
+ *
+ * Provides typed access to path/query parameters, headers, the request body,
+ * and the DI service provider for the current request scope.
+ *
+ * @example
+ * ```ts
+ * const middleware: Middleware = async (ctx, next) => {
+ *     ctx.items.set('startTime', Date.now());
+ *     await next();
+ * };
+ * ```
+ */
 export class RequestContext {
     readonly request: IncomingMessage;
     readonly response: ServerResponse;
@@ -77,6 +91,7 @@ export class RequestContext {
         this.headers = headers;
     }
 
+    /** Path parameters extracted from the matched route template. */
     get pathParams(): Record<string, string> {
         return this.#pathParams;
     }
@@ -85,6 +100,7 @@ export class RequestContext {
         this.#pathParams = value;
     }
 
+    /** Parsed query string parameters from the request URL. */
     get queryParams(): Record<string, string> {
         if (this._queryParams) return this._queryParams;
         const params: Record<string, string> = {};
@@ -94,6 +110,7 @@ export class RequestContext {
         return params;
     }
 
+    /** The DI service provider scoped to this request. Set by the server before invoking the handler. */
     get services(): IServiceProvider | undefined {
         return this.#services;
     }
@@ -102,6 +119,7 @@ export class RequestContext {
         this.#services = value;
     }
 
+    /** Read and buffer the raw request body. Result is cached after the first call. */
     async body(): Promise<Buffer> {
         if (this.#bodyRead) return this.#bodyBuffer!;
 
@@ -115,6 +133,7 @@ export class RequestContext {
         return this.#bodyBuffer;
     }
 
+    /** Read, buffer, and JSON-parse the request body. Result is cached after the first call. */
     async json(): Promise<unknown> {
         if (this.#jsonParsed) return this.#jsonCache;
 

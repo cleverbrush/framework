@@ -1,5 +1,11 @@
 import type { AuthenticationConfig } from '@cleverbrush/server';
 
+/**
+ * An OpenAPI 3.1 Security Scheme Object.
+ * Describes how requests to the API are authenticated.
+ *
+ * @see {@link https://spec.openapis.org/oas/v3.1.0#security-scheme-object OpenAPI Security Scheme Object}
+ */
 export interface OpenApiSecurityScheme {
     readonly type: string;
     readonly scheme?: string;

@@ -1,5 +1,16 @@
 import { createProblemDetails, type ProblemDetails } from './ProblemDetails.js';
 
+/**
+ * Base class for HTTP errors thrown from endpoint handlers.
+ *
+ * Instances are automatically caught by the server and serialized as
+ * RFC 9457 Problem Details (`application/problem+json`) responses.
+ *
+ * @example
+ * ```ts
+ * throw new HttpError(429, 'Too Many Requests', 'Rate limit exceeded.');
+ * ```
+ */
 export class HttpError extends Error {
     readonly status: number;
     readonly title: string;
@@ -20,6 +31,7 @@ export class HttpError extends Error {
         this.extensions = extensions;
     }
 
+    /** Converts this error into an RFC 9457 {@link ProblemDetails} object. */
     toProblemDetails(): ProblemDetails {
         return createProblemDetails(
             this.status,
@@ -30,6 +42,7 @@ export class HttpError extends Error {
     }
 }
 
+/** Thrown when a requested resource cannot be found. Produces a 404 response. */
 export class NotFoundError extends HttpError {
     constructor(detail?: string) {
         super(404, 'Not Found', detail);
@@ -37,6 +50,7 @@ export class NotFoundError extends HttpError {
     }
 }
 
+/** Thrown when the request is malformed or fails validation. Produces a 400 response. */
 export class BadRequestError extends HttpError {
     constructor(detail?: string) {
         super(400, 'Bad Request', detail);
@@ -44,6 +58,7 @@ export class BadRequestError extends HttpError {
     }
 }
 
+/** Thrown when the request lacks valid authentication credentials. Produces a 401 response. */
 export class UnauthorizedError extends HttpError {
     constructor(detail?: string) {
         super(401, 'Unauthorized', detail);
@@ -51,6 +66,7 @@ export class UnauthorizedError extends HttpError {
     }
 }
 
+/** Thrown when the authenticated principal lacks permission. Produces a 403 response. */
 export class ForbiddenError extends HttpError {
     constructor(detail?: string) {
         super(403, 'Forbidden', detail);
@@ -58,6 +74,7 @@ export class ForbiddenError extends HttpError {
     }
 }
 
+/** Thrown when the request conflicts with the current state of the resource. Produces a 409 response. */
 export class ConflictError extends HttpError {
     constructor(detail?: string) {
         super(409, 'Conflict', detail);

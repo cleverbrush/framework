@@ -6,6 +6,25 @@ import type { ContentNegotiator } from './ContentNegotiator.js';
 // Base
 // ---------------------------------------------------------------------------
 
+/**
+ * Abstract base for all HTTP action results.
+ *
+ * Instead of writing directly to `res`, handlers return an `ActionResult`
+ * instance. The server calls `executeAsync()` after the middleware pipeline
+ * completes, ensuring consistent error handling and content negotiation.
+ *
+ * Use the static factory methods (`ActionResult.ok()`, `.created()`, etc.)
+ * rather than constructing subclasses directly.
+ *
+ * @example
+ * ```ts
+ * server.handle(GetUser, ({ params }) => {
+ *     const user = db.find(params.id);
+ *     if (!user) throw new NotFoundError();
+ *     return ActionResult.ok(user);
+ * });
+ * ```
+ */
 export abstract class ActionResult {
     abstract executeAsync(
         req: http.IncomingMessage,
@@ -92,6 +111,13 @@ export abstract class ActionResult {
 // JsonResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Serializes a value and writes it as JSON (or the best content type
+ * selected by `ContentNegotiator` from the `Accept` header).
+ *
+ * Created by `ActionResult.ok()`, `ActionResult.created()`, and
+ * `ActionResult.json()`.
+ */
 export class JsonResult extends ActionResult {
     readonly body: unknown;
     readonly status: number;
@@ -135,6 +161,10 @@ export class JsonResult extends ActionResult {
 // FileResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Sends a binary buffer as a file download attachment.
+ * Created by `ActionResult.file()`.
+ */
 export class FileResult extends ActionResult {
     readonly content: Buffer | Uint8Array;
     readonly fileName: string;
@@ -169,6 +199,10 @@ export class FileResult extends ActionResult {
 // ContentResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Writes an arbitrary string body with a specific content type and status.
+ * Created by `ActionResult.content()`.
+ */
 export class ContentResult extends ActionResult {
     readonly body: string;
     readonly contentType: string;
@@ -195,6 +229,10 @@ export class ContentResult extends ActionResult {
 // StreamResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Pipes a `Readable` stream to the HTTP response.
+ * Created by `ActionResult.stream()`.
+ */
 export class StreamResult extends ActionResult {
     readonly readable: Readable;
     readonly contentType: string;
@@ -234,6 +272,10 @@ export class StreamResult extends ActionResult {
 // StatusCodeResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Responds with a bare HTTP status code and no body.
+ * Created by `ActionResult.status()`.
+ */
 export class StatusCodeResult extends ActionResult {
     readonly status: number;
     readonly headers: Record<string, string>;
@@ -258,6 +300,11 @@ export class StatusCodeResult extends ActionResult {
 // RedirectResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Redirects the client to a new URL.
+ * Uses 302 (temporary) by default; pass `permanent = true` for 301.
+ * Created by `ActionResult.redirect()`.
+ */
 export class RedirectResult extends ActionResult {
     readonly url: string;
     readonly permanent: boolean;
@@ -282,6 +329,10 @@ export class RedirectResult extends ActionResult {
 // NoContentResult
 // ---------------------------------------------------------------------------
 
+/**
+ * Responds with 204 No Content and no body.
+ * Created by `ActionResult.noContent()`.
+ */
 export class NoContentResult extends ActionResult {
     async executeAsync(
         _req: http.IncomingMessage,

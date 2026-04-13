@@ -1,0 +1,242 @@
+/** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it is intentional */
+import { InstallBanner } from '@/app/InstallBanner';
+import { highlightTS } from '@/lib/highlight';
+
+export default function ServerOpenApiPage() {
+    return (
+        <div className="page">
+            <div className="container">
+                <div className="section-header">
+                    <h1>@cleverbrush/server-openapi</h1>
+                    <p className="subtitle">
+                        OpenAPI 3.1 spec generation for{' '}
+                        <code>@cleverbrush/server</code> — no annotations, no
+                        decorators, derived directly from endpoint definitions.
+                    </p>
+                </div>
+
+                {/* ── Installation ─────────────────────────────────── */}
+                <InstallBanner
+                    command="npm install @cleverbrush/server-openapi @cleverbrush/server"
+                    note={
+                        <>
+                            Requires <code>@cleverbrush/schema</code> and{' '}
+                            <code>@cleverbrush/schema-json</code> as peer
+                            dependencies.
+                        </>
+                    }
+                />
+
+                {/* ── Why ──────────────────────────────────────────── */}
+                <div className="why-box">
+                    <h2>💡 Why @cleverbrush/server-openapi?</h2>
+
+                    <h3>The Problem</h3>
+                    <p>
+                        API documentation drifts from implementation. Keeping
+                        OpenAPI specs up to date manually is error-prone.
+                        Annotation-based approaches couple documentation to
+                        source code in brittle ways.
+                    </p>
+
+                    <h3>The Solution</h3>
+                    <p>
+                        <code>@cleverbrush/server-openapi</code> generates the
+                        spec directly from the same endpoint definitions your
+                        server uses for routing and validation. There is no
+                        separate spec to maintain — the server <em>is</em> the
+                        spec.
+                    </p>
+
+                    <h3>Key Features</h3>
+                    <ul>
+                        <li>
+                            <strong>
+                                <code>generateOpenApiSpec()</code>
+                            </strong>{' '}
+                            — produces a full OpenAPI 3.1 document.
+                        </li>
+                        <li>
+                            <strong>Schema conversion</strong> — maps{' '}
+                            <code>@cleverbrush/schema</code> builders to JSON
+                            Schema Draft 2020-12.
+                        </li>
+                        <li>
+                            <strong>Path resolution</strong> — colon-style and{' '}
+                            <code>ParseStringSchemaBuilder</code> templates both
+                            produce typed OpenAPI path parameters.
+                        </li>
+                        <li>
+                            <strong>Security mapping</strong> — JWT and cookie
+                            auth schemes become <code>securitySchemes</code>{' '}
+                            automatically.
+                        </li>
+                        <li>
+                            <strong>
+                                <code>serveOpenApi()</code>
+                            </strong>{' '}
+                            middleware and{' '}
+                            <strong>
+                                <code>createOpenApiEndpoint()</code>
+                            </strong>{' '}
+                            for runtime serving.
+                        </li>
+                        <li>
+                            <strong>
+                                <code>writeOpenApiSpec()</code>
+                            </strong>{' '}
+                            for build-time file generation.
+                        </li>
+                    </ul>
+                </div>
+
+                {/* ── Quick Start ──────────────────────────────────── */}
+                <div className="card">
+                    <h2>Quick Start — serve at runtime</h2>
+                    <p>
+                        Add the <code>serveOpenApi</code> middleware before
+                        starting the server. The spec is lazily generated and
+                        cached on the first request to{' '}
+                        <code>/openapi.json</code>:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { ServerBuilder, endpoint } from '@cleverbrush/server';
+import { serveOpenApi } from '@cleverbrush/server-openapi';
+import { object, string, number } from '@cleverbrush/schema';
+
+const GetUser = endpoint
+    .get('/api/users/:id')
+    .summary('Get a user by ID')
+    .tags('users');
+
+const server = new ServerBuilder();
+
+server
+    .use(serveOpenApi({
+        getRegistrations: () => server.getRegistrations(),
+        info: { title: 'My API', version: '1.0.0' },
+        servers: [{ url: 'https://api.example.com' }]
+    }))
+    .handle(GetUser, ({ params }) => ({ id: params.id }));
+
+await server.listen(3000);
+// GET /openapi.json → OpenAPI 3.1 document`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── As Endpoint ──────────────────────────────────── */}
+                <div className="card">
+                    <h2>Serve as a Typed Endpoint</h2>
+                    <p>
+                        Prefer registering the spec as a first-class endpoint so
+                        it appears in the spec itself and benefits from the same
+                        middleware pipeline:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { createOpenApiEndpoint } from '@cleverbrush/server-openapi';
+
+const { endpoint: openApiEp, handler } = createOpenApiEndpoint({
+    getRegistrations: () => server.getRegistrations(),
+    info: { title: 'My API', version: '1.0.0' }
+});
+
+server.handle(openApiEp, handler);`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Build-time generation ────────────────────────── */}
+                <div className="card">
+                    <h2>Build-Time File Generation</h2>
+                    <p>
+                        Generate the spec to a file during your build pipeline
+                        or CI:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { writeOpenApiSpec } from '@cleverbrush/server-openapi';
+
+// Import your server registrations (without listening)
+import { registrations } from './app';
+
+await writeOpenApiSpec({
+    registrations,
+    info: { title: 'My API', version: '1.0.0' },
+    outputPath: './openapi.json'
+});`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Auth ─────────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Security Schemes from Auth Config</h2>
+                    <p>
+                        Pass the server&apos;s <code>AuthenticationConfig</code>{' '}
+                        to generate <code>securitySchemes</code> and
+                        per-operation <code>security</code> arrays
+                        automatically:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { jwtScheme } from '@cleverbrush/auth';
+
+const authConfig = {
+    defaultScheme: 'jwt',
+    schemes: [jwtScheme({ secret: '...', mapClaims: c => c })]
+};
+
+server.use(serveOpenApi({
+    getRegistrations: () => server.getRegistrations(),
+    info: { title: 'My API', version: '1.0.0' },
+    authConfig
+}));
+
+// JWT endpoints get: securitySchemes.jwt → { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
+// Authorized endpoints get:  security: [{ jwt: [] }]`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Path Params ──────────────────────────────────── */}
+                <div className="card">
+                    <h2>Path Parameters</h2>
+                    <p>
+                        Both colon-style paths and{' '}
+                        <code>ParseStringSchemaBuilder</code> templates are
+                        converted to OpenAPI <code>{'{param}'}</code> format
+                        with per-parameter JSON Schema:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// Colon style → { name: 'id', in: 'path', schema: { type: 'string' } }
+endpoint.get('/api/users/:id');
+
+// ParseStringSchemaBuilder → { name: 'id', in: 'path', schema: { type: 'number' } }
+import { route } from '@cleverbrush/server';
+import { object, number } from '@cleverbrush/schema';
+
+endpoint.get(route(
+    object({ id: number().coerce() }),
+    $t => $t\`/api/users/\${t => t.id}\`
+));`)
+                            }}
+                        />
+                    </pre>
+                </div>
+            </div>
+        </div>
+    );
+}

@@ -219,6 +219,13 @@ export class ParseStringSchemaBuilder<
 
     // -- Introspect ----------------------------------------------------------
 
+    /**
+     * Return a snapshot of this builder's configuration.
+     *
+     * Includes all base-class fields plus:
+     * - `objectSchema` — the object schema defining the result shape.
+     * - `templateDefinition` — the parsed template (literals and selector segments).
+     */
     public introspect() {
         return {
             ...super.introspect(),

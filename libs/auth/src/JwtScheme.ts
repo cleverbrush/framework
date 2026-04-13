@@ -10,11 +10,19 @@ import { Principal } from './Principal.js';
 // JWT Types
 // ---------------------------------------------------------------------------
 
+/**
+ * The decoded JWT header. Contains the algorithm (`alg`) and optionally
+ * the token type (`typ`, typically `"JWT"`).
+ */
 export interface JwtHeader {
     alg: string;
     typ?: string;
 }
 
+/**
+ * The decoded JWT payload. Includes standard registered claims (`iss`, `sub`,
+ * `aud`, `exp`, `nbf`, `iat`, `jti`) and any custom claims.
+ */
 export interface JwtPayload {
     [key: string]: unknown;
     iss?: string;
@@ -30,6 +38,11 @@ export interface JwtPayload {
 // JWT Scheme Config
 // ---------------------------------------------------------------------------
 
+/**
+ * Configuration for {@link jwtScheme}.
+ *
+ * @template T - The type of the principal value produced by `mapClaims`.
+ */
 export interface JwtSchemeOptions<T> {
     /** HMAC secret (for HS256/HS384/HS512) or PEM public key (for RS256/RS384/RS512). */
     secret: string | Buffer;

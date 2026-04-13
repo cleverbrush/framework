@@ -10,6 +10,11 @@ import { Principal } from './Principal.js';
 // Cookie Scheme Config
 // ---------------------------------------------------------------------------
 
+/**
+ * Configuration for {@link cookieScheme}.
+ *
+ * @template T - The type of the principal value returned by `validate`.
+ */
 export interface CookieSchemeOptions<T> {
     /** Name of the cookie to read (e.g. "session", "sid"). */
     cookieName: string;

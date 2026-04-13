@@ -24,9 +24,18 @@ function isParseStringSchema(
     return typeof p !== 'string' && typeof (p as any).validate === 'function';
 }
 
+/**
+ * Radix-style HTTP router that maps method + path to endpoint registrations.
+ *
+ * Both static string paths (colon params style) and `ParseStringSchemaBuilder`
+ * typed path templates are supported.
+ */
 export class Router {
     readonly #routes: Map<string, RegisteredRoute[]> = new Map();
 
+    /**
+     * Register an endpoint with the router.
+     */
     addRoute(registration: EndpointRegistration): void {
         const { method, basePath, pathTemplate } = registration.endpoint;
         const upperMethod = method.toUpperCase();
@@ -44,6 +53,15 @@ export class Router {
         this.#routes.get(upperMethod)!.push(route);
     }
 
+    /**
+     * Match an incoming HTTP method and URL to a registered endpoint.
+     *
+     * Returns:
+     * - `{ match }` — a successful match with parsed path parameters.
+     * - `{ match: null, methodNotAllowed: true, allowedMethods }` — path matches
+     *   but the method does not (405 Method Not Allowed).
+     * - `{ match: null, methodNotAllowed: false }` — no match at all (404).
+     */
     match(
         method: string,
         url: string
