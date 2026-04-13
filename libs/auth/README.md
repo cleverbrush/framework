@@ -118,7 +118,7 @@ const result = await authz.authorize(principal, [requireRole('admin')]);
 const result2 = await authz.authorize(principal, 'admin-only');
 
 if (!result.allowed) {
-    console.log(result.reason); // 'Not authenticated' | 'Requirement failed'
+    console.log(result.reason); // 'Not authenticated' | 'Forbidden'
 }
 ```
 
