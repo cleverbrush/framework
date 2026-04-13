@@ -293,8 +293,7 @@ const activeUsers = await query(db, UserSchema, base)
                                         <code>.whereLike()</code>,{' '}
                                         <code>.whereILike()</code>,{' '}
                                         <code>.whereRaw()</code>,{' '}
-                                        <code>.whereExists()</code> + OR
-                                        variants
+                                        <code>.whereExists()</code>
                                     </td>
                                 </tr>
                                 <tr>
