@@ -185,8 +185,7 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         } else if (out['enum'] !== undefined) {
             // Enum — add null to enum values if not already present
             const enumValues = out['enum'] as unknown[];
-            if (!enumValues.includes(null))
-                out['enum'] = [...enumValues, null];
+            if (!enumValues.includes(null)) out['enum'] = [...enumValues, null];
         } else if (typeof out['type'] === 'string') {
             // Simple type — make it an array: ["string", "null"]
             out['type'] = [out['type'], 'null'];
