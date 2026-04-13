@@ -2,7 +2,7 @@
 // Run: npx tsx libs/knex-schema/src/demo.ts
 
 import Knex from 'knex';
-import { date, number, object, query, string } from './index.js';
+import { createQuery, date, number, object, query, string } from './index.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Schema definitions
@@ -49,6 +49,40 @@ function show(label: string, sql: string) {
     );
     console.log(sql);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createQuery — bind knex once, use schema directly
+// ═══════════════════════════════════════════════════════════════════════════
+
+const q = createQuery(knex);
+
+show('createQuery: SELECT *', q(User).toQuery());
+
+show(
+    'createQuery: WHERE via property descriptor',
+    q(User)
+        .where(t => t.fullName, '=', 'Alice')
+        .toQuery()
+);
+
+show(
+    'createQuery: joinOne',
+    q(User)
+        .joinOne({
+            localColumn: t => t.departmentId,
+            foreignColumn: t => t.id,
+            as: 'department',
+            foreignSchema: Department
+        })
+        .toQuery()
+);
+
+show(
+    'createQuery: baseQuery overload (soft-delete scope)',
+    q(User, knex('users').where('deleted_at', null))
+        .where(t => t.role, '=', 'admin')
+        .toQuery()
+);
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 1. Basic SELECT

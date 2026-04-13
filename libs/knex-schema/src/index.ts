@@ -24,8 +24,13 @@ export {
 } from './extension.js';
 // Mappers (from knex-eager)
 export { clearRow, MAPPERS, mapObject, mapValue } from './mappers.js';
+export type { BoundQuery } from './SchemaQueryBuilder.js';
 // Main entry point
-export { query, SchemaQueryBuilder } from './SchemaQueryBuilder.js';
+export {
+    createQuery,
+    query,
+    SchemaQueryBuilder
+} from './SchemaQueryBuilder.js';
 
 // Types
 export type {

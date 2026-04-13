@@ -1454,3 +1454,82 @@ export function query<
         baseQuery
     );
 }
+
+// ---------------------------------------------------------------------------
+// createQuery() — knex-bound factory
+// ---------------------------------------------------------------------------
+
+/** Bound query function returned by {@link createQuery}. */
+export interface BoundQuery {
+    <
+        TLocalSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
+    >(
+        schema: TLocalSchema
+    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+    <
+        TLocalSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
+    >(
+        schema: TLocalSchema,
+        baseQuery: Knex.QueryBuilder
+    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+}
+
+/**
+ * Bind a Knex instance once and get back a `query(schema)` function that
+ * doesn't require repeating the knex argument on every call.
+ *
+ * @param knex - A configured Knex instance.
+ * @returns A bound query factory: `(schema, baseQuery?) => SchemaQueryBuilder`.
+ *
+ * @example
+ * ```ts
+ * import Knex from 'knex';
+ * import { createQuery } from '@cleverbrush/knex-schema';
+ *
+ * const knex = Knex({ client: 'pg', connection: process.env.DB_URL });
+ * const query = createQuery(knex);
+ *
+ * // No knex argument needed from here on
+ * const users = await query(UserSchema).where(t => t.role, '=', 'admin');
+ * const post = await query(PostSchema).where(t => t.id, '=', 42).first();
+ *
+ * // Optional base query (e.g. soft-delete scope applied globally)
+ * const active = query(UserSchema, knex('users').where('deleted_at', null));
+ * ```
+ */
+export function createQuery(knexInstance: Knex): BoundQuery {
+    return function boundQuery<
+        TLocalSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
+    >(
+        schema: TLocalSchema,
+        baseQuery?: Knex.QueryBuilder
+    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>> {
+        return baseQuery
+            ? query(knexInstance, schema, baseQuery)
+            : query(knexInstance, schema);
+    } as BoundQuery;
+}

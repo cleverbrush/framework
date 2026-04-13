@@ -1015,3 +1015,113 @@ describe('SQL parity with raw knex', () => {
         );
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// createQuery factory
+// ═══════════════════════════════════════════════════════════════════════════
+
+import { createQuery } from './index.js';
+
+describe('createQuery factory', () => {
+    const q = createQuery(knex);
+
+    it('produces same SQL as query(knex, schema) for SELECT *', () => {
+        expect(q(User).toQuery()).toBe(query(knex, User).toQuery());
+    });
+
+    it('produces same SQL for WHERE via descriptor', () => {
+        expect(
+            q(User)
+                .where(t => t.fullName, '=', 'Alice')
+                .toQuery()
+        ).toBe(
+            query(knex, User)
+                .where(t => t.fullName, '=', 'Alice')
+                .toQuery()
+        );
+    });
+
+    it('produces same SQL for chained WHERE + ORDER BY + LIMIT', () => {
+        expect(
+            q(User)
+                .where(t => t.role, '=', 'admin')
+                .orderBy(t => t.createdAt, 'desc')
+                .limit(10)
+                .toQuery()
+        ).toBe(
+            query(knex, User)
+                .where(t => t.role, '=', 'admin')
+                .orderBy(t => t.createdAt, 'desc')
+                .limit(10)
+                .toQuery()
+        );
+    });
+
+    it('the baseQuery overload works', () => {
+        const base1 = knex('users').where('deleted_at', null);
+        const base2 = knex('users').where('deleted_at', null);
+        expect(
+            q(User, base1)
+                .where(t => t.role, '=', 'admin')
+                .toQuery()
+        ).toBe(
+            query(knex, User, base2)
+                .where(t => t.role, '=', 'admin')
+                .toQuery()
+        );
+    });
+
+    it('works with joinOne', () => {
+        expect(
+            q(User)
+                .joinOne({
+                    localColumn: t => t.departmentId,
+                    foreignColumn: t => t.id,
+                    as: 'department',
+                    foreignSchema: Department
+                })
+                .toQuery()
+        ).toBe(
+            query(knex, User)
+                .joinOne({
+                    localColumn: t => t.departmentId,
+                    foreignColumn: t => t.id,
+                    as: 'department',
+                    foreignSchema: Department
+                })
+                .toQuery()
+        );
+    });
+
+    it('works with joinMany', () => {
+        expect(
+            q(User)
+                .joinMany({
+                    localColumn: t => t.id,
+                    foreignColumn: t => t.authorId,
+                    as: 'posts',
+                    foreignSchema: Post
+                })
+                .toQuery()
+        ).toBe(
+            query(knex, User)
+                .joinMany({
+                    localColumn: t => t.id,
+                    foreignColumn: t => t.authorId,
+                    as: 'posts',
+                    foreignSchema: Post
+                })
+                .toQuery()
+        );
+    });
+
+    it('two independent factories from different knex instances do not share state', () => {
+        const knex2 = Knex({ client: 'pg' });
+        const q2 = createQuery(knex2);
+        // Both produce the same SQL — knex client config doesn't affect SQL
+        // generation without a real connection, but they must be independent objects
+        expect(q(User)).not.toBe(q2(User));
+        expect(q(User).toQuery()).toBe(q2(User).toQuery());
+        knex2.destroy();
+    });
+});
