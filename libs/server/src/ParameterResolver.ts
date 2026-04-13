@@ -6,7 +6,7 @@ import type { RequestContext } from './RequestContext.js';
 
 /**
  * Result returned by `resolveArgs()`. When `valid` is `false` the
- * `problemDetails` payload should be sent as a 422 response.
+ * `problemDetails` payload should be sent as a 400 response.
  */
 export type ResolveResult =
     | { valid: true; args: unknown[] }

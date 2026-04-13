@@ -30,8 +30,9 @@ function isParseStringSchema(
 /**
  * Radix-style HTTP router that maps method + path to endpoint registrations.
  *
- * Both static string paths (colon params style) and `ParseStringSchemaBuilder`
- * typed path templates are supported.
+ * Both static string paths (exact-match only) and `ParseStringSchemaBuilder`
+ * typed path templates are supported. For dynamic path parameters use
+ * `route()` / `parseString()` templates rather than colon-param strings.
  */
 export class Router {
     readonly #routes: Map<string, RegisteredRoute[]> = new Map();
