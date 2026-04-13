@@ -111,6 +111,9 @@ function verifySignature(
             .createHmac(hmacHash, secret)
             .update(data)
             .digest();
+        if (expected.length !== signatureBytes.length) {
+            return false;
+        }
         return crypto.timingSafeEqual(expected, signatureBytes);
     }
 
