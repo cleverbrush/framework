@@ -65,3 +65,35 @@ const usersWithPosts = await query(db, UserSchema)
     });
 // type — Array<{ id: number; firstName: string; ... posts: Array<{ id: number; title: string; authorId: number }> }>
 ```
+
+### Additional Features
+
+- **`createQuery(knex)` factory** — bind a knex instance once and reuse the resulting query function across your codebase, instead of passing the knex instance on every call.
+
+  ```ts
+  import { createQuery } from '@cleverbrush/knex-schema';
+
+  const query = createQuery(db);
+
+  const users = await query(UserSchema).where(t => t.age, '>', 18);
+  const posts = await query(PostSchema).orderBy(t => t.id, 'desc');
+
+  // Optional baseQuery overload — start from an existing Knex builder
+  const base = db('users').where('deleted_at', null);
+  const active = await query(UserSchema, base).where(t => t.role, '=', 'admin');
+  ```
+
+- **`toKnexQuery()` on `SchemaQueryBuilder`** — convert any `SchemaQueryBuilder` back to a raw `Knex.QueryBuilder`. Useful when passing a typed builder as the `foreignQuery` in a join spec.
+
+  ```ts
+  const subquery = query(db, PostSchema).where(t => t.title, 'like', '%knex%');
+
+  const users = await query(db, UserSchema)
+      .joinMany({
+          foreignSchema: PostSchema,
+          localColumn:   t => t.id,
+          foreignColumn: t => t.authorId,
+          as:            'posts',
+          foreignQuery:  subquery, // SchemaQueryBuilder accepted directly
+      });
+  ```
