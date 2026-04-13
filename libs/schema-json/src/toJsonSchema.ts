@@ -50,7 +50,7 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 out['pattern'] = `${escapeRegex(info.endsWith)}$`;
             }
             if (Array.isArray(ext['oneOf']) && ext['oneOf'].length > 0)
-                out['enum'] = ext['oneOf'];
+                out['enum'] = [...(ext['oneOf'] as unknown[])];
             return out;
         }
 
@@ -68,7 +68,7 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
             if (ext['positive'] === true) out['exclusiveMinimum'] = 0;
             if (ext['negative'] === true) out['exclusiveMaximum'] = 0;
             if (Array.isArray(ext['oneOf']) && ext['oneOf'].length > 0)
-                out['enum'] = ext['oneOf'];
+                out['enum'] = [...(ext['oneOf'] as unknown[])];
             return out;
         }
 
@@ -185,7 +185,8 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
         } else if (out['enum'] !== undefined) {
             // Enum — add null to enum values if not already present
             const enumValues = out['enum'] as unknown[];
-            if (!enumValues.includes(null)) enumValues.push(null);
+            if (!enumValues.includes(null))
+                out['enum'] = [...enumValues, null];
         } else if (typeof out['type'] === 'string') {
             // Simple type — make it an array: ["string", "null"]
             out['type'] = [out['type'], 'null'];

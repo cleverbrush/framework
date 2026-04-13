@@ -93,7 +93,7 @@ export default function AuthPage() {
 type UserClaims = { sub: string; role: string };
 
 // Sign a token (for testing or token issuance)
-const token = await signJwt(
+const token = signJwt(
     { sub: 'user-1', role: 'admin' },
     process.env.JWT_SECRET!
 );
@@ -120,7 +120,7 @@ const result = await scheme.authenticate({
 });
 
 if (result.succeeded) {
-    result.principal.claims.sub;    // 'user-1'
+    result.principal.value?.sub;    // 'user-1'
     result.principal.hasRole('admin'); // true
 }`)
                             }}
@@ -214,7 +214,7 @@ const r1 = await authz.authorize(principal, [requireRole('admin')]);
 const r2 = await authz.authorize(principal, 'admin-only');
 
 if (!r2.allowed) {
-    console.log(r2.reason); // 'Requirement failed' | 'Not authenticated'
+    console.log(r2.reason); // 'Forbidden' | 'Not authenticated'
 }`)
                             }}
                         />

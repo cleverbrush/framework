@@ -112,11 +112,12 @@ export abstract class ActionResult {
 // ---------------------------------------------------------------------------
 
 /**
- * Serializes a value and writes it as JSON (or the best content type
- * selected by `ContentNegotiator` from the `Accept` header).
+ * Serializes a value and writes it as JSON with `content-type: application/json`,
+ * bypassing content negotiation entirely.
  *
- * Created by `ActionResult.ok()`, `ActionResult.created()`, and
- * `ActionResult.json()`.
+ * Created by `ActionResult.json()`.
+ * `ActionResult.ok()` and `ActionResult.created()` produce a {@link JsonResult}
+ * that goes through content negotiation instead.
  */
 export class JsonResult extends ActionResult {
     readonly body: unknown;
@@ -131,9 +132,9 @@ export class JsonResult extends ActionResult {
     }
 
     async executeAsync(
-        req: http.IncomingMessage,
+        _req: http.IncomingMessage,
         res: http.ServerResponse,
-        contentNegotiator: ContentNegotiator
+        _contentNegotiator: ContentNegotiator
     ): Promise<void> {
         for (const [key, value] of Object.entries(this.headers)) {
             res.setHeader(key, value);
@@ -145,15 +146,8 @@ export class JsonResult extends ActionResult {
             return;
         }
 
-        const acceptHeader = req.headers['accept'] as string | undefined;
-        const handler = contentNegotiator.selectResponseHandler(acceptHeader);
-        if (handler) {
-            res.writeHead(this.status, { 'content-type': handler.mimeType });
-            res.end(handler.serialize(this.body));
-        } else {
-            res.writeHead(this.status, { 'content-type': 'application/json' });
-            res.end(JSON.stringify(this.body));
-        }
+        res.writeHead(this.status, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(this.body));
     }
 }
 

@@ -26,8 +26,6 @@ export interface CookieSchemeOptions<T> {
      * verification, etc.
      */
     validate: (cookieValue: string) => Promise<T | null>;
-    /** Optional claim key used for roles (default: "role"). */
-    roleClaim?: string;
     /** Custom scheme name (default: "cookie"). */
     name?: string;
 }
