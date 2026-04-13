@@ -48,7 +48,7 @@ if (result.succeeded) {
     const principal: Principal<UserClaims> = result.principal;
     principal.isAuthenticated; // true
     principal.hasRole('admin'); // boolean
-    principal.claims.sub;      // string
+    principal.value.sub;       // string
 }
 ```
 
