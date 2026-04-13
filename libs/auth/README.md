@@ -58,7 +58,7 @@ if (result.succeeded) {
 import { jwtScheme, signJwt } from '@cleverbrush/auth';
 
 // Sign a token (for testing or token issuance)
-const token = await signJwt({ sub: 'user-1', role: 'admin' }, 'my-secret');
+const token = signJwt({ sub: 'user-1', role: 'admin' }, 'my-secret');
 
 // Verify and authenticate
 const scheme = jwtScheme({
