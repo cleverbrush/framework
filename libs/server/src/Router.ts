@@ -10,10 +10,13 @@ interface RegisteredRoute {
 }
 
 function normalizePath(p: string): string {
-    // Decode URI components, strip trailing slash (keep root "/")
-    let decoded = decodeURIComponent(p);
+    // Use decodeURI (not decodeURIComponent) so that reserved characters such
+    // as %2F (encoded slash) are kept encoded and do not alter path segmentation.
+    // Throws URIError on malformed percent-encoding – callers that process
+    // untrusted input (e.g. match()) must catch that and return a 400.
+    const decoded = decodeURI(p);
     if (decoded.length > 1 && decoded.endsWith('/')) {
-        decoded = decoded.slice(0, -1);
+        return decoded.slice(0, -1);
     }
     return decoded;
 }
@@ -61,6 +64,8 @@ export class Router {
      * - `{ match: null, methodNotAllowed: true, allowedMethods }` — path matches
      *   but the method does not (405 Method Not Allowed).
      * - `{ match: null, methodNotAllowed: false }` — no match at all (404).
+     * - `{ match: null, methodNotAllowed: false, badRequest: true }` — the URL
+     *   contains malformed percent-encoding (caller should respond with 400).
      */
     match(
         method: string,
@@ -68,9 +73,16 @@ export class Router {
     ): {
         match: RouteMatch | null;
         methodNotAllowed: boolean;
+        badRequest?: boolean;
         allowedMethods?: string[];
     } {
-        const normalized = normalizePath(url);
+        let normalized: string;
+        try {
+            normalized = normalizePath(url);
+        } catch {
+            // URIError from decodeURI – malformed percent-encoding in the URL
+            return { match: null, methodNotAllowed: false, badRequest: true };
+        }
         const upperMethod = method.toUpperCase();
 
         // Try exact method match first

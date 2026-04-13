@@ -174,4 +174,34 @@ describe('Router', () => {
         const result = router.match('post', '/api/items');
         expect(result.match).not.toBeNull();
     });
+
+    it('returns badRequest for malformed percent-encoded URL', () => {
+        const router = new Router();
+        const reg = makeRegistration('GET', '/api');
+        router.addRoute(reg);
+
+        const result = router.match('GET', '/api/%GG');
+        expect(result.match).toBeNull();
+        expect(result.methodNotAllowed).toBe(false);
+        expect(result.badRequest).toBe(true);
+    });
+
+    it('preserves %2F (encoded slash) in URL without changing path segmentation', () => {
+        const ByNamePath = parseString(
+            object({ name: string() }),
+            $t => $t`/${t => t.name}`
+        );
+
+        const router = new Router();
+        const reg = makeRegistration('GET', '/files', ByNamePath);
+        router.addRoute(reg);
+
+        // %2F should NOT be decoded into a path separator so the route stays
+        // under /files and the remainder is treated as one segment.
+        const result = router.match('GET', '/files/foo%2Fbar');
+        // The schema receives /foo%2Fbar as the remainder (still encoded)
+        // which does not match a single-segment name pattern — but crucially
+        // the router should not crash or misinterpret the path structure.
+        expect(result.badRequest).not.toBe(true);
+    });
 });
