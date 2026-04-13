@@ -354,6 +354,15 @@ export class Server {
             const routeResult = this.#router.match(method, urlPath);
 
             if (!routeResult.match) {
+                if (routeResult.badRequest) {
+                    const pd = createProblemDetails(400);
+                    res.writeHead(400, {
+                        'content-type': PROBLEM_JSON_CONTENT_TYPE
+                    });
+                    res.end(serializeProblemDetails(pd));
+                    return;
+                }
+
                 if (routeResult.methodNotAllowed) {
                     const pd = createProblemDetails(405, 'Method Not Allowed');
                     res.writeHead(405, {
