@@ -57,8 +57,8 @@ const PostSchema = object({
 const usersWithPosts = await query(db, UserSchema)
     .joinMany({
         foreignSchema: PostSchema,
-        localKey:      t => t.id,
-        foreignKey:    t => t.authorId,
+        localColumn:   t => t.id,
+        foreignColumn: t => t.authorId,
         as:            'posts',
         limit:         5,
         orderBy:       { column: t => t.id, direction: 'desc' },
