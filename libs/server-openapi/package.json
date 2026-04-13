@@ -5,10 +5,10 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "peerDependencies": {
-        "@cleverbrush/server": "^1.0.0",
+        "@cleverbrush/server": "^2.0.0",
         "@cleverbrush/schema": "^2.0.0",
         "@cleverbrush/schema-json": "^2.0.0",
-        "@cleverbrush/auth": "^1.0.0"
+        "@cleverbrush/auth": "^2.0.0"
     },
     "description": "OpenAPI 3.1 spec generation for @cleverbrush/server — automatic endpoint documentation",
     "files": [
@@ -45,5 +45,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "1.0.0"
+    "version": "2.0.0"
 }

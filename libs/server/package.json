@@ -7,7 +7,7 @@
     "dependencies": {
         "@cleverbrush/schema": "^2.0.0",
         "@cleverbrush/di": "^2.0.0",
-        "@cleverbrush/auth": "^1.0.0"
+        "@cleverbrush/auth": "^2.0.0"
     },
     "description": "Schema-first HTTP server framework — schema-driven controllers, DI, auto-validation, RFC 9457 errors",
     "files": [
@@ -45,5 +45,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "1.0.0"
+    "version": "2.0.0"
 }
