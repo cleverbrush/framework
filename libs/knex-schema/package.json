@@ -1,0 +1,52 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^2.0.0"
+    },
+    "peerDependencies": {
+        "knex": ">=3.1.0"
+    },
+    "description": "Type-safe schema-driven query builder for Knex using @cleverbrush/schema — strongly typed CRUD, eager loading, and column mapping for PostgreSQL",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/knex-schema",
+    "keywords": [
+        "knex",
+        "query builder",
+        "schema",
+        "typescript",
+        "type-safe",
+        "postgresql",
+        "orm",
+        "eager loading",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/knex-schema",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/knex-schema#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "2.0.0"
+}

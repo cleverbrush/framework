@@ -151,6 +151,8 @@ export default function SchemaTypesSection() {
                                     <code>.validate(data)</code>,{' '}
                                     <code>.validateAsync(data)</code>,{' '}
                                     <code>.addProps({'{...}'})</code>,{' '}
+                                    <code>.addConstructor(funcSchema)</code>,{' '}
+                                    <code>.clearConstructors()</code>,{' '}
                                     <code>.optional()</code>,{' '}
                                     <code>.default(value)</code>,{' '}
                                     <code>.catch(value)</code>,{' '}
@@ -250,6 +252,28 @@ export default function SchemaTypesSection() {
                                     <code>.addPreprocessor(fn)</code>,{' '}
                                     <code>.default(value)</code>,{' '}
                                     <code>.catch(value)</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <code>promise(schema?)</code>
+                                </td>
+                                <td>
+                                    Promise / thenable values. Pass an optional
+                                    schema to annotate the resolved-value type —
+                                    the inferred TypeScript type becomes{' '}
+                                    <code>{'Promise<T>'}</code>. See{' '}
+                                    <a href="/schema/promise-schema">
+                                        Promise Schemas
+                                    </a>
+                                    .
+                                </td>
+                                <td>
+                                    <code>.hasResolvedType(schema)</code>,{' '}
+                                    <code>.optional()</code>,{' '}
+                                    <code>.default(value)</code>,{' '}
+                                    <code>.catch(value)</code>,{' '}
+                                    <code>.readonly()</code>
                                 </td>
                             </tr>
                         </tbody>
