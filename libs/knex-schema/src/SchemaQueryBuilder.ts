@@ -278,6 +278,7 @@ export class SchemaQueryBuilder<
      */
     where(column: ColumnRef<TLocalSchema>, operator: string, value: any): this;
     where(column: ColumnRef<TLocalSchema>, value: any): this;
+    where(raw: Knex.Raw, operator: string, value: any): this;
     where(callback: (builder: Knex.QueryBuilder) => void): this;
     where(record: Record<string, any>): this;
     where(raw: Knex.Raw): this;

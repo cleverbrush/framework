@@ -1176,6 +1176,152 @@ describe('SQL parity with raw knex', () => {
                 .toQuery()
         );
     });
+
+    // ── knex.raw() as column argument ──────────────────────────────────────
+    describe('knex.raw() as column argument', () => {
+        it('.where(knex.raw()) — raw as full WHERE expression', () => {
+            expect(
+                query(knex, User)
+                    .where(knex.raw('status = ?', ['active']))
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .where(knex.raw('status = ?', ['active']))
+                    .toQuery()
+            );
+        });
+
+        it('.where(knex.raw(), operator, value) — raw as LHS column', () => {
+            expect(
+                query(knex, User)
+                    .where(knex.raw('"full_name"'), '=', 'Alice')
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .where(knex.raw('"full_name"'), '=', 'Alice')
+                    .toQuery()
+            );
+        });
+
+        it('.andWhere(knex.raw())', () => {
+            expect(
+                query(knex, User)
+                    .where('role', '=', 'admin')
+                    .andWhere(knex.raw('deleted_at IS NULL'))
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .where('role', '=', 'admin')
+                    .andWhere(knex.raw('deleted_at IS NULL'))
+                    .toQuery()
+            );
+        });
+
+        it('.orWhere(knex.raw())', () => {
+            expect(
+                query(knex, User)
+                    .where('role', '=', 'admin')
+                    .orWhere(knex.raw('role = ?', ['superuser']))
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .where('role', '=', 'admin')
+                    .orWhere(knex.raw('role = ?', ['superuser']))
+                    .toQuery()
+            );
+        });
+
+        it('.whereNot(knex.raw())', () => {
+            expect(
+                query(knex, User)
+                    .whereNot(knex.raw('deleted_at IS NULL'))
+                    .toQuery()
+            ).toBe(
+                knex('users').whereNot(knex.raw('deleted_at IS NULL')).toQuery()
+            );
+        });
+
+        it('.select(knex.raw()) — computed expression', () => {
+            expect(
+                query(knex, User)
+                    .select(knex.raw('count(*) as total'))
+                    .toQuery()
+            ).toBe(
+                knex('users').select(knex.raw('count(*) as total')).toQuery()
+            );
+        });
+
+        it('.select() mixing schema column and knex.raw()', () => {
+            expect(
+                query(knex, User)
+                    .select(t => t.role, knex.raw('count(*) as total'))
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .select('role', knex.raw('count(*) as total'))
+                    .toQuery()
+            );
+        });
+
+        it('.distinct(knex.raw())', () => {
+            expect(
+                query(knex, User).distinct(knex.raw('"role"')).toQuery()
+            ).toBe(knex('users').distinct(knex.raw('"role"')).toQuery());
+        });
+
+        it('.orderBy(knex.raw())', () => {
+            expect(
+                query(knex, User)
+                    .orderBy(knex.raw('"created_at" DESC NULLS LAST'))
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .orderBy(knex.raw('"created_at" DESC NULLS LAST'))
+                    .toQuery()
+            );
+        });
+
+        it('.groupBy(knex.raw())', () => {
+            expect(
+                query(knex, User)
+                    .groupBy(knex.raw("date_trunc('day', created_at)"))
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .groupBy(knex.raw("date_trunc('day', created_at)"))
+                    .toQuery()
+            );
+        });
+
+        it('.groupBy() mixing schema column and knex.raw()', () => {
+            expect(
+                query(knex, User)
+                    .groupBy(
+                        t => t.role,
+                        knex.raw("date_trunc('day', created_at)")
+                    )
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .groupBy('role', knex.raw("date_trunc('day', created_at)"))
+                    .toQuery()
+            );
+        });
+
+        it('.having(knex.raw(), operator, value)', () => {
+            expect(
+                query(knex, User)
+                    .groupBy(t => t.role)
+                    .having(knex.raw('count(*)'), '>', 5)
+                    .toQuery()
+            ).toBe(
+                knex('users')
+                    .groupBy('role')
+                    .having(knex.raw('count(*)'), '>', 5)
+                    .toQuery()
+            );
+        });
+    });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
