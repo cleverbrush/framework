@@ -11,7 +11,9 @@ import GenericSchemasSection from '../sections/generic-schemas';
 import GettingStartedSection from '../sections/getting-started';
 import ImmutabilitySection from '../sections/immutability';
 import { SCHEMA_SECTIONS } from '../sections/index';
+import ObjectConstructorsSection from '../sections/object-constructors';
 import ParseStringSection from '../sections/parse-string';
+import PromiseSchemaSection from '../sections/promise-schema';
 import PropertyDescriptorsSection from '../sections/property-descriptors';
 import ReadonlySection from '../sections/readonly';
 import RecursiveSchemasSection from '../sections/recursive-schemas';
@@ -32,6 +34,8 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     'recursive-schemas': RecursiveSchemasSection,
     'generic-schemas': GenericSchemasSection,
     'parse-string': ParseStringSection,
+    'promise-schema': PromiseSchemaSection,
+    'object-constructors': ObjectConstructorsSection,
     validation: ValidationSection,
     'property-descriptors': PropertyDescriptorsSection,
     'default-values': DefaultValuesSection,

@@ -16,7 +16,9 @@ export const SECTION_GROUPS = [
             'discriminated-unions',
             'recursive-schemas',
             'generic-schemas',
-            'parse-string'
+            'parse-string',
+            'promise-schema',
+            'object-constructors'
         ]
     },
     {
@@ -67,6 +69,16 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
     {
         slug: 'parse-string',
         title: 'Parse String & Coercion',
+        group: 'Composition'
+    },
+    {
+        slug: 'promise-schema',
+        title: 'Promise Schemas',
+        group: 'Composition'
+    },
+    {
+        slug: 'object-constructors',
+        title: 'Object Constructors',
         group: 'Composition'
     },
     { slug: 'validation', title: 'Validation', group: 'Validation' },

@@ -19,10 +19,20 @@ import { defineExtension, withExtensions } from '@cleverbrush/schema';
 // Shared implementations
 // ---------------------------------------------------------------------------
 
+/**
+ * Stores the SQL column name for a schema property using the schema extension
+ * system. Consumed by {@link getColumnName} and the query builder's column
+ * resolution logic.
+ */
 function hasColumnName(this: SchemaBuilder<any, any, any>, name: string) {
     return this.withExtension('columnName', name);
 }
 
+/**
+ * Stores the SQL table name for an `ObjectSchemaBuilder` using the schema
+ * extension system. Required for {@link query} to build queries — throws at
+ * query creation time if not set.
+ */
 function hasTableName(
     this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     name: string
@@ -34,8 +44,36 @@ function hasTableName(
 // Extension definition
 // ---------------------------------------------------------------------------
 
+/**
+ * Schema extension that adds database-mapping metadata to schema builders.
+ *
+ * Import the typed factory functions (`string`, `number`, `object`, etc.) from
+ * this package instead of from `@cleverbrush/schema` to gain access to the
+ * `.hasColumnName()` and `.hasTableName()` methods.
+ *
+ * @example
+ * ```ts
+ * import { object, string, number } from '@cleverbrush/knex-schema';
+ *
+ * const UserSchema = object({
+ *     id:         number(),
+ *     firstName:  string().hasColumnName('first_name'),
+ *     lastName:   string().hasColumnName('last_name'),
+ *     createdAt:  date().hasColumnName('created_at'),
+ * }).hasTableName('users');
+ * ```
+ */
 export const dbExtension = defineExtension({
     string: {
+        /**
+         * Override the SQL column name for this property.
+         *
+         * By default the property key is used as the column name. Call
+         * `.hasColumnName('sql_col')` when the database column differs from the
+         * schema property name (e.g. camelCase property → snake_case column).
+         *
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: StringSchemaBuilder<any, any, any, any, any>,
             name: string
@@ -44,6 +82,10 @@ export const dbExtension = defineExtension({
         }
     },
     number: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: NumberSchemaBuilder<any, any, any, any, any>,
             name: string
@@ -52,6 +94,10 @@ export const dbExtension = defineExtension({
         }
     },
     boolean: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: BooleanSchemaBuilder<any, any, any, any, any, any, any>,
             name: string
@@ -60,6 +106,10 @@ export const dbExtension = defineExtension({
         }
     },
     date: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: DateSchemaBuilder<any, any, any, any, any>,
             name: string
@@ -68,6 +118,10 @@ export const dbExtension = defineExtension({
         }
     },
     any: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: AnySchemaBuilder<any, any, any, any, any, any>,
             name: string
@@ -76,6 +130,10 @@ export const dbExtension = defineExtension({
         }
     },
     func: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: FunctionSchemaBuilder<any, any, any, any, any>,
             name: string
@@ -84,6 +142,10 @@ export const dbExtension = defineExtension({
         }
     },
     array: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: ArraySchemaBuilder<any, any, any, any, any, any, any>,
             name: string
@@ -92,6 +154,10 @@ export const dbExtension = defineExtension({
         }
     },
     union: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: UnionSchemaBuilder<any, any, any, any, any, any>,
             name: string
@@ -100,6 +166,10 @@ export const dbExtension = defineExtension({
         }
     },
     generic: {
+        /**
+         * Override the SQL column name for this property.
+         * @param name - The SQL column name.
+         */
         hasColumnName(
             this: GenericSchemaBuilder<any, any, any, any, any, any>,
             name: string
@@ -108,6 +178,14 @@ export const dbExtension = defineExtension({
         }
     },
     object: {
+        /**
+         * Set the SQL table name for this object schema.
+         *
+         * Required before creating a {@link query} builder — throws at
+         * query creation time when not set.
+         *
+         * @param name - The SQL table name (e.g. `'users'`).
+         */
         hasTableName(
             this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
             name: string

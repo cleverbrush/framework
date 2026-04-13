@@ -28,6 +28,47 @@ import {
 // SchemaQueryBuilder
 // ---------------------------------------------------------------------------
 
+/**
+ * Type-safe, schema-driven query builder for Knex.
+ *
+ * `SchemaQueryBuilder` wraps a Knex.QueryBuilder and adds:
+ * - **Type-safe column references** — pass a property accessor (`t => t.name`)
+ *   or a string property name; both are resolved to the correct SQL column
+ *   through the schema's `hasColumnName()` metadata automatically.
+ * - **Eager loading without N+1** — {@link joinOne} and {@link joinMany} use
+ *   PostgreSQL CTEs and `jsonb_agg` to load related rows in a single query.
+ * - **Bidirectional result mapping** — rows returned from Postgres (column
+ *   names) are converted back to schema property names before being returned.
+ * - **Thenable protocol** — the builder itself is `await`-able so you can
+ *   write `await query(db, Schema)` without calling {@link execute} explicitly.
+ *
+ * Create instances via the {@link query} factory function rather than
+ * calling the constructor directly.
+ *
+ * @typeParam TLocalSchema - The `ObjectSchemaBuilder` describing the main table.
+ * @typeParam TResult - The inferred row type, widened automatically as joins
+ *   are registered via {@link joinOne} / {@link joinMany}.
+ *
+ * @example
+ * ```ts
+ * import knex from 'knex';
+ * import { query, object, string, number } from '@cleverbrush/knex-schema';
+ *
+ * const UserSchema = object({
+ *     id:   number(),
+ *     name: string(),
+ *     age:  number().optional(),
+ * }).hasTableName('users');
+ *
+ * const db = knex({ client: 'pg', connection: process.env.DB_URL });
+ *
+ * // Fetch all users older than 18, ordered by name
+ * const adults = await query(db, UserSchema)
+ *     .where(t => t.age, '>', 18)
+ *     .orderBy(t => t.name);
+ * // adults: Array<{ id: number; name: string; age?: number }>
+ * ```
+ */
 export class SchemaQueryBuilder<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TResult
@@ -38,6 +79,14 @@ export class SchemaQueryBuilder<
     readonly #specs: ValidatedSpec[] = [];
     readonly #tableName: string;
 
+    /**
+     * @param knex - A configured Knex instance.
+     * @param localSchema - The `ObjectSchemaBuilder` for the primary table.
+     *   Must have a table name set via `.hasTableName()`.
+     * @param baseQuery - Optional pre-configured `Knex.QueryBuilder` to use as
+     *   the base query instead of the default `knex(tableName)`. Useful when you
+     *   need custom joins, CTEs, or other Knex features not exposed by this API.
+     */
     constructor(
         knex: Knex,
         localSchema: TLocalSchema,
@@ -65,6 +114,50 @@ export class SchemaQueryBuilder<
     // Relation methods — eager loading (absorbed from knex-eager)
     // =======================================================================
 
+    /**
+     * Eager-load a single related row (one-to-one / many-to-one relationship).
+     *
+     * The related rows are fetched using a single CTE + `jsonb_agg` — no N+1
+     * queries. The related object is attached to each result row under the
+     * field name specified by `spec.as`.
+     *
+     * @param spec - Join specification. Key fields:
+     *   - `foreignSchema` — the `ObjectSchemaBuilder` of the related table.
+     *   - `localKey` — the local column that holds the foreign-table reference.
+     *   - `foreignKey` — the primary/unique key on the foreign table.
+     *   - `as` — the property name to attach the related object under.
+     *   - `required` — if `true` (default), rows without a matching related
+     *     record are excluded (inner join); if `false`, they are included with
+     *     `null` (left join).
+     *   - `foreignQuery` — optional pre-filtered `Knex.QueryBuilder` for the
+     *     foreign table (e.g. to apply scopes).
+     *
+     * @returns `this` (with an updated `TResult` type that includes the new field)
+     *   for chaining.
+     *
+     * @example
+     * ```ts
+     * const PostSchema = object({
+     *     id:       number(),
+     *     title:    string(),
+     *     authorId: number(),
+     * }).hasTableName('posts');
+     *
+     * const AuthorSchema = object({
+     *     id:   number(),
+     *     name: string(),
+     * }).hasTableName('authors');
+     *
+     * const posts = await query(db, PostSchema)
+     *     .joinOne({
+     *         foreignSchema: AuthorSchema,
+     *         localKey:      t => t.authorId,
+     *         foreignKey:    t => t.id,
+     *         as:            'author',
+     *     });
+     * // posts[0].author.name — typed as string ✓
+     * ```
+     */
     joinOne<
         TForeignSchema extends ObjectSchemaBuilder<
             any,
@@ -89,6 +182,52 @@ export class SchemaQueryBuilder<
         return this as any;
     }
 
+    /**
+     * Eager-load a collection of related rows (one-to-many relationship).
+     *
+     * Related rows are fetched via a single CTE + `jsonb_agg` query. The
+     * collection is attached to each result row under the field name specified
+     * by `spec.as`. Supports `limit`, `offset`, and `orderBy` per-parent
+     * using a `row_number()` window function to avoid fetching the full
+     * relation before slicing.
+     *
+     * @param spec - Join specification. Key fields:
+     *   - `foreignSchema` — the `ObjectSchemaBuilder` of the related table.
+     *   - `localKey` — the primary/unique key on the local table.
+     *   - `foreignKey` — the column on the foreign table that references `localKey`.
+     *   - `as` — the property name to attach the array under.
+     *   - `limit` / `offset` — optional pagination per parent row.
+     *   - `orderBy` — optional `{ column, direction }` for the sub-collection.
+     *   - `foreignQuery` — optional pre-filtered `Knex.QueryBuilder`.
+     *
+     * @returns `this` (with an updated `TResult` type that includes the new field)
+     *   for chaining.
+     *
+     * @example
+     * ```ts
+     * const UserSchema = object({
+     *     id:   number(),
+     *     name: string(),
+     * }).hasTableName('users');
+     *
+     * const PostSchema = object({
+     *     id:       number(),
+     *     title:    string(),
+     *     authorId: number(),
+     * }).hasTableName('posts');
+     *
+     * const users = await query(db, UserSchema)
+     *     .joinMany({
+     *         foreignSchema: PostSchema,
+     *         localKey:      t => t.id,
+     *         foreignKey:    t => t.authorId,
+     *         as:            'posts',
+     *         limit:         5,
+     *         orderBy:       { column: t => t.id, direction: 'desc' },
+     *     });
+     * // users[0].posts — typed as Array<{ id: number; title: string; authorId: number }>
+     * ```
+     */
     joinMany<
         TForeignSchema extends ObjectSchemaBuilder<
             any,
@@ -116,6 +255,22 @@ export class SchemaQueryBuilder<
     // WHERE methods
     // =======================================================================
 
+    /**
+     * Add a `WHERE` clause to the query.
+     *
+     * Accepts a column reference, an optional operator, and a value:
+     * - `where(t => t.age, '>', 18)` — property accessor + operator + value.
+     * - `where('age', 18)` — string key + value (defaults to `=`).
+     * - `where({ name: 'Alice' })` — record object; property keys are mapped
+     *   to column names automatically.
+     * - `where(builder => { ... })` — Knex sub-builder callback for grouped
+     *   conditions.
+     * - `where(knex.raw('...'))` — raw SQL expression.
+     *
+     * Multiple `.where()` calls are combined with `AND`.
+     *
+     * @returns `this` for chaining.
+     */
     where(column: ColumnRef<TLocalSchema>, operator: string, value: any): this;
     where(column: ColumnRef<TLocalSchema>, value: any): this;
     where(callback: (builder: Knex.QueryBuilder) => void): this;
@@ -151,6 +306,11 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Alias for {@link where} — explicitly adds an `AND WHERE` clause.
+     * Identical to calling `.where()` when no logical-OR grouping is needed.
+     * @returns `this` for chaining.
+     */
     andWhere(
         column: ColumnRef<TLocalSchema>,
         operator: string,
@@ -189,6 +349,10 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add an `OR WHERE` clause. Use this to create alternative filter branches.
+     * @returns `this` for chaining.
+     */
     orWhere(
         column: ColumnRef<TLocalSchema>,
         operator: string,
@@ -227,6 +391,10 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `WHERE NOT` clause — negates the condition.
+     * @returns `this` for chaining.
+     */
     whereNot(
         column: ColumnRef<TLocalSchema>,
         operator: string,
@@ -265,6 +433,12 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `WHERE column IN (values)` clause.
+     * @param column - Column reference (property accessor or string key).
+     * @param values - Array of values or a sub-query.
+     * @returns `this` for chaining.
+     */
     whereIn(
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
@@ -276,6 +450,12 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `WHERE column NOT IN (values)` clause.
+     * @param column - Column reference.
+     * @param values - Array of values or a sub-query.
+     * @returns `this` for chaining.
+     */
     whereNotIn(
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
@@ -287,6 +467,10 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add an `OR WHERE column IN (values)` clause.
+     * @returns `this` for chaining.
+     */
     orWhereIn(
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
@@ -298,6 +482,10 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add an `OR WHERE column NOT IN (values)` clause.
+     * @returns `this` for chaining.
+     */
     orWhereNotIn(
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
@@ -309,11 +497,19 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `WHERE column IS NULL` clause.
+     * @returns `this` for chaining.
+     */
     whereNull(column: ColumnRef<TLocalSchema>): this {
         this.#baseQuery.whereNull(this.#resolveColumn(column, 'whereNull'));
         return this;
     }
 
+    /**
+     * Add a `WHERE column IS NOT NULL` clause.
+     * @returns `this` for chaining.
+     */
     whereNotNull(column: ColumnRef<TLocalSchema>): this {
         this.#baseQuery.whereNotNull(
             this.#resolveColumn(column, 'whereNotNull')
@@ -321,6 +517,10 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add an `OR WHERE column IS NULL` clause.
+     * @returns `this` for chaining.
+     */
     orWhereNull(column: ColumnRef<TLocalSchema>): this {
         (this.#baseQuery as any).orWhereNull(
             this.#resolveColumn(column, 'orWhereNull')
@@ -328,6 +528,10 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add an `OR WHERE column IS NOT NULL` clause.
+     * @returns `this` for chaining.
+     */
     orWhereNotNull(column: ColumnRef<TLocalSchema>): this {
         (this.#baseQuery as any).orWhereNotNull(
             this.#resolveColumn(column, 'orWhereNotNull')
@@ -335,6 +539,11 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `WHERE column BETWEEN low AND high` clause.
+     * @param range - A two-element tuple `[low, high]`.
+     * @returns `this` for chaining.
+     */
     whereBetween(
         column: ColumnRef<TLocalSchema>,
         range: readonly [any, any]
@@ -346,6 +555,11 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `WHERE column NOT BETWEEN low AND high` clause.
+     * @param range - A two-element tuple `[low, high]`.
+     * @returns `this` for chaining.
+     */
     whereNotBetween(
         column: ColumnRef<TLocalSchema>,
         range: readonly [any, any]
@@ -357,6 +571,11 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a case-sensitive `WHERE column LIKE value` clause.
+     * @param value - A SQL LIKE pattern (e.g. `'Alice%'`).
+     * @returns `this` for chaining.
+     */
     whereLike(column: ColumnRef<TLocalSchema>, value: string): this {
         (this.#baseQuery as any).whereLike(
             this.#resolveColumn(column, 'whereLike'),
@@ -365,6 +584,11 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a case-insensitive `WHERE column ILIKE value` clause (PostgreSQL).
+     * @param value - A SQL LIKE pattern (e.g. `'alice%'`).
+     * @returns `this` for chaining.
+     */
     whereILike(column: ColumnRef<TLocalSchema>, value: string): this {
         (this.#baseQuery as any).whereILike(
             this.#resolveColumn(column, 'whereILike'),
@@ -373,11 +597,22 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a raw `WHERE` clause. Useful for database-specific expressions.
+     * @param sql - Raw SQL string with optional `:binding:` or `?` placeholders.
+     * @param bindings - Values for the placeholders.
+     * @returns `this` for chaining.
+     */
     whereRaw(sql: string, ...bindings: any[]): this {
         this.#baseQuery.whereRaw(sql, ...bindings);
         return this;
     }
 
+    /**
+     * Add a `WHERE EXISTS (subquery)` clause.
+     * @param callback - A Knex query callback or sub-query builder.
+     * @returns `this` for chaining.
+     */
     whereExists(callback: Knex.QueryCallback | Knex.QueryBuilder): this {
         this.#baseQuery.whereExists(callback as any);
         return this;
@@ -387,6 +622,17 @@ export class SchemaQueryBuilder<
     // ORDER BY
     // =======================================================================
 
+    /**
+     * Order the results by a column.
+     * @param column - Column reference or raw expression.
+     * @param direction - `'asc'` (default) or `'desc'`.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * query(db, UserSchema).orderBy(t => t.name).orderBy(t => t.createdAt, 'desc');
+     * ```
+     */
     orderBy(
         column: ColumnRef<TLocalSchema> | Knex.Raw,
         direction?: 'asc' | 'desc'
@@ -396,6 +642,11 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Order the results by a raw SQL expression.
+     * @param sql - Raw SQL (e.g. `'LOWER(name) ASC'`).
+     * @returns `this` for chaining.
+     */
     orderByRaw(sql: string, ...bindings: any[]): this {
         this.#baseQuery.orderByRaw(sql, ...bindings);
         return this;
@@ -405,17 +656,30 @@ export class SchemaQueryBuilder<
     // GROUP BY / HAVING
     // =======================================================================
 
+    /**
+     * Add a `GROUP BY` clause.
+     * @param columns - One or more column references or raw expressions.
+     * @returns `this` for chaining.
+     */
     groupBy(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.groupBy(...(resolved as string[]));
         return this;
     }
 
+    /**
+     * Add a raw `GROUP BY` expression.
+     * @returns `this` for chaining.
+     */
     groupByRaw(sql: string, ...bindings: any[]): this {
         this.#baseQuery.groupByRaw(sql, ...bindings);
         return this;
     }
 
+    /**
+     * Add a `HAVING column operator value` clause (used with `GROUP BY`).
+     * @returns `this` for chaining.
+     */
     having(
         column: ColumnRef<TLocalSchema> | Knex.Raw,
         operator: string,
@@ -426,6 +690,10 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a raw `HAVING` expression.
+     * @returns `this` for chaining.
+     */
     havingRaw(sql: string, ...bindings: any[]): this {
         this.#baseQuery.havingRaw(sql, ...bindings);
         return this;
@@ -435,11 +703,21 @@ export class SchemaQueryBuilder<
     // PAGINATION
     // =======================================================================
 
+    /**
+     * Limit the number of rows returned.
+     * @param n - Maximum number of rows.
+     * @returns `this` for chaining.
+     */
     limit(n: number): this {
         this.#baseQuery.limit(n);
         return this;
     }
 
+    /**
+     * Skip the first `n` rows in the result set (for cursor/offset pagination).
+     * @param n - Number of rows to skip.
+     * @returns `this` for chaining.
+     */
     offset(n: number): this {
         this.#baseQuery.offset(n);
         return this;
@@ -449,12 +727,23 @@ export class SchemaQueryBuilder<
     // SELECT / DISTINCT
     // =======================================================================
 
+    /**
+     * Select specific columns instead of `*`. Each column reference is
+     * resolved to its SQL column name through the schema.
+     * @param columns - One or more column references or raw expressions.
+     * @returns `this` for chaining.
+     */
     select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.select(...(resolved as string[]));
         return this;
     }
 
+    /**
+     * Add `DISTINCT` to the select clause. Duplicate rows are eliminated.
+     * @param columns - One or more column references or raw expressions.
+     * @returns `this` for chaining.
+     */
     distinct(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.distinct(...(resolved as string[]));
@@ -465,6 +754,11 @@ export class SchemaQueryBuilder<
     // AGGREGATES
     // =======================================================================
 
+    /**
+     * Add a `COUNT(*)` or `COUNT(column)` aggregate to the select list.
+     * @param column - Optional column to count (defaults to `*`).
+     * @returns `this` for chaining.
+     */
     count(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
         if (column) {
             this.#baseQuery.count(this.#resolveColumnArg(column) as string);
@@ -474,6 +768,11 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `COUNT(DISTINCT column)` aggregate to the select list.
+     * @param column - Optional column (defaults to `*`).
+     * @returns `this` for chaining.
+     */
     countDistinct(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
         if (column) {
             this.#baseQuery.countDistinct(
@@ -485,21 +784,37 @@ export class SchemaQueryBuilder<
         return this;
     }
 
+    /**
+     * Add a `MIN(column)` aggregate.
+     * @returns `this` for chaining.
+     */
     min(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
         this.#baseQuery.min(this.#resolveColumnArg(column) as string);
         return this;
     }
 
+    /**
+     * Add a `MAX(column)` aggregate.
+     * @returns `this` for chaining.
+     */
     max(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
         this.#baseQuery.max(this.#resolveColumnArg(column) as string);
         return this;
     }
 
+    /**
+     * Add a `SUM(column)` aggregate.
+     * @returns `this` for chaining.
+     */
     sum(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
         this.#baseQuery.sum(this.#resolveColumnArg(column) as string);
         return this;
     }
 
+    /**
+     * Add an `AVG(column)` aggregate.
+     * @returns `this` for chaining.
+     */
     avg(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
         this.#baseQuery.avg(this.#resolveColumnArg(column) as string);
         return this;
@@ -509,6 +824,22 @@ export class SchemaQueryBuilder<
     // WRITE OPERATIONS
     // =======================================================================
 
+    /**
+     * Insert a single row into the table and return the inserted record.
+     *
+     * Property keys are mapped to SQL column names via the schema's
+     * `hasColumnName()` metadata before the `INSERT` is executed. The
+     * returned row is mapped back to property names.
+     *
+     * @param data - The object to insert. Keys must be valid schema property names.
+     * @returns The full inserted row (including database-generated fields).
+     *
+     * @example
+     * ```ts
+     * const user = await query(db, UserSchema).insert({ name: 'Alice', age: 30 });
+     * // user.id is populated by the database DEFAULT / SERIAL
+     * ```
+     */
     async insert(data: InsertType<TLocalSchema>): Promise<TResult> {
         const mapped = this.#mapObjectToColumns(data as Record<string, any>);
         const [row] = await this.#knex(this.#tableName)
@@ -517,6 +848,13 @@ export class SchemaQueryBuilder<
         return this.#mapRow(row) as TResult;
     }
 
+    /**
+     * Insert multiple rows in a single `INSERT` statement and return all
+     * inserted records.
+     *
+     * @param data - Array of objects to insert.
+     * @returns The full inserted rows in insertion order.
+     */
     async insertMany(data: InsertType<TLocalSchema>[]): Promise<TResult[]> {
         const mapped = data.map(d =>
             this.#mapObjectToColumns(d as Record<string, any>)
@@ -527,12 +865,38 @@ export class SchemaQueryBuilder<
         return rows.map((row: any) => this.#mapRow(row) as TResult);
     }
 
+    /**
+     * Update all rows that match the current `WHERE` clause and return the
+     * updated records.
+     *
+     * Only the keys present in `data` are updated (partial update). Property
+     * keys are resolved to column names automatically.
+     *
+     * @param data - Partial schema object with fields to update.
+     * @returns All rows that were updated.
+     *
+     * @example
+     * ```ts
+     * const updated = await query(db, UserSchema)
+     *     .where(t => t.id, userId)
+     *     .update({ name: 'Bob' });
+     * ```
+     */
     async update(data: Partial<InferType<TLocalSchema>>): Promise<TResult[]> {
         const mapped = this.#mapObjectToColumns(data as Record<string, any>);
         const rows = await this.#baseQuery.update(mapped).returning('*');
         return rows.map((row: any) => this.#mapRow(row) as TResult);
     }
 
+    /**
+     * Delete all rows that match the current `WHERE` clause.
+     * @returns The number of rows deleted.
+     *
+     * @example
+     * ```ts
+     * const count = await query(db, UserSchema).where(t => t.id, id).delete();
+     * ```
+     */
     async delete(): Promise<number> {
         return this.#baseQuery.delete();
     }
@@ -541,7 +905,21 @@ export class SchemaQueryBuilder<
     // ESCAPE HATCH
     // =======================================================================
 
-    /** Escape hatch: apply any Knex method to the base query */
+    /**
+     * Escape hatch: apply any Knex method to the underlying base query.
+     *
+     * Use this when you need a Knex feature not exposed by this API (e.g.
+     * `forUpdate()`, CTEs, `join()`, `union()`).
+     *
+     * @param fn - A callback that receives the raw `Knex.QueryBuilder` and
+     *   may mutate it in place.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * query(db, UserSchema).apply(qb => qb.forUpdate().noWait());
+     * ```
+     */
     apply(fn: (builder: Knex.QueryBuilder) => void): this {
         fn(this.#baseQuery);
         return this;
@@ -917,17 +1295,33 @@ export class SchemaQueryBuilder<
     // Execution
     // =======================================================================
 
-    /** Returns the raw SQL string for debugging */
+    /**
+     * Return the raw SQL string that would be executed, for debugging.
+     * Does not execute the query against the database.
+     */
     toQuery(): string {
         return this.#buildQuery().toQuery();
     }
 
-    /** Returns the raw SQL string */
+    /**
+     * Alias for {@link toQuery} — returns the raw SQL string.
+     */
     toString(): string {
         return this.#buildQuery().toString();
     }
 
-    /** Execute the query and return all rows */
+    /**
+     * Execute the query and return all matching rows, mapped back to schema
+     * property names.
+     *
+     * @returns A promise that resolves to an array of result objects typed as
+     *   `TResult[]`.
+     *
+     * @example
+     * ```ts
+     * const users = await query(db, UserSchema).execute();
+     * ```
+     */
     async execute(): Promise<TResult[]> {
         const query = this.#buildQuery();
         const rows = await query;
@@ -939,7 +1333,16 @@ export class SchemaQueryBuilder<
         return rows.map((row: any) => this.#cleanAndMapRow(row)) as TResult[];
     }
 
-    /** Execute the query and return the first row (or undefined) */
+    /**
+     * Execute the query and return only the first row, or `undefined` if no
+     * rows match.
+     *
+     * @example
+     * ```ts
+     * const user = await query(db, UserSchema).where(t => t.id, id).first();
+     * if (user) { /* ... *\/ }
+     * ```
+     */
     async first(): Promise<TResult | undefined> {
         const query = this.#buildQuery().first();
         const row = await query;
@@ -948,7 +1351,16 @@ export class SchemaQueryBuilder<
         return this.#cleanAndMapRow(row) as TResult;
     }
 
-    /** Thenable — allows `await query(knex, schema)` directly */
+    /**
+     * Thenable implementation — allows the builder to be awaited directly
+     * without calling {@link execute} explicitly.
+     *
+     * @example
+     * ```ts
+     * const users = await query(db, UserSchema).where(t => t.name, 'Alice');
+     * // Equivalent to: await query(db, UserSchema).where(...).execute()
+     * ```
+     */
     // biome-ignore lint/suspicious/noThenProperty: intentional thenable for `await builder` support
     then<TReturn1 = TResult[], TReturn2 = never>(
         onfulfilled?:
@@ -964,7 +1376,29 @@ export class SchemaQueryBuilder<
 // query() — main entry point
 // ---------------------------------------------------------------------------
 
-/** Create a typed schema query builder */
+/**
+ * Create a typed {@link SchemaQueryBuilder} for the table described by `schema`.
+ *
+ * The schema must have a table name configured via `.hasTableName()`.
+ * Column name mappings set via `.hasColumnName()` are applied automatically
+ * to all query methods. The returned builder is thenable — you can `await` it
+ * directly to execute the query and get `TResult[]`.
+ *
+ * @param knex - A configured Knex instance.
+ * @param schema - The `ObjectSchemaBuilder` describing the table.
+ * @returns A new {@link SchemaQueryBuilder} ready for chaining.
+ *
+ * @example
+ * ```ts
+ * import knex from 'knex';
+ * import { query, object, string, number } from '@cleverbrush/knex-schema';
+ *
+ * const UserSchema = object({ id: number(), name: string() }).hasTableName('users');
+ * const db = knex({ client: 'pg', connection: process.env.DB_URL });
+ *
+ * const users = await query(db, UserSchema).where(t => t.name, 'like', 'A%');
+ * ```
+ */
 export function query<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 >(
@@ -972,7 +1406,24 @@ export function query<
     schema: TLocalSchema
 ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
 
-/** Create a typed schema query builder from an existing Knex query */
+/**
+ * Create a typed {@link SchemaQueryBuilder} from an existing Knex query builder.
+ *
+ * Use this overload when you need to supply a pre-configured base query —
+ * for example one that already has a sub-query, CTE, or a schema scope applied.
+ *
+ * @param knex - A configured Knex instance.
+ * @param schema - The `ObjectSchemaBuilder` describing the table.
+ * @param baseQuery - An existing `Knex.QueryBuilder` to use as the base.
+ * @returns A new {@link SchemaQueryBuilder} wrapping `baseQuery`.
+ *
+ * @example
+ * ```ts
+ * // Use a scoped base query (e.g. soft-delete filter applied globally)
+ * const base = db('users').where('deleted_at', null);
+ * const activeUsers = await query(db, UserSchema, base).where(t => t.age, '>', 18);
+ * ```
+ */
 export function query<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 >(
