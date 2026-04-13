@@ -230,7 +230,9 @@ export class ArraySchemaBuilder<
                     value: obj
                 }),
                 getSchema: () => this,
-                parent: undefined
+                parent: undefined,
+                propertyName: undefined,
+                toJsonPointer: () => ''
             }
         };
 

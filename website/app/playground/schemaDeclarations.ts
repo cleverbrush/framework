@@ -2284,6 +2284,15 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
      * @param selector a callback function to select property from the schema.
      */
     getErrorsFor<TPropertySchema, TParentPropertyDescriptor>(selector?: (properties: PropertyDescriptorTree<TSchema, TRootSchema>) => PropertyDescriptor<TRootSchema, TPropertySchema, TParentPropertyDescriptor>): TPropertySchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any> ? PropertyValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor> : NestedValidationResult<TPropertySchema, TRootSchema, TParentPropertyDescriptor>;
+    /**
+     * Returns a list of all property validation results that have direct
+     * validation errors. Each entry exposes \`.descriptor\` (with
+     * \`.toJsonPointer()\` for the property's path) and \`.errors\`.
+     *
+     * This is useful for collecting all errors with their full JSON Pointer
+     * paths, e.g. for building RFC 9457 Problem Details responses.
+     */
+    getInvalidProperties(): ReadonlyArray<NestedValidationResult<any, TRootSchema, any>>;
 };
 /**
  * Object schema builder class. Similar to the \`object\` type
@@ -2898,6 +2907,13 @@ export declare class ParseStringSchemaBuilder<TResult = any, TRequired extends b
      */
     static create(props: ParseStringSchemaBuilderCreateProps): ParseStringSchemaBuilder<any, true, false, false, {}>;
     protected constructor(props: ParseStringSchemaBuilderCreateProps);
+    /**
+     * Return a snapshot of this builder's configuration.
+     *
+     * Includes all base-class fields plus:
+     * - \`objectSchema\` — the object schema defining the result shape.
+     * - \`templateDefinition\` — the parsed template (literals and selector segments).
+     */
     introspect(): {
         /** The object schema defining the result shape. */
         objectSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
@@ -3989,6 +4005,19 @@ export type PropertyDescriptorInner<TSchema extends ObjectSchemaBuilder<any, any
      */
     getSchema: () => TPropertySchema;
     parent: PropertyDescriptorInnerFromPropertyDescriptor<TParentPropertyDescriptor>;
+    /**
+     * The name of this property within its parent object, or \`undefined\`
+     * for the root descriptor.
+     */
+    propertyName: string | undefined;
+    /**
+     * Returns a JSON Pointer (RFC 6901) string representing this
+     * property's path from the root descriptor.
+     *
+     * Property names are escaped per RFC 6901 (\`~\` → \`~0\`, \`/\` → \`~1\`).
+     * The root descriptor returns an empty string (\`''\`).
+     */
+    toJsonPointer: () => string;
 };
 /**
  * A wrapper object keyed by {@link SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR} that
@@ -5368,13 +5397,14 @@ export { GenericSchemaBuilder, generic } from './builders/GenericSchemaBuilder.j
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';
+export type { ObjectSchemaValidationResult } from './builders/ObjectSchemaBuilder.js';
 export { ObjectSchemaBuilder, object, SchemaPropertySelector } from './builders/ObjectSchemaBuilder.js';
 export type { ParseStringTemplateTag } from './builders/ParseStringSchemaBuilder.js';
 export { ParseStringSchemaBuilder, parseString } from './builders/ParseStringSchemaBuilder.js';
 export { PromiseSchemaBuilder, promise } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
-export type { PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
+export type { NestedValidationResult, PropertyDescriptor, PropertyDescriptorInner, PropertyDescriptorTree, PropertySetterOptions, ValidationErrorMessageProvider } from './builders/SchemaBuilder.js';
 export { BRAND, Brand, InferType, MakeOptional, SchemaBuilder, SchemaValidationError, SYMBOL_HAS_PROPERTIES, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR, ValidationError, ValidationResult } from './builders/SchemaBuilder.js';
 export { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 export type { TupleElementValidationResults, TupleSchemaValidationResult } from './builders/TupleSchemaBuilder.js';

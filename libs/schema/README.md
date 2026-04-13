@@ -3,11 +3,11 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- bundle-badge-start -->
-[![Bundle size](https://img.shields.io/badge/bundle-19.5%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![Bundle size](https://img.shields.io/badge/bundle-19.8%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-97.2%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-96.9%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).
