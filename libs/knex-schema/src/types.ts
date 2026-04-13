@@ -18,11 +18,29 @@ export type SchemaKeys<
 // ---------------------------------------------------------------------------
 // ColumnRef — a column can be specified as a string key or a property accessor
 // ---------------------------------------------------------------------------
+
+/**
+ * Strips the `withExtensions()` overlay from a schema type, reducing it to a
+ * plain `ObjectSchemaBuilder<TProps, TReq>`. This is necessary so that
+ * `PropertyDescriptorTree<SchemaBase<T>, SchemaBase<T>>` resolves without
+ * hitting TypeScript's recursion depth limit, which happens when the full
+ * intersection type (builder + extension methods + HiddenExtensionMethods) is
+ * passed directly.
+ */
+type SchemaBase<
+    T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> =
+    T extends ObjectSchemaBuilder<infer P, infer Req, any, any, any, any, any>
+        ? ObjectSchemaBuilder<P, Req>
+        : never;
+
 export type ColumnRef<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > =
     | SchemaKeys<T>
-    | ((tree: PropertyDescriptorTree<T, T>) => PropertyDescriptor<T, any, any>);
+    | ((
+          tree: PropertyDescriptorTree<SchemaBase<T>, SchemaBase<T>>
+      ) => PropertyDescriptor<SchemaBase<T>, any, any>);
 
 // ---------------------------------------------------------------------------
 // JoinOne specification — single related object (N:1 / belongsTo / hasOne)
@@ -50,7 +68,7 @@ export interface JoinOneSpec<
     /** If true (default), uses INNER JOIN; if false, uses LEFT JOIN (result may be null) */
     required?: TRequired;
     /** Optional Knex query builder for the foreign table — auto-derived from foreignSchema's tableName if omitted */
-    foreignQuery?: Knex.QueryBuilder;
+    foreignQuery?: Knex.QueryBuilder | { toKnexQuery(): Knex.QueryBuilder };
     /** Foreign schema for type inference */
     foreignSchema: TForeignSchema;
     /** Optional post-load value transformers per foreign column */
@@ -80,7 +98,7 @@ export interface JoinManySpec<
     /** Name of the field that will hold the loaded array in the result */
     as: TFieldName;
     /** Optional Knex query builder for the foreign table — auto-derived from foreignSchema's tableName if omitted */
-    foreignQuery?: Knex.QueryBuilder;
+    foreignQuery?: Knex.QueryBuilder | { toKnexQuery(): Knex.QueryBuilder };
     /** Foreign schema for type inference */
     foreignSchema: TForeignSchema;
     /** Maximum number of related items to load per parent row */

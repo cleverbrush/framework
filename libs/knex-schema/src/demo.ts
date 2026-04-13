@@ -310,6 +310,27 @@ show(
 );
 
 // ═══════════════════════════════════════════════════════════════════════════
+// 19. joinOne with explicit foreignQuery based on a different schema
+// ═══════════════════════════════════════════════════════════════════════════
+
+show(
+    'joinOne with filtered foreignQuery',
+    query(knex, User)
+        .joinOne({
+            localColumn: t => t.departmentId,
+            foreignColumn: t => t.id,
+            as: 'department',
+            foreignSchema: Department,
+            foreignQuery: query(knex, Department).where(
+                t => t.budget,
+                '>',
+                1000
+            )
+        })
+        .toQuery()
+);
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Done
 // ═══════════════════════════════════════════════════════════════════════════
 

@@ -14,15 +14,22 @@ import type {
 /**
  * Resolve foreignQuery: use the provided one, or auto-derive from
  * the foreign schema's tableName extension.
+ * Also normalizes SchemaQueryBuilder instances to raw Knex.QueryBuilder
+ * by calling `.toKnexQuery()` if available.
  */
 function resolveForeignQuery(
     spec: {
-        foreignQuery?: Knex.QueryBuilder;
+        foreignQuery?: Knex.QueryBuilder | { toKnexQuery(): Knex.QueryBuilder };
         foreignSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
     },
     knex: Knex
 ): Knex.QueryBuilder {
-    if (spec.foreignQuery) return spec.foreignQuery;
+    if (spec.foreignQuery) {
+        if ('toKnexQuery' in spec.foreignQuery) {
+            return spec.foreignQuery.toKnexQuery();
+        }
+        return spec.foreignQuery as Knex.QueryBuilder;
+    }
 
     const tableName = getTableName(spec.foreignSchema);
     return knex(tableName);

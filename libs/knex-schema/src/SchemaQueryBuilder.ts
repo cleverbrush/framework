@@ -1304,6 +1304,15 @@ export class SchemaQueryBuilder<
     }
 
     /**
+     * Returns the underlying Knex query builder. Useful when passing this
+     * query as a `foreignQuery` in `.joinOne()` / `.joinMany()`, or any context
+     * that expects a raw `Knex.QueryBuilder`.
+     */
+    toKnexQuery(): Knex.QueryBuilder {
+        return this.#buildQuery();
+    }
+
+    /**
      * Alias for {@link toQuery} — returns the raw SQL string.
      */
     toString(): string {

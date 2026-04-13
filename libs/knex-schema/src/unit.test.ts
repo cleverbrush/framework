@@ -461,7 +461,7 @@ describe('eager loading', () => {
         expect(sql).toContain('"role" = \'admin\'');
     });
 
-    it('joinOne with explicit foreignQuery', () => {
+    it('joinOne with explicit foreignQuery as raw knex', () => {
         const sql = query(knex, User)
             .joinOne({
                 localColumn: t => t.departmentId,
@@ -473,6 +473,90 @@ describe('eager loading', () => {
             .toQuery();
 
         expect(sql).toContain('"budget" > 1000');
+    });
+
+    it('joinOne with SchemaQueryBuilder as foreignQuery', () => {
+        const sql = query(knex, User)
+            .joinOne({
+                localColumn: t => t.departmentId,
+                foreignColumn: t => t.id,
+                as: 'department',
+                foreignSchema: Department,
+                foreignQuery: query(knex, Department).where(
+                    t => t.budget,
+                    '>',
+                    1000
+                )
+            })
+            .toQuery();
+
+        expect(sql).toContain('"budget" > 1000');
+    });
+
+    it('SchemaQueryBuilder foreignQuery produces same SQL as raw knex foreignQuery', () => {
+        const rawSql = query(knex, User)
+            .joinOne({
+                localColumn: t => t.departmentId,
+                foreignColumn: t => t.id,
+                as: 'department',
+                foreignSchema: Department,
+                foreignQuery: knex('departments').where('budget', '>', 1000)
+            })
+            .toQuery();
+
+        const schemaSql = query(knex, User)
+            .joinOne({
+                localColumn: t => t.departmentId,
+                foreignColumn: t => t.id,
+                as: 'department',
+                foreignSchema: Department,
+                foreignQuery: query(knex, Department).where(
+                    t => t.budget,
+                    '>',
+                    1000
+                )
+            })
+            .toQuery();
+
+        expect(schemaSql).toBe(rawSql);
+    });
+
+    it('joinMany with SchemaQueryBuilder as foreignQuery', () => {
+        const sql = query(knex, User)
+            .joinMany({
+                localColumn: t => t.id,
+                foreignColumn: t => t.authorId,
+                as: 'posts',
+                foreignSchema: Post,
+                foreignQuery: query(knex, Post).where(t => t.categoryId, '=', 5)
+            })
+            .toQuery();
+
+        expect(sql).toContain('"category_id" = 5');
+    });
+
+    it('joinMany SchemaQueryBuilder foreignQuery matches raw knex', () => {
+        const rawSql = query(knex, User)
+            .joinMany({
+                localColumn: t => t.id,
+                foreignColumn: t => t.authorId,
+                as: 'posts',
+                foreignSchema: Post,
+                foreignQuery: knex('posts').where('category_id', '=', 5)
+            })
+            .toQuery();
+
+        const schemaSql = query(knex, User)
+            .joinMany({
+                localColumn: t => t.id,
+                foreignColumn: t => t.authorId,
+                as: 'posts',
+                foreignSchema: Post,
+                foreignQuery: query(knex, Post).where(t => t.categoryId, '=', 5)
+            })
+            .toQuery();
+
+        expect(schemaSql).toBe(rawSql);
     });
 
     it('throws on duplicate field names', () => {
@@ -491,5 +575,443 @@ describe('eager loading', () => {
                     foreignSchema: Department
                 });
         }).toThrow('duplicate field name');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// SQL parity — SchemaQueryBuilder vs raw knex
+//
+// For each method, we verify that SchemaQueryBuilder produces exactly the
+// same SQL as a raw knex query built with the mapped column names directly.
+// This confirms that the only thing the builder does is translate property
+// keys → column names; all other knex behaviour is preserved unchanged.
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('SQL parity with raw knex', () => {
+    // ── SELECT ────────────────────────────────────────────────────────────
+
+    it('SELECT *', () => {
+        expect(query(knex, User).toQuery()).toBe(knex('users').toQuery());
+    });
+
+    it('SELECT specific columns (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .select(
+                    t => t.fullName,
+                    t => t.email,
+                    t => t.createdAt
+                )
+                .toQuery()
+        ).toBe(
+            knex('users').select('full_name', 'email', 'created_at').toQuery()
+        );
+    });
+
+    it('SELECT specific columns (string key)', () => {
+        expect(query(knex, User).select('fullName', 'email').toQuery()).toBe(
+            knex('users').select('full_name', 'email').toQuery()
+        );
+    });
+
+    it('SELECT — identity mapping (no hasColumnName)', () => {
+        expect(query(knex, SimpleTag).select('id', 'name').toQuery()).toBe(
+            knex('tags').select('id', 'name').toQuery()
+        );
+    });
+
+    // ── DISTINCT ──────────────────────────────────────────────────────────
+
+    it('DISTINCT (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .distinct(t => t.role)
+                .toQuery()
+        ).toBe(knex('users').distinct('role').toQuery());
+    });
+
+    it('DISTINCT (string key)', () => {
+        expect(query(knex, User).distinct('departmentId').toQuery()).toBe(
+            knex('users').distinct('department_id').toQuery()
+        );
+    });
+
+    // ── WHERE ─────────────────────────────────────────────────────────────
+
+    it('.where (operator, descriptor)', () => {
+        expect(
+            query(knex, User)
+                .where(t => t.fullName, '=', 'Alice')
+                .toQuery()
+        ).toBe(knex('users').where('full_name', '=', 'Alice').toQuery());
+    });
+
+    it('.where (operator, string key)', () => {
+        expect(
+            query(knex, User).where('fullName', '=', 'Alice').toQuery()
+        ).toBe(knex('users').where('full_name', '=', 'Alice').toQuery());
+    });
+
+    it('.where (operator, identity column)', () => {
+        expect(query(knex, User).where('email', '=', 'a@b.com').toQuery()).toBe(
+            knex('users').where('email', '=', 'a@b.com').toQuery()
+        );
+    });
+
+    it('.where (record)', () => {
+        expect(
+            query(knex, User)
+                .where({ fullName: 'Alice', role: 'admin' })
+                .toQuery()
+        ).toBe(
+            knex('users').where({ full_name: 'Alice', role: 'admin' }).toQuery()
+        );
+    });
+
+    it('.where (callback)', () => {
+        expect(
+            query(knex, User)
+                .where((b: KnexType.QueryBuilder) => {
+                    b.where('role', 'admin');
+                })
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .where(b => {
+                    b.where('role', 'admin');
+                })
+                .toQuery()
+        );
+    });
+
+    it('.andWhere (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .where('role', '=', 'admin')
+                .andWhere(t => t.departmentId, '>', 5)
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .where('role', '=', 'admin')
+                .andWhere('department_id', '>', 5)
+                .toQuery()
+        );
+    });
+
+    it('.orWhere (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .where('role', '=', 'admin')
+                .orWhere(t => t.role, '=', 'editor')
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .where('role', '=', 'admin')
+                .orWhere('role', '=', 'editor')
+                .toQuery()
+        );
+    });
+
+    it('.whereNot (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereNot(t => t.role, 'banned')
+                .toQuery()
+        ).toBe(knex('users').whereNot('role', 'banned').toQuery());
+    });
+
+    it('.whereNot (string key)', () => {
+        expect(query(knex, User).whereNot('departmentId', 99).toQuery()).toBe(
+            knex('users').whereNot('department_id', 99).toQuery()
+        );
+    });
+
+    it('.whereIn (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereIn(t => t.role, ['admin', 'editor'])
+                .toQuery()
+        ).toBe(knex('users').whereIn('role', ['admin', 'editor']).toQuery());
+    });
+
+    it('.whereIn (string key, mapped column)', () => {
+        expect(
+            query(knex, User).whereIn('departmentId', [1, 2, 3]).toQuery()
+        ).toBe(knex('users').whereIn('department_id', [1, 2, 3]).toQuery());
+    });
+
+    it('.whereNotIn (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereNotIn(t => t.role, ['banned'])
+                .toQuery()
+        ).toBe(knex('users').whereNotIn('role', ['banned']).toQuery());
+    });
+
+    it('.whereNull (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereNull(t => t.managerId)
+                .toQuery()
+        ).toBe(knex('users').whereNull('manager_id').toQuery());
+    });
+
+    it('.whereNotNull (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereNotNull(t => t.managerId)
+                .toQuery()
+        ).toBe(knex('users').whereNotNull('manager_id').toQuery());
+    });
+
+    it('.orWhereNull (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereNull(t => t.managerId)
+                .orWhereNull(t => t.departmentId)
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .whereNull('manager_id')
+                .orWhereNull('department_id')
+                .toQuery()
+        );
+    });
+
+    it('.orWhereNotNull (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereNull(t => t.managerId)
+                .orWhereNotNull(t => t.departmentId)
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .whereNull('manager_id')
+                .orWhereNotNull('department_id')
+                .toQuery()
+        );
+    });
+
+    it('.whereBetween (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .whereBetween(t => t.departmentId, [1, 10])
+                .toQuery()
+        ).toBe(knex('users').whereBetween('department_id', [1, 10]).toQuery());
+    });
+
+    it('.whereNotBetween (string key)', () => {
+        expect(
+            query(knex, User)
+                .whereNotBetween('departmentId', [20, 30])
+                .toQuery()
+        ).toBe(
+            knex('users').whereNotBetween('department_id', [20, 30]).toQuery()
+        );
+    });
+
+    it('.whereRaw passthrough', () => {
+        expect(
+            query(knex, User).whereRaw('full_name ILIKE ?', '%smith%').toQuery()
+        ).toBe(
+            knex('users').whereRaw('full_name ILIKE ?', '%smith%').toQuery()
+        );
+    });
+
+    // ── ORDER BY ──────────────────────────────────────────────────────────
+
+    it('.orderBy asc (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .orderBy(t => t.fullName, 'asc')
+                .toQuery()
+        ).toBe(knex('users').orderBy('full_name', 'asc').toQuery());
+    });
+
+    it('.orderBy desc (string key)', () => {
+        expect(query(knex, User).orderBy('createdAt', 'desc').toQuery()).toBe(
+            knex('users').orderBy('created_at', 'desc').toQuery()
+        );
+    });
+
+    it('.orderByRaw passthrough', () => {
+        expect(
+            query(knex, User)
+                .orderByRaw('"created_at" DESC NULLS LAST')
+                .toQuery()
+        ).toBe(
+            knex('users').orderByRaw('"created_at" DESC NULLS LAST').toQuery()
+        );
+    });
+
+    // ── LIMIT / OFFSET ────────────────────────────────────────────────────
+
+    it('.limit', () => {
+        expect(query(knex, User).limit(25).toQuery()).toBe(
+            knex('users').limit(25).toQuery()
+        );
+    });
+
+    it('.offset', () => {
+        expect(query(knex, User).offset(50).toQuery()).toBe(
+            knex('users').offset(50).toQuery()
+        );
+    });
+
+    it('.limit + .offset', () => {
+        expect(query(knex, User).limit(10).offset(20).toQuery()).toBe(
+            knex('users').limit(10).offset(20).toQuery()
+        );
+    });
+
+    // ── GROUP BY / HAVING ─────────────────────────────────────────────────
+
+    it('.groupBy (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .groupBy(t => t.role)
+                .toQuery()
+        ).toBe(knex('users').groupBy('role').toQuery());
+    });
+
+    it('.groupBy (string key, mapped column)', () => {
+        expect(query(knex, User).groupBy('departmentId').toQuery()).toBe(
+            knex('users').groupBy('department_id').toQuery()
+        );
+    });
+
+    it('.groupBy multiple columns', () => {
+        expect(
+            query(knex, User).groupBy('role', 'departmentId').toQuery()
+        ).toBe(knex('users').groupBy('role', 'department_id').toQuery());
+    });
+
+    it('.groupByRaw passthrough', () => {
+        expect(query(knex, User).groupByRaw('"role"').toQuery()).toBe(
+            knex('users').groupByRaw('"role"').toQuery()
+        );
+    });
+
+    it('.having (string key)', () => {
+        expect(
+            query(knex, User)
+                .groupBy('role')
+                .having('role', '!=', 'banned')
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .groupBy('role')
+                .having('role', '!=', 'banned')
+                .toQuery()
+        );
+    });
+
+    it('.havingRaw passthrough', () => {
+        expect(
+            query(knex, User)
+                .groupBy('role')
+                .havingRaw('count(*) > 5')
+                .toQuery()
+        ).toBe(
+            knex('users').groupBy('role').havingRaw('count(*) > 5').toQuery()
+        );
+    });
+
+    // ── AGGREGATES ────────────────────────────────────────────────────────
+
+    it('.count()', () => {
+        expect(query(knex, User).count().toQuery()).toBe(
+            knex('users').count().toQuery()
+        );
+    });
+
+    it('.count(column, descriptor)', () => {
+        expect(
+            query(knex, User)
+                .count(t => t.id)
+                .toQuery()
+        ).toBe(knex('users').count('id').toQuery());
+    });
+
+    it('.countDistinct(column, descriptor)', () => {
+        expect(
+            query(knex, User)
+                .countDistinct(t => t.departmentId)
+                .toQuery()
+        ).toBe(knex('users').countDistinct('department_id').toQuery());
+    });
+
+    it('.min (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .min(t => t.createdAt)
+                .toQuery()
+        ).toBe(knex('users').min('created_at').toQuery());
+    });
+
+    it('.max (descriptor)', () => {
+        expect(
+            query(knex, User)
+                .max(t => t.createdAt)
+                .toQuery()
+        ).toBe(knex('users').max('created_at').toQuery());
+    });
+
+    it('.sum (string key)', () => {
+        expect(query(knex, User).sum('departmentId').toQuery()).toBe(
+            knex('users').sum('department_id').toQuery()
+        );
+    });
+
+    it('.avg (string key)', () => {
+        expect(query(knex, User).avg('departmentId').toQuery()).toBe(
+            knex('users').avg('department_id').toQuery()
+        );
+    });
+
+    // ── COMBINED ──────────────────────────────────────────────────────────
+
+    it('combined: SELECT + WHERE + ORDER BY + LIMIT + OFFSET', () => {
+        expect(
+            query(knex, User)
+                .select(
+                    t => t.fullName,
+                    t => t.email,
+                    t => t.role
+                )
+                .where(t => t.role, '=', 'admin')
+                .andWhere(t => t.departmentId, '>', 5)
+                .orderBy(t => t.fullName, 'asc')
+                .limit(20)
+                .offset(40)
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .select('full_name', 'email', 'role')
+                .where('role', '=', 'admin')
+                .andWhere('department_id', '>', 5)
+                .orderBy('full_name', 'asc')
+                .limit(20)
+                .offset(40)
+                .toQuery()
+        );
+    });
+
+    it('combined: WHERE complex + GROUP BY + HAVING', () => {
+        expect(
+            query(knex, User)
+                .select(t => t.role)
+                .whereIn(t => t.role, ['admin', 'editor'])
+                .groupBy(t => t.role)
+                .having('role', '!=', 'banned')
+                .toQuery()
+        ).toBe(
+            knex('users')
+                .select('role')
+                .whereIn('role', ['admin', 'editor'])
+                .groupBy('role')
+                .having('role', '!=', 'banned')
+                .toQuery()
+        );
     });
 });
