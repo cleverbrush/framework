@@ -137,7 +137,7 @@ export class ServerBuilder {
     }
 
     /**
-     * Enable the `GET /healthz` endpoint that returns `{ ok: true }` (200).
+     * Enable the `GET /health` endpoint that returns `{ ok: true }` (200).
      * Useful for load balancer and container readiness probes.
      */
     withHealthcheck(): this {

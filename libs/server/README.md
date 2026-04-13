@@ -16,7 +16,7 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 - **RFC 9457 Problem Details** — validation errors and `HttpError` subclasses are serialized as `application/problem+json`.
 - **Type-safe routes** — `route()` builds typed path parameters using `ParseStringSchemaBuilder` segments.
 - **OpenAPI-ready** — `getRegistrations()` exposes endpoint metadata for `@cleverbrush/server-openapi`.
-- **Health check** — optional `/healthz` endpoint via `server.withHealthcheck()`.
+- **Health check** — optional `/health` endpoint via `server.withHealthcheck()`.
 
 ## Installation
 
@@ -27,7 +27,7 @@ npm install @cleverbrush/server @cleverbrush/schema
 ## Quick Start
 
 ```ts
-import { ServerBuilder } from '@cleverbrush/server';
+import { ServerBuilder, endpoint, ActionResult } from '@cleverbrush/server';
 import { object, string, number } from '@cleverbrush/schema';
 
 const CreateUserBody = object({ name: string(), age: number() });
@@ -63,7 +63,7 @@ const delUser  = endpoint.delete('/api/users/:id');
 
 ### Request Validation
 
-Attach schemas for body, query string, and headers. Validation errors automatically produce a 422 Problem Details response.
+Attach schemas for body, query string, and headers. Validation errors automatically produce a 400 Problem Details response.
 
 ```ts
 import { object, string, number } from '@cleverbrush/schema';
@@ -83,10 +83,10 @@ Use `route()` to define path parameters with the full schema type system:
 
 ```ts
 import { route } from '@cleverbrush/server';
-import { object, number } from '@cleverbrush/schema';
+import { number } from '@cleverbrush/schema';
 
 const GetUser = endpoint.get(
-    route(object({ id: number().coerce() }), $t => $t`/api/users/${t => t.id}`)
+    route({ id: number().coerce() })`/api/users/${t => t.id}`
 );
 
 server.handle(GetUser, ({ params }) => {
