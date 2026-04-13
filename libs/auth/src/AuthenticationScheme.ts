@@ -19,6 +19,10 @@ export interface AuthenticationContext {
 // Authentication Result
 // ---------------------------------------------------------------------------
 
+/**
+ * The result returned by {@link AuthenticationScheme.authenticate}.
+ * On success, provides a typed `Principal`; on failure, an optional reason.
+ */
 export type AuthenticationResult<T = unknown> =
     | { succeeded: true; principal: Principal<T> }
     | { succeeded: false; failure?: string };

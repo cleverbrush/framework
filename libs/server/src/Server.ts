@@ -37,6 +37,13 @@ import type {
 // Authentication / Authorization Config Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Authentication configuration passed to `ServerBuilder.useAuthentication()`.
+ *
+ * At least one scheme must be listed. The `defaultScheme` name must match
+ * one of the registered scheme `name` values — it is used when no specific
+ * scheme is requested.
+ */
 export interface AuthenticationConfig {
     /** Name of the default scheme to use (must match a scheme's `name`). */
     defaultScheme: string;
@@ -44,11 +51,32 @@ export interface AuthenticationConfig {
     schemes: AuthenticationScheme<any>[];
 }
 
+/**
+ * Authorization configuration passed to `ServerBuilder.useAuthorization()`.
+ *
+ * Named policies can be referenced by string in future `authorize('policy-name')`
+ * calls (currently resolved at startup time).
+ */
 export interface AuthorizationConfig {
     /** Named policies (looked up by `authorize('policy-name')` — future use). */
     policies?: Record<string, (builder: PolicyBuilder) => void>;
 }
 
+/**
+ * Fluent builder for constructing and starting an HTTP server.
+ *
+ * @example
+ * ```ts
+ * const server = new ServerBuilder();
+ *
+ * server
+ *     .services(svc => svc.addSingleton(IDb, () => new Db()))
+ *     .use(loggingMiddleware)
+ *     .handle(GetUser, ({ params }) => db.find(params.id));
+ *
+ * await server.listen(3000);
+ * ```
+ */
 export class ServerBuilder {
     readonly #serviceCollection = new ServiceCollection();
     readonly #registrations: EndpointRegistration[] = [];
@@ -59,16 +87,29 @@ export class ServerBuilder {
     #authzConfig: AuthorizationConfig | null = null;
     #healthcheck = false;
 
+    /**
+     * Configure the DI service collection.
+     *
+     * @param configureFn - Receives the `ServiceCollection` for registrations.
+     */
     services(configureFn: (svc: ServiceCollection) => void): this {
         configureFn(this.#serviceCollection);
         return this;
     }
 
+    /**
+     * Add a global middleware that runs for every request.
+     * Middleware is executed in the order it is added.
+     */
     use(middleware: Middleware): this {
         this.#globalMiddlewares.push(middleware);
         return this;
     }
 
+    /**
+     * Register an additional content type handler for content negotiation.
+     * JSON is registered by default.
+     */
     contentType(handler: ContentTypeHandler): this {
         this.#contentNegotiator.register(handler);
         return this;
@@ -95,11 +136,22 @@ export class ServerBuilder {
         return this;
     }
 
+    /**
+     * Enable the `GET /healthz` endpoint that returns `{ ok: true }` (200).
+     * Useful for load balancer and container readiness probes.
+     */
     withHealthcheck(): this {
         this.#healthcheck = true;
         return this;
     }
 
+    /**
+     * Register an endpoint and its handler.
+     *
+     * @param endpointDef - An `EndpointBuilder` instance (e.g. from `endpoint.get(...)`).
+     * @param handler - The typed handler function.
+     * @param options - Optional per-endpoint middleware.
+     */
     handle<E extends EndpointBuilder<any, any, any, any, any, any, any, any>>(
         endpointDef: E,
         handler: Handler<E>,
@@ -129,6 +181,13 @@ export class ServerBuilder {
         return this.#authConfig;
     }
 
+    /**
+     * Start listening on the given port and host. Resolves with the running
+     * {@link Server} instance.
+     *
+     * @param port - TCP port (default: `ServerOptions.port ?? 3000`).
+     * @param host - Bind address (default: `ServerOptions.host ?? '0.0.0.0'`).
+     */
     async listen(port?: number, host?: string): Promise<Server> {
         const router = new Router();
 
@@ -185,6 +244,11 @@ export class ServerBuilder {
     }
 }
 
+/**
+ * The running HTTP/HTTPS server instance returned by `ServerBuilder.listen()`.
+ *
+ * Use `close()` to gracefully shut down the server.
+ */
 export class Server {
     readonly #router: Router;
     readonly #serviceProvider: ServiceProvider;
@@ -207,6 +271,10 @@ export class Server {
         this.#healthcheck = healthcheck;
     }
 
+    /**
+     * Start listening. Called internally by `ServerBuilder.listen()` after
+     * the server is fully configured.
+     */
     async start(
         port: number,
         host: string,
@@ -240,6 +308,7 @@ export class Server {
         });
     }
 
+    /** Gracefully stop the server and free the TCP port. */
     async close(): Promise<void> {
         if (!this.#httpServer) return;
         await new Promise<void>((resolve, reject) => {
@@ -251,6 +320,10 @@ export class Server {
         this.#httpServer = null;
     }
 
+    /**
+     * The bound address after `listen()` resolves.
+     * Returns `null` if the server has been closed or not yet started.
+     */
     get address(): { port: number; host: string } | null {
         const addr = this.#httpServer?.address();
         if (!addr || typeof addr === 'string') return null;

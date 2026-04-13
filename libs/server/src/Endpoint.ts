@@ -27,6 +27,12 @@ type ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal> = {
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
     (TPrincipal extends undefined ? {} : { principal: TPrincipal });
 
+/**
+ * The fully-typed argument object passed to endpoint handlers.
+ *
+ * The shape is inferred from the `EndpointBuilder` chain — only the keys
+ * actually configured (body, query, headers, params, principal) are present.
+ */
 export type ActionContext<E> =
     E extends EndpointBuilder<
         infer TParams,
@@ -53,6 +59,10 @@ type InferServices<T> = {
         : never;
 };
 
+/**
+ * Extracts the injected service schemas map from an `EndpointBuilder` type.
+ * Used internally by the `Handler` type to derive the `services` argument.
+ */
 export type ServiceSchemas<E> =
     E extends EndpointBuilder<
         any,
@@ -85,6 +95,12 @@ type ResponseType<E> =
 // Handler — the action function type, inferred from an endpoint
 // ---------------------------------------------------------------------------
 
+/**
+ * The handler function type inferred from an `EndpointBuilder`.
+ *
+ * When the endpoint has injected services, the handler receives a second
+ * `services` argument with all resolved service instances.
+ */
 export type Handler<E> =
     HasKeys<ServiceSchemas<E>> extends true
         ? (
@@ -107,6 +123,11 @@ export type Handler<E> =
 
 type RoutePath = string | ParseStringSchemaBuilder<any, any, any, any, any>;
 
+/**
+ * Snapshot of all configuration set on an `EndpointBuilder`.
+ * Used by the server for routing and by `@cleverbrush/server-openapi` for
+ * spec generation.
+ */
 export interface EndpointMetadata {
     readonly method: string;
     readonly basePath: string;
@@ -149,6 +170,23 @@ export interface EndpointMetadata {
     readonly responseSchema: SchemaBuilder<any, any, any, any, any> | null;
 }
 
+/**
+ * Immutable, fluent builder for HTTP endpoint definitions.
+ *
+ * All methods return a new builder instance — the original is never mutated.
+ * Use the {@link endpoint} singleton (or {@link createEndpoints}) to obtain
+ * the first builder in the chain.
+ *
+ * @example
+ * ```ts
+ * const GetUser = endpoint
+ *     .get('/api/users')
+ *     .query(object({ id: number().coerce() }))
+ *     .authorize(UserPrincipal, 'admin')
+ *     .returns(UserSchema)
+ *     .summary('Get a user by ID');
+ * ```
+ */
 export class EndpointBuilder<
     TParams = {},
     TBody = undefined,
@@ -244,6 +282,8 @@ export class EndpointBuilder<
         this.#responseSchema = responseSchema;
     }
 
+    /** Define the request body schema. Validation failures return 422 Problem Details. */
+    /** Define the request body schema. Validation failures return 422 Problem Details. */
     body<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
     ): EndpointBuilder<
@@ -274,6 +314,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** Define the query string schema (must be an object schema). Validation failures return 422. */
     query<
         TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
@@ -306,6 +347,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** Define an expected request headers schema (must be an object schema). */
     headers<
         TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
     >(
@@ -338,6 +380,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** Declare DI services to be resolved per-request and passed as the second handler argument. */
     inject<
         TSchemas extends Record<string, SchemaBuilder<any, any, any, any, any>>
     >(
@@ -450,6 +493,13 @@ export class EndpointBuilder<
         );
     }
 
+    /**
+     * Declare the response type for OpenAPI spec generation.
+     *
+     * Overloads:
+     * - `returns<T>()` — generic type only, no runtime schema
+     * - `returns(schema)` — provides a schema for spec generation and type inference
+     */
     returns<T>(): EndpointBuilder<
         TParams,
         TBody,
@@ -499,6 +549,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** Short, human-readable summary for OpenAPI operation objects. */
     summary(
         text: string
     ): EndpointBuilder<
@@ -529,6 +580,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** Longer description for OpenAPI operation objects. Supports Markdown. */
     description(
         text: string
     ): EndpointBuilder<
@@ -559,6 +611,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** OpenAPI tags grouping this operation in generated documentation. */
     tags(
         ...tags: string[]
     ): EndpointBuilder<
@@ -589,6 +642,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** A unique, stable identifier for this operation in OpenAPI spec. */
     operationId(
         id: string
     ): EndpointBuilder<
@@ -619,6 +673,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** Mark this endpoint as deprecated in OpenAPI spec output. */
     deprecated(): EndpointBuilder<
         TParams,
         TBody,
@@ -647,6 +702,7 @@ export class EndpointBuilder<
         );
     }
 
+    /** Return an immutable snapshot of this builder's configuration as {@link EndpointMetadata}. */
     introspect(): EndpointMetadata {
         return {
             method: this.#method,
@@ -671,6 +727,9 @@ export class EndpointBuilder<
 // endpoint factory — creates EndpointBuilder instances
 // ---------------------------------------------------------------------------
 
+/**
+ * Optional OpenAPI metadata fields accepted by `createEndpoint` / `createEndpoints`.
+ */
 export type EndpointMetadataDescriptors = {
     readonly summary?: string;
     readonly description?: string;
@@ -858,6 +917,20 @@ export function createEndpoints<const T extends Record<string, string>>(
     return endpoint as EndpointFactory<T[keyof T]>;
 }
 
+/**
+ * The global endpoint factory singleton.
+ *
+ * Creates `EndpointBuilder` instances for each HTTP method. Use
+ * {@link createEndpoints} to get a role-constrained version.
+ *
+ * @example
+ * ```ts
+ * import { endpoint } from '@cleverbrush/server';
+ *
+ * const GetUsers = endpoint.get('/api/users');
+ * const CreateUser = endpoint.post('/api/users').body(CreateUserSchema);
+ * ```
+ */
 export const endpoint: EndpointFactory = {
     get: (basePath, pathTemplate?) =>
         createEndpoint('GET', basePath, pathTemplate),

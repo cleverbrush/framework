@@ -28,6 +28,10 @@ export function parseCookies(header: string): Record<string, string> {
 // Cookie Serialization
 // ---------------------------------------------------------------------------
 
+/**
+ * Options for the `Set-Cookie` header, controlling cookie lifetime,
+ * scope, and security attributes.
+ */
 export interface CookieOptions {
     /** Max lifetime in seconds. */
     maxAge?: number;

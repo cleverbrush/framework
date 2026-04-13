@@ -13,11 +13,19 @@ function isParseStringSchema(
     return typeof p !== 'string' && typeof (p as any).validate === 'function';
 }
 
+/**
+ * Describes a single path parameter extracted from a route template,
+ * including its name and the JSON Schema representation of its type.
+ */
 export interface PathParameterInfo {
     readonly name: string;
     readonly schema: Record<string, unknown>;
 }
 
+/**
+ * The output of resolving a route path template to an OpenAPI-compatible
+ * path string and its parameter list.
+ */
 export interface ResolvedPath {
     /** OpenAPI-formatted path, e.g. `/api/users/{id}` */
     readonly path: string;

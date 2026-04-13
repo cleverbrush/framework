@@ -4,6 +4,10 @@ import type { ProblemDetails, ValidationErrorItem } from './ProblemDetails.js';
 import { createValidationProblemDetails } from './ProblemDetails.js';
 import type { RequestContext } from './RequestContext.js';
 
+/**
+ * Result returned by `resolveArgs()`. When `valid` is `false` the
+ * `problemDetails` payload should be sent as a 422 response.
+ */
 export type ResolveResult =
     | { valid: true; args: unknown[] }
     | { valid: false; problemDetails: ProblemDetails };

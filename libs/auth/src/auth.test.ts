@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
     AuthorizationService,
     cookieScheme,
+    defineRoles,
     jwtScheme,
+    PolicyBuilder,
     Principal,
     parseCookies,
     requireRole,
@@ -399,5 +401,70 @@ describe('cookieScheme', () => {
         });
 
         expect(result.succeeded).toBe(false);
+    });
+});
+
+// -----------------------------------------------------------------------
+// PolicyBuilder
+// -----------------------------------------------------------------------
+
+describe('PolicyBuilder', () => {
+    it('builds a policy with a name and role requirement', async () => {
+        const policy = new PolicyBuilder()
+            .requireRole('admin')
+            .build('admin-only');
+
+        expect(policy.name).toBe('admin-only');
+        expect(policy.requirements).toHaveLength(1);
+        const claims = new Map<string, string | string[]>([['role', 'admin']]);
+        const allowed = await policy.requirements[0](
+            new Principal(true, {}, claims)
+        );
+        expect(allowed).toBe(true);
+    });
+
+    it('builds a policy with a custom requirement', async () => {
+        const policy = new PolicyBuilder()
+            .require(p => p.isAuthenticated)
+            .build('authenticated');
+
+        expect(policy.name).toBe('authenticated');
+        expect(await policy.requirements[0](new Principal(true, {}))).toBe(
+            true
+        );
+        expect(await policy.requirements[0](Principal.anonymous())).toBe(false);
+    });
+
+    it('accumulates multiple requirements', () => {
+        const policy = new PolicyBuilder()
+            .requireRole('editor')
+            .require(p => p.isAuthenticated)
+            .build('strict');
+
+        expect(policy.requirements).toHaveLength(2);
+    });
+
+    it('is chainable (returns this)', () => {
+        const builder = new PolicyBuilder();
+        const returned = builder.requireRole('admin');
+        expect(returned).toBe(builder);
+    });
+});
+
+// -----------------------------------------------------------------------
+// defineRoles
+// -----------------------------------------------------------------------
+
+describe('defineRoles', () => {
+    it('returns a frozen object with the provided roles', () => {
+        const Roles = defineRoles({ admin: 'admin', editor: 'editor' });
+        expect(Roles.admin).toBe('admin');
+        expect(Roles.editor).toBe('editor');
+        expect(Object.isFrozen(Roles)).toBe(true);
+    });
+
+    it('preserves all keys', () => {
+        const Roles = defineRoles({ a: 'a', b: 'b', c: 'c' });
+        expect(Object.keys(Roles)).toEqual(['a', 'b', 'c']);
     });
 });
