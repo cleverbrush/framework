@@ -58,8 +58,6 @@ export interface JwtSchemeOptions<T> {
     clockTolerance?: number;
     /** Custom scheme name (default: 'jwt'). */
     name?: string;
-    /** Claim key used for roles (default: 'role'). */
-    roleClaim?: string;
 }
 
 // ---------------------------------------------------------------------------
