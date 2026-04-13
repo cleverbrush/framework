@@ -1,5 +1,5 @@
 import { signJwt } from '@cleverbrush/auth';
-import { type ActionContext, ActionResult } from '@cleverbrush/server';
+import { ActionResult, type Handler } from '@cleverbrush/server';
 import { JWT_SECRET } from '../config.js';
 import type { loginEp } from '../endpoints.js';
 
@@ -10,9 +10,9 @@ const USERS: Record<string, { password: string; name: string; role: string }> =
         carol: { password: 'carol123', name: 'Carol', role: 'user' }
     };
 
-export function login({
+export const login: Handler<typeof loginEp> = ({
     body: { username, password }
-}: ActionContext<typeof loginEp>) {
+}) => {
     const user = USERS[username];
     if (!user || user.password !== password) {
         return ActionResult.json(
@@ -25,4 +25,4 @@ export function login({
         JWT_SECRET
     );
     return { token };
-}
+};

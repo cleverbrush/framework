@@ -1,7 +1,7 @@
 import {
-    type ActionContext,
     ActionResult,
     ForbiddenError,
+    type Handler,
     NotFoundError
 } from '@cleverbrush/server';
 import type {
@@ -22,10 +22,10 @@ function assertCanAccess(
     }
 }
 
-export function listTodos({
+export const listTodos: Handler<typeof listTodosEp> = ({
     principal,
     query
-}: ActionContext<typeof listTodosEp>) {
+}) => {
     const all = [...todos.values()];
     if (principal.role === 'admin' && query.ownerId) {
         return all.filter(t => t.ownerId === query.ownerId);
@@ -34,46 +34,43 @@ export function listTodos({
         return all.filter(t => t.ownerId === principal.userId);
     }
     return all;
-}
+};
 
-export function getTodo({
-    params,
-    principal
-}: ActionContext<typeof getTodoEp>) {
+export const getTodo: Handler<typeof getTodoEp> = ({ params, principal }) => {
     const todo = todos.get(params.id);
     if (!todo) throw new NotFoundError(`Todo ${params.id} not found`);
     assertCanAccess(principal, todo);
     return todo;
-}
+};
 
-export function createTodo({
+export const createTodo: Handler<typeof createTodoEp> = ({
     body,
     principal
-}: ActionContext<typeof createTodoEp>) {
+}) => {
     const todo = addTodo(body.title, principal.userId);
     return ActionResult.created(todo, `/api/todos/${todo.id}`);
-}
+};
 
-export function updateTodo({
+export const updateTodo: Handler<typeof updateTodoEp> = ({
     params,
     body,
     principal
-}: ActionContext<typeof updateTodoEp>) {
+}) => {
     const todo = todos.get(params.id);
     if (!todo) throw new NotFoundError(`Todo ${params.id} not found`);
     assertCanAccess(principal, todo);
     if (body.title !== undefined) todo.title = body.title;
     if (body.completed !== undefined) todo.completed = body.completed;
     return todo;
-}
+};
 
-export function deleteTodo({
+export const deleteTodo: Handler<typeof deleteTodoEp> = ({
     params,
     principal
-}: ActionContext<typeof deleteTodoEp>) {
+}) => {
     const todo = todos.get(params.id);
     if (!todo) throw new NotFoundError(`Todo ${params.id} not found`);
     assertCanAccess(principal, todo);
     todos.delete(params.id);
     return ActionResult.noContent();
-}
+};
