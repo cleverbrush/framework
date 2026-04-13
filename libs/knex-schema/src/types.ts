@@ -72,7 +72,9 @@ export interface JoinOneSpec<
     /** Foreign schema for type inference */
     foreignSchema: TForeignSchema;
     /** Optional post-load value transformers per foreign column */
-    mappers?: Partial<Record<SchemaKeys<TForeignSchema>, (value: any) => any>>;
+    mappers?: Partial<
+        Record<SchemaKeys<TForeignSchema>, ((value: any) => any) | string>
+    >;
 }
 
 // ---------------------------------------------------------------------------
@@ -111,7 +113,9 @@ export interface JoinManySpec<
         direction?: 'asc' | 'desc';
     };
     /** Optional post-load value transformers per foreign column */
-    mappers?: Partial<Record<SchemaKeys<TForeignSchema>, (value: any) => any>>;
+    mappers?: Partial<
+        Record<SchemaKeys<TForeignSchema>, ((value: any) => any) | string>
+    >;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,7 +168,7 @@ export interface ValidatedJoinOneSpec {
     as: string;
     required: boolean;
     foreignQuery: Knex.QueryBuilder;
-    mappers?: Record<string, (value: any) => any>;
+    mappers?: Record<string, ((value: any) => any) | string>;
 }
 
 export interface ValidatedJoinManySpec {
@@ -175,7 +179,7 @@ export interface ValidatedJoinManySpec {
     limit: number | null;
     offset: number | null;
     orderBy: { column: string; direction: 'asc' | 'desc' } | null;
-    mappers?: Record<string, (value: any) => any>;
+    mappers?: Record<string, ((value: any) => any) | string>;
 }
 
 export type ValidatedSpec =

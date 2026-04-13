@@ -123,8 +123,8 @@ export class SchemaQueryBuilder<
      *
      * @param spec - Join specification. Key fields:
      *   - `foreignSchema` — the `ObjectSchemaBuilder` of the related table.
-     *   - `localKey` — the local column that holds the foreign-table reference.
-     *   - `foreignKey` — the primary/unique key on the foreign table.
+     *   - `localColumn` — the local column that holds the foreign-table reference.
+     *   - `foreignColumn` — the primary/unique key on the foreign table.
      *   - `as` — the property name to attach the related object under.
      *   - `required` — if `true` (default), rows without a matching related
      *     record are excluded (inner join); if `false`, they are included with
@@ -151,8 +151,8 @@ export class SchemaQueryBuilder<
      * const posts = await query(db, PostSchema)
      *     .joinOne({
      *         foreignSchema: AuthorSchema,
-     *         localKey:      t => t.authorId,
-     *         foreignKey:    t => t.id,
+     *         localColumn:   t => t.authorId,
+     *         foreignColumn: t => t.id,
      *         as:            'author',
      *     });
      * // posts[0].author.name — typed as string ✓
@@ -193,8 +193,8 @@ export class SchemaQueryBuilder<
      *
      * @param spec - Join specification. Key fields:
      *   - `foreignSchema` — the `ObjectSchemaBuilder` of the related table.
-     *   - `localKey` — the primary/unique key on the local table.
-     *   - `foreignKey` — the column on the foreign table that references `localKey`.
+     *   - `localColumn` — the primary/unique key on the local table.
+     *   - `foreignColumn` — the column on the foreign table that references `localColumn`.
      *   - `as` — the property name to attach the array under.
      *   - `limit` / `offset` — optional pagination per parent row.
      *   - `orderBy` — optional `{ column, direction }` for the sub-collection.
@@ -219,8 +219,8 @@ export class SchemaQueryBuilder<
      * const users = await query(db, UserSchema)
      *     .joinMany({
      *         foreignSchema: PostSchema,
-     *         localKey:      t => t.id,
-     *         foreignKey:    t => t.authorId,
+     *         localColumn:   t => t.id,
+     *         foreignColumn: t => t.authorId,
      *         as:            'posts',
      *         limit:         5,
      *         orderBy:       { column: t => t.id, direction: 'desc' },

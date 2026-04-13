@@ -7,6 +7,9 @@ import {
     date,
     getColumnName,
     getTableName,
+    MAPPERS,
+    mapObject,
+    mapValue,
     number,
     object,
     query,
@@ -579,7 +582,126 @@ describe('eager loading', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// SQL parity — SchemaQueryBuilder vs raw knex
+// Mapper tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('mappers', () => {
+    describe('MAPPERS built-ins', () => {
+        it('date_from_json converts a date string to a Date object', () => {
+            const result = MAPPERS.date_from_json('2024-01-15T00:00:00.000Z');
+            expect(result).toBeInstanceOf(Date);
+            expect((result as Date).getFullYear()).toBe(2024);
+        });
+
+        it('date_from_json passes through falsy values', () => {
+            expect(MAPPERS.date_from_json(null)).toBeNull();
+            expect(MAPPERS.date_from_json('')).toBe('');
+            expect(MAPPERS.date_from_json(0)).toBe(0);
+        });
+    });
+
+    describe('mapValue', () => {
+        it('calls a function mapper directly', () => {
+            const double = (v: number) => v * 2;
+            expect(mapValue(double, 5)).toBe(10);
+        });
+
+        it('resolves a built-in string mapper by name', () => {
+            const result = mapValue(
+                'date_from_json',
+                '2024-06-01T00:00:00.000Z'
+            );
+            expect(result).toBeInstanceOf(Date);
+        });
+
+        it('throws for an unknown built-in string name', () => {
+            expect(() => mapValue('unknown_mapper', 'x')).toThrow(
+                'unknown mapper "unknown_mapper"'
+            );
+        });
+    });
+
+    describe('mapObject', () => {
+        it('applies function mappers to specified keys', () => {
+            const obj = { a: 1, b: 2, c: 3 };
+            const result = mapObject(obj, { a: v => v * 10 });
+            expect(result).toEqual({ a: 10, b: 2, c: 3 });
+        });
+
+        it('applies built-in string mappers to specified keys', () => {
+            const obj = {
+                createdAt: '2024-01-15T00:00:00.000Z',
+                name: 'Alice'
+            };
+            const result = mapObject(obj, { createdAt: 'date_from_json' });
+            expect(result.createdAt).toBeInstanceOf(Date);
+            expect(result.name).toBe('Alice');
+        });
+    });
+
+    describe('validateMappers via joinOne/joinMany', () => {
+        it('accepts a function mapper in joinOne spec', () => {
+            expect(() =>
+                query(knex, User).joinOne({
+                    localColumn: t => t.departmentId,
+                    foreignColumn: t => t.id,
+                    as: 'department',
+                    foreignSchema: Department,
+                    mappers: { name: v => String(v).toUpperCase() }
+                })
+            ).not.toThrow();
+        });
+
+        it('accepts a built-in string mapper name in joinOne spec', () => {
+            expect(() =>
+                query(knex, Post).joinOne({
+                    localColumn: t => t.authorId,
+                    foreignColumn: t => t.id,
+                    as: 'author',
+                    foreignSchema: User,
+                    mappers: { createdAt: 'date_from_json' }
+                })
+            ).not.toThrow();
+        });
+
+        it('rejects an unknown built-in string mapper name in joinOne spec', () => {
+            expect(() =>
+                query(knex, User).joinOne({
+                    localColumn: t => t.departmentId,
+                    foreignColumn: t => t.id,
+                    as: 'department',
+                    foreignSchema: Department,
+                    mappers: { name: 'not_a_real_mapper' as any }
+                })
+            ).toThrow('unknown built-in mapper name "not_a_real_mapper"');
+        });
+
+        it('accepts a built-in string mapper name in joinMany spec', () => {
+            expect(() =>
+                query(knex, User).joinMany({
+                    localColumn: t => t.id,
+                    foreignColumn: t => t.authorId,
+                    as: 'posts',
+                    foreignSchema: Post,
+                    mappers: { createdAt: 'date_from_json' }
+                })
+            ).not.toThrow();
+        });
+
+        it('rejects a non-function, non-string mapper value', () => {
+            expect(() =>
+                query(knex, User).joinOne({
+                    localColumn: t => t.departmentId,
+                    foreignColumn: t => t.id,
+                    as: 'department',
+                    foreignSchema: Department,
+                    mappers: { name: 42 as any }
+                })
+            ).toThrow('must be a function or a built-in mapper name');
+        });
+    });
+});
+
 //
 // For each method, we verify that SchemaQueryBuilder produces exactly the
 // same SQL as a raw knex query built with the mapped column names directly.

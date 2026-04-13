@@ -4,6 +4,7 @@ import type { ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { resolveColumnRef } from './columns.js';
 import { getTableName } from './extension.js';
+import { MAPPERS } from './mappers.js';
 import type {
     JoinManySpec,
     JoinOneSpec,
@@ -67,7 +68,9 @@ export function validateJoinOne(
         as: spec.as,
         required,
         foreignQuery,
-        mappers: spec.mappers as Record<string, (value: any) => any> | undefined
+        mappers: spec.mappers as
+            | Record<string, ((value: any) => any) | string>
+            | undefined
     };
 }
 
@@ -123,7 +126,9 @@ export function validateJoinMany(
         limit,
         offset,
         orderBy,
-        mappers: spec.mappers as Record<string, (value: any) => any> | undefined
+        mappers: spec.mappers as
+            | Record<string, ((value: any) => any) | string>
+            | undefined
     };
 }
 
@@ -132,8 +137,17 @@ function validateMappers(mappers: Record<string, unknown>): void {
         throw new Error('mappers must be an object');
     }
     for (const key of Object.keys(mappers)) {
-        if (typeof mappers[key] !== 'function') {
-            throw new Error(`mapper for "${key}" must be a function`);
+        const m = mappers[key];
+        if (typeof m === 'string') {
+            if (typeof MAPPERS[m] !== 'function') {
+                throw new Error(
+                    `mapper for "${key}": unknown built-in mapper name "${m}"`
+                );
+            }
+        } else if (typeof m !== 'function') {
+            throw new Error(
+                `mapper for "${key}" must be a function or a built-in mapper name`
+            );
         }
     }
 }
