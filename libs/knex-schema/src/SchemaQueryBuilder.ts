@@ -78,6 +78,11 @@ export class SchemaQueryBuilder<
     readonly #localSchema: TLocalSchema;
     readonly #specs: ValidatedSpec[] = [];
     readonly #tableName: string;
+    /**
+     * Tracks the SQL column names that were explicitly passed to `.select()`.
+     * `null` means no explicit select was made (SELECT *).
+     */
+    #explicitSelects: string[] | null = null;
 
     /**
      * @param knex - A configured Knex instance.
@@ -736,6 +741,13 @@ export class SchemaQueryBuilder<
     select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.select(...(resolved as string[]));
+        // Track the string-resolved columns (not Knex.Raw) for CTE column management
+        this.#explicitSelects ??= [];
+        for (const r of resolved) {
+            if (typeof r === 'string') {
+                this.#explicitSelects.push(r);
+            }
+        }
         return this;
     }
 
@@ -937,15 +949,57 @@ export class SchemaQueryBuilder<
         const knex = this.#knex;
         const specs = this.#specs;
 
-        const resultQuery = knex
-            .queryBuilder()
-            .with('originalQuery', this.#baseQuery)
-            .select('originalQuery.*')
-            .from(
-                knex.raw(':originalQuery:', {
-                    originalQuery: 'originalQuery'
-                })
+        // Collect all localColumns needed for CTE joins
+        const requiredLocalColumns = [
+            ...new Set(specs.map(s => s.localColumn))
+        ];
+
+        // If the caller used .select(...), some localColumns may have been
+        // omitted. Clone the base query and ensure those columns are always
+        // included in the CTE so the join conditions work at runtime.
+        // Track which columns we added so they can be excluded from the
+        // final SELECT (preserving the original column set the caller asked for).
+        let cteQuery = this.#baseQuery;
+        let extraColumns: string[] = [];
+
+        if (this.#explicitSelects !== null) {
+            const selectedSet = new Set(this.#explicitSelects);
+            extraColumns = requiredLocalColumns.filter(
+                col => !selectedSet.has(col)
             );
+            if (extraColumns.length > 0) {
+                cteQuery = this.#baseQuery.clone();
+                for (const col of extraColumns) {
+                    cteQuery.column(col);
+                }
+            }
+        }
+
+        // Build the outer query that wraps the CTE.
+        // When we added extra columns, select only the original columns + joined
+        // aliases (instead of originalQuery.*) so the caller's column set is
+        // preserved in the final result.
+        const resultQuery = knex.queryBuilder().with('originalQuery', cteQuery);
+
+        if (extraColumns.length > 0 && this.#explicitSelects !== null) {
+            // Explicit column list: original user selections only
+            for (const col of this.#explicitSelects) {
+                resultQuery.select(
+                    knex.raw(':originalQuery:.:col: as :col:', {
+                        originalQuery: 'originalQuery',
+                        col
+                    })
+                );
+            }
+        } else {
+            resultQuery.select('originalQuery.*');
+        }
+
+        resultQuery.from(
+            knex.raw(':originalQuery:', {
+                originalQuery: 'originalQuery'
+            })
+        );
 
         for (let i = 0; i < specs.length; i++) {
             const spec = specs[i];

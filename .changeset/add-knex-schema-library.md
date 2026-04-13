@@ -11,7 +11,7 @@ A new library that wraps Knex with a fully type-safe, schema-driven API. Use `@c
 - **Schema-as-table** — decorate schema properties with `.hasColumnName('sql_col')` and the schema itself with `.hasTableName('table')` to map between TypeScript property names and SQL column names automatically.
 - **Type-safe column references** — pass property accessor functions (`t => t.firstName`) or string property keys (`'firstName'`) instead of raw column strings. The builder resolves them to the correct SQL column name at runtime.
 - **Eager loading without N+1** — `.joinOne(spec)` and `.joinMany(spec)` load related rows using a single CTE + `jsonb_agg` query. Supports per-join `limit`, `offset`, and `orderBy` via a `row_number()` window function.
-- **Full WHERE surface** — `where`, `andWhere`, `orWhere`, `whereNot`, `whereIn`, `whereNotIn`, `whereNull`, `whereBetween`, `whereLike`, `whereILike`, `whereRaw`, `whereExists`, and their OR variants.
+- **Full WHERE surface** — `where`, `andWhere`, `orWhere`, `whereNot`, `whereIn`, `whereNotIn`, `whereNull`, `whereBetween`, `whereLike`, `whereILike`, `whereRaw`, `whereExists`, and their `or`/`and` variants.
 - **ORDER BY, GROUP BY, HAVING, LIMIT, OFFSET, SELECT, DISTINCT, aggregates** — all accepting schema column references.
 - **Write operations** — `insert(data)`, `insertMany(data)`, `update(data)`, `delete()` with automatic bidirectional column mapping.
 - **Thenable** — builders can be `await`-ed directly without calling `.execute()`.
@@ -71,8 +71,10 @@ const usersWithPosts = await query(db, UserSchema)
 - **`createQuery(knex)` factory** — bind a knex instance once and reuse the resulting query function across your codebase, instead of passing the knex instance on every call.
 
   ```ts
+  import knex from 'knex';
   import { createQuery } from '@cleverbrush/knex-schema';
 
+  const db = knex({ client: 'pg', connection: process.env.DB_URL });
   const query = createQuery(db);
 
   const users = await query(UserSchema).where(t => t.age, '>', 18);

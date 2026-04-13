@@ -1,7 +1,7 @@
 // @cleverbrush/knex-schema — Unit tests
 
 import Knex, { type Knex as KnexType } from 'knex';
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import {
     buildColumnMap,
     date,
@@ -55,8 +55,10 @@ const SimpleTag = object({
 
 const knex = Knex({ client: 'pg' });
 
-// ═══════════════════════════════════════════════════════════════════════════
-// Extension tests
+afterAll(async () => {
+    await knex.destroy();
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('schema extension', () => {
@@ -578,6 +580,44 @@ describe('eager loading', () => {
                     foreignSchema: Department
                 });
         }).toThrow('duplicate field name');
+    });
+
+    it('joinOne with .select() still includes localColumn in CTE', () => {
+        // If the caller uses .select() and omits the join key (departmentId),
+        // the generated SQL should still include it in the CTE so the join works.
+        const sql = query(knex, User)
+            .select(t => t.fullName) // intentionally omit departmentId
+            .joinOne({
+                localColumn: t => t.departmentId,
+                foreignColumn: t => t.id,
+                as: 'department',
+                foreignSchema: Department
+            })
+            .toQuery();
+
+        // CTE must still reference department_id even though it wasn't selected
+        expect(sql).toContain('"department_id"');
+        // The join condition must be present
+        expect(sql).toContain('eagerRelation0');
+    });
+
+    it('joinMany with .select() still includes localColumn in CTE', () => {
+        const sql = query(knex, User)
+            .select(t => t.fullName) // intentionally omit id (localColumn for joinMany)
+            .joinMany({
+                localColumn: t => t.id,
+                foreignColumn: t => t.authorId,
+                as: 'posts',
+                foreignSchema: Post
+            })
+            .toQuery();
+
+        // CTE must still reference id even though it wasn't selected
+        expect(sql).toContain('"id"');
+        // The final SELECT must not expose the extra "id" column we injected
+        // (it only appears in the CTE, not in the outer SELECT list as originalQuery.*)
+        // The outer query should only select full_name and the joined alias
+        expect(sql).toContain('"full_name"');
     });
 });
 
