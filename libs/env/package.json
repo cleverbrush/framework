@@ -5,7 +5,9 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/deep": "^2.0.0",
+        "@cleverbrush/deep": "^2.0.0"
+    },
+    "peerDependencies": {
         "@cleverbrush/schema": "^2.0.0"
     },
     "description": "Type-safe environment variable parsing with @cleverbrush/schema — validated, coerced, structured configs from process.env",

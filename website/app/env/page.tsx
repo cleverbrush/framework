@@ -16,10 +16,10 @@ export default function EnvPage() {
 
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
-                    command="npm install @cleverbrush/env"
+                    command="npm install @cleverbrush/env @cleverbrush/schema"
                     note={
                         <>
-                            Includes <code>@cleverbrush/schema</code> as a
+                            Requires <code>@cleverbrush/schema</code> as a peer
                             dependency.
                         </>
                     }

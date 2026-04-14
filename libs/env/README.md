@@ -35,10 +35,10 @@ Type-safe environment variable parsing with `@cleverbrush/schema` — validated,
 ## Installation
 
 ```bash
-npm install @cleverbrush/env
+npm install @cleverbrush/env @cleverbrush/schema
 ```
 
-`@cleverbrush/env` uses `@cleverbrush/schema` internally; no separate peer dependency install is required.
+**Peer dependency:** `@cleverbrush/schema` must be installed separately.
 
 ## Quick Start
 
