@@ -939,6 +939,59 @@ export class SchemaQueryBuilder<
     }
 
     // =======================================================================
+    // Transaction support
+    // =======================================================================
+
+    /**
+     * Bind this query builder to a Knex transaction.
+     *
+     * Returns a **new** builder that runs all operations — SELECT, INSERT,
+     * UPDATE, DELETE, and eager-loaded sub-queries — within the given
+     * transaction. The original builder is left unchanged.
+     *
+     * Use this when you already have a transaction obtained from
+     * `knex.transaction()` and want all operations performed by the returned
+     * builder to participate in that transaction.
+     *
+     * @param trx - The Knex transaction obtained from `knex.transaction()`.
+     * @returns A new {@link SchemaQueryBuilder} bound to the transaction.
+     *
+     * @example
+     * ```ts
+     * async function createUser(
+     *     data: InsertType<typeof UserSchema>,
+     *     trx: Knex.Transaction
+     * ) {
+     *     return query(db, UserSchema).transacting(trx).insert(data);
+     * }
+     *
+     * await db.transaction(async trx => {
+     *     const user = await createUser({ name: 'Alice' }, trx);
+     *     await query(db, PostSchema).transacting(trx).insert({ authorId: user.id, title: 'Hello' });
+     * });
+     * ```
+     */
+    transacting(
+        trx: Knex.Transaction
+    ): SchemaQueryBuilder<TLocalSchema, TResult> {
+        const builder = new SchemaQueryBuilder<TLocalSchema, TResult>(
+            trx as unknown as Knex,
+            this.#localSchema,
+            this.#baseQuery.clone().transacting(trx)
+        );
+        for (const spec of this.#specs) {
+            builder.#specs.push({
+                ...spec,
+                foreignQuery: spec.foreignQuery.clone().transacting(trx)
+            });
+        }
+        builder.#explicitSelects = this.#explicitSelects
+            ? [...this.#explicitSelects]
+            : null;
+        return builder;
+    }
+
+    // =======================================================================
     // CTE-based eager loading query building (from knex-eager)
     // =======================================================================
 
@@ -1543,6 +1596,49 @@ export interface BoundQuery {
         schema: TLocalSchema,
         baseQuery: Knex.QueryBuilder
     ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+    /**
+     * Return a version of this bound factory whose queries all run within the
+     * given Knex transaction. Equivalent to calling `.transacting(trx)` on
+     * each individual builder, but more convenient when every query in a block
+     * must share the same transaction.
+     *
+     * @example
+     * ```ts
+     * const db = createQuery(knex);
+     *
+     * await knex.transaction(async trx => {
+     *     const dbTrx = db.withTransaction(trx);
+     *     const user = await dbTrx(UserSchema).insert({ name: 'Alice' });
+     *     await dbTrx(PostSchema).insert({ authorId: user.id, title: 'Hello' });
+     * });
+     * ```
+     */
+    withTransaction(trx: Knex.Transaction): BoundQuery;
+    /**
+     * Start a Knex transaction and run `callback` inside it, passing a
+     * transaction-bound `BoundQuery` factory as the argument. The transaction
+     * is committed when the callback resolves and rolled back if it rejects.
+     *
+     * This is the callback-style counterpart to {@link withTransaction} — you
+     * don't need to obtain a `Knex.Transaction` object yourself.
+     *
+     * @param callback - An async function that receives a transaction-bound
+     *   `BoundQuery` and returns a value. The returned value is forwarded as
+     *   the resolved value of the outer `Promise`.
+     * @returns A `Promise` that resolves with the value returned by `callback`.
+     *
+     * @example
+     * ```ts
+     * const db = createQuery(knex);
+     *
+     * const user = await db.transaction(async dbTrx => {
+     *     const newUser = await dbTrx(UserSchema).insert({ name: 'Alice' });
+     *     await dbTrx(PostSchema).insert({ authorId: newUser.id, title: 'Hello' });
+     *     return newUser;
+     * });
+     * ```
+     */
+    transaction<T>(callback: (db: BoundQuery) => Promise<T>): Promise<T>;
 }
 
 /**
@@ -1569,7 +1665,7 @@ export interface BoundQuery {
  * ```
  */
 export function createQuery(knexInstance: Knex): BoundQuery {
-    return function boundQuery<
+    function boundQuery<
         TLocalSchema extends ObjectSchemaBuilder<
             any,
             any,
@@ -1586,5 +1682,18 @@ export function createQuery(knexInstance: Knex): BoundQuery {
         return baseQuery
             ? query(knexInstance, schema, baseQuery)
             : query(knexInstance, schema);
-    } as BoundQuery;
+    }
+
+    (boundQuery as BoundQuery).withTransaction = (
+        trx: Knex.Transaction
+    ): BoundQuery => createQuery(trx as unknown as Knex);
+
+    (boundQuery as BoundQuery).transaction = <T>(
+        callback: (db: BoundQuery) => Promise<T>
+    ): Promise<T> =>
+        knexInstance.transaction(trx =>
+            callback(createQuery(trx as unknown as Knex))
+        );
+
+    return boundQuery as BoundQuery;
 }
