@@ -1329,7 +1329,7 @@ describe('SQL parity with raw knex', () => {
 // createQuery factory
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { createQuery, type BoundQuery } from './index.js';
+import { type BoundQuery, createQuery } from './index.js';
 
 describe('createQuery factory', () => {
     const q = createQuery(knex);
