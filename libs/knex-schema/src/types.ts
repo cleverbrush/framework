@@ -187,8 +187,8 @@ export type ValidatedSpec =
     | ({ type: 'many' } & ValidatedJoinManySpec);
 
 // ---------------------------------------------------------------------------
-// InsertType — like InferType but makes optional properties omittable
+// InsertType — all properties optional (DB may generate some, e.g. SERIAL id)
 // ---------------------------------------------------------------------------
 export type InsertType<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-> = InferType<T>;
+> = InferType<ReturnType<T['makeAllPropsOptional']>>;
