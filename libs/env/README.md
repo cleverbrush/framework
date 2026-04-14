@@ -38,7 +38,7 @@ Type-safe environment variable parsing with `@cleverbrush/schema` — validated,
 npm install @cleverbrush/env
 ```
 
-**Peer dependency:** `@cleverbrush/schema`
+`@cleverbrush/env` uses `@cleverbrush/schema` internally; no separate peer dependency install is required.
 
 ## Quick Start
 
