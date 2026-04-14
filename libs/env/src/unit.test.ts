@@ -239,6 +239,32 @@ describe('parseEnv()', () => {
             }
         });
 
+        it('treats empty-string env var as missing (not coerced)', () => {
+            expect(() =>
+                parseEnv(
+                    {
+                        port: env('DB_PORT', number().coerce())
+                    },
+                    { DB_PORT: '' }
+                )
+            ).toThrow(EnvValidationError);
+
+            try {
+                parseEnv(
+                    {
+                        port: env('DB_PORT', number().coerce())
+                    },
+                    { DB_PORT: '' }
+                );
+                expect.unreachable('should have thrown');
+            } catch (e) {
+                expect(e).toBeInstanceOf(EnvValidationError);
+                const err = e as EnvValidationError;
+                expect(err.missing).toHaveLength(1);
+                expect(err.missing[0].varName).toBe('DB_PORT');
+            }
+        });
+
         it('reports multiple missing vars at once', () => {
             try {
                 parseEnv(

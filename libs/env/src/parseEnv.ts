@@ -57,7 +57,7 @@ function walkConfig(
 
         if (isEnvField(node)) {
             const raw = source[node.varName];
-            rawObject[key] = raw;
+            rawObject[key] = raw === '' ? undefined : raw;
             mappings.push({
                 varName: node.varName,
                 configPath,
