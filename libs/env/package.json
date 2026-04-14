@@ -1,0 +1,54 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/deep": "^2.0.0"
+    },
+    "peerDependencies": {
+        "@cleverbrush/schema": "^2.0.0"
+    },
+    "description": "Type-safe environment variable parsing with @cleverbrush/schema — validated, coerced, structured configs from process.env",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/env",
+    "keywords": [
+        "environment variables",
+        "env",
+        "dotenv",
+        "config",
+        "type-safe",
+        "validation",
+        "typescript",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/env",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/env#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "type": "module",
+    "devDependencies": {
+        "@types/node": "^25.4.0"
+    },
+    "types": "./dist/index.d.ts",
+    "version": "2.0.0"
+}
