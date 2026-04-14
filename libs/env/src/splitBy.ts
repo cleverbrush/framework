@@ -14,11 +14,11 @@
  * // "a, b, c" → ['a', 'b', 'c']
  * ```
  */
-export function splitBy<T = string>(separator: string): (value: T[]) => T[] {
-    return ((value: unknown): unknown => {
+export function splitBy(separator: string): (value: unknown) => unknown {
+    return (value: unknown): unknown => {
         if (typeof value === 'string') {
             return value.split(separator).map(s => s.trim());
         }
         return value;
-    }) as (value: T[]) => T[];
+    };
 }
