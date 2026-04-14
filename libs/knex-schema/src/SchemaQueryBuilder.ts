@@ -949,22 +949,22 @@ export class SchemaQueryBuilder<
      * UPDATE, DELETE, and eager-loaded sub-queries — within the given
      * transaction. The original builder is left unchanged.
      *
-     * This is the recommended way to integrate with the optional-transaction
-     * pattern where a function optionally accepts a `trx` argument:
+     * Use this when you already have a transaction obtained from
+     * `knex.transaction()` and want all operations performed by the returned
+     * builder to participate in that transaction.
      *
      * @param trx - The Knex transaction obtained from `knex.transaction()`.
      * @returns A new {@link SchemaQueryBuilder} bound to the transaction.
      *
      * @example
      * ```ts
-     * async function createUser(data: InsertType<typeof UserSchema>, trx?: Knex.Transaction) {
+     * async function createUser(
+     *     data: InsertType<typeof UserSchema>,
+     *     trx: Knex.Transaction
+     * ) {
      *     return query(db, UserSchema).transacting(trx).insert(data);
      * }
      *
-     * // Without a transaction
-     * await createUser({ name: 'Alice' });
-     *
-     * // Inside an explicit transaction
      * await db.transaction(async trx => {
      *     const user = await createUser({ name: 'Alice' }, trx);
      *     await query(db, PostSchema).transacting(trx).insert({ authorId: user.id, title: 'Hello' });
