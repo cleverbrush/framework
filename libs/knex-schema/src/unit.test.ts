@@ -1631,10 +1631,14 @@ describe('transaction support', () => {
                 .spyOn(knex, 'transaction')
                 .mockImplementation((cb: any) => cb(trx));
 
-            const result = await db.transaction(async _dbTrx => 42);
-            spy.mockRestore();
+            let result: number;
+            try {
+                result = await db.transaction(async _dbTrx => 42);
+            } finally {
+                spy.mockRestore();
+            }
 
-            expect(result).toBe(42);
+            expect(result!).toBe(42);
         });
 
         it('transaction() callback receives a factory whose queries share the trx schema', async () => {
@@ -1644,12 +1648,15 @@ describe('transaction support', () => {
                 .mockImplementation((cb: any) => cb(trx));
 
             let sql = '';
-            await db.transaction(async dbTrx => {
-                sql = dbTrx(User)
-                    .where(t => t.role, '=', 'admin')
-                    .toQuery();
-            });
-            spy.mockRestore();
+            try {
+                await db.transaction(async dbTrx => {
+                    sql = dbTrx(User)
+                        .where(t => t.role, '=', 'admin')
+                        .toQuery();
+                });
+            } finally {
+                spy.mockRestore();
+            }
 
             expect(sql).toContain('"role" = \'admin\'');
         });
