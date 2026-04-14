@@ -977,12 +977,12 @@ export class SchemaQueryBuilder<
         const builder = new SchemaQueryBuilder<TLocalSchema, TResult>(
             trx as unknown as Knex,
             this.#localSchema,
-            this.#baseQuery.transacting(trx)
+            this.#baseQuery.clone().transacting(trx)
         );
         for (const spec of this.#specs) {
             builder.#specs.push({
                 ...spec,
-                foreignQuery: spec.foreignQuery.transacting(trx)
+                foreignQuery: spec.foreignQuery.clone().transacting(trx)
             });
         }
         builder.#explicitSelects = this.#explicitSelects
