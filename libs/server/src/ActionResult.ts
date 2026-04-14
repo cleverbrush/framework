@@ -37,19 +37,30 @@ export abstract class ActionResult {
     // -----------------------------------------------------------------------
 
     /** 200 OK — serializes value using content negotiation. */
-    static ok(body: unknown, headers?: Record<string, string>): JsonResult {
-        return new JsonResult(body, 200, headers);
+    static ok<T>(
+        body: T,
+        headers?: Record<string, string>
+    ): JsonResult<200, T> {
+        return new JsonResult(body, 200, headers) as JsonResult<200, T>;
     }
 
     /** 201 Created — serializes value using content negotiation. */
-    static created(
-        body: unknown,
+    static created<T>(
+        body: T,
         location?: string,
         headers?: Record<string, string>
-    ): JsonResult {
+    ): JsonResult<201, T> {
         const h: Record<string, string> = { ...headers };
         if (location) h['location'] = location;
-        return new JsonResult(body, 201, h);
+        return new JsonResult(body, 201, h) as JsonResult<201, T>;
+    }
+
+    /** 202 Accepted — serializes value using content negotiation. */
+    static accepted<T>(
+        body: T,
+        headers?: Record<string, string>
+    ): JsonResult<202, T> {
+        return new JsonResult(body, 202, headers) as JsonResult<202, T>;
     }
 
     /** 204 No Content. */
@@ -57,15 +68,65 @@ export abstract class ActionResult {
         return new NoContentResult();
     }
 
+    /** 400 Bad Request — serializes value as JSON. */
+    static badRequest<T>(
+        body: T,
+        headers?: Record<string, string>
+    ): JsonResult<400, T> {
+        return new JsonResult(body, 400, headers) as JsonResult<400, T>;
+    }
+
+    /** 401 Unauthorized — serializes value as JSON. */
+    static unauthorized<T>(
+        body: T,
+        headers?: Record<string, string>
+    ): JsonResult<401, T> {
+        return new JsonResult(body, 401, headers) as JsonResult<401, T>;
+    }
+
+    /** 403 Forbidden — serializes value as JSON. */
+    static forbidden<T>(
+        body: T,
+        headers?: Record<string, string>
+    ): JsonResult<403, T> {
+        return new JsonResult(body, 403, headers) as JsonResult<403, T>;
+    }
+
+    /** 404 Not Found — serializes value as JSON. */
+    static notFound<T>(
+        body: T,
+        headers?: Record<string, string>
+    ): JsonResult<404, T> {
+        return new JsonResult(body, 404, headers) as JsonResult<404, T>;
+    }
+
+    /** 409 Conflict — serializes value as JSON. */
+    static conflict<T>(
+        body: T,
+        headers?: Record<string, string>
+    ): JsonResult<409, T> {
+        return new JsonResult(body, 409, headers) as JsonResult<409, T>;
+    }
+
     /** Temporary (302) or permanent (301) redirect. */
     static redirect(url: string, permanent = false): RedirectResult {
         return new RedirectResult(url, permanent);
     }
 
-    /** Explicit JSON response — always uses application/json regardless of Accept. */
+    /**
+     * Explicit JSON response with a specific status code.
+     * Use the named factories (`ok`, `notFound`, etc.) for common codes.
+     * This overload is an escape hatch for uncommon status codes.
+     */
+    static json<T>(body: T): JsonResult<200, T>;
+    static json<S extends number, T>(
+        body: T,
+        status: S,
+        headers?: Record<string, string>
+    ): JsonResult<S, T>;
     static json(
         body: unknown,
-        status = 200,
+        status: number = 200,
         headers?: Record<string, string>
     ): JsonResult {
         return new JsonResult(body, status, headers);
@@ -99,11 +160,11 @@ export abstract class ActionResult {
     }
 
     /** Bare status code with no body. */
-    static status(
-        status: number,
+    static status<S extends number>(
+        status: S,
         headers?: Record<string, string>
-    ): StatusCodeResult {
-        return new StatusCodeResult(status, headers);
+    ): StatusCodeResult<S> {
+        return new StatusCodeResult(status, headers) as StatusCodeResult<S>;
     }
 }
 
@@ -119,15 +180,22 @@ export abstract class ActionResult {
  * `ActionResult.ok()` and `ActionResult.created()` produce a {@link JsonResult}
  * that goes through content negotiation instead.
  */
-export class JsonResult extends ActionResult {
-    readonly body: unknown;
-    readonly status: number;
+export class JsonResult<
+    TStatus extends number = number,
+    TBody = unknown
+> extends ActionResult {
+    readonly body: TBody;
+    readonly status: TStatus;
     readonly headers: Record<string, string>;
 
-    constructor(body: unknown, status = 200, headers?: Record<string, string>) {
+    constructor(
+        body: TBody,
+        status: TStatus | number = 200,
+        headers?: Record<string, string>
+    ) {
         super();
         this.body = body;
-        this.status = status;
+        this.status = status as TStatus;
         this.headers = headers ?? {};
     }
 
@@ -270,13 +338,15 @@ export class StreamResult extends ActionResult {
  * Responds with a bare HTTP status code and no body.
  * Created by `ActionResult.status()`.
  */
-export class StatusCodeResult extends ActionResult {
-    readonly status: number;
+export class StatusCodeResult<
+    TStatus extends number = number
+> extends ActionResult {
+    readonly status: TStatus;
     readonly headers: Record<string, string>;
 
-    constructor(status: number, headers?: Record<string, string>) {
+    constructor(status: TStatus | number, headers?: Record<string, string>) {
         super();
-        this.status = status;
+        this.status = status as TStatus;
         this.headers = headers ?? {};
     }
 

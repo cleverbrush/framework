@@ -4,7 +4,16 @@ import type {
     ParseStringSchemaBuilder,
     SchemaBuilder
 } from '@cleverbrush/schema';
-import type { ActionResult } from './ActionResult.js';
+import type {
+    ActionResult,
+    ContentResult,
+    FileResult,
+    JsonResult,
+    NoContentResult,
+    RedirectResult,
+    StatusCodeResult,
+    StreamResult
+} from './ActionResult.js';
 import type { RequestContext } from './RequestContext.js';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +51,7 @@ export type ActionContext<E> =
         any,
         infer TPrincipal,
         any,
+        any,
         any
     >
         ? Simplify<
@@ -72,6 +82,7 @@ export type ServiceSchemas<E> =
         infer TServices,
         any,
         any,
+        any,
         any
     >
         ? TServices
@@ -86,10 +97,61 @@ type ResponseType<E> =
         any,
         any,
         any,
-        infer TResponse
+        infer TResponse,
+        any
     >
         ? TResponse
         : any;
+
+/**
+ * Extracts the `TResponses` map from an `EndpointBuilder` type.
+ * `TResponses` is a `Record<number, BodyType>` inferred from `.responses()`.
+ */
+export type ResponsesOf<E> =
+    E extends EndpointBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        infer TResponses
+    >
+        ? TResponses
+        : never;
+
+type HasResponses<E> = keyof ResponsesOf<E> extends never ? false : true;
+
+/**
+ * The union of permitted return values for a handler whose endpoint
+ * declared `.responses()`. Each member corresponds to one declared code:
+ *
+ * - `null` schema (e.g. 204) → `NoContentResult` for 204, `StatusCodeResult<K>` otherwise
+ * - Non-null schema for code 200 → also allows a plain object (treated as 200 by the server)
+ * - Non-null schema for other codes → `JsonResult<K, Body>`
+ *
+ * `FileResult`, `StreamResult`, `ContentResult`, and `RedirectResult` are always
+ * permitted as an escape hatch for non-JSON responses.
+ */
+export type AllowedResponseReturn<TResponses extends Record<number, any>> =
+    | {
+          [K in keyof TResponses & number]: TResponses[K] extends null
+              ? K extends 204
+                  ? NoContentResult
+                  : StatusCodeResult<K>
+              : JsonResult<K, TResponses[K]>;
+      }[keyof TResponses & number]
+    | (200 extends keyof TResponses
+          ? TResponses[200] extends null
+              ? never
+              : TResponses[200]
+          : never)
+    | FileResult
+    | StreamResult
+    | ContentResult
+    | RedirectResult;
 
 // ---------------------------------------------------------------------------
 // Handler — the action function type, inferred from an endpoint
@@ -101,21 +163,20 @@ type ResponseType<E> =
  * When the endpoint has injected services, the handler receives a second
  * `services` argument with all resolved service instances.
  */
+type HandlerReturn<E> =
+    HasResponses<E> extends true
+        ? AllowedResponseReturn<ResponsesOf<E>>
+        : ResponseType<E> | ActionResult;
+
 export type Handler<E> =
     HasKeys<ServiceSchemas<E>> extends true
         ? (
               arg: ActionContext<E>,
               services: Simplify<InferServices<ServiceSchemas<E>>>
-          ) =>
-              | ResponseType<E>
-              | ActionResult
-              | Promise<ResponseType<E> | ActionResult>
+          ) => HandlerReturn<E> | Promise<HandlerReturn<E>>
         : (
               arg: ActionContext<E>
-          ) =>
-              | ResponseType<E>
-              | ActionResult
-              | Promise<ResponseType<E> | ActionResult>;
+          ) => HandlerReturn<E> | Promise<HandlerReturn<E>>;
 
 // ---------------------------------------------------------------------------
 // EndpointBuilder — immutable builder for endpoint definitions
@@ -168,6 +229,16 @@ export interface EndpointMetadata {
     readonly operationId: string | null;
     readonly deprecated: boolean;
     readonly responseSchema: SchemaBuilder<any, any, any, any, any> | null;
+    /**
+     * Per-status-code response schemas declared via `.responses()`.
+     * When non-null, takes precedence over `responseSchema` for OpenAPI generation
+     * and constrains the handler return type to the declared codes.
+     * A `null` schema value means the response has no body (e.g. 204).
+     */
+    readonly responsesSchemas: Record<
+        number,
+        SchemaBuilder<any, any, any, any, any> | null
+    > | null;
 }
 
 /**
@@ -187,6 +258,19 @@ export interface EndpointMetadata {
  *     .summary('Get a user by ID');
  * ```
  */
+/**
+ * Infers the per-code body type map from a `.responses()` schema map.
+ * Each schema maps to its `InferType`; a `null` schema maps to `null`
+ * (meaning the response has no body).
+ */
+type InferResponsesMap<
+    T extends Record<number, SchemaBuilder<any, any, any, any, any> | null>
+> = {
+    [K in keyof T]: T[K] extends SchemaBuilder<any, any, any, any, any>
+        ? InferType<T[K]>
+        : null;
+};
+
 export class EndpointBuilder<
     TParams = {},
     TBody = undefined,
@@ -195,7 +279,8 @@ export class EndpointBuilder<
     TServices = {},
     TPrincipal = undefined,
     TRoles extends string = string,
-    TResponse = any
+    TResponse = any,
+    TResponses extends Record<number, any> = {}
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -230,6 +315,10 @@ export class EndpointBuilder<
     readonly #operationId: string | null;
     readonly #deprecated: boolean;
     readonly #responseSchema: SchemaBuilder<any, any, any, any, any> | null;
+    readonly #responsesSchemas: Record<
+        number,
+        SchemaBuilder<any, any, any, any, any> | null
+    > | null;
 
     constructor(
         method: string,
@@ -264,7 +353,11 @@ export class EndpointBuilder<
         tags: readonly string[] = [],
         operationId: string | null = null,
         deprecated: boolean = false,
-        responseSchema: SchemaBuilder<any, any, any, any, any> | null = null
+        responseSchema: SchemaBuilder<any, any, any, any, any> | null = null,
+        responsesSchemas: Record<
+            number,
+            SchemaBuilder<any, any, any, any, any> | null
+        > | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -280,9 +373,9 @@ export class EndpointBuilder<
         this.#operationId = operationId;
         this.#deprecated = deprecated;
         this.#responseSchema = responseSchema;
+        this.#responsesSchemas = responsesSchemas;
     }
 
-    /** Define the request body schema. Validation failures return 422 Problem Details. */
     /** Define the request body schema. Validation failures return 422 Problem Details. */
     body<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
@@ -294,7 +387,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -310,7 +404,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -327,7 +422,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -343,7 +439,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -360,7 +457,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -376,7 +474,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -393,7 +492,8 @@ export class EndpointBuilder<
         TSchemas,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -409,7 +509,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -433,7 +534,8 @@ export class EndpointBuilder<
         TServices,
         InferType<TSchema>,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     >;
     authorize(
         ...roles: TRoles[]
@@ -445,7 +547,8 @@ export class EndpointBuilder<
         TServices,
         unknown,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     >;
     authorize(
         ...args: unknown[]
@@ -457,7 +560,8 @@ export class EndpointBuilder<
         TServices,
         any,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         let roles: string[];
         if (
@@ -489,7 +593,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -508,7 +613,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        T
+        T,
+        TResponses
     >;
     returns<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
@@ -520,11 +626,12 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        InferType<TSchema>
+        InferType<TSchema>,
+        TResponses
     >;
     returns(
         _schema?: unknown
-    ): EndpointBuilder<any, any, any, any, any, any, any, any> {
+    ): EndpointBuilder<any, any, any, any, any, any, any, any, any> {
         const schema =
             _schema != null &&
             typeof _schema === 'object' &&
@@ -545,7 +652,67 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            schema ?? this.#responseSchema
+            schema ?? this.#responseSchema,
+            this.#responsesSchemas
+        );
+    }
+
+    /**
+     * Declare per-status-code response schemas for OpenAPI generation and
+     * handler return-type enforcement.
+     *
+     * Pass `null` as the schema for body-less codes (e.g. 204).
+     *
+     * @example
+     * ```ts
+     * const ep = endpoint
+     *     .get('/api/todos/:id')
+     *     .responses({
+     *         200: object({ id: number(), title: string() }),
+     *         404: object({ message: string() }),
+     *     });
+     *
+     * const handler: Handler<typeof ep> = ({ params }) => {
+     *     const todo = todos.get(params.id);
+     *     if (!todo) return ActionResult.notFound({ message: 'Not found' });
+     *     return todo; // plain object → 200
+     * };
+     * ```
+     */
+    responses<
+        const T extends Record<
+            number,
+            SchemaBuilder<any, any, any, any, any> | null
+        >
+    >(
+        map: T
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        InferResponsesMap<T>
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            map
         );
     }
 
@@ -560,7 +727,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -576,7 +744,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -591,7 +760,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -607,7 +777,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -622,7 +793,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -638,7 +810,8 @@ export class EndpointBuilder<
             tags,
             this.#operationId,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -653,7 +826,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -669,7 +843,8 @@ export class EndpointBuilder<
             this.#tags,
             id,
             this.#deprecated,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -682,7 +857,8 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        TResponse
+        TResponse,
+        TResponses
     > {
         return new EndpointBuilder(
             this.#method,
@@ -698,7 +874,8 @@ export class EndpointBuilder<
             this.#tags,
             this.#operationId,
             true,
-            this.#responseSchema
+            this.#responseSchema,
+            this.#responsesSchemas
         );
     }
 
@@ -718,7 +895,8 @@ export class EndpointBuilder<
             tags: this.#tags,
             operationId: this.#operationId,
             deprecated: this.#deprecated,
-            responseSchema: this.#responseSchema
+            responseSchema: this.#responseSchema,
+            responsesSchemas: this.#responsesSchemas
         };
     }
 }
@@ -767,6 +945,7 @@ function createEndpoint(
         meta?.tags ?? [],
         meta?.operationId ?? null,
         meta?.deprecated ?? false,
+        null,
         null
     );
 }
@@ -781,25 +960,95 @@ type ScopedEndpointFactoryMethods<
 > = {
     get<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
     post<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
     put<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
     patch<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
     delete<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
     head<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
     options<TParams = {}>(
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, TPrincipal, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
 };
 
 export type ScopedEndpointFactory<TRoles extends string = string> =
@@ -870,31 +1119,101 @@ type EndpointFactory<TRoles extends string = string> = {
     get<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        undefined,
+        TRoles,
+        any,
+        {}
+    >;
     post<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        undefined,
+        TRoles,
+        any,
+        {}
+    >;
     put<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        undefined,
+        TRoles,
+        any,
+        {}
+    >;
     patch<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        undefined,
+        TRoles,
+        any,
+        {}
+    >;
     delete<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        undefined,
+        TRoles,
+        any,
+        {}
+    >;
     head<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        undefined,
+        TRoles,
+        any,
+        {}
+    >;
     options<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<TParams, undefined, {}, {}, {}, undefined, TRoles>;
+    ): EndpointBuilder<
+        TParams,
+        undefined,
+        {},
+        {},
+        {},
+        undefined,
+        TRoles,
+        any,
+        {}
+    >;
     resource(basePath: string): ScopedEndpointFactory<TRoles>;
 };
 
