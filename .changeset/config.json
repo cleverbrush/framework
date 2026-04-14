@@ -11,7 +11,8 @@
             "@cleverbrush/scheduler",
             "@cleverbrush/mapper",
             "@cleverbrush/knex-clickhouse",
-            "@cleverbrush/react-form"
+            "@cleverbrush/react-form",
+            "@cleverbrush/env"
         ]
     ],
     "linked": [],

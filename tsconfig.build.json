@@ -11,6 +11,7 @@
         { "path": "libs/scheduler" },
         { "path": "libs/di" },
         { "path": "libs/auth" },
-        { "path": "libs/server" }
+        { "path": "libs/server" },
+        { "path": "libs/env/tsconfig.build.json" }
     ]
 }
