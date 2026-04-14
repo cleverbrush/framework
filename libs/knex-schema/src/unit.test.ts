@@ -1631,14 +1631,12 @@ describe('transaction support', () => {
                 .spyOn(knex, 'transaction')
                 .mockImplementation((cb: any) => cb(trx));
 
-            let result: number;
             try {
-                result = await db.transaction(async _dbTrx => 42);
+                const result = await db.transaction(async _dbTrx => 42);
+                expect(result).toBe(42);
             } finally {
                 spy.mockRestore();
             }
-
-            expect(result!).toBe(42);
         });
 
         it('transaction() callback receives a factory whose queries share the trx schema', async () => {
