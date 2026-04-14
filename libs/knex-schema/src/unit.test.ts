@@ -1,7 +1,7 @@
 // @cleverbrush/knex-schema — Unit tests
 
 import Knex, { type Knex as KnexType } from 'knex';
-import { afterAll, describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
     buildColumnMap,
     date,
@@ -14,6 +14,7 @@ import {
     object,
     query,
     resolveColumnRef,
+    SchemaQueryBuilder,
     string
 } from './index.js';
 
@@ -1328,7 +1329,7 @@ describe('SQL parity with raw knex', () => {
 // createQuery factory
 // ═══════════════════════════════════════════════════════════════════════════
 
-import { createQuery } from './index.js';
+import { createQuery, type BoundQuery } from './index.js';
 
 describe('createQuery factory', () => {
     const q = createQuery(knex);
@@ -1431,5 +1432,226 @@ describe('createQuery factory', () => {
         expect(q(User)).not.toBe(q2(User));
         expect(q(User).toQuery()).toBe(q2(User).toQuery());
         knex2.destroy();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Transaction support
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('transaction support', () => {
+    // Use the knex instance itself as a stand-in for a Knex.Transaction.
+    // Knex.Transaction extends Knex, so the cast is structurally valid.
+    // transacting() only binds the connection client — it does not alter
+    // the generated SQL, so toQuery() remains testable without a real DB.
+    const trx = knex as unknown as KnexType.Transaction;
+
+    describe('SchemaQueryBuilder.transacting()', () => {
+        it('returns a SchemaQueryBuilder instance', () => {
+            const builder = query(knex, User).transacting(trx);
+            expect(builder).toBeInstanceOf(SchemaQueryBuilder);
+        });
+
+        it('does not mutate the original builder', () => {
+            const original = query(knex, User).where(t => t.role, '=', 'admin');
+            const bound = original.transacting(trx);
+            expect(bound).not.toBe(original);
+        });
+
+        it('preserves WHERE clauses after transacting()', () => {
+            const sql = query(knex, User)
+                .where(t => t.role, '=', 'admin')
+                .transacting(trx)
+                .toQuery();
+            expect(sql).toContain('"role" = \'admin\'');
+        });
+
+        it('preserves ORDER BY after transacting()', () => {
+            const sql = query(knex, User)
+                .orderBy(t => t.createdAt, 'desc')
+                .transacting(trx)
+                .toQuery();
+            expect(sql).toContain('order by "created_at" desc');
+        });
+
+        it('preserves LIMIT / OFFSET after transacting()', () => {
+            const sql = query(knex, User)
+                .limit(10)
+                .offset(5)
+                .transacting(trx)
+                .toQuery();
+            expect(sql).toContain('limit 10');
+            expect(sql).toContain('offset 5');
+        });
+
+        it('transacting() after joinOne preserves CTE structure', () => {
+            const sql = query(knex, User)
+                .joinOne({
+                    localColumn: t => t.departmentId,
+                    foreignColumn: t => t.id,
+                    as: 'department',
+                    foreignSchema: Department
+                })
+                .transacting(trx)
+                .toQuery();
+
+            expect(sql).toContain('with "originalQuery" as');
+            expect(sql).toContain('"departments"');
+            expect(sql).toContain('jsonb_agg');
+            expect(sql).toContain('"department"');
+        });
+
+        it('transacting() after joinMany preserves CTE structure', () => {
+            const sql = query(knex, User)
+                .joinMany({
+                    localColumn: t => t.id,
+                    foreignColumn: t => t.authorId,
+                    as: 'posts',
+                    foreignSchema: Post
+                })
+                .transacting(trx)
+                .toQuery();
+
+            expect(sql).toContain('with "originalQuery" as');
+            expect(sql).toContain('"posts"');
+            expect(sql).toContain('jsonb_agg');
+            expect(sql).toContain('coalesce');
+        });
+
+        it('produces same SQL as non-transacting version', () => {
+            const plain = query(knex, User)
+                .where(t => t.departmentId, '>', 3)
+                .orderBy(t => t.fullName)
+                .toQuery();
+
+            const transacted = query(knex, User)
+                .where(t => t.departmentId, '>', 3)
+                .orderBy(t => t.fullName)
+                .transacting(trx)
+                .toQuery();
+
+            expect(transacted).toBe(plain);
+        });
+
+        it('transacting() can be called before building the query chain', () => {
+            const sql = query(knex, User)
+                .transacting(trx)
+                .where(t => t.role, '=', 'editor')
+                .limit(20)
+                .toQuery();
+
+            expect(sql).toContain('"role" = \'editor\'');
+            expect(sql).toContain('limit 20');
+        });
+    });
+
+    describe('BoundQuery.withTransaction()', () => {
+        const db = createQuery(knex);
+
+        it('withTransaction() returns a BoundQuery', () => {
+            const dbTrx = db.withTransaction(trx);
+            expect(typeof dbTrx).toBe('function');
+            expect(typeof dbTrx.withTransaction).toBe('function');
+        });
+
+        it('withTransaction() factory produces same SQL as query(trx, schema)', () => {
+            const dbTrx = db.withTransaction(trx);
+            expect(dbTrx(User).toQuery()).toBe(query(knex, User).toQuery());
+        });
+
+        it('withTransaction() factory supports chaining', () => {
+            const dbTrx = db.withTransaction(trx);
+            const sql = dbTrx(User)
+                .where(t => t.role, '=', 'admin')
+                .orderBy(t => t.createdAt, 'desc')
+                .limit(5)
+                .toQuery();
+
+            expect(sql).toContain('"role" = \'admin\'');
+            expect(sql).toContain('order by "created_at" desc');
+            expect(sql).toContain('limit 5');
+        });
+
+        it('withTransaction() does not affect the original bound factory', () => {
+            const plainSql = db(User).toQuery();
+            db.withTransaction(trx); // should not mutate db
+            expect(db(User).toQuery()).toBe(plainSql);
+        });
+
+        it('withTransaction() supports joinOne', () => {
+            const dbTrx = db.withTransaction(trx);
+            const sql = dbTrx(User)
+                .joinOne({
+                    localColumn: t => t.departmentId,
+                    foreignColumn: t => t.id,
+                    as: 'department',
+                    foreignSchema: Department
+                })
+                .toQuery();
+
+            expect(sql).toContain('"departments"');
+            expect(sql).toContain('"department"');
+        });
+    });
+
+    describe('BoundQuery.transaction() callback', () => {
+        it('transaction() is a function on the bound factory', () => {
+            const db = createQuery(knex);
+            expect(typeof db.transaction).toBe('function');
+        });
+
+        it('transaction() passes a BoundQuery to the callback', async () => {
+            const db = createQuery(knex);
+            let capturedDb: BoundQuery | undefined;
+
+            const spy = vi
+                .spyOn(knex, 'transaction')
+                .mockImplementation((cb: any) => cb(trx));
+
+            try {
+                await db.transaction(async dbTrx => {
+                    capturedDb = dbTrx;
+                });
+            } finally {
+                spy.mockRestore();
+            }
+
+            expect(typeof capturedDb).toBe('function');
+            expect(typeof (capturedDb as BoundQuery).withTransaction).toBe(
+                'function'
+            );
+            expect(typeof (capturedDb as BoundQuery).transaction).toBe(
+                'function'
+            );
+        });
+
+        it('transaction() resolves with the callback return value', async () => {
+            const db = createQuery(knex);
+            const spy = vi
+                .spyOn(knex, 'transaction')
+                .mockImplementation((cb: any) => cb(trx));
+
+            const result = await db.transaction(async _dbTrx => 42);
+            spy.mockRestore();
+
+            expect(result).toBe(42);
+        });
+
+        it('transaction() callback receives a factory whose queries share the trx schema', async () => {
+            const db = createQuery(knex);
+            const spy = vi
+                .spyOn(knex, 'transaction')
+                .mockImplementation((cb: any) => cb(trx));
+
+            let sql = '';
+            await db.transaction(async dbTrx => {
+                sql = dbTrx(User)
+                    .where(t => t.role, '=', 'admin')
+                    .toQuery();
+            });
+            spy.mockRestore();
+
+            expect(sql).toContain('"role" = \'admin\'');
+        });
     });
 });
