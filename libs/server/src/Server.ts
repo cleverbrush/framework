@@ -152,7 +152,9 @@ export class ServerBuilder {
      * @param handler - The typed handler function.
      * @param options - Optional per-endpoint middleware.
      */
-    handle<E extends EndpointBuilder<any, any, any, any, any, any, any, any>>(
+    handle<
+        E extends EndpointBuilder<any, any, any, any, any, any, any, any, any>
+    >(
         endpointDef: E,
         handler: Handler<E>,
         options?: { middlewares?: Middleware[] }

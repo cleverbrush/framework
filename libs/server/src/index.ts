@@ -10,12 +10,14 @@ export {
 } from './ActionResult.js';
 export {
     type ActionContext,
+    type AllowedResponseReturn,
     createEndpoints,
     EndpointBuilder,
     type EndpointMetadata,
     type EndpointMetadataDescriptors,
     endpoint,
     type Handler,
+    type ResponsesOf,
     type ScopedEndpointFactory
 } from './Endpoint.js';
 export {

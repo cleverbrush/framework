@@ -103,34 +103,112 @@ function buildRequestBody(
     return body;
 }
 
+// Default descriptions for common HTTP status codes
+const HTTP_STATUS_DESCRIPTIONS: Record<number, string> = {
+    200: 'OK',
+    201: 'Created',
+    202: 'Accepted',
+    204: 'No Content',
+    400: 'Bad Request',
+    401: 'Unauthorized',
+    403: 'Forbidden',
+    404: 'Not Found',
+    409: 'Conflict',
+    422: 'Unprocessable Entity',
+    500: 'Internal Server Error'
+};
+
+// Minimal inline schema for ProblemDetails error responses
+const PROBLEM_DETAILS_SCHEMA = {
+    type: 'object',
+    properties: {
+        status: { type: 'integer' },
+        title: { type: 'string' },
+        detail: { type: 'string' }
+    }
+};
+
 function buildResponses(
-    responseSchema: SchemaBuilder<any, any, any, any, any> | null,
+    meta: EndpointMetadata,
     method: string
 ): Record<string, unknown> {
-    if (responseSchema) {
-        const jsonSchema = convertSchema(responseSchema);
-        const respInfo = responseSchema.introspect() as any;
+    const result: Record<string, unknown> = {};
+
+    // Multi-code path — .responses() was called
+    if (meta.responsesSchemas) {
+        for (const [codeStr, schema] of Object.entries(meta.responsesSchemas)) {
+            const code = Number(codeStr);
+            const desc =
+                HTTP_STATUS_DESCRIPTIONS[code] ?? `Response ${codeStr}`;
+            if (schema) {
+                const jsonSchema = convertSchema(schema);
+                const respInfo = schema.introspect() as any;
+                const customDesc =
+                    typeof respInfo.description === 'string' &&
+                    respInfo.description !== ''
+                        ? respInfo.description
+                        : desc;
+                result[codeStr] = {
+                    description: customDesc,
+                    content: { 'application/json': { schema: jsonSchema } }
+                };
+            } else {
+                result[codeStr] = { description: desc };
+            }
+        }
+    } else if (meta.responseSchema) {
+        // Legacy single-code path — .returns() was called
+        const jsonSchema = convertSchema(meta.responseSchema);
+        const respInfo = meta.responseSchema.introspect() as any;
         const desc =
             typeof respInfo.description === 'string' &&
             respInfo.description !== ''
                 ? respInfo.description
                 : 'Successful response';
-        return {
-            '200': {
-                description: desc,
-                content: {
-                    'application/json': { schema: jsonSchema }
-                }
+        result['200'] = {
+            description: desc,
+            content: { 'application/json': { schema: jsonSchema } }
+        };
+    } else if (method === 'DELETE' || method === 'HEAD') {
+        result['204'] = { description: 'No content' };
+    } else {
+        result['200'] = { description: 'Successful response' };
+    }
+
+    // Auto-add framework-generated error responses
+    if (meta.bodySchema && !result['422']) {
+        result['422'] = {
+            description: 'Validation error',
+            content: {
+                'application/problem+json': { schema: PROBLEM_DETAILS_SCHEMA }
             }
         };
     }
 
-    // No response schema — use 204 for methods that typically don't return content
-    if (method === 'DELETE' || method === 'HEAD') {
-        return { '204': { description: 'No content' } };
+    if (meta.authRoles !== null) {
+        if (!result['401']) {
+            result['401'] = {
+                description: 'Unauthorized',
+                content: {
+                    'application/problem+json': {
+                        schema: PROBLEM_DETAILS_SCHEMA
+                    }
+                }
+            };
+        }
+        if (!result['403']) {
+            result['403'] = {
+                description: 'Forbidden',
+                content: {
+                    'application/problem+json': {
+                        schema: PROBLEM_DETAILS_SCHEMA
+                    }
+                }
+            };
+        }
     }
 
-    return { '200': { description: 'Successful response' } };
+    return result;
 }
 
 function buildOperation(
@@ -217,10 +295,7 @@ function buildOperation(
     }
 
     // Responses
-    operation['responses'] = buildResponses(
-        meta.responseSchema,
-        meta.method.toUpperCase()
-    );
+    operation['responses'] = buildResponses(meta, meta.method.toUpperCase());
 
     // Security
     const security = mapOperationSecurity(authRoles(meta), securitySchemeNames);
