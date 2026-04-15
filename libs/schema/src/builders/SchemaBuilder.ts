@@ -1411,7 +1411,7 @@ export abstract class SchemaBuilder<
              */
             description: this.#description,
             /**
-             * The component name attached to this schema via `.schemaName()`,
+             * The logical name attached to this schema via `.schemaName()`,
              * or `undefined` if none was set.
              */
             schemaName: this.#schemaName,
@@ -1579,23 +1579,17 @@ export abstract class SchemaBuilder<
     }
 
     /**
-     * Attaches a component name to this schema for OpenAPI `components/schemas`
-     * registration.
+     * Attaches a logical name to this schema instance.
      *
-     * When a named schema is passed to `generateOpenApiSpec()` from
-     * `@cleverbrush/server-openapi`, it is collected into
-     * `components.schemas[name]` and every occurrence in the spec is replaced
-     * with a `$ref: '#/components/schemas/<name>'` pointer instead of being
-     * inlined in full.
+     * The name is purely metadata — it has no effect on validation. It is
+     * accessible via `.introspect().schemaName` and can be consumed by any
+     * tool that introspects schemas at runtime, such as OpenAPI spec
+     * generators, documentation tools, form libraries, or code generators.
      *
-     * **Naming rules**
-     * - Names must be unique across the spec. Registering two *different*
-     *   schema instances under the same name throws at generation time.
-     * - Re-using the same constant (same object reference) in multiple
-     *   endpoints is fine — it is detected and deduplicated automatically.
-     *
-     * The name has no effect on validation and is not emitted by
-     * `toJsonSchema()` from `@cleverbrush/schema-json`.
+     * **Uniqueness** is the responsibility of the consuming tool. Passing the
+     * same constant (same object reference) to multiple consumers is always
+     * safe; how conflicts between different instances with the same name are
+     * handled depends on the tool.
      *
      * @example
      * ```ts
@@ -1606,9 +1600,7 @@ export abstract class SchemaBuilder<
      *   name: string(),
      * }).schemaName('User');
      *
-     * // Both endpoints share the same constant → single components.schemas entry
-     * const GetUser   = endpoint.get('/users/:id').returns(UserSchema);
-     * const ListUsers = endpoint.get('/users').returns(array(UserSchema));
+     * UserSchema.introspect().schemaName; // 'User'
      * ```
      */
     public schemaName(name: string): this {

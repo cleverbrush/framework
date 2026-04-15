@@ -1,4 +1,4 @@
-import { boolean, number, object, string } from '@cleverbrush/schema';
+import { boolean, number, object, string, union } from '@cleverbrush/schema';
 import type {
     EndpointMetadata,
     EndpointRegistration
@@ -626,5 +626,72 @@ describe('generateOpenApiSpec — $ref deduplication', () => {
         );
         const schemas = (spec['components'] as any)['schemas'];
         expect(Object.keys(schemas)).toEqual(['User']);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Discriminated union → discriminator keyword
+// ---------------------------------------------------------------------------
+
+describe('discriminated union discriminator keyword', () => {
+    it('emits discriminator on inline discriminated union body schema', () => {
+        const bodySchema = union(
+            object({ type: string('cat'), name: string() })
+        ).or(object({ type: string('dog'), breed: string() }));
+
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    bodySchema
+                })
+            ])
+        );
+
+        const body = (spec['paths'] as any)['/api/items']['post'][
+            'requestBody'
+        ]['content']['application/json']['schema'];
+        expect(body['discriminator']).toEqual({ propertyName: 'type' });
+        expect(body['anyOf']).toBeDefined();
+    });
+
+    it('emits discriminator with mapping when branches are named schemas', () => {
+        const CatSchema = object({
+            type: string('cat'),
+            name: string()
+        }).schemaName('Cat');
+        const DogSchema = object({
+            type: string('dog'),
+            breed: string()
+        }).schemaName('Dog');
+        const bodySchema = union(CatSchema).or(DogSchema);
+
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    bodySchema
+                })
+            ])
+        );
+
+        const body = (spec['paths'] as any)['/api/items']['post'][
+            'requestBody'
+        ]['content']['application/json']['schema'];
+        expect(body['discriminator']).toEqual({
+            propertyName: 'type',
+            mapping: {
+                cat: '#/components/schemas/Cat',
+                dog: '#/components/schemas/Dog'
+            }
+        });
+        expect(body['anyOf']).toEqual([
+            { $ref: '#/components/schemas/Cat' },
+            { $ref: '#/components/schemas/Dog' }
+        ]);
+        // Components should contain both schemas
+        const schemas = (spec['components'] as any)['schemas'];
+        expect(schemas['Cat']).toBeDefined();
+        expect(schemas['Dog']).toBeDefined();
     });
 });

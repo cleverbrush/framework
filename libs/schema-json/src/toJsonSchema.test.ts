@@ -221,6 +221,90 @@ test('toJsonSchema - 28: mixed union → anyOf', () => {
 });
 
 // ---------------------------------------------------------------------------
+// discriminated unions → discriminator keyword
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 28a: discriminated union → anyOf + discriminator', () => {
+    const schema = union(object({ type: string('cat'), name: string() })).or(
+        object({ type: string('dog'), breed: string() })
+    );
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        anyOf: [
+            {
+                type: 'object',
+                properties: {
+                    type: { const: 'cat' },
+                    name: { type: 'string' }
+                },
+                required: ['type', 'name'],
+                additionalProperties: false
+            },
+            {
+                type: 'object',
+                properties: {
+                    type: { const: 'dog' },
+                    breed: { type: 'string' }
+                },
+                required: ['type', 'breed'],
+                additionalProperties: false
+            }
+        ],
+        discriminator: { propertyName: 'type' }
+    });
+});
+
+test('toJsonSchema - 28b: non-discriminated union → no discriminator key', () => {
+    const schema = union(string()).or(number().isFloat());
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).not.toHaveProperty('discriminator');
+});
+
+test('toJsonSchema - 28c: nullable discriminated union → discriminator preserved', () => {
+    const schema = union(object({ kind: string('a'), x: number() }))
+        .or(object({ kind: string('b'), y: number() }))
+        .nullable();
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result['discriminator']).toEqual({ propertyName: 'kind' });
+    // anyOf should include { type: 'null' } for nullable
+    const anyOf = result['anyOf'] as any[];
+    expect(anyOf.some((o: any) => o.type === 'null')).toBe(true);
+});
+
+test('toJsonSchema - 28d: discriminated union with nameResolver → mapping', () => {
+    const catSchema = object({
+        type: string('cat'),
+        name: string()
+    }).schemaName('Cat');
+    const dogSchema = object({
+        type: string('dog'),
+        breed: string()
+    }).schemaName('Dog');
+    const schema = union(catSchema).or(dogSchema);
+
+    const resolver = (s: any) => {
+        const info = s.introspect();
+        return info.schemaName ?? null;
+    };
+
+    const result = toJsonSchema(schema, {
+        $schema: false,
+        nameResolver: resolver
+    });
+    expect(result['discriminator']).toEqual({
+        propertyName: 'type',
+        mapping: {
+            cat: '#/components/schemas/Cat',
+            dog: '#/components/schemas/Dog'
+        }
+    });
+    // anyOf entries should be $refs
+    const anyOf = result['anyOf'] as any[];
+    expect(anyOf[0]).toEqual({ $ref: '#/components/schemas/Cat' });
+    expect(anyOf[1]).toEqual({ $ref: '#/components/schemas/Dog' });
+});
+
+// ---------------------------------------------------------------------------
 // any
 // ---------------------------------------------------------------------------
 

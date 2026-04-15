@@ -232,6 +232,15 @@ const result = UserSchema.validate({
                                 </tr>
                                 <tr>
                                     <td>
+                                        <code>discriminator</code>
+                                    </td>
+                                    <td>
+                                        auto-emitted for discriminated{' '}
+                                        <code>union()</code> branches
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
                                         <code>minLength</code> /{' '}
                                         <code>maxLength</code>
                                     </td>

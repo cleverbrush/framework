@@ -163,10 +163,44 @@ function convertNodeInner(
                 }
             }
             if (allConst) return { ...readOnly, enum: enumValues };
-            return {
+
+            const converted = options.map(o => convertNode(o, resolver));
+            const out: Out = {
                 ...readOnly,
-                anyOf: options.map(o => convertNode(o, resolver))
+                anyOf: converted
             };
+
+            // Emit discriminator keyword for discriminated unions
+            const discriminatorProp: string | undefined =
+                info.discriminatorPropertyName;
+            if (discriminatorProp) {
+                const disc: Out = { propertyName: discriminatorProp };
+                // Build mapping when any option resolved to a $ref
+                const mapping: Record<string, string> = {};
+                let hasRef = false;
+                for (let i = 0; i < options.length; i++) {
+                    const ref = converted[i]['$ref'];
+                    if (typeof ref === 'string') {
+                        const oi = options[i].introspect() as any;
+                        const props:
+                            | Record<string, SchemaBuilder<any, any, any>>
+                            | undefined = oi.properties;
+                        if (props?.[discriminatorProp]) {
+                            const propInfo = props[
+                                discriminatorProp
+                            ].introspect() as any;
+                            if (propInfo.equalsTo !== undefined) {
+                                mapping[String(propInfo.equalsTo)] = ref;
+                                hasRef = true;
+                            }
+                        }
+                    }
+                }
+                if (hasRef) disc['mapping'] = mapping;
+                out['discriminator'] = disc;
+            }
+
+            return out;
         }
 
         default:

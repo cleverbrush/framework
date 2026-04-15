@@ -157,6 +157,29 @@ registry.entries();            // IterableIterator<[name, SchemaBuilder]>
 registry.isEmpty;              // boolean
 ```
 
+## Discriminated Unions
+
+When a request body, response, or parameter schema is a **discriminated union** — all branches are objects sharing a required property with unique literal values — the generated spec automatically includes the OpenAPI `discriminator` keyword alongside `anyOf`.
+
+If the union branches use `.schemaName()` and are extracted as `$ref` components, the `discriminator` also includes a `mapping` from each literal value to its `$ref` path:
+
+```ts
+const Cat = object({ type: string('cat'), name: string() }).schemaName('Cat');
+const Dog = object({ type: string('dog'), breed: string() }).schemaName('Dog');
+const PetBody = union(Cat).or(Dog);
+
+const CreatePet = endpoint.post('/api/pets').body(PetBody);
+
+// Generated spec:
+// requestBody.content['application/json'].schema:
+// {
+//   anyOf: [{ $ref: '#/components/schemas/Cat' }, { $ref: '#/components/schemas/Dog' }],
+//   discriminator: { propertyName: 'type', mapping: { cat: '…/Cat', dog: '…/Dog' } }
+// }
+```
+
+Code generators like openapi-generator and orval use the `discriminator` to produce proper tagged union types.
+
 ## Authentication & Security Schemes
 
 Pass the server's `AuthenticationConfig` to automatically generate `securitySchemes` and per-operation `security` arrays:
