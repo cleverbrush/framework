@@ -47,6 +47,25 @@ export interface OpenApiServer {
 }
 
 /**
+ * A tag entry in the OpenAPI top-level `tags` array.
+ * Provides a name, optional description, and optional external documentation
+ * for a tag group.
+ *
+ * @see https://spec.openapis.org/oas/v3.1.0#tag-object
+ */
+export interface OpenApiTag {
+    /** Tag name. Must match the tag strings used on individual operations. */
+    readonly name: string;
+    /** Short description for the tag group, displayed in Swagger UI / Redoc. */
+    readonly description?: string;
+    /** Link to external documentation for this tag. */
+    readonly externalDocs?: {
+        readonly url: string;
+        readonly description?: string;
+    };
+}
+
+/**
  * Options passed to {@link generateOpenApiSpec}.
  */
 export interface OpenApiOptions {
@@ -55,6 +74,19 @@ export interface OpenApiOptions {
     readonly servers?: readonly OpenApiServer[];
     readonly authConfig?: AuthenticationConfig | null;
     readonly securitySchemes?: Record<string, OpenApiSecurityScheme>;
+    /**
+     * Top-level tag definitions with optional descriptions and external docs.
+     *
+     * When provided, these entries are emitted as the top-level `tags` array.
+     * Any tag names used by registered endpoints but absent from this list are
+     * automatically appended as name-only entries (sorted alphabetically).
+     *
+     * When omitted, unique tag names are still auto-collected from all
+     * registered endpoints and emitted as name-only entries.
+     *
+     * @see https://spec.openapis.org/oas/v3.1.0#tag-object
+     */
+    readonly tags?: readonly OpenApiTag[];
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +352,7 @@ function authRoles(meta: EndpointMetadata): readonly string[] | null {
  * Generate an OpenAPI 3.1 specification document from registered endpoints.
  */
 export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
-    const { registrations, info, servers, authConfig, securitySchemes } =
+    const { registrations, info, servers, authConfig, securitySchemes, tags } =
         options;
 
     // Security schemes — from explicit config or auto-mapped
@@ -385,6 +417,23 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
         );
     }
 
+    // Build top-level tags array: explicit entries first, then auto-collected
+    // tag names from endpoints that are not already covered.
+    const explicitNames = new Set((tags ?? []).map(t => t.name));
+    const autoNames: string[] = [];
+    for (const reg of registrations) {
+        for (const tag of reg.endpoint.tags) {
+            if (!explicitNames.has(tag) && !autoNames.includes(tag)) {
+                autoNames.push(tag);
+            }
+        }
+    }
+    autoNames.sort();
+    const mergedTags: OpenApiTag[] = [
+        ...(tags ?? []),
+        ...autoNames.map(name => ({ name }))
+    ];
+
     // Assemble document
     const doc: OpenApiDocument = {
         openapi: '3.1.0',
@@ -393,6 +442,10 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
 
     if (servers && servers.length > 0) {
         doc['servers'] = servers.map(s => ({ ...s }));
+    }
+
+    if (mergedTags.length > 0) {
+        doc['tags'] = mergedTags.map(t => ({ ...t }));
     }
 
     doc['paths'] = paths;

@@ -11,6 +11,7 @@ OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Con
 - **Schema conversion** — maps `@cleverbrush/schema` builders to JSON Schema Draft 2020-12 via `@cleverbrush/schema-json`.
 - **Path resolution** — converts both colon-style paths (`:id`) and `ParseStringSchemaBuilder` templates to OpenAPI `{param}` format with per-parameter schemas.
 - **Security mapping** — translates `@cleverbrush/auth` authentication schemes to OpenAPI `securitySchemes`; maps per-endpoint `authorize()` to `security` arrays.
+- **Top-level tags** — pass `tags: [{ name, description?, externalDocs? }]` to `OpenApiOptions`; tag names are also auto-collected from endpoint registrations.
 - **`serveOpenApi()`** — middleware that lazily generates and caches the spec; serves it at a configurable path (default: `/openapi.json`).
 - **`createOpenApiEndpoint()`** — returns a typed endpoint + handler pair for use with `ServerBuilder.handle()`.
 - **CLI / build script** — `writeOpenApiSpec()` writes the spec to a file.
@@ -200,6 +201,27 @@ server.use(serveOpenApi({
 ```
 
 JWT schemes generate `{ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }`; cookie schemes generate `{ type: 'apiKey', in: 'cookie' }`.
+
+## Top-Level Tags
+
+OpenAPI supports a top-level `tags` array where each entry can carry a `description` and optional `externalDocs`. Pass a `tags` array to `generateOpenApiSpec()` (or any serving helper) to define them:
+
+```ts
+generateOpenApiSpec({
+    registrations,
+    info: { title: 'My API', version: '1.0.0' },
+    tags: [
+        {
+            name: 'users',
+            description: 'User management endpoints',
+            externalDocs: { url: 'https://docs.example.com/users' }
+        },
+        { name: 'orders', description: 'Order management endpoints' }
+    ]
+});
+```
+
+When `tags` is omitted, unique tag names are automatically collected from all registered endpoints and emitted as name-only entries — so Swagger UI and Redoc still group operations correctly. Any endpoint tag not present in the explicit list is appended alphabetically.
 
 ## OpenAPI Info
 

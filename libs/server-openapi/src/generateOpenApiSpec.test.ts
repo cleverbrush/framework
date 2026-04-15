@@ -780,4 +780,112 @@ describe('discriminated union discriminator keyword', () => {
             .content['application/json'].schema;
         expect(schema.properties.tags).not.toHaveProperty('default');
     });
+
+    // --- Top-level tags ---
+
+    it('emits explicit tags with descriptions as top-level tags', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([], {
+                tags: [
+                    { name: 'users', description: 'User management' },
+                    { name: 'orders', description: 'Order management' }
+                ]
+            })
+        );
+        expect(spec['tags']).toEqual([
+            { name: 'users', description: 'User management' },
+            { name: 'orders', description: 'Order management' }
+        ]);
+    });
+
+    it('emits explicit tags with externalDocs', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([], {
+                tags: [
+                    {
+                        name: 'users',
+                        externalDocs: {
+                            url: 'https://example.com/docs/users',
+                            description: 'User docs'
+                        }
+                    }
+                ]
+            })
+        );
+        const tag = (spec['tags'] as any[])[0];
+        expect(tag.name).toBe('users');
+        expect(tag.externalDocs).toEqual({
+            url: 'https://example.com/docs/users',
+            description: 'User docs'
+        });
+    });
+
+    it('auto-collects tag names from endpoints when no explicit tags provided', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    tags: ['items']
+                })
+            ])
+        );
+        expect(spec['tags']).toEqual([{ name: 'items' }]);
+    });
+
+    it('merges explicit tags with auto-collected, explicit first', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions(
+                [
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/orders',
+                        tags: ['orders']
+                    }),
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/users',
+                        tags: ['users']
+                    })
+                ],
+                {
+                    tags: [{ name: 'users', description: 'User management' }]
+                }
+            )
+        );
+        // 'users' is explicit (with description), 'orders' is auto-collected
+        expect(spec['tags']).toEqual([
+            { name: 'users', description: 'User management' },
+            { name: 'orders' }
+        ]);
+    });
+
+    it('omits top-level tags entirely when no explicit and no endpoint tags', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        expect(spec['tags']).toBeUndefined();
+    });
+
+    it('deduplicates auto-collected tag names across endpoints', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/a',
+                    tags: ['items']
+                }),
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/b',
+                    tags: ['items']
+                })
+            ])
+        );
+        const tagNames = (spec['tags'] as any[]).map((t: any) => t.name);
+        expect(tagNames.filter((n: string) => n === 'items')).toHaveLength(1);
+    });
 });

@@ -72,6 +72,14 @@ export default function ServerOpenApiPage() {
                             automatically.
                         </li>
                         <li>
+                            <strong>Top-level tags</strong> — pass{' '}
+                            <code>
+                                tags: [{'{'}name, description?{'}'}]
+                            </code>{' '}
+                            to annotate tag groups; tag names are also
+                            auto-collected from endpoint registrations.
+                        </li>
+                        <li>
                             <strong>Discriminated unions</strong> — the OpenAPI{' '}
                             <code>discriminator</code> keyword is emitted
                             automatically for tagged union schemas, enabling
@@ -285,6 +293,42 @@ server.use(serveOpenApi({
                             }}
                         />
                     </pre>
+                </div>
+
+                {/* ── Tags ─────────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Top-Level Tags with Descriptions</h2>
+                    <p>
+                        OpenAPI supports a top-level <code>tags</code> array
+                        where each entry can carry a <code>description</code>{' '}
+                        and optional <code>externalDocs</code>. Pass a{' '}
+                        <code>tags</code> option to describe your tag groups:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`generateOpenApiSpec({
+    registrations,
+    info: { title: 'My API', version: '1.0.0' },
+    tags: [
+        {
+            name: 'users',
+            description: 'User management endpoints',
+            externalDocs: { url: 'https://docs.example.com/users' }
+        },
+        { name: 'orders', description: 'Order management endpoints' }
+    ]
+});`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        When <code>tags</code> is omitted, unique tag names are
+                        automatically collected from all registered endpoints
+                        and emitted as name-only entries — Swagger UI and Redoc
+                        still group operations correctly. Any endpoint tag not
+                        covered by the explicit list is appended alphabetically.
+                    </p>
                 </div>
 
                 {/* ── Path Params ──────────────────────────────────── */}
