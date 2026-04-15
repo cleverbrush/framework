@@ -181,6 +181,53 @@ const CreatePet = endpoint.post('/api/pets').body(PetBody);
 
 Code generators like openapi-generator and orval use the `discriminator` to produce proper tagged union types.
 
+## Recursive Schemas
+
+Self-referential schemas (tree nodes, nested menus, threaded comments) are
+supported via `lazy()` from `@cleverbrush/schema`. Call `.schemaName()` on the
+root schema and `generateOpenApiSpec` will:
+
+1. Register the named schema in `components.schemas`, expanding its definition
+   exactly once.
+2. Replace every recursive reference inside the definition with the appropriate
+   `$ref` pointer — breaking the cycle automatically.
+
+```ts
+import { object, number, array, lazy } from '@cleverbrush/schema';
+
+type TreeNode = { value: number; children: TreeNode[] };
+
+// TypeScript needs an explicit annotation for recursive types
+const treeNode: ReturnType<typeof object> = object({
+    value: number(),
+    children: array(lazy(() => treeNode))
+}).schemaName('TreeNode');
+
+// Use treeNode as a body / response schema — no extra configuration needed
+const CreateTree = endpoint.post('/api/tree').body(treeNode);
+```
+
+Generated spec (abbreviated):
+
+```yaml
+components:
+  schemas:
+    TreeNode:
+      type: object
+      properties:
+        value:  { type: integer }
+        children:
+          type: array
+          items: { $ref: '#/components/schemas/TreeNode' }
+paths:
+  /api/tree:
+    post:
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/TreeNode' }
+```
+
 ## Authentication & Security Schemes
 
 Pass the server's `AuthenticationConfig` to automatically generate `securitySchemes` and per-operation `security` arrays:

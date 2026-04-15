@@ -395,10 +395,24 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
         }
     }
 
-    const resolveComponentSchemaName =
-        (rootSchema: SchemaBuilder<any, any, any>) =>
-        (candidate: SchemaBuilder<any, any, any>) =>
-            candidate === rootSchema ? undefined : registry.getName(candidate);
+    const resolveComponentSchemaName = (
+        rootSchema: SchemaBuilder<any, any, any>
+    ) => {
+        // The root schema must be inlined exactly once — for the component
+        // definition itself. Any subsequent encounter (e.g. through a lazy
+        // self-reference) should emit a $ref instead of inlining again,
+        // which would otherwise cause infinite recursion.
+        let inlinedRoot = false;
+        return (
+            candidate: SchemaBuilder<any, any, any>
+        ): string | undefined => {
+            if (candidate === rootSchema && !inlinedRoot) {
+                inlinedRoot = true;
+                return undefined; // inline the root definition once
+            }
+            return registry.getName(candidate) ?? undefined;
+        };
+    };
 
     // Build paths
     const paths: Record<string, Record<string, unknown>> = {};

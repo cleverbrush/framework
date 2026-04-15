@@ -1,4 +1,13 @@
-import { boolean, number, object, string, union } from '@cleverbrush/schema';
+import {
+    array,
+    boolean,
+    lazy,
+    number,
+    object,
+    type SchemaBuilder,
+    string,
+    union
+} from '@cleverbrush/schema';
 import type {
     EndpointMetadata,
     EndpointRegistration
@@ -887,5 +896,62 @@ describe('discriminated union discriminator keyword', () => {
         );
         const tagNames = (spec['tags'] as any[]).map((t: any) => t.name);
         expect(tagNames.filter((n: string) => n === 'items')).toHaveLength(1);
+    });
+
+    // --- Recursive / lazy schemas ---
+
+    it('resolves non-recursive lazy body schema inline', () => {
+        const bodySchema = lazy(() => object({ name: string() }));
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema
+                })
+            ])
+        );
+        const schema = (spec['paths'] as any)['/api/items']['post'].requestBody
+            .content['application/json'].schema;
+        expect(schema.type).toBe('object');
+        expect(schema.properties.name).toEqual({ type: 'string' });
+    });
+
+    it('emits $ref for recursive schema in components and breaks cycle in body', () => {
+        // Must annotate explicitly to satisfy TypeScript recursive type
+        const treeNode: SchemaBuilder<any, any, any, any, any> = object({
+            value: number(),
+            children: array(lazy(() => treeNode))
+        }).schemaName('TreeNode');
+
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/tree',
+                    bodySchema: treeNode
+                })
+            ])
+        );
+
+        // components.schemas should contain TreeNode
+        const schemas = (spec['components'] as any)['schemas'];
+        expect(schemas['TreeNode']).toBeDefined();
+        expect(schemas['TreeNode'].type).toBe('object');
+
+        // The children array items in the component definition should be a $ref
+        const childrenItems = schemas['TreeNode'].properties.children.items;
+        expect(childrenItems).toEqual({
+            $ref: '#/components/schemas/TreeNode'
+        });
+
+        // Request body should reference the component
+        const requestBodySchema = (spec['paths'] as any)['/api/tree']['post']
+            .requestBody.content['application/json'].schema;
+        expect(requestBodySchema).toEqual({
+            $ref: '#/components/schemas/TreeNode'
+        });
     });
 });

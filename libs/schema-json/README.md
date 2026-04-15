@@ -196,6 +196,46 @@ toJsonSchema(schema, { $schema: false });
 toJsonSchema(schema, { draft: '07' });
 ```
 
+### Lazy / Recursive Schemas
+
+`toJsonSchema` resolves `lazy()` schemas transparently. When the resolved schema
+has a name returned by `nameResolver`, the output is a `$ref` pointer — which
+is the key mechanism for breaking recursive cycles:
+
+```ts
+import { object, number, array, lazy } from '@cleverbrush/schema';
+import { toJsonSchema } from '@cleverbrush/schema-json';
+
+type TreeNode = { value: number; children: TreeNode[] };
+
+const treeNode: ReturnType<typeof object> = object({
+    value: number(),
+    children: array(lazy(() => treeNode))
+}).schemaName('TreeNode');
+
+let rootSeen = false;
+toJsonSchema(treeNode, {
+    $schema: false,
+    nameResolver: s => {
+        // Inline the root once (for the definition itself), then emit $ref
+        if (s === treeNode && !rootSeen) { rootSeen = true; return null; }
+        return (s.introspect() as any).schemaName ?? null;
+    }
+});
+// {
+//   type: 'object',
+//   properties: {
+//     value: { type: 'integer' },
+//     children: { type: 'array', items: { $ref: '#/components/schemas/TreeNode' } }
+//   },
+//   ...
+// }
+```
+
+When using `@cleverbrush/server-openapi`, this is handled automatically — call
+`.schemaName()` on the root schema and `generateOpenApiSpec` will emit the
+correct `$ref` pointers and component definition with no extra configuration.
+
 ---
 
 ## Type Utilities

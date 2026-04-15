@@ -295,6 +295,40 @@ server.use(serveOpenApi({
                     </pre>
                 </div>
 
+                {/* ── Recursive Schemas ─────────────────────────────── */}
+                <div className="card">
+                    <h2>Recursive / Self-Referential Schemas</h2>
+                    <p>
+                        Self-referential schemas — tree nodes, nested menus,
+                        threaded comments — are supported via{' '}
+                        <code>lazy()</code> from{' '}
+                        <code>@cleverbrush/schema</code>. Call{' '}
+                        <code>.schemaName()</code> on the root and{' '}
+                        <code>generateOpenApiSpec</code> handles the rest: the
+                        schema is expanded once under{' '}
+                        <code>components/schemas</code>, and every recursive
+                        reference becomes a <code>$ref</code> pointer.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { object, number, array, lazy } from '@cleverbrush/schema';
+
+type TreeNode = { value: number; children: TreeNode[] };
+
+const treeNode: ReturnType<typeof object> = object({
+    value: number(),
+    children: array(lazy(() => treeNode))
+}).schemaName('TreeNode');
+
+// Use treeNode as a body or response schema — no extra config needed:
+// components.schemas.TreeNode → { type: 'object', properties: { children: { items: { $ref: '...' } } } }
+// requestBody                 → { "$ref": "#/components/schemas/TreeNode" }`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
                 {/* ── Tags ─────────────────────────────────────────── */}
                 <div className="card">
                     <h2>Top-Level Tags with Descriptions</h2>

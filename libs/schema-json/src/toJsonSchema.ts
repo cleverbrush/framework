@@ -211,6 +211,16 @@ function convertNodeInner(
             return out;
         }
 
+        case 'lazy': {
+            // Resolve the lazy schema once and delegate conversion.
+            // If the resolved schema has a name registered in the nameResolver,
+            // convertNode will short-circuit to a $ref — breaking recursive cycles.
+            // Recursive schemas without a registered name will cause infinite
+            // recursion here; callers must use .schemaName() to break the cycle.
+            const resolved: SchemaBuilder<any, any, any> = info.getter();
+            return convertNode(resolved, resolver);
+        }
+
         default:
             return {};
     }
@@ -328,7 +338,7 @@ function convertNode(
  * ```
  */
 export function toJsonSchema(
-    schema: SchemaBuilder<any, any, any>,
+    schema: SchemaBuilder<any, any, any, any, any>,
     opts?: ToJsonSchemaOptions
 ): Record<string, unknown> {
     const body = convertNode(schema, opts?.nameResolver);
