@@ -391,6 +391,69 @@ const Download = endpoint
                     </p>
                 </div>
 
+                {/* ── Multiple Content Types ───────────────────────── */}
+                <div className="card">
+                    <h2>Multiple Content Types</h2>
+                    <p>
+                        Use <code>.produces()</code> to declare additional
+                        response content types for content-negotiated endpoints.
+                        The generated spec emits a multi-entry{' '}
+                        <code>content</code> map where each MIME type can
+                        optionally override the response schema:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const GetItems = endpoint
+    .get('/api/items')
+    .returns(object({ id: number(), name: string() }))
+    .produces({
+        'text/csv': {},           // reuses the JSON response schema
+        'application/xml': { schema: string() } // custom schema
+    });`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        <code>application/json</code> is always included when a
+                        response schema is declared. When{' '}
+                        <code>.producesFile()</code> is also set, the binary
+                        response takes precedence.
+                    </p>
+                </div>
+
+                {/* ── Response Headers ─────────────────────────────── */}
+                <div className="card">
+                    <h2>Response Headers</h2>
+                    <p>
+                        Document response headers — pagination cursors,
+                        rate-limit counters, cache-control directives — with{' '}
+                        <code>.responseHeaders()</code>. Each property in the
+                        object schema becomes a named header entry in the
+                        OpenAPI spec, applied to every response code:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const GetItems = endpoint
+    .get('/api/items')
+    .returns(object({ id: number(), name: string() }))
+    .responseHeaders(object({
+        'X-Total-Count': number().describe('Total number of matching items'),
+        'X-Page':        number().describe('Current page index'),
+        'X-Rate-Limit':  number()
+    }));`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Property descriptions propagate to the OpenAPI{' '}
+                        <code>description</code> field on each header entry,
+                        making pagination and throttling contracts visible in
+                        Swagger UI and generated client SDKs.
+                    </p>
+                </div>
+
                 {/* ── Tags ─────────────────────────────────────────── */}
                 <div className="card">
                     <h2>Top-Level Tags with Descriptions</h2>

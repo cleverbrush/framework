@@ -14,6 +14,8 @@ OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Con
 - **Top-level tags** — pass `tags: [{ name, description?, externalDocs? }]` to `OpenApiOptions`; tag names are also auto-collected from endpoint registrations.
 - **Request body examples** — emit `example` / `examples` on Media Type Objects via `.example()` and `.examples()` on `EndpointBuilder`. Schema-level examples propagate automatically.
 - **Binary / file responses** — `.producesFile(contentType?, description?)` emits binary content types instead of JSON schemas for file download endpoints.
+- **Multiple content types** — `.produces({ 'text/csv': {}, 'application/xml': { schema } })` emits a multi-entry `content` map for content-negotiated endpoints; an optional per-type schema override is supported.
+- **Response headers** — `.responseHeaders(schema)` documents response headers (`X-Total-Count`, rate-limit, cache-control, etc.) across every response code; each property becomes a named header entry with schema and description.
 - **`serveOpenApi()`** — middleware that lazily generates and caches the spec; serves it at a configurable path (default: `/openapi.json`).
 - **`createOpenApiEndpoint()`** — returns a typed endpoint + handler pair for use with `ServerBuilder.handle()`.
 - **CLI / build script** — `writeOpenApiSpec()` writes the spec to a file.

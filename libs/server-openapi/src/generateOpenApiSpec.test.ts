@@ -42,6 +42,8 @@ function makeMeta(partial: Partial<EndpointMetadata> = {}): EndpointMetadata {
         example: null,
         examples: null,
         producesFile: null,
+        produces: null,
+        responseHeaderSchema: null,
         ...partial
     };
 }
@@ -1134,5 +1136,167 @@ describe('binary file responses', () => {
         });
         // Should NOT have application/json
         expect(response.content['application/json']).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.3 — .produces() multiple content types
+// ---------------------------------------------------------------------------
+
+describe('multiple content types', () => {
+    it('emits multiple content types reusing the response schema', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number(), name: string() }),
+                    produces: {
+                        'text/csv': {},
+                        'application/xml': {}
+                    }
+                })
+            ])
+        );
+
+        const content = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].content;
+        expect(content['application/json']).toBeDefined();
+        expect(content['text/csv'].schema).toEqual(
+            content['application/json'].schema
+        );
+        expect(content['application/xml'].schema).toEqual(
+            content['application/json'].schema
+        );
+    });
+
+    it('uses per-type schema override when provided', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number() }),
+                    produces: {
+                        'text/csv': { schema: string() }
+                    }
+                })
+            ])
+        );
+
+        const content = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].content;
+        expect(content['application/json'].schema).toHaveProperty(
+            'type',
+            'object'
+        );
+        expect(content['text/csv'].schema).toEqual({ type: 'string' });
+    });
+
+    it('producesFile takes precedence over produces', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    responseSchema: object({ data: string() }),
+                    produces: { 'text/csv': {} },
+                    producesFile: { contentType: 'application/pdf' }
+                })
+            ])
+        );
+
+        const content = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ].content;
+        expect(content['application/pdf']).toBeDefined();
+        expect(content['text/csv']).toBeUndefined();
+        expect(content['application/json']).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.4 — .responseHeaders() response header metadata
+// ---------------------------------------------------------------------------
+
+describe('response headers', () => {
+    it('emits response headers on 200 response', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number() }),
+                    responseHeaderSchema: object({
+                        'X-Total-Count': number(),
+                        'X-Page': number()
+                    }) as any
+                })
+            ])
+        );
+
+        const headers = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].headers;
+        expect(headers['X-Total-Count'].schema).toEqual({ type: 'integer' });
+        expect(headers['X-Page'].schema).toEqual({ type: 'integer' });
+    });
+
+    it('adds headers to every response code including error responses', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema: object({ name: string() }),
+                    authRoles: [],
+                    responseSchema: object({ id: number() }),
+                    responseHeaderSchema: object({
+                        'X-Request-Id': string()
+                    }) as any
+                })
+            ])
+        );
+
+        const responses = (spec['paths'] as any)['/api/items']['post']
+            .responses;
+        // 200, 422 (body validation), 401 + 403 (auth)
+        for (const code of ['200', '422', '401', '403']) {
+            expect(responses[code].headers['X-Request-Id']).toBeDefined();
+        }
+    });
+
+    it('emits description from schema property describe()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number() }),
+                    responseHeaderSchema: object({
+                        'X-Total-Count': number().describe(
+                            'Total number of items'
+                        )
+                    }) as any
+                })
+            ])
+        );
+
+        const header = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].headers['X-Total-Count'];
+        expect(header.schema).toEqual({
+            type: 'integer',
+            description: 'Total number of items'
+        });
+        expect(header.description).toBe('Total number of items');
     });
 });

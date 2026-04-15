@@ -260,6 +260,30 @@ export interface EndpointMetadata {
         contentType?: string;
         description?: string;
     } | null;
+    /**
+     * Multiple response content types for content-negotiated endpoints.
+     * Keys are MIME types; an optional `schema` overrides the default response
+     * schema for that content type. When set alongside `.producesFile()`,
+     * `producesFile` takes precedence.
+     */
+    readonly produces: Record<
+        string,
+        { schema?: SchemaBuilder<any, any, any, any, any> }
+    > | null;
+    /**
+     * Schema describing response headers emitted on every response code.
+     * Each property in the object schema becomes a header name with its
+     * sub-schema and optional description.
+     */
+    readonly responseHeaderSchema: ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > | null;
 }
 
 /**
@@ -349,6 +373,19 @@ export class EndpointBuilder<
         contentType?: string;
         description?: string;
     } | null;
+    readonly #produces: Record<
+        string,
+        { schema?: SchemaBuilder<any, any, any, any, any> }
+    > | null;
+    readonly #responseHeaderSchema: ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > | null;
 
     constructor(
         method: string,
@@ -396,7 +433,20 @@ export class EndpointBuilder<
         producesFile: {
             contentType?: string;
             description?: string;
-        } | null = null
+        } | null = null,
+        produces: Record<
+            string,
+            { schema?: SchemaBuilder<any, any, any, any, any> }
+        > | null = null,
+        responseHeaderSchema: ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        > | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -416,6 +466,8 @@ export class EndpointBuilder<
         this.#example = example;
         this.#examples = examples;
         this.#producesFile = producesFile;
+        this.#produces = produces;
+        this.#responseHeaderSchema = responseHeaderSchema;
     }
 
     /** Define the request body schema. Validation failures return 422 Problem Details. */
@@ -450,7 +502,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -488,7 +542,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -526,7 +582,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -564,7 +622,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -651,7 +711,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -713,7 +775,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -775,7 +839,9 @@ export class EndpointBuilder<
             map,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -811,7 +877,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -847,7 +915,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -883,7 +953,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -919,7 +991,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -953,7 +1027,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -996,7 +1072,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             value,
             this.#examples,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -1042,7 +1120,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             map,
-            this.#producesFile
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -1087,7 +1167,9 @@ export class EndpointBuilder<
             this.#responsesSchemas,
             this.#example,
             this.#examples,
-            { contentType, description }
+            { contentType, description },
+            this.#produces,
+            this.#responseHeaderSchema
         );
     }
 
@@ -1111,8 +1193,128 @@ export class EndpointBuilder<
             responsesSchemas: this.#responsesSchemas,
             example: this.#example,
             examples: this.#examples,
-            producesFile: this.#producesFile
+            producesFile: this.#producesFile,
+            produces: this.#produces,
+            responseHeaderSchema: this.#responseHeaderSchema
         };
+    }
+
+    /**
+     * Declare that this endpoint can produce responses in multiple content types.
+     *
+     * Each key is a MIME type. Provide an optional `schema` to override the
+     * default response schema for that type; otherwise the schema from
+     * `.returns()` / `.responses()` is reused for every declared content type.
+     *
+     * When used alongside `.producesFile()`, the binary response takes precedence.
+     *
+     * @param contentTypes - Map of MIME type → optional schema override.
+     *
+     * @example
+     * ```ts
+     * endpoint.get('/api/items')
+     *   .returns(object({ id: number(), name: string() }))
+     *   .produces({
+     *     'text/csv': {},
+     *     'application/xml': { schema: string() }
+     *   })
+     * ```
+     */
+    produces(
+        contentTypes: Record<
+            string,
+            { schema?: SchemaBuilder<any, any, any, any, any> }
+        >
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            contentTypes,
+            this.#responseHeaderSchema
+        );
+    }
+
+    /**
+     * Declare response headers emitted by this endpoint.
+     *
+     * The object schema's properties become header names in the OpenAPI spec;
+     * each property's sub-schema and description are emitted in the `headers`
+     * map on every response code.
+     *
+     * @param schema - Object schema whose properties describe the response headers.
+     *
+     * @example
+     * ```ts
+     * endpoint.get('/api/items')
+     *   .responseHeaders(object({
+     *     'X-Total-Count': number().describe('Total number of items'),
+     *     'X-Page': number()
+     *   }))
+     * ```
+     */
+    responseHeaders<
+        TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    >(
+        schema: TSchema
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            schema
+        );
     }
 }
 
@@ -1160,6 +1362,8 @@ function createEndpoint(
         meta?.tags ?? [],
         meta?.operationId ?? null,
         meta?.deprecated ?? false,
+        null,
+        null,
         null,
         null,
         null,

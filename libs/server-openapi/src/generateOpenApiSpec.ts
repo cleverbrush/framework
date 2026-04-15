@@ -1,4 +1,4 @@
-import type { SchemaBuilder } from '@cleverbrush/schema';
+import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
 import type {
     AuthenticationConfig,
     EndpointMetadata,
@@ -173,6 +173,32 @@ const PROBLEM_DETAILS_SCHEMA = {
     }
 };
 
+function buildResponseHeaders(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    registry: SchemaRegistry
+): Record<string, unknown> {
+    const info = schema.introspect() as any;
+    const props: Record<
+        string,
+        SchemaBuilder<any, any, any, any, any>
+    > = info.properties ?? {};
+    const headers: Record<string, unknown> = {};
+    for (const [name, propSchema] of Object.entries(props)) {
+        const propInfo = propSchema.introspect() as any;
+        const header: Record<string, unknown> = {
+            schema: convertSchema(propSchema, registry)
+        };
+        if (
+            typeof propInfo.description === 'string' &&
+            propInfo.description !== ''
+        ) {
+            header['description'] = propInfo.description;
+        }
+        headers[name] = header;
+    }
+    return headers;
+}
+
 function buildResponses(
     meta: EndpointMetadata,
     method: string,
@@ -260,6 +286,47 @@ function buildResponses(
                     }
                 }
             };
+        }
+    }
+
+    // Multiple content types — augment each response's content map with extra
+    // MIME types from .produces(). producesFile already handled above (binary wins).
+    if (meta.produces && !meta.producesFile) {
+        for (const code of Object.keys(result)) {
+            const entry = result[code] as Record<string, unknown>;
+            const existingContent = entry['content'] as
+                | Record<string, unknown>
+                | undefined;
+            // Only augment success responses that already have a content map
+            // (skip error responses whose content is application/problem+json)
+            if (
+                !existingContent ||
+                existingContent['application/problem+json']
+            ) {
+                continue;
+            }
+            const baseSchema =
+                (existingContent['application/json'] as Record<string, unknown>)
+                    ?.schema ?? {};
+            for (const [mimeType, typeEntry] of Object.entries(meta.produces)) {
+                if (mimeType === 'application/json') continue;
+                existingContent[mimeType] = {
+                    schema: typeEntry.schema
+                        ? convertSchema(typeEntry.schema, registry)
+                        : baseSchema
+                };
+            }
+        }
+    }
+
+    // Response headers — inject into every response code when declared
+    if (meta.responseHeaderSchema) {
+        const headers = buildResponseHeaders(
+            meta.responseHeaderSchema,
+            registry
+        );
+        for (const code of Object.keys(result)) {
+            (result[code] as Record<string, unknown>)['headers'] = headers;
         }
     }
 

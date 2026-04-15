@@ -180,3 +180,54 @@ describe('EndpointBuilder .returns() schema storage', () => {
         expect(meta.producesFile).toBeNull();
     });
 });
+
+describe('EndpointBuilder .produces() / .responseHeaders()', () => {
+    it('.produces() stores content type map in introspect', () => {
+        const csvSchema = string();
+        const ep = endpoint
+            .get('/api/items')
+            .returns(object({ id: number() }))
+            .produces({
+                'text/csv': { schema: csvSchema },
+                'application/xml': {}
+            });
+
+        const meta = ep.introspect();
+        expect(meta.produces).toEqual({
+            'text/csv': { schema: csvSchema },
+            'application/xml': {}
+        });
+    });
+
+    it('.produces() returns a new builder without mutating original', () => {
+        const a = endpoint.get('/api/items');
+        const b = a.produces({ 'text/csv': {} });
+        expect(a).not.toBe(b);
+        expect(a.introspect().produces).toBeNull();
+        expect(b.introspect().produces).toEqual({ 'text/csv': {} });
+    });
+
+    it('.responseHeaders() stores schema in introspect', () => {
+        const headerSchema = object({
+            'X-Total-Count': number(),
+            'X-Page': number()
+        });
+        const ep = endpoint.get('/api/items').responseHeaders(headerSchema);
+        expect(ep.introspect().responseHeaderSchema).toBe(headerSchema);
+    });
+
+    it('.responseHeaders() returns a new builder without mutating original', () => {
+        const headerSchema = object({ 'X-Request-Id': string() });
+        const a = endpoint.get('/api/items');
+        const b = a.responseHeaders(headerSchema);
+        expect(a).not.toBe(b);
+        expect(a.introspect().responseHeaderSchema).toBeNull();
+        expect(b.introspect().responseHeaderSchema).toBe(headerSchema);
+    });
+
+    it('produces/responseHeaderSchema default to null in introspect', () => {
+        const meta = endpoint.get('/api/items').introspect();
+        expect(meta.produces).toBeNull();
+        expect(meta.responseHeaderSchema).toBeNull();
+    });
+});
