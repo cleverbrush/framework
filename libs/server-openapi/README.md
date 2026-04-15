@@ -10,7 +10,7 @@ OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Con
 - **`generateOpenApiSpec()`** — converts `@cleverbrush/server` endpoint registrations into an OpenAPI 3.1 document.
 - **Schema conversion** — maps `@cleverbrush/schema` builders to JSON Schema Draft 2020-12 via `@cleverbrush/schema-json`.
 - **Path resolution** — converts both colon-style paths (`:id`) and `ParseStringSchemaBuilder` templates to OpenAPI `{param}` format with per-parameter schemas.
-- **Security mapping** — translates `@cleverbrush/auth` authentication schemes to OpenAPI `securitySchemes`; maps per-endpoint `authorize()` to `security` arrays.
+- **Security mapping** — translates `@cleverbrush/auth` authentication schemes to OpenAPI `securitySchemes`; maps per-endpoint `authorize()` to `security` arrays. Auto-detects OAuth 2.0 flows (`authorizationCodeScheme`, `clientCredentialsScheme`) and OpenID Connect (`oidcScheme`).
 - **Top-level tags** — pass `tags: [{ name, description?, externalDocs? }]` to `OpenApiOptions`; tag names are also auto-collected from endpoint registrations.
 - **Request body examples** — emit `example` / `examples` on Media Type Objects via `.example()` and `.examples()` on `EndpointBuilder`. Schema-level examples propagate automatically.
 - **Binary / file responses** — `.producesFile(contentType?, description?)` emits binary content types instead of JSON schemas for file download endpoints.

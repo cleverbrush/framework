@@ -63,7 +63,7 @@ These items require new metadata fields on `EndpointBuilder` / `EndpointMetadata
 - **Files**: `libs/server/src/Endpoint.ts`, `libs/server-openapi/src/generateOpenApiSpec.ts` → `buildResponses()`
 - **Impact**: File download endpoints currently show no response body in generated docs.
 
-### 2.3 Multiple content types in responses
+### 2.3 Multiple content types in responses - DONE
 
 - **Server**: Add `.produces(...mediaTypes: string[])` to `EndpointBuilder`. Store negotiable content types in metadata.
 - **OpenAPI**: Emit multiple entries in the `content` map for the relevant response code.
@@ -71,14 +71,14 @@ These items require new metadata fields on `EndpointBuilder` / `EndpointMetadata
 - **Depends on**: Step 2.2 (same metadata pipeline).
 - **Impact**: Accurately documents content-negotiated endpoints that serve both JSON and, say, CSV or XML.
 
-### 2.4 Response headers metadata
+### 2.4 Response headers metadata - DONE
 
 - **Server**: Add `.responseHeaders(schema: ObjectSchemaBuilder)` to `EndpointBuilder` (same pattern as `.headers()`). Store in metadata.
 - **OpenAPI**: Emit a `headers` map on response objects, with per-header name, schema, and description.
 - **Files**: `libs/server/src/Endpoint.ts` (new metadata field), `libs/server-openapi/src/generateOpenApiSpec.ts` → `buildResponses()`
 - **Impact**: Documents pagination headers (`X-Total-Count`), rate-limit headers, cache control, etc.
 
-### 2.5 OAuth 2.0 / OpenID Connect security scheme support
+### 2.5 OAuth 2.0 / OpenID Connect security scheme support ✅ DONE
 
 - **What**: Only JWT Bearer and cookie-based schemes are auto-detected today. OAuth 2.0 and OIDC are entirely unsupported.
 - **OpenAPI**: Extend `mapSecuritySchemes()` to detect OAuth scheme types and emit `type: 'oauth2'` with the appropriate flows (authorizationCode, clientCredentials, password, implicit) and their scopes. Detect OIDC → `type: 'openIdConnect'` with `openIdConnectUrl`.

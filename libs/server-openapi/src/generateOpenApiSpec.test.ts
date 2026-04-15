@@ -470,6 +470,106 @@ describe('generateOpenApiSpec', () => {
         expect(components.securitySchemes['jwt']).toBeUndefined();
     });
 
+    it('auto-detects OAuth2 scheme from flows property', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions(
+                [
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/oauth-protected',
+                        authRoles: ['read:items']
+                    })
+                ],
+                {
+                    authConfig: {
+                        defaultScheme: 'oauth2',
+                        schemes: [
+                            {
+                                name: 'oauth2',
+                                flows: {
+                                    authorizationCode: {
+                                        authorizationUrl:
+                                            'https://auth.example.com/authorize',
+                                        tokenUrl:
+                                            'https://auth.example.com/token',
+                                        scopes: {
+                                            'read:items': 'Read items'
+                                        }
+                                    }
+                                },
+                                authenticate: async () => ({
+                                    succeeded: false as const,
+                                    failure: 'test'
+                                }),
+                                challenge: () => ({
+                                    headerName: 'WWW-Authenticate',
+                                    headerValue: 'Bearer'
+                                })
+                            } as any
+                        ]
+                    }
+                }
+            )
+        );
+        const components = spec['components'] as any;
+        expect(components.securitySchemes['oauth2']).toEqual({
+            type: 'oauth2',
+            flows: {
+                authorizationCode: {
+                    authorizationUrl: 'https://auth.example.com/authorize',
+                    tokenUrl: 'https://auth.example.com/token',
+                    scopes: { 'read:items': 'Read items' }
+                }
+            }
+        });
+        const op = (spec['paths'] as any)['/api/oauth-protected']['get'];
+        expect(op.security).toEqual([{ oauth2: ['read:items'] }]);
+    });
+
+    it('auto-detects OIDC scheme from openIdConnectUrl property', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions(
+                [
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/oidc-protected',
+                        authRoles: []
+                    })
+                ],
+                {
+                    authConfig: {
+                        defaultScheme: 'oidc',
+                        schemes: [
+                            {
+                                name: 'oidc',
+                                openIdConnectUrl:
+                                    'https://auth.example.com/.well-known/openid-configuration',
+                                authenticate: async () => ({
+                                    succeeded: false as const,
+                                    failure: 'test'
+                                }),
+                                challenge: () => ({
+                                    headerName: 'WWW-Authenticate',
+                                    headerValue: 'Bearer'
+                                })
+                            } as any
+                        ]
+                    }
+                }
+            )
+        );
+        const components = spec['components'] as any;
+        expect(components.securitySchemes['oidc']).toEqual({
+            type: 'openIdConnect',
+            openIdConnectUrl:
+                'https://auth.example.com/.well-known/openid-configuration'
+        });
+        const op = (spec['paths'] as any)['/api/oidc-protected']['get'];
+        expect(op.security).toEqual([{ oidc: [] }]);
+    });
+
     // --- Multiple endpoints ---
 
     it('handles multiple endpoints on different paths', () => {

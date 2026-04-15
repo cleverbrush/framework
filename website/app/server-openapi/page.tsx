@@ -67,9 +67,9 @@ export default function ServerOpenApiPage() {
                             produce typed OpenAPI path parameters.
                         </li>
                         <li>
-                            <strong>Security mapping</strong> — JWT and cookie
-                            auth schemes become <code>securitySchemes</code>{' '}
-                            automatically.
+                            <strong>Security mapping</strong> — JWT, cookie,
+                            OAuth 2.0, and OpenID Connect auth schemes become{' '}
+                            <code>securitySchemes</code> automatically.
                         </li>
                         <li>
                             <strong>Top-level tags</strong> — pass{' '}
@@ -275,11 +275,19 @@ const CreateUserBody = object({ address: AddressSchema, name: string() });`
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { jwtScheme } from '@cleverbrush/auth';
+                                __html: highlightTS(`import { jwtScheme, authorizationCodeScheme } from '@cleverbrush/auth';
 
 const authConfig = {
     defaultScheme: 'jwt',
-    schemes: [jwtScheme({ secret: '...', mapClaims: c => c })]
+    schemes: [
+        jwtScheme({ secret: '...', mapClaims: c => c }),
+        authorizationCodeScheme({
+            authorizationUrl: 'https://auth.example.com/authorize',
+            tokenUrl: 'https://auth.example.com/token',
+            scopes: { 'read:items': 'Read items' },
+            authenticate: async (ctx) => ({ succeeded: false })
+        })
+    ]
 };
 
 server.use(serveOpenApi({
@@ -288,8 +296,8 @@ server.use(serveOpenApi({
     authConfig
 }));
 
-// JWT endpoints get: securitySchemes.jwt → { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
-// Authorized endpoints get:  security: [{ jwt: [] }]`)
+// JWT → securitySchemes.jwt: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
+// OAuth2 → securitySchemes.oauth2: { type: 'oauth2', flows: { authorizationCode: ... } }`)
                             }}
                         />
                     </pre>

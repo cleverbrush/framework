@@ -29,6 +29,15 @@ export {
     jwtScheme,
     signJwt
 } from './JwtScheme.js';
+export {
+    type AuthorizationCodeSchemeOptions,
+    authorizationCodeScheme,
+    type ClientCredentialsSchemeOptions,
+    clientCredentialsScheme,
+    type OAuthFlow,
+    type OAuthFlows
+} from './OAuthScheme.js';
+export { type OidcSchemeOptions, oidcScheme } from './OidcScheme.js';
 export { Principal } from './Principal.js';
 
 // Helpers

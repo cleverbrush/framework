@@ -58,6 +58,102 @@ describe('mapSecuritySchemes', () => {
         expect(mapSecuritySchemes(null)).toEqual({});
         expect(mapSecuritySchemes(undefined)).toEqual({});
     });
+
+    it('maps OAuth authorization code scheme to oauth2 security scheme', () => {
+        const scheme = {
+            name: 'oauth2',
+            flows: {
+                authorizationCode: {
+                    authorizationUrl: 'https://auth.example.com/authorize',
+                    tokenUrl: 'https://auth.example.com/token',
+                    scopes: { 'read:items': 'Read items' }
+                }
+            },
+            authenticate: async () => ({
+                succeeded: false as const,
+                failure: 'test'
+            }),
+            challenge: () => ({
+                headerName: 'WWW-Authenticate',
+                headerValue: 'Bearer'
+            })
+        };
+        const config: AuthenticationConfig = {
+            defaultScheme: 'oauth2',
+            schemes: [scheme]
+        };
+        const result = mapSecuritySchemes(config);
+        expect(result['oauth2']).toEqual({
+            type: 'oauth2',
+            flows: {
+                authorizationCode: {
+                    authorizationUrl: 'https://auth.example.com/authorize',
+                    tokenUrl: 'https://auth.example.com/token',
+                    scopes: { 'read:items': 'Read items' }
+                }
+            }
+        });
+    });
+
+    it('maps OAuth client credentials scheme to oauth2 security scheme', () => {
+        const scheme = {
+            name: 'oauth2',
+            flows: {
+                clientCredentials: {
+                    tokenUrl: 'https://auth.example.com/token',
+                    scopes: { 'service:read': 'Read service data' }
+                }
+            },
+            authenticate: async () => ({
+                succeeded: false as const,
+                failure: 'test'
+            }),
+            challenge: () => ({
+                headerName: 'WWW-Authenticate',
+                headerValue: 'Bearer'
+            })
+        };
+        const config: AuthenticationConfig = {
+            defaultScheme: 'oauth2',
+            schemes: [scheme]
+        };
+        const result = mapSecuritySchemes(config);
+        expect(result['oauth2']).toEqual({
+            type: 'oauth2',
+            flows: {
+                clientCredentials: {
+                    tokenUrl: 'https://auth.example.com/token',
+                    scopes: { 'service:read': 'Read service data' }
+                }
+            }
+        });
+    });
+
+    it('maps OIDC scheme to openIdConnect security scheme', () => {
+        const scheme = {
+            name: 'oidc',
+            openIdConnectUrl:
+                'https://auth.example.com/.well-known/openid-configuration',
+            authenticate: async () => ({
+                succeeded: false as const,
+                failure: 'test'
+            }),
+            challenge: () => ({
+                headerName: 'WWW-Authenticate',
+                headerValue: 'Bearer'
+            })
+        };
+        const config: AuthenticationConfig = {
+            defaultScheme: 'oidc',
+            schemes: [scheme]
+        };
+        const result = mapSecuritySchemes(config);
+        expect(result['oidc']).toEqual({
+            type: 'openIdConnect',
+            openIdConnectUrl:
+                'https://auth.example.com/.well-known/openid-configuration'
+        });
+    });
 });
 
 describe('mapOperationSecurity', () => {
