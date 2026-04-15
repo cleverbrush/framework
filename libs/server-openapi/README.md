@@ -174,7 +174,7 @@ const CreatePet = endpoint.post('/api/pets').body(PetBody);
 // requestBody.content['application/json'].schema:
 // {
 //   anyOf: [{ $ref: '#/components/schemas/Cat' }, { $ref: '#/components/schemas/Dog' }],
-//   discriminator: { propertyName: 'type', mapping: { cat: '…/Cat', dog: '…/Dog' } }
+//   discriminator: { propertyName: 'type', mapping: { cat: '#/components/schemas/Cat', dog: '#/components/schemas/Dog' } }
 // }
 ```
 
