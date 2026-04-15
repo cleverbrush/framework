@@ -29,6 +29,7 @@ function makeMeta(partial: Partial<EndpointMetadata> = {}): EndpointMetadata {
         operationId: null,
         deprecated: false,
         responseSchema: null,
+        responsesSchemas: null,
         ...partial
     };
 }
