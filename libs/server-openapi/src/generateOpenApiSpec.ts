@@ -363,6 +363,11 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
         }
     }
 
+    const resolveComponentSchemaName =
+        (rootSchema: SchemaBuilder<any, any, any>) =>
+        (candidate: SchemaBuilder<any, any, any>) =>
+            candidate === rootSchema ? undefined : registry.getName(candidate);
+
     // Build paths
     const paths: Record<string, Record<string, unknown>> = {};
 
@@ -395,9 +400,13 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
     // Components — security schemes + named component schemas
     const componentSchemas: Record<string, unknown> = {};
     for (const [name, schema] of registry.entries()) {
-        // Convert without nameResolver so the definition itself is fully inlined
-        // (avoids a self-referential $ref in the components section).
-        componentSchemas[name] = convertSchema(schema);
+        // Inline the root schema to avoid a self-referential $ref, but resolve
+        // nested named schemas through the shared registry so component
+        // definitions can still deduplicate via $ref.
+        componentSchemas[name] = convertSchema(
+            schema,
+            resolveComponentSchemaName(schema)
+        );
     }
     const hasSchemas = Object.keys(componentSchemas).length > 0;
 
