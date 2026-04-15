@@ -1,4 +1,11 @@
-import { boolean, number, object, string, union } from '@cleverbrush/schema';
+import {
+    array,
+    boolean,
+    number,
+    object,
+    string,
+    union
+} from '@cleverbrush/schema';
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
@@ -175,3 +182,99 @@ export type TodoEvent =
     | { type: 'assigned'; assignedTo: number }
     | { type: 'commented'; comment: string }
     | { type: 'completed'; completedAt: string };
+
+// ── Import / Export ───────────────────────────────────────────────────────────
+
+export const ImportTodoItemSchema = object({
+    title: string()
+        .minLength(1)
+        .describe('Title of the todo to import. Must be at least 1 character.'),
+    description: string()
+        .optional()
+        .describe('Optional description for the imported todo.')
+}).schemaName('ImportTodoItem');
+
+export const ImportTodosBodySchema = object({
+    items: array(ImportTodoItemSchema).describe(
+        'Array of todo items to import.'
+    )
+}).schemaName('ImportTodosBody');
+
+export const ImportResultItemSchema = object({
+    title: string().describe('Title of the todo item.'),
+    success: boolean().describe('Whether the item was successfully imported.'),
+    error: string()
+        .optional()
+        .describe('Error message if the item failed to import.')
+}).schemaName('ImportResultItem');
+
+export const ImportResultSchema = object({
+    imported: number().describe('Number of successfully imported todos.'),
+    total: number().describe('Total number of items in the request.'),
+    items: array(ImportResultItemSchema).describe(
+        'Per-item import results.'
+    )
+}).schemaName('ImportResult');
+
+// ── Request header schemas ────────────────────────────────────────────────────
+
+export const ImportRequestHeadersSchema = object({
+    'x-idempotency-key': string()
+        .optional()
+        .describe(
+            'Optional idempotency key to prevent duplicate imports on retries.'
+        )
+});
+
+export const CompletionRequestHeadersSchema = object({
+    'if-match': string()
+        .optional()
+        .describe(
+            'ETag of the todo for optimistic concurrency control. Must match the current updatedAt timestamp.'
+        )
+});
+
+// ── Response header schemas ───────────────────────────────────────────────────
+
+export const ExportResponseHeadersSchema = object({
+    'x-total-count': number().describe(
+        'Total number of todos included in the export.'
+    ),
+    'x-export-format': string().describe(
+        'The format of the exported data (e.g. "csv").'
+    )
+});
+
+// ── Webhook schemas ───────────────────────────────────────────────────────────
+
+export const TodoNotificationPayloadSchema = object({
+    event: string().describe(
+        'Event type, e.g. "todo.created" or "todo.completed".'
+    ),
+    todoId: number().describe('ID of the affected todo.'),
+    todo: TodoResponseSchema
+}).schemaName('TodoNotificationPayload');
+
+export const WebhookAckSchema = object({
+    received: boolean().describe('Whether the consumer acknowledged the event.')
+}).schemaName('WebhookAck');
+
+export const WebhookSubscriptionBodySchema = object({
+    callbackUrl: string().describe(
+        'The URL where webhook notifications will be sent.'
+    ),
+    events: array(string()).describe(
+        'Event types to subscribe to, e.g. ["todo.created", "todo.completed"].'
+    )
+}).schemaName('WebhookSubscriptionBody');
+
+export const WebhookSubscriptionResponseSchema = object({
+    id: string().describe('Unique identifier for this subscription.'),
+    callbackUrl: string().describe(
+        'The registered callback URL for notifications.'
+    ),
+    events: array(string()).describe('The subscribed event types.'),
+    createdAt: string().describe(
+        'ISO 8601 timestamp of when the subscription was created.'
+    )
+}).schemaName('WebhookSubscriptionResponse');

@@ -1,6 +1,10 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
 import { UserDbSchema } from '../../db/schemas.js';
-import type { DeleteUserEndpoint, ListUsersEndpoint } from '../endpoints.js';
+import type {
+    DeleteUserEndpoint,
+    GetMyProfileEndpoint,
+    ListUsersEndpoint
+} from '../endpoints.js';
 import { mapUser } from '../mappers.js';
 
 // ── List users (admin only) ───────────────────────────────────────────────────
@@ -49,4 +53,23 @@ export const deleteUserHandler: Handler<typeof DeleteUserEndpoint> = async (
         .delete();
 
     return ActionResult.noContent();
+};
+
+// ── Get current user profile ──────────────────────────────────────────────────
+
+export const getMyProfileHandler: Handler<typeof GetMyProfileEndpoint> = async (
+    { principal },
+    { db }
+) => {
+    const user = await db(UserDbSchema)
+        .where(t => t.id, principal.userId)
+        .first();
+
+    if (!user) {
+        return ActionResult.notFound({
+            message: 'User not found.'
+        });
+    }
+
+    return mapUser(user);
 };
