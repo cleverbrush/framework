@@ -12,6 +12,8 @@ export interface OpenApiSecurityScheme {
     readonly bearerFormat?: string;
     readonly in?: string;
     readonly name?: string;
+    readonly flows?: Record<string, unknown>;
+    readonly openIdConnectUrl?: string;
 }
 
 /**
@@ -27,7 +29,17 @@ export function mapSecuritySchemes(
         const name = scheme.name;
         const challenge = scheme.challenge?.();
 
-        if (
+        if ('openIdConnectUrl' in scheme && (scheme as any).openIdConnectUrl) {
+            result[name] = {
+                type: 'openIdConnect',
+                openIdConnectUrl: (scheme as any).openIdConnectUrl
+            };
+        } else if ('flows' in scheme && (scheme as any).flows) {
+            result[name] = {
+                type: 'oauth2',
+                flows: (scheme as any).flows
+            };
+        } else if (
             challenge?.headerValue?.toLowerCase().startsWith('bearer') ||
             name === 'jwt'
         ) {

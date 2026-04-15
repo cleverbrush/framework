@@ -1,4 +1,12 @@
-import { array, number, object, string, union } from '@cleverbrush/schema';
+import {
+    array,
+    lazy,
+    number,
+    object,
+    type SchemaBuilder,
+    string,
+    union
+} from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
 import { SchemaRegistry, walkSchemas } from './schemaRegistry.js';
 
@@ -143,11 +151,28 @@ describe('walkSchemas', () => {
         expect(() => walkSchemas(root, registry)).toThrow(/Thing/);
     });
 
-    it('skips lazy schemas without recursing', () => {
+    it('skips lazy schemas without recursing (legacy sentinel test)', () => {
         const registry = new SchemaRegistry();
-        // Constructing a lazy schema that calls back into itself
-        // walkSchemas must not recurse into it
-        const lazySchema = { introspect: () => ({ type: 'lazy' }) } as any;
+        // A real LazySchemaBuilder pointing to a simple schema — should not throw
+        const lazySchema = lazy(() => string());
         expect(() => walkSchemas(lazySchema, registry)).not.toThrow();
+    });
+
+    it('resolves lazy and registers named schema behind the boundary', () => {
+        const registry = new SchemaRegistry();
+        const Inner = object({ id: number() }).schemaName('Inner');
+        const root = object({ child: lazy(() => Inner) });
+        walkSchemas(root, registry);
+        expect(registry.getName(Inner)).toBe('Inner');
+    });
+
+    it('handles self-referential lazy without infinite loop', () => {
+        const registry = new SchemaRegistry();
+        const treeNode: SchemaBuilder<any, any, any, any, any> = object({
+            value: number(),
+            children: array(lazy(() => treeNode))
+        }).schemaName('TreeNode');
+        expect(() => walkSchemas(treeNode, registry)).not.toThrow();
+        expect(registry.getName(treeNode)).toBe('TreeNode');
     });
 });

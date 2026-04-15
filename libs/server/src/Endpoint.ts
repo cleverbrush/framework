@@ -2,6 +2,7 @@ import type {
     InferType,
     ObjectSchemaBuilder,
     ParseStringSchemaBuilder,
+    PropertyDescriptorTree,
     SchemaBuilder
 } from '@cleverbrush/schema';
 import type {
@@ -31,7 +32,13 @@ type HasKeys<T> = keyof T extends never ? false : true;
 type ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal> = {
     context: RequestContext;
 } & (HasKeys<TParams> extends true ? { params: TParams } : {}) &
-    (TBody extends undefined ? {} : { body: TBody }) &
+    (TBody extends undefined
+        ? {}
+        : {
+              body: TBody extends SchemaBuilder<any, any, any, any, any>
+                  ? InferType<TBody>
+                  : TBody;
+          }) &
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
     (TPrincipal extends undefined ? {} : { principal: TPrincipal });
@@ -100,7 +107,9 @@ type ResponseType<E> =
         infer TResponse,
         any
     >
-        ? TResponse
+        ? TResponse extends SchemaBuilder<any, any, any, any, any>
+            ? InferType<TResponse>
+            : TResponse
         : any;
 
 /**
@@ -185,6 +194,90 @@ export type Handler<E> =
 type RoutePath = string | ParseStringSchemaBuilder<any, any, any, any, any>;
 
 /**
+ * Lightweight recursive property reference tree for type-safe runtime
+ * expression building in `.links()` and `.callbacks()`.
+ *
+ * At runtime the actual value is a `PropertyDescriptorTree` from
+ * `ObjectSchemaBuilder.getPropertiesFor()`, which provides `toJsonPointer()`
+ * and the `SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR` marker used by the OpenAPI
+ * generator to resolve path expressions automatically.
+ */
+export type PropertyRefTree<T> = {
+    readonly [K in keyof T]-?: PropertyRefTree<T[K]>;
+};
+
+/**
+ * A link from a response to a follow-up operation.
+ *
+ * @see https://spec.openapis.org/oas/v3.1.0#link-object
+ */
+export interface LinkDefinition<TResponse = any> {
+    /** `operationId` of the target operation. */
+    readonly operationId: string;
+    /**
+     * Map of target parameter names to values.
+     *
+     * - `Record<string, string>` — raw OpenAPI runtime expressions such as
+     *   `'$response.body#/id'`.
+     * - Callback `(response: PropertyRefTree<TResponse>) => Record<string, unknown>` —
+     *   type-safe selector; properties accessed on `response` are converted to
+     *   `$response.body#/<pointer>` expressions automatically.
+     */
+    readonly parameters?:
+        | Record<string, string>
+        | ((
+              response: TResponse extends ObjectSchemaBuilder<
+                  any,
+                  any,
+                  any,
+                  any,
+                  any
+              >
+                  ? PropertyDescriptorTree<TResponse, TResponse>
+                  : PropertyRefTree<any>
+          ) => Record<string, unknown>);
+    /** Human-readable description of the link relationship. */
+    readonly description?: string;
+    /** Runtime expression or literal for the linked operation's request body. */
+    readonly requestBody?: string;
+}
+
+/**
+ * A callback declaration for async request/response patterns.
+ *
+ * @see https://spec.openapis.org/oas/v3.1.0#callback-object
+ */
+export interface CallbackDefinition<TBody = any> {
+    /**
+     * Raw OpenAPI runtime expression for the callback URL,
+     * e.g. `'{$request.body#/callbackUrl}'`.
+     * Mutually exclusive with `urlFrom`.
+     */
+    readonly expression?: string;
+    /**
+     * Type-safe selector for the request body field holding the callback URL.
+     * The generator converts the selected property to a
+     * `'{$request.body#/<pointer>}'` expression automatically.
+     * Mutually exclusive with `expression`.
+     */
+    readonly urlFrom?: (
+        body: TBody extends ObjectSchemaBuilder<any, any, any, any, any>
+            ? PropertyDescriptorTree<TBody, TBody>
+            : PropertyRefTree<any>
+    ) => unknown;
+    /** HTTP method for the callback request (default: `'POST'`). */
+    readonly method?: string;
+    /** Short summary of the callback operation. */
+    readonly summary?: string;
+    /** Detailed description of the callback operation. */
+    readonly description?: string;
+    /** Request body schema for the callback payload. */
+    readonly body?: SchemaBuilder<any, any, any, any, any>;
+    /** Response schema expected from the callback consumer. */
+    readonly response?: SchemaBuilder<any, any, any, any, any>;
+}
+
+/**
  * Snapshot of all configuration set on an `EndpointBuilder`.
  * Used by the server for routing and by `@cleverbrush/server-openapi` for
  * spec generation.
@@ -239,6 +332,66 @@ export interface EndpointMetadata {
         number,
         SchemaBuilder<any, any, any, any, any> | null
     > | null;
+    /**
+     * A single example value for the request body, emitted as `example` on the
+     * OpenAPI Media Type Object.
+     */
+    readonly example: unknown | null;
+    /**
+     * A map of named examples for the request body, emitted as `examples` on the
+     * OpenAPI Media Type Object. Each entry follows the OpenAPI Example Object shape.
+     */
+    readonly examples: Record<
+        string,
+        { summary?: string; description?: string; value: unknown }
+    > | null;
+    /**
+     * When set, the endpoint produces a binary file response instead of JSON.
+     * The OpenAPI spec will emit the appropriate binary content type.
+     */
+    readonly producesFile: {
+        contentType?: string;
+        description?: string;
+    } | null;
+    /**
+     * Multiple response content types for content-negotiated endpoints.
+     * Keys are MIME types; an optional `schema` overrides the default response
+     * schema for that content type. When set alongside `.producesFile()`,
+     * `producesFile` takes precedence.
+     */
+    readonly produces: Record<
+        string,
+        { schema?: SchemaBuilder<any, any, any, any, any> }
+    > | null;
+    /**
+     * Schema describing response headers emitted on every response code.
+     * Each property in the object schema becomes a header name with its
+     * sub-schema and optional description.
+     */
+    readonly responseHeaderSchema: ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > | null;
+    /**
+     * External documentation URL for this operation, emitted as `externalDocs`
+     * on the OpenAPI Operation Object.
+     */
+    readonly externalDocs: { url: string; description?: string } | null;
+    /**
+     * Response links declared via `.links()`, emitted under the primary
+     * success response's `links` map in the OpenAPI spec.
+     */
+    readonly links: Record<string, LinkDefinition> | null;
+    /**
+     * Callbacks declared via `.callbacks()`, emitted as `callbacks` on the
+     * OpenAPI Operation Object.
+     */
+    readonly callbacks: Record<string, CallbackDefinition> | null;
 }
 
 /**
@@ -319,6 +472,31 @@ export class EndpointBuilder<
         number,
         SchemaBuilder<any, any, any, any, any> | null
     > | null;
+    readonly #example: unknown | null;
+    readonly #examples: Record<
+        string,
+        { summary?: string; description?: string; value: unknown }
+    > | null;
+    readonly #producesFile: {
+        contentType?: string;
+        description?: string;
+    } | null;
+    readonly #produces: Record<
+        string,
+        { schema?: SchemaBuilder<any, any, any, any, any> }
+    > | null;
+    readonly #responseHeaderSchema: ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > | null;
+    readonly #externalDocs: { url: string; description?: string } | null;
+    readonly #links: Record<string, LinkDefinition> | null;
+    readonly #callbacks: Record<string, CallbackDefinition> | null;
 
     constructor(
         method: string,
@@ -357,7 +535,32 @@ export class EndpointBuilder<
         responsesSchemas: Record<
             number,
             SchemaBuilder<any, any, any, any, any> | null
-        > | null = null
+        > | null = null,
+        example: unknown | null = null,
+        examples: Record<
+            string,
+            { summary?: string; description?: string; value: unknown }
+        > | null = null,
+        producesFile: {
+            contentType?: string;
+            description?: string;
+        } | null = null,
+        produces: Record<
+            string,
+            { schema?: SchemaBuilder<any, any, any, any, any> }
+        > | null = null,
+        responseHeaderSchema: ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        > | null = null,
+        externalDocs: { url: string; description?: string } | null = null,
+        links: Record<string, LinkDefinition> | null = null,
+        callbacks: Record<string, CallbackDefinition> | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -374,6 +577,14 @@ export class EndpointBuilder<
         this.#deprecated = deprecated;
         this.#responseSchema = responseSchema;
         this.#responsesSchemas = responsesSchemas;
+        this.#example = example;
+        this.#examples = examples;
+        this.#producesFile = producesFile;
+        this.#produces = produces;
+        this.#responseHeaderSchema = responseHeaderSchema;
+        this.#externalDocs = externalDocs;
+        this.#links = links;
+        this.#callbacks = callbacks;
     }
 
     /** Define the request body schema. Validation failures return 422 Problem Details. */
@@ -381,7 +592,7 @@ export class EndpointBuilder<
         schema: TSchema
     ): EndpointBuilder<
         TParams,
-        InferType<TSchema>,
+        TSchema,
         TQuery,
         THeaders,
         TServices,
@@ -405,7 +616,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -440,7 +659,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -475,7 +702,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -510,7 +745,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -594,7 +837,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -626,7 +877,7 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        InferType<TSchema>,
+        TSchema,
         TResponses
     >;
     returns(
@@ -653,7 +904,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             schema ?? this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -712,7 +971,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            map
+            map,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -745,7 +1012,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -778,7 +1053,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -811,7 +1094,15 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -844,7 +1135,15 @@ export class EndpointBuilder<
             id,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -875,7 +1174,164 @@ export class EndpointBuilder<
             this.#operationId,
             true,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Provide a single example value for the request body.
+     *
+     * Emitted as the `example` field on the OpenAPI Media Type Object
+     * (`application/json`). Pre-fills the "Try it out" panel in Swagger UI.
+     *
+     * @param value - An example request body value.
+     */
+    example(
+        value: TBody
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            value,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Provide named examples for the request body.
+     *
+     * Each entry is emitted under the `examples` map of the OpenAPI Media Type
+     * Object following the Example Object shape (`{ summary?, description?, value }`).
+     *
+     * @param map - A record of named examples.
+     */
+    examples(
+        map: Record<
+            string,
+            { summary?: string; description?: string; value: TBody }
+        >
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            map,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Declare that this endpoint produces a binary file response.
+     *
+     * When set, the OpenAPI spec emits a binary content type instead of a JSON
+     * schema for the success response. Takes precedence over `.returns()`.
+     *
+     * @param contentType - MIME type (default: `'application/octet-stream'`).
+     * @param description - Optional response description for the spec.
+     */
+    producesFile(
+        contentType?: string,
+        description?: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            { contentType, description },
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -896,8 +1352,311 @@ export class EndpointBuilder<
             operationId: this.#operationId,
             deprecated: this.#deprecated,
             responseSchema: this.#responseSchema,
-            responsesSchemas: this.#responsesSchemas
+            responsesSchemas: this.#responsesSchemas,
+            example: this.#example,
+            examples: this.#examples,
+            producesFile: this.#producesFile,
+            produces: this.#produces,
+            responseHeaderSchema: this.#responseHeaderSchema,
+            externalDocs: this.#externalDocs,
+            links: this.#links,
+            callbacks: this.#callbacks
         };
+    }
+
+    /**
+     * Declare that this endpoint can produce responses in multiple content types.
+     *
+     * Each key is a MIME type. Provide an optional `schema` to override the
+     * default response schema for that type; otherwise the schema from
+     * `.returns()` / `.responses()` is reused for every declared content type.
+     *
+     * When used alongside `.producesFile()`, the binary response takes precedence.
+     *
+     * @param contentTypes - Map of MIME type → optional schema override.
+     *
+     * @example
+     * ```ts
+     * endpoint.get('/api/items')
+     *   .returns(object({ id: number(), name: string() }))
+     *   .produces({
+     *     'text/csv': {},
+     *     'application/xml': { schema: string() }
+     *   })
+     * ```
+     */
+    produces(
+        contentTypes: Record<
+            string,
+            { schema?: SchemaBuilder<any, any, any, any, any> }
+        >
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            contentTypes,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Declare response headers emitted by this endpoint.
+     *
+     * The object schema's properties become header names in the OpenAPI spec;
+     * each property's sub-schema and description are emitted in the `headers`
+     * map on every response code.
+     *
+     * @param schema - Object schema whose properties describe the response headers.
+     *
+     * @example
+     * ```ts
+     * endpoint.get('/api/items')
+     *   .responseHeaders(object({
+     *     'X-Total-Count': number().describe('Total number of items'),
+     *     'X-Page': number()
+     *   }))
+     * ```
+     */
+    responseHeaders<
+        TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    >(
+        schema: TSchema
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            schema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Link external documentation to this operation.
+     *
+     * Emitted as the `externalDocs` field on the OpenAPI Operation Object.
+     *
+     * @param url - The URL to the external documentation.
+     * @param description - Optional short description of the external docs.
+     */
+    externalDocs(
+        url: string,
+        description?: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            { url, description },
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Declare response links for OpenAPI spec generation.
+     *
+     * Links describe follow-up actions that can be taken based on the response,
+     * emitted under the primary 2xx response's `links` map.
+     *
+     * @param defs - Record mapping link names to {@link LinkDefinition} objects.
+     *
+     * @example
+     * ```ts
+     * endpoint.get('/api/users/:id')
+     *   .returns(UserSchema)
+     *   .links({
+     *     GetUser: {
+     *       operationId: 'getUser',
+     *       parameters: (r) => ({ id: r.id }),
+     *     },
+     *   })
+     * ```
+     */
+    links(
+        defs: Record<string, LinkDefinition<TResponse>>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            defs as Record<string, LinkDefinition>,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Declare callbacks for OpenAPI spec generation.
+     *
+     * Callbacks describe async out-of-band requests that may be sent to a URL
+     * provided in the request body, emitted as the `callbacks` field on the
+     * OpenAPI Operation Object.
+     *
+     * @param defs - Record mapping callback names to {@link CallbackDefinition} objects.
+     *
+     * @example
+     * ```ts
+     * endpoint.post('/api/subscriptions')
+     *   .body(object({ callbackUrl: string() }))
+     *   .callbacks({
+     *     onEvent: {
+     *       urlFrom: (b) => b.callbackUrl,
+     *       method: 'POST',
+     *       body: EventSchema,
+     *     },
+     *   })
+     * ```
+     */
+    callbacks(
+        defs: Record<string, CallbackDefinition<TBody>>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            defs as Record<string, CallbackDefinition>
+        );
     }
 }
 
@@ -945,6 +1704,11 @@ function createEndpoint(
         meta?.tags ?? [],
         meta?.operationId ?? null,
         meta?.deprecated ?? false,
+        null,
+        null,
+        null,
+        null,
+        null,
         null,
         null
     );

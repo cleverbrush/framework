@@ -32,6 +32,7 @@ import type {
     Middleware,
     ServerOptions
 } from './types.js';
+import type { WebhookDefinition } from './Webhook.js';
 
 // ---------------------------------------------------------------------------
 // Authentication / Authorization Config Types
@@ -80,6 +81,7 @@ export interface AuthorizationConfig {
 export class ServerBuilder {
     readonly #serviceCollection = new ServiceCollection();
     readonly #registrations: EndpointRegistration[] = [];
+    readonly #webhooks: WebhookDefinition[] = [];
     readonly #globalMiddlewares: Middleware[] = [];
     readonly #contentNegotiator = new ContentNegotiator();
     #options: ServerOptions = {};
@@ -173,6 +175,27 @@ export class ServerBuilder {
      */
     getRegistrations(): readonly EndpointRegistration[] {
         return [...this.#registrations];
+    }
+
+    /**
+     * Register a webhook definition.
+     *
+     * Webhooks are recorded for OpenAPI spec generation only — they are not
+     * served as HTTP routes by the runtime server.
+     *
+     * @param def - A {@link WebhookDefinition} created with {@link defineWebhook}.
+     */
+    webhook(def: WebhookDefinition): this {
+        this.#webhooks.push(def);
+        return this;
+    }
+
+    /**
+     * Returns a snapshot of all registered webhook definitions.
+     * Consumed by `@cleverbrush/server-openapi` to emit the `webhooks` map.
+     */
+    getWebhooks(): readonly WebhookDefinition[] {
+        return [...this.#webhooks];
     }
 
     /**

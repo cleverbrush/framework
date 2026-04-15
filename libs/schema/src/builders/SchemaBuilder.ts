@@ -222,6 +222,7 @@ export type SchemaBuilderProps<T> = {
     hasCatch?: boolean;
     description?: string;
     schemaName?: string;
+    example?: unknown;
 };
 
 export type ValidationContext<
@@ -727,6 +728,7 @@ export abstract class SchemaBuilder<
     #defaultValue: TResult | (() => TResult) | undefined = undefined;
     #catchValue: TResult | (() => TResult) | undefined = undefined;
     #hasCatch = false;
+    #example: unknown | undefined = undefined;
     /**
      * Cached result of the first `['~standard']` access. Stored so that
      * repeated property reads return the exact same object reference, which
@@ -1423,7 +1425,12 @@ export abstract class SchemaBuilder<
             /**
              * The catch/fallback value or factory function set via `.catch()`.
              */
-            catchValue: this.#catchValue
+            catchValue: this.#catchValue,
+            /**
+             * An example value attached to this schema via `.example()`,
+             * or `undefined` if none was set.
+             */
+            example: this.#example
         };
     }
 
@@ -1575,6 +1582,29 @@ export abstract class SchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             description: text
+        }) as unknown as this;
+    }
+
+    /**
+     * Attaches an example value to this schema instance.
+     *
+     * The example is purely metadata — it has no effect on validation.
+     * It is accessible via `.introspect().example` and is emitted as the
+     * `example` keyword in JSON Schema output and OpenAPI spec generation.
+     *
+     * @example
+     * ```ts
+     * import { string } from '@cleverbrush/schema';
+     *
+     * const Email = string().example('user@example.com');
+     *
+     * Email.introspect().example; // 'user@example.com'
+     * ```
+     */
+    public example(value: TResult): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            example: value
         }) as unknown as this;
     }
 
@@ -2047,6 +2077,10 @@ export abstract class SchemaBuilder<
 
         if (typeof props.schemaName === 'string') {
             this.#schemaName = props.schemaName;
+        }
+
+        if (props.example !== undefined) {
+            this.#example = props.example;
         }
 
         this.#requiredErrorMessageProvider =

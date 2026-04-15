@@ -119,4 +119,195 @@ describe('EndpointBuilder .returns() schema storage', () => {
         expect(meta.querySchema).not.toBeNull();
         expect(meta.responseSchema).toBe(responseSchema);
     });
+
+    // --- .example() / .examples() / .producesFile() ---
+
+    it('.example() stores value and chains', () => {
+        const ep = endpoint
+            .post('/api/items')
+            .body(object({ name: string() }))
+            .example({ name: 'Widget' });
+
+        const meta = ep.introspect();
+        expect(meta.example).toEqual({ name: 'Widget' });
+    });
+
+    it('.examples() stores map and chains', () => {
+        const examples = {
+            minimal: { summary: 'Minimal', value: { name: 'A' } },
+            full: {
+                summary: 'Full',
+                description: 'A complete example',
+                value: { name: 'B' }
+            }
+        };
+        const ep = endpoint
+            .post('/api/items')
+            .body(object({ name: string() }))
+            .examples(examples);
+
+        const meta = ep.introspect();
+        expect(meta.examples).toEqual(examples);
+    });
+
+    it('.producesFile() stores metadata and chains', () => {
+        const ep = endpoint
+            .get('/api/export')
+            .producesFile('text/csv', 'CSV export');
+
+        const meta = ep.introspect();
+        expect(meta.producesFile).toEqual({
+            contentType: 'text/csv',
+            description: 'CSV export'
+        });
+    });
+
+    it('.producesFile() defaults to no contentType when called without args', () => {
+        const ep = endpoint.get('/api/download').producesFile();
+
+        const meta = ep.introspect();
+        expect(meta.producesFile).toEqual({
+            contentType: undefined,
+            description: undefined
+        });
+    });
+
+    it('example/examples/producesFile default to null in introspect', () => {
+        const ep = endpoint.get('/api/health');
+        const meta = ep.introspect();
+        expect(meta.example).toBeNull();
+        expect(meta.examples).toBeNull();
+        expect(meta.producesFile).toBeNull();
+    });
+});
+
+describe('EndpointBuilder .produces() / .responseHeaders()', () => {
+    it('.produces() stores content type map in introspect', () => {
+        const csvSchema = string();
+        const ep = endpoint
+            .get('/api/items')
+            .returns(object({ id: number() }))
+            .produces({
+                'text/csv': { schema: csvSchema },
+                'application/xml': {}
+            });
+
+        const meta = ep.introspect();
+        expect(meta.produces).toEqual({
+            'text/csv': { schema: csvSchema },
+            'application/xml': {}
+        });
+    });
+
+    it('.produces() returns a new builder without mutating original', () => {
+        const a = endpoint.get('/api/items');
+        const b = a.produces({ 'text/csv': {} });
+        expect(a).not.toBe(b);
+        expect(a.introspect().produces).toBeNull();
+        expect(b.introspect().produces).toEqual({ 'text/csv': {} });
+    });
+
+    it('.responseHeaders() stores schema in introspect', () => {
+        const headerSchema = object({
+            'X-Total-Count': number(),
+            'X-Page': number()
+        });
+        const ep = endpoint.get('/api/items').responseHeaders(headerSchema);
+        expect(ep.introspect().responseHeaderSchema).toBe(headerSchema);
+    });
+
+    it('.responseHeaders() returns a new builder without mutating original', () => {
+        const headerSchema = object({ 'X-Request-Id': string() });
+        const a = endpoint.get('/api/items');
+        const b = a.responseHeaders(headerSchema);
+        expect(a).not.toBe(b);
+        expect(a.introspect().responseHeaderSchema).toBeNull();
+        expect(b.introspect().responseHeaderSchema).toBe(headerSchema);
+    });
+
+    it('produces/responseHeaderSchema default to null in introspect', () => {
+        const meta = endpoint.get('/api/items').introspect();
+        expect(meta.produces).toBeNull();
+        expect(meta.responseHeaderSchema).toBeNull();
+    });
+});
+
+describe('EndpointBuilder .externalDocs() / .links() / .callbacks()', () => {
+    it('.externalDocs() stores url and description in introspect', () => {
+        const ep = endpoint
+            .get('/api/items')
+            .externalDocs('https://example.com/docs', 'Full docs');
+        const meta = ep.introspect();
+        expect(meta.externalDocs).toEqual({
+            url: 'https://example.com/docs',
+            description: 'Full docs'
+        });
+    });
+
+    it('.externalDocs() returns a new builder without mutating original', () => {
+        const a = endpoint.get('/api/items');
+        const b = a.externalDocs('https://example.com');
+        expect(a).not.toBe(b);
+        expect(a.introspect().externalDocs).toBeNull();
+        expect(b.introspect().externalDocs).toEqual({
+            url: 'https://example.com',
+            description: undefined
+        });
+    });
+
+    it('externalDocs defaults to null in introspect', () => {
+        expect(endpoint.get('/api/items').introspect().externalDocs).toBeNull();
+    });
+
+    it('.links() stores link definitions in introspect', () => {
+        const defs = {
+            GetUser: {
+                operationId: 'getUser',
+                parameters: { id: '$response.body#/id' }
+            }
+        };
+        const ep = endpoint.get('/api/users').links(defs);
+        expect(ep.introspect().links).toEqual(defs);
+    });
+
+    it('.links() returns a new builder without mutating original', () => {
+        const a = endpoint.get('/api/users');
+        const b = a.links({ Self: { operationId: 'getUser' } });
+        expect(a).not.toBe(b);
+        expect(a.introspect().links).toBeNull();
+        expect(b.introspect().links).toEqual({
+            Self: { operationId: 'getUser' }
+        });
+    });
+
+    it('links defaults to null in introspect', () => {
+        expect(endpoint.get('/api/items').introspect().links).toBeNull();
+    });
+
+    it('.callbacks() stores callback definitions in introspect', () => {
+        const defs = {
+            onEvent: {
+                expression: '{$request.body#/callbackUrl}',
+                method: 'POST'
+            }
+        };
+        const ep = endpoint.post('/api/subscriptions').callbacks(defs);
+        expect(ep.introspect().callbacks).toEqual(defs);
+    });
+
+    it('.callbacks() returns a new builder without mutating original', () => {
+        const a = endpoint.post('/api/subscriptions');
+        const b = a.callbacks({
+            onEvent: { expression: '{$url}', method: 'POST' }
+        });
+        expect(a).not.toBe(b);
+        expect(a.introspect().callbacks).toBeNull();
+        expect(b.introspect().callbacks).toEqual({
+            onEvent: { expression: '{$url}', method: 'POST' }
+        });
+    });
+
+    it('callbacks defaults to null in introspect', () => {
+        expect(endpoint.post('/api/items').introspect().callbacks).toBeNull();
+    });
 });

@@ -1,8 +1,18 @@
-import { boolean, number, object, string, union } from '@cleverbrush/schema';
+import {
+    array,
+    boolean,
+    lazy,
+    number,
+    object,
+    type SchemaBuilder,
+    string,
+    union
+} from '@cleverbrush/schema';
 import type {
     EndpointMetadata,
     EndpointRegistration
 } from '@cleverbrush/server';
+import { endpoint } from '@cleverbrush/server';
 import { describe, expect, it } from 'vitest';
 import {
     generateOpenApiSpec,
@@ -30,6 +40,14 @@ function makeMeta(partial: Partial<EndpointMetadata> = {}): EndpointMetadata {
         deprecated: false,
         responseSchema: null,
         responsesSchemas: null,
+        example: null,
+        examples: null,
+        producesFile: null,
+        produces: null,
+        responseHeaderSchema: null,
+        externalDocs: null,
+        links: null,
+        callbacks: null,
         ...partial
     };
 }
@@ -456,6 +474,106 @@ describe('generateOpenApiSpec', () => {
         expect(components.securitySchemes['jwt']).toBeUndefined();
     });
 
+    it('auto-detects OAuth2 scheme from flows property', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions(
+                [
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/oauth-protected',
+                        authRoles: ['read:items']
+                    })
+                ],
+                {
+                    authConfig: {
+                        defaultScheme: 'oauth2',
+                        schemes: [
+                            {
+                                name: 'oauth2',
+                                flows: {
+                                    authorizationCode: {
+                                        authorizationUrl:
+                                            'https://auth.example.com/authorize',
+                                        tokenUrl:
+                                            'https://auth.example.com/token',
+                                        scopes: {
+                                            'read:items': 'Read items'
+                                        }
+                                    }
+                                },
+                                authenticate: async () => ({
+                                    succeeded: false as const,
+                                    failure: 'test'
+                                }),
+                                challenge: () => ({
+                                    headerName: 'WWW-Authenticate',
+                                    headerValue: 'Bearer'
+                                })
+                            } as any
+                        ]
+                    }
+                }
+            )
+        );
+        const components = spec['components'] as any;
+        expect(components.securitySchemes['oauth2']).toEqual({
+            type: 'oauth2',
+            flows: {
+                authorizationCode: {
+                    authorizationUrl: 'https://auth.example.com/authorize',
+                    tokenUrl: 'https://auth.example.com/token',
+                    scopes: { 'read:items': 'Read items' }
+                }
+            }
+        });
+        const op = (spec['paths'] as any)['/api/oauth-protected']['get'];
+        expect(op.security).toEqual([{ oauth2: ['read:items'] }]);
+    });
+
+    it('auto-detects OIDC scheme from openIdConnectUrl property', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions(
+                [
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/oidc-protected',
+                        authRoles: []
+                    })
+                ],
+                {
+                    authConfig: {
+                        defaultScheme: 'oidc',
+                        schemes: [
+                            {
+                                name: 'oidc',
+                                openIdConnectUrl:
+                                    'https://auth.example.com/.well-known/openid-configuration',
+                                authenticate: async () => ({
+                                    succeeded: false as const,
+                                    failure: 'test'
+                                }),
+                                challenge: () => ({
+                                    headerName: 'WWW-Authenticate',
+                                    headerValue: 'Bearer'
+                                })
+                            } as any
+                        ]
+                    }
+                }
+            )
+        );
+        const components = spec['components'] as any;
+        expect(components.securitySchemes['oidc']).toEqual({
+            type: 'openIdConnect',
+            openIdConnectUrl:
+                'https://auth.example.com/.well-known/openid-configuration'
+        });
+        const op = (spec['paths'] as any)['/api/oidc-protected']['get'];
+        expect(op.security).toEqual([{ oidc: [] }]);
+    });
+
     // --- Multiple endpoints ---
 
     it('handles multiple endpoints on different paths', () => {
@@ -694,5 +812,801 @@ describe('discriminated union discriminator keyword', () => {
         const schemas = (spec['components'] as any)['schemas'];
         expect(schemas['Cat']).toBeDefined();
         expect(schemas['Dog']).toBeDefined();
+    });
+
+    // --- Default values ---
+
+    it('propagates default values in query parameters', () => {
+        const querySchema = object({
+            page: number().default(1).optional(),
+            search: string()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    querySchema
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        const pageParam = op.parameters.find(
+            (p: any) => p.name === 'page' && p.in === 'query'
+        );
+        expect(pageParam.schema).toHaveProperty('default', 1);
+    });
+
+    it('propagates default values in header parameters', () => {
+        const headerSchema = object({
+            'x-version': string().default('v1').optional()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    headerSchema
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        const versionParam = op.parameters.find(
+            (p: any) => p.name === 'x-version' && p.in === 'header'
+        );
+        expect(versionParam.schema).toHaveProperty('default', 'v1');
+    });
+
+    it('propagates default values in request body properties', () => {
+        const bodySchema = object({
+            active: boolean().default(true).optional()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema
+                })
+            ])
+        );
+        const schema = (spec['paths'] as any)['/api/items']['post'].requestBody
+            .content['application/json'].schema;
+        expect(schema.properties.active).toHaveProperty('default', true);
+    });
+
+    it('omits factory defaults from request body properties', () => {
+        const bodySchema = object({
+            tags: string()
+                .default(() => 'none')
+                .optional()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema
+                })
+            ])
+        );
+        const schema = (spec['paths'] as any)['/api/items']['post'].requestBody
+            .content['application/json'].schema;
+        expect(schema.properties.tags).not.toHaveProperty('default');
+    });
+
+    // --- Top-level tags ---
+
+    it('emits explicit tags with descriptions as top-level tags', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([], {
+                tags: [
+                    { name: 'users', description: 'User management' },
+                    { name: 'orders', description: 'Order management' }
+                ]
+            })
+        );
+        expect(spec['tags']).toEqual([
+            { name: 'users', description: 'User management' },
+            { name: 'orders', description: 'Order management' }
+        ]);
+    });
+
+    it('emits explicit tags with externalDocs', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([], {
+                tags: [
+                    {
+                        name: 'users',
+                        externalDocs: {
+                            url: 'https://example.com/docs/users',
+                            description: 'User docs'
+                        }
+                    }
+                ]
+            })
+        );
+        const tag = (spec['tags'] as any[])[0];
+        expect(tag.name).toBe('users');
+        expect(tag.externalDocs).toEqual({
+            url: 'https://example.com/docs/users',
+            description: 'User docs'
+        });
+    });
+
+    it('auto-collects tag names from endpoints when no explicit tags provided', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    tags: ['items']
+                })
+            ])
+        );
+        expect(spec['tags']).toEqual([{ name: 'items' }]);
+    });
+
+    it('merges explicit tags with auto-collected, explicit first', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions(
+                [
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/orders',
+                        tags: ['orders']
+                    }),
+                    makeReg({
+                        method: 'GET',
+                        basePath: '/api',
+                        pathTemplate: '/users',
+                        tags: ['users']
+                    })
+                ],
+                {
+                    tags: [{ name: 'users', description: 'User management' }]
+                }
+            )
+        );
+        // 'users' is explicit (with description), 'orders' is auto-collected
+        expect(spec['tags']).toEqual([
+            { name: 'users', description: 'User management' },
+            { name: 'orders' }
+        ]);
+    });
+
+    it('omits top-level tags entirely when no explicit and no endpoint tags', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        expect(spec['tags']).toBeUndefined();
+    });
+
+    it('deduplicates auto-collected tag names across endpoints', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/a',
+                    tags: ['items']
+                }),
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/b',
+                    tags: ['items']
+                })
+            ])
+        );
+        const tagNames = (spec['tags'] as any[]).map((t: any) => t.name);
+        expect(tagNames.filter((n: string) => n === 'items')).toHaveLength(1);
+    });
+
+    // --- Recursive / lazy schemas ---
+
+    it('resolves non-recursive lazy body schema inline', () => {
+        const bodySchema = lazy(() => object({ name: string() }));
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema
+                })
+            ])
+        );
+        const schema = (spec['paths'] as any)['/api/items']['post'].requestBody
+            .content['application/json'].schema;
+        expect(schema.type).toBe('object');
+        expect(schema.properties.name).toEqual({ type: 'string' });
+    });
+
+    it('emits $ref for recursive schema in components and breaks cycle in body', () => {
+        // Must annotate explicitly to satisfy TypeScript recursive type
+        const treeNode: SchemaBuilder<any, any, any, any, any> = object({
+            value: number(),
+            children: array(lazy(() => treeNode))
+        }).schemaName('TreeNode');
+
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/tree',
+                    bodySchema: treeNode
+                })
+            ])
+        );
+
+        // components.schemas should contain TreeNode
+        const schemas = (spec['components'] as any)['schemas'];
+        expect(schemas['TreeNode']).toBeDefined();
+        expect(schemas['TreeNode'].type).toBe('object');
+
+        // The children array items in the component definition should be a $ref
+        const childrenItems = schemas['TreeNode'].properties.children.items;
+        expect(childrenItems).toEqual({
+            $ref: '#/components/schemas/TreeNode'
+        });
+
+        // Request body should reference the component
+        const requestBodySchema = (spec['paths'] as any)['/api/tree']['post']
+            .requestBody.content['application/json'].schema;
+        expect(requestBodySchema).toEqual({
+            $ref: '#/components/schemas/TreeNode'
+        });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.1 — .example() / .examples() on request body
+// ---------------------------------------------------------------------------
+
+describe('request body examples', () => {
+    it('emits example on the media type object from .example()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema: object({ name: string() }),
+                    example: { name: 'Widget' }
+                })
+            ])
+        );
+
+        const mediaType = (spec['paths'] as any)['/api/items']['post']
+            .requestBody.content['application/json'];
+        expect(mediaType.example).toEqual({ name: 'Widget' });
+        expect(mediaType.examples).toBeUndefined();
+    });
+
+    it('emits examples map on the media type object from .examples()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema: object({ name: string() }),
+                    examples: {
+                        minimal: { summary: 'Minimal', value: { name: 'A' } },
+                        full: {
+                            summary: 'Full',
+                            description: 'Complete payload',
+                            value: { name: 'B' }
+                        }
+                    }
+                })
+            ])
+        );
+
+        const mediaType = (spec['paths'] as any)['/api/items']['post']
+            .requestBody.content['application/json'];
+        expect(mediaType.examples).toEqual({
+            minimal: { summary: 'Minimal', value: { name: 'A' } },
+            full: {
+                summary: 'Full',
+                description: 'Complete payload',
+                value: { name: 'B' }
+            }
+        });
+        expect(mediaType.example).toBeUndefined();
+    });
+
+    it('schema-level .example() flows through to parameter schema', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    querySchema: object({ page: number().example(1) }) as any
+                })
+            ])
+        );
+
+        const params = (spec['paths'] as any)['/api/items']['get'].parameters;
+        const pageParam = params.find((p: any) => p.name === 'page');
+        expect(pageParam.schema.examples).toEqual([1]);
+    });
+
+    it('schema-level .example() flows through to response schema', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({
+                        id: number(),
+                        name: string()
+                    }).example({ id: 1, name: 'Widget' })
+                })
+            ])
+        );
+
+        const responseSchema = (spec['paths'] as any)['/api/items']['get']
+            .responses['200'].content['application/json'].schema;
+        expect(responseSchema.examples).toEqual([{ id: 1, name: 'Widget' }]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.2 — .producesFile() binary response
+// ---------------------------------------------------------------------------
+
+describe('binary file responses', () => {
+    it('emits application/octet-stream by default', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    producesFile: {}
+                })
+            ])
+        );
+
+        const response = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ];
+        expect(response.description).toBe('File download');
+        expect(response.content).toEqual({
+            'application/octet-stream': {
+                schema: { type: 'string', format: 'binary' }
+            }
+        });
+    });
+
+    it('emits custom content type', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    producesFile: {
+                        contentType: 'text/csv',
+                        description: 'CSV export'
+                    }
+                })
+            ])
+        );
+
+        const response = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ];
+        expect(response.description).toBe('CSV export');
+        expect(response.content).toEqual({
+            'text/csv': {
+                schema: { type: 'string', format: 'binary' }
+            }
+        });
+    });
+
+    it('producesFile takes precedence over .returns()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    responseSchema: object({ data: string() }),
+                    producesFile: {
+                        contentType: 'application/pdf',
+                        description: 'PDF report'
+                    }
+                })
+            ])
+        );
+
+        const response = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ];
+        expect(response.content).toEqual({
+            'application/pdf': {
+                schema: { type: 'string', format: 'binary' }
+            }
+        });
+        // Should NOT have application/json
+        expect(response.content['application/json']).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.3 — .produces() multiple content types
+// ---------------------------------------------------------------------------
+
+describe('multiple content types', () => {
+    it('emits multiple content types reusing the response schema', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number(), name: string() }),
+                    produces: {
+                        'text/csv': {},
+                        'application/xml': {}
+                    }
+                })
+            ])
+        );
+
+        const content = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].content;
+        expect(content['application/json']).toBeDefined();
+        expect(content['text/csv'].schema).toEqual(
+            content['application/json'].schema
+        );
+        expect(content['application/xml'].schema).toEqual(
+            content['application/json'].schema
+        );
+    });
+
+    it('uses per-type schema override when provided', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number() }),
+                    produces: {
+                        'text/csv': { schema: string() }
+                    }
+                })
+            ])
+        );
+
+        const content = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].content;
+        expect(content['application/json'].schema).toHaveProperty(
+            'type',
+            'object'
+        );
+        expect(content['text/csv'].schema).toEqual({ type: 'string' });
+    });
+
+    it('producesFile takes precedence over produces', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    responseSchema: object({ data: string() }),
+                    produces: { 'text/csv': {} },
+                    producesFile: { contentType: 'application/pdf' }
+                })
+            ])
+        );
+
+        const content = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ].content;
+        expect(content['application/pdf']).toBeDefined();
+        expect(content['text/csv']).toBeUndefined();
+        expect(content['application/json']).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.4 — .responseHeaders() response header metadata
+// ---------------------------------------------------------------------------
+
+describe('response headers', () => {
+    it('emits response headers on 200 response', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number() }),
+                    responseHeaderSchema: object({
+                        'X-Total-Count': number(),
+                        'X-Page': number()
+                    }) as any
+                })
+            ])
+        );
+
+        const headers = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].headers;
+        expect(headers['X-Total-Count'].schema).toEqual({ type: 'integer' });
+        expect(headers['X-Page'].schema).toEqual({ type: 'integer' });
+    });
+
+    it('adds headers to every response code including error responses', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema: object({ name: string() }),
+                    authRoles: [],
+                    responseSchema: object({ id: number() }),
+                    responseHeaderSchema: object({
+                        'X-Request-Id': string()
+                    }) as any
+                })
+            ])
+        );
+
+        const responses = (spec['paths'] as any)['/api/items']['post']
+            .responses;
+        // 200, 422 (body validation), 401 + 403 (auth)
+        for (const code of ['200', '422', '401', '403']) {
+            expect(responses[code].headers['X-Request-Id']).toBeDefined();
+        }
+    });
+
+    it('emits description from schema property describe()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({ id: number() }),
+                    responseHeaderSchema: object({
+                        'X-Total-Count': number().describe(
+                            'Total number of items'
+                        )
+                    }) as any
+                })
+            ])
+        );
+
+        const header = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].headers['X-Total-Count'];
+        expect(header.schema).toEqual({
+            type: 'integer',
+            description: 'Total number of items'
+        });
+        expect(header.description).toBe('Total number of items');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.5 externalDocs
+// ---------------------------------------------------------------------------
+
+describe('externalDocs', () => {
+    it('emits externalDocs on operation when set', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    externalDocs: {
+                        url: 'https://example.com/docs',
+                        description: 'Full reference'
+                    }
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.externalDocs).toEqual({
+            url: 'https://example.com/docs',
+            description: 'Full reference'
+        });
+    });
+
+    it('emits externalDocs without description when description is absent', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({ externalDocs: { url: 'https://example.com' } })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.externalDocs).toEqual({ url: 'https://example.com' });
+        expect(op.externalDocs.description).toBeUndefined();
+    });
+
+    it('omits externalDocs when not set', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.externalDocs).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.2 Links
+// ---------------------------------------------------------------------------
+
+describe('links', () => {
+    it('emits raw string parameter links on the primary 2xx response', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    responseSchema: object({ id: number() }),
+                    links: {
+                        GetUser: {
+                            operationId: 'getUser',
+                            parameters: { userId: '$response.body#/id' }
+                        }
+                    }
+                })
+            ])
+        );
+        const links = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].links;
+        expect(links).toEqual({
+            GetUser: {
+                operationId: 'getUser',
+                parameters: { userId: '$response.body#/id' }
+            }
+        });
+    });
+
+    it('resolves descriptor-callback parameters to JSON Pointer expressions', () => {
+        const resp = object({ userId: number(), name: string() });
+        // Use the typed builder so `r` is inferred as PropertyRefTree<{ userId: number; name: string }>
+        const ep = endpoint
+            .get('/api/items')
+            .returns(resp)
+            .links({
+                GetUser: {
+                    operationId: 'getUser',
+                    parameters: r => ({ id: r.userId })
+                }
+            });
+        const spec = generateOpenApiSpec(
+            makeOptions([{ endpoint: ep.introspect(), handler: () => {} }])
+        );
+        const links = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].links;
+        expect(links.GetUser.parameters).toEqual({
+            id: '$response.body#/userId'
+        });
+    });
+
+    it('omits links property when not set', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        const resp = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ];
+        expect(resp.links).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.3 Callbacks
+// ---------------------------------------------------------------------------
+
+describe('callbacks', () => {
+    it('emits callback with raw expression URL', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    callbacks: {
+                        onEvent: {
+                            expression: '{$request.body#/callbackUrl}',
+                            method: 'POST',
+                            summary: 'Event fired'
+                        }
+                    }
+                })
+            ])
+        );
+        const cbs = (spec['paths'] as any)['/api/items']['post'].callbacks;
+        expect(cbs).toBeDefined();
+        const pathItem = cbs['onEvent']['{$request.body#/callbackUrl}'];
+        expect(pathItem).toBeDefined();
+        expect(pathItem['post'].summary).toBe('Event fired');
+        expect(pathItem['post'].responses['200']).toEqual({
+            description: 'OK'
+        });
+    });
+
+    it('resolves urlFrom descriptor callback to expression', () => {
+        const bodySchema = object({ hookUrl: string() });
+        // Use the typed builder so `b` is inferred as PropertyRefTree<{ hookUrl: string }>
+        const ep = endpoint
+            .post('/api/items')
+            .body(bodySchema)
+            .callbacks({
+                onEvent: {
+                    urlFrom: b => b.hookUrl,
+                    method: 'POST'
+                }
+            });
+        const spec = generateOpenApiSpec(
+            makeOptions([{ endpoint: ep.introspect(), handler: () => {} }])
+        );
+        const cbs = (spec['paths'] as any)['/api/items']['post'].callbacks;
+        expect(cbs['onEvent']['{$request.body#/hookUrl}']).toBeDefined();
+    });
+
+    it('omits callbacks when not set', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.callbacks).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.1 Webhooks
+// ---------------------------------------------------------------------------
+
+describe('webhooks', () => {
+    it('emits webhooks map with body schema and default POST method', () => {
+        const bodySchema = object({ id: number(), email: string() });
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg()], {
+                webhooks: [
+                    {
+                        name: 'userCreated',
+                        summary: 'New user created',
+                        body: bodySchema
+                    }
+                ]
+            })
+        );
+        const webhook = (spec['webhooks'] as any)?.['userCreated'];
+        expect(webhook).toBeDefined();
+        expect(webhook['post']).toBeDefined();
+        expect(webhook['post'].summary).toBe('New user created');
+        expect(
+            webhook['post'].requestBody.content['application/json']
+        ).toBeDefined();
+        expect(webhook['post'].responses['200']).toEqual({
+            description: 'OK'
+        });
+    });
+
+    it('respects custom method on webhook', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg()], {
+                webhooks: [{ name: 'ping', method: 'GET' }]
+            })
+        );
+        const webhook = (spec['webhooks'] as any)?.['ping'];
+        expect(webhook?.['get']).toBeDefined();
+        expect(webhook?.['post']).toBeUndefined();
+    });
+
+    it('omits webhooks key when no webhooks provided', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        expect(spec['webhooks']).toBeUndefined();
     });
 });

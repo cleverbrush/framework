@@ -11,12 +11,15 @@ export {
 export {
     type ActionContext,
     type AllowedResponseReturn,
+    type CallbackDefinition,
     createEndpoints,
     EndpointBuilder,
     type EndpointMetadata,
     type EndpointMetadataDescriptors,
     endpoint,
     type Handler,
+    type LinkDefinition,
+    type PropertyRefTree,
     type ResponsesOf,
     type ScopedEndpointFactory
 } from './Endpoint.js';
@@ -49,3 +52,4 @@ export type {
     Middleware,
     ServerOptions
 } from './types.js';
+export { defineWebhook, type WebhookDefinition } from './Webhook.js';

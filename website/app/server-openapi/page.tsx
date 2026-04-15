@@ -67,9 +67,17 @@ export default function ServerOpenApiPage() {
                             produce typed OpenAPI path parameters.
                         </li>
                         <li>
-                            <strong>Security mapping</strong> — JWT and cookie
-                            auth schemes become <code>securitySchemes</code>{' '}
-                            automatically.
+                            <strong>Security mapping</strong> — JWT, cookie,
+                            OAuth 2.0, and OpenID Connect auth schemes become{' '}
+                            <code>securitySchemes</code> automatically.
+                        </li>
+                        <li>
+                            <strong>Top-level tags</strong> — pass{' '}
+                            <code>
+                                tags: [{'{'}name, description?{'}'}]
+                            </code>{' '}
+                            to annotate tag groups; tag names are also
+                            auto-collected from endpoint registrations.
                         </li>
                         <li>
                             <strong>Discriminated unions</strong> — the OpenAPI{' '}
@@ -267,11 +275,19 @@ const CreateUserBody = object({ address: AddressSchema, name: string() });`
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { jwtScheme } from '@cleverbrush/auth';
+                                __html: highlightTS(`import { jwtScheme, authorizationCodeScheme } from '@cleverbrush/auth';
 
 const authConfig = {
     defaultScheme: 'jwt',
-    schemes: [jwtScheme({ secret: '...', mapClaims: c => c })]
+    schemes: [
+        jwtScheme({ secret: '...', mapClaims: c => c }),
+        authorizationCodeScheme({
+            authorizationUrl: 'https://auth.example.com/authorize',
+            tokenUrl: 'https://auth.example.com/token',
+            scopes: { 'read:items': 'Read items' },
+            authenticate: async (ctx) => ({ succeeded: false })
+        })
+    ]
 };
 
 server.use(serveOpenApi({
@@ -280,11 +296,206 @@ server.use(serveOpenApi({
     authConfig
 }));
 
-// JWT endpoints get: securitySchemes.jwt → { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
-// Authorized endpoints get:  security: [{ jwt: [] }]`)
+// JWT → securitySchemes.jwt: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
+// OAuth2 → securitySchemes.oauth2: { type: 'oauth2', flows: { authorizationCode: ... } }`)
                             }}
                         />
                     </pre>
+                </div>
+
+                {/* ── Recursive Schemas ─────────────────────────────── */}
+                <div className="card">
+                    <h2>Recursive / Self-Referential Schemas</h2>
+                    <p>
+                        Self-referential schemas — tree nodes, nested menus,
+                        threaded comments — are supported via{' '}
+                        <code>lazy()</code> from{' '}
+                        <code>@cleverbrush/schema</code>. Call{' '}
+                        <code>.schemaName()</code> on the root and{' '}
+                        <code>generateOpenApiSpec</code> handles the rest: the
+                        schema is expanded once under{' '}
+                        <code>components/schemas</code>, and every recursive
+                        reference becomes a <code>$ref</code> pointer.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { object, number, array, lazy } from '@cleverbrush/schema';
+
+type TreeNode = { value: number; children: TreeNode[] };
+
+const treeNode: ReturnType<typeof object> = object({
+    value: number(),
+    children: array(lazy(() => treeNode))
+}).schemaName('TreeNode');
+
+// Use treeNode as a body or response schema — no extra config needed:
+// components.schemas.TreeNode → { type: 'object', properties: { children: { items: { $ref: '...' } } } }
+// requestBody                 → { "$ref": "#/components/schemas/TreeNode" }`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Request Body Examples ────────────────────────── */}
+                <div className="card">
+                    <h2>Request Body Examples</h2>
+                    <p>
+                        Pre-fill the <strong>Try it out</strong> panel in
+                        Swagger UI by attaching examples to endpoints:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const CreateUser = endpoint
+    .post('/api/users')
+    .body(UserSchema)
+    .example({ name: 'Alice', email: 'alice@example.com' });
+
+// Or provide named examples:
+const CreateItem = endpoint
+    .post('/api/items')
+    .body(ItemSchema)
+    .examples({
+        minimal: { summary: 'Minimal', value: { name: 'Widget' } },
+        full: { summary: 'Complete', value: { name: 'Widget', price: 9.99 } }
+    });`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Schema-level examples set via{' '}
+                        <code>.example(value)</code> propagate to parameter and
+                        response schemas automatically.
+                    </p>
+                </div>
+
+                {/* ── File Download Responses ─────────────────────── */}
+                <div className="card">
+                    <h2>File Download Responses</h2>
+                    <p>
+                        Declare binary file responses with{' '}
+                        <code>.producesFile()</code> — the generated spec emits
+                        the correct binary content type instead of a JSON
+                        schema:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const ExportCsv = endpoint
+    .get('/api/export')
+    .producesFile('text/csv', 'CSV export');
+
+const Download = endpoint
+    .get('/api/download')
+    .producesFile(); // defaults to application/octet-stream`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        When both <code>.returns()</code> and{' '}
+                        <code>.producesFile()</code> are set, the binary
+                        response takes precedence.
+                    </p>
+                </div>
+
+                {/* ── Multiple Content Types ───────────────────────── */}
+                <div className="card">
+                    <h2>Multiple Content Types</h2>
+                    <p>
+                        Use <code>.produces()</code> to declare additional
+                        response content types for content-negotiated endpoints.
+                        The generated spec emits a multi-entry{' '}
+                        <code>content</code> map where each MIME type can
+                        optionally override the response schema:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const GetItems = endpoint
+    .get('/api/items')
+    .returns(object({ id: number(), name: string() }))
+    .produces({
+        'text/csv': {},           // reuses the JSON response schema
+        'application/xml': { schema: string() } // custom schema
+    });`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        <code>application/json</code> is always included when a
+                        response schema is declared. When{' '}
+                        <code>.producesFile()</code> is also set, the binary
+                        response takes precedence.
+                    </p>
+                </div>
+
+                {/* ── Response Headers ─────────────────────────────── */}
+                <div className="card">
+                    <h2>Response Headers</h2>
+                    <p>
+                        Document response headers — pagination cursors,
+                        rate-limit counters, cache-control directives — with{' '}
+                        <code>.responseHeaders()</code>. Each property in the
+                        object schema becomes a named header entry in the
+                        OpenAPI spec, applied to every response code:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const GetItems = endpoint
+    .get('/api/items')
+    .returns(object({ id: number(), name: string() }))
+    .responseHeaders(object({
+        'X-Total-Count': number().describe('Total number of matching items'),
+        'X-Page':        number().describe('Current page index'),
+        'X-Rate-Limit':  number()
+    }));`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Property descriptions propagate to the OpenAPI{' '}
+                        <code>description</code> field on each header entry,
+                        making pagination and throttling contracts visible in
+                        Swagger UI and generated client SDKs.
+                    </p>
+                </div>
+
+                {/* ── Tags ─────────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Top-Level Tags with Descriptions</h2>
+                    <p>
+                        OpenAPI supports a top-level <code>tags</code> array
+                        where each entry can carry a <code>description</code>{' '}
+                        and optional <code>externalDocs</code>. Pass a{' '}
+                        <code>tags</code> option to describe your tag groups:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`generateOpenApiSpec({
+    registrations,
+    info: { title: 'My API', version: '1.0.0' },
+    tags: [
+        {
+            name: 'users',
+            description: 'User management endpoints',
+            externalDocs: { url: 'https://docs.example.com/users' }
+        },
+        { name: 'orders', description: 'Order management endpoints' }
+    ]
+});`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        When <code>tags</code> is omitted, unique tag names are
+                        automatically collected from all registered endpoints
+                        and emitted as name-only entries — Swagger UI and Redoc
+                        still group operations correctly. Any endpoint tag not
+                        covered by the explicit list is appended alphabetically.
+                    </p>
                 </div>
 
                 {/* ── Path Params ──────────────────────────────────── */}
@@ -310,6 +521,121 @@ endpoint.get(route(
     object({ id: number().coerce() }),
     $t => $t\`/api/users/\${t => t.id}\`
 ));`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── externalDocs ─────────────────────────────────── */}
+                <div className="card">
+                    <h2>External Documentation</h2>
+                    <p>
+                        Link external reference material to an operation with{' '}
+                        <code>.externalDocs(url, description?)</code>. The
+                        generator emits an <code>externalDocs</code> object on
+                        the OpenAPI Operation Object:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const GetItems = endpoint
+    .get('/api/items')
+    .returns(ItemSchema)
+    .externalDocs('https://docs.example.com/items', 'Items API reference');`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Links ────────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Response Links</h2>
+                    <p>
+                        Declare follow-up actions available from a response
+                        using <code>.links(defs)</code>. Links are emitted under
+                        the primary 2xx response&apos;s <code>links</code> map.
+                        Parameters can be raw runtime expression strings or a
+                        type-safe callback where property accesses resolve to{' '}
+                        <code>$response.body#/&lt;pointer&gt;</code> expressions
+                        automatically:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const CreateUser = endpoint
+    .post('/api/users')
+    .body(object({ name: string(), email: string() }))
+    .returns(object({ id: number(), name: string(), email: string() }))
+    .links({
+        GetUser: {
+            operationId: 'getUser',
+            // Type-safe: accesses 'id' → resolves to '$response.body#/id'
+            parameters: (r) => ({ userId: r.id }),
+        },
+    });`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Callbacks ────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Callbacks</h2>
+                    <p>
+                        Document async out-of-band requests with{' '}
+                        <code>.callbacks(defs)</code>. The callback URL can be a
+                        raw runtime expression string or a type-safe{' '}
+                        <code>urlFrom</code> selector that resolves a request
+                        body field to a{' '}
+                        <code>{'{$request.body#/<pointer>}'}</code> expression:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const Subscribe = endpoint
+    .post('/api/subscriptions')
+    .body(object({ callbackUrl: string(), events: array(string()) }))
+    .callbacks({
+        onEvent: {
+            urlFrom: (b) => b.callbackUrl,  // → {$request.body#/callbackUrl}
+            method: 'POST',
+            summary: 'Event notification delivered to subscriber',
+            body: EventSchema,
+        },
+    });`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Webhooks ─────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Webhooks</h2>
+                    <p>
+                        Document async webhook notifications your API sends to
+                        consumers. Use <code>defineWebhook()</code> and register
+                        via <code>ServerBuilder.webhook()</code>, then pass them
+                        to <code>generateOpenApiSpec</code> via the{' '}
+                        <code>webhooks</code> option. A top-level{' '}
+                        <code>webhooks</code> map is emitted in the OpenAPI 3.1
+                        document:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { defineWebhook } from '@cleverbrush/server';
+
+const userCreated = defineWebhook('userCreated', {
+    method: 'POST',
+    summary: 'Fired when a new user registers',
+    body: object({ id: number(), email: string() }),
+});
+
+// Register with the server (for documentation only):
+createServer().webhook(userCreated).handle(/* ... */);
+
+// Or pass directly to the generator:
+generateOpenApiSpec({ registrations, info, webhooks: [userCreated] });`)
                             }}
                         />
                     </pre>

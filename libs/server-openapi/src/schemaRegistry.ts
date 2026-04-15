@@ -168,7 +168,20 @@ export function walkSchemas(
                 walkSchemas(info.valueSchema, registry, visited);
             }
             break;
-        // 'lazy' intentionally excluded — resolved lazily, handled separately
+        case 'lazy': {
+            // Resolve the inner schema and walk it so that any named schema
+            // reachable through a lazy boundary is registered. Cycle-safety is
+            // provided by the `visited` set — the lazy wrapper itself was
+            // already added above, preventing infinite recursion on
+            // self-referential schemas.
+            const resolved = (schema as any).resolve() as SchemaBuilder<
+                any,
+                any,
+                any
+            >;
+            walkSchemas(resolved, registry, visited);
+            break;
+        }
         default:
             break;
     }

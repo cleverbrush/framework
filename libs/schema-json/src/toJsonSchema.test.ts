@@ -3,9 +3,11 @@ import {
     array,
     boolean,
     date,
+    lazy,
     nul,
     number,
     object,
+    type SchemaBuilder,
     string,
     tuple,
     union
@@ -574,4 +576,108 @@ test('toJsonSchema - 52: number().oneOf(1,2,3) → enum', () => {
         $schema: false
     });
     expect(result).toEqual({ type: 'integer', enum: [1, 2, 3] });
+});
+
+// ---------------------------------------------------------------------------
+// lazy schema support
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 53: lazy(() => string()) → { type: "string" }', () => {
+    const result = toJsonSchema(
+        lazy(() => string()),
+        { $schema: false }
+    );
+    expect(result).toEqual({ type: 'string' });
+});
+
+test('toJsonSchema - 54: lazy wrapping nullable number', () => {
+    const result = toJsonSchema(
+        lazy(() => number().nullable()),
+        {
+            $schema: false
+        }
+    );
+    expect(result).toEqual({ type: ['integer', 'null'] });
+});
+
+test('toJsonSchema - 55: lazy wrapping named schema emits $ref via nameResolver', () => {
+    const UserSchema = object({ id: number(), name: string() }).schemaName(
+        'User'
+    );
+    const result = toJsonSchema(
+        lazy(() => UserSchema),
+        {
+            $schema: false,
+            nameResolver: s =>
+                (s.introspect() as any).schemaName === 'User' ? 'User' : null
+        }
+    );
+    expect(result).toEqual({ $ref: '#/components/schemas/User' });
+});
+
+test('toJsonSchema - 56: self-referential tree emits $ref for recursive children', () => {
+    // Must annotate explicitly to satisfy TypeScript recursive type
+    const treeNode: SchemaBuilder<any, any, any, any, any> = object({
+        value: number(),
+        children: array(lazy(() => treeNode))
+    }).schemaName('TreeNode');
+
+    const nameResolver = (s: any) =>
+        (s.introspect() as any).schemaName === 'TreeNode' ? 'TreeNode' : null;
+
+    // Convert the root without resolving its own name the first time (simulate
+    // component schema conversion where the root is inlined but nested refs are
+    // resolved). A `rootSeen` flag ensures we only skip the root once; the
+    // second encounter (via the lazy self-reference) must emit a $ref to break
+    // the cycle.
+    let rootSeen = false;
+    const result = toJsonSchema(treeNode, {
+        $schema: false,
+        nameResolver: (s: any) => {
+            if (s === treeNode && !rootSeen) {
+                rootSeen = true;
+                return null;
+            }
+            return nameResolver(s);
+        }
+    });
+
+    expect(result.type).toBe('object');
+    const props = result.properties as any;
+    expect(props.children.type).toBe('array');
+    expect(props.children.items).toEqual({
+        $ref: '#/components/schemas/TreeNode'
+    });
+});
+
+// ---------------------------------------------------------------------------
+// .example() emission
+// ---------------------------------------------------------------------------
+
+test('57. string schema with .example() emits examples array', () => {
+    const schema = string().example('hello@example.com');
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        type: 'string',
+        examples: ['hello@example.com']
+    });
+});
+
+test('58. number schema with .example() emits examples array', () => {
+    const schema = number().example(42);
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        type: 'integer',
+        examples: [42]
+    });
+});
+
+test('59. object schema with .example() emits examples array', () => {
+    const schema = object({
+        name: string(),
+        age: number()
+    }).example({ name: 'Alice', age: 30 });
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result.type).toBe('object');
+    expect(result.examples).toEqual([{ name: 'Alice', age: 30 }]);
 });

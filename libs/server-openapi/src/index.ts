@@ -4,7 +4,8 @@ export {
     type OpenApiDocument,
     type OpenApiInfo,
     type OpenApiOptions,
-    type OpenApiServer
+    type OpenApiServer,
+    type OpenApiTag
 } from './generateOpenApiSpec.js';
 export {
     createOpenApiEndpoint,
