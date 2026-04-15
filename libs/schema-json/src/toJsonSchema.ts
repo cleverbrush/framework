@@ -7,6 +7,10 @@ function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function escapeJsonPointerSegment(s: string): string {
+    return s.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
 type Resolver =
     | ((schema: SchemaBuilder<any, any, any>) => string | null)
     | undefined;
@@ -176,7 +180,11 @@ function convertNode(
 ): Out {
     if (resolver) {
         const name = resolver(schema);
-        if (name !== null) return { $ref: `#/components/schemas/${name}` };
+        if (typeof name === 'string' && name.length > 0) {
+            return {
+                $ref: `#/components/schemas/${escapeJsonPointerSegment(name)}`,
+            };
+        }
     }
     const out = convertNodeInner(schema, resolver);
     const info = schema.introspect() as any;
