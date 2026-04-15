@@ -115,6 +115,7 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `const` | literal builder (`.equals(...)`) |
 | `enum` | `union(…)` of const builders |
 | `anyOf` | `union(…)` of sub-builders |
+| `anyOf` + `discriminator` | auto-emitted for discriminated `union()` branches (see below) |
 | `allOf` | not supported — falls back to `any()` |
 | `minLength` / `maxLength` | `.minLength()` / `.maxLength()` |
 | `pattern` | `.matches(regex)` (invalid patterns silently ignored) |
@@ -152,6 +153,32 @@ function toJsonSchema(
 **Returns** a plain JavaScript object that is safe to `JSON.stringify`.
 
 Descriptions set via `.describe(text)` are emitted as the `description` field on the corresponding JSON Schema node (including nested object properties).
+
+#### Discriminated unions
+
+When a `union()` is a **discriminated union** — all branches are objects sharing a required property with unique literal values — `toJsonSchema()` automatically emits the `discriminator` keyword alongside `anyOf`:
+
+```ts
+const schema = union(
+    object({ type: string('cat'), name: string() })
+).or(
+    object({ type: string('dog'), breed: string() })
+);
+
+toJsonSchema(schema, { $schema: false });
+// {
+//   anyOf: [ { ... type: { const: 'cat' } ... }, { ... type: { const: 'dog' } ... } ],
+//   discriminator: { propertyName: 'type' }
+// }
+```
+
+When a `nameResolver` is provided and union branches resolve to `$ref` pointers, a `mapping` is also emitted:
+
+```ts
+// discriminator: { propertyName: 'type', mapping: { cat: '#/components/schemas/Cat', dog: '#/components/schemas/Dog' } }
+```
+
+This enables code-generation tools (openapi-generator, orval, etc.) to produce proper tagged union types.
 
 #### `ToJsonSchemaOptions`
 

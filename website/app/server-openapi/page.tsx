@@ -72,6 +72,13 @@ export default function ServerOpenApiPage() {
                             automatically.
                         </li>
                         <li>
+                            <strong>Discriminated unions</strong> — the OpenAPI{' '}
+                            <code>discriminator</code> keyword is emitted
+                            automatically for tagged union schemas, enabling
+                            code generators (openapi-generator, orval) to
+                            produce proper typed variants.
+                        </li>
+                        <li>
                             <strong>
                                 <code>serveOpenApi()</code>
                             </strong>{' '}

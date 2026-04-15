@@ -163,10 +163,52 @@ function convertNodeInner(
                 }
             }
             if (allConst) return { ...readOnly, enum: enumValues };
-            return {
+
+            const converted = options.map(o => convertNode(o, resolver));
+            const out: Out = {
                 ...readOnly,
-                anyOf: options.map(o => convertNode(o, resolver))
+                anyOf: converted
             };
+
+            // Emit discriminator keyword for discriminated unions
+            const discriminatorProp: string | undefined =
+                info.discriminatorPropertyName;
+            if (discriminatorProp) {
+                const disc: Out = { propertyName: discriminatorProp };
+                // Only emit mapping when every option resolved to a $ref
+                // and every discriminator value can be populated.
+                const mapping: Record<string, string> = {};
+                let allRefsMapped = options.length > 0;
+                for (let i = 0; i < options.length; i++) {
+                    const ref = converted[i]['$ref'];
+                    if (typeof ref !== 'string') {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    const oi = options[i].introspect() as any;
+                    const props:
+                        | Record<string, SchemaBuilder<any, any, any>>
+                        | undefined = oi.properties;
+                    const discriminatorSchema = props?.[discriminatorProp];
+                    if (!discriminatorSchema) {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    const propInfo = discriminatorSchema.introspect() as any;
+                    if (propInfo.equalsTo === undefined) {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    mapping[String(propInfo.equalsTo)] = ref;
+                }
+                if (allRefsMapped) disc['mapping'] = mapping;
+                out['discriminator'] = disc;
+            }
+
+            return out;
         }
 
         default:

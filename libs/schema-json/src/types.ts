@@ -55,7 +55,14 @@ export type JsonSchemaNode =
       }
     | { readonly const: unknown; [k: string]: unknown }
     | { readonly enum: readonly unknown[]; [k: string]: unknown }
-    | { readonly anyOf: readonly JsonSchemaNode[]; [k: string]: unknown }
+    | {
+          readonly anyOf: readonly JsonSchemaNode[];
+          readonly discriminator?: {
+              readonly propertyName: string;
+              readonly mapping?: Readonly<Record<string, string>>;
+          };
+          [k: string]: unknown;
+      }
     | { readonly allOf: readonly JsonSchemaNode[]; [k: string]: unknown }
     | Record<string, never>;
 

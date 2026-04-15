@@ -126,6 +126,41 @@ type Schedule = InferType<typeof ScheduleSchema>;
                 <code>z.discriminatedUnion()</code>, but without any extra API
                 surface.
             </p>
+
+            <h3>JSON Schema &amp; OpenAPI</h3>
+            <p>
+                When you convert a discriminated union to JSON Schema via{' '}
+                <code>toJsonSchema()</code> (or use it in a{' '}
+                <code>@cleverbrush/server-openapi</code> endpoint), the{' '}
+                <code>discriminator</code> keyword is emitted automatically
+                alongside <code>anyOf</code>. Code generators like
+                openapi-generator and orval use this to produce proper tagged
+                union types.
+            </p>
+            <pre>
+                <code
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                    dangerouslySetInnerHTML={{
+                        __html: highlightTS(`import { toJsonSchema } from '@cleverbrush/schema-json';
+
+const jsonSchema = toJsonSchema(ShapeSchema, { $schema: false });
+// {
+//   anyOf: [
+//     { type: 'object', properties: { type: { const: 'circle' },    radius: ... }, ... },
+//     { type: 'object', properties: { type: { const: 'rectangle' }, width: ..., height: ... }, ... },
+//     { type: 'object', properties: { type: { const: 'triangle' },  base: ..., height: ... }, ... }
+//   ],
+//   discriminator: { propertyName: 'type' }
+// }`)
+                    }}
+                />
+            </pre>
+            <p>
+                If the union branches use <code>.schemaName()</code> and are
+                extracted as <code>$ref</code> components, the discriminator
+                also includes a <code>mapping</code> from each literal value to
+                its <code>$ref</code> path.
+            </p>
         </div>
     );
 }

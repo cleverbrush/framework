@@ -289,7 +289,13 @@ export class UnionSchemaBuilder<
             /**
              * Array of schemas participating in the union.
              */
-            options: this.#options
+            options: this.#options,
+            /**
+             * When the union is a discriminated union (all branches are objects
+             * sharing a required property with unique literal values), this is
+             * the name of that property. `undefined` otherwise.
+             */
+            discriminatorPropertyName: this.#discriminatorKey ?? undefined
         };
     }
 

@@ -710,6 +710,18 @@ test('clearDefault - removes the default value', () => {
 // Discriminator detection failure cases (lines 242-272)
 // ---------------------------------------------------------------------------
 
+test('introspect: discriminated union exposes discriminatorPropertyName', () => {
+    const schema = union(object({ type: string('cat'), name: string() })).or(
+        object({ type: string('dog'), breed: string() })
+    );
+    expect(schema.introspect().discriminatorPropertyName).toBe('type');
+});
+
+test('introspect: non-discriminated union has discriminatorPropertyName undefined', () => {
+    const schema = union(string()).or(number());
+    expect(schema.introspect().discriminatorPropertyName).toBeUndefined();
+});
+
 test('discriminator: missing key in one branch → falls back to linear scan (line 242)', () => {
     // First branch has "type", second branch does NOT → isDiscriminator=false
     const schema = union(object({ type: string('cat'), name: string() })).or(
