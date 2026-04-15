@@ -182,7 +182,7 @@ function convertNode(
         const name = resolver(schema);
         if (typeof name === 'string' && name.length > 0) {
             return {
-                $ref: `#/components/schemas/${escapeJsonPointerSegment(name)}`,
+                $ref: `#/components/schemas/${escapeJsonPointerSegment(name)}`
             };
         }
     }
