@@ -161,6 +161,9 @@ export function walkSchemas(
             break;
         }
         case 'record':
+            if (info.keySchema) {
+                walkSchemas(info.keySchema, registry, visited);
+            }
             if (info.valueSchema) {
                 walkSchemas(info.valueSchema, registry, visited);
             }
