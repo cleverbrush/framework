@@ -86,6 +86,77 @@ await writeOpenApiSpec({
 });
 ```
 
+## $ref Deduplication (Named Schemas)
+
+When the same schema definition is used by multiple endpoints, you can mark it with `.schemaName()` from `@cleverbrush/schema` so that `generateOpenApiSpec()` extracts it once into `components/schemas` and replaces every inline occurrence with a `$ref` pointer.
+
+### How it works
+
+1. Call `.schemaName('ComponentName')` on any `@cleverbrush/schema` builder you want to extract.
+2. Export the result as a **constant** and reuse the same reference wherever the schema is needed.
+3. `generateOpenApiSpec()` detects all named schemas via a pre-pass walk, emits them under `components.schemas`, and replaces inline definitions with `$ref` pointers.
+
+```ts
+import { object, string, number } from '@cleverbrush/schema';
+import { endpoint } from '@cleverbrush/server';
+import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
+
+// Mark once — reuse everywhere
+const UserSchema = object({
+    id:   number(),
+    name: string(),
+}).schemaName('User');
+
+const GetUser   = endpoint.get('/api/users/:id').returns(UserSchema);
+const ListUsers = endpoint.get('/api/users').returns(array(UserSchema));
+
+const spec = generateOpenApiSpec({
+    registrations: [GetUser.registration, ListUsers.registration],
+    info: { title: 'My API', version: '1.0.0' }
+});
+// components.schemas.User → { type: 'object', properties: { id: …, name: … } }
+// GET /api/users/:id  → responses.200.content['application/json'].schema: { $ref: '#/components/schemas/User' }
+// GET /api/users      → responses.200.content['application/json'].schema: { type: 'array', items: { $ref: '…/User' } }
+```
+
+Nested named schemas inside request bodies are also resolved:
+
+```ts
+const AddressSchema = object({ street: string(), city: string() }).schemaName('Address');
+
+// The wrapper is anonymous — inlined. The nested AddressSchema → $ref.
+const CreateUserBody = object({ address: AddressSchema, name: string() });
+```
+
+### Conflict rule
+
+Registering **two different schema instances** under the same name throws immediately during spec generation:
+
+```ts
+const A = object({ x: string() }).schemaName('Thing');
+const B = object({ y: number() }).schemaName('Thing'); // different instance!
+
+generateOpenApiSpec({ registrations: [...], info: { … } });
+// Error: Schema name "Thing" is already registered by a different schema instance.
+```
+
+Re-registering the **same** instance (because it appears in multiple endpoints) is a no-op.
+
+### `SchemaRegistry` (advanced)
+
+`SchemaRegistry` and `walkSchemas` are also exported from `@cleverbrush/server-openapi` for custom tooling:
+
+```ts
+import { SchemaRegistry, walkSchemas } from '@cleverbrush/server-openapi';
+
+const registry = new SchemaRegistry();
+walkSchemas(MySchema, registry);
+
+registry.getName(MySchema);    // 'MyComponentName' | null
+registry.entries();            // IterableIterator<[name, SchemaBuilder]>
+registry.isEmpty;              // boolean
+```
+
 ## Authentication & Security Schemes
 
 Pass the server's `AuthenticationConfig` to automatically generate `securitySchemes` and per-operation `security` arrays:

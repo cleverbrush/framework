@@ -6,6 +6,7 @@ import type {
 } from '@cleverbrush/server';
 import { resolvePath } from './pathUtils.js';
 import { convertSchema } from './schemaConverter.js';
+import { SchemaRegistry, walkSchemas } from './schemaRegistry.js';
 import {
     mapOperationSecurity,
     mapSecuritySchemes,
@@ -88,9 +89,10 @@ function buildParameterObject(
 }
 
 function buildRequestBody(
-    bodySchema: SchemaBuilder<any, any, any, any, any>
+    bodySchema: SchemaBuilder<any, any, any, any, any>,
+    registry: SchemaRegistry
 ): Record<string, unknown> {
-    const jsonSchema = convertSchema(bodySchema);
+    const jsonSchema = convertSchema(bodySchema, registry);
     const bodyInfo = bodySchema.introspect() as any;
     const body: Record<string, unknown> = {
         required: bodyInfo.isRequired !== false,
@@ -130,7 +132,8 @@ const PROBLEM_DETAILS_SCHEMA = {
 
 function buildResponses(
     meta: EndpointMetadata,
-    method: string
+    method: string,
+    registry: SchemaRegistry
 ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
@@ -141,7 +144,7 @@ function buildResponses(
             const desc =
                 HTTP_STATUS_DESCRIPTIONS[code] ?? `Response ${codeStr}`;
             if (schema) {
-                const jsonSchema = convertSchema(schema);
+                const jsonSchema = convertSchema(schema, registry);
                 const respInfo = schema.introspect() as any;
                 const customDesc =
                     typeof respInfo.description === 'string' &&
@@ -158,7 +161,7 @@ function buildResponses(
         }
     } else if (meta.responseSchema) {
         // Legacy single-code path — .returns() was called
-        const jsonSchema = convertSchema(meta.responseSchema);
+        const jsonSchema = convertSchema(meta.responseSchema, registry);
         const respInfo = meta.responseSchema.introspect() as any;
         const desc =
             typeof respInfo.description === 'string' &&
@@ -214,7 +217,8 @@ function buildResponses(
 function buildOperation(
     meta: EndpointMetadata,
     pathParams: { name: string; schema: Record<string, unknown> }[],
-    securitySchemeNames: string[]
+    securitySchemeNames: string[],
+    registry: SchemaRegistry
 ): Record<string, unknown> {
     const operation: Record<string, unknown> = {};
 
@@ -252,7 +256,7 @@ function buildOperation(
                 buildParameterObject(
                     name,
                     'query',
-                    convertSchema(propSchema),
+                    convertSchema(propSchema, registry),
                     isRequired,
                     description
                 )
@@ -279,7 +283,7 @@ function buildOperation(
                 buildParameterObject(
                     name,
                     'header',
-                    convertSchema(propSchema),
+                    convertSchema(propSchema, registry),
                     isRequired,
                     description
                 )
@@ -291,11 +295,15 @@ function buildOperation(
 
     // Request body
     if (meta.bodySchema) {
-        operation['requestBody'] = buildRequestBody(meta.bodySchema);
+        operation['requestBody'] = buildRequestBody(meta.bodySchema, registry);
     }
 
     // Responses
-    operation['responses'] = buildResponses(meta, meta.method.toUpperCase());
+    operation['responses'] = buildResponses(
+        meta,
+        meta.method.toUpperCase(),
+        registry
+    );
 
     // Security
     const security = mapOperationSecurity(authRoles(meta), securitySchemeNames);
@@ -320,6 +328,41 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
         securitySchemes ?? mapSecuritySchemes(authConfig);
     const securitySchemeNames = Object.keys(resolvedSchemes);
 
+    // Pre-pass: collect all named schemas from every endpoint into a registry.
+    // Walking happens before path generation so that $ref pointers are emitted
+    // correctly at every call site within buildOperation.
+    const registry = new SchemaRegistry();
+    const visited = new Set<SchemaBuilder<any, any, any>>();
+    for (const reg of registrations) {
+        const meta = reg.endpoint;
+        if (meta.bodySchema) walkSchemas(meta.bodySchema, registry, visited);
+        if (meta.responseSchema)
+            walkSchemas(meta.responseSchema, registry, visited);
+        if (meta.responsesSchemas) {
+            for (const schema of Object.values(meta.responsesSchemas)) {
+                if (schema) walkSchemas(schema, registry, visited);
+            }
+        }
+        if (meta.querySchema) {
+            const queryProps =
+                (meta.querySchema.introspect() as any).properties ?? {};
+            for (const propSchema of Object.values<
+                SchemaBuilder<any, any, any>
+            >(queryProps)) {
+                walkSchemas(propSchema, registry, visited);
+            }
+        }
+        if (meta.headerSchema) {
+            const headerProps =
+                (meta.headerSchema.introspect() as any).properties ?? {};
+            for (const propSchema of Object.values<
+                SchemaBuilder<any, any, any>
+            >(headerProps)) {
+                walkSchemas(propSchema, registry, visited);
+            }
+        }
+    }
+
     // Build paths
     const paths: Record<string, Record<string, unknown>> = {};
 
@@ -332,7 +375,8 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
         paths[path][method] = buildOperation(
             meta,
             pathParams as { name: string; schema: Record<string, unknown> }[],
-            securitySchemeNames
+            securitySchemeNames,
+            registry
         );
     }
 
@@ -348,11 +392,21 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
 
     doc['paths'] = paths;
 
-    // Components
-    if (securitySchemeNames.length > 0) {
-        doc['components'] = {
-            securitySchemes: { ...resolvedSchemes }
-        };
+    // Components — security schemes + named component schemas
+    const componentSchemas: Record<string, unknown> = {};
+    for (const [name, schema] of registry.entries()) {
+        // Convert without nameResolver so the definition itself is fully inlined
+        // (avoids a self-referential $ref in the components section).
+        componentSchemas[name] = convertSchema(schema);
+    }
+    const hasSchemas = Object.keys(componentSchemas).length > 0;
+
+    if (securitySchemeNames.length > 0 || hasSchemas) {
+        const components: Record<string, unknown> = {};
+        if (securitySchemeNames.length > 0)
+            components['securitySchemes'] = { ...resolvedSchemes };
+        if (hasSchemas) components['schemas'] = componentSchemas;
+        doc['components'] = components;
     }
 
     return doc;

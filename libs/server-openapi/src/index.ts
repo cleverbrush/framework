@@ -16,6 +16,7 @@ export {
     resolvePath
 } from './pathUtils.js';
 export { convertSchema } from './schemaConverter.js';
+export { SchemaRegistry, walkSchemas } from './schemaRegistry.js';
 export {
     mapOperationSecurity,
     mapSecuritySchemes,

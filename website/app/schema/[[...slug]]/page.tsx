@@ -17,6 +17,7 @@ import PromiseSchemaSection from '../sections/promise-schema';
 import PropertyDescriptorsSection from '../sections/property-descriptors';
 import ReadonlySection from '../sections/readonly';
 import RecursiveSchemasSection from '../sections/recursive-schemas';
+import SchemaNameSection from '../sections/schema-name';
 import SchemaTypesSection from '../sections/schema-types';
 import StandardSchemaSection from '../sections/standard-schema';
 import ValidationSection from '../sections/validation';
@@ -42,6 +43,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     'catch-fallback': CatchFallbackSection,
     readonly: ReadonlySection,
     describe: DescribeSection,
+    'schema-name': SchemaNameSection,
     extensions: ExtensionsSection,
     'built-in-extensions': BuiltInExtensionsSection,
     'standard-schema': StandardSchemaSection,

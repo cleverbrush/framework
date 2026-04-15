@@ -132,6 +132,28 @@ export type ToJsonSchemaOptions = {
      * @default true
      */
     $schema?: boolean;
+
+    /**
+     * Optional hook called for every schema node before conversion.
+     *
+     * When provided, the function receives each {@link SchemaBuilder} instance
+     * encountered during recursive conversion (including nested ones inside
+     * objects, arrays, and unions). If the function returns a non-null string,
+     * conversion of that node is short-circuited and a
+     * `{ $ref: '#/components/schemas/<name>' }` object is returned instead of
+     * the full inline JSON Schema.
+     *
+     * Return `null` to let conversion proceed normally.
+     *
+     * Primarily used by `@cleverbrush/server-openapi` to emit `$ref` pointers
+     * for schemas registered via `.schemaName()`.
+     *
+     * @param schema - The schema node currently being converted.
+     * @returns The component name to reference, or `null` to inline.
+     */
+    nameResolver?: (
+        schema: import('@cleverbrush/schema').SchemaBuilder<any, any, any>
+    ) => string | null;
 };
 
 // ---------------------------------------------------------------------------

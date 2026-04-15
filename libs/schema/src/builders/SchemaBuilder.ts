@@ -221,6 +221,7 @@ export type SchemaBuilderProps<T> = {
     catchValue?: T | (() => T);
     hasCatch?: boolean;
     description?: string;
+    schemaName?: string;
 };
 
 export type ValidationContext<
@@ -712,6 +713,7 @@ export abstract class SchemaBuilder<
     #isNullable = false;
     #isReadonly = false;
     #description: string | undefined;
+    #schemaName: string | undefined;
     #preprocessors: PreprocessorEntry<TResult>[] = [];
     #validators: ValidatorEntry<TResult>[] = [];
     #hasMutating = false;
@@ -1409,8 +1411,14 @@ export abstract class SchemaBuilder<
              */
             description: this.#description,
             /**
+             * The component name attached to this schema via `.schemaName()`,
+             * or `undefined` if none was set.
+             */
+            schemaName: this.#schemaName,
+            /**
              * Whether a catch/fallback value has been set on this schema via `.catch()`.
              */
+
             hasCatch: this.#hasCatch,
             /**
              * The catch/fallback value or factory function set via `.catch()`.
@@ -1567,6 +1575,46 @@ export abstract class SchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             description: text
+        }) as unknown as this;
+    }
+
+    /**
+     * Attaches a component name to this schema for OpenAPI `components/schemas`
+     * registration.
+     *
+     * When a named schema is passed to `generateOpenApiSpec()` from
+     * `@cleverbrush/server-openapi`, it is collected into
+     * `components.schemas[name]` and every occurrence in the spec is replaced
+     * with a `$ref: '#/components/schemas/<name>'` pointer instead of being
+     * inlined in full.
+     *
+     * **Naming rules**
+     * - Names must be unique across the spec. Registering two *different*
+     *   schema instances under the same name throws at generation time.
+     * - Re-using the same constant (same object reference) in multiple
+     *   endpoints is fine — it is detected and deduplicated automatically.
+     *
+     * The name has no effect on validation and is not emitted by
+     * `toJsonSchema()` from `@cleverbrush/schema-json`.
+     *
+     * @example
+     * ```ts
+     * import { object, string, number } from '@cleverbrush/schema';
+     *
+     * export const UserSchema = object({
+     *   id:   number(),
+     *   name: string(),
+     * }).schemaName('User');
+     *
+     * // Both endpoints share the same constant → single components.schemas entry
+     * const GetUser   = endpoint.get('/users/:id').returns(UserSchema);
+     * const ListUsers = endpoint.get('/users').returns(array(UserSchema));
+     * ```
+     */
+    public schemaName(name: string): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            schemaName: name
         }) as unknown as this;
     }
 
@@ -2003,6 +2051,10 @@ export abstract class SchemaBuilder<
 
         if (typeof props.description === 'string') {
             this.#description = props.description;
+        }
+
+        if (typeof props.schemaName === 'string') {
+            this.#schemaName = props.schemaName;
         }
 
         this.#requiredErrorMessageProvider =
