@@ -695,4 +695,89 @@ describe('discriminated union discriminator keyword', () => {
         expect(schemas['Cat']).toBeDefined();
         expect(schemas['Dog']).toBeDefined();
     });
+
+    // --- Default values ---
+
+    it('propagates default values in query parameters', () => {
+        const querySchema = object({
+            page: number().default(1).optional(),
+            search: string()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    querySchema
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        const pageParam = op.parameters.find(
+            (p: any) => p.name === 'page' && p.in === 'query'
+        );
+        expect(pageParam.schema).toHaveProperty('default', 1);
+    });
+
+    it('propagates default values in header parameters', () => {
+        const headerSchema = object({
+            'x-version': string().default('v1').optional()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    headerSchema
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        const versionParam = op.parameters.find(
+            (p: any) => p.name === 'x-version' && p.in === 'header'
+        );
+        expect(versionParam.schema).toHaveProperty('default', 'v1');
+    });
+
+    it('propagates default values in request body properties', () => {
+        const bodySchema = object({
+            active: boolean().default(true).optional()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema
+                })
+            ])
+        );
+        const schema = (spec['paths'] as any)['/api/items']['post'].requestBody
+            .content['application/json'].schema;
+        expect(schema.properties.active).toHaveProperty('default', true);
+    });
+
+    it('omits factory defaults from request body properties', () => {
+        const bodySchema = object({
+            tags: string()
+                .default(() => 'none')
+                .optional()
+        });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema
+                })
+            ])
+        );
+        const schema = (spec['paths'] as any)['/api/items']['post'].requestBody
+            .content['application/json'].schema;
+        expect(schema.properties.tags).not.toHaveProperty('default');
+    });
 });

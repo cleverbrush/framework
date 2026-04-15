@@ -1,4 +1,4 @@
-import { number, object, string } from '@cleverbrush/schema';
+import { boolean, number, object, string } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
 import { convertSchema } from './schemaConverter.js';
 
@@ -31,5 +31,27 @@ describe('schemaConverter', () => {
     it('preserves description from .describe()', () => {
         const result = convertSchema(string().describe('A name'));
         expect(result).toHaveProperty('description', 'A name');
+    });
+
+    // --- Default values ---
+
+    it('emits default for string with literal default', () => {
+        const result = convertSchema(string().default('hello'));
+        expect(result).toEqual({ type: 'string', default: 'hello' });
+    });
+
+    it('emits default for number with literal default', () => {
+        const result = convertSchema(number().default(42));
+        expect(result).toEqual({ type: 'integer', default: 42 });
+    });
+
+    it('emits default for boolean with literal default', () => {
+        const result = convertSchema(boolean().default(false));
+        expect(result).toEqual({ type: 'boolean', default: false });
+    });
+
+    it('omits default for factory function default', () => {
+        const result = convertSchema(string().default(() => 'x'));
+        expect(result).not.toHaveProperty('default');
     });
 });
