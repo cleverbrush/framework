@@ -175,28 +175,36 @@ function convertNodeInner(
                 info.discriminatorPropertyName;
             if (discriminatorProp) {
                 const disc: Out = { propertyName: discriminatorProp };
-                // Build mapping when any option resolved to a $ref
+                // Only emit mapping when every option resolved to a $ref
+                // and every discriminator value can be populated.
                 const mapping: Record<string, string> = {};
-                let hasRef = false;
+                let allRefsMapped = options.length > 0;
                 for (let i = 0; i < options.length; i++) {
                     const ref = converted[i]['$ref'];
-                    if (typeof ref === 'string') {
-                        const oi = options[i].introspect() as any;
-                        const props:
-                            | Record<string, SchemaBuilder<any, any, any>>
-                            | undefined = oi.properties;
-                        if (props?.[discriminatorProp]) {
-                            const propInfo = props[
-                                discriminatorProp
-                            ].introspect() as any;
-                            if (propInfo.equalsTo !== undefined) {
-                                mapping[String(propInfo.equalsTo)] = ref;
-                                hasRef = true;
-                            }
-                        }
+                    if (typeof ref !== 'string') {
+                        allRefsMapped = false;
+                        break;
                     }
+
+                    const oi = options[i].introspect() as any;
+                    const props:
+                        | Record<string, SchemaBuilder<any, any, any>>
+                        | undefined = oi.properties;
+                    const discriminatorSchema = props?.[discriminatorProp];
+                    if (!discriminatorSchema) {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    const propInfo = discriminatorSchema.introspect() as any;
+                    if (propInfo.equalsTo === undefined) {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    mapping[String(propInfo.equalsTo)] = ref;
                 }
-                if (hasRef) disc['mapping'] = mapping;
+                if (allRefsMapped) disc['mapping'] = mapping;
                 out['discriminator'] = disc;
             }
 
