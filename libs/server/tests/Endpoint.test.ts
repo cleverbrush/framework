@@ -231,3 +231,83 @@ describe('EndpointBuilder .produces() / .responseHeaders()', () => {
         expect(meta.responseHeaderSchema).toBeNull();
     });
 });
+
+describe('EndpointBuilder .externalDocs() / .links() / .callbacks()', () => {
+    it('.externalDocs() stores url and description in introspect', () => {
+        const ep = endpoint
+            .get('/api/items')
+            .externalDocs('https://example.com/docs', 'Full docs');
+        const meta = ep.introspect();
+        expect(meta.externalDocs).toEqual({
+            url: 'https://example.com/docs',
+            description: 'Full docs'
+        });
+    });
+
+    it('.externalDocs() returns a new builder without mutating original', () => {
+        const a = endpoint.get('/api/items');
+        const b = a.externalDocs('https://example.com');
+        expect(a).not.toBe(b);
+        expect(a.introspect().externalDocs).toBeNull();
+        expect(b.introspect().externalDocs).toEqual({
+            url: 'https://example.com',
+            description: undefined
+        });
+    });
+
+    it('externalDocs defaults to null in introspect', () => {
+        expect(endpoint.get('/api/items').introspect().externalDocs).toBeNull();
+    });
+
+    it('.links() stores link definitions in introspect', () => {
+        const defs = {
+            GetUser: {
+                operationId: 'getUser',
+                parameters: { id: '$response.body#/id' }
+            }
+        };
+        const ep = endpoint.get('/api/users').links(defs);
+        expect(ep.introspect().links).toEqual(defs);
+    });
+
+    it('.links() returns a new builder without mutating original', () => {
+        const a = endpoint.get('/api/users');
+        const b = a.links({ Self: { operationId: 'getUser' } });
+        expect(a).not.toBe(b);
+        expect(a.introspect().links).toBeNull();
+        expect(b.introspect().links).toEqual({
+            Self: { operationId: 'getUser' }
+        });
+    });
+
+    it('links defaults to null in introspect', () => {
+        expect(endpoint.get('/api/items').introspect().links).toBeNull();
+    });
+
+    it('.callbacks() stores callback definitions in introspect', () => {
+        const defs = {
+            onEvent: {
+                expression: '{$request.body#/callbackUrl}',
+                method: 'POST'
+            }
+        };
+        const ep = endpoint.post('/api/subscriptions').callbacks(defs);
+        expect(ep.introspect().callbacks).toEqual(defs);
+    });
+
+    it('.callbacks() returns a new builder without mutating original', () => {
+        const a = endpoint.post('/api/subscriptions');
+        const b = a.callbacks({
+            onEvent: { expression: '{$url}', method: 'POST' }
+        });
+        expect(a).not.toBe(b);
+        expect(a.introspect().callbacks).toBeNull();
+        expect(b.introspect().callbacks).toEqual({
+            onEvent: { expression: '{$url}', method: 'POST' }
+        });
+    });
+
+    it('callbacks defaults to null in introspect', () => {
+        expect(endpoint.post('/api/items').introspect().callbacks).toBeNull();
+    });
+});

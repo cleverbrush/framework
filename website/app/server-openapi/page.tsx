@@ -525,6 +525,121 @@ endpoint.get(route(
                         />
                     </pre>
                 </div>
+
+                {/* ── externalDocs ─────────────────────────────────── */}
+                <div className="card">
+                    <h2>External Documentation</h2>
+                    <p>
+                        Link external reference material to an operation with{' '}
+                        <code>.externalDocs(url, description?)</code>. The
+                        generator emits an <code>externalDocs</code> object on
+                        the OpenAPI Operation Object:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const GetItems = endpoint
+    .get('/api/items')
+    .returns(ItemSchema)
+    .externalDocs('https://docs.example.com/items', 'Items API reference');`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Links ────────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Response Links</h2>
+                    <p>
+                        Declare follow-up actions available from a response
+                        using <code>.links(defs)</code>. Links are emitted under
+                        the primary 2xx response&apos;s <code>links</code> map.
+                        Parameters can be raw runtime expression strings or a
+                        type-safe callback where property accesses resolve to{' '}
+                        <code>$response.body#/&lt;pointer&gt;</code> expressions
+                        automatically:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const CreateUser = endpoint
+    .post('/api/users')
+    .body(object({ name: string(), email: string() }))
+    .returns(object({ id: number(), name: string(), email: string() }))
+    .links({
+        GetUser: {
+            operationId: 'getUser',
+            // Type-safe: accesses 'id' → resolves to '$response.body#/id'
+            parameters: (r) => ({ userId: r.id }),
+        },
+    });`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Callbacks ────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Callbacks</h2>
+                    <p>
+                        Document async out-of-band requests with{' '}
+                        <code>.callbacks(defs)</code>. The callback URL can be a
+                        raw runtime expression string or a type-safe{' '}
+                        <code>urlFrom</code> selector that resolves a request
+                        body field to a{' '}
+                        <code>{'{$request.body#/<pointer>}'}</code> expression:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const Subscribe = endpoint
+    .post('/api/subscriptions')
+    .body(object({ callbackUrl: string(), events: array(string()) }))
+    .callbacks({
+        onEvent: {
+            urlFrom: (b) => b.callbackUrl,  // → {$request.body#/callbackUrl}
+            method: 'POST',
+            summary: 'Event notification delivered to subscriber',
+            body: EventSchema,
+        },
+    });`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Webhooks ─────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Webhooks</h2>
+                    <p>
+                        Document async webhook notifications your API sends to
+                        consumers. Use <code>defineWebhook()</code> and register
+                        via <code>ServerBuilder.webhook()</code>, then pass them
+                        to <code>generateOpenApiSpec</code> via the{' '}
+                        <code>webhooks</code> option. A top-level{' '}
+                        <code>webhooks</code> map is emitted in the OpenAPI 3.1
+                        document:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { defineWebhook } from '@cleverbrush/server';
+
+const userCreated = defineWebhook('userCreated', {
+    method: 'POST',
+    summary: 'Fired when a new user registers',
+    body: object({ id: number(), email: string() }),
+});
+
+// Register with the server (for documentation only):
+createServer().webhook(userCreated).handle(/* ... */);
+
+// Or pass directly to the generator:
+generateOpenApiSpec({ registrations, info, webhooks: [userCreated] });`)
+                            }}
+                        />
+                    </pre>
+                </div>
             </div>
         </div>
     );

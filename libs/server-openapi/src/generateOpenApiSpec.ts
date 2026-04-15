@@ -1,8 +1,13 @@
-import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
+import {
+    ObjectSchemaBuilder,
+    type SchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+} from '@cleverbrush/schema';
 import type {
     AuthenticationConfig,
     EndpointMetadata,
-    EndpointRegistration
+    EndpointRegistration,
+    WebhookDefinition
 } from '@cleverbrush/server';
 import { resolvePath } from './pathUtils.js';
 import { convertSchema } from './schemaConverter.js';
@@ -87,6 +92,16 @@ export interface OpenApiOptions {
      * @see https://spec.openapis.org/oas/v3.1.0#tag-object
      */
     readonly tags?: readonly OpenApiTag[];
+    /**
+     * Webhook definitions to emit in the top-level `webhooks` map of the
+     * generated OpenAPI document.
+     *
+     * Webhooks are not served as HTTP routes — they merely document async
+     * out-of-band requests that your API sends to subscribers.
+     *
+     * @see https://spec.openapis.org/oas/v3.1.0#fixed-fields
+     */
+    readonly webhooks?: readonly WebhookDefinition[];
 }
 
 // ---------------------------------------------------------------------------
@@ -330,6 +345,69 @@ function buildResponses(
         }
     }
 
+    // Links — attach to the lowest 2xx response
+    if (meta.links) {
+        const linksOut: Record<string, unknown> = {};
+        for (const [linkName, linkDef] of Object.entries(meta.links)) {
+            const link: Record<string, unknown> = {
+                operationId: linkDef.operationId
+            };
+            if (linkDef.description) link['description'] = linkDef.description;
+            if (linkDef.requestBody) link['requestBody'] = linkDef.requestBody;
+            if (linkDef.parameters) {
+                let params: Record<string, unknown>;
+                if (
+                    typeof linkDef.parameters === 'function' &&
+                    meta.responseSchema
+                ) {
+                    const tree = ObjectSchemaBuilder.getPropertiesFor(
+                        meta.responseSchema as ObjectSchemaBuilder<
+                            any,
+                            any,
+                            any,
+                            any,
+                            any,
+                            any,
+                            any
+                        >
+                    );
+                    const raw = (
+                        linkDef.parameters as (
+                            r: any
+                        ) => Record<string, unknown>
+                    )(tree);
+                    params = {};
+                    for (const [paramName, value] of Object.entries(raw)) {
+                        if (
+                            value &&
+                            typeof value === 'object' &&
+                            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in
+                                (value as object)
+                        ) {
+                            const pointer = (value as any)[
+                                SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                            ].toJsonPointer();
+                            params[paramName] = `$response.body#${pointer}`;
+                        } else {
+                            params[paramName] = value;
+                        }
+                    }
+                } else {
+                    params = linkDef.parameters as Record<string, unknown>;
+                }
+                link['parameters'] = params;
+            }
+            linksOut[linkName] = link;
+        }
+        const successCode = Object.keys(result)
+            .filter(k => Number(k) >= 200 && Number(k) < 300)
+            .sort()[0];
+        if (successCode) {
+            (result[successCode] as Record<string, unknown>)['links'] =
+                linksOut;
+        }
+    }
+
     return result;
 }
 
@@ -433,6 +511,85 @@ function buildOperation(
     const security = mapOperationSecurity(authRoles(meta), securitySchemeNames);
     if (security.length > 0) operation['security'] = security;
 
+    // External documentation
+    if (meta.externalDocs) {
+        const ed: Record<string, unknown> = { url: meta.externalDocs.url };
+        if (meta.externalDocs.description)
+            ed['description'] = meta.externalDocs.description;
+        operation['externalDocs'] = ed;
+    }
+
+    // Callbacks
+    if (meta.callbacks) {
+        const callbacksOut: Record<string, unknown> = {};
+        for (const [cbName, cbDef] of Object.entries(meta.callbacks)) {
+            // Determine URL expression
+            let expression: string;
+            if (cbDef.expression) {
+                expression = cbDef.expression;
+            } else if (cbDef.urlFrom && meta.bodySchema) {
+                const tree = ObjectSchemaBuilder.getPropertiesFor(
+                    meta.bodySchema as ObjectSchemaBuilder<
+                        any,
+                        any,
+                        any,
+                        any,
+                        any,
+                        any,
+                        any
+                    >
+                );
+                const selected = cbDef.urlFrom(tree);
+                if (
+                    selected &&
+                    typeof selected === 'object' &&
+                    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in (selected as object)
+                ) {
+                    const pointer = (selected as any)[
+                        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                    ].toJsonPointer();
+                    expression = `{$request.body#${pointer}}`;
+                } else {
+                    expression = String(
+                        selected ?? '{$request.body#/callbackUrl}'
+                    );
+                }
+            } else {
+                expression = '{$request.body#/callbackUrl}';
+            }
+
+            const cbMethod = (cbDef.method ?? 'post').toLowerCase();
+            const cbOperation: Record<string, unknown> = {};
+            if (cbDef.summary) cbOperation['summary'] = cbDef.summary;
+            if (cbDef.description)
+                cbOperation['description'] = cbDef.description;
+            if (cbDef.body) {
+                cbOperation['requestBody'] = buildRequestBody(
+                    cbDef.body,
+                    registry
+                );
+            }
+            const cbResponses: Record<string, unknown> = {};
+            if (cbDef.response) {
+                cbResponses['200'] = {
+                    description: 'OK',
+                    content: {
+                        'application/json': {
+                            schema: convertSchema(cbDef.response, registry)
+                        }
+                    }
+                };
+            } else {
+                cbResponses['200'] = { description: 'OK' };
+            }
+            cbOperation['responses'] = cbResponses;
+            callbacksOut[cbName] = {
+                [expression]: { [cbMethod]: cbOperation }
+            };
+        }
+        operation['callbacks'] = callbacksOut;
+    }
+
     return operation;
 }
 
@@ -484,6 +641,20 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
             >(headerProps)) {
                 walkSchemas(propSchema, registry, visited);
             }
+        }
+        if (meta.callbacks) {
+            for (const cbDef of Object.values(meta.callbacks)) {
+                if (cbDef.body) walkSchemas(cbDef.body, registry, visited);
+                if (cbDef.response)
+                    walkSchemas(cbDef.response, registry, visited);
+            }
+        }
+    }
+    if (options.webhooks) {
+        for (const webhook of options.webhooks) {
+            if (webhook.body) walkSchemas(webhook.body, registry, visited);
+            if (webhook.response)
+                walkSchemas(webhook.response, registry, visited);
         }
     }
 
@@ -555,6 +726,42 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
     }
 
     doc['paths'] = paths;
+
+    // Webhooks — out-of-band async requests documented alongside paths
+    if (options.webhooks && options.webhooks.length > 0) {
+        const webhooksObj: Record<string, unknown> = {};
+        for (const webhook of options.webhooks) {
+            const whMethod = (webhook.method ?? 'post').toLowerCase();
+            const whOperation: Record<string, unknown> = {};
+            if (webhook.summary) whOperation['summary'] = webhook.summary;
+            if (webhook.description)
+                whOperation['description'] = webhook.description;
+            if (webhook.tags && webhook.tags.length > 0)
+                whOperation['tags'] = [...webhook.tags];
+            if (webhook.body) {
+                whOperation['requestBody'] = buildRequestBody(
+                    webhook.body,
+                    registry
+                );
+            }
+            const whResponses: Record<string, unknown> = {};
+            if (webhook.response) {
+                whResponses['200'] = {
+                    description: 'OK',
+                    content: {
+                        'application/json': {
+                            schema: convertSchema(webhook.response, registry)
+                        }
+                    }
+                };
+            } else {
+                whResponses['200'] = { description: 'OK' };
+            }
+            whOperation['responses'] = whResponses;
+            webhooksObj[webhook.name] = { [whMethod]: whOperation };
+        }
+        doc['webhooks'] = webhooksObj;
+    }
 
     // Components — security schemes + named component schemas
     const componentSchemas: Record<string, unknown> = {};

@@ -92,11 +92,11 @@ These items require new metadata fields on `EndpointBuilder` / `EndpointMetadata
 
 | # | Feature | Notes |
 |---|---------|-------|
-| 3.1 | **Webhooks** (OpenAPI 3.1) | New endpoint type for outgoing webhooks; emit under top-level `webhooks` key |
-| 3.2 | **Links between operations** | Declare response → next-operation relationships (e.g., create → GET by ID) |
-| 3.3 | **Callbacks** | For async request/response patterns with webhook callbacks |
+| 3.1 | **Webhooks** (OpenAPI 3.1) ✅ | `defineWebhook()` + `ServerBuilder.webhook()` + `OpenApiOptions.webhooks`; emitted under top-level `webhooks` key |
+| 3.2 | **Links between operations** ✅ | `.links(defs)` on `EndpointBuilder`; type-safe descriptor callback support |
+| 3.3 | **Callbacks** ✅ | `.callbacks(defs)` on `EndpointBuilder`; `urlFrom` descriptor resolution |
 | 3.4 | **API versioning strategy** | Version prefix in paths, or header/query versioning with spec-level hints |
-| 3.5 | **`externalDocs` on operations** | Add `.externalDocs(url, description?)` to `EndpointBuilder` |
+| 3.5 | **`externalDocs` on operations** ✅ | `.externalDocs(url, description?)` on `EndpointBuilder` |
 
 ---
 

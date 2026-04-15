@@ -2,6 +2,7 @@ import type {
     InferType,
     ObjectSchemaBuilder,
     ParseStringSchemaBuilder,
+    PropertyDescriptorTree,
     SchemaBuilder
 } from '@cleverbrush/schema';
 import type {
@@ -31,7 +32,13 @@ type HasKeys<T> = keyof T extends never ? false : true;
 type ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal> = {
     context: RequestContext;
 } & (HasKeys<TParams> extends true ? { params: TParams } : {}) &
-    (TBody extends undefined ? {} : { body: TBody }) &
+    (TBody extends undefined
+        ? {}
+        : {
+              body: TBody extends SchemaBuilder<any, any, any, any, any>
+                  ? InferType<TBody>
+                  : TBody;
+          }) &
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
     (TPrincipal extends undefined ? {} : { principal: TPrincipal });
@@ -100,7 +107,9 @@ type ResponseType<E> =
         infer TResponse,
         any
     >
-        ? TResponse
+        ? TResponse extends SchemaBuilder<any, any, any, any, any>
+            ? InferType<TResponse>
+            : TResponse
         : any;
 
 /**
@@ -183,6 +192,90 @@ export type Handler<E> =
 // ---------------------------------------------------------------------------
 
 type RoutePath = string | ParseStringSchemaBuilder<any, any, any, any, any>;
+
+/**
+ * Lightweight recursive property reference tree for type-safe runtime
+ * expression building in `.links()` and `.callbacks()`.
+ *
+ * At runtime the actual value is a `PropertyDescriptorTree` from
+ * `ObjectSchemaBuilder.getPropertiesFor()`, which provides `toJsonPointer()`
+ * and the `SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR` marker used by the OpenAPI
+ * generator to resolve path expressions automatically.
+ */
+export type PropertyRefTree<T> = {
+    readonly [K in keyof T]-?: PropertyRefTree<T[K]>;
+};
+
+/**
+ * A link from a response to a follow-up operation.
+ *
+ * @see https://spec.openapis.org/oas/v3.1.0#link-object
+ */
+export interface LinkDefinition<TResponse = any> {
+    /** `operationId` of the target operation. */
+    readonly operationId: string;
+    /**
+     * Map of target parameter names to values.
+     *
+     * - `Record<string, string>` — raw OpenAPI runtime expressions such as
+     *   `'$response.body#/id'`.
+     * - Callback `(response: PropertyRefTree<TResponse>) => Record<string, unknown>` —
+     *   type-safe selector; properties accessed on `response` are converted to
+     *   `$response.body#/<pointer>` expressions automatically.
+     */
+    readonly parameters?:
+        | Record<string, string>
+        | ((
+              response: TResponse extends ObjectSchemaBuilder<
+                  any,
+                  any,
+                  any,
+                  any,
+                  any
+              >
+                  ? PropertyDescriptorTree<TResponse, TResponse>
+                  : PropertyRefTree<any>
+          ) => Record<string, unknown>);
+    /** Human-readable description of the link relationship. */
+    readonly description?: string;
+    /** Runtime expression or literal for the linked operation's request body. */
+    readonly requestBody?: string;
+}
+
+/**
+ * A callback declaration for async request/response patterns.
+ *
+ * @see https://spec.openapis.org/oas/v3.1.0#callback-object
+ */
+export interface CallbackDefinition<TBody = any> {
+    /**
+     * Raw OpenAPI runtime expression for the callback URL,
+     * e.g. `'{$request.body#/callbackUrl}'`.
+     * Mutually exclusive with `urlFrom`.
+     */
+    readonly expression?: string;
+    /**
+     * Type-safe selector for the request body field holding the callback URL.
+     * The generator converts the selected property to a
+     * `'{$request.body#/<pointer>}'` expression automatically.
+     * Mutually exclusive with `expression`.
+     */
+    readonly urlFrom?: (
+        body: TBody extends ObjectSchemaBuilder<any, any, any, any, any>
+            ? PropertyDescriptorTree<TBody, TBody>
+            : PropertyRefTree<any>
+    ) => unknown;
+    /** HTTP method for the callback request (default: `'POST'`). */
+    readonly method?: string;
+    /** Short summary of the callback operation. */
+    readonly summary?: string;
+    /** Detailed description of the callback operation. */
+    readonly description?: string;
+    /** Request body schema for the callback payload. */
+    readonly body?: SchemaBuilder<any, any, any, any, any>;
+    /** Response schema expected from the callback consumer. */
+    readonly response?: SchemaBuilder<any, any, any, any, any>;
+}
 
 /**
  * Snapshot of all configuration set on an `EndpointBuilder`.
@@ -284,6 +377,21 @@ export interface EndpointMetadata {
         any,
         any
     > | null;
+    /**
+     * External documentation URL for this operation, emitted as `externalDocs`
+     * on the OpenAPI Operation Object.
+     */
+    readonly externalDocs: { url: string; description?: string } | null;
+    /**
+     * Response links declared via `.links()`, emitted under the primary
+     * success response's `links` map in the OpenAPI spec.
+     */
+    readonly links: Record<string, LinkDefinition> | null;
+    /**
+     * Callbacks declared via `.callbacks()`, emitted as `callbacks` on the
+     * OpenAPI Operation Object.
+     */
+    readonly callbacks: Record<string, CallbackDefinition> | null;
 }
 
 /**
@@ -386,6 +494,9 @@ export class EndpointBuilder<
         any,
         any
     > | null;
+    readonly #externalDocs: { url: string; description?: string } | null;
+    readonly #links: Record<string, LinkDefinition> | null;
+    readonly #callbacks: Record<string, CallbackDefinition> | null;
 
     constructor(
         method: string,
@@ -446,7 +557,10 @@ export class EndpointBuilder<
             any,
             any,
             any
-        > | null = null
+        > | null = null,
+        externalDocs: { url: string; description?: string } | null = null,
+        links: Record<string, LinkDefinition> | null = null,
+        callbacks: Record<string, CallbackDefinition> | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -468,6 +582,9 @@ export class EndpointBuilder<
         this.#producesFile = producesFile;
         this.#produces = produces;
         this.#responseHeaderSchema = responseHeaderSchema;
+        this.#externalDocs = externalDocs;
+        this.#links = links;
+        this.#callbacks = callbacks;
     }
 
     /** Define the request body schema. Validation failures return 422 Problem Details. */
@@ -475,7 +592,7 @@ export class EndpointBuilder<
         schema: TSchema
     ): EndpointBuilder<
         TParams,
-        InferType<TSchema>,
+        TSchema,
         TQuery,
         THeaders,
         TServices,
@@ -504,7 +621,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -544,7 +664,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -584,7 +707,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -624,7 +750,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -713,7 +842,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -745,7 +877,7 @@ export class EndpointBuilder<
         TServices,
         TPrincipal,
         TRoles,
-        InferType<TSchema>,
+        TSchema,
         TResponses
     >;
     returns(
@@ -777,7 +909,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -841,7 +976,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -879,7 +1017,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -917,7 +1058,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -955,7 +1099,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -993,7 +1140,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -1029,7 +1179,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -1074,7 +1227,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -1122,7 +1278,10 @@ export class EndpointBuilder<
             map,
             this.#producesFile,
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -1169,7 +1328,10 @@ export class EndpointBuilder<
             this.#examples,
             { contentType, description },
             this.#produces,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -1195,7 +1357,10 @@ export class EndpointBuilder<
             examples: this.#examples,
             producesFile: this.#producesFile,
             produces: this.#produces,
-            responseHeaderSchema: this.#responseHeaderSchema
+            responseHeaderSchema: this.#responseHeaderSchema,
+            externalDocs: this.#externalDocs,
+            links: this.#links,
+            callbacks: this.#callbacks
         };
     }
 
@@ -1256,7 +1421,10 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             contentTypes,
-            this.#responseHeaderSchema
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
         );
     }
 
@@ -1313,7 +1481,181 @@ export class EndpointBuilder<
             this.#examples,
             this.#producesFile,
             this.#produces,
-            schema
+            schema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Link external documentation to this operation.
+     *
+     * Emitted as the `externalDocs` field on the OpenAPI Operation Object.
+     *
+     * @param url - The URL to the external documentation.
+     * @param description - Optional short description of the external docs.
+     */
+    externalDocs(
+        url: string,
+        description?: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            { url, description },
+            this.#links,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Declare response links for OpenAPI spec generation.
+     *
+     * Links describe follow-up actions that can be taken based on the response,
+     * emitted under the primary 2xx response's `links` map.
+     *
+     * @param defs - Record mapping link names to {@link LinkDefinition} objects.
+     *
+     * @example
+     * ```ts
+     * endpoint.get('/api/users/:id')
+     *   .returns(UserSchema)
+     *   .links({
+     *     GetUser: {
+     *       operationId: 'getUser',
+     *       parameters: (r) => ({ id: r.id }),
+     *     },
+     *   })
+     * ```
+     */
+    links(
+        defs: Record<string, LinkDefinition<TResponse>>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            defs as Record<string, LinkDefinition>,
+            this.#callbacks
+        );
+    }
+
+    /**
+     * Declare callbacks for OpenAPI spec generation.
+     *
+     * Callbacks describe async out-of-band requests that may be sent to a URL
+     * provided in the request body, emitted as the `callbacks` field on the
+     * OpenAPI Operation Object.
+     *
+     * @param defs - Record mapping callback names to {@link CallbackDefinition} objects.
+     *
+     * @example
+     * ```ts
+     * endpoint.post('/api/subscriptions')
+     *   .body(object({ callbackUrl: string() }))
+     *   .callbacks({
+     *     onEvent: {
+     *       urlFrom: (b) => b.callbackUrl,
+     *       method: 'POST',
+     *       body: EventSchema,
+     *     },
+     *   })
+     * ```
+     */
+    callbacks(
+        defs: Record<string, CallbackDefinition<TBody>>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            defs as Record<string, CallbackDefinition>
         );
     }
 }

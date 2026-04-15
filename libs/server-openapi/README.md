@@ -16,6 +16,10 @@ OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Con
 - **Binary / file responses** — `.producesFile(contentType?, description?)` emits binary content types instead of JSON schemas for file download endpoints.
 - **Multiple content types** — `.produces({ 'text/csv': {}, 'application/xml': { schema } })` emits a multi-entry `content` map for content-negotiated endpoints; an optional per-type schema override is supported.
 - **Response headers** — `.responseHeaders(schema)` documents response headers (`X-Total-Count`, rate-limit, cache-control, etc.) across every response code; each property becomes a named header entry with schema and description.
+- **External docs** — `.externalDocs(url, description?)` attaches an `externalDocs` object to the OpenAPI Operation Object.
+- **Links** — `.links(defs)` declares follow-up links from a response; emitted under the primary 2xx response's `links` map. Parameters can be raw runtime expression strings or a type-safe callback `(response) => Record<string, unknown>` where property accesses are resolved to `$response.body#/<pointer>` expressions automatically.
+- **Callbacks** — `.callbacks(defs)` declares async out-of-band callbacks on the Operation Object. The callback URL can be a raw `expression` string or a type-safe `urlFrom` callback resolved from the request body schema via property descriptors.
+- **Webhooks** — pass `webhooks: [defineWebhook('name', options)]` to `OpenApiOptions` (and register via `ServerBuilder.webhook(def)`) to emit a top-level `webhooks` map in the OpenAPI document.
 - **`serveOpenApi()`** — middleware that lazily generates and caches the spec; serves it at a configurable path (default: `/openapi.json`).
 - **`createOpenApiEndpoint()`** — returns a typed endpoint + handler pair for use with `ServerBuilder.handle()`.
 - **CLI / build script** — `writeOpenApiSpec()` writes the spec to a file.

@@ -12,6 +12,7 @@ import type {
     EndpointMetadata,
     EndpointRegistration
 } from '@cleverbrush/server';
+import { endpoint } from '@cleverbrush/server';
 import { describe, expect, it } from 'vitest';
 import {
     generateOpenApiSpec,
@@ -44,6 +45,9 @@ function makeMeta(partial: Partial<EndpointMetadata> = {}): EndpointMetadata {
         producesFile: null,
         produces: null,
         responseHeaderSchema: null,
+        externalDocs: null,
+        links: null,
+        callbacks: null,
         ...partial
     };
 }
@@ -1398,5 +1402,211 @@ describe('response headers', () => {
             description: 'Total number of items'
         });
         expect(header.description).toBe('Total number of items');
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.5 externalDocs
+// ---------------------------------------------------------------------------
+
+describe('externalDocs', () => {
+    it('emits externalDocs on operation when set', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    externalDocs: {
+                        url: 'https://example.com/docs',
+                        description: 'Full reference'
+                    }
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.externalDocs).toEqual({
+            url: 'https://example.com/docs',
+            description: 'Full reference'
+        });
+    });
+
+    it('emits externalDocs without description when description is absent', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({ externalDocs: { url: 'https://example.com' } })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.externalDocs).toEqual({ url: 'https://example.com' });
+        expect(op.externalDocs.description).toBeUndefined();
+    });
+
+    it('omits externalDocs when not set', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.externalDocs).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.2 Links
+// ---------------------------------------------------------------------------
+
+describe('links', () => {
+    it('emits raw string parameter links on the primary 2xx response', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    responseSchema: object({ id: number() }),
+                    links: {
+                        GetUser: {
+                            operationId: 'getUser',
+                            parameters: { userId: '$response.body#/id' }
+                        }
+                    }
+                })
+            ])
+        );
+        const links = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].links;
+        expect(links).toEqual({
+            GetUser: {
+                operationId: 'getUser',
+                parameters: { userId: '$response.body#/id' }
+            }
+        });
+    });
+
+    it('resolves descriptor-callback parameters to JSON Pointer expressions', () => {
+        const resp = object({ userId: number(), name: string() });
+        // Use the typed builder so `r` is inferred as PropertyRefTree<{ userId: number; name: string }>
+        const ep = endpoint
+            .get('/api/items')
+            .returns(resp)
+            .links({
+                GetUser: {
+                    operationId: 'getUser',
+                    parameters: r => ({ id: r.userId })
+                }
+            });
+        const spec = generateOpenApiSpec(
+            makeOptions([{ endpoint: ep.introspect(), handler: () => {} }])
+        );
+        const links = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ].links;
+        expect(links.GetUser.parameters).toEqual({
+            id: '$response.body#/userId'
+        });
+    });
+
+    it('omits links property when not set', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        const resp = (spec['paths'] as any)['/api/items']['get'].responses[
+            '200'
+        ];
+        expect(resp.links).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.3 Callbacks
+// ---------------------------------------------------------------------------
+
+describe('callbacks', () => {
+    it('emits callback with raw expression URL', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    callbacks: {
+                        onEvent: {
+                            expression: '{$request.body#/callbackUrl}',
+                            method: 'POST',
+                            summary: 'Event fired'
+                        }
+                    }
+                })
+            ])
+        );
+        const cbs = (spec['paths'] as any)['/api/items']['post'].callbacks;
+        expect(cbs).toBeDefined();
+        const pathItem = cbs['onEvent']['{$request.body#/callbackUrl}'];
+        expect(pathItem).toBeDefined();
+        expect(pathItem['post'].summary).toBe('Event fired');
+        expect(pathItem['post'].responses['200']).toEqual({
+            description: 'OK'
+        });
+    });
+
+    it('resolves urlFrom descriptor callback to expression', () => {
+        const bodySchema = object({ hookUrl: string() });
+        // Use the typed builder so `b` is inferred as PropertyRefTree<{ hookUrl: string }>
+        const ep = endpoint
+            .post('/api/items')
+            .body(bodySchema)
+            .callbacks({
+                onEvent: {
+                    urlFrom: b => b.hookUrl,
+                    method: 'POST'
+                }
+            });
+        const spec = generateOpenApiSpec(
+            makeOptions([{ endpoint: ep.introspect(), handler: () => {} }])
+        );
+        const cbs = (spec['paths'] as any)['/api/items']['post'].callbacks;
+        expect(cbs['onEvent']['{$request.body#/hookUrl}']).toBeDefined();
+    });
+
+    it('omits callbacks when not set', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.callbacks).toBeUndefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §3.1 Webhooks
+// ---------------------------------------------------------------------------
+
+describe('webhooks', () => {
+    it('emits webhooks map with body schema and default POST method', () => {
+        const bodySchema = object({ id: number(), email: string() });
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg()], {
+                webhooks: [
+                    {
+                        name: 'userCreated',
+                        summary: 'New user created',
+                        body: bodySchema
+                    }
+                ]
+            })
+        );
+        const webhook = (spec['webhooks'] as any)?.['userCreated'];
+        expect(webhook).toBeDefined();
+        expect(webhook['post']).toBeDefined();
+        expect(webhook['post'].summary).toBe('New user created');
+        expect(
+            webhook['post'].requestBody.content['application/json']
+        ).toBeDefined();
+        expect(webhook['post'].responses['200']).toEqual({
+            description: 'OK'
+        });
+    });
+
+    it('respects custom method on webhook', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg()], {
+                webhooks: [{ name: 'ping', method: 'GET' }]
+            })
+        );
+        const webhook = (spec['webhooks'] as any)?.['ping'];
+        expect(webhook?.['get']).toBeDefined();
+        expect(webhook?.['post']).toBeUndefined();
+    });
+
+    it('omits webhooks key when no webhooks provided', () => {
+        const spec = generateOpenApiSpec(makeOptions([makeReg()]));
+        expect(spec['webhooks']).toBeUndefined();
     });
 });
