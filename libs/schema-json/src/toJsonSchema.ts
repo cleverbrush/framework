@@ -243,6 +243,11 @@ function convertNode(
     if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
 
+    // Emit example value if set
+    if (info.example !== undefined) {
+        out['examples'] = [info.example];
+    }
+
     // Emit default for serializable primitives (not factory functions)
     if (
         info.hasDefault === true &&

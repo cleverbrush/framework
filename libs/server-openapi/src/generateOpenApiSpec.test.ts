@@ -39,6 +39,9 @@ function makeMeta(partial: Partial<EndpointMetadata> = {}): EndpointMetadata {
         deprecated: false,
         responseSchema: null,
         responsesSchemas: null,
+        example: null,
+        examples: null,
+        producesFile: null,
         ...partial
     };
 }
@@ -953,5 +956,183 @@ describe('discriminated union discriminator keyword', () => {
         expect(requestBodySchema).toEqual({
             $ref: '#/components/schemas/TreeNode'
         });
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.1 — .example() / .examples() on request body
+// ---------------------------------------------------------------------------
+
+describe('request body examples', () => {
+    it('emits example on the media type object from .example()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema: object({ name: string() }),
+                    example: { name: 'Widget' }
+                })
+            ])
+        );
+
+        const mediaType = (spec['paths'] as any)['/api/items']['post']
+            .requestBody.content['application/json'];
+        expect(mediaType.example).toEqual({ name: 'Widget' });
+        expect(mediaType.examples).toBeUndefined();
+    });
+
+    it('emits examples map on the media type object from .examples()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'POST',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    bodySchema: object({ name: string() }),
+                    examples: {
+                        minimal: { summary: 'Minimal', value: { name: 'A' } },
+                        full: {
+                            summary: 'Full',
+                            description: 'Complete payload',
+                            value: { name: 'B' }
+                        }
+                    }
+                })
+            ])
+        );
+
+        const mediaType = (spec['paths'] as any)['/api/items']['post']
+            .requestBody.content['application/json'];
+        expect(mediaType.examples).toEqual({
+            minimal: { summary: 'Minimal', value: { name: 'A' } },
+            full: {
+                summary: 'Full',
+                description: 'Complete payload',
+                value: { name: 'B' }
+            }
+        });
+        expect(mediaType.example).toBeUndefined();
+    });
+
+    it('schema-level .example() flows through to parameter schema', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    querySchema: object({ page: number().example(1) }) as any
+                })
+            ])
+        );
+
+        const params = (spec['paths'] as any)['/api/items']['get'].parameters;
+        const pageParam = params.find((p: any) => p.name === 'page');
+        expect(pageParam.schema.examples).toEqual([1]);
+    });
+
+    it('schema-level .example() flows through to response schema', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/items',
+                    responseSchema: object({
+                        id: number(),
+                        name: string()
+                    }).example({ id: 1, name: 'Widget' })
+                })
+            ])
+        );
+
+        const responseSchema = (spec['paths'] as any)['/api/items']['get']
+            .responses['200'].content['application/json'].schema;
+        expect(responseSchema.examples).toEqual([{ id: 1, name: 'Widget' }]);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// §2.2 — .producesFile() binary response
+// ---------------------------------------------------------------------------
+
+describe('binary file responses', () => {
+    it('emits application/octet-stream by default', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    producesFile: {}
+                })
+            ])
+        );
+
+        const response = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ];
+        expect(response.description).toBe('File download');
+        expect(response.content).toEqual({
+            'application/octet-stream': {
+                schema: { type: 'string', format: 'binary' }
+            }
+        });
+    });
+
+    it('emits custom content type', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    producesFile: {
+                        contentType: 'text/csv',
+                        description: 'CSV export'
+                    }
+                })
+            ])
+        );
+
+        const response = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ];
+        expect(response.description).toBe('CSV export');
+        expect(response.content).toEqual({
+            'text/csv': {
+                schema: { type: 'string', format: 'binary' }
+            }
+        });
+    });
+
+    it('producesFile takes precedence over .returns()', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    basePath: '/api',
+                    pathTemplate: '/export',
+                    responseSchema: object({ data: string() }),
+                    producesFile: {
+                        contentType: 'application/pdf',
+                        description: 'PDF report'
+                    }
+                })
+            ])
+        );
+
+        const response = (spec['paths'] as any)['/api/export']['get'].responses[
+            '200'
+        ];
+        expect(response.content).toEqual({
+            'application/pdf': {
+                schema: { type: 'string', format: 'binary' }
+            }
+        });
+        // Should NOT have application/json
+        expect(response.content['application/json']).toBeUndefined();
     });
 });

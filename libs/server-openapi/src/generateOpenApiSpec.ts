@@ -122,14 +122,25 @@ function buildParameterObject(
 
 function buildRequestBody(
     bodySchema: SchemaBuilder<any, any, any, any, any>,
-    registry: SchemaRegistry
+    registry: SchemaRegistry,
+    example?: unknown | null,
+    examples?: Record<
+        string,
+        { summary?: string; description?: string; value: unknown }
+    > | null
 ): Record<string, unknown> {
     const jsonSchema = convertSchema(bodySchema, registry);
     const bodyInfo = bodySchema.introspect() as any;
+    const mediaType: Record<string, unknown> = { schema: jsonSchema };
+    if (example != null) {
+        mediaType['example'] = example;
+    } else if (examples != null) {
+        mediaType['examples'] = examples;
+    }
     const body: Record<string, unknown> = {
         required: bodyInfo.isRequired !== false,
         content: {
-            'application/json': { schema: jsonSchema }
+            'application/json': mediaType
         }
     };
     if (typeof bodyInfo.description === 'string' && bodyInfo.description !== '')
@@ -169,8 +180,17 @@ function buildResponses(
 ): Record<string, unknown> {
     const result: Record<string, unknown> = {};
 
-    // Multi-code path — .responses() was called
-    if (meta.responsesSchemas) {
+    // Binary file response — takes precedence over JSON schema
+    if (meta.producesFile) {
+        const ct = meta.producesFile.contentType ?? 'application/octet-stream';
+        const desc = meta.producesFile.description ?? 'File download';
+        result['200'] = {
+            description: desc,
+            content: {
+                [ct]: { schema: { type: 'string', format: 'binary' } }
+            }
+        };
+    } else if (meta.responsesSchemas) {
         for (const [codeStr, schema] of Object.entries(meta.responsesSchemas)) {
             const code = Number(codeStr);
             const desc =
@@ -327,7 +347,12 @@ function buildOperation(
 
     // Request body
     if (meta.bodySchema) {
-        operation['requestBody'] = buildRequestBody(meta.bodySchema, registry);
+        operation['requestBody'] = buildRequestBody(
+            meta.bodySchema,
+            registry,
+            meta.example,
+            meta.examples
+        );
     }
 
     // Responses

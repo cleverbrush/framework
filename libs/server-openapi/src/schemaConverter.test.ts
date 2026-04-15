@@ -54,4 +54,14 @@ describe('schemaConverter', () => {
         const result = convertSchema(string().default(() => 'x'));
         expect(result).not.toHaveProperty('default');
     });
+
+    // --- Example values ---
+
+    it('emits examples array from .example()', () => {
+        const result = convertSchema(string().example('user@example.com'));
+        expect(result).toEqual({
+            type: 'string',
+            examples: ['user@example.com']
+        });
+    });
 });

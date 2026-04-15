@@ -1001,6 +1001,28 @@ console.log(info.hasDefault);    // true
 console.log(info.defaultValue);  // 'hello'
 ```
 
+## Examples
+
+Attach example values to any schema with `.example(value)`. The example is typed to the schema's result type, so the compiler catches mismatches. Examples are purely metadata — validation is unaffected.
+
+```typescript
+import { string, number, object } from '@cleverbrush/schema';
+
+const Email = string().example('user@example.com');
+const Age   = number().example(30);
+
+const User  = object({
+    email: Email,
+    age:   Age,
+}).example({ email: 'alice@example.com', age: 25 });
+```
+
+Examples are exposed via `.introspect()` and consumed by `@cleverbrush/schema-json` (emitted as the JSON Schema `examples` keyword) and `@cleverbrush/server-openapi` (pre-fills parameter and response schemas in generated specs).
+
+```typescript
+Email.introspect().example; // 'user@example.com'
+```
+
 ## Catch / Fallback
 
 Every schema builder supports `.catch(value)`. When validation **fails for any reason** — wrong type, constraint violation, missing required value — the fallback is returned as a successful result instead of errors.

@@ -649,3 +649,35 @@ test('toJsonSchema - 56: self-referential tree emits $ref for recursive children
         $ref: '#/components/schemas/TreeNode'
     });
 });
+
+// ---------------------------------------------------------------------------
+// .example() emission
+// ---------------------------------------------------------------------------
+
+test('57. string schema with .example() emits examples array', () => {
+    const schema = string().example('hello@example.com');
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        type: 'string',
+        examples: ['hello@example.com']
+    });
+});
+
+test('58. number schema with .example() emits examples array', () => {
+    const schema = number().example(42);
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        type: 'integer',
+        examples: [42]
+    });
+});
+
+test('59. object schema with .example() emits examples array', () => {
+    const schema = object({
+        name: string(),
+        age: number()
+    }).example({ name: 'Alice', age: 30 });
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result.type).toBe('object');
+    expect(result.examples).toEqual([{ name: 'Alice', age: 30 }]);
+});

@@ -12,6 +12,8 @@ OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Con
 - **Path resolution** — converts both colon-style paths (`:id`) and `ParseStringSchemaBuilder` templates to OpenAPI `{param}` format with per-parameter schemas.
 - **Security mapping** — translates `@cleverbrush/auth` authentication schemes to OpenAPI `securitySchemes`; maps per-endpoint `authorize()` to `security` arrays.
 - **Top-level tags** — pass `tags: [{ name, description?, externalDocs? }]` to `OpenApiOptions`; tag names are also auto-collected from endpoint registrations.
+- **Request body examples** — emit `example` / `examples` on Media Type Objects via `.example()` and `.examples()` on `EndpointBuilder`. Schema-level examples propagate automatically.
+- **Binary / file responses** — `.producesFile(contentType?, description?)` emits binary content types instead of JSON schemas for file download endpoints.
 - **`serveOpenApi()`** — middleware that lazily generates and caches the spec; serves it at a configurable path (default: `/openapi.json`).
 - **`createOpenApiEndpoint()`** — returns a typed endpoint + handler pair for use with `ServerBuilder.handle()`.
 - **CLI / build script** — `writeOpenApiSpec()` writes the spec to a file.
@@ -227,6 +229,81 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/TreeNode' }
 ```
+
+## Request Body Examples
+
+Pre-fill the **Try it out** panel in Swagger UI by attaching examples to endpoints.
+
+### Single example
+
+```ts
+const CreateUser = endpoint
+    .post('/api/users')
+    .body(UserSchema)
+    .example({ name: 'Alice', email: 'alice@example.com' });
+```
+
+Emits `example` on the OpenAPI Media Type Object:
+
+```yaml
+requestBody:
+  content:
+    application/json:
+      schema: { ... }
+      example: { name: Alice, email: alice@example.com }
+```
+
+### Named examples
+
+```ts
+const CreateUser = endpoint
+    .post('/api/users')
+    .body(UserSchema)
+    .examples({
+        minimal: { summary: 'Minimal', value: { name: 'Alice' } },
+        full: {
+            summary: 'Complete',
+            description: 'A fully populated user',
+            value: { name: 'Alice', email: 'alice@example.com', age: 30 }
+        }
+    });
+```
+
+### Schema-level examples
+
+Examples attached directly to schemas via `.example()` propagate to parameter and response schemas in the generated spec:
+
+```ts
+const PageParam = number().example(1);
+const UserResponse = object({ id: number(), name: string() }).example({ id: 1, name: 'Alice' });
+```
+
+## Binary / File Responses
+
+Use `.producesFile()` to declare that an endpoint returns a binary file instead of JSON. The generated spec emits the appropriate binary content type.
+
+```ts
+const ExportCsv = endpoint
+    .get('/api/export')
+    .producesFile('text/csv', 'CSV export');
+
+const Download = endpoint
+    .get('/api/download')
+    .producesFile(); // defaults to application/octet-stream
+```
+
+Produces:
+
+```yaml
+responses:
+  '200':
+    description: CSV export
+    content:
+      text/csv:
+        schema: { type: string, format: binary }
+```
+
+When both `.returns()` and `.producesFile()` are set, the binary response takes precedence.
 
 ## Authentication & Security Schemes
 

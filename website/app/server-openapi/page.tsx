@@ -329,6 +329,68 @@ const treeNode: ReturnType<typeof object> = object({
                     </pre>
                 </div>
 
+                {/* ── Request Body Examples ────────────────────────── */}
+                <div className="card">
+                    <h2>Request Body Examples</h2>
+                    <p>
+                        Pre-fill the <strong>Try it out</strong> panel in
+                        Swagger UI by attaching examples to endpoints:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const CreateUser = endpoint
+    .post('/api/users')
+    .body(UserSchema)
+    .example({ name: 'Alice', email: 'alice@example.com' });
+
+// Or provide named examples:
+const CreateItem = endpoint
+    .post('/api/items')
+    .body(ItemSchema)
+    .examples({
+        minimal: { summary: 'Minimal', value: { name: 'Widget' } },
+        full: { summary: 'Complete', value: { name: 'Widget', price: 9.99 } }
+    });`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Schema-level examples set via{' '}
+                        <code>.example(value)</code> propagate to parameter and
+                        response schemas automatically.
+                    </p>
+                </div>
+
+                {/* ── File Download Responses ─────────────────────── */}
+                <div className="card">
+                    <h2>File Download Responses</h2>
+                    <p>
+                        Declare binary file responses with{' '}
+                        <code>.producesFile()</code> — the generated spec emits
+                        the correct binary content type instead of a JSON
+                        schema:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const ExportCsv = endpoint
+    .get('/api/export')
+    .producesFile('text/csv', 'CSV export');
+
+const Download = endpoint
+    .get('/api/download')
+    .producesFile(); // defaults to application/octet-stream`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        When both <code>.returns()</code> and{' '}
+                        <code>.producesFile()</code> are set, the binary
+                        response takes precedence.
+                    </p>
+                </div>
+
                 {/* ── Tags ─────────────────────────────────────────── */}
                 <div className="card">
                     <h2>Top-Level Tags with Descriptions</h2>

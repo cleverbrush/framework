@@ -154,6 +154,8 @@ function toJsonSchema(
 
 Descriptions set via `.describe(text)` are emitted as the `description` field on the corresponding JSON Schema node (including nested object properties).
 
+Examples set via `.example(value)` are emitted as the `examples` array on the corresponding JSON Schema node.
+
 #### Discriminated unions
 
 When a `union()` is a **discriminated union** — all branches are objects sharing a required property with unique literal values — `toJsonSchema()` automatically emits the `discriminator` keyword alongside `anyOf`:

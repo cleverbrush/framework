@@ -119,4 +119,64 @@ describe('EndpointBuilder .returns() schema storage', () => {
         expect(meta.querySchema).not.toBeNull();
         expect(meta.responseSchema).toBe(responseSchema);
     });
+
+    // --- .example() / .examples() / .producesFile() ---
+
+    it('.example() stores value and chains', () => {
+        const ep = endpoint
+            .post('/api/items')
+            .body(object({ name: string() }))
+            .example({ name: 'Widget' });
+
+        const meta = ep.introspect();
+        expect(meta.example).toEqual({ name: 'Widget' });
+    });
+
+    it('.examples() stores map and chains', () => {
+        const examples = {
+            minimal: { summary: 'Minimal', value: { name: 'A' } },
+            full: {
+                summary: 'Full',
+                description: 'A complete example',
+                value: { name: 'B' }
+            }
+        };
+        const ep = endpoint
+            .post('/api/items')
+            .body(object({ name: string() }))
+            .examples(examples);
+
+        const meta = ep.introspect();
+        expect(meta.examples).toEqual(examples);
+    });
+
+    it('.producesFile() stores metadata and chains', () => {
+        const ep = endpoint
+            .get('/api/export')
+            .producesFile('text/csv', 'CSV export');
+
+        const meta = ep.introspect();
+        expect(meta.producesFile).toEqual({
+            contentType: 'text/csv',
+            description: 'CSV export'
+        });
+    });
+
+    it('.producesFile() defaults to no contentType when called without args', () => {
+        const ep = endpoint.get('/api/download').producesFile();
+
+        const meta = ep.introspect();
+        expect(meta.producesFile).toEqual({
+            contentType: undefined,
+            description: undefined
+        });
+    });
+
+    it('example/examples/producesFile default to null in introspect', () => {
+        const ep = endpoint.get('/api/health');
+        const meta = ep.introspect();
+        expect(meta.example).toBeNull();
+        expect(meta.examples).toBeNull();
+        expect(meta.producesFile).toBeNull();
+    });
 });

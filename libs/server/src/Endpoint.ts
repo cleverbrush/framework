@@ -239,6 +239,27 @@ export interface EndpointMetadata {
         number,
         SchemaBuilder<any, any, any, any, any> | null
     > | null;
+    /**
+     * A single example value for the request body, emitted as `example` on the
+     * OpenAPI Media Type Object.
+     */
+    readonly example: unknown | null;
+    /**
+     * A map of named examples for the request body, emitted as `examples` on the
+     * OpenAPI Media Type Object. Each entry follows the OpenAPI Example Object shape.
+     */
+    readonly examples: Record<
+        string,
+        { summary?: string; description?: string; value: unknown }
+    > | null;
+    /**
+     * When set, the endpoint produces a binary file response instead of JSON.
+     * The OpenAPI spec will emit the appropriate binary content type.
+     */
+    readonly producesFile: {
+        contentType?: string;
+        description?: string;
+    } | null;
 }
 
 /**
@@ -319,6 +340,15 @@ export class EndpointBuilder<
         number,
         SchemaBuilder<any, any, any, any, any> | null
     > | null;
+    readonly #example: unknown | null;
+    readonly #examples: Record<
+        string,
+        { summary?: string; description?: string; value: unknown }
+    > | null;
+    readonly #producesFile: {
+        contentType?: string;
+        description?: string;
+    } | null;
 
     constructor(
         method: string,
@@ -357,7 +387,16 @@ export class EndpointBuilder<
         responsesSchemas: Record<
             number,
             SchemaBuilder<any, any, any, any, any> | null
-        > | null = null
+        > | null = null,
+        example: unknown | null = null,
+        examples: Record<
+            string,
+            { summary?: string; description?: string; value: unknown }
+        > | null = null,
+        producesFile: {
+            contentType?: string;
+            description?: string;
+        } | null = null
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -374,6 +413,9 @@ export class EndpointBuilder<
         this.#deprecated = deprecated;
         this.#responseSchema = responseSchema;
         this.#responsesSchemas = responsesSchemas;
+        this.#example = example;
+        this.#examples = examples;
+        this.#producesFile = producesFile;
     }
 
     /** Define the request body schema. Validation failures return 422 Problem Details. */
@@ -405,7 +447,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -440,7 +485,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -475,7 +523,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -510,7 +561,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -594,7 +648,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -653,7 +710,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             schema ?? this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -712,7 +772,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            map
+            map,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -745,7 +808,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -778,7 +844,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -811,7 +880,10 @@ export class EndpointBuilder<
             this.#operationId,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -844,7 +916,10 @@ export class EndpointBuilder<
             id,
             this.#deprecated,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
         );
     }
 
@@ -875,7 +950,144 @@ export class EndpointBuilder<
             this.#operationId,
             true,
             this.#responseSchema,
-            this.#responsesSchemas
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile
+        );
+    }
+
+    /**
+     * Provide a single example value for the request body.
+     *
+     * Emitted as the `example` field on the OpenAPI Media Type Object
+     * (`application/json`). Pre-fills the "Try it out" panel in Swagger UI.
+     *
+     * @param value - An example request body value.
+     */
+    example(
+        value: TBody
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            value,
+            this.#examples,
+            this.#producesFile
+        );
+    }
+
+    /**
+     * Provide named examples for the request body.
+     *
+     * Each entry is emitted under the `examples` map of the OpenAPI Media Type
+     * Object following the Example Object shape (`{ summary?, description?, value }`).
+     *
+     * @param map - A record of named examples.
+     */
+    examples(
+        map: Record<
+            string,
+            { summary?: string; description?: string; value: TBody }
+        >
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            map,
+            this.#producesFile
+        );
+    }
+
+    /**
+     * Declare that this endpoint produces a binary file response.
+     *
+     * When set, the OpenAPI spec emits a binary content type instead of a JSON
+     * schema for the success response. Takes precedence over `.returns()`.
+     *
+     * @param contentType - MIME type (default: `'application/octet-stream'`).
+     * @param description - Optional response description for the spec.
+     */
+    producesFile(
+        contentType?: string,
+        description?: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            { contentType, description }
         );
     }
 
@@ -896,7 +1108,10 @@ export class EndpointBuilder<
             operationId: this.#operationId,
             deprecated: this.#deprecated,
             responseSchema: this.#responseSchema,
-            responsesSchemas: this.#responsesSchemas
+            responsesSchemas: this.#responsesSchemas,
+            example: this.#example,
+            examples: this.#examples,
+            producesFile: this.#producesFile
         };
     }
 }
@@ -945,6 +1160,9 @@ function createEndpoint(
         meta?.tags ?? [],
         meta?.operationId ?? null,
         meta?.deprecated ?? false,
+        null,
+        null,
+        null,
         null,
         null
     );

@@ -29,7 +29,7 @@ These items only touch `libs/schema-json` and `libs/server-openapi`. High impact
 - **Where**: `libs/server-openapi/src/schemaConverter.test.ts`
 - **Impact**: Low-effort confidence boost; uncovers any silent gaps.
 
-### 1.4 Top-level tags with descriptions
+### 1.4 Top-level tags with descriptions - DONE
 
 - **What**: OpenAPI supports a top-level `tags` array with `name`, `description`, and optional `externalDocs`. Currently only operation-level tag strings are emitted; there is no way to attach a description to a tag group.
 - **Where**: `libs/server-openapi/src/generateOpenApiSpec.ts` — add an optional `tags` field to `OpenApiOptions` (array of `{ name, description?, externalDocs? }`). Emit as the top-level `tags` array. Auto-collect unique tag names from registered endpoints as a fallback.
@@ -48,7 +48,7 @@ These items only touch `libs/schema-json` and `libs/server-openapi`. High impact
 
 These items require new metadata fields on `EndpointBuilder` / `EndpointMetadata` in `libs/server/src/Endpoint.ts` and corresponding consumers in `libs/server-openapi`.
 
-### 2.1 `.example()` / `.examples()` on endpoints and schemas
+### 2.1 `.example()` / `.examples()` on endpoints and schemas - DONE
 
 - **Server**: Add `.example(value)` and `.examples(Record<string, { summary?, value }>)` to `EndpointBuilder`. Store in `EndpointMetadata`.
 - **Schema**: Add `.example(value)` to `SchemaBuilder` base; store in `introspect()` output so it propagates through parameter and body schema conversion.
@@ -56,7 +56,7 @@ These items require new metadata fields on `EndpointBuilder` / `EndpointMetadata
 - **Files**: `libs/server/src/Endpoint.ts`, `libs/schema/src/SchemaBuilder.ts`, `libs/server-openapi/src/generateOpenApiSpec.ts`
 - **Impact**: Self-documenting APIs; Swagger UI "Try it out" gets pre-filled values without manual editing.
 
-### 2.2 Binary / file / stream response metadata
+### 2.2 Binary / file / stream response metadata - DONE
 
 - **Server**: Add `.producesFile(contentType?, description?)` to `EndpointBuilder`. Store in metadata.
 - **OpenAPI**: When file metadata is present, emit `content: { 'application/octet-stream': { schema: { type: 'string', format: 'binary' } } }` rather than a JSON schema entry.
