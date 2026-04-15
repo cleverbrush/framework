@@ -97,7 +97,7 @@ When the same schema definition is used by multiple endpoints, you can mark it w
 3. `generateOpenApiSpec()` detects all named schemas via a pre-pass walk, emits them under `components.schemas`, and replaces inline definitions with `$ref` pointers.
 
 ```ts
-import { object, string, number } from '@cleverbrush/schema';
+import { object, string, number, array } from '@cleverbrush/schema';
 import { endpoint } from '@cleverbrush/server';
 import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
 
