@@ -177,6 +177,77 @@ await writeOpenApiSpec({
                     </pre>
                 </div>
 
+                {/* ── $ref Deduplication ───────────────────────────── */}
+                <div className="card">
+                    <h2>
+                        <code>$ref</code> Deduplication — Named Schemas
+                    </h2>
+                    <p>
+                        Call <code>.schemaName(&apos;Name&apos;)</code> on any{' '}
+                        <code>@cleverbrush/schema</code> builder to mark it as a
+                        named component. <code>generateOpenApiSpec()</code>{' '}
+                        automatically extracts all named schemas into{' '}
+                        <code>components/schemas</code> and replaces every
+                        inline occurrence with a <code>$ref</code> pointer —
+                        eliminating repetition and producing cleaner specs.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(
+                                    `import { object, string, number, array } from '@cleverbrush/schema';
+import { endpoint } from '@cleverbrush/server';
+import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
+
+// Export as a constant — reuse the same reference everywhere
+export const UserSchema = object({
+    id:   number(),
+    name: string().nonempty(),
+}).schemaName('User');
+
+const GetUser   = endpoint.get('/api/users/:id').returns(UserSchema);
+const ListUsers = endpoint.get('/api/users').returns(array(UserSchema));
+
+const spec = generateOpenApiSpec({
+    registrations: [GetUser.registration, ListUsers.registration],
+    info: { title: 'My API', version: '1.0.0' },
+});
+
+// ✅ UserSchema is emitted ONCE under components.schemas.User
+// ✅ Both endpoints receive { "$ref": "#/components/schemas/User" }
+//    instead of repeating the full inline definition`
+                                )
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Nested named schemas inside request bodies and response
+                        objects are resolved automatically too:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(
+                                    `const AddressSchema = object({
+    street: string(),
+    city:   string(),
+}).schemaName('Address');
+
+// Wrapper is anonymous → inlined; nested Address → $ref
+const CreateUserBody = object({ address: AddressSchema, name: string() });`
+                                )
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        <strong>Conflict rule:</strong> registering two{' '}
+                        <em>different</em> schema instances under the same name
+                        throws during spec generation. Always export named
+                        schemas as constants and share the same object
+                        reference.
+                    </p>
+                </div>
+
                 {/* ── Auth ─────────────────────────────────────────── */}
                 <div className="card">
                     <h2>Security Schemes from Auth Config</h2>

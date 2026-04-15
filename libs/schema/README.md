@@ -1091,6 +1091,50 @@ console.log(schema.introspect().isReadonly); // true
 
 > **Note:** `.readonly()` is **shallow** — only top-level object properties or the array itself are marked readonly. For deeply nested immutability consider applying `.readonly()` at each level, or use a `DeepReadonly` utility type post-validation.
 
+## schemaName
+
+Every schema builder supports `.schemaName(name)`. This is a **metadata-only** modifier — it attaches a component name to the schema for use by OpenAPI tooling. It has no effect on validation or type inference.
+
+```typescript
+import { object, string, number } from '@cleverbrush/schema';
+
+export const UserSchema = object({
+    id:   number(),
+    name: string(),
+}).schemaName('User');
+
+// Accessible at runtime
+UserSchema.introspect().schemaName; // 'User'
+```
+
+Chains naturally with all other modifiers:
+
+```typescript
+const ProductSchema = object({
+    sku:   string().nonempty(),
+    price: number().min(0),
+})
+    .schemaName('Product')
+    .describe('A product in the catalogue');
+```
+
+When used with [`@cleverbrush/server-openapi`](../server-openapi), any schema that carries a `schemaName` is automatically extracted into `components/schemas` and all usages in the document are replaced with `$ref` pointers — eliminating repeated inline definitions:
+
+```typescript
+import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
+
+// UserSchema is emitted once under components.schemas.User
+// Every endpoint that references it gets:  { $ref: '#/components/schemas/User' }
+generateOpenApiSpec({ registrations, info: { title: 'My API', version: '1.0.0' } });
+```
+
+> **Name uniqueness:** Registering two *different* schema instances under the same name throws an error. Always export named schemas as constants and reuse the same reference everywhere.
+
+| Method / Property | Signature | Notes |
+|---|---|---|
+| `.schemaName(name)` | `schemaName(name: string): this` | Returns a new builder; original is unchanged |
+| `.introspect().schemaName` | `string \| undefined` | The name passed to `.schemaName()`, or `undefined` |
+
 ## Describe
 
 Every schema builder supports `.describe(text)`. This is a **metadata-only** modifier — it stores a human-readable description on the schema at runtime with no effect on validation.

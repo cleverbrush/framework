@@ -7,7 +7,18 @@ function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
+function escapeJsonPointerSegment(s: string): string {
+    return s.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
+type Resolver =
+    | ((schema: SchemaBuilder<any, any, any>) => string | null)
+    | undefined;
+
+function convertNodeInner(
+    schema: SchemaBuilder<any, any, any>,
+    resolver: Resolver
+): Out {
     const info = schema.introspect() as any;
     const ext: Record<string, unknown> = info.extensions ?? {};
     const readOnly: Out = info.isReadonly === true ? { readOnly: true } : {};
@@ -84,7 +95,7 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
         case 'array': {
             const out: Out = { ...readOnly, type: 'array' };
             if (info.elementSchema)
-                out['items'] = convertNode(info.elementSchema);
+                out['items'] = convertNode(info.elementSchema, resolver);
             if (info.minLength !== undefined) out['minItems'] = info.minLength;
             if (info.maxLength !== undefined) out['maxItems'] = info.maxLength;
             if (ext['nonempty'] === true && out['minItems'] === undefined)
@@ -97,11 +108,11 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 info.elements ?? [];
             const out: Out = {
                 type: 'array',
-                prefixItems: elements.map(convertNode),
+                prefixItems: elements.map(e => convertNode(e, resolver)),
                 minItems: elements.length
             };
             if (info.restSchema) {
-                out['items'] = convertNode(info.restSchema);
+                out['items'] = convertNode(info.restSchema, resolver);
             } else {
                 out['items'] = false;
                 out['maxItems'] = elements.length;
@@ -118,7 +129,7 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 const outProps: Record<string, unknown> = {};
                 const required: string[] = [];
                 for (const [key, propSchema] of Object.entries(props)) {
-                    outProps[key] = convertNode(propSchema);
+                    outProps[key] = convertNode(propSchema, resolver);
                     if ((propSchema.introspect() as any).isRequired !== false)
                         required.push(key);
                 }
@@ -152,7 +163,10 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 }
             }
             if (allConst) return { ...readOnly, enum: enumValues };
-            return { ...readOnly, anyOf: options.map(convertNode) };
+            return {
+                ...readOnly,
+                anyOf: options.map(o => convertNode(o, resolver))
+            };
         }
 
         default:
@@ -160,8 +174,19 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
     }
 }
 
-function convertNode(schema: SchemaBuilder<any, any, any>): Out {
-    const out = convertNodeInner(schema);
+function convertNode(
+    schema: SchemaBuilder<any, any, any>,
+    resolver: Resolver
+): Out {
+    if (resolver) {
+        const name = resolver(schema);
+        if (typeof name === 'string' && name.length > 0) {
+            return {
+                $ref: `#/components/schemas/${escapeJsonPointerSegment(name)}`
+            };
+        }
+    }
+    const out = convertNodeInner(schema, resolver);
     const info = schema.introspect() as any;
     if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
@@ -264,7 +289,7 @@ export function toJsonSchema(
     schema: SchemaBuilder<any, any, any>,
     opts?: ToJsonSchemaOptions
 ): Record<string, unknown> {
-    const body = convertNode(schema);
+    const body = convertNode(schema, opts?.nameResolver);
     if (opts?.$schema === false) return body;
     const draft = opts?.draft ?? '2020-12';
     const uri =

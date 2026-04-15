@@ -27,7 +27,13 @@ export const SECTION_GROUPS = [
     },
     {
         label: 'Modifiers',
-        slugs: ['default-values', 'catch-fallback', 'readonly', 'describe']
+        slugs: [
+            'default-values',
+            'catch-fallback',
+            'readonly',
+            'describe',
+            'schema-name'
+        ]
     },
     {
         label: 'Extensions',
@@ -91,6 +97,7 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
     { slug: 'catch-fallback', title: 'Catch / Fallback', group: 'Modifiers' },
     { slug: 'readonly', title: 'Readonly Modifier', group: 'Modifiers' },
     { slug: 'describe', title: 'Describe', group: 'Modifiers' },
+    { slug: 'schema-name', title: 'schemaName', group: 'Modifiers' },
     { slug: 'extensions', title: 'Extensions', group: 'Extensions' },
     {
         slug: 'built-in-extensions',

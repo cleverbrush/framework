@@ -484,3 +484,147 @@ describe('generateOpenApiSpec', () => {
         expect(paths['/api/posts']['post']).toBeDefined();
     });
 });
+
+// ---------------------------------------------------------------------------
+// $ref / component schema deduplication via .schemaName()
+// ---------------------------------------------------------------------------
+
+describe('generateOpenApiSpec — $ref deduplication', () => {
+    it('emits components.schemas entry for a named response schema', () => {
+        const UserSchema = object({ id: number(), name: string() }).schemaName(
+            'User'
+        );
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg({ responseSchema: UserSchema })])
+        );
+        const components = spec['components'] as any;
+        expect(components).toBeDefined();
+        expect(components['schemas']['User']).toMatchObject({ type: 'object' });
+    });
+
+    it('emits $ref in operation response when schema is named', () => {
+        const UserSchema = object({ id: number() }).schemaName('User');
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg({ responseSchema: UserSchema })])
+        );
+        const paths = spec['paths'] as any;
+        const content =
+            paths['/api/items']['get']['responses']['200']['content'];
+        expect(content['application/json']['schema']).toEqual({
+            $ref: '#/components/schemas/User'
+        });
+    });
+
+    it('shares a single components.schemas entry across two endpoints', () => {
+        const UserSchema = object({ id: number() }).schemaName('User');
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    basePath: '/api',
+                    pathTemplate: '/users',
+                    method: 'GET',
+                    responseSchema: UserSchema
+                }),
+                makeReg({
+                    basePath: '/api',
+                    pathTemplate: '/admin/user',
+                    method: 'GET',
+                    responseSchema: UserSchema
+                })
+            ])
+        );
+        const schemas = (spec['components'] as any)['schemas'];
+        expect(Object.keys(schemas)).toEqual(['User']);
+
+        const paths = spec['paths'] as any;
+        const ref1 =
+            paths['/api/users']['get']['responses']['200']['content'][
+                'application/json'
+            ]['schema'];
+        const ref2 =
+            paths['/api/admin/user']['get']['responses']['200']['content'][
+                'application/json'
+            ]['schema'];
+        expect(ref1).toEqual({ $ref: '#/components/schemas/User' });
+        expect(ref2).toEqual({ $ref: '#/components/schemas/User' });
+    });
+
+    it('inlines unnamed schemas as before', () => {
+        const AnonSchema = object({ val: string() });
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg({ responseSchema: AnonSchema })])
+        );
+        const paths = spec['paths'] as any;
+        const schema =
+            paths['/api/items']['get']['responses']['200']['content'][
+                'application/json'
+            ]['schema'];
+        expect(schema).toMatchObject({ type: 'object' });
+        expect(schema).not.toHaveProperty('$ref');
+        // No components.schemas when everything is inline + no security
+        const components = spec['components'] as any;
+        expect(components?.schemas).toBeUndefined();
+    });
+
+    it('emits $ref for a named schema nested inside the body', () => {
+        const AddressSchema = object({ city: string() }).schemaName('Address');
+        const CreateUserBody = object({ address: AddressSchema });
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg({ bodySchema: CreateUserBody })])
+        );
+        const schemas = (spec['components'] as any)['schemas'];
+        expect(schemas['Address']).toMatchObject({ type: 'object' });
+
+        const paths = spec['paths'] as any;
+        const bodySchema =
+            paths['/api/items']['get']['requestBody']['content'][
+                'application/json'
+            ]['schema'];
+        // The top-level body is anonymous — inlined
+        expect(bodySchema['properties']['address']).toEqual({
+            $ref: '#/components/schemas/Address'
+        });
+    });
+
+    it('throws when two different schema instances share a name', () => {
+        const A = object({ x: string() }).schemaName('Conflict');
+        const B = object({ y: number() }).schemaName('Conflict');
+        expect(() =>
+            generateOpenApiSpec(
+                makeOptions([
+                    makeReg({
+                        basePath: '/api',
+                        pathTemplate: '/a',
+                        responseSchema: A
+                    }),
+                    makeReg({
+                        basePath: '/api',
+                        pathTemplate: '/b',
+                        responseSchema: B
+                    })
+                ])
+            )
+        ).toThrow(/Conflict/);
+    });
+
+    it('handles the same named schema in body and response without error', () => {
+        const UserSchema = object({ id: number() }).schemaName('User');
+        expect(() =>
+            generateOpenApiSpec(
+                makeOptions([
+                    makeReg({
+                        bodySchema: UserSchema,
+                        responseSchema: UserSchema
+                    })
+                ])
+            )
+        ).not.toThrow();
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({ bodySchema: UserSchema, responseSchema: UserSchema })
+            ])
+        );
+        const schemas = (spec['components'] as any)['schemas'];
+        expect(Object.keys(schemas)).toEqual(['User']);
+    });
+});

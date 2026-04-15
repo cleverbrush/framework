@@ -405,7 +405,22 @@ const spec = toJsonSchema(ProductSchema);
 const openApiSchema = toJsonSchema(ProductSchema, { $schema: false });
 
 // Use Draft 07 format
-const draft7Schema = toJsonSchema(ProductSchema, { draft: '07' });`
+const draft7Schema = toJsonSchema(ProductSchema, { draft: '07' });
+
+// Use nameResolver to emit $ref pointers for named component schemas
+// (used internally by @cleverbrush/server-openapi — see SchemaRegistry)
+const registry = new Map([['Product', ProductSchema]]);
+const withRefs = toJsonSchema(ProductSchema, {
+    $schema: false,
+    nameResolver: (schema) => {
+        for (const [name, s] of registry) {
+            if (s === schema) return name;
+        }
+        return null;
+    },
+});
+// Instead of inlining, nodes matching a registry entry become:
+// { "$ref": "#/components/schemas/Product" }`
                                 )
                             }}
                         />
@@ -531,6 +546,20 @@ type B = JsonSchemaNodeToBuilder<typeof S>;
                                         <code>format</code> omitted in{' '}
                                         <code>toJsonSchema</code> output; no
                                         single JSON Schema keyword covers both
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>nameResolver</code> +{' '}
+                                        <code>$ref</code> round-trip
+                                    </td>
+                                    <td>
+                                        <code>nameResolver</code> emits{' '}
+                                        <code>$ref</code> pointers based on an
+                                        external registry;{' '}
+                                        <code>fromJsonSchema</code> does not
+                                        resolve <code>$ref</code> — they fall
+                                        back to <code>any()</code>
                                     </td>
                                 </tr>
                             </tbody>

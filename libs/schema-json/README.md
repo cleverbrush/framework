@@ -159,6 +159,7 @@ Descriptions set via `.describe(text)` are emitted as the `description` field on
 | --- | --- | --- | --- |
 | `draft` | `'2020-12' \| '07'` | `'2020-12'` | JSON Schema draft version for the `$schema` URI |
 | `$schema` | `boolean` | `true` | Whether to include the `$schema` header in the output |
+| `nameResolver` | `(schema: SchemaBuilder) => string \| null` | `undefined` | Called for every node before conversion. Return a non-null string to emit `{ $ref: '#/components/schemas/<name>' }` instead of an inline schema. Used by `@cleverbrush/server-openapi` to wire named schemas from `.schemaName()` into `$ref` pointers. |
 
 ```ts
 // Embed in OpenAPI (suppress the $schema header)
@@ -221,3 +222,4 @@ type B = JsonSchemaNodeToBuilder<typeof S>;
 | `allOf` in `fromJsonSchema` | Falls back to `SchemaBuilder<unknown>` (no deep merge) |
 | Dual IP format (`ip()` with both v4 + v6) | `format` is omitted in `toJsonSchema` output (no standard keyword covers both) |
 | JSDoc comments on properties | Not preserved in `toJsonSchema` output |
+| `nameResolver` + `$ref` / `$defs` round-trip | `nameResolver` emits `$ref` pointers based on external registry; `fromJsonSchema` does not resolve `$ref` references — they fall back to `any()` |
