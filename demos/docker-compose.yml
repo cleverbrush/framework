@@ -56,7 +56,7 @@ services:
   swagger-ui:
     image: swaggerapi/swagger-ui:latest
     environment:
-      URL: http://localhost:${APP_PORT:-3000}/api/openapi.json
+      URL: http://localhost:${APP_PORT:-3000}/openapi.json
       DISPLAY_OPERATION_ID: "true"
     ports:
       - "${SWAGGER_PORT:-8090}:8080"

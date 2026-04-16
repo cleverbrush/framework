@@ -1,6 +1,6 @@
 {
     "name": "@cleverbrush/todo-shared",
-    "version": "0.0.0-beta-20260416104918",
+    "version": "0.0.0-beta-20260416114445",
     "description": "Shared API schemas and types for the todo demonstrator (backend + frontend)",
     "type": "module",
     "main": "./src/index.ts",
@@ -13,7 +13,7 @@
     },
     "sideEffects": false,
     "dependencies": {
-        "@cleverbrush/schema": "0.0.0-beta-20260416104918"
+        "@cleverbrush/schema": "0.0.0-beta-20260416114445"
     },
     "devDependencies": {
         "typescript": "^6.0.2"
