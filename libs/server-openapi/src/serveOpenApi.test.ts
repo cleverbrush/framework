@@ -119,4 +119,37 @@ describe('serveOpenApi', () => {
         expect(headers['content-length']).toBeDefined();
         expect(Number(headers['content-length'])).toBeGreaterThan(0);
     });
+
+    it('derives registrations and authConfig from server option', async () => {
+        const mw = serveOpenApi({
+            server: {
+                getRegistrations: () => [] as EndpointRegistration[],
+                getAuthenticationConfig: () => ({
+                    defaultScheme: 'jwt',
+                    schemes: [
+                        {
+                            name: 'jwt',
+                            authenticate: () => ({} as any),
+                            challenge: () => ({
+                                headerName: 'WWW-Authenticate',
+                                headerValue: 'Bearer'
+                            })
+                        }
+                    ]
+                }),
+                getWebhooks: () => []
+            },
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        const ctx = makeContext('GET', '/openapi.json');
+        await mw(ctx as any, vi.fn());
+
+        const body = (ctx.response.end as any).mock.calls[0][0];
+        const parsed = JSON.parse(body);
+        expect(parsed.components?.securitySchemes?.jwt).toEqual({
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT'
+        });
+    });
 });

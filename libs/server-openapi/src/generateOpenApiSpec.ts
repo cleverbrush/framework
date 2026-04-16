@@ -19,6 +19,21 @@ import {
 } from './securityMapper.js';
 
 // ---------------------------------------------------------------------------
+// Server interface (structural — avoids hard dependency on ServerBuilder class)
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal interface for a `@cleverbrush/server` server instance. Matches
+ * the relevant subset of `ServerBuilder` so that callers can pass the
+ * server directly without importing the class.
+ */
+export interface OpenApiServer_ServerLike {
+    getRegistrations(): readonly EndpointRegistration[];
+    getAuthenticationConfig(): AuthenticationConfig | null;
+    getWebhooks(): readonly WebhookDefinition[];
+}
+
+// ---------------------------------------------------------------------------
 // Options
 // ---------------------------------------------------------------------------
 
@@ -72,9 +87,19 @@ export interface OpenApiTag {
 
 /**
  * Options passed to {@link generateOpenApiSpec}.
+ *
+ * When `server` is provided, `registrations` and `authConfig` are derived
+ * from it automatically (unless explicitly overridden).
  */
 export interface OpenApiOptions {
-    readonly registrations: readonly EndpointRegistration[];
+    /**
+     * A `ServerBuilder` (or any object implementing the same methods).
+     * When set, `registrations`, `authConfig`, and `webhooks` are
+     * automatically read from the server instance. Explicit values for
+     * those fields take precedence over the server-derived ones.
+     */
+    readonly server?: OpenApiServer_ServerLike;
+    readonly registrations?: readonly EndpointRegistration[];
     readonly info: OpenApiInfo;
     readonly servers?: readonly OpenApiServer[];
     readonly authConfig?: AuthenticationConfig | null;
@@ -601,8 +626,19 @@ function authRoles(meta: EndpointMetadata): readonly string[] | null {
  * Generate an OpenAPI 3.1 specification document from registered endpoints.
  */
 export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
-    const { registrations, info, servers, authConfig, securitySchemes, tags } =
-        options;
+    const srv = options.server;
+    const registrations =
+        options.registrations ?? srv?.getRegistrations() ?? [];
+    const authConfig =
+        options.authConfig !== undefined
+            ? options.authConfig
+            : (srv?.getAuthenticationConfig() ?? undefined);
+    const webhooks =
+        options.webhooks ??
+        (srv && srv.getWebhooks().length > 0
+            ? srv.getWebhooks()
+            : undefined);
+    const { info, servers, securitySchemes, tags } = options;
 
     // Security schemes — from explicit config or auto-mapped
     const resolvedSchemes: Record<string, OpenApiSecurityScheme> =
@@ -650,8 +686,8 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
             }
         }
     }
-    if (options.webhooks) {
-        for (const webhook of options.webhooks) {
+    if (webhooks) {
+        for (const webhook of webhooks) {
             if (webhook.body) walkSchemas(webhook.body, registry, visited);
             if (webhook.response)
                 walkSchemas(webhook.response, registry, visited);
@@ -728,9 +764,9 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
     doc['paths'] = paths;
 
     // Webhooks — out-of-band async requests documented alongside paths
-    if (options.webhooks && options.webhooks.length > 0) {
+    if (webhooks && webhooks.length > 0) {
         const webhooksObj: Record<string, unknown> = {};
-        for (const webhook of options.webhooks) {
+        for (const webhook of webhooks) {
             const whMethod = (webhook.method ?? 'post').toLowerCase();
             const whOperation: Record<string, unknown> = {};
             if (webhook.summary) whOperation['summary'] = webhook.summary;

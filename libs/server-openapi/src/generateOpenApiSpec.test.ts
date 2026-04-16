@@ -1609,4 +1609,118 @@ describe('webhooks', () => {
         const spec = generateOpenApiSpec(makeOptions([makeReg()]));
         expect(spec['webhooks']).toBeUndefined();
     });
+
+    // --- server option ---
+
+    it('derives registrations from server option', () => {
+        const reg = makeReg({
+            method: 'GET',
+            basePath: '',
+            pathTemplate: '/items',
+            summary: 'List items'
+        });
+        const spec = generateOpenApiSpec({
+            server: {
+                getRegistrations: () => [reg],
+                getAuthenticationConfig: () => null,
+                getWebhooks: () => []
+            },
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        expect((spec['paths'] as any)['/items']?.['get']?.summary).toBe(
+            'List items'
+        );
+    });
+
+    it('derives authConfig from server option', () => {
+        const reg = makeReg({
+            method: 'GET',
+            basePath: '',
+            pathTemplate: '/secure',
+            authRoles: []
+        });
+        const spec = generateOpenApiSpec({
+            server: {
+                getRegistrations: () => [reg],
+                getAuthenticationConfig: () => ({
+                    defaultScheme: 'jwt',
+                    schemes: [{ name: 'jwt', authenticate: () => ({} as any), challenge: () => ({ headerName: 'WWW-Authenticate', headerValue: 'Bearer' }) }]
+                }),
+                getWebhooks: () => []
+            },
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        const components = spec['components'] as any;
+        expect(components?.securitySchemes?.jwt).toEqual({
+            type: 'http',
+            scheme: 'bearer',
+            bearerFormat: 'JWT'
+        });
+        const op = (spec['paths'] as any)['/secure']?.['get'];
+        expect(op?.security).toEqual([{ jwt: [] }]);
+    });
+
+    it('derives webhooks from server option', () => {
+        const spec = generateOpenApiSpec({
+            server: {
+                getRegistrations: () => [makeReg()],
+                getAuthenticationConfig: () => null,
+                getWebhooks: () => [
+                    { name: 'onEvent', summary: 'Event fired' }
+                ]
+            },
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        expect(
+            (spec['webhooks'] as any)?.['onEvent']?.['post']?.summary
+        ).toBe('Event fired');
+    });
+
+    it('explicit registrations override server-derived ones', () => {
+        const serverReg = makeReg({
+            method: 'GET',
+            basePath: '',
+            pathTemplate: '/from-server'
+        });
+        const explicitReg = makeReg({
+            method: 'GET',
+            basePath: '',
+            pathTemplate: '/explicit'
+        });
+        const spec = generateOpenApiSpec({
+            server: {
+                getRegistrations: () => [serverReg],
+                getAuthenticationConfig: () => null,
+                getWebhooks: () => []
+            },
+            registrations: [explicitReg],
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        expect((spec['paths'] as any)['/explicit']).toBeDefined();
+        expect((spec['paths'] as any)['/from-server']).toBeUndefined();
+    });
+
+    it('explicit authConfig overrides server-derived one', () => {
+        const reg = makeReg({
+            method: 'GET',
+            basePath: '',
+            pathTemplate: '/secure',
+            authRoles: []
+        });
+        const spec = generateOpenApiSpec({
+            server: {
+                getRegistrations: () => [reg],
+                getAuthenticationConfig: () => ({
+                    defaultScheme: 'jwt',
+                    schemes: [{ name: 'jwt', authenticate: () => ({} as any), challenge: () => ({ headerName: 'WWW-Authenticate', headerValue: 'Bearer' }) }]
+                }),
+                getWebhooks: () => []
+            },
+            authConfig: null,
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        // Explicit null overrides server's JWT config — no security schemes
+        const components = spec['components'] as any;
+        expect(components?.securitySchemes).toBeUndefined();
+    });
 });
