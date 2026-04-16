@@ -12,7 +12,7 @@ import {
     Text,
     TextField
 } from '@radix-ui/themes';
-import type { TodoResponse } from '@cleverbrush/todo-shared';
+import type { TodoResponse } from '@cleverbrush/todo-backend/contract';
 import { ApiError } from '@cleverbrush/web';
 import { client } from '../../api/client';
 import { useAuth } from '../../lib/auth-context';

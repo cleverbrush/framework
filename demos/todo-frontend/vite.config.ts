@@ -6,9 +6,8 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
         alias: {
-            // Resolve todo-shared from source during development
-            '@cleverbrush/todo-shared/contract': resolve(__dirname, '../todo-shared/src/contract.ts'),
-            '@cleverbrush/todo-shared': resolve(__dirname, '../todo-shared/src/index.ts')
+            // Resolve backend contract from source during development
+            '@cleverbrush/todo-backend/contract': resolve(__dirname, '../todo-backend/src/contract.ts')
         },
         // Force a single instance of these packages so instanceof checks work
         // across @cleverbrush/react-form (which bundles its own copy) and app code

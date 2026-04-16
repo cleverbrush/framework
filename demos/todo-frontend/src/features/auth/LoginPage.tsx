@@ -12,7 +12,7 @@ import {
 } from '@radix-ui/themes';
 import { useGoogleLogin } from '@react-oauth/google';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
-import { LoginBodySchema } from '@cleverbrush/todo-shared';
+import { LoginBodySchema } from '@cleverbrush/todo-backend/contract';
 import { useAuth } from '../../lib/auth-context';
 import { ApiError } from '../../lib/http-client';
 

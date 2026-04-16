@@ -7,8 +7,9 @@ WORKDIR /app
 # Copy root workspace manifest for dependency resolution
 COPY package.json package-lock.json* ./
 
-# Copy shared package
-COPY demos/todo-shared/ ./demos/todo-shared/
+# Copy backend contract source (resolved by Vite alias at build time)
+COPY demos/todo-backend/package.json ./demos/todo-backend/
+COPY demos/todo-backend/src/ ./demos/todo-backend/src/
 
 # Copy frontend package manifest
 COPY demos/todo-frontend/package.json ./demos/todo-frontend/

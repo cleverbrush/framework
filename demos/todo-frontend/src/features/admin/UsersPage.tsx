@@ -14,7 +14,7 @@ import { client } from '../../api/client';
 import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Pagination } from '../../components/Pagination';
-import type { UserResponse } from '@cleverbrush/todo-shared';
+import type { UserResponse } from '@cleverbrush/todo-backend/contract';
 
 const PAGE_SIZE = 20;
 

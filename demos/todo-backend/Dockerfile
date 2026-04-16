@@ -7,9 +7,6 @@ WORKDIR /app
 # Copy root workspace manifest for npm workspaces resolution
 COPY package.json package-lock.json* ./
 
-# Copy shared package (source-only, no build needed)
-COPY demos/todo-shared/ ./demos/todo-shared/
-
 # Copy backend package
 COPY demos/todo-backend/package.json ./demos/todo-backend/
 

@@ -8,7 +8,7 @@ import {
     Heading
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
-import { CreateTodoBodySchema } from '@cleverbrush/todo-shared';
+import { CreateTodoBodySchema } from '@cleverbrush/todo-backend/contract';
 import { ApiError } from '@cleverbrush/web';
 import { client } from '../../api/client';
 

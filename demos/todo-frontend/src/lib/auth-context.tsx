@@ -8,7 +8,7 @@ import {
 } from 'react';
 import { client } from '../api/client';
 import { loadToken, setToken } from './http-client';
-import type { UserResponse } from '@cleverbrush/todo-shared';
+import type { UserResponse } from '@cleverbrush/todo-backend/contract';
 
 type AuthState = {
     user: UserResponse | null;

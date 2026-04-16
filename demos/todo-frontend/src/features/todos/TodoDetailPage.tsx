@@ -15,7 +15,7 @@ import {
     TextField
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
-import { UpdateTodoBodySchema, type TodoEvent, type TodoResponse, type UserResponse } from '@cleverbrush/todo-shared';
+import { UpdateTodoBodySchema, type TodoEvent, type TodoResponse, type UserResponse } from '@cleverbrush/todo-backend/contract';
 import { ApiError } from '@cleverbrush/web';
 import { client } from '../../api/client';
 import { loadToken } from '../../lib/http-client';

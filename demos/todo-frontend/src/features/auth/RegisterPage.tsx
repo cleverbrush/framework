@@ -11,7 +11,7 @@ import {
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { string } from '@cleverbrush/schema';
-import { RegisterBodySchema } from '@cleverbrush/todo-shared';
+import { RegisterBodySchema } from '@cleverbrush/todo-backend/contract';
 import { useAuth } from '../../lib/auth-context';
 import { ApiError } from '../../lib/http-client';
 

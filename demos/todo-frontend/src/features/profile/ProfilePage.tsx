@@ -12,7 +12,7 @@ import {
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Link } from 'react-router';
 import { client } from '../../api/client';
-import type { UserResponse } from '@cleverbrush/todo-shared';
+import type { UserResponse } from '@cleverbrush/todo-backend/contract';
 
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserResponse | null>(null);

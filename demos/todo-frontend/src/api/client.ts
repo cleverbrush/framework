@@ -17,7 +17,7 @@
  */
 
 import { createClient } from '@cleverbrush/web';
-import { api } from '@cleverbrush/todo-shared/contract';
+import { api } from '@cleverbrush/todo-backend/contract';
 import { loadToken, setToken } from '../lib/http-client';
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? '';

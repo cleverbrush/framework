@@ -38,7 +38,7 @@ import {
     UserResponseSchema,
     WebhookSubscriptionBodySchema,
     WebhookSubscriptionResponseSchema
-} from './index.js';
+} from './schemas.js';
 
 // ── Shared route templates ────────────────────────────────────────────────────
 

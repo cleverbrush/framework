@@ -1,73 +1,34 @@
-import { array, number, object, string } from '@cleverbrush/schema';
+import { object, string, number } from '@cleverbrush/schema';
 import {
     createEndpoints,
-    defineWebhook,
-    endpoint,
-    route
+    defineWebhook
 } from '@cleverbrush/server';
 import { BoundQueryToken } from '../di/tokens.js';
 import {
-    CompletionRequestHeadersSchema,
-    CreateTodoBodySchema,
-    ErrorResponseSchema,
-    ExportResponseHeadersSchema,
-    GoogleAuthBodySchema,
-    ImportRequestHeadersSchema,
-    ImportResultSchema,
-    ImportTodosBodySchema,
-    LoginBodySchema,
-    PaginationQuerySchema,
     PrincipalSchema,
-    RegisterBodySchema,
-    TodoEventSchema,
-    TodoListQuerySchema,
     TodoNotificationPayloadSchema,
-    TodoResponseSchema,
-    TodoWithAuthorResponseSchema,
-    TokenResponseSchema,
-    UpdateTodoBodySchema,
-    UserResponseSchema,
-    WebhookAckSchema,
-    WebhookSubscriptionBodySchema,
-    WebhookSubscriptionResponseSchema
+    WebhookAckSchema
 } from './schemas.js';
-
-// ── Path templates ────────────────────────────────────────────────────────────
-
-const ById = route({ id: number().coerce() })`/${t => t.id}`;
-const ByIdWithAuthor = route({
-    id: number().coerce()
-})`/${t => t.id}/with-author`;
+import { api } from './contract.js';
 
 // ── Auth endpoints ────────────────────────────────────────────────────────────
-// Using full paths (not resource()) because register and login are
-// different static sub-paths, not parameterized routes.
 
-export const RegisterEndpoint = endpoint
-    .post('/api/auth/register')
-    .body(RegisterBodySchema)
+export const RegisterEndpoint = api.auth.register
     .inject({ db: BoundQueryToken })
-    .responses({ 201: UserResponseSchema, 400: ErrorResponseSchema })
     .summary('Register a new user')
     .description('Creates a new user account with the "user" role.')
     .tags('auth')
     .operationId('register');
 
-export const LoginEndpoint = endpoint
-    .post('/api/auth/login')
-    .body(LoginBodySchema)
+export const LoginEndpoint = api.auth.login
     .inject({ db: BoundQueryToken })
-    .responses({ 200: TokenResponseSchema, 401: ErrorResponseSchema })
     .summary('Login')
     .description('Authenticates a user and returns a signed JWT.')
     .tags('auth')
     .operationId('login');
 
-export const GoogleLoginEndpoint = endpoint
-    .post('/api/auth/google')
-    .body(GoogleAuthBodySchema)
+export const GoogleLoginEndpoint = api.auth.googleLogin
     .inject({ db: BoundQueryToken })
-    .responses({ 200: TokenResponseSchema, 400: ErrorResponseSchema, 401: ErrorResponseSchema })
     .summary('Login with Google')
     .description('Exchanges a Google ID token for an application JWT. Auto-provisions the user on first login.')
     .tags('auth')
@@ -75,14 +36,9 @@ export const GoogleLoginEndpoint = endpoint
 
 // ── Todo endpoints ────────────────────────────────────────────────────────────
 
-const todosApi = endpoint.resource('/api/todos');
-
-export const ListTodosEndpoint = todosApi
-    .get()
-    .query(TodoListQuerySchema)
+export const ListTodosEndpoint = api.todos.list
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({ 200: array(TodoResponseSchema) })
     .summary('List todos')
     .description(
         'Returns a paginated list of todos. Users see only their own todos; admins can see all todos or filter by userId.'
@@ -90,15 +46,9 @@ export const ListTodosEndpoint = todosApi
     .tags('todos')
     .operationId('listTodos');
 
-export const GetTodoEndpoint = todosApi
-    .get(ById)
+export const GetTodoEndpoint = api.todos.get
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({
-        200: TodoResponseSchema,
-        403: ErrorResponseSchema,
-        404: ErrorResponseSchema
-    })
     .summary('Get a todo by ID')
     .description(
         'Returns a todo by its ID. Users can only fetch their own todos.'
@@ -106,15 +56,9 @@ export const GetTodoEndpoint = todosApi
     .tags('todos')
     .operationId('getTodo');
 
-export const GetTodoWithAuthorEndpoint = todosApi
-    .get(ByIdWithAuthor)
+export const GetTodoWithAuthorEndpoint = api.todos.getWithAuthor
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({
-        200: TodoWithAuthorResponseSchema,
-        403: ErrorResponseSchema,
-        404: ErrorResponseSchema
-    })
     .summary('Get a todo with its author')
     .description(
         'Returns a todo together with its author. Demonstrates nested $ref deduplication in the OpenAPI spec.'
@@ -122,27 +66,17 @@ export const GetTodoWithAuthorEndpoint = todosApi
     .tags('todos')
     .operationId('getTodoWithAuthor');
 
-export const CreateTodoEndpoint = todosApi
-    .post()
-    .body(CreateTodoBodySchema)
+export const CreateTodoEndpoint = api.todos.create
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({ 201: TodoResponseSchema })
     .summary('Create a todo')
     .description('Creates a new todo owned by the authenticated user.')
     .tags('todos')
     .operationId('createTodo');
 
-export const UpdateTodoEndpoint = todosApi
-    .patch(ById)
-    .body(UpdateTodoBodySchema)
+export const UpdateTodoEndpoint = api.todos.update
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({
-        200: TodoResponseSchema,
-        403: ErrorResponseSchema,
-        404: ErrorResponseSchema
-    })
     .summary('Update a todo')
     .description(
         'Partially updates a todo. Users can only update their own todos; admins can update any todo.'
@@ -150,15 +84,9 @@ export const UpdateTodoEndpoint = todosApi
     .tags('todos')
     .operationId('updateTodo');
 
-export const DeleteTodoEndpoint = todosApi
-    .delete(ById)
+export const DeleteTodoEndpoint = api.todos.delete
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({
-        204: null,
-        403: ErrorResponseSchema,
-        404: ErrorResponseSchema
-    })
     .summary('Delete a todo')
     .description(
         'Deletes a todo. Users can only delete their own todos; admins can delete any todo.'
@@ -166,18 +94,9 @@ export const DeleteTodoEndpoint = todosApi
     .tags('todos')
     .operationId('deleteTodo');
 
-const ByIdEvents = route({ id: number().coerce() })`/${t => t.id}/events`;
-
-export const SendTodoEventEndpoint = todosApi
-    .post(ByIdEvents)
-    .body(TodoEventSchema)
+export const SendTodoEventEndpoint = api.todos.sendEvent
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({
-        200: TodoEventSchema,
-        403: ErrorResponseSchema,
-        404: ErrorResponseSchema
-    })
     .summary('Send a todo event')
     .description(
         'Accepts a discriminated-union event for a todo (assigned / commented / completed). ' +
@@ -188,14 +107,9 @@ export const SendTodoEventEndpoint = todosApi
 
 // ── User management endpoints (admin only) ────────────────────────────────────
 
-const usersApi = endpoint.resource('/api/users');
-
-export const ListUsersEndpoint = usersApi
-    .get()
-    .query(PaginationQuerySchema)
+export const ListUsersEndpoint = api.users.list
     .authorize(PrincipalSchema, 'admin')
     .inject({ db: BoundQueryToken })
-    .responses({ 200: array(UserResponseSchema) })
     .summary('List all users')
     .description(
         'Returns a paginated list of all registered users. Admin only.'
@@ -203,15 +117,9 @@ export const ListUsersEndpoint = usersApi
     .tags('users')
     .operationId('listUsers');
 
-export const DeleteUserEndpoint = usersApi
-    .delete(ById)
+export const DeleteUserEndpoint = api.users.delete
     .authorize(PrincipalSchema, 'admin')
     .inject({ db: BoundQueryToken })
-    .responses({
-        204: null,
-        400: ErrorResponseSchema,
-        404: ErrorResponseSchema
-    })
     .summary('Delete a user')
     .description(
         'Permanently deletes a user account and all their todos. Admin only.'
@@ -219,26 +127,13 @@ export const DeleteUserEndpoint = usersApi
     .tags('users')
     .operationId('deleteUser');
 
-// ── Additional route templates ────────────────────────────────────────────────
-
-const ByIdAttachment = route({
-    id: number().coerce()
-})`/${t => t.id}/attachment`;
-
-const ByIdComplete = route({
-    id: number().coerce()
-})`/${t => t.id}/complete`;
-
 // ── Export todos as CSV ───────────────────────────────────────────────────────
 // Features: .produces(), .responseHeaders(), .externalDocs(), per-endpoint middleware
 
-export const ExportTodosEndpoint = todosApi
-    .get(route({})`/export`)
+export const ExportTodosEndpoint = api.todos.exportCsv
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .returns(string())
     .produces({ 'text/csv': {} })
-    .responseHeaders(ExportResponseHeadersSchema)
     .externalDocs(
         'https://tools.ietf.org/html/rfc4180',
         'CSV format specification (RFC 4180)'
@@ -254,8 +149,7 @@ export const ExportTodosEndpoint = todosApi
 // ── Download todo attachment ──────────────────────────────────────────────────
 // Features: .producesFile(), ActionResult.file()
 
-export const DownloadAttachmentEndpoint = todosApi
-    .get(ByIdAttachment)
+export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
     .producesFile('text/plain', 'A plain-text summary of the todo.')
@@ -270,19 +164,9 @@ export const DownloadAttachmentEndpoint = todosApi
 // ── Import todos ──────────────────────────────────────────────────────────────
 // Features: .example(), .examples(), .headers(), ActionResult.json(), ActionResult.accepted()
 
-export const ImportTodosEndpoint = todosApi
-    .post(route({})`/import`)
-    .body(ImportTodosBodySchema)
-    .headers(ImportRequestHeadersSchema)
+export const ImportTodosEndpoint = api.todos.importBulk
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({
-        207: ImportResultSchema,
-        202: object({
-            message: string().describe('Status message for queued imports.'),
-            total: number().describe('Total number of items queued.')
-        }).schemaName('ImportAccepted')
-    })
     .example({ items: [{ title: 'Buy groceries' }] } as any)
     .examples({
         minimal: {
@@ -313,12 +197,9 @@ export const ImportTodosEndpoint = todosApi
 // ── Deprecated full replace ───────────────────────────────────────────────────
 // Features: .deprecated(), ActionResult.redirect()
 
-export const LegacyReplaceTodoEndpoint = todosApi
-    .put(ById)
-    .body(UpdateTodoBodySchema)
+export const LegacyReplaceTodoEndpoint = api.todos.legacyReplace
     .authorize(PrincipalSchema)
     .deprecated()
-    .responses({ 200: TodoResponseSchema })
     .summary('Replace a todo (deprecated)')
     .description(
         '**Deprecated** — use `PATCH /api/todos/{id}` instead for partial updates. ' +
@@ -331,17 +212,9 @@ export const LegacyReplaceTodoEndpoint = todosApi
 // ── Complete todo with conflict detection ─────────────────────────────────────
 // Features: .headers() (If-Match), ActionResult.conflict(), ActionResult.status()
 
-export const CompleteTodoEndpoint = todosApi
-    .post(ByIdComplete)
-    .headers(CompletionRequestHeadersSchema)
+export const CompleteTodoEndpoint = api.todos.complete
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .responses({
-        200: TodoResponseSchema,
-        409: ErrorResponseSchema,
-        403: ErrorResponseSchema,
-        404: ErrorResponseSchema
-    })
     .summary('Complete a todo with conflict detection')
     .description(
         'Marks a todo as completed. Supports optimistic concurrency via the `If-Match` header — ' +
@@ -354,11 +227,9 @@ export const CompleteTodoEndpoint = todosApi
 // ── Get current user ──────────────────────────────────────────────────────────
 // Features: .returns(), .links()
 
-export const GetMyProfileEndpoint = usersApi
-    .get(route({})`/me`)
+export const GetMyProfileEndpoint = api.users.me
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken })
-    .returns(UserResponseSchema)
     .links({
         GetMyTodos: {
             operationId: 'listTodos',
@@ -376,14 +247,8 @@ export const GetMyProfileEndpoint = usersApi
 // ── Webhook subscription ─────────────────────────────────────────────────────
 // Features: .callbacks()
 
-export const SubscribeWebhookEndpoint = endpoint
-    .post('/api/webhooks/subscribe')
-    .body(WebhookSubscriptionBodySchema)
+export const SubscribeWebhookEndpoint = api.webhooks.subscribe
     .authorize(PrincipalSchema)
-    .responses({
-        201: WebhookSubscriptionResponseSchema,
-        400: ErrorResponseSchema
-    })
     .callbacks({
         onEvent: {
             urlFrom: b => b.callbackUrl,
