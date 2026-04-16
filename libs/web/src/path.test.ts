@@ -17,10 +17,10 @@ describe('buildPath', () => {
         expect(template.serialize).toHaveBeenCalledWith({ id: 42 });
     });
 
-    test('template object without params — returns basePath only', () => {
-        const template = { serialize: vi.fn() };
-        const result = buildPath('/api/todos', template);
-        expect(result).toBe('/api/todos');
-        expect(template.serialize).not.toHaveBeenCalled();
+    test('template object without params — calls serialize with empty object', () => {
+        const template = { serialize: vi.fn().mockReturnValue('/me') };
+        const result = buildPath('/api/users', template);
+        expect(result).toBe('/api/users/me');
+        expect(template.serialize).toHaveBeenCalledWith({});
     });
 });

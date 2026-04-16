@@ -23,8 +23,8 @@ export function buildPath(
         return basePath + pathTemplate;
     }
 
-    if (typeof pathTemplate.serialize === 'function' && params) {
-        return basePath + pathTemplate.serialize(params);
+    if (typeof pathTemplate.serialize === 'function') {
+        return basePath + pathTemplate.serialize(params ?? {});
     }
 
     return basePath;
