@@ -5,6 +5,7 @@ export {
     type OpenApiInfo,
     type OpenApiOptions,
     type OpenApiServer,
+    type OpenApiServer_ServerLike,
     type OpenApiTag
 } from './generateOpenApiSpec.js';
 export {

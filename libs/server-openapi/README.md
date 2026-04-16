@@ -46,7 +46,7 @@ const server = new ServerBuilder();
 
 server
     .use(serveOpenApi({
-        getRegistrations: () => server.getRegistrations(),
+        server,
         info: { title: 'My API', version: '1.0.0' }
     }))
     .handle(GetUser, ({ params }) => ({ id: params.id }));
@@ -54,6 +54,8 @@ server
 await server.listen(3000);
 // GET /openapi.json → OpenAPI 3.1 document
 ```
+
+When `server` is provided, endpoint registrations, authentication config, and webhooks are derived automatically. You can still pass `getRegistrations`, `authConfig`, or `webhooks` explicitly to override any server-derived value.
 
 ## Generating the Spec
 
@@ -63,7 +65,7 @@ await server.listen(3000);
 import { serveOpenApi } from '@cleverbrush/server-openapi';
 
 server.use(serveOpenApi({
-    getRegistrations: () => server.getRegistrations(),
+    server,
     info: { title: 'My API', version: '1.0.0' },
     servers: [{ url: 'https://api.example.com', description: 'Production' }],
     path: '/openapi.json'   // default
@@ -76,7 +78,7 @@ server.use(serveOpenApi({
 import { createOpenApiEndpoint } from '@cleverbrush/server-openapi';
 
 const { endpoint: openApiEp, handler } = createOpenApiEndpoint({
-    getRegistrations: () => server.getRegistrations(),
+    server,
     info: { title: 'My API', version: '1.0.0' }
 });
 
@@ -313,20 +315,31 @@ When both `.returns()` and `.producesFile()` are set, the binary response takes 
 
 ## Authentication & Security Schemes
 
-Pass the server's `AuthenticationConfig` to automatically generate `securitySchemes` and per-operation `security` arrays:
+When you pass the `server` option, authentication configuration is picked up automatically from `server.getAuthenticationConfig()`. Security schemes and per-operation `security` arrays are generated without any extra configuration:
 
 ```ts
 import { jwtScheme } from '@cleverbrush/auth';
 
-const authConfig = {
-    defaultScheme: 'jwt',
-    schemes: [jwtScheme({ secret: '...', mapClaims: c => c })]
-};
+const server = new ServerBuilder()
+    .useAuthentication({
+        defaultScheme: 'jwt',
+        schemes: [jwtScheme({ secret: '...', mapClaims: c => c })]
+    })
+    .useAuthorization();
 
+server.use(serveOpenApi({
+    server,
+    info: { title: 'My API', version: '1.0.0' }
+}));
+```
+
+You can also pass `authConfig` explicitly (useful when not using the `server` option):
+
+```ts
 server.use(serveOpenApi({
     getRegistrations: () => server.getRegistrations(),
     info: { title: 'My API', version: '1.0.0' },
-    authConfig
+    authConfig: server.getAuthenticationConfig()
 }));
 ```
 
