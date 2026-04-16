@@ -123,7 +123,7 @@ export function buildServer(config: Config) {
     const openApiHandler = (): OpenApiDocument => {
         if (!cachedSpec) {
             cachedSpec = generateOpenApiSpec({
-                registrations: server.getRegistrations(),
+                server,
                 info: {
                     title: 'ToDo Management API',
                     version: '1.0.0',
@@ -174,8 +174,7 @@ export function buildServer(config: Config) {
                         description:
                             'The auto-generated OpenAPI 3.1 specification for this API.'
                     }
-                ],
-                webhooks: [todoCreatedWebhook, todoCompletedWebhook]
+                ]
             });
         }
         return cachedSpec;
