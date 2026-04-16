@@ -1,6 +1,4 @@
-import { object, string, number } from '@cleverbrush/schema';
 import {
-    createEndpoints,
     defineWebhook
 } from '@cleverbrush/server';
 import { BoundQueryToken } from '../di/tokens.js';
@@ -270,23 +268,52 @@ export const SubscribeWebhookEndpoint = api.webhooks.subscribe
     .operationId('subscribeWebhook');
 
 // ── Admin activity log ────────────────────────────────────────────────────────
-// Features: createEndpoints() with role constraints, ActionResult.stream(), per-endpoint middleware
+// Features: ActionResult.stream(), per-endpoint middleware
 
-const Roles = { admin: 'admin', user: 'user' } as const;
-const adminApi = createEndpoints(Roles);
-
-export const AdminActivityEndpoint = adminApi
-    .get('/api/admin/activity')
+export const AdminActivityEndpoint = api.admin.activityLog
     .authorize(PrincipalSchema, 'admin')
-    .returns(string())
     .summary('Admin activity log stream')
     .description(
         'Streams recent activity entries as newline-delimited JSON (NDJSON). Admin only. ' +
-            'Demonstrates `createEndpoints()` with compile-time role constraints, ' +
-            '`ActionResult.stream()`, and per-endpoint middleware.'
+            'Demonstrates `ActionResult.stream()` and per-endpoint middleware.'
     )
     .tags('admin')
     .operationId('adminActivityLog');
+
+// ── Grouped endpoints — used with mapHandlers() for compile-time safety ───────
+
+export const endpoints = {
+    auth: {
+        register: RegisterEndpoint,
+        login: LoginEndpoint,
+        googleLogin: GoogleLoginEndpoint
+    },
+    todos: {
+        list: ListTodosEndpoint,
+        get: GetTodoEndpoint,
+        getWithAuthor: GetTodoWithAuthorEndpoint,
+        create: CreateTodoEndpoint,
+        update: UpdateTodoEndpoint,
+        delete: DeleteTodoEndpoint,
+        sendEvent: SendTodoEventEndpoint,
+        exportCsv: ExportTodosEndpoint,
+        downloadAttachment: DownloadAttachmentEndpoint,
+        importBulk: ImportTodosEndpoint,
+        legacyReplace: LegacyReplaceTodoEndpoint,
+        complete: CompleteTodoEndpoint
+    },
+    users: {
+        list: ListUsersEndpoint,
+        delete: DeleteUserEndpoint,
+        me: GetMyProfileEndpoint
+    },
+    webhooks: {
+        subscribe: SubscribeWebhookEndpoint
+    },
+    admin: {
+        activityLog: AdminActivityEndpoint
+    }
+};
 
 // ── Webhook definitions (OpenAPI-only, not served as routes) ──────────────────
 // Features: defineWebhook(), server.webhook()

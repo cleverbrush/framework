@@ -95,8 +95,17 @@ export function createClient<T extends ApiContract>(
         return meta;
     }
 
-    // The actual fetch logic, shared by every endpoint proxy method.
-    async function execute(ep: any, args: any): Promise<any> {
+    // Builds the URL, headers, and body for a request.  Shared by both
+    // the regular `execute` path and the streaming `stream` path.
+    function buildRequest(
+        ep: any,
+        args: any
+    ): {
+        url: string;
+        method: string;
+        headers: Record<string, string>;
+        body: string | undefined;
+    } {
         const meta = getMeta(ep);
         const method = meta.method.toUpperCase();
 
@@ -123,6 +132,18 @@ export function createClient<T extends ApiContract>(
             reqHeaders['Content-Type'] = JSON_CONTENT_TYPE;
             body = JSON.stringify(args.body);
         }
+
+        return { url, method, headers: reqHeaders, body };
+    }
+
+    // The actual fetch logic, shared by every endpoint proxy method.
+    async function execute(ep: any, args: any): Promise<any> {
+        const {
+            url,
+            method,
+            headers: reqHeaders,
+            body
+        } = buildRequest(ep, args);
 
         // -- Fetch --
         const response = await customFetch(url, {
@@ -168,6 +189,58 @@ export function createClient<T extends ApiContract>(
         return response.text();
     }
 
+    // Streaming fetch — yields newline-delimited chunks (e.g. NDJSON).
+    async function* streamLines(ep: any, args: any): AsyncIterable<string> {
+        const {
+            url,
+            method,
+            headers: reqHeaders,
+            body
+        } = buildRequest(ep, args);
+
+        const response = await customFetch(url, {
+            method,
+            headers: reqHeaders,
+            body,
+            signal: args?.signal
+        });
+
+        if (!response.ok) {
+            if (response.status === 401) {
+                onUnauthorized?.();
+            }
+            throw new ApiError(
+                response.status,
+                response.statusText || `HTTP ${response.status}`
+            );
+        }
+
+        if (!response.body) return;
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() ?? '';
+                for (const line of lines) {
+                    const trimmed = line.trim();
+                    if (trimmed) yield trimmed;
+                }
+            }
+            // Flush remaining buffer
+            const remaining = buffer.trim();
+            if (remaining) yield remaining;
+        } finally {
+            reader.releaseLock();
+        }
+    }
+
     // -- Two-level Proxy ---------------------------------------------------
 
     // Level 1: group proxy (e.g. `client.todos`)
@@ -182,8 +255,11 @@ export function createClient<T extends ApiContract>(
                     const ep = group[endpointName];
                     if (!ep) return undefined;
 
-                    // Return a callable that invokes the fetch logic.
-                    return (args?: any) => execute(ep, args);
+                    // Return a callable that invokes the fetch logic,
+                    // with a `.stream()` method for NDJSON streaming.
+                    const call = (args?: any) => execute(ep, args);
+                    call.stream = (args?: any) => streamLines(ep, args);
+                    return call;
                 }
             });
         }

@@ -351,4 +351,162 @@ describe('createClient', () => {
         expect(init.headers['X-Global']).toBe('yes');
         expect(init.headers['X-Request']).toBe('specific');
     });
+
+    // -- .stream() ---------------------------------------------------------
+
+    test('stream() yields newline-delimited lines', async () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode('{"a":1}\n{"a":2}\n'));
+                controller.enqueue(encoder.encode('{"a":3}\n'));
+                controller.close();
+            }
+        });
+
+        mockFetch.mockResolvedValue(
+            new Response(stream, { status: 200, statusText: 'OK' })
+        );
+        const client = createClient(contract, { fetch: mockFetch });
+
+        const lines: string[] = [];
+        for await (const line of client.todos.list.stream()) {
+            lines.push(line);
+        }
+
+        expect(lines).toEqual(['{"a":1}', '{"a":2}', '{"a":3}']);
+    });
+
+    test('stream() handles partial chunks across reads', async () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode('{"x":'));
+                controller.enqueue(encoder.encode('1}\n{"x":2}\n'));
+                controller.close();
+            }
+        });
+
+        mockFetch.mockResolvedValue(
+            new Response(stream, { status: 200, statusText: 'OK' })
+        );
+        const client = createClient(contract, { fetch: mockFetch });
+
+        const lines: string[] = [];
+        for await (const line of client.todos.list.stream()) {
+            lines.push(line);
+        }
+
+        expect(lines).toEqual(['{"x":1}', '{"x":2}']);
+    });
+
+    test('stream() flushes remaining buffer on close', async () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode('line1\nline2'));
+                controller.close();
+            }
+        });
+
+        mockFetch.mockResolvedValue(
+            new Response(stream, { status: 200, statusText: 'OK' })
+        );
+        const client = createClient(contract, { fetch: mockFetch });
+
+        const lines: string[] = [];
+        for await (const line of client.todos.list.stream()) {
+            lines.push(line);
+        }
+
+        expect(lines).toEqual(['line1', 'line2']);
+    });
+
+    test('stream() skips blank lines', async () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode('a\n\n\nb\n'));
+                controller.close();
+            }
+        });
+
+        mockFetch.mockResolvedValue(
+            new Response(stream, { status: 200, statusText: 'OK' })
+        );
+        const client = createClient(contract, { fetch: mockFetch });
+
+        const lines: string[] = [];
+        for await (const line of client.todos.list.stream()) {
+            lines.push(line);
+        }
+
+        expect(lines).toEqual(['a', 'b']);
+    });
+
+    test('stream() throws ApiError on non-2xx', async () => {
+        mockFetch.mockResolvedValue(errorResponse(403, undefined, 'Forbidden'));
+        const client = createClient(contract, { fetch: mockFetch });
+
+        const lines: string[] = [];
+        const err = await (async () => {
+            try {
+                for await (const line of client.todos.list.stream()) {
+                    lines.push(line);
+                }
+            } catch (e) {
+                return e;
+            }
+        })();
+
+        expect(err).toBeInstanceOf(ApiError);
+        expect((err as ApiError).status).toBe(403);
+        expect(lines).toHaveLength(0);
+    });
+
+    test('stream() sends auth token', async () => {
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.close();
+            }
+        });
+        mockFetch.mockResolvedValue(
+            new Response(stream, { status: 200, statusText: 'OK' })
+        );
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            getToken: () => 'stream-token'
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _ of client.todos.list.stream()) {
+            // drain
+        }
+
+        const [, init] = mockFetch.mock.calls[0];
+        expect(init.headers['Authorization']).toBe('Bearer stream-token');
+    });
+
+    test('stream() passes signal to fetch', async () => {
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.close();
+            }
+        });
+        mockFetch.mockResolvedValue(
+            new Response(stream, { status: 200, statusText: 'OK' })
+        );
+        const client = createClient(contract, { fetch: mockFetch });
+        const controller = new AbortController();
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        for await (const _ of client.todos.list.stream({
+            signal: controller.signal
+        })) {
+            // drain
+        }
+
+        const [, init] = mockFetch.mock.calls[0];
+        expect(init.signal).toBe(controller.signal);
+    });
 });

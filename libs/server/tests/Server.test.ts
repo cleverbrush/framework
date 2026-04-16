@@ -1,6 +1,6 @@
 import { number, object, string } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
-import { endpoint } from '../src/Endpoint.js';
+import { endpoint, mapHandlers } from '../src/Endpoint.js';
 import { createServer } from '../src/Server.js';
 import { defineWebhook } from '../src/Webhook.js';
 
@@ -94,6 +94,85 @@ describe('ServerBuilder.getAuthenticationConfig()', () => {
         expect(config!.defaultScheme).toBe('jwt');
         expect(config!.schemes).toHaveLength(1);
         expect(config!.schemes[0].name).toBe('jwt');
+    });
+});
+
+describe('ServerBuilder.handleAll()', () => {
+    const endpoints = {
+        auth: {
+            login: endpoint
+                .post('/api/login')
+                .body(object({ email: string() })),
+            register: endpoint.post('/api/register')
+        },
+        items: {
+            list: endpoint.get('/api/items'),
+            create: endpoint.post('/api/items').body(object({ name: string() }))
+        }
+    };
+
+    it('registers all endpoints from a mapping', () => {
+        const mapping = mapHandlers(endpoints, {
+            auth: { login: () => 'ok', register: () => 'ok' },
+            items: { list: () => [], create: () => ({}) }
+        });
+
+        const builder = createServer().handleAll(mapping);
+        expect(builder.getRegistrations()).toHaveLength(4);
+    });
+
+    it('registers correct handlers for each endpoint', () => {
+        const loginHandler = () => 'logged in';
+        const mapping = mapHandlers(endpoints, {
+            auth: { login: loginHandler, register: () => 'ok' },
+            items: { list: () => [], create: () => ({}) }
+        });
+
+        const builder = createServer().handleAll(mapping);
+        const regs = builder.getRegistrations();
+        const loginReg = regs.find(r => r.endpoint.basePath === '/api/login');
+        expect(loginReg).toBeDefined();
+        expect(loginReg!.handler).toBe(loginHandler);
+    });
+
+    it('registers middlewares from object entries', () => {
+        const mw = async (_ctx: any, next: () => Promise<void>) => {
+            await next();
+        };
+        const createHandler = () => ({ id: 1 });
+
+        const mapping = mapHandlers(endpoints, {
+            auth: { login: () => 'ok', register: () => 'ok' },
+            items: {
+                list: () => [],
+                create: { handler: createHandler, middlewares: [mw] }
+            }
+        });
+
+        const builder = createServer().handleAll(mapping);
+        const regs = builder.getRegistrations();
+        const createReg = regs.find(
+            r =>
+                r.endpoint.basePath === '/api/items' &&
+                r.endpoint.method === 'POST'
+        );
+        expect(createReg).toBeDefined();
+        expect(createReg!.handler).toBe(createHandler);
+        expect(createReg!.middlewares).toEqual([mw]);
+    });
+
+    it('is chainable with handle()', () => {
+        const extra = endpoint.get('/api/health');
+        const mapping = mapHandlers(endpoints, {
+            auth: { login: () => 'ok', register: () => 'ok' },
+            items: { list: () => [], create: () => ({}) }
+        });
+
+        const builder = createServer()
+            .handle(extra, () => 'ok')
+            .handleAll(mapping);
+
+        expect(builder.getRegistrations()).toHaveLength(5);
     });
 });
 

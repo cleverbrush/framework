@@ -2,6 +2,7 @@ import { jwtScheme } from '@cleverbrush/auth';
 import {
     createServer,
     endpoint,
+    mapHandlers,
     type Middleware
 } from '@cleverbrush/server';
 import {
@@ -9,51 +10,13 @@ import {
     type OpenApiDocument
 } from '@cleverbrush/server-openapi';
 import {
-    AdminActivityEndpoint,
-    CompleteTodoEndpoint,
-    CreateTodoEndpoint,
-    DeleteTodoEndpoint,
-    DeleteUserEndpoint,
-    DownloadAttachmentEndpoint,
-    ExportTodosEndpoint,
-    GetMyProfileEndpoint,
-    GetTodoEndpoint,
-    GetTodoWithAuthorEndpoint,
-    GoogleLoginEndpoint,
-    ImportTodosEndpoint,
-    LegacyReplaceTodoEndpoint,
-    ListTodosEndpoint,
-    ListUsersEndpoint,
-    LoginEndpoint,
-    RegisterEndpoint,
-    SendTodoEventEndpoint,
-    SubscribeWebhookEndpoint,
+    endpoints,
     todoCompletedWebhook,
-    todoCreatedWebhook,
-    UpdateTodoEndpoint
+    todoCreatedWebhook
 } from './api/endpoints.js';
+import { handlers } from './api/handlers/index.js';
+import { exportTodosHandler } from './api/handlers/todos.js';
 import { activityLogHandler } from './api/handlers/admin.js';
-import { googleLoginHandler, loginHandler, registerHandler } from './api/handlers/auth.js';
-import {
-    completeTodoHandler,
-    createTodoHandler,
-    deleteTodoHandler,
-    downloadAttachmentHandler,
-    exportTodosHandler,
-    getTodoHandler,
-    getTodoWithAuthorHandler,
-    importTodosHandler,
-    legacyReplaceTodoHandler,
-    listTodosHandler,
-    sendTodoEventHandler,
-    updateTodoHandler
-} from './api/handlers/todos.js';
-import {
-    deleteUserHandler,
-    getMyProfileHandler,
-    listUsersHandler
-} from './api/handlers/users.js';
-import { subscribeWebhookHandler } from './api/handlers/webhooks.js';
 import type { Config } from './config.js';
 import { configureDI } from './di/setup.js';
 
@@ -188,38 +151,27 @@ export function buildServer(config: Config) {
     // ── Register webhooks on the server (for getWebhooks() introspection)
     server.webhook(todoCreatedWebhook).webhook(todoCompletedWebhook);
 
+    // ── Register all contract endpoints via compile-time checked mapping
     server
         .handle(openApiEndpoint, openApiHandler)
-        // Auth
-        .handle(RegisterEndpoint, registerHandler)
-        .handle(LoginEndpoint, loginHandler)
-        .handle(GoogleLoginEndpoint, googleLoginHandler)
-        // Todos
-        .handle(ListTodosEndpoint, listTodosHandler)
-        .handle(GetTodoEndpoint, getTodoHandler)
-        .handle(GetTodoWithAuthorEndpoint, getTodoWithAuthorHandler)
-        .handle(CreateTodoEndpoint, createTodoHandler)
-        .handle(UpdateTodoEndpoint, updateTodoHandler)
-        .handle(DeleteTodoEndpoint, deleteTodoHandler)
-        .handle(SendTodoEventEndpoint, sendTodoEventHandler)
-        // New todo features
-        .handle(ExportTodosEndpoint, exportTodosHandler, {
-            middlewares: [auditLogMiddleware]
-        })
-        .handle(DownloadAttachmentEndpoint, downloadAttachmentHandler)
-        .handle(ImportTodosEndpoint, importTodosHandler)
-        .handle(LegacyReplaceTodoEndpoint, legacyReplaceTodoHandler)
-        .handle(CompleteTodoEndpoint, completeTodoHandler)
-        // Users
-        .handle(GetMyProfileEndpoint, getMyProfileHandler)
-        .handle(ListUsersEndpoint, listUsersHandler)
-        .handle(DeleteUserEndpoint, deleteUserHandler)
-        // Webhooks
-        .handle(SubscribeWebhookEndpoint, subscribeWebhookHandler)
-        // Admin
-        .handle(AdminActivityEndpoint, activityLogHandler, {
-            middlewares: [timingMiddleware]
-        });
+        .handleAll(
+            mapHandlers(endpoints, {
+                ...handlers,
+                todos: {
+                    ...handlers.todos,
+                    exportCsv: {
+                        handler: exportTodosHandler,
+                        middlewares: [auditLogMiddleware]
+                    }
+                },
+                admin: {
+                    activityLog: {
+                        handler: activityLogHandler,
+                        middlewares: [timingMiddleware]
+                    }
+                }
+            })
+        );
 
     return server;
 }

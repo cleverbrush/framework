@@ -16,6 +16,7 @@ import type {
     StreamResult
 } from './ActionResult.js';
 import type { RequestContext } from './RequestContext.js';
+import type { Middleware } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Simplify — flattens intersection types for clean IDE tooltips
@@ -186,6 +187,112 @@ export type Handler<E> =
         : (
               arg: ActionContext<E>
           ) => HandlerReturn<E> | Promise<HandlerReturn<E>>;
+
+// ---------------------------------------------------------------------------
+// Handler mapping — compile-time complete endpoint → handler binding
+// ---------------------------------------------------------------------------
+
+type AnyEndpoint = EndpointBuilder<any, any, any, any, any, any, any, any, any>;
+
+/**
+ * A single handler entry in a {@link HandlerMap}.
+ *
+ * Either a bare handler function or an object with a `handler` function and
+ * optional per-endpoint `middlewares`.
+ */
+export type HandlerEntry<E> =
+    | Handler<E>
+    | { handler: Handler<E>; middlewares?: Middleware[] };
+
+/**
+ * A compile-time complete mapping from an endpoint group structure to
+ * handler entries. Every endpoint key in every group must have a
+ * corresponding {@link HandlerEntry} — omitting one is a type error.
+ *
+ * @typeParam TEndpoints - A record of groups, each a record of endpoint
+ *   builders. Typically the return type of `defineApi()` with server-side
+ *   extensions applied.
+ */
+export type HandlerMap<TEndpoints> = {
+    [G in keyof TEndpoints]: {
+        [E in keyof TEndpoints[G]]: TEndpoints[G][E] extends AnyEndpoint
+            ? HandlerEntry<TEndpoints[G][E]>
+            : never;
+    };
+};
+
+/**
+ * The opaque result of {@link mapHandlers}. Passed to
+ * `ServerBuilder.handleAll()` to register every endpoint at once.
+ */
+export interface HandlerMapping {
+    /** @internal */
+    readonly _entries: ReadonlyArray<{
+        endpoint: AnyEndpoint;
+        handler: (...args: any[]) => any;
+        middlewares?: Middleware[];
+    }>;
+}
+
+/**
+ * Binds a complete set of endpoint builders to their handlers with
+ * compile-time exhaustiveness checking.
+ *
+ * TypeScript will report an error if any endpoint in `endpoints` is
+ * missing from `handlers`, or if a handler's signature does not match
+ * its endpoint. This is analogous to how `@cleverbrush/mapper` tracks
+ * unmapped properties at the type level.
+ *
+ * @param endpoints - A grouped object of extended endpoint builders
+ *   (e.g. after `.authorize()` / `.inject()`).
+ * @param handlers - A matching grouped object of handler functions or
+ *   `{ handler, middlewares }` entries.
+ * @returns A {@link HandlerMapping} to pass to `ServerBuilder.handleAll()`.
+ *
+ * @example
+ * ```ts
+ * const mapping = mapHandlers(endpoints, {
+ *     auth: {
+ *         register: registerHandler,
+ *         login: loginHandler,
+ *     },
+ *     todos: {
+ *         list: listTodosHandler,
+ *         create: createTodoHandler,
+ *         export: { handler: exportHandler, middlewares: [auditLog] },
+ *     },
+ * });
+ *
+ * server.handleAll(mapping);
+ * ```
+ */
+export function mapHandlers<
+    TEndpoints extends Record<string, Record<string, AnyEndpoint>>
+>(endpoints: TEndpoints, handlers: HandlerMap<TEndpoints>): HandlerMapping {
+    const entries: HandlerMapping['_entries'][number][] = [];
+
+    for (const groupKey of Object.keys(endpoints)) {
+        const group = endpoints[groupKey]!;
+        const handlerGroup = (handlers as any)[groupKey];
+
+        for (const endpointKey of Object.keys(group)) {
+            const ep = group[endpointKey]!;
+            const entry = handlerGroup[endpointKey];
+
+            if (typeof entry === 'function') {
+                entries.push({ endpoint: ep, handler: entry });
+            } else {
+                entries.push({
+                    endpoint: ep,
+                    handler: entry.handler,
+                    middlewares: entry.middlewares
+                });
+            }
+        }
+    }
+
+    return { _entries: entries };
+}
 
 // ---------------------------------------------------------------------------
 // EndpointBuilder — immutable builder for endpoint definitions

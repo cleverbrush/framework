@@ -1,6 +1,6 @@
 import { number, object, string } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
-import { endpoint } from '../src/Endpoint.js';
+import { endpoint, mapHandlers } from '../src/Endpoint.js';
 
 describe('EndpointBuilder metadata', () => {
     it('summary() stores summary in introspect', () => {
@@ -309,5 +309,90 @@ describe('EndpointBuilder .externalDocs() / .links() / .callbacks()', () => {
 
     it('callbacks defaults to null in introspect', () => {
         expect(endpoint.post('/api/items').introspect().callbacks).toBeNull();
+    });
+});
+
+describe('mapHandlers()', () => {
+    const endpoints = {
+        auth: {
+            login: endpoint
+                .post('/api/login')
+                .body(object({ email: string() })),
+            register: endpoint
+                .post('/api/register')
+                .body(object({ email: string() }))
+        },
+        items: {
+            list: endpoint.get('/api/items'),
+            create: endpoint.post('/api/items').body(object({ name: string() }))
+        }
+    };
+
+    it('produces an entry for every endpoint', () => {
+        const mapping = mapHandlers(endpoints, {
+            auth: {
+                login: () => 'login',
+                register: () => 'register'
+            },
+            items: {
+                list: () => [],
+                create: () => ({ id: 1 })
+            }
+        });
+
+        expect(mapping._entries).toHaveLength(4);
+    });
+
+    it('bare function handlers are extracted correctly', () => {
+        const loginHandler = () => 'ok';
+        const mapping = mapHandlers(endpoints, {
+            auth: { login: loginHandler, register: () => 'r' },
+            items: { list: () => [], create: () => ({}) }
+        });
+
+        const loginEntry = mapping._entries.find(
+            e => e.endpoint.introspect().basePath === '/api/login'
+        );
+        expect(loginEntry).toBeDefined();
+        expect(loginEntry!.handler).toBe(loginHandler);
+        expect(loginEntry!.middlewares).toBeUndefined();
+    });
+
+    it('object entries with middlewares are extracted', () => {
+        const createHandler = () => ({ id: 1 });
+        const mw = async (_ctx: any, next: () => Promise<void>) => {
+            await next();
+        };
+
+        const mapping = mapHandlers(endpoints, {
+            auth: { login: () => 'ok', register: () => 'r' },
+            items: {
+                list: () => [],
+                create: { handler: createHandler, middlewares: [mw] }
+            }
+        });
+
+        const createEntry = mapping._entries.find(
+            e =>
+                e.endpoint.introspect().basePath === '/api/items' &&
+                e.endpoint.introspect().method === 'POST'
+        );
+        expect(createEntry).toBeDefined();
+        expect(createEntry!.handler).toBe(createHandler);
+        expect(createEntry!.middlewares).toEqual([mw]);
+    });
+
+    it('preserves endpoint references', () => {
+        const mapping = mapHandlers(endpoints, {
+            auth: { login: () => 'ok', register: () => 'r' },
+            items: { list: () => [], create: () => ({}) }
+        });
+
+        const listEntry = mapping._entries.find(
+            e =>
+                e.endpoint.introspect().basePath === '/api/items' &&
+                e.endpoint.introspect().method === 'GET'
+        );
+        expect(listEntry!.endpoint).toBe(endpoints.items.list);
     });
 });

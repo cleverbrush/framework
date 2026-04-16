@@ -18,7 +18,11 @@ export {
     type EndpointMetadataDescriptors,
     endpoint,
     type Handler,
+    type HandlerEntry,
+    type HandlerMap,
+    type HandlerMapping,
     type LinkDefinition,
+    mapHandlers,
     type PropertyRefTree,
     type ResponsesOf,
     type ScopedEndpointFactory

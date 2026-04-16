@@ -174,11 +174,23 @@ export type EndpointResponse<E> =
  * When the endpoint requires arguments (path params, body, query, or
  * headers) the function takes a single argument object.  When no arguments
  * are needed the function can be called with no arguments.
+ *
+ * Every endpoint call also exposes a `.stream()` method that returns an
+ * `AsyncIterable<string>` yielding newline-delimited chunks (e.g. NDJSON).
+ * An optional `AbortSignal` can be passed to cancel an in-flight stream.
  */
 type EndpointCall<E> =
     EndpointCallArgs<E> extends undefined
-        ? () => Promise<EndpointResponse<E>>
-        : (args: EndpointCallArgs<E>) => Promise<EndpointResponse<E>>;
+        ? (() => Promise<EndpointResponse<E>>) & {
+              stream: (options?: {
+                  signal?: AbortSignal;
+              }) => AsyncIterable<string>;
+          }
+        : ((args: EndpointCallArgs<E>) => Promise<EndpointResponse<E>>) & {
+              stream: (
+                  args: EndpointCallArgs<E> & { signal?: AbortSignal }
+              ) => AsyncIterable<string>;
+          };
 
 /**
  * Maps an {@link ApiContract} to a fully typed client object.

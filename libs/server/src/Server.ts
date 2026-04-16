@@ -15,7 +15,7 @@ import {
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
-import type { EndpointBuilder, Handler } from './Endpoint.js';
+import type { EndpointBuilder, Handler, HandlerMapping } from './Endpoint.js';
 import { HttpError } from './HttpError.js';
 import { MiddlewarePipeline } from './MiddlewarePipeline.js';
 import { needsBody, resolveArgs } from './ParameterResolver.js';
@@ -166,6 +166,24 @@ export class ServerBuilder {
             handler,
             middlewares: options?.middlewares
         });
+        return this;
+    }
+
+    /**
+     * Register all endpoints from a {@link HandlerMapping} created by
+     * {@link mapHandlers}. This is the bulk equivalent of calling
+     * `.handle()` for each endpoint individually.
+     *
+     * @param mapping - The mapping produced by `mapHandlers(endpoints, handlers)`.
+     */
+    handleAll(mapping: HandlerMapping): this {
+        for (const entry of mapping._entries) {
+            this.#registrations.push({
+                endpoint: entry.endpoint.introspect(),
+                handler: entry.handler,
+                middlewares: entry.middlewares
+            });
+        }
         return this;
     }
 
