@@ -16,15 +16,13 @@ import { useAuth } from '../../lib/auth-context';
 import { ApiError } from '../../lib/http-client';
 
 // Extend register schema with confirm password field
-const RegisterFormSchema = object({
-    email: string().describe("Your email address."),
-    password: string().minLength(8).describe("At least 8 characters."),
+const RegisterFormSchema = RegisterBodySchema.addProps({
     confirmPassword: string().describe("Repeat your password.")
 }).addValidator((v) => {
     if (v.password !== v.confirmPassword) {
         return {
             valid: false,
-            errors: [{ message: 'Passwords do not match.', path: [(t: any) => t.confirmPassword] }]
+            errors: [{ message: 'Passwords do not match.'}]
         };
     }
     return { valid: true };
