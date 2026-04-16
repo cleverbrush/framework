@@ -1,5 +1,6 @@
 {
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "private": true,
     "bugs": {
         "url": "https://github.com/cleverbrush/framework/issues",
         "email": "andrew_zol@cleverbrush.com"
