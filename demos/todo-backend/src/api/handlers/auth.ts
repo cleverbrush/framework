@@ -115,26 +115,38 @@ export const googleLoginHandler: Handler<typeof GoogleLoginEndpoint> = async (
         });
     }
 
-    const client = new OAuth2Client(clientId);
+    let email: string | undefined;
 
-    let payload: { email?: string; sub?: string } | undefined;
+    // Try verifying as an ID token first, fall back to access token
+    const client = new OAuth2Client(clientId);
     try {
         const ticket = await client.verifyIdToken({
             idToken: body.idToken,
             audience: clientId
         });
-        payload = ticket.getPayload();
+        email = ticket.getPayload()?.email;
     } catch {
-        return ActionResult.unauthorized({ message: 'Invalid Google ID token.' });
+        // Not a valid ID token — treat as an access token and fetch user info
+        try {
+            const res = await fetch(
+                `https://www.googleapis.com/oauth2/v3/userinfo`,
+                { headers: { Authorization: `Bearer ${body.idToken}` } }
+            );
+            if (!res.ok) {
+                return ActionResult.unauthorized({ message: 'Invalid Google token.' });
+            }
+            const info = (await res.json()) as { email?: string };
+            email = info.email;
+        } catch {
+            return ActionResult.unauthorized({ message: 'Invalid Google token.' });
+        }
     }
 
-    if (!payload?.email) {
+    if (!email) {
         return ActionResult.unauthorized({
             message: 'Google token does not contain an email address.'
         });
     }
-
-    const email = payload.email;
 
     // Find or auto-provision user
     let user = await db(UserDbSchema).where(t => t.email, email).first();

@@ -5,15 +5,15 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/auth": "0.0.0-beta-20260416154456",
-        "@cleverbrush/di": "0.0.0-beta-20260416154456",
-        "@cleverbrush/env": "0.0.0-beta-20260416154456",
-        "@cleverbrush/knex-schema": "0.0.0-beta-20260416154456",
-        "@cleverbrush/mapper": "0.0.0-beta-20260416154456",
-        "@cleverbrush/schema": "0.0.0-beta-20260416154456",
-        "@cleverbrush/schema-json": "0.0.0-beta-20260416154456",
-        "@cleverbrush/server": "0.0.0-beta-20260416154456",
-        "@cleverbrush/server-openapi": "0.0.0-beta-20260416154456",
+        "@cleverbrush/auth": "*",
+        "@cleverbrush/di": "*",
+        "@cleverbrush/env": "*",
+        "@cleverbrush/knex-schema": "*",
+        "@cleverbrush/mapper": "*",
+        "@cleverbrush/schema": "*",
+        "@cleverbrush/schema-json": "*",
+        "@cleverbrush/server": "*",
+        "@cleverbrush/server-openapi": "*",
         "google-auth-library": "^9.15.0",
         "knex": "^3.1.0",
         "pg": "^8.13.3"
@@ -39,7 +39,7 @@
     "scripts": {
         "start": "node dist/index.js",
         "watch": "tsc --build tsconfig.build.json --watch",
-        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
     },
     "devDependencies": {
