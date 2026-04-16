@@ -897,6 +897,43 @@ const SignupSchema = object({
 });
 ```
 
+### Property-Targeted Validator Errors
+
+By default, errors returned from object-level validators are attached to the root object. You can target an error to a specific property by providing a `property` selector — the same selector used by `getErrorsFor()` and react-form's `forProperty`:
+
+```typescript
+const SignupSchema = object({
+    password: string().minLength(8),
+    confirmPassword: string().minLength(8)
+}).addValidator((value) => {
+    if (value.password !== value.confirmPassword) {
+        return {
+            valid: false,
+            errors: [{
+                message: 'Passwords do not match',
+                property: (t) => t.confirmPassword
+            }]
+        };
+    }
+    return { valid: true };
+});
+
+const result = SignupSchema.validate(
+    { password: 'secret1', confirmPassword: 'secret2' },
+    { doNotStopOnFirstError: true }
+);
+
+// Error is routed to confirmPassword:
+result.getErrorsFor((t) => t.confirmPassword).errors;
+// → ['Passwords do not match']
+
+// Other properties are unaffected:
+result.getErrorsFor((t) => t.password).errors;
+// → []
+```
+
+You can target multiple properties from a single validator by returning multiple errors with different `property` selectors. Errors without a `property` selector are attached to the root object as before.
+
 ### Per-Property Errors with `getErrorsFor()` (Recommended)
 
 `ObjectSchemaBuilder.validate()` returns an extended result with a `getErrorsFor()` method for inspecting errors on individual properties — perfect for showing inline form errors. **This is the recommended way to inspect validation errors on object schemas** and replaces the deprecated `errors` array on `ObjectSchemaValidationResult`:

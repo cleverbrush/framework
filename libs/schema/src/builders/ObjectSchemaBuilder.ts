@@ -777,15 +777,49 @@ export class ObjectSchemaBuilder<
 
         const errors = prevalidatedResult.errors || [];
 
-        if (!valid && !doNotStopOnFirstError && preValidationErrors) {
+        /**
+         * Routes a pre-validation error through `addErrorFor`, respecting
+         * the optional `property` selector on `ValidationError`.
+         */
+        const routePreValidationError = (error: {
+            message: string;
+            property?: (tree: any) => any;
+        }) => {
+            if (
+                typeof error.property === 'function' &&
+                ObjectSchemaBuilder.isValidPropertyDescriptor(
+                    currentPropertyDescriptor
+                )
+            ) {
+                const targetDescriptor = error.property(
+                    currentPropertyDescriptor
+                );
+                if (
+                    ObjectSchemaBuilder.isValidPropertyDescriptor(
+                        targetDescriptor
+                    )
+                ) {
+                    addErrorFor(
+                        targetDescriptor,
+                        error.message,
+                        currentPropertyDescriptor
+                    );
+                    return;
+                }
+            }
+            // Fallback: attach to root descriptor
             if (
                 ObjectSchemaBuilder.isValidPropertyDescriptor(
                     currentPropertyDescriptor
                 )
             ) {
-                for (const error of preValidationErrors) {
-                    addErrorFor(currentPropertyDescriptor, error.message);
-                }
+                addErrorFor(currentPropertyDescriptor, error.message);
+            }
+        };
+
+        if (!valid && !doNotStopOnFirstError && preValidationErrors) {
+            for (const error of preValidationErrors) {
+                routePreValidationError(error);
             }
 
             return {
@@ -797,6 +831,15 @@ export class ObjectSchemaBuilder<
                     getInvalidProperties
                 }
             };
+        }
+
+        // When doNotStopOnFirstError is true and there are pre-validation
+        // errors (e.g. from addValidator), route them through addErrorFor
+        // so they are visible via getErrorsFor().
+        if (doNotStopOnFirstError && preValidationErrors) {
+            for (const error of preValidationErrors) {
+                routePreValidationError(error);
+            }
         }
 
         const {
@@ -1075,6 +1118,62 @@ export class ObjectSchemaBuilder<
             getErrorsFor,
             getInvalidProperties
         };
+    }
+
+    /**
+     * Adds a `validator` to validators list.
+     *
+     * Object-level validators can return errors with a `property` selector
+     * to route the error to a specific property, making it visible via
+     * `getErrorsFor()`.
+     *
+     * ```ts
+     * schema.addValidator((value) => ({
+     *     valid: false,
+     *     errors: [{
+     *         message: 'Passwords do not match',
+     *         property: (t) => t.confirmPassword
+     *     }]
+     * }));
+     * ```
+     *
+     * The `property` selector uses the same `PropertyDescriptorTree`
+     * as `getErrorsFor()` and react-form's `forProperty`.
+     */
+    public addValidator(
+        validator: (
+            object: undefined extends TExplicitType
+                ? WithConstructors<
+                      TConstructorSchemas,
+                      RespectPropsOptionality<TProperties>
+                  >
+                : TExplicitType
+        ) =>
+            | {
+                  valid: boolean;
+                  errors?: Array<{
+                      message: string;
+                      property?: (
+                          properties: PropertyDescriptorTree<
+                              ObjectSchemaBuilder<TProperties>
+                          >
+                      ) => PropertyDescriptor<any, any, any>;
+                  }>;
+              }
+            | Promise<{
+                  valid: boolean;
+                  errors?: Array<{
+                      message: string;
+                      property?: (
+                          properties: PropertyDescriptorTree<
+                              ObjectSchemaBuilder<TProperties>
+                          >
+                      ) => PropertyDescriptor<any, any, any>;
+                  }>;
+              }>,
+        options?: { mutates?: boolean }
+    ): this {
+        return super.addValidator(validator as any, options);
     }
 
     /**
