@@ -27,17 +27,11 @@ export const mappingRegistry = mapper()
         m
             .for(t => t.authProvider)
             .compute(f => f.authProvider)
-            .for(t => t.createdAt)
-            .compute(f => f.createdAt.toISOString())
     )
     .configure(TodoRowSchema, TodoResponseSchema, m =>
         m
             .for(t => t.description)
             .compute(f => f.description ?? undefined)
-            .for(t => t.createdAt)
-            .compute(f => f.createdAt.toISOString())
-            .for(t => t.updatedAt)
-            .compute(f => f.updatedAt.toISOString())
     );
 
 const _mapUserFn = mappingRegistry.getMapper(UserRowSchema, UserResponseSchema);

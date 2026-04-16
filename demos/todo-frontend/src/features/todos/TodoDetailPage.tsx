@@ -87,7 +87,7 @@ export function TodoDetailPage() {
         setCompleteLoading(true);
         setConflictError(false);
         setError(null);
-        const etag = data?.todo.updatedAt;
+        const etag = data?.todo.updatedAt ? String(data.todo.updatedAt) : undefined;
         try {
             await todosApi.complete(Number(id), etag);
             load();
@@ -139,7 +139,7 @@ export function TodoDetailPage() {
             } else if (eventType === 'commented') {
                 event = { type: 'commented', comment: eventComment };
             } else {
-                event = { type: 'completed', completedAt: new Date(eventCompletedAt).toISOString() };
+                event = { type: 'completed', completedAt: new Date(eventCompletedAt) };
             }
             const result = await todosApi.sendEvent(Number(id), event);
             setEventResult(JSON.stringify(result, null, 2));
@@ -226,7 +226,7 @@ export function TodoDetailPage() {
                             Updated: {todo ? new Date(todo.updatedAt).toLocaleString() : '-'}
                         </Text>
                         <Text size="1" color="gray" style={{ display: 'block' }}>
-                            ETag: <code style={{ fontSize: 10 }}>{todo?.updatedAt}</code>
+                            ETag: <code style={{ fontSize: 10 }}>{todo?.updatedAt ? String(todo.updatedAt) : ''}</code>
                         </Text>
                     </Card>
 

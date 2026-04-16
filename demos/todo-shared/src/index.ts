@@ -1,6 +1,8 @@
 import {
     array,
     boolean,
+    date,
+    type InferType,
     number,
     object,
     string,
@@ -40,10 +42,7 @@ export const PrincipalSchema = object({
     )
 });
 
-export type Principal = {
-    userId: number;
-    role: string;
-};
+export type Principal = InferType<typeof PrincipalSchema>;
 
 // ── User responses ────────────────────────────────────────────────────────────
 
@@ -52,18 +51,12 @@ export const UserResponseSchema = object({
     email: string().describe("The user's email address."),
     role: string().describe('The user\'s role. One of "user" or "admin".'),
     authProvider: string().describe('Authentication provider: "local" or "google".').optional(),
-    createdAt: string().describe(
+    createdAt: date().coerce().describe(
         'ISO 8601 timestamp of when the account was created.'
     )
 }).schemaName('UserResponse');
 
-export type UserResponse = {
-    id: number;
-    email: string;
-    role: string;
-    authProvider?: string;
-    createdAt: string;
-};
+export type UserResponse = InferType<typeof UserResponseSchema>;
 
 // ── Todo requests ─────────────────────────────────────────────────────────────
 
@@ -96,21 +89,13 @@ export const TodoResponseSchema = object({
         .describe('Optional longer description of the todo.'),
     completed: boolean().describe('Whether the todo has been completed.'),
     userId: number().describe('ID of the user who owns this todo.'),
-    createdAt: string().describe(
+    createdAt: date().coerce().describe(
         'ISO 8601 timestamp of when the todo was created.'
     ),
-    updatedAt: string().describe('ISO 8601 timestamp of the last update.')
+    updatedAt: date().coerce().describe('ISO 8601 timestamp of the last update.')
 }).schemaName('TodoResponse');
 
-export type TodoResponse = {
-    id: number;
-    title: string;
-    description?: string;
-    completed: boolean;
-    userId: number;
-    createdAt: string;
-    updatedAt: string;
-};
+export type TodoResponse = InferType<typeof TodoResponseSchema>;
 
 // ── Pagination ────────────────────────────────────────────────────────────────
 
@@ -167,7 +152,7 @@ export const TodoCommentedEventSchema = object({
 
 export const TodoCompletedEventSchema = object({
     type: string().equals('completed').describe('Event type discriminator.'),
-    completedAt: string().describe(
+    completedAt: date().coerce().describe(
         'ISO 8601 timestamp when the todo was completed.'
     )
 }).schemaName('TodoCompletedEvent');
@@ -177,10 +162,7 @@ export const TodoEventSchema = union(TodoAssignedEventSchema)
     .or(TodoCompletedEventSchema)
     .schemaName('TodoEvent');
 
-export type TodoEvent =
-    | { type: 'assigned'; assignedTo: number }
-    | { type: 'commented'; comment: string }
-    | { type: 'completed'; completedAt: string };
+export type TodoEvent = InferType<typeof TodoEventSchema>;
 
 // ── Import / Export ───────────────────────────────────────────────────────────
 
@@ -271,7 +253,7 @@ export const WebhookSubscriptionResponseSchema = object({
         'The registered callback URL for notifications.'
     ),
     events: array(string()).describe('The subscribed event types.'),
-    createdAt: string().describe(
+    createdAt: date().coerce().describe(
         'ISO 8601 timestamp of when the subscription was created.'
     )
 }).schemaName('WebhookSubscriptionResponse');

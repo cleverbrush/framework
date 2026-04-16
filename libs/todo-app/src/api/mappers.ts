@@ -35,16 +35,12 @@ const TodoRowSchema = object({
  */
 export const mappingRegistry = mapper()
     .configure(UserRowSchema, UserResponseSchema, m =>
-        m.for(t => t.createdAt).compute(f => f.createdAt.toISOString())
+        m.for(t => t.createdAt).compute(f => f.createdAt)
     )
     .configure(TodoRowSchema, TodoResponseSchema, m =>
         m
             .for(t => t.description)
             .compute(f => f.description ?? undefined)
-            .for(t => t.createdAt)
-            .compute(f => f.createdAt.toISOString())
-            .for(t => t.updatedAt)
-            .compute(f => f.updatedAt.toISOString())
     );
 
 const _mapUserFn = mappingRegistry.getMapper(UserRowSchema, UserResponseSchema);

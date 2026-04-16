@@ -4,7 +4,7 @@ export type WebhookSubscription = {
     id: string;
     callbackUrl: string;
     events: string[];
-    createdAt: string;
+    createdAt: Date;
 };
 
 export function subscribe(body: { callbackUrl: string; events: string[] }) {

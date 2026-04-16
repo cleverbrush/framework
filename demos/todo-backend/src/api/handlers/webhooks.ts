@@ -22,7 +22,7 @@ export const subscribeWebhookHandler: Handler<
         id: randomBytes(12).toString('hex'),
         callbackUrl: body.callbackUrl,
         events: body.events,
-        createdAt: new Date().toISOString()
+        createdAt: new Date()
     };
 
     return ActionResult.created(subscription, `/api/webhooks/${subscription.id}`);

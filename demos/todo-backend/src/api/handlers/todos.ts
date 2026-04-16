@@ -239,7 +239,7 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
     const header = 'id,title,description,completed,userId,createdAt,updatedAt';
     const csvRows = todos.map(
         t =>
-            `${t.id},"${(t.title ?? '').replace(/"/g, '""')}","${(t.description ?? '').replace(/"/g, '""')}",${t.completed},${t.userId},${t.createdAt},${t.updatedAt}`
+            `${t.id},"${(t.title ?? '').replace(/"/g, '""')}","${(t.description ?? '').replace(/"/g, '""')}",${t.completed},${t.userId},${t.createdAt.toISOString()},${t.updatedAt.toISOString()}`
     );
     const csv = [header, ...csvRows].join('\n');
 
@@ -276,8 +276,8 @@ export const downloadAttachmentHandler: Handler<
         `Title: ${mapped.title}`,
         mapped.description ? `Description: ${mapped.description}` : null,
         `Completed: ${mapped.completed ? 'Yes' : 'No'}`,
-        `Created: ${mapped.createdAt}`,
-        `Updated: ${mapped.updatedAt}`
+        `Created: ${mapped.createdAt.toISOString()}`,
+        `Updated: ${mapped.updatedAt.toISOString()}`
     ]
         .filter(Boolean)
         .join('\n');
