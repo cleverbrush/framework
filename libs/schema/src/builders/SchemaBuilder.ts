@@ -60,8 +60,31 @@ export type InferType<T> = T extends {
 
 /**
  * Represents a single validation error with a human-readable error message.
+ *
+ * When returned from an object-level validator (via {@link SchemaBuilder.addValidator | addValidator}),
+ * the optional `property` selector can route the error to a specific property
+ * so that {@link ObjectSchemaValidationResult.getErrorsFor | getErrorsFor()} reports it
+ * on that property rather than only on the root object.
+ *
+ * ```ts
+ * .addValidator((v) => ({
+ *     valid: false,
+ *     errors: [{
+ *         message: 'Passwords do not match',
+ *         property: (t) => t.confirmPassword
+ *     }]
+ * }))
+ * ```
  */
-export type ValidationError = { message: string };
+export type ValidationError = {
+    message: string;
+    /**
+     * Optional property selector that targets this error to a specific
+     * property of the validated object. Uses the same selector signature
+     * as `getErrorsFor()` and react-form's `forProperty`.
+     */
+    property?: (tree: any) => any;
+};
 
 /**
  * Used to represent a validation result for nested

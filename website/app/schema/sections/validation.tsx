@@ -161,6 +161,50 @@ console.log(result.errors); // [{ message: 'This email is already registered' }]
                     }}
                 />
             </pre>
+
+            <h3>Property-Targeted Validator Errors</h3>
+            <p>
+                By default, errors from object-level validators are attached to
+                the root object. You can target an error to a specific property
+                by providing a <code>property</code> selector — the same
+                selector used by <code>getErrorsFor()</code> and react-form's{' '}
+                <code>forProperty</code>:
+            </p>
+            <pre>
+                <code
+                    // biome-ignore lint/security/noDangerouslySetInnerHtml: allow here
+                    dangerouslySetInnerHTML={{
+                        __html: highlightTS(`const SignupSchema = object({
+  password: string().minLength(8),
+  confirmPassword: string().minLength(8)
+}).addValidator((value) => {
+  if (value.password !== value.confirmPassword) {
+    return {
+      valid: false,
+      errors: [{
+        message: 'Passwords do not match',
+        property: (t) => t.confirmPassword   // ← route to specific field
+      }]
+    };
+  }
+  return { valid: true };
+});
+
+const result = SignupSchema.validate(
+  { password: 'secret1', confirmPassword: 'secret2' },
+  { doNotStopOnFirstError: true }
+);
+
+// Error is routed to confirmPassword:
+result.getErrorsFor(t => t.confirmPassword).errors;
+// → ['Passwords do not match']
+
+// Other properties are unaffected:
+result.getErrorsFor(t => t.password).errors;
+// → []`)
+                    }}
+                />
+            </pre>
         </div>
     );
 }

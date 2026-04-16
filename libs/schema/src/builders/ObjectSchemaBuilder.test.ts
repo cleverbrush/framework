@@ -3029,6 +3029,249 @@ test('getErrorsFor - root errors from validator', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Property-targeted validator errors
+// ---------------------------------------------------------------------------
+
+test('addValidator - property-targeted error appears on getErrorsFor', () => {
+    const schema = object({
+        password: string().minLength(6),
+        confirmPassword: string().minLength(6)
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate(
+        { password: 'secret1', confirmPassword: 'secret2' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    const confirmErrors = result.getErrorsFor(t => t.confirmPassword);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Passwords do not match');
+
+    const passwordErrors = result.getErrorsFor(t => t.password);
+    expect(passwordErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - property-targeted error without doNotStopOnFirstError', () => {
+    const schema = object({
+        password: string().minLength(6),
+        confirmPassword: string().minLength(6)
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate({
+        password: 'secret1',
+        confirmPassword: 'secret2'
+    });
+
+    expect(result.valid).toEqual(false);
+
+    const confirmErrors = result.getErrorsFor(t => t.confirmPassword);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Passwords do not match');
+
+    const passwordErrors = result.getErrorsFor(t => t.password);
+    expect(passwordErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - multiple errors targeting different properties', () => {
+    const schema = object({
+        startDate: string(),
+        endDate: string(),
+        name: string()
+    }).addValidator(value => {
+        if (value.startDate > value.endDate) {
+            return {
+                valid: false as const,
+                errors: [
+                    {
+                        message: 'Start date must be before end date',
+                        property: t => t.startDate
+                    },
+                    {
+                        message: 'End date must be after start date',
+                        property: t => t.endDate
+                    }
+                ]
+            };
+        }
+        return { valid: true as const };
+    });
+
+    const result = schema.validate(
+        { startDate: '2026-12-01', endDate: '2026-01-01', name: 'test' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    const startErrors = result.getErrorsFor(t => t.startDate);
+    expect(startErrors.errors.length).toEqual(1);
+    expect(startErrors.errors[0]).toEqual('Start date must be before end date');
+
+    const endErrors = result.getErrorsFor(t => t.endDate);
+    expect(endErrors.errors.length).toEqual(1);
+    expect(endErrors.errors[0]).toEqual('End date must be after start date');
+
+    const nameErrors = result.getErrorsFor(t => t.name);
+    expect(nameErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - mix of targeted and untargeted errors', () => {
+    const schema = object({
+        password: string(),
+        confirmPassword: string()
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    },
+                    { message: 'Form has errors' }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate(
+        { password: 'abc', confirmPassword: 'xyz' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    // Targeted error goes to confirmPassword
+    const confirmErrors = result.getErrorsFor(t => t.confirmPassword);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Passwords do not match');
+
+    // Untargeted error goes to root
+    const rootErrors = result.getErrorsFor();
+    expect(rootErrors.errors).toContain('Form has errors');
+
+    // Both errors present in flat errors array
+    expect(result.errors).toBeDefined();
+    expect(result.errors!.length).toEqual(2);
+});
+
+test('addValidator - async validator with property targeting', async () => {
+    const schema = object({
+        email: string(),
+        confirmEmail: string()
+    }).addValidator(async value => {
+        if (value.email !== value.confirmEmail) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Emails do not match',
+                        property: t => t.confirmEmail
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = await schema.validateAsync(
+        { email: 'a@b.com', confirmEmail: 'c@d.com' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    const confirmErrors = result.getErrorsFor(t => t.confirmEmail);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Emails do not match');
+
+    const emailErrors = result.getErrorsFor(t => t.email);
+    expect(emailErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - property-targeted error also in flat errors array', () => {
+    const schema = object({
+        password: string(),
+        confirmPassword: string()
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate(
+        { password: 'abc', confirmPassword: 'xyz' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+    // Error is still in the flat errors array for backward compat
+    expect(result.errors).toBeDefined();
+    expect(result.errors!.length).toEqual(1);
+    expect(result.errors![0].message).toEqual('Passwords do not match');
+});
+
+test('addValidator - property selector callback receives PropertyDescriptorTree', () => {
+    object({
+        password: string(),
+        confirmPassword: string()
+    }).addValidator(_value => {
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: 'test',
+                    property: t => {
+                        // t should have 'password' and 'confirmPassword' keys
+                        expectTypeOf(t).toHaveProperty('password');
+                        expectTypeOf(t).toHaveProperty('confirmPassword');
+                        return t.confirmPassword;
+                    }
+                }
+            ]
+        };
+    });
+});
+
+// ---------------------------------------------------------------------------
 // clearDefault (line 397)
 // ---------------------------------------------------------------------------
 
