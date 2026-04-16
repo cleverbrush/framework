@@ -38,9 +38,7 @@ export const mappingRegistry = mapper()
         m.for(t => t.createdAt).compute(f => f.createdAt)
     )
     .configure(TodoRowSchema, TodoResponseSchema, m =>
-        m
-            .for(t => t.description)
-            .compute(f => f.description ?? undefined)
+        m.for(t => t.description).compute(f => f.description ?? undefined)
     );
 
 const _mapUserFn = mappingRegistry.getMapper(UserRowSchema, UserResponseSchema);
