@@ -10,7 +10,7 @@ import {
     Text
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
-import { object, string } from '@cleverbrush/schema';
+import { string } from '@cleverbrush/schema';
 import { RegisterBodySchema } from '@cleverbrush/todo-shared';
 import { useAuth } from '../../lib/auth-context';
 import { ApiError } from '../../lib/http-client';
