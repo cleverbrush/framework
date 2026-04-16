@@ -10,7 +10,7 @@ import {
   Spinner,
 } from '@radix-ui/themes';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
-import { list, deleteUser } from '../../api/users';
+import { client } from '../../api/client';
 import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Pagination } from '../../components/Pagination';
@@ -32,7 +32,7 @@ export default function UsersPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await list(page, PAGE_SIZE);
+      const res = await client.users.list({ query: { page, limit: PAGE_SIZE } });
       setUsers(res);
       setHasMore(res.length === PAGE_SIZE);
     } catch (e: any) {
@@ -48,7 +48,7 @@ export default function UsersPage() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await deleteUser(deleteTarget.id);
+      await client.users.delete({ params: { id: deleteTarget.id } });
       setDeleteTarget(null);
       load();
     } catch (e: any) {

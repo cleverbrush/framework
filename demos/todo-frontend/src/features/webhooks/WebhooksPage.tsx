@@ -12,7 +12,7 @@ import {
   CheckboxGroup,
 } from '@radix-ui/themes';
 import { InfoCircledIcon, CheckCircledIcon } from '@radix-ui/react-icons';
-import { subscribe } from '../../api/webhooks';
+import { client } from '../../api/client';
 
 const EVENT_TYPES = ['todo.created', 'todo.updated', 'todo.completed', 'todo.deleted'];
 
@@ -37,7 +37,7 @@ export default function WebhooksPage() {
     setError(null);
     setResult(null);
     try {
-      const res = await subscribe({ callbackUrl, events: selectedEvents });
+      const res = await client.webhooks.subscribe({ body: { callbackUrl, events: selectedEvents } });
       setResult(res);
       setCallbackUrl('');
     } catch (e: any) {

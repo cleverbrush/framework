@@ -11,8 +11,8 @@ import {
     Text,
     TextField
 } from '@radix-ui/themes';
-import { todosApi } from '../../api/todos';
-import { ApiError } from '../../lib/http-client';
+import { ApiError } from '@cleverbrush/web';
+import { client } from '../../api/client';
 
 type ImportItem = { title: string; description: string };
 type ImportResult = { title: string; success: boolean; error?: string };
@@ -45,17 +45,18 @@ export function ImportTodosPage() {
         setAcceptedAsync(false);
 
         try {
-            const result = await todosApi.import(
-                toImport.map((i) => ({ title: i.title, description: i.description || undefined })),
-                idempotencyKey || undefined
-            );
-            setResults(result);
-        } catch (e) {
-            if (e instanceof ApiError && e.status === 202) {
-                setAcceptedAsync(true);
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const result = await client.todos.importBulk({
+                body: { items: toImport },
+                headers: { 'x-idempotency-key': idempotencyKey || undefined }
+            }) as any;
+            if (result?.items) {
+                setResults(result);
             } else {
-                setError(e instanceof ApiError ? e.message : 'Import failed.');
+                setAcceptedAsync(true);
             }
+        } catch (e) {
+            setError(e instanceof ApiError ? e.message : 'Import failed.');
         } finally {
             setLoading(false);
         }

@@ -9,8 +9,8 @@ import {
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { CreateTodoBodySchema } from '@cleverbrush/todo-shared';
-import { todosApi } from '../../api/todos';
-import { ApiError } from '../../lib/http-client';
+import { ApiError } from '@cleverbrush/web';
+import { client } from '../../api/client';
 
 export function CreateTodoPage() {
     const navigate = useNavigate();
@@ -26,10 +26,7 @@ export function CreateTodoPage() {
         setLoading(true);
         setError(null);
         try {
-            const todo = await todosApi.create({
-                title: result.object.title,
-                description: result.object.description
-            });
+            const todo = await client.todos.create({ body: result.object });
             navigate(`/todos/${todo.id}`);
         } catch (e) {
             setError(e instanceof ApiError ? e.message : 'Failed to create todo.');

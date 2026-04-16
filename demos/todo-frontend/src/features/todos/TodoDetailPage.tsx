@@ -16,10 +16,11 @@ import {
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { UpdateTodoBodySchema, type TodoEvent, type TodoResponse, type UserResponse } from '@cleverbrush/todo-shared';
-import { todosApi } from '../../api/todos';
+import { ApiError } from '@cleverbrush/web';
+import { client } from '../../api/client';
+import { loadToken } from '../../lib/http-client';
 import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
-import { ApiError } from '../../lib/http-client';
 
 type TodoWithAuthor = { todo: TodoResponse; author: UserResponse };
 
@@ -52,7 +53,7 @@ export function TodoDetailPage() {
         setLoading(true);
         setError(null);
         try {
-            const result = await todosApi.getWithAuthor(Number(id));
+            const result = await client.todos.getWithAuthor({ params: { id: Number(id) } });
             setData(result);
             editForm.setValue({
                 title: result.todo.title,
@@ -74,7 +75,7 @@ export function TodoDetailPage() {
         setSaveLoading(true);
         setError(null);
         try {
-            await todosApi.update(Number(id), result.object);
+            await client.todos.update({ params: { id: Number(id) }, body: result.object });
             load();
         } catch (e) {
             setError(e instanceof ApiError ? e.message : 'Failed to save.');
@@ -89,7 +90,7 @@ export function TodoDetailPage() {
         setError(null);
         const etag = data?.todo.updatedAt ? String(data.todo.updatedAt) : undefined;
         try {
-            await todosApi.complete(Number(id), etag);
+            await client.todos.complete({ params: { id: Number(id) }, headers: { 'if-match': etag } });
             load();
         } catch (e) {
             if (e instanceof ApiError && e.status === 409) {
@@ -104,7 +105,12 @@ export function TodoDetailPage() {
 
     const handleDownload = async () => {
         try {
-            const blob = await todosApi.downloadAttachment(Number(id));
+            const token = loadToken();
+            const resp = await fetch(`/api/todos/${id}/attachment`, {
+                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            });
+            if (!resp.ok) throw new Error('Download failed');
+            const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -119,7 +125,7 @@ export function TodoDetailPage() {
     const handleDelete = async () => {
         setDeleteLoading(true);
         try {
-            await todosApi.delete(Number(id));
+            await client.todos.delete({ params: { id: Number(id) } });
             navigate('/todos');
         } catch (e) {
             setError(e instanceof ApiError ? e.message : 'Failed to delete.');
@@ -141,7 +147,7 @@ export function TodoDetailPage() {
             } else {
                 event = { type: 'completed', completedAt: new Date(eventCompletedAt) };
             }
-            const result = await todosApi.sendEvent(Number(id), event);
+            const result = await client.todos.sendEvent({ params: { id: Number(id) }, body: event });
             setEventResult(JSON.stringify(result, null, 2));
         } catch (e) {
             setError(e instanceof ApiError ? e.message : 'Event failed.');

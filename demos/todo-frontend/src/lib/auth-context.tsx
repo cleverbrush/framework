@@ -6,8 +6,7 @@ import {
     useState,
     type ReactNode
 } from 'react';
-import { authApi } from '../api/auth';
-import { me as loadMyProfile } from '../api/users';
+import { client } from '../api/client';
 import { loadToken, setToken } from './http-client';
 import type { UserResponse } from '@cleverbrush/todo-shared';
 
@@ -41,7 +40,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const fetchMe = useCallback(async (t: string) => {
         setToken(t);
         try {
-            const me = await loadMyProfile();
+            const me = await client.users.me();
             setUser(me);
             setTokenState(t);
         } catch {
@@ -62,18 +61,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [fetchMe]);
 
     const login = useCallback(async (email: string, password: string) => {
-        const { token: t } = await authApi.login({ email, password });
+        const { token: t } = await client.auth.login({ body: { email, password } });
         await fetchMe(t);
     }, [fetchMe]);
 
     const register = useCallback(async (email: string, password: string) => {
-        await authApi.register({ email, password });
-        const { token: t } = await authApi.login({ email, password });
+        await client.auth.register({ body: { email, password } });
+        const { token: t } = await client.auth.login({ body: { email, password } });
         await fetchMe(t);
     }, [fetchMe]);
 
     const googleLogin = useCallback(async (idToken: string) => {
-        const { token: t } = await authApi.googleLogin(idToken);
+        const { token: t } = await client.auth.googleLogin({ body: { idToken } });
         await fetchMe(t);
     }, [fetchMe]);
 

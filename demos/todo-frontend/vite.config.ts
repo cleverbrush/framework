@@ -7,6 +7,7 @@ export default defineConfig({
     resolve: {
         alias: {
             // Resolve todo-shared from source during development
+            '@cleverbrush/todo-shared/contract': resolve(__dirname, '../todo-shared/src/contract.ts'),
             '@cleverbrush/todo-shared': resolve(__dirname, '../todo-shared/src/index.ts')
         },
         // Force a single instance of these packages so instanceof checks work

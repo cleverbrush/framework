@@ -13,11 +13,11 @@ import {
     TextField
 } from '@radix-ui/themes';
 import type { TodoResponse } from '@cleverbrush/todo-shared';
-import { todosApi } from '../../api/todos';
+import { ApiError } from '@cleverbrush/web';
+import { client } from '../../api/client';
 import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Pagination } from '../../components/Pagination';
-import { ApiError } from '../../lib/http-client';
 
 const PAGE_SIZE = 10;
 
@@ -39,7 +39,7 @@ export function TodoListPage() {
         setError(null);
         try {
             const userId = isAdmin && userIdFilter ? Number(userIdFilter) : undefined;
-            const data = await todosApi.list({ page, limit: PAGE_SIZE, userId });
+            const data = await client.todos.list({ query: { page, limit: PAGE_SIZE, userId } });
             setTodos(data);
         } catch (e) {
             setError(e instanceof ApiError ? e.message : 'Failed to load todos.');
@@ -54,7 +54,7 @@ export function TodoListPage() {
         if (!deleteTarget) return;
         setDeleting(true);
         try {
-            await todosApi.delete(deleteTarget.id);
+            await client.todos.delete({ params: { id: deleteTarget.id } });
             setDeleteTarget(null);
             load();
         } catch (e) {
@@ -67,7 +67,8 @@ export function TodoListPage() {
     const handleExport = async () => {
         setExporting(true);
         try {
-            const { blob, totalCount } = await todosApi.exportCsv();
+            const csvText = await client.todos.exportCsv();
+            const blob = new Blob([csvText], { type: 'text/csv' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

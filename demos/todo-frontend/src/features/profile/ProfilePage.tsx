@@ -11,7 +11,7 @@ import {
 } from '@radix-ui/themes';
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Link } from 'react-router';
-import { me as fetchMe } from '../../api/users';
+import { client } from '../../api/client';
 import type { UserResponse } from '@cleverbrush/todo-shared';
 
 export default function ProfilePage() {
@@ -20,7 +20,7 @@ export default function ProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchMe()
+    client.users.me()
       .then(setProfile)
       .catch((e: unknown) => setError(e instanceof Error ? e.message : 'Failed to load profile'))
       .finally(() => setLoading(false));
