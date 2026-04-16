@@ -12,9 +12,10 @@ import {
     Text,
     TextField
 } from '@radix-ui/themes';
-import type { TodoResponse } from '@cleverbrush/todo-backend/contract';
 import { ApiError } from '@cleverbrush/web';
 import { client } from '../../api/client';
+
+type Todo = Awaited<ReturnType<typeof client.todos.list>>[number];
 import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Pagination } from '../../components/Pagination';
@@ -25,12 +26,12 @@ export function TodoListPage() {
     const { isAdmin } = useAuth();
     const navigate = useNavigate();
 
-    const [todos, setTodos] = useState<TodoResponse[]>([]);
+    const [todos, setTodos] = useState<Todo[]>([]);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [userIdFilter, setUserIdFilter] = useState('');
-    const [deleteTarget, setDeleteTarget] = useState<TodoResponse | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<Todo | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [exporting, setExporting] = useState(false);
 

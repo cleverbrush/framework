@@ -15,14 +15,16 @@ import {
     TextField
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
-import { UpdateTodoBodySchema, type TodoEvent, type TodoResponse, type UserResponse } from '@cleverbrush/todo-backend/contract';
+import { UpdateTodoBodySchema } from '@cleverbrush/todo-backend/contract';
 import { ApiError } from '@cleverbrush/web';
 import { client } from '../../api/client';
+
+type TodoEvent = Parameters<typeof client.todos.sendEvent>[0]['body'];
 import { loadToken } from '../../lib/http-client';
 import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
-type TodoWithAuthor = { todo: TodoResponse; author: UserResponse };
+type TodoWithAuthor = Awaited<ReturnType<typeof client.todos.getWithAuthor>>;
 
 export function TodoDetailPage() {
     const { id } = useParams<{ id: string }>();

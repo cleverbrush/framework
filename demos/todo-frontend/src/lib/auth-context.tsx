@@ -8,10 +8,11 @@ import {
 } from 'react';
 import { client } from '../api/client';
 import { loadToken, setToken } from './http-client';
-import type { UserResponse } from '@cleverbrush/todo-backend/contract';
+
+type UserProfile = Awaited<ReturnType<typeof client.users.me>>;
 
 type AuthState = {
-    user: UserResponse | null;
+    user: UserProfile | null;
     token: string | null;
     isAuthenticated: boolean;
     isAdmin: boolean;
@@ -28,7 +29,7 @@ type AuthActions = {
 const AuthContext = createContext<(AuthState & AuthActions) | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [user, setUser] = useState<UserResponse | null>(null);
+    const [user, setUser] = useState<UserProfile | null>(null);
     const [token, setTokenState] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
 

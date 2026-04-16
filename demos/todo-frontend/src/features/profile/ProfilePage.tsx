@@ -12,10 +12,9 @@ import {
 import { InfoCircledIcon } from '@radix-ui/react-icons';
 import { Link } from 'react-router';
 import { client } from '../../api/client';
-import type { UserResponse } from '@cleverbrush/todo-backend/contract';
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<UserResponse | null>(null);
+  const [profile, setProfile] = useState<Awaited<ReturnType<typeof client.users.me>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

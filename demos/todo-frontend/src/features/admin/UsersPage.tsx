@@ -14,18 +14,19 @@ import { client } from '../../api/client';
 import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 import { Pagination } from '../../components/Pagination';
-import type { UserResponse } from '@cleverbrush/todo-backend/contract';
+
+type User = Awaited<ReturnType<typeof client.users.list>>[number];
 
 const PAGE_SIZE = 20;
 
 export default function UsersPage() {
   const { user } = useAuth();
-  const [users, setUsers] = useState<UserResponse[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<UserResponse | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
