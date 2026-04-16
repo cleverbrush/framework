@@ -22,7 +22,10 @@ const RegisterFormSchema = RegisterBodySchema.addProps({
     if (v.password !== v.confirmPassword) {
         return {
             valid: false,
-            errors: [{ message: 'Passwords do not match.'}]
+            errors: [{ 
+                message: 'Passwords do not match.',
+                property: t => t.confirmPassword
+            }]
         };
     }
     return { valid: true };
