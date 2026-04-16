@@ -352,10 +352,9 @@ export const legacyReplaceTodoHandler: Handler<
 
 // ── Complete todo with conflict detection ─────────────────────────────────────
 
-export const completeTodoHandler: Handler<typeof CompleteTodoEndpoint> = async (
-    { params, headers, principal },
-    { db }
-) => {
+export const completeTodoHandler: Handler<
+    typeof CompleteTodoEndpoint
+> = async ({ params, headers, principal }, { db }) => {
     const todo = await db(TodoDbSchema)
         .where(t => t.id, params.id)
         .first();

@@ -1,5 +1,9 @@
 import { jwtScheme } from '@cleverbrush/auth';
-import { createServer, endpoint, type Middleware } from '@cleverbrush/server';
+import {
+    createServer,
+    endpoint,
+    type Middleware
+} from '@cleverbrush/server';
 import {
     generateOpenApiSpec,
     type OpenApiDocument
@@ -15,6 +19,7 @@ import {
     GetMyProfileEndpoint,
     GetTodoEndpoint,
     GetTodoWithAuthorEndpoint,
+    GoogleLoginEndpoint,
     ImportTodosEndpoint,
     LegacyReplaceTodoEndpoint,
     ListTodosEndpoint,
@@ -28,7 +33,7 @@ import {
     UpdateTodoEndpoint
 } from './api/endpoints.js';
 import { activityLogHandler } from './api/handlers/admin.js';
-import { loginHandler, registerHandler } from './api/handlers/auth.js';
+import { googleLoginHandler, loginHandler, registerHandler } from './api/handlers/auth.js';
 import {
     completeTodoHandler,
     createTodoHandler,
@@ -189,6 +194,7 @@ export function buildServer(config: Config) {
         // Auth
         .handle(RegisterEndpoint, registerHandler)
         .handle(LoginEndpoint, loginHandler)
+        .handle(GoogleLoginEndpoint, googleLoginHandler)
         // Todos
         .handle(ListTodosEndpoint, listTodosHandler)
         .handle(GetTodoEndpoint, getTodoHandler)

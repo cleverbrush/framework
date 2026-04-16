@@ -26,7 +26,8 @@
         "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json"
     },
     "workspaces": [
-        "./libs/*"
+        "./libs/*",
+        "./demos/*"
     ],
     "keywords": [],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",

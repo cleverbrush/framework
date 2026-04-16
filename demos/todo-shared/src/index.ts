@@ -21,6 +21,10 @@ export const LoginBodySchema = object({
     password: string().describe("The user's password.")
 });
 
+export const GoogleAuthBodySchema = object({
+    idToken: string().describe('Google ID token obtained from the Google Sign-In flow.')
+});
+
 export const TokenResponseSchema = object({
     token: string().describe(
         'Signed JWT to be sent as a Bearer token in subsequent requests.'
@@ -47,6 +51,7 @@ export const UserResponseSchema = object({
     id: number().describe('Unique identifier of the user.'),
     email: string().describe("The user's email address."),
     role: string().describe('The user\'s role. One of "user" or "admin".'),
+    authProvider: string().describe('Authentication provider: "local" or "google".').optional(),
     createdAt: string().describe(
         'ISO 8601 timestamp of when the account was created.'
     )
@@ -56,6 +61,7 @@ export type UserResponse = {
     id: number;
     email: string;
     role: string;
+    authProvider?: string;
     createdAt: string;
 };
 
@@ -141,9 +147,6 @@ export const ErrorResponseSchema = object({
 }).schemaName('ErrorResponse');
 
 // ── Todo with embedded author ─────────────────────────────────────────────────
-// Demonstrates nested $ref deduplication: both TodoResponse and UserResponse
-// are named schemas, so generateOpenApiSpec() emits each once in
-// components/schemas and references them via $ref wherever they appear.
 
 export const TodoWithAuthorResponseSchema = object({
     todo: TodoResponseSchema,
@@ -151,10 +154,6 @@ export const TodoWithAuthorResponseSchema = object({
 }).schemaName('TodoWithAuthorResponse');
 
 // ── Todo events (discriminated union) ─────────────────────────────────────────
-// Demonstrates OpenAPI discriminator output from @cleverbrush/schema-json.
-// The `type` property is a string literal on every branch, so the union
-// builder detects it as the discriminator key and emits the OpenAPI
-// `discriminator: { propertyName: "type", mapping: { … } }` keyword.
 
 export const TodoAssignedEventSchema = object({
     type: string().equals('assigned').describe('Event type discriminator.'),

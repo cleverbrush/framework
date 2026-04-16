@@ -1,0 +1,67 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-todo_db}
+      POSTGRES_USER: ${POSTGRES_USER:-todo_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo_secret}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo_user} -d ${POSTGRES_DB:-todo_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: demos/todo-backend/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB:-todo_db}
+      DB_USER: ${POSTGRES_USER:-todo_user}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-todo_secret}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min32chars!}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-3600}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      PORT: 3000
+      NODE_ENV: production
+    ports:
+      - "${APP_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: demos/todo-frontend/Dockerfile
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+        VITE_API_URL: ""
+    depends_on:
+      backend:
+        condition: service_started
+    ports:
+      - "${FRONTEND_PORT:-5173}:80"
+
+  swagger-ui:
+    image: swaggerapi/swagger-ui:latest
+    environment:
+      URL: http://localhost:${APP_PORT:-3000}/api/openapi.json
+      DISPLAY_OPERATION_ID: "true"
+    ports:
+      - "${SWAGGER_PORT:-8090}:8080"
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
