@@ -580,9 +580,7 @@ test('serialize: Date param', () => {
         $t => $t`/events/${t => t.since}`
     );
 
-    expect(schema.serialize({ since: d })).toBe(
-        '/events/Mon Jan 15 2024 10:30:00 GMT+0000 (Coordinated Universal Time)'
-    );
+    expect(schema.serialize({ since: d })).toBe(`/events/${String(d)}`);
 });
 
 test('serialize: throws on missing required param', () => {
