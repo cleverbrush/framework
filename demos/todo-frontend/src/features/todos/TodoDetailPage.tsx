@@ -21,7 +21,6 @@ import { client } from '../../api/client';
 
 type TodoEvent = Parameters<typeof client.todos.sendEvent>[0]['body'];
 import { loadToken } from '../../lib/http-client';
-import { useAuth } from '../../lib/auth-context';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 type TodoWithAuthor = Awaited<ReturnType<typeof client.todos.getWithAuthor>>;
@@ -29,7 +28,6 @@ type TodoWithAuthor = Awaited<ReturnType<typeof client.todos.getWithAuthor>>;
 export function TodoDetailPage() {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { isAdmin } = useAuth();
 
     const [data, setData] = useState<TodoWithAuthor | null>(null);
     const [loading, setLoading] = useState(true);
