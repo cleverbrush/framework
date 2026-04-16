@@ -70,8 +70,11 @@ export const CreateTodoBodySchema = object({
 });
 
 export const UpdateTodoBodySchema = object({
+    /** New title for the todo. */
     title: string().minLength(1).optional().describe('New title for the todo.'),
+    /** New description for the todo. */
     description: string().optional().describe('New description for the todo.'),
+    /** Whether the todo is completed. */
     completed: boolean()
         .optional()
         .describe(

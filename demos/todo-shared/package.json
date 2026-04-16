@@ -9,11 +9,16 @@
         ".": {
             "types": "./src/index.ts",
             "default": "./src/index.ts"
+        },
+        "./contract": {
+            "types": "./src/contract.ts",
+            "default": "./src/contract.ts"
         }
     },
     "sideEffects": false,
     "dependencies": {
-        "@cleverbrush/schema": "0.0.0-beta-20260416114445"
+        "@cleverbrush/schema": "^2.0.0",
+        "@cleverbrush/server": "^2.0.0"
     },
     "devDependencies": {
         "typescript": "^6.0.2"

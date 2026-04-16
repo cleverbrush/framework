@@ -129,7 +129,7 @@ describe('serveOpenApi', () => {
                     schemes: [
                         {
                             name: 'jwt',
-                            authenticate: () => ({} as any),
+                            authenticate: () => ({}) as any,
                             challenge: () => ({
                                 headerName: 'WWW-Authenticate',
                                 headerValue: 'Bearer'

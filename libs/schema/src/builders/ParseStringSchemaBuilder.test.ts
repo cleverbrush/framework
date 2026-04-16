@@ -538,3 +538,77 @@ test('InferType with optional', () => {
     type Result = InferType<typeof schema>;
     expectTypeOf<Result>().toEqualTypeOf<{ id: number } | undefined>();
 });
+
+// ---------------------------------------------------------------------------
+// serialize — reverse of validate
+// ---------------------------------------------------------------------------
+
+test('serialize: single number param', () => {
+    const schema = parseString(
+        object({ id: number().coerce() }),
+        $t => $t`/orders/${t => t.id}`
+    );
+
+    expect(schema.serialize({ id: 42 })).toBe('/orders/42');
+});
+
+test('serialize: multiple params', () => {
+    const schema = parseString(
+        object({ org: string(), repo: string() }),
+        $t => $t`/${t => t.org}/${t => t.repo}`
+    );
+
+    expect(schema.serialize({ org: 'cleverbrush', repo: 'framework' })).toBe(
+        '/cleverbrush/framework'
+    );
+});
+
+test('serialize: boolean param', () => {
+    const schema = parseString(
+        object({ active: boolean() }),
+        $t => $t`/items?active=${t => t.active}`
+    );
+
+    expect(schema.serialize({ active: true })).toBe('/items?active=true');
+    expect(schema.serialize({ active: false })).toBe('/items?active=false');
+});
+
+test('serialize: Date param', () => {
+    const d = new Date('2024-01-15T10:30:00.000Z');
+    const schema = parseString(
+        object({ since: date() }),
+        $t => $t`/events/${t => t.since}`
+    );
+
+    expect(schema.serialize({ since: d })).toBe(
+        '/events/Mon Jan 15 2024 10:30:00 GMT+0000 (Coordinated Universal Time)'
+    );
+});
+
+test('serialize: throws on missing required param', () => {
+    const schema = parseString(
+        object({ id: number().coerce() }),
+        $t => $t`/orders/${t => t.id}`
+    );
+
+    expect(() => schema.serialize({} as any)).toThrow(
+        /Missing required parameter "id"/
+    );
+});
+
+test('serialize: roundtrip with validate', () => {
+    const schema = parseString(
+        object({ id: number().coerce(), slug: string() }),
+        $t => $t`/posts/${t => t.id}/${t => t.slug}`
+    );
+
+    const original = { id: 7, slug: 'hello-world' };
+    const serialized = schema.serialize(original);
+    expect(serialized).toBe('/posts/7/hello-world');
+
+    const parsed = schema.validate(serialized);
+    expect(parsed.valid).toBe(true);
+    if (parsed.valid) {
+        expect(parsed.object).toEqual(original);
+    }
+});

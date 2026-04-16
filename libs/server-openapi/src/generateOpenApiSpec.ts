@@ -635,9 +635,7 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
             : (srv?.getAuthenticationConfig() ?? undefined);
     const webhooks =
         options.webhooks ??
-        (srv && srv.getWebhooks().length > 0
-            ? srv.getWebhooks()
-            : undefined);
+        (srv && srv.getWebhooks().length > 0 ? srv.getWebhooks() : undefined);
     const { info, servers, securitySchemes, tags } = options;
 
     // Security schemes — from explicit config or auto-mapped

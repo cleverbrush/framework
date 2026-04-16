@@ -1644,7 +1644,16 @@ describe('webhooks', () => {
                 getRegistrations: () => [reg],
                 getAuthenticationConfig: () => ({
                     defaultScheme: 'jwt',
-                    schemes: [{ name: 'jwt', authenticate: () => ({} as any), challenge: () => ({ headerName: 'WWW-Authenticate', headerValue: 'Bearer' }) }]
+                    schemes: [
+                        {
+                            name: 'jwt',
+                            authenticate: () => ({}) as any,
+                            challenge: () => ({
+                                headerName: 'WWW-Authenticate',
+                                headerValue: 'Bearer'
+                            })
+                        }
+                    ]
                 }),
                 getWebhooks: () => []
             },
@@ -1665,15 +1674,13 @@ describe('webhooks', () => {
             server: {
                 getRegistrations: () => [makeReg()],
                 getAuthenticationConfig: () => null,
-                getWebhooks: () => [
-                    { name: 'onEvent', summary: 'Event fired' }
-                ]
+                getWebhooks: () => [{ name: 'onEvent', summary: 'Event fired' }]
             },
             info: { title: 'Test', version: '1.0.0' }
         });
-        expect(
-            (spec['webhooks'] as any)?.['onEvent']?.['post']?.summary
-        ).toBe('Event fired');
+        expect((spec['webhooks'] as any)?.['onEvent']?.['post']?.summary).toBe(
+            'Event fired'
+        );
     });
 
     it('explicit registrations override server-derived ones', () => {
@@ -1712,7 +1719,16 @@ describe('webhooks', () => {
                 getRegistrations: () => [reg],
                 getAuthenticationConfig: () => ({
                     defaultScheme: 'jwt',
-                    schemes: [{ name: 'jwt', authenticate: () => ({} as any), challenge: () => ({ headerName: 'WWW-Authenticate', headerValue: 'Bearer' }) }]
+                    schemes: [
+                        {
+                            name: 'jwt',
+                            authenticate: () => ({}) as any,
+                            challenge: () => ({
+                                headerName: 'WWW-Authenticate',
+                                headerValue: 'Bearer'
+                            })
+                        }
+                    ]
                 }),
                 getWebhooks: () => []
             },

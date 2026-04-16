@@ -6,21 +6,20 @@
     },
     "dependencies": {
         "@cleverbrush/schema": "^2.0.0",
-        "@cleverbrush/di": "^2.0.0",
-        "@cleverbrush/auth": "^2.0.0"
+        "@cleverbrush/server": "^2.0.0"
     },
-    "description": "Schema-first HTTP server framework — schema-driven controllers, DI, auto-validation, RFC 9457 errors",
+    "description": "Typed HTTP client generated from @cleverbrush/server API contracts — zero codegen, full type safety",
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/server",
+    "homepage": "https://docs.cleverbrush.com/web",
     "keywords": [
-        "http",
-        "server",
-        "schema",
-        "dependency injection",
-        "validation",
+        "http-client",
+        "typed-client",
+        "api-client",
         "typescript",
+        "type-safe",
+        "proxy",
         "cleverbrush"
     ],
     "license": "BSD 3-Clause",
@@ -29,15 +28,11 @@
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
-        },
-        "./contract": {
-            "types": "./dist/contract.d.ts",
-            "import": "./dist/contract.js"
         }
     },
     "sideEffects": false,
-    "name": "@cleverbrush/server",
-    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/server#readme",
+    "name": "@cleverbrush/web",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/web#readme",
     "repository": {
         "type": "git",
         "url": "github:cleverbrush/framework"

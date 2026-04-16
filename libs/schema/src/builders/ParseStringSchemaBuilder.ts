@@ -76,6 +76,21 @@ function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Resolves a dot-separated property path on a (possibly nested) object.
+ *
+ * For flat paths like `'id'` this is equivalent to `obj['id']`.
+ * For nested paths like `'order.id'` it traverses `obj.order.id`.
+ */
+function resolvePath(obj: any, path: string): unknown {
+    let current: any = obj;
+    for (const part of path.split('.')) {
+        if (current == null) return undefined;
+        current = current[part];
+    }
+    return current;
+}
+
 // ---------------------------------------------------------------------------
 // Path-tracking Proxy (used at schema creation time)
 // ---------------------------------------------------------------------------
@@ -234,6 +249,49 @@ export class ParseStringSchemaBuilder<
             /** The template definition (literals + segments). */
             templateDefinition: this.#templateDef
         };
+    }
+
+    // -- Serialize -----------------------------------------------------------
+
+    /**
+     * Builds a string from the template by substituting parameter values.
+     *
+     * This is the reverse of {@link validate}: where `validate` parses a
+     * string into a typed object, `serialize` takes a params object and
+     * produces the string.
+     *
+     * @param params - An object matching the template's parsed result type.
+     *   Nested properties are resolved via dot-paths (e.g. `order.id`).
+     *   Values are coerced to strings via `String()`.
+     * @returns The reconstructed string with all segments replaced.
+     * @throws {Error} If a required parameter is missing (`undefined`).
+     *
+     * @example
+     * ```ts
+     * const Route = parseString(
+     *   object({ id: number().coerce() }),
+     *   $t => $t`/todos/${t => t.id}`
+     * );
+     *
+     * Route.serialize({ id: 42 }); // '/todos/42'
+     * ```
+     */
+    public serialize(params: TResult): string {
+        const { literals, segments } = this.#templateDef;
+        let result = '';
+        for (let i = 0; i < segments.length; i++) {
+            result += literals[i];
+            const key = segments[i].path;
+            const value = resolvePath(params, key);
+            if (value === undefined || value === null) {
+                throw new Error(
+                    `Missing required parameter "${key}" for template ${this.#humanPattern()}`
+                );
+            }
+            result += String(value);
+        }
+        result += literals[segments.length] ?? '';
+        return result;
     }
 
     // -- Validate (sync) -----------------------------------------------------

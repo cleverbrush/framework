@@ -24,6 +24,7 @@ The flagship package is **`@cleverbrush/schema`** — a schema validation librar
 | [`@cleverbrush/async`](./libs/async) | Async utilities: `Collector`, `debounce`, `throttle`, `retry` |
 | [`@cleverbrush/deep`](./libs/deep) | Deep operations on objects: deep equality, deep merge, flattening, hashing |
 | [`@cleverbrush/scheduler`](./libs/scheduler) | Cron-like job scheduler for Node.js using worker threads |
+| [`@cleverbrush/web`](./libs/web) | Typed HTTP client for `@cleverbrush/server` API contracts — Proxy-based, zero codegen, full type inference |
 | [`@cleverbrush/knex-clickhouse`](./libs/knex-clickhouse) | Knex query builder dialect for ClickHouse |
 
 ---
