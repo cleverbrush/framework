@@ -314,6 +314,60 @@ function LiveFeed() {
 }
 ```
 
+## Request Batching
+
+Enable the server-side batch endpoint so the client can coalesce many concurrent requests into a single HTTP round-trip.
+
+```ts
+import { createServer } from '@cleverbrush/server';
+
+const server = await createServer()
+    .useBatching()          // enables POST /__batch
+    .handleAll(mapping)
+    .listen(3000);
+```
+
+### How it works
+
+The batch endpoint (`POST /__batch` by default) accepts a JSON body:
+
+```json
+{
+    "requests": [
+        { "method": "GET",  "url": "/api/todos",      "headers": { "authorization": "Bearer ..." } },
+        { "method": "POST", "url": "/api/todos",      "headers": { "content-type": "application/json", "authorization": "Bearer ..." }, "body": "{\"title\":\"Buy milk\"}" }
+    ]
+}
+```
+
+Each sub-request is processed through the **full middleware and handler pipeline** (including auth and DI) in parallel by default. The response is:
+
+```json
+{
+    "responses": [
+        { "status": 200, "headers": { "content-type": "application/json" }, "body": "[{\"id\":1}]" },
+        { "status": 201, "headers": { "content-type": "application/json" }, "body": "{\"id\":2,\"title\":\"Buy milk\"}" }
+    ]
+}
+```
+
+One sub-request failing returns its error status in its own slot — the rest succeed normally.
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `path` | `string` | `'/__batch'` | URL path for the batch endpoint |
+| `maxSize` | `number` | `20` | Maximum sub-requests per batch (400 if exceeded) |
+| `parallel` | `boolean` | `true` | Run sub-requests in parallel (`false` for sequential) |
+
+```ts
+createServer()
+    .useBatching({ path: '/_batch', maxSize: 50, parallel: false })
+    .handleAll(mapping)
+    .listen(3000);
+```
+
 ## License
 
 BSD-3-Clause — see [LICENSE](../../LICENSE).

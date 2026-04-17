@@ -34,9 +34,14 @@ import type {
     ContentTypeHandler,
     EndpointRegistration,
     Middleware,
+    ServerBatchingOptions,
     ServerOptions,
     SubscriptionRegistration
 } from './types.js';
+import {
+    VirtualIncomingMessage,
+    VirtualServerResponse
+} from './VirtualHttp.js';
 import type { WebhookDefinition } from './Webhook.js';
 import {
     errorFrame,
@@ -101,6 +106,7 @@ export class ServerBuilder {
     #authConfig: AuthenticationConfig | null = null;
     #authzConfig: AuthorizationConfig | null = null;
     #healthcheck = false;
+    #batchConfig: ServerBatchingOptions | null = null;
 
     /**
      * Configure the DI service collection.
@@ -157,6 +163,32 @@ export class ServerBuilder {
      */
     withHealthcheck(): this {
         this.#healthcheck = true;
+        return this;
+    }
+
+    /**
+     * Enable the server-side request batching endpoint.
+     *
+     * Once enabled, the server accepts `POST <path>` (default `/__batch`)
+     * containing an array of sub-requests and processes each one through the
+     * full middleware and handler pipeline, returning an array of
+     * sub-responses in a single HTTP reply.
+     *
+     * Pair this with the `batching()` middleware from `@cleverbrush/client/batching`
+     * on the client side.
+     *
+     * @param options - {@link ServerBatchingOptions} (all fields optional).
+     *
+     * @example
+     * ```ts
+     * new ServerBuilder()
+     *     .useBatching()
+     *     .handleAll(mapping)
+     *     .listen(3000);
+     * ```
+     */
+    useBatching(options: ServerBatchingOptions = {}): this {
+        this.#batchConfig = options;
         return this;
     }
 
@@ -308,7 +340,8 @@ export class ServerBuilder {
             this.#contentNegotiator,
             allMiddlewares,
             this.#healthcheck,
-            this.#subscriptionRegistrations.length > 0
+            this.#subscriptionRegistrations.length > 0,
+            this.#batchConfig
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -331,6 +364,7 @@ export class Server {
     readonly #globalMiddlewares: Middleware[];
     readonly #healthcheck: boolean;
     readonly #hasSubscriptions: boolean;
+    readonly #batchConfig: ServerBatchingOptions | null;
     #httpServer: http.Server | https.Server | null = null;
     #wss: WebSocketServer | null = null;
     readonly #activeConnections: Set<WebSocket> = new Set();
@@ -341,7 +375,8 @@ export class Server {
         contentNegotiator: ContentNegotiator,
         globalMiddlewares: Middleware[],
         healthcheck = false,
-        hasSubscriptions = false
+        hasSubscriptions = false,
+        batchConfig: ServerBatchingOptions | null = null
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
@@ -349,6 +384,7 @@ export class Server {
         this.#globalMiddlewares = globalMiddlewares;
         this.#healthcheck = healthcheck;
         this.#hasSubscriptions = hasSubscriptions;
+        this.#batchConfig = batchConfig;
     }
 
     /**
@@ -476,6 +512,16 @@ export class Server {
             ) {
                 res.writeHead(200);
                 res.end();
+                return;
+            }
+
+            // Batch endpoint — handled before routing and auth.
+            if (
+                this.#batchConfig !== null &&
+                method === 'POST' &&
+                urlPath === (this.#batchConfig.path ?? '/__batch')
+            ) {
+                await this.#handleBatchRequest(req, res);
                 return;
             }
 
@@ -628,6 +674,78 @@ export class Server {
                 // Swallow disposal errors
             }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Batch request handler
+    // -----------------------------------------------------------------------
+
+    async #handleBatchRequest(
+        req: http.IncomingMessage,
+        res: http.ServerResponse
+    ): Promise<void> {
+        const config = this.#batchConfig!;
+        const maxSize = config.maxSize ?? 20;
+        const parallel = config.parallel ?? true;
+
+        // Read the outer body.
+        let outerBody: { requests: Array<BatchSubRequest> };
+        try {
+            const raw = await readBuffer(req);
+            outerBody = JSON.parse(raw.toString('utf-8')) as {
+                requests: Array<BatchSubRequest>;
+            };
+            if (!Array.isArray(outerBody?.requests)) {
+                throw new Error('requests must be an array');
+            }
+        } catch {
+            const pd = createProblemDetails(400, 'Invalid batch request body');
+            res.writeHead(400, { 'content-type': PROBLEM_JSON_CONTENT_TYPE });
+            res.end(serializeProblemDetails(pd));
+            return;
+        }
+
+        if (outerBody.requests.length > maxSize) {
+            const pd = createProblemDetails(
+                400,
+                `Batch size ${outerBody.requests.length} exceeds maximum of ${maxSize}`
+            );
+            res.writeHead(400, { 'content-type': PROBLEM_JSON_CONTENT_TYPE });
+            res.end(serializeProblemDetails(pd));
+            return;
+        }
+
+        const execute = async (
+            item: BatchSubRequest
+        ): Promise<BatchSubResponse> => {
+            const virtualReq = new VirtualIncomingMessage({
+                method: (item.method ?? 'GET').toUpperCase(),
+                url: item.url,
+                headers: item.headers ?? {},
+                body: item.body
+            });
+            const virtualRes = new VirtualServerResponse();
+
+            await this.#handleRequest(
+                virtualReq as unknown as http.IncomingMessage,
+                virtualRes as unknown as http.ServerResponse
+            );
+
+            return virtualRes.toResult();
+        };
+
+        let results: BatchSubResponse[];
+        if (parallel) {
+            results = await Promise.all(outerBody.requests.map(execute));
+        } else {
+            results = [];
+            for (const item of outerBody.requests) {
+                results.push(await execute(item));
+            }
+        }
+
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ responses: results }));
     }
 
     async #sendResult(
@@ -955,6 +1073,37 @@ export function createServer(options?: ServerOptions): ServerBuilder {
         (builder as any).__options = options;
     }
     return builder;
+}
+
+// ---------------------------------------------------------------------------
+// Batch helpers
+// ---------------------------------------------------------------------------
+
+/** A single sub-request within a batch body. */
+interface BatchSubRequest {
+    method: string;
+    /** Path + query string, e.g. `/api/todos?page=1`. */
+    url: string;
+    headers?: Record<string, string>;
+    /** Raw JSON-serialised body string. Absent for GET/HEAD/DELETE. */
+    body?: string;
+}
+
+/** A single sub-response within the batch reply. */
+interface BatchSubResponse {
+    status: number;
+    headers: Record<string, string>;
+    body: string;
+}
+
+/** Reads the entire body of an `IncomingMessage` into a `Buffer`. */
+function readBuffer(req: http.IncomingMessage): Promise<Buffer> {
+    return new Promise<Buffer>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
+    });
 }
 
 /** Flatten a nested object to a flat Record<string, string> for raw pathParams */

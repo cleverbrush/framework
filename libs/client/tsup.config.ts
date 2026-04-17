@@ -7,6 +7,7 @@ export default defineConfig({
         'src/timeout.ts',
         'src/dedupe.ts',
         'src/cache.ts',
+        'src/batching.ts',
         'src/react.ts'
     ],
     format: ['esm'],

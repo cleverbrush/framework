@@ -23,6 +23,7 @@ const navItems: NavItem[] = [
     { to: '/todos', label: 'Todos', emoji: '✅' },
     { to: '/todos/import', label: 'Import', emoji: '📥' },
     { to: '/resilience', label: 'Resilience', emoji: '🛡️' },
+    { to: '/batching', label: 'Batching', emoji: '📦' },
     { to: '/react-query', label: 'React Query', emoji: '⚡' },
     { to: '/live', label: 'Live', emoji: '📡' },
     { to: '/webhooks', label: 'Webhooks', emoji: '🔔' },

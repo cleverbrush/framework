@@ -22,6 +22,7 @@ import { retry } from '@cleverbrush/client/retry';
 import { timeout } from '@cleverbrush/client/timeout';
 import { dedupe } from '@cleverbrush/client/dedupe';
 import { throttlingCache } from '@cleverbrush/client/cache';
+import { batching } from '@cleverbrush/client/batching';
 import { api } from '@cleverbrush/todo-backend/contract';
 import { loadToken, setToken } from '../lib/http-client';
 
@@ -37,6 +38,7 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? '';
  * 2. **timeout** — aborts requests exceeding 10 seconds
  * 3. **dedupe** — coalesces identical in-flight GET requests
  * 4. **cache** — serves cached GET responses within a 2-second TTL
+ * 5. **batching** — coalesces concurrent requests into a single `POST /__batch`
  */
 export const client = createClient(api, {
     baseUrl: BASE_URL,
@@ -49,6 +51,7 @@ export const client = createClient(api, {
         retry({ limit: 2, retryOnTimeout: true }),
         timeout({ timeout: 10_000 }),
         dedupe(),
-        throttlingCache({ throttle: 2000 })
+        throttlingCache({ throttle: 2000 }),
+        batching({ maxSize: 10, windowMs: 10 })
     ]
 });

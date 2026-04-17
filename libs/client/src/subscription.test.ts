@@ -1,5 +1,5 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { SubscriptionBuilder } from '@cleverbrush/server';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { createClient } from './client.js';
 import type { SubscriptionReconnectOptions } from './types.js';
 

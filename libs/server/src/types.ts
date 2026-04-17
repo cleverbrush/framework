@@ -107,3 +107,56 @@ export interface ServerOptions {
         readonly cert: string;
     };
 }
+
+// ---------------------------------------------------------------------------
+// Batching Options
+// ---------------------------------------------------------------------------
+
+/**
+ * Configuration for the server-side request batching endpoint, enabled via
+ * `ServerBuilder.useBatching()`.
+ *
+ * The batch endpoint accepts `POST <path>` with a JSON body containing an
+ * array of sub-requests. It processes each through the full middleware and
+ * handler pipeline, then returns an array of sub-responses in a single reply.
+ *
+ * @example
+ * ```ts
+ * new ServerBuilder()
+ *     .useBatching({ path: '/__batch', maxSize: 20, parallel: true })
+ *     .handleAll(mapping)
+ *     .listen(3000);
+ * ```
+ */
+export interface ServerBatchingOptions {
+    /**
+     * URL path of the batch endpoint.
+     *
+     * Must match the `batchPath` configured on the client-side
+     * `batching()` middleware.
+     *
+     * @default '/__batch'
+     */
+    path?: string;
+
+    /**
+     * Maximum number of sub-requests allowed per batch.
+     *
+     * Requests exceeding this limit are rejected with `400 Bad Request`.
+     *
+     * @default 20
+     */
+    maxSize?: number;
+
+    /**
+     * Whether to execute sub-requests in parallel (`true`) or sequentially
+     * (`false`).
+     *
+     * Parallel execution is faster but requires all handlers to be
+     * concurrency-safe. Set to `false` if your handlers share mutable
+     * request-scoped state that would cause conflicts when run concurrently.
+     *
+     * @default true
+     */
+    parallel?: boolean;
+}

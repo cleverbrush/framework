@@ -77,7 +77,8 @@ export function buildServer(config: Config) {
             ]
         })
         .useAuthorization()
-        .withHealthcheck();
+        .withHealthcheck()
+        .useBatching();
 
     // ── OpenAPI spec endpoint (using generateOpenApiSpec directly for tags + webhooks support)
 

@@ -19,6 +19,7 @@ const WebhooksPage = lazy(() => import('./features/webhooks/WebhooksPage'));
 const UsersPage = lazy(() => import('./features/admin/UsersPage'));
 const ActivityPage = lazy(() => import('./features/admin/ActivityPage'));
 const ResiliencePage = lazy(() => import('./features/resilience/ResiliencePage'));
+const BatchingPage = lazy(() => import('./features/batching/BatchingPage'));
 const ReactQueryPage = lazy(() => import('./features/react-query/ReactQueryPage'));
 const LivePage = lazy(() => import('./features/live/LivePage'));
 
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
           { path: '/profile', element: <Suspense fallback={<PageFallback />}><ProfilePage /></Suspense> },
           { path: '/webhooks', element: <Suspense fallback={<PageFallback />}><WebhooksPage /></Suspense> },
           { path: '/resilience', element: <Suspense fallback={<PageFallback />}><ResiliencePage /></Suspense> },
+          { path: '/batching', element: <Suspense fallback={<PageFallback />}><BatchingPage /></Suspense> },
           { path: '/react-query', element: <Suspense fallback={<PageFallback />}><ReactQueryPage /></Suspense> },
           { path: '/live', element: <Suspense fallback={<PageFallback />}><LivePage /></Suspense> },
           {

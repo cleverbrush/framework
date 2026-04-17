@@ -67,6 +67,10 @@
             "types": "./dist/cache.d.ts",
             "import": "./dist/cache.js"
         },
+        "./batching": {
+            "types": "./dist/batching.d.ts",
+            "import": "./dist/batching.js"
+        },
         "./react": {
             "types": "./dist/react.d.ts",
             "import": "./dist/react.js"

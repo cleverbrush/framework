@@ -63,6 +63,7 @@ export type {
     ContentTypeHandler,
     EndpointRegistration,
     Middleware,
+    ServerBatchingOptions,
     ServerOptions,
     SubscriptionRegistration
 } from './types.js';

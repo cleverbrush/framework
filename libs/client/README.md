@@ -295,6 +295,77 @@ try {
 }
 ```
 
+## Request Batching
+
+```ts
+import { batching } from '@cleverbrush/client/batching';
+```
+
+Reduces HTTP round-trips by coalescing concurrent requests into a single `POST /__batch`. Individual call sites are completely unaware of batching — they still receive their own typed responses.
+
+> **Prerequisite**: the server must have batching enabled via `ServerBuilder.useBatching()`.
+
+### Basic usage
+
+```ts
+import { batching } from '@cleverbrush/client/batching';
+
+const client = createClient(api, {
+    baseUrl: 'https://api.example.com',
+    middlewares: [
+        retry(),
+        timeout(),
+        batching({ maxSize: 10, windowMs: 10 }), // innermost — closest to fetch
+    ],
+});
+
+// These three concurrent calls are coalesced into ONE HTTP request.
+const [todos, user, stats] = await Promise.all([
+    client.todos.list(),
+    client.users.me(),
+    client.stats.summary(),
+]);
+```
+
+### How it works
+
+1. The first queued request starts a `windowMs` timer.
+2. Additional requests arriving before the timer fires join the same batch.
+3. When the timer fires (or `maxSize` is reached), all queued requests are sent as a single `POST /__batch`.
+4. The server processes each sub-request through its full pipeline and returns an array of sub-responses.
+5. Each caller receives its own reconstructed `Response`.
+
+If only **one** request is queued at flush time it is sent directly — no batch overhead.
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxSize` | `number` | `10` | Maximum requests per batch; flush immediately on reaching this limit |
+| `windowMs` | `number` | `10` | Collection window in milliseconds |
+| `batchPath` | `string` | `'/__batch'` | Batch endpoint path (must match server config) |
+| `skip` | `(url, init) => boolean` | — | Return `true` to bypass batching for a specific request |
+
+### Skipping specific requests
+
+```ts
+batching({
+    skip: (_url, init) => {
+        // Never batch file uploads
+        return init.body instanceof FormData;
+    },
+})
+```
+
+### Middleware placement
+
+Place `batching()` **last** in the middleware array so that `retry()` and `timeout()` operate on each logical call promise independently, not on the single batch fetch:
+
+```ts
+middlewares: [retry(), timeout(), batching()], // ✅ correct
+middlewares: [batching(), retry(), timeout()], // ⚠️ retry wraps the whole batch
+```
+
 ## WebSocket Subscriptions
 
 Subscription endpoints defined with `endpoint.subscription()` in the server contract are automatically detected by the client. Instead of returning a `Promise`, they return a live `Subscription` handle backed by the browser WebSocket API.
@@ -661,6 +732,7 @@ if (isApiError(error)) {
 | `@cleverbrush/client/timeout` | AbortController-based timeout middleware |
 | `@cleverbrush/client/dedupe` | Request deduplication middleware |
 | `@cleverbrush/client/cache` | Throttling cache middleware |
+| `@cleverbrush/client/batching` | Request batching middleware |
 | `@cleverbrush/client/react` | TanStack Query hooks + unified client |
 
 ## License

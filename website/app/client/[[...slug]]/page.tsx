@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import BatchingSection from '../sections/batching';
 import CacheSection from '../sections/cache';
 import DedupeSection from '../sections/dedupe';
 import ErrorHandlingSection from '../sections/error-handling';
@@ -25,6 +26,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     timeout: TimeoutSection,
     dedupe: DedupeSection,
     cache: CacheSection,
+    batching: BatchingSection,
     'error-handling': ErrorHandlingSection,
     'per-call-overrides': PerCallOverridesSection,
     'react-integration': ReactIntegrationSection,
