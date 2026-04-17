@@ -22,6 +22,7 @@ type NavItem = {
 const navItems: NavItem[] = [
     { to: '/todos', label: 'Todos', emoji: '✅' },
     { to: '/todos/import', label: 'Import', emoji: '📥' },
+    { to: '/resilience', label: 'Resilience', emoji: '🛡️' },
     { to: '/webhooks', label: 'Webhooks', emoji: '🔔' },
     { to: '/profile', label: 'Profile', emoji: '👤' },
     { to: '/admin/users', label: 'Users', emoji: '👥', adminOnly: true },

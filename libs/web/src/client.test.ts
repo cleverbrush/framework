@@ -509,4 +509,290 @@ describe('createClient', () => {
         const [, init] = mockFetch.mock.calls[0];
         expect(init.signal).toBe(controller.signal);
     });
+
+    // -- Middleware integration --------------------------------------------
+
+    test('middleware wraps fetch calls', async () => {
+        mockFetch.mockResolvedValue(jsonResponse({ ok: true }));
+        const order: string[] = [];
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            middlewares: [
+                next => async (url, init) => {
+                    order.push('mw-before');
+                    const res = await next(url, init);
+                    order.push('mw-after');
+                    return res;
+                }
+            ]
+        });
+
+        await client.todos.list();
+        expect(order).toEqual(['mw-before', 'mw-after']);
+    });
+
+    test('middleware can modify request headers', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+
+        const client = createClient(contract, {
+            fetch: mockFetch as any,
+            middlewares: [
+                next => (url, init) => {
+                    const headers = {
+                        ...(init.headers as Record<string, string>),
+                        'X-Middleware': 'injected'
+                    };
+                    return next(url, { ...init, headers });
+                }
+            ]
+        });
+
+        await client.todos.list();
+        const [, init] = mockFetch.mock.calls[0];
+        expect((init.headers as Record<string, string>)['X-Middleware']).toBe(
+            'injected'
+        );
+    });
+
+    test('multiple middlewares compose in order', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+        const order: string[] = [];
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            middlewares: [
+                next => async (url, init) => {
+                    order.push('outer-before');
+                    const res = await next(url, init);
+                    order.push('outer-after');
+                    return res;
+                },
+                next => async (url, init) => {
+                    order.push('inner-before');
+                    const res = await next(url, init);
+                    order.push('inner-after');
+                    return res;
+                }
+            ]
+        });
+
+        await client.todos.list();
+        expect(order).toEqual([
+            'outer-before',
+            'inner-before',
+            'inner-after',
+            'outer-after'
+        ]);
+    });
+
+    test('middleware works with streaming', async () => {
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.enqueue(encoder.encode('line1\n'));
+                controller.close();
+            }
+        });
+        mockFetch.mockResolvedValue(
+            new Response(stream, { status: 200, statusText: 'OK' })
+        );
+
+        const called = vi.fn();
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            middlewares: [
+                next => (url, init) => {
+                    called();
+                    return next(url, init);
+                }
+            ]
+        });
+
+        const lines: string[] = [];
+        for await (const line of client.todos.list.stream()) {
+            lines.push(line);
+        }
+        expect(called).toHaveBeenCalledOnce();
+        expect(lines).toEqual(['line1']);
+    });
+
+    // -- Hooks integration -------------------------------------------------
+
+    test('beforeRequest hook is called before fetch', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+        const captured: string[] = [];
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            hooks: {
+                beforeRequest: [
+                    req => {
+                        captured.push(req.url);
+                    }
+                ]
+            }
+        });
+
+        await client.todos.list();
+        expect(captured).toEqual(['/api/todos']);
+    });
+
+    test('beforeRequest hook can modify init', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            hooks: {
+                beforeRequest: [
+                    req => {
+                        (req.init.headers as Record<string, string>)['X-Hook'] =
+                            'yes';
+                    }
+                ]
+            }
+        });
+
+        await client.todos.list();
+        const [, init] = mockFetch.mock.calls[0];
+        expect(init.headers['X-Hook']).toBe('yes');
+    });
+
+    test('afterResponse hook is called after fetch', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+        const statuses: number[] = [];
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            hooks: {
+                afterResponse: [
+                    (_req, res) => {
+                        statuses.push(res.status);
+                    }
+                ]
+            }
+        });
+
+        await client.todos.list();
+        expect(statuses).toEqual([200]);
+    });
+
+    test('afterResponse hook can replace response', async () => {
+        mockFetch.mockResolvedValue(jsonResponse({ original: true }));
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            hooks: {
+                afterResponse: [() => jsonResponse({ replaced: true })]
+            }
+        });
+
+        const result = await client.todos.list();
+        expect(result).toEqual({ replaced: true });
+    });
+
+    test('beforeError hook transforms ApiError', async () => {
+        mockFetch.mockResolvedValue(errorResponse(500, undefined, 'ISE'));
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            hooks: {
+                beforeError: [
+                    err => {
+                        err.message = 'Custom: ' + err.message;
+                        return err;
+                    }
+                ]
+            }
+        });
+
+        const err = await client.todos.list().catch((e: unknown) => e);
+        expect((err as Error).message).toBe('Custom: ISE');
+    });
+
+    test('TypeError from fetch is wrapped in NetworkError', async () => {
+        const { NetworkError } = await import('./errors.js');
+        mockFetch.mockRejectedValue(new TypeError('fetch failed'));
+
+        const client = createClient(contract, { fetch: mockFetch });
+        const err = await client.todos.list().catch((e: unknown) => e);
+        expect(err).toBeInstanceOf(NetworkError);
+        expect((err as InstanceType<typeof NetworkError>).cause).toBeInstanceOf(
+            TypeError
+        );
+    });
+
+    test('hooks and middleware work together', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+        const order: string[] = [];
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            middlewares: [
+                next => async (url, init) => {
+                    order.push('middleware');
+                    return next(url, init);
+                }
+            ],
+            hooks: {
+                beforeRequest: [
+                    () => {
+                        order.push('beforeRequest');
+                    }
+                ],
+                afterResponse: [
+                    () => {
+                        order.push('afterResponse');
+                    }
+                ]
+            }
+        });
+
+        await client.todos.list();
+        expect(order).toEqual(['beforeRequest', 'middleware', 'afterResponse']);
+    });
+
+    test('per-call options are forwarded to middleware via PER_CALL_OPTIONS symbol', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+        let capturedInit: RequestInit | undefined;
+
+        const { PER_CALL_OPTIONS } = await import('./middleware.js');
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            middlewares: [
+                next => (url, init) => {
+                    capturedInit = init;
+                    return next(url, init);
+                }
+            ]
+        });
+
+        await client.todos.list({ retry: { limit: 5 }, timeout: 30000 } as any);
+
+        const perCall = (capturedInit as any)?.[PER_CALL_OPTIONS];
+        expect(perCall).toEqual({ retry: { limit: 5 }, timeout: 30000 });
+    });
+
+    test('per-call options are not set when not provided', async () => {
+        mockFetch.mockResolvedValue(jsonResponse([]));
+        let capturedInit: RequestInit | undefined;
+
+        const { PER_CALL_OPTIONS } = await import('./middleware.js');
+
+        const client = createClient(contract, {
+            fetch: mockFetch,
+            middlewares: [
+                next => (url, init) => {
+                    capturedInit = init;
+                    return next(url, init);
+                }
+            ]
+        });
+
+        await client.todos.list();
+
+        const perCall = (capturedInit as any)?.[PER_CALL_OPTIONS];
+        expect(perCall).toBeUndefined();
+    });
 });

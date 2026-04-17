@@ -91,6 +91,188 @@ Creates a typed HTTP client from an API contract.
 | `options.onUnauthorized` | `() => void` | Called on 401 responses |
 | `options.fetch` | `typeof fetch` | Custom fetch implementation (default: `globalThis.fetch`) |
 | `options.headers` | `Record<string, string>` | Extra headers sent with every request |
+| `options.middlewares` | `Middleware[]` | Middleware functions that wrap the fetch call |
+| `options.hooks` | `ClientHooks` | Lifecycle hooks invoked at various stages of a request |
+
+## Middleware
+
+Middlewares wrap the `fetch` call, allowing you to intercept, modify, or short-circuit requests and responses. They compose like an onion — the first middleware in the array is the outermost wrapper.
+
+```ts
+import { createClient } from '@cleverbrush/web';
+import { retry } from '@cleverbrush/web/retry';
+import { timeout } from '@cleverbrush/web/timeout';
+import { dedupe } from '@cleverbrush/web/dedupe';
+import { throttlingCache } from '@cleverbrush/web/cache';
+
+const client = createClient(api, {
+    baseUrl: 'https://api.example.com',
+    middlewares: [
+        retry({ limit: 3 }),
+        timeout({ timeout: 10000 }),
+        dedupe(),
+        throttlingCache({ throttle: 2000 }),
+    ],
+});
+```
+
+### Writing custom middleware
+
+```ts
+import type { Middleware } from '@cleverbrush/web';
+
+const logger: Middleware = (next) => async (url, init) => {
+    console.log('→', init.method, url);
+    const res = await next(url, init);
+    console.log('←', res.status);
+    return res;
+};
+```
+
+## Lifecycle Hooks
+
+Hooks are invoked at various stages of a request. All hook arrays execute serially in order.
+
+```ts
+const client = createClient(api, {
+    hooks: {
+        beforeRequest: [(req) => {
+            req.init.headers = {
+                ...req.init.headers as Record<string, string>,
+                'X-Request-Id': crypto.randomUUID(),
+            };
+        }],
+        afterResponse: [(req, res) => {
+            console.log(`${req.init.method} ${req.url} → ${res.status}`);
+        }],
+        beforeError: [(error) => {
+            console.error('Request failed:', error.message);
+            return error;
+        }],
+    },
+});
+```
+
+| Hook | Signature | Description |
+|------|-----------|-------------|
+| `beforeRequest` | `(req: { url, init }) => void` | Modify request before sending |
+| `afterResponse` | `(req, response) => void \| Response` | Inspect/replace response |
+| `beforeRetry` | `(info: { url, init, error, retryCount }) => void` | Called between retry attempts |
+| `beforeError` | `(error: WebError) => WebError` | Transform errors before throwing |
+
+## Resilience Middlewares
+
+### Retry — `@cleverbrush/web/retry`
+
+```ts
+import { retry } from '@cleverbrush/web/retry';
+
+retry({
+    limit: 2,           // max retries (default: 2)
+    methods: ['GET'],   // retryable methods (default: GET, PUT, HEAD, DELETE, OPTIONS)
+    statusCodes: [500], // retryable status codes (default: 408, 429, 500, 502, 503, 504)
+    backoffLimit: 5000, // max delay in ms (default: Infinity)
+    delay: (n) => n * 1000,  // custom delay function
+    jitter: true,       // add randomization to delays
+    retryOnTimeout: false,   // retry on TimeoutError (default: false)
+    shouldRetry: (err, count) => count < 3,  // custom predicate
+});
+```
+
+Respects `Retry-After` headers (seconds and HTTP-date formats) on 429/503 responses.
+
+### Timeout — `@cleverbrush/web/timeout`
+
+```ts
+import { timeout } from '@cleverbrush/web/timeout';
+
+timeout({ timeout: 10000 }); // 10 second timeout (default)
+```
+
+Aborts requests that exceed the configured duration, throwing a `TimeoutError`.
+
+### Dedupe — `@cleverbrush/web/dedupe`
+
+```ts
+import { dedupe } from '@cleverbrush/web/dedupe';
+
+dedupe({
+    skip: (url, init) => init.method !== 'GET', // skip non-GET (default)
+    key: (url, init) => `${init.method}@${url}`, // dedup key (default)
+});
+```
+
+Prevents duplicate in-flight requests. Concurrent calls with the same key share a single fetch; each caller receives a cloned response.
+
+### Cache — `@cleverbrush/web/cache`
+
+```ts
+import { throttlingCache } from '@cleverbrush/web/cache';
+
+throttlingCache({
+    throttle: 1000,     // TTL in ms (default: 1000)
+    skip: (url, init) => init.method !== 'GET', // skip non-GET (default)
+    condition: (res) => res.ok, // only cache successful responses (default)
+    invalidate: (url, init) => {
+        if (init.method !== 'GET') return `GET@${url}`;
+        return null;
+    },
+});
+```
+
+Caches successful GET responses for a configurable TTL. Subsequent requests within the TTL receive a cloned cached response without hitting the network.
+
+## Per-Call Overrides
+
+Override middleware options for individual calls:
+
+```ts
+// Override timeout for a slow endpoint
+const report = await client.reports.generate({
+    body: { type: 'annual' },
+    timeout: 60000,
+});
+
+// Override retry limit
+const data = await client.data.fetch({
+    query: { id: 1 },
+    retry: { limit: 5 },
+});
+```
+
+## Error Types
+
+All errors extend a common `WebError` base class.
+
+```ts
+import {
+    ApiError, TimeoutError, NetworkError,
+    isApiError, isTimeoutError, isNetworkError, isWebError
+} from '@cleverbrush/web';
+```
+
+| Error | Description | Properties |
+|-------|-------------|------------|
+| `WebError` | Base class for all web client errors | `message` |
+| `ApiError` | Non-2xx HTTP response | `status`, `message`, `body` |
+| `TimeoutError` | Request exceeded timeout | `timeout` (ms) |
+| `NetworkError` | Network-level failure | `cause` |
+
+### Type guards
+
+```ts
+try {
+    await client.todos.get({ params: { id: 999 } });
+} catch (err) {
+    if (isApiError(err)) {
+        console.log(err.status, err.body);
+    } else if (isTimeoutError(err)) {
+        console.log('Timed out after', err.timeout, 'ms');
+    } else if (isNetworkError(err)) {
+        console.log('Network failure:', err.cause);
+    }
+}
+```
 
 ### `ApiError`
 

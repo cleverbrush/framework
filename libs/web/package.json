@@ -28,6 +28,22 @@
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./retry": {
+            "types": "./dist/retry.d.ts",
+            "import": "./dist/retry.js"
+        },
+        "./timeout": {
+            "types": "./dist/timeout.d.ts",
+            "import": "./dist/timeout.js"
+        },
+        "./dedupe": {
+            "types": "./dist/dedupe.d.ts",
+            "import": "./dist/dedupe.js"
+        },
+        "./cache": {
+            "types": "./dist/cache.d.ts",
+            "import": "./dist/cache.js"
         }
     },
     "sideEffects": false,

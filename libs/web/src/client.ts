@@ -14,10 +14,11 @@
  */
 
 import type { ApiContract } from '@cleverbrush/server/contract';
-import { ApiError } from './errors.js';
+import { ApiError, NetworkError, WebError } from './errors.js';
+import { composeMiddleware, PER_CALL_OPTIONS } from './middleware.js';
 import { buildPath } from './path.js';
 import { serializeQuery } from './query.js';
-import type { ClientOptions, TypedClient } from './types.js';
+import type { ClientHooks, ClientOptions, TypedClient } from './types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -27,6 +28,66 @@ const JSON_CONTENT_TYPE = 'application/json';
 
 function hasBody(method: string): boolean {
     return method === 'POST' || method === 'PUT' || method === 'PATCH';
+}
+
+// ---------------------------------------------------------------------------
+// Hook runners
+// ---------------------------------------------------------------------------
+
+async function runBeforeRequest(
+    hooks: ClientHooks,
+    url: string,
+    init: RequestInit
+): Promise<void> {
+    if (!hooks.beforeRequest) return;
+    for (const hook of hooks.beforeRequest) {
+        await hook({ url, init });
+    }
+}
+
+async function runAfterResponse(
+    hooks: ClientHooks,
+    url: string,
+    init: RequestInit,
+    response: Response
+): Promise<Response> {
+    if (!hooks.afterResponse) return response;
+    let res = response;
+    for (const hook of hooks.afterResponse) {
+        const result = await hook({ url, init }, res);
+        if (result instanceof Response) {
+            res = result;
+        }
+    }
+    return res;
+}
+
+async function runBeforeError(
+    hooks: ClientHooks,
+    error: WebError
+): Promise<WebError> {
+    if (!hooks.beforeError) return error;
+    let err = error;
+    for (const hook of hooks.beforeError) {
+        err = await hook(err);
+    }
+    return err;
+}
+
+async function wrapAndRunBeforeError(
+    hooks: ClientHooks,
+    err: unknown
+): Promise<Error> {
+    if (err instanceof WebError) {
+        return runBeforeError(hooks, err);
+    }
+    if (err instanceof TypeError) {
+        const networkError = new NetworkError('Network request failed', {
+            cause: err
+        });
+        return runBeforeError(hooks, networkError);
+    }
+    return err instanceof Error ? err : new Error(String(err));
 }
 
 // ---------------------------------------------------------------------------
@@ -81,8 +142,15 @@ export function createClient<T extends ApiContract>(
         getToken,
         fetch: customFetch = globalThis.fetch,
         onUnauthorized,
-        headers: extraHeaders
+        headers: extraHeaders,
+        middlewares = [],
+        hooks = {}
     } = options;
+
+    // Compose middleware chain around the custom (or global) fetch.
+    const composedFetch = composeMiddleware(middlewares, (url, init) =>
+        customFetch(url, init)
+    );
 
     // Cache introspected metadata per endpoint so we only call .introspect() once.
     const metaCache = new WeakMap<object, any>();
@@ -145,12 +213,33 @@ export function createClient<T extends ApiContract>(
             body
         } = buildRequest(ep, args);
 
-        // -- Fetch --
-        const response = await customFetch(url, {
+        const init: RequestInit = {
             method,
             headers: reqHeaders,
             body
-        });
+        };
+
+        // Attach per-call middleware overrides if provided.
+        const perCallOptions: Record<string, unknown> = {};
+        if (args?.retry !== undefined) perCallOptions.retry = args.retry;
+        if (args?.timeout !== undefined) perCallOptions.timeout = args.timeout;
+        if (Object.keys(perCallOptions).length > 0) {
+            (init as any)[PER_CALL_OPTIONS] = perCallOptions;
+        }
+
+        // -- beforeRequest hooks --
+        await runBeforeRequest(hooks, url, init);
+
+        // -- Fetch (through middleware chain) --
+        let response: Response;
+        try {
+            response = await composedFetch(url, init);
+        } catch (err) {
+            throw await wrapAndRunBeforeError(hooks, err);
+        }
+
+        // -- afterResponse hooks --
+        response = await runAfterResponse(hooks, url, init, response);
 
         // -- Handle errors --
         if (!response.ok) {
@@ -168,11 +257,12 @@ export function createClient<T extends ApiContract>(
                 }
             }
 
-            throw new ApiError(
+            const apiError = new ApiError(
                 response.status,
                 response.statusText || `HTTP ${response.status}`,
                 errorBody
             );
+            throw await runBeforeError(hooks, apiError);
         }
 
         // -- Parse response --
@@ -198,21 +288,36 @@ export function createClient<T extends ApiContract>(
             body
         } = buildRequest(ep, args);
 
-        const response = await customFetch(url, {
+        const init: RequestInit = {
             method,
             headers: reqHeaders,
             body,
             signal: args?.signal
-        });
+        };
+
+        // -- beforeRequest hooks --
+        await runBeforeRequest(hooks, url, init);
+
+        // -- Fetch (through middleware chain) --
+        let response: Response;
+        try {
+            response = await composedFetch(url, init);
+        } catch (err) {
+            throw await wrapAndRunBeforeError(hooks, err);
+        }
+
+        // -- afterResponse hooks --
+        response = await runAfterResponse(hooks, url, init, response);
 
         if (!response.ok) {
             if (response.status === 401) {
                 onUnauthorized?.();
             }
-            throw new ApiError(
+            const apiError = new ApiError(
                 response.status,
                 response.statusText || `HTTP ${response.status}`
             );
+            throw await runBeforeError(hooks, apiError);
         }
 
         if (!response.body) return;

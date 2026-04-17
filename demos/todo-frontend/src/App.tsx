@@ -18,6 +18,7 @@ const ProfilePage = lazy(() => import('./features/profile/ProfilePage'));
 const WebhooksPage = lazy(() => import('./features/webhooks/WebhooksPage'));
 const UsersPage = lazy(() => import('./features/admin/UsersPage'));
 const ActivityPage = lazy(() => import('./features/admin/ActivityPage'));
+const ResiliencePage = lazy(() => import('./features/resilience/ResiliencePage'));
 
 const PageFallback = () => (
   <Flex justify="center" align="center" p="8">
@@ -41,6 +42,7 @@ const router = createBrowserRouter([
           { path: '/todos/:id', element: <Suspense fallback={<PageFallback />}><TodoDetailPage /></Suspense> },
           { path: '/profile', element: <Suspense fallback={<PageFallback />}><ProfilePage /></Suspense> },
           { path: '/webhooks', element: <Suspense fallback={<PageFallback />}><WebhooksPage /></Suspense> },
+          { path: '/resilience', element: <Suspense fallback={<PageFallback />}><ResiliencePage /></Suspense> },
           {
             element: <ProtectedRoute adminOnly />,
             children: [

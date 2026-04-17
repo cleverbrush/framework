@@ -31,6 +31,11 @@ import {
     getMyProfileHandler
 } from './users.js';
 import { subscribeWebhookHandler } from './webhooks.js';
+import {
+    demoSlowHandler,
+    demoFlakyHandler,
+    demoEchoHandler
+} from './demo.js';
 
 import type { HandlerMap } from '@cleverbrush/server';
 import type { endpoints } from '../endpoints.js';
@@ -65,5 +70,10 @@ export const handlers: HandlerMap<typeof endpoints> = {
     },
     admin: {
         activityLog: activityLogHandler
+    },
+    demo: {
+        slow: demoSlowHandler,
+        flaky: demoFlakyHandler,
+        echo: demoEchoHandler
     }
 };

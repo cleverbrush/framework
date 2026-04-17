@@ -12,6 +12,8 @@ import type {
     EndpointBuilder,
     ApiContract as ServerApiContract
 } from '@cleverbrush/server/contract';
+import type { WebError } from './errors.js';
+import type { Middleware } from './middleware.js';
 
 // ---------------------------------------------------------------------------
 // Re-export contract types
@@ -169,6 +171,29 @@ export type EndpointResponse<E> =
 // ---------------------------------------------------------------------------
 
 /**
+ * Per-call overrides that can be passed alongside endpoint arguments to
+ * override middleware defaults for a single request.
+ */
+export interface PerCallOverrides {
+    /**
+     * Override retry middleware options for this call only.
+     * Pass `{ limit: 0 }` to disable retries entirely.
+     */
+    retry?: {
+        limit?: number;
+        methods?: string[];
+        statusCodes?: number[];
+        backoffLimit?: number;
+        jitter?: boolean;
+        retryOnTimeout?: boolean;
+    };
+    /**
+     * Override the timeout (in milliseconds) for this call only.
+     */
+    timeout?: number;
+}
+
+/**
  * The callable signature for a single endpoint on the typed client.
  *
  * When the endpoint requires arguments (path params, body, query, or
@@ -181,12 +206,14 @@ export type EndpointResponse<E> =
  */
 type EndpointCall<E> =
     EndpointCallArgs<E> extends undefined
-        ? (() => Promise<EndpointResponse<E>>) & {
+        ? ((args?: PerCallOverrides) => Promise<EndpointResponse<E>>) & {
               stream: (options?: {
                   signal?: AbortSignal;
               }) => AsyncIterable<string>;
           }
-        : ((args: EndpointCallArgs<E>) => Promise<EndpointResponse<E>>) & {
+        : ((
+              args: EndpointCallArgs<E> & PerCallOverrides
+          ) => Promise<EndpointResponse<E>>) & {
               stream: (
                   args: EndpointCallArgs<E> & { signal?: AbortSignal }
               ) => AsyncIterable<string>;
@@ -228,6 +255,75 @@ export type TypedClient<T extends ServerApiContract> = {
 };
 
 // ---------------------------------------------------------------------------
+// ClientHooks — lifecycle hook types
+// ---------------------------------------------------------------------------
+
+/**
+ * Lifecycle hooks that are invoked at various stages of a request.
+ *
+ * All hook arrays are executed serially in order. Hooks can be synchronous
+ * or asynchronous.
+ */
+export interface ClientHooks {
+    /**
+     * Called before every request is sent.
+     * Can be used to log, modify headers, or add tracing information.
+     *
+     * @example
+     * ```ts
+     * hooks: {
+     *     beforeRequest: [(req) => {
+     *         req.init.headers = {
+     *             ...req.init.headers as Record<string, string>,
+     *             'X-Request-Id': crypto.randomUUID(),
+     *         };
+     *     }],
+     * }
+     * ```
+     */
+    beforeRequest?: ((request: {
+        url: string;
+        init: RequestInit;
+    }) => void | Promise<void>)[];
+
+    /**
+     * Called after a successful response is received.
+     * Returning a `Response` replaces the original response.
+     *
+     * @example
+     * ```ts
+     * hooks: {
+     *     afterResponse: [(req, res) => {
+     *         console.log(`${req.init.method} ${req.url} → ${res.status}`);
+     *     }],
+     * }
+     * ```
+     */
+    afterResponse?: ((
+        request: { url: string; init: RequestInit },
+        response: Response
+    ) => any | Response | Promise<any | Response>)[];
+
+    /**
+     * Called before a retry attempt.
+     * Useful for logging retry attempts or modifying the request between retries.
+     */
+    beforeRetry?: ((info: {
+        url: string;
+        init: RequestInit;
+        error: Error;
+        retryCount: number;
+    }) => void | Promise<void>)[];
+
+    /**
+     * Called before an error is thrown.
+     * Can transform or enrich the error before it reaches the caller.
+     * The returned error replaces the original.
+     */
+    beforeError?: ((error: WebError) => WebError | Promise<WebError>)[];
+}
+
+// ---------------------------------------------------------------------------
 // ClientOptions
 // ---------------------------------------------------------------------------
 
@@ -267,4 +363,35 @@ export interface ClientOptions {
      * Additional headers sent with every request.
      */
     headers?: Record<string, string>;
+
+    /**
+     * Middleware functions that wrap the fetch call.
+     * Applied in array order — the first middleware is the outermost wrapper.
+     *
+     * @example
+     * ```ts
+     * import { retry } from '@cleverbrush/web/retry';
+     * import { timeout } from '@cleverbrush/web/timeout';
+     *
+     * const client = createClient(api, {
+     *     middlewares: [retry(), timeout({ timeout: 10000 })],
+     * });
+     * ```
+     */
+    middlewares?: Middleware[];
+
+    /**
+     * Lifecycle hooks invoked at various stages of a request.
+     *
+     * @example
+     * ```ts
+     * const client = createClient(api, {
+     *     hooks: {
+     *         beforeRequest: [(req) => { console.log('→', req.url); }],
+     *         afterResponse: [(req, res) => { console.log('←', res.status); }],
+     *     },
+     * });
+     * ```
+     */
+    hooks?: ClientHooks;
 }

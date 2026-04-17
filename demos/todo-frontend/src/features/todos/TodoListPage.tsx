@@ -12,7 +12,7 @@ import {
     Text,
     TextField
 } from '@radix-ui/themes';
-import { ApiError } from '@cleverbrush/web';
+import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/web';
 import { client } from '../../api/client';
 
 type Todo = Awaited<ReturnType<typeof client.todos.list>>[number];
@@ -43,7 +43,10 @@ export function TodoListPage() {
             const data = await client.todos.list({ query: { page, limit: PAGE_SIZE, userId } });
             setTodos(data);
         } catch (e) {
-            setError(e instanceof ApiError ? e.message : 'Failed to load todos.');
+            if (e instanceof ApiError) setError(e.message);
+            else if (isTimeoutError(e)) setError('Request timed out. Please try again.');
+            else if (isNetworkError(e)) setError('Network error. Check your connection.');
+            else setError('Failed to load todos.');
         } finally {
             setLoading(false);
         }

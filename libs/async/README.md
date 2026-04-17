@@ -17,7 +17,7 @@ npm install @cleverbrush/async
 ## Usage
 
 ```typescript
-import { Collector, debounce, throttle, retry } from '@cleverbrush/async';
+import { Collector, debounce, throttle, retry, withTimeout, dedupe } from '@cleverbrush/async';
 ```
 
 ## API
@@ -134,6 +134,49 @@ const data = await retry(
         shouldRetry: (err) => err.status !== 404
     }
 );
+```
+
+### `withTimeout(fn, ms)`
+
+Wraps a promise-returning function with a timeout. If the function does not resolve within `ms` milliseconds, the returned promise rejects with a `TimeoutError` and the internal `AbortSignal` is triggered.
+
+**Parameters:**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `fn` | `(signal: AbortSignal) => Promise<T>` | The async function to wrap. Receives an `AbortSignal` that fires on timeout. |
+| `ms` | `number` | Timeout in milliseconds |
+
+```typescript
+import { withTimeout } from '@cleverbrush/async';
+
+const data = await withTimeout(
+    (signal) => fetch('/api/slow', { signal }).then(r => r.json()),
+    5000
+);
+```
+
+### `dedupe(keyFn, fn)`
+
+Deduplicates concurrent calls to the same async function. If a call with the same key is already in-flight, returns the existing promise instead of starting a new one.
+
+**Parameters:**
+
+| Name | Type | Description |
+| --- | --- | --- |
+| `keyFn` | `(...args) => string` | Computes a cache key from the arguments |
+| `fn` | `(...args) => Promise<T>` | The async function to wrap |
+
+```typescript
+import { dedupe } from '@cleverbrush/async';
+
+const fetchUser = dedupe(
+    (id: number) => `user-${id}`,
+    (id: number) => fetch(`/api/users/${id}`).then(r => r.json())
+);
+
+// These two concurrent calls share a single fetch:
+const [a, b] = await Promise.all([fetchUser(1), fetchUser(1)]);
 ```
 
 ## Code Quality

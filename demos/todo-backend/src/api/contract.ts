@@ -207,5 +207,31 @@ export const api = defineApi({
         activityLog: endpoint
             .get('/api/admin/activity')
             .returns(string())
+    },
+
+    // ── Resilience demo endpoints ─────────────────────────────────────────
+    demo: {
+        /** Responds after a configurable delay (ms via query). */
+        slow: endpoint
+            .get('/api/demo/slow')
+            .query(object({ delay: number().coerce().optional() }))
+            .returns(object({ ok: string() })),
+
+        /** Fails with 500 a configurable number of times before succeeding. */
+        flaky: endpoint
+            .get('/api/demo/flaky')
+            .query(
+                object({
+                    failCount: number().coerce().optional(),
+                    key: string().optional()
+                })
+            )
+            .returns(object({ attempt: number() })),
+
+        /** Echoes back the request body. */
+        echo: endpoint
+            .post('/api/demo/echo')
+            .body(object({ message: string() }))
+            .returns(object({ message: string() }))
     }
 });

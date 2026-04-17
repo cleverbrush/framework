@@ -280,6 +280,28 @@ export const AdminActivityEndpoint = api.admin.activityLog
     .tags('admin')
     .operationId('adminActivityLog');
 
+// ── Demo endpoints (resilience testing) ───────────────────────────────────────
+
+export const DemoSlowEndpoint = api.demo.slow
+    .summary('Slow response')
+    .description('Responds after a configurable delay for timeout testing.')
+    .tags('demo')
+    .operationId('demoSlow');
+
+export const DemoFlakyEndpoint = api.demo.flaky
+    .summary('Flaky response')
+    .description(
+        'Fails with 500 a configurable number of times before succeeding, for retry testing.'
+    )
+    .tags('demo')
+    .operationId('demoFlaky');
+
+export const DemoEchoEndpoint = api.demo.echo
+    .summary('Echo')
+    .description('Echoes back the request body.')
+    .tags('demo')
+    .operationId('demoEcho');
+
 // ── Grouped endpoints — used with mapHandlers() for compile-time safety ───────
 
 export const endpoints = {
@@ -312,6 +334,11 @@ export const endpoints = {
     },
     admin: {
         activityLog: AdminActivityEndpoint
+    },
+    demo: {
+        slow: DemoSlowEndpoint,
+        flaky: DemoFlakyEndpoint,
+        echo: DemoEchoEndpoint
     }
 };
 

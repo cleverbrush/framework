@@ -16,7 +16,7 @@ import {
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { UpdateTodoBodySchema } from '@cleverbrush/todo-backend/contract';
-import { ApiError } from '@cleverbrush/web';
+import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/web';
 import { client } from '../../api/client';
 
 type TodoEvent = Parameters<typeof client.todos.sendEvent>[0]['body'];
@@ -61,7 +61,10 @@ export function TodoDetailPage() {
                 completed: result.todo.completed
             });
         } catch (e) {
-            setError(e instanceof ApiError ? e.message : 'Failed to load todo.');
+            if (e instanceof ApiError) setError(e.message);
+            else if (isTimeoutError(e)) setError('Request timed out. Please try again.');
+            else if (isNetworkError(e)) setError('Network error. Check your connection.');
+            else setError('Failed to load todo.');
         } finally {
             setLoading(false);
         }

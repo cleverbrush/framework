@@ -18,9 +18,25 @@
  */
 
 export { createClient } from './client.js';
-export { ApiError } from './errors.js';
+export {
+    ApiError,
+    isApiError,
+    isNetworkError,
+    isTimeoutError,
+    isWebError,
+    NetworkError,
+    TimeoutError,
+    WebError
+} from './errors.js';
+export type { FetchLike, Middleware } from './middleware.js';
+export {
+    composeMiddleware,
+    getPerCallOptions,
+    PER_CALL_OPTIONS
+} from './middleware.js';
 export type {
     ApiContract,
+    ClientHooks,
     ClientOptions,
     EndpointCallArgs,
     EndpointResponse,
