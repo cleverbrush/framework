@@ -68,7 +68,13 @@ export class VirtualIncomingMessage extends Readable {
         this.url = init.url;
         // Ensure a `host` header is present so that RequestContext can parse
         // the URL correctly (it uses `http://${req.headers.host}` as the base).
-        this.headers = { host: 'localhost', ...init.headers };
+        // Lowercase all keys to match Node.js http.IncomingMessage behaviour,
+        // which normalises header names to lower-case before exposing them.
+        const lowercased: Record<string, string> = {};
+        for (const [key, value] of Object.entries(init.headers ?? {})) {
+            lowercased[key.toLowerCase()] = value;
+        }
+        this.headers = { host: 'localhost', ...lowercased };
         this.#body =
             init.body != null && init.body.length > 0
                 ? Buffer.from(init.body, 'utf-8')
