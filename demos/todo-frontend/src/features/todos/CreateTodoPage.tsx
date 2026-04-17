@@ -9,7 +9,7 @@ import {
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { CreateTodoBodySchema } from '@cleverbrush/todo-backend/contract';
-import { ApiError } from '@cleverbrush/web';
+import { ApiError } from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 export function CreateTodoPage() {

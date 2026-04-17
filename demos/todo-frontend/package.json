@@ -11,12 +11,11 @@
     },
     "dependencies": {
         "@cleverbrush/react-form": "*",
-        "@cleverbrush/react-query": "*",
+        "@cleverbrush/client": "*",
         "@cleverbrush/schema": "*",
         "@cleverbrush/server": "*",
         "@tanstack/react-query": "^5.80.7",
         "@cleverbrush/todo-backend": "*",
-        "@cleverbrush/web": "*",
         "@radix-ui/react-icons": "^1.3.0",
         "@radix-ui/themes": "^3.2.1",
         "@react-oauth/google": "^0.12.1",

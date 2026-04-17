@@ -1,0 +1,90 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^2.0.0",
+        "@cleverbrush/server": "^2.0.0"
+    },
+    "devDependencies": {
+        "@tanstack/react-query": "^5.75.0",
+        "@testing-library/react": "^16.3.0",
+        "@types/react": "^19.0.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "peerDependencies": {
+        "@tanstack/react-query": "^5.0.0",
+        "react": ">=18.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@tanstack/react-query": {
+            "optional": true
+        },
+        "react": {
+            "optional": true
+        }
+    },
+    "description": "Typed HTTP client with optional TanStack Query hooks — generated from @cleverbrush/server API contracts, zero codegen, full type safety",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/client",
+    "keywords": [
+        "http-client",
+        "typed-client",
+        "api-client",
+        "react-query",
+        "tanstack-query",
+        "typescript",
+        "type-safe",
+        "proxy",
+        "hooks",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./retry": {
+            "types": "./dist/retry.d.ts",
+            "import": "./dist/retry.js"
+        },
+        "./timeout": {
+            "types": "./dist/timeout.d.ts",
+            "import": "./dist/timeout.js"
+        },
+        "./dedupe": {
+            "types": "./dist/dedupe.d.ts",
+            "import": "./dist/dedupe.js"
+        },
+        "./cache": {
+            "types": "./dist/cache.d.ts",
+            "import": "./dist/cache.js"
+        },
+        "./react": {
+            "types": "./dist/react.d.ts",
+            "import": "./dist/react.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/client",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/client#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "2.0.0"
+}

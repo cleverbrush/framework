@@ -13,7 +13,7 @@ import {
     TextField
 } from '@radix-ui/themes';
 import { useQueryClient } from '@tanstack/react-query';
-import { isApiError, isWebError } from '@cleverbrush/web';
+import { isApiError, isWebError } from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 // ── Shared Helpers ──────────────────────────────────────────────────────
@@ -526,7 +526,7 @@ export default function ReactQueryPage() {
                 ⚡ React Query Integration
             </Heading>
             <Text size="2" color="gray" mb="5" as="p">
-                Interactive demos of <Code>@cleverbrush/react-query</Code>{' '}
+                Interactive demos of <Code>@cleverbrush/client/react</Code>{' '}
                 — TanStack Query hooks auto-generated from the API contract.
             </Text>
             <Flex direction="column" gap="4">

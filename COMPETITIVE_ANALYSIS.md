@@ -85,11 +85,11 @@ This document compares the **@cleverbrush/framework** with the most relevant com
 | Streaming | ✅ `.stream()` → `AsyncIterable` | ✅ Subscriptions | ❌ | ❌ | ✅ WebSocket | ❌ |
 | Error hierarchy | ✅ 4-level typed hierarchy | ❌ `TRPCClientError` | ❌ | ❌ | ❌ | ❌ |
 | Hooks (before/after) | ✅ `beforeRequest`, `afterResponse`, `beforeError` | ❌ | ❌ | ❌ | ❌ | ❌ |
-| React Query integration | ✅ `@cleverbrush/react-query` | ✅ Built-in | ✅ Built-in | ✅ Via SWR pattern | ❌ | ✅ @zodios/react |
+| React Query integration | ✅ `@cleverbrush/client/react` | ✅ Built-in | ✅ Built-in | ✅ Via SWR pattern | ❌ | ✅ @zodios/react |
 | Response validation (client-side) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Custom fetch | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ (Axios) |
 
-**Assessment**: Our client is the most resilience-focused: built-in retry, timeout, dedup, cache, per-call overrides, and structured error hierarchy. TanStack Query integration is provided via `@cleverbrush/react-query`, putting us on par with tRPC, ts-rest, and Zodios.
+**Assessment**: Our client is the most resilience-focused: built-in retry, timeout, dedup, cache, per-call overrides, and structured error hierarchy. TanStack Query integration is provided via `@cleverbrush/client/react`, putting us on par with tRPC, ts-rest, and Zodios.
 
 ### 1.5 Ecosystem / Additional Packages
 
@@ -147,7 +147,7 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 
 | Gap | Who does it | Impact | Priority |
 |---|---|---|---|
-| ~~React Query / TanStack Query integration~~ | ~~tRPC, ts-rest, Zodios~~ | ~~High~~ | ✅ Done (`@cleverbrush/react-query`) |
+| ~~React Query / TanStack Query integration~~ | ~~tRPC, ts-rest, Zodios~~ | ~~High~~ | ✅ Done (`@cleverbrush/client/react`) |
 | **Multi-runtime (CF Workers, Deno, Bun)** | Hono, Elysia, tRPC | Medium — important for edge deployment | 🟡 Medium |
 | **WebSocket / Subscriptions** | tRPC, Elysia, Hono | Medium — real-time is increasingly expected | 🟡 Medium |
 | **Request batching** | tRPC | Low–Medium — reduces HTTP overhead | 🟢 Low |
@@ -172,7 +172,7 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 
 ### Phase 1 — High Priority (Fill Critical Gaps)
 
-#### 1.1 TanStack Query Integration (`@cleverbrush/react-query`) — ✅ IMPLEMENTED
+#### 1.1 TanStack Query Integration (`@cleverbrush/client/react`) — ✅ IMPLEMENTED
 **Status**: Shipped. Provides `createQueryClient()` with auto-generated `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`, `useMutation`, `queryKey`, and `prefetch` for every endpoint. Hierarchical query keys enable group-level invalidation.
 
 #### 1.2 WebSocket / Subscriptions Support

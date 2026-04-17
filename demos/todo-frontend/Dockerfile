@@ -22,7 +22,7 @@ COPY libs/schema-json/package.json ./libs/schema-json/
 COPY libs/scheduler/package.json ./libs/scheduler/
 COPY libs/server/package.json ./libs/server/
 COPY libs/server-openapi/package.json ./libs/server-openapi/
-COPY libs/web/package.json ./libs/web/
+COPY libs/client/package.json ./libs/client/
 COPY libs/benchmarks/package.json ./libs/benchmarks/
 COPY demos/todo-backend/package.json ./demos/todo-backend/
 COPY demos/todo-frontend/package.json ./demos/todo-frontend/

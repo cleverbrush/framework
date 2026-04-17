@@ -11,7 +11,7 @@ import {
     Text,
     TextField
 } from '@radix-ui/themes';
-import { ApiError } from '@cleverbrush/web';
+import { ApiError } from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 type ImportItem = { title: string; description: string };

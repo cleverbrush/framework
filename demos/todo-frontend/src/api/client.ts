@@ -1,7 +1,7 @@
 /**
  * Unified typed API client for the Todo application.
  *
- * Uses `createClient()` from `@cleverbrush/react-query` with the shared
+ * Uses `createClient()` from `@cleverbrush/client/react` with the shared
  * API contract to provide a client where every endpoint is both callable
  * (direct HTTP fetch) and exposes TanStack Query hooks.
  *
@@ -17,11 +17,11 @@
  * ```
  */
 
-import { createClient } from '@cleverbrush/react-query';
-import { retry } from '@cleverbrush/web/retry';
-import { timeout } from '@cleverbrush/web/timeout';
-import { dedupe } from '@cleverbrush/web/dedupe';
-import { throttlingCache } from '@cleverbrush/web/cache';
+import { createClient } from '@cleverbrush/client/react';
+import { retry } from '@cleverbrush/client/retry';
+import { timeout } from '@cleverbrush/client/timeout';
+import { dedupe } from '@cleverbrush/client/dedupe';
+import { throttlingCache } from '@cleverbrush/client/cache';
 import { api } from '@cleverbrush/todo-backend/contract';
 import { loadToken, setToken } from '../lib/http-client';
 

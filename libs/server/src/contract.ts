@@ -81,7 +81,7 @@ export type ApiContract = Record<string, ApiGroup>;
  * The returned object is the **single source of truth** for both server and
  * client.  The server imports it and extends each endpoint with
  * `.authorize()`, `.inject()`, and OpenAPI metadata.  The client passes it
- * to `createClient()` from `@cleverbrush/web` to obtain a fully typed HTTP
+ * to `createClient()` from `@cleverbrush/client` to obtain a fully typed HTTP
  * client.
  *
  * At runtime the contract (and each group within it) is frozen with

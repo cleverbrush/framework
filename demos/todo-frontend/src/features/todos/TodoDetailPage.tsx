@@ -16,7 +16,7 @@ import {
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { UpdateTodoBodySchema } from '@cleverbrush/todo-backend/contract';
-import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/web';
+import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 type TodoEvent = Parameters<typeof client.todos.sendEvent>[0]['body'];

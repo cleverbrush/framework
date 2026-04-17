@@ -15,7 +15,7 @@ import {
     isTimeoutError,
     isNetworkError,
     isWebError
-} from '@cleverbrush/web';
+} from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 type DemoResult = {
@@ -195,7 +195,7 @@ export default function ResiliencePage() {
                 🛡️ Resilience Demo
             </Heading>
             <Text size="2" color="gray" mb="5" as="p">
-                Interactive demonstrations of @cleverbrush/web middleware and
+                Interactive demonstrations of @cleverbrush/client middleware and
                 error handling features.
             </Text>
 

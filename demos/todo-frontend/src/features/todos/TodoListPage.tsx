@@ -12,7 +12,7 @@ import {
     Text,
     TextField
 } from '@radix-ui/themes';
-import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/web';
+import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 type Todo = Awaited<ReturnType<typeof client.todos.list>>[number];
