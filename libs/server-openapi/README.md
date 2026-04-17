@@ -3,11 +3,13 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 
-OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Converts endpoint registrations, schema definitions, and authentication configuration into a fully-formed OpenAPI document — no annotations, no decorators.
+OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Converts endpoint registrations, schema definitions, and authentication configuration into a fully-formed OpenAPI document — no annotations, no decorators. Also generates **AsyncAPI 3.0** documents for WebSocket subscription endpoints.
 
 ## Features
 
 - **`generateOpenApiSpec()`** — converts `@cleverbrush/server` endpoint registrations into an OpenAPI 3.1 document.
+- **`generateAsyncApiSpec()`** — converts `@cleverbrush/server` WebSocket subscription registrations into an AsyncAPI 3.0 document.
+- **`serveAsyncApi()`** — middleware that lazily generates and caches the AsyncAPI spec; serves it at a configurable path (default: `/asyncapi.json`).
 - **Schema conversion** — maps `@cleverbrush/schema` builders to JSON Schema Draft 2020-12 via `@cleverbrush/schema-json`.
 - **Path resolution** — converts both colon-style paths (`:id`) and `ParseStringSchemaBuilder` templates to OpenAPI `{param}` format with per-parameter schemas.
 - **Security mapping** — translates `@cleverbrush/auth` authentication schemes to OpenAPI `securitySchemes`; maps per-endpoint `authorize()` to `security` arrays. Auto-detects OAuth 2.0 flows (`authorizationCodeScheme`, `clientCredentialsScheme`) and OpenID Connect (`oidcScheme`).
@@ -394,6 +396,64 @@ import { object, number } from '@cleverbrush/schema';
 endpoint.get(route(object({ id: number().coerce() }), $t => $t`/api/users/${t => t.id}`));
 // produces path "/api/users/{id}" with schema { type: 'number' }
 ```
+
+## AsyncAPI 3.0 (WebSocket Subscriptions)
+
+`generateAsyncApiSpec()` and `serveAsyncApi()` convert `@cleverbrush/server` WebSocket subscription registrations into an **AsyncAPI 3.0** document — no annotations required.
+
+### Middleware (recommended)
+
+```ts
+import { serveAsyncApi } from '@cleverbrush/server-openapi';
+
+server.use(serveAsyncApi({
+    server,
+    info: { title: 'My API', version: '1.0.0' },
+    // Optional: document the WebSocket servers
+    servers: {
+        production: { host: 'api.example.com', protocol: 'wss' },
+        local: { host: 'localhost:3000', protocol: 'ws' },
+    },
+    path: '/asyncapi.json',  // default
+}));
+// GET /asyncapi.json → AsyncAPI 3.0 document (lazily generated, cached)
+```
+
+### Programmatic use
+
+```ts
+import { generateAsyncApiSpec } from '@cleverbrush/server-openapi';
+
+const spec = generateAsyncApiSpec({
+    subscriptions: server.getSubscriptionRegistrations(),
+    info: { title: 'My API', version: '1.0.0' },
+    servers: {
+        production: { host: 'api.example.com', protocol: 'wss' },
+    },
+});
+
+// write to file, validate, upload to AsyncAPI Studio, etc.
+await fs.writeFile('asyncapi.json', JSON.stringify(spec, null, 2));
+```
+
+### Document structure
+
+Each subscription endpoint becomes:
+
+- A **channel** (keyed by the subscription's `operationId` or a sanitised form of its path) with an `address` containing the WebSocket URL path.
+- A **`send` operation** if the endpoint has an outgoing schema (server → client events).
+- A **`receive` operation** if the endpoint has an incoming schema (client → server messages).
+
+Named schemas (registered via `.schemaName()`) are collected into `components.schemas` and referenced via `$ref` pointers in the channel messages.
+
+### `AsyncApiOptions`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `subscriptions` | `readonly SubscriptionRegistration[]` | — | From `server.getSubscriptionRegistrations()` |
+| `info` | `AsyncApiInfo` | — | `{ title, version, description?, ... }` |
+| `servers` | `Record<string, AsyncApiServerEntry>` | `{}` | Named WebSocket server entries |
+| `defaultHost` | `string` | — | Fallback host when `servers` is empty |
 
 ## License
 

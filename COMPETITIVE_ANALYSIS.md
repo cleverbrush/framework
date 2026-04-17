@@ -50,10 +50,10 @@ This document compares the **@cleverbrush/framework** with the most relevant com
 | Middleware pipeline | ✅ `ServerBuilder.use()` | ✅ | ✅ | ✅ | ✅ Lifecycle hooks | ❌ |
 | Multi-runtime (CF Workers, Deno, Bun) | ❌ Node.js only | ✅ Via adapters | ✅ Via adapters | ✅ Native | ✅ Bun-native | ❌ Node.js only |
 | Request batching | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
-| Subscriptions / WebSockets | ❌ | ✅ | ❌ | ✅ | ✅ | ❌ |
+| Subscriptions / WebSockets | ✅ `endpoint.subscription()` + typed async-generator handlers | ✅ | ❌ | ✅ | ✅ | ❌ |
 | ProblemDetails (RFC 7807) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-**Assessment**: Strong in compile-time safety (`mapHandlers`, route templates, typed DI). Weaker than tRPC/Hono/Elysia in multi-runtime support and real-time features (subscriptions).
+**Assessment**: Strong in compile-time safety (`mapHandlers`, route templates, typed DI) and now competitive on real-time features via typed WebSocket subscriptions. The main remaining platform gap versus tRPC/Hono/Elysia is multi-runtime support.
 
 ### 1.3 OpenAPI
 
@@ -82,14 +82,14 @@ This document compares the **@cleverbrush/framework** with the most relevant com
 | Request deduplication | ✅ `withDeduplication()` | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Response caching | ✅ `withCache()` (TTL) | ❌ (React Query) | ❌ (React Query) | ❌ (SWR) | ❌ | ❌ |
 | Per-call overrides | ✅ `{ retry: {...}, timeout: 5000 }` | ❌ | ❌ | ❌ | ❌ | ❌ |
-| Streaming | ✅ `.stream()` → `AsyncIterable` | ✅ Subscriptions | ❌ | ❌ | ✅ WebSocket | ❌ |
+| Streaming | ✅ `.stream()` + WebSocket `Subscription` handles | ✅ Subscriptions | ❌ | ❌ | ✅ WebSocket | ❌ |
 | Error hierarchy | ✅ 4-level typed hierarchy | ❌ `TRPCClientError` | ❌ | ❌ | ❌ | ❌ |
 | Hooks (before/after) | ✅ `beforeRequest`, `afterResponse`, `beforeError` | ❌ | ❌ | ❌ | ❌ | ❌ |
 | React Query integration | ✅ `@cleverbrush/client/react` | ✅ Built-in | ✅ Built-in | ✅ Via SWR pattern | ❌ | ✅ @zodios/react |
 | Response validation (client-side) | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | Custom fetch | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ (Axios) |
 
-**Assessment**: Our client is the most resilience-focused: built-in retry, timeout, dedup, cache, per-call overrides, and structured error hierarchy. TanStack Query integration is provided via `@cleverbrush/client/react`, putting us on par with tRPC, ts-rest, and Zodios.
+**Assessment**: Our client is the most resilience-focused: built-in retry, timeout, dedup, cache, per-call overrides, structured error hierarchy, and now typed WebSocket subscriptions with a React hook. TanStack Query integration is provided via `@cleverbrush/client/react`, putting us on par with tRPC, ts-rest, and Zodios for mainstream client ergonomics.
 
 ### 1.5 Ecosystem / Additional Packages
 
@@ -148,14 +148,15 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 | Gap | Who does it | Impact | Priority |
 |---|---|---|---|
 | ~~React Query / TanStack Query integration~~ | ~~tRPC, ts-rest, Zodios~~ | ~~High~~ | ✅ Done (`@cleverbrush/client/react`) |
+| ~~WebSocket / Subscriptions~~ | ~~tRPC, Elysia, Hono~~ | ~~Medium — real-time is increasingly expected~~ | ✅ Done (`endpoint.subscription()`, typed client subscriptions, `useSubscription`) |
 | **Multi-runtime (CF Workers, Deno, Bun)** | Hono, Elysia, tRPC | Medium — important for edge deployment | 🟡 Medium |
-| **WebSocket / Subscriptions** | tRPC, Elysia, Hono | Medium — real-time is increasingly expected | 🟡 Medium |
 | **Request batching** | tRPC | Low–Medium — reduces HTTP overhead | 🟢 Low |
 | **Community size / adoption** | tRPC (36k★), Hono (24k★) | High — ecosystem, docs, plugins, hiring | 🟡 Medium |
 | **Interactive documentation / playground** | Hono, Elysia | Low — nice-to-have for developer experience | 🟢 Low |
 | **Client-side response validation** | Zodios | Low — useful for untrusted APIs | 🟢 Low |
 | **Testing utilities** | Elysia, Hono | Low — in-memory test helpers | 🟢 Low |
 | **File upload (typed)** | Hono, Elysia | Low — we support it via binary body | 🟢 Low |
+| **Subscription reconnection / AsyncAPI coverage** | tRPC, Elysia, Hono (partial, ecosystem-specific) | Low–Medium — polish on top of the shipped real-time foundation | ✅ Done |
 
 ### What we do better than everyone:
 
@@ -175,16 +176,18 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 #### 1.1 TanStack Query Integration (`@cleverbrush/client/react`) — ✅ IMPLEMENTED
 **Status**: Shipped. Provides `createQueryClient()` with auto-generated `useQuery`, `useSuspenseQuery`, `useInfiniteQuery`, `useMutation`, `queryKey`, and `prefetch` for every endpoint. Hierarchical query keys enable group-level invalidation.
 
-#### 1.2 WebSocket / Subscriptions Support
-**Why**: Real-time features are increasingly expected. tRPC subscriptions are a key selling point.
+#### 1.2 WebSocket / Subscriptions Support — ✅ IMPLEMENTED
+**Status**: Shipped. The framework now supports `endpoint.subscription()` in contracts, schema-validated incoming and outgoing WebSocket messages, typed server-side async-generator handlers, typed client-side `Subscription` handles, React `useSubscription()`, demo coverage, documentation, and unit tests.
 
-**Scope**:
-- New endpoint type: `endpoint.subscription()` or `endpoint.ws()`
+**Delivered scope**:
+- New endpoint type: `endpoint.subscription()`
 - Schema-validated messages in both directions
-- Client: `client.events.subscribe()` → `AsyncIterable<Event>` with typed events
+- Client: `client.group.endpoint()` returns a typed `Subscription` handle that is an `AsyncIterable<Event>` and exposes `send()` / `close()`
 - Server: handler returns `AsyncGenerator<Event>`
-- Reconnection with backoff (leverage existing `@cleverbrush/async` retry)
-- OpenAPI: document as AsyncAPI or WebSocket endpoint
+- React: `useSubscription()` for lifecycle and event-state management
+- Automatic reconnection with configurable exponential backoff, jitter, `maxRetries`, `shouldReconnect` predicate, and per-call or global policy via `SubscriptionReconnectOptions`
+- AsyncAPI 3.0 document generation via `generateAsyncApiSpec()` and `serveAsyncApi()` in `@cleverbrush/server-openapi`
+- `ServerBuilder.getSubscriptionRegistrations()` for programmatic spec generation
 
 #### 1.3 Request Batching (Client)
 **Why**: Reduces HTTP overhead for chatty UIs making many parallel requests.
@@ -270,7 +273,6 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 
 ```
 Q1: TanStack Query integration (1.1) — immediately addresses #1 gap
-Q1: WebSocket subscriptions (1.2) — addresses real-time gap
 Q2: Multi-runtime adapters (2.1) — enables edge deployment
 Q2: Request batching (1.3) — performance optimization
 Q3: Testing utilities (2.2) — developer experience
@@ -285,8 +287,8 @@ Q4: CLI tool (3.2) — onboarding experience
 
 **@cleverbrush/framework occupies a unique position**: it's the only framework where a single schema system drives the entire stack — from database queries and environment parsing through DI and server endpoints to client calls and React forms. This "schema as connective tissue" architecture provides unmatched type safety and consistency.
 
-**Our main competitive gaps are adoption-driven features**: TanStack Query integration, multi-runtime support, and real-time subscriptions. These are the features that teams actively evaluate when choosing a framework. Addressing them (particularly TanStack Query) would eliminate the primary reasons a team might choose tRPC or ts-rest over us.
+**Our main competitive gaps are now narrower**: multi-runtime support remains the biggest adoption blocker, with batching and ecosystem maturity still lagging some competitors. The largest real-time gap has been closed by shipping typed WebSocket subscriptions with automatic reconnection/backoff and AsyncAPI 3.0 documentation.
 
 **Our main competitive advantages are depth features**: exhaustive handler mapping, OpenAPI links/callbacks/webhooks, typed runtime expressions, compile-time mapper, built-in client resilience, and schema extensibility. These are features that teams appreciate after adoption — they prevent bugs and reduce boilerplate in large codebases.
 
-The strategy should be: **close the adoption gaps first (Phase 1), then leverage depth advantages to retain and delight users (Phases 2–3).**
+The strategy should be: **finish the remaining adoption gaps (especially multi-runtime support), then keep compounding the framework's depth advantages in Phase 2–3.**

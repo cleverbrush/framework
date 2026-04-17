@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import type { SubscriptionBuilder } from '@cleverbrush/server';
 import { createClient } from './client.js';
+import type { SubscriptionReconnectOptions } from './types.js';
 
 // ---------------------------------------------------------------------------
 // WebSocket mock
@@ -57,6 +59,9 @@ class MockWebSocket {
 
     simulateError() {
         this.onerror?.({});
+        // In real browsers, onerror is always followed by onclose
+        this.readyState = MockWebSocket.CLOSED;
+        this.onclose?.({ code: 1006, reason: 'Connection error' });
     }
 
     simulateClose() {
@@ -544,5 +549,390 @@ describe('createClient — subscriptions', () => {
         (client as any).live.events({ signal: ac.signal });
 
         expect(MockWebSocket.instances[0].closed).toBe(true);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// Reconnection tests
+// ---------------------------------------------------------------------------
+
+describe('createClient — subscriptions — reconnection', () => {
+    let originalWebSocket: typeof globalThis.WebSocket;
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        MockWebSocket.instances = [];
+        originalWebSocket = globalThis.WebSocket;
+        (globalThis as any).WebSocket = MockWebSocket;
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        (globalThis as any).WebSocket = originalWebSocket;
+    });
+
+    function makeClient(global?: SubscriptionReconnectOptions) {
+        const contract = {
+            live: {
+                events: {
+                    introspect: () => ({
+                        protocol: 'subscription' as const,
+                        basePath: '/ws/events',
+                        pathTemplate: ''
+                    })
+                }
+            }
+        };
+        return createClient(
+            contract as unknown as { live: { events: SubscriptionBuilder } },
+            {
+                baseUrl: 'http://localhost:3000',
+                subscriptionReconnect: global
+            }
+        );
+    }
+
+    test('reconnects after unexpected close', () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({
+            reconnect: { jitter: false }
+        });
+        const ws1 = MockWebSocket.instances[0];
+        ws1.simulateOpen();
+        ws1.simulateClose();
+
+        expect(sub.state).toBe('reconnecting');
+        expect(MockWebSocket.instances).toHaveLength(1);
+
+        vi.advanceTimersByTime(300); // attempt 1 default delay
+
+        expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    test('transitions back to connected after successful reconnect', () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({
+            reconnect: { jitter: false }
+        });
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+
+        vi.advanceTimersByTime(300);
+
+        MockWebSocket.instances[1].simulateOpen();
+        expect(sub.state).toBe('connected');
+    });
+
+    test('resets reconnect attempt counter after successful connect', () => {
+        const client = makeClient();
+        const _sub = client.live.events({
+            reconnect: { jitter: false }
+        });
+
+        // Reconnect once
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+        vi.advanceTimersByTime(300);
+        MockWebSocket.instances[1].simulateOpen();
+
+        // Reconnect again — delay should be 300ms again (attempt reset to 1)
+        MockWebSocket.instances[1].simulateClose();
+        vi.advanceTimersByTime(299);
+        expect(MockWebSocket.instances).toHaveLength(2);
+        vi.advanceTimersByTime(1);
+        expect(MockWebSocket.instances).toHaveLength(3);
+    });
+
+    test('exponential backoff between reconnect attempts', () => {
+        const client = makeClient();
+        (client as any).live.events({ reconnect: { jitter: false } });
+
+        MockWebSocket.instances[0].simulateOpen();
+        // Attempt 1: 300ms
+        MockWebSocket.instances[0].simulateClose();
+        vi.advanceTimersByTime(299);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(MockWebSocket.instances).toHaveLength(2);
+
+        // Attempt 2: 600ms
+        MockWebSocket.instances[1].simulateClose(); // no open → new attempt
+        vi.advanceTimersByTime(599);
+        expect(MockWebSocket.instances).toHaveLength(2);
+        vi.advanceTimersByTime(1);
+        expect(MockWebSocket.instances).toHaveLength(3);
+    });
+
+    test('respects backoffLimit ceiling', () => {
+        const client = makeClient();
+        (client as any).live.events({
+            reconnect: { jitter: false, backoffLimit: 500 }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        // attempt 1 delay = min(300, 500) = 300 ms
+        MockWebSocket.instances[0].simulateClose();
+        vi.advanceTimersByTime(300);
+        expect(MockWebSocket.instances).toHaveLength(2);
+
+        // attempt 2 delay = min(600, 500) = 500 ms
+        MockWebSocket.instances[1].simulateClose();
+        vi.advanceTimersByTime(499);
+        expect(MockWebSocket.instances).toHaveLength(2);
+        vi.advanceTimersByTime(1);
+        expect(MockWebSocket.instances).toHaveLength(3);
+    });
+
+    test('stops reconnecting after maxRetries', () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({
+            reconnect: { jitter: false, maxRetries: 2 }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose(); // attempt 1
+        vi.advanceTimersByTime(300);
+        expect(MockWebSocket.instances).toHaveLength(2);
+
+        MockWebSocket.instances[1].simulateClose(); // attempt 2
+        vi.advanceTimersByTime(600);
+        expect(MockWebSocket.instances).toHaveLength(3);
+
+        MockWebSocket.instances[2].simulateClose(); // exceeds maxRetries
+        vi.advanceTimersByTime(10_000); // no reconnect
+        expect(MockWebSocket.instances).toHaveLength(3);
+        expect(sub.state).toBe('closed');
+    });
+
+    test('shouldReconnect predicate returning false stops reconnection', () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({
+            reconnect: {
+                jitter: false,
+                shouldReconnect: (e: any) => e.code !== 4003
+            }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        // Trigger close with code 4003
+        MockWebSocket.instances[0].onclose?.({ code: 4003, reason: 'policy' });
+
+        vi.advanceTimersByTime(10_000);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(sub.state).toBe('closed');
+    });
+
+    test('shouldReconnect predicate returning true allows reconnection', () => {
+        const client = makeClient();
+        (client as any).live.events({
+            reconnect: {
+                jitter: false,
+                shouldReconnect: (e: any) => e.code !== 4003
+            }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].onclose?.({ code: 1006, reason: '' });
+        vi.advanceTimersByTime(300);
+        expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    test('manual close() does not trigger reconnection', () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({
+            reconnect: { jitter: false }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        sub.close();
+
+        vi.advanceTimersByTime(10_000);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(sub.state).toBe('closed');
+    });
+
+    test('abort signal does not trigger reconnection', () => {
+        const client = makeClient();
+        const ac = new AbortController();
+        const sub = (client as any).live.events({
+            reconnect: { jitter: false },
+            signal: ac.signal
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        ac.abort();
+
+        vi.advanceTimersByTime(10_000);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(sub.state).toBe('closed');
+    });
+
+    test('iterator.return() does not trigger reconnection', async () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({
+            reconnect: { jitter: false }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        const iter = sub[Symbol.asyncIterator]();
+        await iter.return!();
+
+        vi.advanceTimersByTime(10_000);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(sub.state).toBe('closed');
+    });
+
+    test('messages continue to iterate across reconnections', async () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({
+            reconnect: { jitter: false }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateMessage({
+            type: 'message',
+            data: 'before'
+        });
+
+        // Reconnect
+        MockWebSocket.instances[0].simulateClose();
+        vi.advanceTimersByTime(300);
+        MockWebSocket.instances[1].simulateOpen();
+        MockWebSocket.instances[1].simulateMessage({
+            type: 'message',
+            data: 'after'
+        });
+
+        const iter = sub[Symbol.asyncIterator]();
+        const r1 = await iter.next();
+        const r2 = await iter.next();
+
+        expect(r1.value).toBe('before');
+        expect(r2.value).toBe('after');
+    });
+
+    test('per-call reconnect overrides global subscriptionReconnect', () => {
+        const client = createClient(
+            {
+                live: {
+                    events: {
+                        introspect: () => ({
+                            protocol: 'subscription',
+                            basePath: '/ws/events',
+                            pathTemplate: ''
+                        })
+                    }
+                }
+            } as any,
+            {
+                baseUrl: 'http://localhost:3000',
+                subscriptionReconnect: { maxRetries: 100, jitter: false }
+            }
+        );
+
+        // Per-call disables reconnection
+        const sub = (client as any).live.events({ reconnect: false });
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+
+        vi.advanceTimersByTime(10_000);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(sub.state).toBe('closed');
+    });
+
+    test('reconnect: false explicitly disables reconnection', () => {
+        const client = makeClient();
+        const sub = (client as any).live.events({ reconnect: false });
+
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+
+        vi.advanceTimersByTime(10_000);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(sub.state).toBe('closed');
+    });
+
+    test('global subscriptionReconnect applies to all subscriptions', () => {
+        const client = createClient(
+            {
+                live: {
+                    events: {
+                        introspect: () => ({
+                            protocol: 'subscription',
+                            basePath: '/ws/events',
+                            pathTemplate: ''
+                        })
+                    }
+                }
+            } as any,
+            {
+                baseUrl: 'http://localhost:3000',
+                subscriptionReconnect: { jitter: false }
+            }
+        );
+
+        (client as any).live.events();
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+
+        vi.advanceTimersByTime(300);
+        expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    test('reconnect: true uses global defaults', () => {
+        const client = createClient(
+            {
+                live: {
+                    events: {
+                        introspect: () => ({
+                            protocol: 'subscription',
+                            basePath: '/ws/events',
+                            pathTemplate: ''
+                        })
+                    }
+                }
+            } as any,
+            {
+                baseUrl: 'http://localhost:3000',
+                subscriptionReconnect: { jitter: false }
+            }
+        );
+
+        (client as any).live.events({ reconnect: true });
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+
+        vi.advanceTimersByTime(300);
+        expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    test('custom delay function is used', () => {
+        const client = makeClient();
+        (client as any).live.events({
+            reconnect: {
+                jitter: false,
+                delay: (_attempt: number) => 1000
+            }
+        });
+
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+
+        vi.advanceTimersByTime(999);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        vi.advanceTimersByTime(1);
+        expect(MockWebSocket.instances).toHaveLength(2);
+    });
+
+    test('no reconnection when reconnect not configured', () => {
+        const client = makeClient();
+        const sub = (client as any).live.events();
+
+        MockWebSocket.instances[0].simulateOpen();
+        MockWebSocket.instances[0].simulateClose();
+
+        vi.advanceTimersByTime(10_000);
+        expect(MockWebSocket.instances).toHaveLength(1);
+        expect(sub.state).toBe('closed');
     });
 });

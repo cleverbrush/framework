@@ -7,6 +7,7 @@ import {
 } from '@cleverbrush/server';
 import {
     generateOpenApiSpec,
+    serveAsyncApi,
     type OpenApiDocument
 } from '@cleverbrush/server-openapi';
 import {
@@ -147,6 +148,21 @@ export function buildServer(config: Config) {
         }
         return cachedSpec;
     };
+
+    // ── AsyncAPI spec middleware (registered after server is assigned)
+    server.use(serveAsyncApi({
+        server,
+        info: {
+            title: 'ToDo Management API – WebSocket',
+            version: '1.0.0'
+        },
+        servers: {
+            local: {
+                host: `${config.server.host === '0.0.0.0' ? 'localhost' : config.server.host}:${config.server.port}`,
+                protocol: 'ws'
+            }
+        }
+    }));
 
     // ── Register webhooks on the server (for getWebhooks() introspection)
     server.webhook(todoCreatedWebhook).webhook(todoCompletedWebhook);

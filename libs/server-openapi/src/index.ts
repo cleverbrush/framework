@@ -1,5 +1,13 @@
 export { writeOpenApiSpec } from './cli.js';
 export {
+    type AsyncApiDocument,
+    type AsyncApiInfo,
+    type AsyncApiOptions,
+    type AsyncApiServer_ServerLike,
+    type AsyncApiServerEntry,
+    generateAsyncApiSpec
+} from './generateAsyncApiSpec.js';
+export {
     generateOpenApiSpec,
     type OpenApiDocument,
     type OpenApiInfo,
@@ -24,4 +32,5 @@ export {
     mapSecuritySchemes,
     type OpenApiSecurityScheme
 } from './securityMapper.js';
+export { type ServeAsyncApiOptions, serveAsyncApi } from './serveAsyncApi.js';
 export { type ServeOpenApiOptions, serveOpenApi } from './serveOpenApi.js';

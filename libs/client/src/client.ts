@@ -22,6 +22,7 @@ import type {
     ClientHooks,
     ClientOptions,
     Subscription,
+    SubscriptionReconnectOptions,
     TypedClient
 } from './types.js';
 
@@ -149,7 +150,8 @@ export function createClient<T extends ApiContract>(
         onUnauthorized,
         headers: extraHeaders,
         middlewares = [],
-        hooks = {}
+        hooks = {},
+        subscriptionReconnect
     } = options;
 
     // Compose middleware chain around the custom (or global) fetch.
@@ -374,7 +376,8 @@ export function createClient<T extends ApiContract>(
                                 meta,
                                 args,
                                 baseUrl,
-                                getToken
+                                getToken,
+                                subscriptionReconnect
                             );
                     }
 
@@ -393,6 +396,18 @@ export function createClient<T extends ApiContract>(
 // ---------------------------------------------------------------------------
 
 /**
+ * Default exponential backoff delay for subscription reconnection.
+ * Returns `300 * 2^(attempt - 1)` ms, matching the HTTP retry middleware's
+ * backoff formula for consistency.
+ *
+ * @param attempt - 1-indexed reconnection attempt number.
+ * @returns Delay in milliseconds before the attempt.
+ */
+export function defaultSubscriptionDelay(attempt: number): number {
+    return 300 * 2 ** (attempt - 1);
+}
+
+/**
  * Creates a {@link Subscription} handle backed by the browser WebSocket API.
  *
  * The handle is an `AsyncIterable` — use `for await` to consume incoming
@@ -405,18 +420,47 @@ export function createClient<T extends ApiContract>(
  * Auth tokens are appended as a `?token=` query parameter because the
  * browser WebSocket constructor does not support custom headers.
  *
- * @param meta - Introspected subscription endpoint metadata (`basePath`, `pathTemplate`, `protocol`).
- * @param args - Call-site arguments: `params`, `query`, `signal`.
+ * When `reconnect` options are provided (either via per-call `args.reconnect`
+ * or global `globalReconnect`), the handle will automatically reconnect
+ * after an unexpected connection close with exponential backoff. Manual
+ * calls to `.close()` and AbortSignal aborts will NOT trigger reconnection.
+ *
+ * @param meta - Introspected subscription endpoint metadata.
+ * @param args - Call-site arguments: `params`, `query`, `signal`, `reconnect`.
  * @param baseUrl - The client's configured base URL.
  * @param getToken - Optional token provider for authentication.
+ * @param globalReconnect - Global reconnect defaults from `ClientOptions`.
  * @returns A live {@link Subscription} handle.
  */
 function createSubscriptionHandle(
     meta: any,
     args: any,
     baseUrl: string,
-    getToken?: () => string | null | undefined
+    getToken?: () => string | null | undefined,
+    globalReconnect?: SubscriptionReconnectOptions
 ): Subscription<any, any> {
+    // Resolve reconnect options: per-call wins over global, false disables
+    const perCallReconnect = args?.reconnect;
+    let reconnectOptions: SubscriptionReconnectOptions | null;
+    if (perCallReconnect === false) {
+        reconnectOptions = null;
+    } else if (perCallReconnect === true) {
+        reconnectOptions = globalReconnect ?? {};
+    } else if (
+        perCallReconnect != null &&
+        typeof perCallReconnect === 'object'
+    ) {
+        reconnectOptions = perCallReconnect;
+    } else {
+        reconnectOptions = globalReconnect ?? null;
+    }
+
+    const maxRetries = reconnectOptions?.maxRetries ?? Infinity;
+    const delayFn = reconnectOptions?.delay ?? defaultSubscriptionDelay;
+    const useJitter = reconnectOptions?.jitter ?? true;
+    const backoffLimit = reconnectOptions?.backoffLimit ?? 30_000;
+    const shouldReconnect = reconnectOptions?.shouldReconnect;
+
     // Build WebSocket URL
     const path = buildPath(meta.basePath, meta.pathTemplate, args?.params);
     const qs = serializeQuery(args?.query);
@@ -436,81 +480,145 @@ function createSubscriptionHandle(
         }
     }
 
-    let wsUrl = wsBase + path + (qs ? '?' + qs : '');
+    const wsUrlBase = wsBase + path + (qs ? '?' + qs : '');
 
-    // Add auth token as query param for WebSocket (headers not supported in browser WebSocket API)
-    const token = getToken?.();
-    if (token) {
-        const sep = wsUrl.includes('?') ? '&' : '?';
-        wsUrl += `${sep}token=${encodeURIComponent(token)}`;
+    function buildWsUrl(): string {
+        let url = wsUrlBase;
+        const token = getToken?.();
+        if (token) {
+            const sep = url.includes('?') ? '&' : '?';
+            url += `${sep}token=${encodeURIComponent(token)}`;
+        }
+        return url;
     }
 
-    let currentState: Subscription<any, any>['state'] = 'connecting';
     const signal = args?.signal as AbortSignal | undefined;
+
+    let currentState: Subscription<any, any>['state'] = 'connecting';
 
     // Message queue for async iteration
     const messageQueue: any[] = [];
     let messageResolve: ((result: IteratorResult<any>) => void) | null = null;
     let done = false;
 
-    const ws = new WebSocket(wsUrl);
+    // Tracks whether the user explicitly closed the subscription (no reconnect)
+    let manuallyClosed = false;
+    let reconnectAttempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    ws.onopen = () => {
-        currentState = 'connected';
-    };
+    function pushMessage(value: any): void {
+        if (messageResolve) {
+            messageResolve({ value, done: false });
+            messageResolve = null;
+        } else {
+            messageQueue.push(value);
+        }
+    }
 
-    ws.onclose = () => {
-        currentState = 'closed';
+    function terminateDone(): void {
         done = true;
+        currentState = 'closed';
+        if (reconnectTimer !== null) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
         if (messageResolve) {
             messageResolve({ value: undefined, done: true });
             messageResolve = null;
         }
-    };
+    }
 
-    ws.onerror = () => {
-        currentState = 'closed';
-        done = true;
-        if (messageResolve) {
-            messageResolve({ value: undefined, done: true });
-            messageResolve = null;
-        }
-    };
+    let ws: WebSocket;
 
-    ws.onmessage = event => {
-        let frame: any;
-        try {
-            frame = JSON.parse(
-                typeof event.data === 'string'
-                    ? event.data
-                    : event.data.toString()
-            );
-        } catch {
-            return; // Ignore malformed frames
-        }
+    function createWs(): WebSocket {
+        const socket = new WebSocket(buildWsUrl());
 
-        if (frame.type === 'pong') return;
-        if (frame.type === 'error') return; // TODO: surface errors
+        socket.onopen = () => {
+            reconnectAttempt = 0;
+            currentState = 'connected';
+        };
 
-        // Both 'message' and 'tracked' frames carry data
-        if (frame.type === 'message' || frame.type === 'tracked') {
-            if (messageResolve) {
-                messageResolve({ value: frame.data, done: false });
-                messageResolve = null;
-            } else {
-                messageQueue.push(frame.data);
+        socket.onclose = (event: any) => {
+            if (manuallyClosed || done) {
+                terminateDone();
+                return;
             }
-        }
-    };
+
+            // Attempt reconnection if configured
+            if (reconnectOptions !== null && reconnectAttempt < maxRetries) {
+                const closeCode: number =
+                    typeof event?.code === 'number' ? event.code : 1006;
+                const closeReason: string =
+                    typeof event?.reason === 'string' ? event.reason : '';
+
+                if (
+                    shouldReconnect &&
+                    !shouldReconnect({ code: closeCode, reason: closeReason })
+                ) {
+                    terminateDone();
+                    return;
+                }
+
+                reconnectAttempt++;
+                currentState = 'reconnecting';
+
+                let delay = Math.min(delayFn(reconnectAttempt), backoffLimit);
+                if (useJitter) {
+                    delay = delay * (1 + Math.random() * 0.25);
+                }
+
+                reconnectTimer = setTimeout(() => {
+                    reconnectTimer = null;
+                    if (!manuallyClosed && !done) {
+                        ws = createWs();
+                    }
+                }, delay);
+            } else {
+                terminateDone();
+            }
+        };
+
+        socket.onerror = () => {
+            // onerror is always followed by onclose in the WebSocket lifecycle;
+            // let onclose handle reconnection/termination.
+        };
+
+        socket.onmessage = (event: any) => {
+            let frame: any;
+            try {
+                frame = JSON.parse(
+                    typeof event.data === 'string'
+                        ? event.data
+                        : event.data.toString()
+                );
+            } catch {
+                return; // Ignore malformed frames
+            }
+
+            if (frame.type === 'pong') return;
+            if (frame.type === 'error') return; // TODO: surface errors
+
+            // Both 'message' and 'tracked' frames carry data
+            if (frame.type === 'message' || frame.type === 'tracked') {
+                pushMessage(frame.data);
+            }
+        };
+
+        return socket;
+    }
+
+    ws = createWs();
 
     // Handle external abort signal
     if (signal) {
         if (signal.aborted) {
+            manuallyClosed = true;
             ws.close();
         } else {
             signal.addEventListener(
                 'abort',
                 () => {
+                    manuallyClosed = true;
                     ws.close();
                 },
                 { once: true }
@@ -526,6 +634,7 @@ function createSubscriptionHandle(
         },
 
         close(): void {
+            manuallyClosed = true;
             ws.close();
         },
 
@@ -553,6 +662,7 @@ function createSubscriptionHandle(
                     });
                 },
                 return(): Promise<IteratorResult<any>> {
+                    manuallyClosed = true;
                     ws.close();
                     done = true;
                     return Promise.resolve({

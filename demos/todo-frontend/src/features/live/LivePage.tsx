@@ -20,7 +20,7 @@ import { client } from '../../api/client';
 
 function TodoUpdatesPanel() {
     const { events, state, close } = useSubscription(
-        () => client.live.todoUpdates(),
+        () => client.live.todoUpdates({ reconnect: { maxRetries: 10 } }),
         { maxEvents: 50 }
     );
 
@@ -34,9 +34,11 @@ function TodoUpdatesPanel() {
                             color={
                                 state === 'connected'
                                     ? 'green'
-                                    : state === 'connecting'
-                                      ? 'yellow'
-                                      : 'red'
+                                    : state === 'reconnecting'
+                                      ? 'orange'
+                                      : state === 'connecting'
+                                        ? 'yellow'
+                                        : 'red'
                             }
                         >
                             {state}
@@ -48,6 +50,7 @@ function TodoUpdatesPanel() {
                 </Flex>
                 <Text size="2" color="gray">
                     Server pushes simulated todo change events every 2 seconds.
+                    Reconnects automatically on unexpected drops (up to 10 retries).
                 </Text>
                 <ScrollArea style={{ maxHeight: 300 }}>
                     <Flex direction="column" gap="1">
@@ -93,7 +96,7 @@ function ChatPanel() {
     const scrollRef = useRef<HTMLDivElement>(null);
 
     const { events, state, send, close } = useSubscription(
-        () => client.live.chat(),
+        () => client.live.chat({ reconnect: { maxRetries: 10 } }),
         { maxEvents: 200 }
     );
 
@@ -114,9 +117,11 @@ function ChatPanel() {
                             color={
                                 state === 'connected'
                                     ? 'green'
-                                    : state === 'connecting'
-                                      ? 'yellow'
-                                      : 'red'
+                                    : state === 'reconnecting'
+                                      ? 'orange'
+                                      : state === 'connecting'
+                                        ? 'yellow'
+                                        : 'red'
                             }
                         >
                             {state}

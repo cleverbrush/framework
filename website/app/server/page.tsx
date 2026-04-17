@@ -427,6 +427,74 @@ async function* handler({ signal }) {
                         />
                     </pre>
                 </div>
+
+                {/* ── AsyncAPI Documentation ──────────────────────── */}
+                <div className="card">
+                    <h2>AsyncAPI Documentation</h2>
+                    <p>
+                        Generate an <strong>AsyncAPI 3.0</strong> document from
+                        your WebSocket subscription registrations — no
+                        annotations required. Use <code>serveAsyncApi()</code>{' '}
+                        from <code>@cleverbrush/server-openapi</code> to serve
+                        it as middleware alongside your OpenAPI spec.
+                    </p>
+
+                    <h3>Serving the spec</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { serveAsyncApi } from '@cleverbrush/server-openapi';
+
+server
+    .use(serveAsyncApi({
+        server,
+        info: { title: 'My API', version: '1.0.0' },
+        servers: {
+            production: { host: 'api.example.com', protocol: 'wss' },
+        },
+    }))
+    .handle(/* ... */);
+
+// GET /asyncapi.json → AsyncAPI 3.0 document`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Custom path &amp; programmatic use</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { generateAsyncApiSpec } from '@cleverbrush/server-openapi';
+
+// Serve at a custom path
+server.use(serveAsyncApi({
+    server,
+    info: { title: 'My API', version: '1.0.0' },
+    path: '/docs/asyncapi.json',
+}));
+
+// Or generate programmatically (e.g. write to file):
+const spec = generateAsyncApiSpec({
+    subscriptions: server.getSubscriptionRegistrations(),
+    info: { title: 'My API', version: '1.0.0' },
+});
+await fs.writeFile('asyncapi.json', JSON.stringify(spec, null, 2));`)
+                            }}
+                        />
+                    </pre>
+
+                    <p>
+                        Each subscription is emitted as a{' '}
+                        <strong>channel</strong> with its address, and one or
+                        two <strong>operations</strong>: a <code>send</code>{' '}
+                        operation for server→client events and a{' '}
+                        <code>receive</code> operation for client→server
+                        messages. Named schemas (set via{' '}
+                        <code>.schemaName()</code>) are automatically collected
+                        into <code>components.schemas</code> with{' '}
+                        <code>$ref</code> pointers.
+                    </p>
+                </div>
             </div>
         </div>
     );

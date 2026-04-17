@@ -328,6 +328,94 @@ function LiveFeed() {
                     />
                 </pre>
             </div>
+
+            {/* ── Automatic Reconnection ────────────────────────── */}
+            <div className="card">
+                <h2>Automatic Reconnection</h2>
+                <p>
+                    Enable automatic reconnection with exponential backoff.
+                    Reconnection is <strong>not</strong> triggered by manual{' '}
+                    <code>.close()</code> calls or <code>AbortSignal</code>{' '}
+                    aborts — only by unexpected connection drops.
+                </p>
+
+                <h3>Global default</h3>
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`const client = createClient(api, {
+    baseUrl: 'https://api.example.com',
+    subscriptionReconnect: {
+        maxRetries: 10,        // default: Infinity
+        backoffLimit: 30_000,  // max delay ms (default: 30 000)
+        jitter: true,          // ±25% random jitter (default: true)
+    },
+});`)
+                        }}
+                    />
+                </pre>
+
+                <h3>Per-call override</h3>
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`// Override options for this subscription:
+const sub = client.live.events({
+    reconnect: { maxRetries: 3, jitter: false },
+});
+
+// Disable reconnection even when a global default is set:
+const sub2 = client.live.events({ reconnect: false });`)
+                        }}
+                    />
+                </pre>
+
+                <h3>Custom delay &amp; predicate</h3>
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`const sub = client.live.events({
+    reconnect: {
+        delay: (attempt) => Math.min(500 * 2 ** (attempt - 1), 60_000),
+        jitter: false,
+        // Stop reconnecting on specific close codes:
+        shouldReconnect: ({ code }) => code !== 4003,
+    },
+});`)
+                        }}
+                    />
+                </pre>
+
+                <h3>Reconnection state in React</h3>
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`function LiveFeed() {
+    const { events, state } = useSubscription(
+        () => client.live.events({ reconnect: { maxRetries: 5 } }),
+    );
+
+    return (
+        <div>
+            {state === 'reconnecting' && (
+                <span className="badge">Reconnecting…</span>
+            )}
+            {events.map((e, i) => <div key={i}>{JSON.stringify(e)}</div>)}
+        </div>
+    );
+}`)
+                        }}
+                    />
+                </pre>
+
+                <p>
+                    The default delay formula is{' '}
+                    <code>300 × 2^(attempt − 1)</code> ms, matching the HTTP
+                    retry middleware&apos;s backoff for consistency. The{' '}
+                    <code>backoffLimit</code> caps the delay before jitter is
+                    applied.
+                </p>
+            </div>
         </>
     );
 }

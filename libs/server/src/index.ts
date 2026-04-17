@@ -63,6 +63,7 @@ export type {
     ContentTypeHandler,
     EndpointRegistration,
     Middleware,
-    ServerOptions
+    ServerOptions,
+    SubscriptionRegistration
 } from './types.js';
 export { defineWebhook, type WebhookDefinition } from './Webhook.js';

@@ -292,6 +292,84 @@ export type SubscriptionIncoming<E> =
             : TIncoming
         : never;
 
+// ---------------------------------------------------------------------------
+// SubscriptionReconnectOptions
+// ---------------------------------------------------------------------------
+
+/**
+ * Automatic reconnection options for WebSocket subscriptions.
+ *
+ * When provided (or when set to `true` on a per-call basis), the client will
+ * automatically attempt to reconnect after an unexpected connection close.
+ * Manual calls to `.close()` and `AbortSignal` aborts will NOT trigger
+ * reconnection.
+ *
+ * @example
+ * ```ts
+ * // Global default for all subscriptions:
+ * const client = createClient(api, {
+ *     baseUrl: 'https://api.example.com',
+ *     subscriptionReconnect: { maxRetries: 5, backoffLimit: 30_000 },
+ * });
+ *
+ * // Per-call override (overrides global):
+ * const sub = client.live.events({ reconnect: { maxRetries: 3 } });
+ *
+ * // Disable reconnection for a single call even when global is set:
+ * const sub = client.live.events({ reconnect: false });
+ * ```
+ */
+export interface SubscriptionReconnectOptions {
+    /**
+     * Maximum number of reconnection attempts.
+     * After this many failures the subscription transitions to `'closed'`.
+     * Defaults to `Infinity` (reconnect indefinitely).
+     */
+    maxRetries?: number;
+
+    /**
+     * Custom delay function that returns the number of milliseconds to wait
+     * before attempt `n` (1-indexed).
+     *
+     * Defaults to exponential backoff: `300 * 2^(attempt - 1)` ms.
+     *
+     * @example
+     * ```ts
+     * // Linear 2 s delay:
+     * delay: () => 2000
+     * // Exponential starting at 500 ms:
+     * delay: (attempt) => 500 * 2 ** (attempt - 1)
+     * ```
+     */
+    delay?: (attempt: number) => number;
+
+    /**
+     * When `true`, a random jitter up to 25 % of the computed delay is added.
+     * This spreads reconnection storms when many clients disconnect at once.
+     * Defaults to `true`.
+     */
+    jitter?: boolean;
+
+    /**
+     * Upper bound for the delay in milliseconds (before jitter).
+     * The delay returned by {@link delay} is clamped to this value.
+     * Defaults to `30_000` (30 seconds).
+     */
+    backoffLimit?: number;
+
+    /**
+     * Optional predicate called with the close event before each reconnect
+     * attempt. Return `false` to stop reconnecting immediately.
+     *
+     * @example
+     * ```ts
+     * // Only reconnect on clean-ish close codes (not policy violations):
+     * shouldReconnect: (event) => event.code !== 4003
+     * ```
+     */
+    shouldReconnect?: (event: { code: number; reason: string }) => boolean;
+}
+
 /**
  * A live WebSocket subscription handle returned by `client.group.endpoint()`.
  *
@@ -313,14 +391,23 @@ export interface Subscription<TOutgoing, TIncoming = never>
  *
  * Returns a {@link Subscription} handle that is both an `AsyncIterable`
  * and has `send()` / `close()` methods.
+ *
+ * Pass `reconnect: false` to disable automatic reconnection for this call
+ * even when a global `subscriptionReconnect` is configured.
  */
 export type SubscriptionCall<E> =
     SubscriptionCallArgs<E> extends undefined
         ? (args?: {
               signal?: AbortSignal;
+              /** Per-call reconnection override. `false` disables reconnection. */
+              reconnect?: SubscriptionReconnectOptions | boolean;
           }) => Subscription<SubscriptionOutgoing<E>, SubscriptionIncoming<E>>
         : (
-              args: SubscriptionCallArgs<E> & { signal?: AbortSignal }
+              args: SubscriptionCallArgs<E> & {
+                  signal?: AbortSignal;
+                  /** Per-call reconnection override. `false` disables reconnection. */
+                  reconnect?: SubscriptionReconnectOptions | boolean;
+              }
           ) => Subscription<SubscriptionOutgoing<E>, SubscriptionIncoming<E>>;
 
 /**
@@ -508,4 +595,27 @@ export interface ClientOptions {
      * ```
      */
     hooks?: ClientHooks;
+
+    /**
+     * Default reconnection options for all WebSocket subscriptions created by
+     * this client.
+     *
+     * Individual subscription calls can override these options by passing a
+     * `reconnect` argument. Pass `reconnect: false` at the call site to
+     * disable reconnection for a specific subscription even when a global
+     * default is set.
+     *
+     * @example
+     * ```ts
+     * const client = createClient(api, {
+     *     baseUrl: 'https://api.example.com',
+     *     subscriptionReconnect: {
+     *         maxRetries: 10,
+     *         backoffLimit: 60_000,
+     *         jitter: true,
+     *     },
+     * });
+     * ```
+     */
+    subscriptionReconnect?: SubscriptionReconnectOptions;
 }

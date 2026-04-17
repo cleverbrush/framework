@@ -364,6 +364,76 @@ const client = createClient(api, {
 const sub = client.live.events();
 ```
 
+### Automatic Reconnection
+
+Enable automatic reconnection with exponential backoff for WebSocket subscriptions. Reconnection is **not** triggered by manual `.close()` calls or `AbortSignal` aborts — only by unexpected connection drops.
+
+#### Global default (all subscriptions)
+
+```ts
+const client = createClient(api, {
+    baseUrl: 'https://api.example.com',
+    subscriptionReconnect: {
+        maxRetries: 10,        // default: Infinity
+        backoffLimit: 30_000,  // max delay ms (default: 30 000)
+        jitter: true,          // ±25% random jitter (default: true)
+    },
+});
+```
+
+#### Per-call override
+
+```ts
+// Override the global default for this subscription:
+const sub = client.live.events({
+    reconnect: { maxRetries: 3, jitter: false },
+});
+
+// Disable reconnection for this subscription even when a global default is set:
+const sub = client.live.events({ reconnect: false });
+
+// Use global defaults explicitly:
+const sub = client.live.events({ reconnect: true });
+```
+
+#### Custom delay function
+
+```ts
+const sub = client.live.events({
+    reconnect: {
+        delay: (attempt) => Math.min(500 * 2 ** (attempt - 1), 60_000),
+        jitter: false,
+    },
+});
+```
+
+The default delay formula is `300 × 2^(attempt − 1)` ms (same as the HTTP retry middleware), capped by `backoffLimit`.
+
+#### Conditional reconnection via `shouldReconnect`
+
+```ts
+const sub = client.live.events({
+    reconnect: {
+        shouldReconnect: ({ code, reason }) => code !== 4003,
+    },
+});
+```
+
+When `shouldReconnect` returns `false` the subscription transitions directly to `'closed'` without further attempts.
+
+#### Observing the `'reconnecting'` state
+
+```tsx
+const { state } = useSubscription(() => client.live.events({
+    reconnect: { maxRetries: 5 },
+}));
+
+// state can be: 'connecting' | 'connected' | 'reconnecting' | 'closed'
+if (state === 'reconnecting') {
+    return <Badge>Reconnecting…</Badge>;
+}
+```
+
 ### React hook — `useSubscription`
 
 Import from `@cleverbrush/client/react`:

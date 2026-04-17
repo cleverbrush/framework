@@ -16,6 +16,7 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 - **RFC 9457 Problem Details** — validation errors and `HttpError` subclasses are serialized as `application/problem+json`.
 - **Type-safe routes** — `route()` builds typed path parameters using `ParseStringSchemaBuilder` segments.
 - **OpenAPI-ready** — `getRegistrations()` exposes endpoint metadata for `@cleverbrush/server-openapi`.
+- **AsyncAPI-ready** — `getSubscriptionRegistrations()` exposes subscription metadata for `generateAsyncApiSpec()` in `@cleverbrush/server-openapi`.
 - **Health check** — optional `/health` endpoint via `server.withHealthcheck()`.
 - **WebSocket subscriptions** — `endpoint.subscription('/ws/path')` with typed incoming/outgoing schemas, `tracked()` events, and async generator handlers.
 

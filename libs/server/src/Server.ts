@@ -216,6 +216,14 @@ export class ServerBuilder {
     }
 
     /**
+     * Returns a snapshot of all registered WebSocket subscription endpoints.
+     * Consumed by `@cleverbrush/server-openapi` to emit the AsyncAPI spec.
+     */
+    getSubscriptionRegistrations(): readonly SubscriptionRegistration[] {
+        return [...this.#subscriptionRegistrations];
+    }
+
+    /**
      * Register a webhook definition.
      *
      * Webhooks are recorded for OpenAPI spec generation only — they are not
