@@ -16,6 +16,7 @@ const NAV_ITEMS = [
     { href: '/auth', label: 'Auth' },
     { href: '/server-openapi', label: 'OpenAPI' },
     { href: '/web', label: 'Web Client' },
+    { href: '/react-query', label: 'React Query' },
     { href: '/react-form', label: 'React Form' },
     { href: '/schema-json', label: 'Schema JSON' },
     { href: '/showcases', label: 'Showcases' },

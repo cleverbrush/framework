@@ -1,22 +1,23 @@
 /**
- * Typed API client for the Todo application.
+ * Unified typed API client for the Todo application.
  *
- * Uses `createClient()` from `@cleverbrush/web` with the shared API
- * contract to provide a fully typed HTTP client.  All endpoint arguments
- * (params, body, query) and responses are inferred from the contract —
- * no manual type annotations needed.
+ * Uses `createClient()` from `@cleverbrush/react-query` with the shared
+ * API contract to provide a client where every endpoint is both callable
+ * (direct HTTP fetch) and exposes TanStack Query hooks.
  *
  * @example
  * ```ts
  * import { client } from './client';
  *
- * // Fully typed — body shape and response type inferred from contract
+ * // Direct fetch
  * const todos = await client.todos.list({ query: { page: 1 } });
- * const todo  = await client.todos.get({ params: { id: 1 } });
+ *
+ * // React Query hooks
+ * const { data } = client.todos.list.useQuery();
  * ```
  */
 
-import { createClient } from '@cleverbrush/web';
+import { createClient } from '@cleverbrush/react-query';
 import { retry } from '@cleverbrush/web/retry';
 import { timeout } from '@cleverbrush/web/timeout';
 import { dedupe } from '@cleverbrush/web/dedupe';

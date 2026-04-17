@@ -1,0 +1,59 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^2.0.0",
+        "@cleverbrush/server": "^2.0.0",
+        "@cleverbrush/web": "^2.0.0"
+    },
+    "devDependencies": {
+        "@tanstack/react-query": "^5.75.0",
+        "@testing-library/react": "^16.3.0",
+        "@types/react": "^19.0.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
+    },
+    "peerDependencies": {
+        "@tanstack/react-query": "^5.0.0",
+        "react": ">=18.0.0"
+    },
+    "description": "TanStack Query integration for @cleverbrush/web typed HTTP clients — fully typed useQuery, useMutation, and more",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/react-query",
+    "keywords": [
+        "react-query",
+        "tanstack-query",
+        "typed-client",
+        "react",
+        "hooks",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/react-query",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/react-query#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build --watch",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "2.0.0"
+}

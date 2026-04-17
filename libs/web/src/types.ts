@@ -204,7 +204,7 @@ export interface PerCallOverrides {
  * `AsyncIterable<string>` yielding newline-delimited chunks (e.g. NDJSON).
  * An optional `AbortSignal` can be passed to cancel an in-flight stream.
  */
-type EndpointCall<E> =
+export type EndpointCall<E> =
     EndpointCallArgs<E> extends undefined
         ? ((args?: PerCallOverrides) => Promise<EndpointResponse<E>>) & {
               stream: (options?: {

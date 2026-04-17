@@ -11,8 +11,10 @@
     },
     "dependencies": {
         "@cleverbrush/react-form": "*",
+        "@cleverbrush/react-query": "*",
         "@cleverbrush/schema": "*",
         "@cleverbrush/server": "*",
+        "@tanstack/react-query": "^5.80.7",
         "@cleverbrush/todo-backend": "*",
         "@cleverbrush/web": "*",
         "@radix-ui/react-icons": "^1.3.0",

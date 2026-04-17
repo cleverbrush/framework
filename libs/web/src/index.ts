@@ -38,7 +38,9 @@ export type {
     ApiContract,
     ClientHooks,
     ClientOptions,
+    EndpointCall,
     EndpointCallArgs,
     EndpointResponse,
+    PerCallOverrides,
     TypedClient
 } from './types.js';
