@@ -339,6 +339,94 @@ const AdminEp = endpoint
                         />
                     </pre>
                 </div>
+
+                {/* ── WebSocket Subscriptions ──────────────────────── */}
+                <div className="card">
+                    <h2>WebSocket Subscriptions</h2>
+                    <p>
+                        Define real-time endpoints with{' '}
+                        <code>endpoint.subscription()</code>. Handlers are async
+                        generators — yield events to push them to the client,
+                        and consume the <code>incoming</code> iterable for
+                        bidirectional messaging.
+                    </p>
+
+                    <h3>Contract</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { endpoint, defineApi } from '@cleverbrush/server/contract';
+import { object, string, number } from '@cleverbrush/schema';
+
+export const api = defineApi({
+    live: {
+        // Server-push only
+        events: endpoint
+            .subscription('/ws/events')
+            .outgoing(object({ action: string(), id: number() })),
+
+        // Bidirectional
+        chat: endpoint
+            .subscription('/ws/chat')
+            .incoming(object({ text: string() }))
+            .outgoing(object({ user: string(), text: string(), ts: number() })),
+    },
+});`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Handler — Server Push</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import type { SubscriptionHandler } from '@cleverbrush/server';
+
+const eventsHandler: SubscriptionHandler<typeof EventsSubscription> =
+    async function* ({ context, signal }) {
+        while (!signal.aborted) {
+            yield { action: 'heartbeat', id: Date.now() };
+            await new Promise(r => setTimeout(r, 2000));
+        }
+    };`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Handler — Bidirectional</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const chatHandler: SubscriptionHandler<typeof ChatSubscription> =
+    async function* ({ incoming }) {
+        for await (const msg of incoming) {
+            // Echo back with server timestamp
+            yield { user: 'server', text: msg.text, ts: Date.now() };
+        }
+    };`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Tracked Events</h3>
+                    <p>
+                        Wrap events with <code>tracked(id, data)</code> to
+                        include a correlation ID for client-side
+                        acknowledgement:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { tracked } from '@cleverbrush/server';
+
+async function* handler({ signal }) {
+    yield tracked('evt-001', { action: 'created', id: 1 });
+    yield tracked('evt-002', { action: 'updated', id: 2 });
+}`)
+                            }}
+                        />
+                    </pre>
+                </div>
             </div>
         </div>
     );

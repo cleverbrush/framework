@@ -1,5 +1,6 @@
 import type { EndpointMetadata } from './Endpoint.js';
 import type { RequestContext } from './RequestContext.js';
+import type { SubscriptionMetadata } from './Subscription.js';
 
 // ---------------------------------------------------------------------------
 // Endpoint Registration
@@ -11,6 +12,20 @@ import type { RequestContext } from './RequestContext.js';
  */
 export interface EndpointRegistration {
     readonly endpoint: EndpointMetadata;
+    readonly handler: (...args: any[]) => any;
+    readonly middlewares?: readonly Middleware[];
+}
+
+// ---------------------------------------------------------------------------
+// Subscription Registration
+// ---------------------------------------------------------------------------
+
+/**
+ * A registered subscription pairing its metadata with the async generator
+ * handler and any per-subscription middleware.
+ */
+export interface SubscriptionRegistration {
+    readonly endpoint: SubscriptionMetadata;
     readonly handler: (...args: any[]) => any;
     readonly middlewares?: readonly Middleware[];
 }

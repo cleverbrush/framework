@@ -43,20 +43,31 @@ export {
     type ScopedEndpointFactory
 } from './Endpoint.js';
 export { route } from './route.js';
+export {
+    SubscriptionBuilder,
+    type SubscriptionContext,
+    type SubscriptionHandler,
+    type SubscriptionHandlerEntry,
+    type SubscriptionMetadata,
+    type TrackedEvent,
+    tracked
+} from './Subscription.js';
 
 import type { EndpointBuilder as _EB } from './Endpoint.js';
+import type { SubscriptionBuilder as _SB } from './Subscription.js';
 
 // ---------------------------------------------------------------------------
 // defineApi — typed, one-level API contract grouping
 // ---------------------------------------------------------------------------
 
 /**
- * A record of named {@link EndpointBuilder} instances that form a single
- * logical API group (e.g. "todos", "auth", "users").
+ * A record of named {@link EndpointBuilder} or {@link SubscriptionBuilder}
+ * instances that form a single logical API group (e.g. "todos", "auth", "live").
  */
 export type ApiGroup = Record<
     string,
-    _EB<any, any, any, any, any, any, any, any, any>
+    | _EB<any, any, any, any, any, any, any, any, any>
+    | _SB<any, any, any, any, any, any, any, any>
 >;
 
 /**

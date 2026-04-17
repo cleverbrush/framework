@@ -295,6 +295,111 @@ try {
 }
 ```
 
+## WebSocket Subscriptions
+
+Subscription endpoints defined with `endpoint.subscription()` in the server contract are automatically detected by the client. Instead of returning a `Promise`, they return a live `Subscription` handle backed by the browser WebSocket API.
+
+### Subscribing
+
+```ts
+// The subscribe function returns a Subscription handle, not a Promise
+const sub = client.live.todoUpdates();
+
+// Consume events via async iteration
+for await (const event of sub) {
+    console.log(event.action, event.todoId);
+}
+```
+
+### Bidirectional messaging
+
+```ts
+const chat = client.live.chat();
+
+// Send messages to the server
+chat.send({ text: 'Hello!' });
+
+// Receive messages
+for await (const msg of chat) {
+    console.log(`${msg.user}: ${msg.text}`);
+}
+```
+
+### Connection state
+
+```ts
+const sub = client.live.events();
+
+sub.state; // 'connecting' | 'connected' | 'reconnecting' | 'closed'
+```
+
+### Closing
+
+```ts
+sub.close();
+```
+
+### AbortSignal support
+
+```ts
+const ac = new AbortController();
+const sub = client.live.events({ signal: ac.signal });
+
+// Abort closes the WebSocket
+ac.abort();
+```
+
+### Authentication
+
+Auth tokens are sent as a `?token=` query parameter (the browser WebSocket API does not support custom headers):
+
+```ts
+const client = createClient(api, {
+    baseUrl: 'https://api.example.com',
+    getToken: () => localStorage.getItem('token'),
+});
+
+// Token is automatically appended:
+// wss://api.example.com/ws/events?token=<token>
+const sub = client.live.events();
+```
+
+### React hook — `useSubscription`
+
+Import from `@cleverbrush/client/react`:
+
+```tsx
+import { useSubscription } from '@cleverbrush/client/react';
+
+function LiveFeed() {
+    const { events, state, send, close, error } = useSubscription(
+        () => client.live.events(),
+        { maxEvents: 100, enabled: true }
+    );
+
+    return (
+        <div>
+            <p>Status: {state}</p>
+            {events.map((e, i) => <div key={i}>{JSON.stringify(e)}</div>)}
+        </div>
+    );
+}
+```
+
+| Return value | Type | Description |
+|-------------|------|-------------|
+| `lastEvent` | `T \| undefined` | Most recently received event |
+| `events` | `T[]` | Accumulated events (newest last) |
+| `state` | `string` | Connection state: `connecting`, `connected`, `reconnecting`, `closed` |
+| `send` | `(msg) => void` | Send a message (bidirectional subscriptions) |
+| `close` | `() => void` | Close the subscription |
+| `error` | `Error \| undefined` | Last error, if any |
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | `true` | Toggle the subscription on/off |
+| `maxEvents` | `number` | unlimited | Maximum events to keep in the `events` array |
+
 ## React Integration (`@cleverbrush/client/react`)
 
 The `/react` subpath provides a `createClient()` that wraps the core client with TanStack Query hooks. Every endpoint becomes callable **and** provides hooks.

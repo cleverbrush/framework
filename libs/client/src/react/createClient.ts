@@ -135,8 +135,7 @@ export function createClient<T extends ApiContract>(
                         return () => buildGroupQueryKey(groupName);
                     }
 
-                    const ep = group[prop];
-                    if (!ep) return undefined;
+                    if (!Object.hasOwn(group, prop)) return undefined;
 
                     return getUnifiedEndpoint(groupName, prop);
                 }

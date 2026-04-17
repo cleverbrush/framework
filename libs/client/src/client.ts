@@ -18,7 +18,12 @@ import { ApiError, NetworkError, WebError } from './errors.js';
 import { composeMiddleware, PER_CALL_OPTIONS } from './middleware.js';
 import { buildPath } from './path.js';
 import { serializeQuery } from './query.js';
-import type { ClientHooks, ClientOptions, TypedClient } from './types.js';
+import type {
+    ClientHooks,
+    ClientOptions,
+    Subscription,
+    TypedClient
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -357,11 +362,23 @@ export function createClient<T extends ApiContract>(
             // Level 2: endpoint proxy (e.g. `client.todos.list`)
             return new Proxy(Object.create(null), {
                 get(_groupTarget, endpointName: string) {
+                    if (!Object.hasOwn(group, endpointName)) return undefined;
                     const ep = group[endpointName];
-                    if (!ep) return undefined;
 
-                    // Return a callable that invokes the fetch logic,
-                    // with a `.stream()` method for NDJSON streaming.
+                    const meta = getMeta(ep);
+
+                    // Subscription endpoints return a Subscription handle
+                    if (meta.protocol === 'subscription') {
+                        return (args?: any) =>
+                            createSubscriptionHandle(
+                                meta,
+                                args,
+                                baseUrl,
+                                getToken
+                            );
+                    }
+
+                    // Regular HTTP endpoints return a callable with .stream()
                     const call = (args?: any) => execute(ep, args);
                     call.stream = (args?: any) => streamLines(ep, args);
                     return call;
@@ -369,4 +386,183 @@ export function createClient<T extends ApiContract>(
             });
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+// WebSocket Subscription
+// ---------------------------------------------------------------------------
+
+/**
+ * Creates a {@link Subscription} handle backed by the browser WebSocket API.
+ *
+ * The handle is an `AsyncIterable` — use `for await` to consume incoming
+ * events — and exposes `send()` / `close()` for bidirectional communication.
+ *
+ * URL scheme conversion is automatic:
+ * - `http://` → `ws://`
+ * - `https://` → `wss://`
+ *
+ * Auth tokens are appended as a `?token=` query parameter because the
+ * browser WebSocket constructor does not support custom headers.
+ *
+ * @param meta - Introspected subscription endpoint metadata (`basePath`, `pathTemplate`, `protocol`).
+ * @param args - Call-site arguments: `params`, `query`, `signal`.
+ * @param baseUrl - The client's configured base URL.
+ * @param getToken - Optional token provider for authentication.
+ * @returns A live {@link Subscription} handle.
+ */
+function createSubscriptionHandle(
+    meta: any,
+    args: any,
+    baseUrl: string,
+    getToken?: () => string | null | undefined
+): Subscription<any, any> {
+    // Build WebSocket URL
+    const path = buildPath(meta.basePath, meta.pathTemplate, args?.params);
+    const qs = serializeQuery(args?.query);
+
+    // Convert http(s):// to ws(s)://
+    let wsBase = baseUrl;
+    if (wsBase.startsWith('https://')) {
+        wsBase = 'wss://' + wsBase.slice(8);
+    } else if (wsBase.startsWith('http://')) {
+        wsBase = 'ws://' + wsBase.slice(7);
+    } else if (!wsBase.startsWith('ws://') && !wsBase.startsWith('wss://')) {
+        // Relative URL — use current page's WebSocket scheme
+        if (typeof window !== 'undefined') {
+            const proto =
+                window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            wsBase = `${proto}//${window.location.host}`;
+        }
+    }
+
+    let wsUrl = wsBase + path + (qs ? '?' + qs : '');
+
+    // Add auth token as query param for WebSocket (headers not supported in browser WebSocket API)
+    const token = getToken?.();
+    if (token) {
+        const sep = wsUrl.includes('?') ? '&' : '?';
+        wsUrl += `${sep}token=${encodeURIComponent(token)}`;
+    }
+
+    let currentState: Subscription<any, any>['state'] = 'connecting';
+    const signal = args?.signal as AbortSignal | undefined;
+
+    // Message queue for async iteration
+    const messageQueue: any[] = [];
+    let messageResolve: ((result: IteratorResult<any>) => void) | null = null;
+    let done = false;
+
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+        currentState = 'connected';
+    };
+
+    ws.onclose = () => {
+        currentState = 'closed';
+        done = true;
+        if (messageResolve) {
+            messageResolve({ value: undefined, done: true });
+            messageResolve = null;
+        }
+    };
+
+    ws.onerror = () => {
+        currentState = 'closed';
+        done = true;
+        if (messageResolve) {
+            messageResolve({ value: undefined, done: true });
+            messageResolve = null;
+        }
+    };
+
+    ws.onmessage = event => {
+        let frame: any;
+        try {
+            frame = JSON.parse(
+                typeof event.data === 'string'
+                    ? event.data
+                    : event.data.toString()
+            );
+        } catch {
+            return; // Ignore malformed frames
+        }
+
+        if (frame.type === 'pong') return;
+        if (frame.type === 'error') return; // TODO: surface errors
+
+        // Both 'message' and 'tracked' frames carry data
+        if (frame.type === 'message' || frame.type === 'tracked') {
+            if (messageResolve) {
+                messageResolve({ value: frame.data, done: false });
+                messageResolve = null;
+            } else {
+                messageQueue.push(frame.data);
+            }
+        }
+    };
+
+    // Handle external abort signal
+    if (signal) {
+        if (signal.aborted) {
+            ws.close();
+        } else {
+            signal.addEventListener(
+                'abort',
+                () => {
+                    ws.close();
+                },
+                { once: true }
+            );
+        }
+    }
+
+    const subscription: Subscription<any, any> = {
+        send(message: any): void {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'message', data: message }));
+            }
+        },
+
+        close(): void {
+            ws.close();
+        },
+
+        get state() {
+            return currentState;
+        },
+
+        [Symbol.asyncIterator]() {
+            return {
+                next(): Promise<IteratorResult<any>> {
+                    if (messageQueue.length > 0) {
+                        return Promise.resolve({
+                            value: messageQueue.shift()!,
+                            done: false
+                        });
+                    }
+                    if (done) {
+                        return Promise.resolve({
+                            value: undefined,
+                            done: true
+                        });
+                    }
+                    return new Promise(resolve => {
+                        messageResolve = resolve;
+                    });
+                },
+                return(): Promise<IteratorResult<any>> {
+                    ws.close();
+                    done = true;
+                    return Promise.resolve({
+                        value: undefined,
+                        done: true
+                    });
+                }
+            };
+        }
+    };
+
+    return subscription;
 }

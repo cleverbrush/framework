@@ -36,6 +36,10 @@ import {
     demoFlakyHandler,
     demoEchoHandler
 } from './demo.js';
+import {
+    todoUpdatesHandler,
+    chatHandler
+} from './live.js';
 
 import type { HandlerMap } from '@cleverbrush/server';
 import type { endpoints } from '../endpoints.js';
@@ -75,5 +79,9 @@ export const handlers: HandlerMap<typeof endpoints> = {
         slow: demoSlowHandler,
         flaky: demoFlakyHandler,
         echo: demoEchoHandler
+    },
+    live: {
+        todoUpdates: todoUpdatesHandler,
+        chat: chatHandler
     }
 };

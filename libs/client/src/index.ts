@@ -44,5 +44,10 @@ export type {
     EndpointCallArgs,
     EndpointResponse,
     PerCallOverrides,
+    Subscription,
+    SubscriptionCall,
+    SubscriptionCallArgs,
+    SubscriptionIncoming,
+    SubscriptionOutgoing,
     TypedClient
 } from './types.js';

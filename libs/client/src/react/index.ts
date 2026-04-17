@@ -44,3 +44,8 @@ export type {
     UnifiedEndpointCall,
     UnifiedGroup
 } from './types.js';
+export {
+    type UseSubscriptionOptions,
+    type UseSubscriptionState,
+    useSubscription
+} from './useSubscription.js';

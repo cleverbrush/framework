@@ -16,6 +16,12 @@ import type {
     StreamResult
 } from './ActionResult.js';
 import type { RequestContext } from './RequestContext.js';
+import {
+    createSubscription,
+    isSubscriptionBuilder,
+    type SubscriptionBuilder,
+    type SubscriptionHandlerEntry
+} from './Subscription.js';
 import type { Middleware } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -193,6 +199,16 @@ export type Handler<E> =
 // ---------------------------------------------------------------------------
 
 type AnyEndpoint = EndpointBuilder<any, any, any, any, any, any, any, any, any>;
+type AnySubscriptionBuilder = SubscriptionBuilder<
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any
+>;
 
 /**
  * A single handler entry in a {@link HandlerMap}.
@@ -209,15 +225,20 @@ export type HandlerEntry<E> =
  * handler entries. Every endpoint key in every group must have a
  * corresponding {@link HandlerEntry} — omitting one is a type error.
  *
+ * Subscription endpoints (created via `endpoint.subscription()`) are
+ * mapped to {@link SubscriptionHandlerEntry} instead of {@link HandlerEntry}.
+ *
  * @typeParam TEndpoints - A record of groups, each a record of endpoint
  *   builders. Typically the return type of `defineApi()` with server-side
  *   extensions applied.
  */
 export type HandlerMap<TEndpoints> = {
     [G in keyof TEndpoints]: {
-        [E in keyof TEndpoints[G]]: TEndpoints[G][E] extends AnyEndpoint
-            ? HandlerEntry<TEndpoints[G][E]>
-            : never;
+        [E in keyof TEndpoints[G]]: TEndpoints[G][E] extends AnySubscriptionBuilder
+            ? SubscriptionHandlerEntry<TEndpoints[G][E]>
+            : TEndpoints[G][E] extends AnyEndpoint
+              ? HandlerEntry<TEndpoints[G][E]>
+              : never;
     };
 };
 
@@ -229,6 +250,12 @@ export interface HandlerMapping {
     /** @internal */
     readonly _entries: ReadonlyArray<{
         endpoint: AnyEndpoint;
+        handler: (...args: any[]) => any;
+        middlewares?: Middleware[];
+    }>;
+    /** @internal */
+    readonly _subscriptions: ReadonlyArray<{
+        endpoint: AnySubscriptionBuilder;
         handler: (...args: any[]) => any;
         middlewares?: Middleware[];
     }>;
@@ -267,9 +294,13 @@ export interface HandlerMapping {
  * ```
  */
 export function mapHandlers<
-    TEndpoints extends Record<string, Record<string, AnyEndpoint>>
+    TEndpoints extends Record<
+        string,
+        Record<string, AnyEndpoint | AnySubscriptionBuilder>
+    >
 >(endpoints: TEndpoints, handlers: HandlerMap<TEndpoints>): HandlerMapping {
     const entries: HandlerMapping['_entries'][number][] = [];
+    const subscriptions: HandlerMapping['_subscriptions'][number][] = [];
 
     for (const groupKey of Object.keys(endpoints)) {
         const group = endpoints[groupKey]!;
@@ -279,19 +310,23 @@ export function mapHandlers<
             const ep = group[endpointKey]!;
             const entry = handlerGroup[endpointKey];
 
-            if (typeof entry === 'function') {
-                entries.push({ endpoint: ep, handler: entry });
+            const handler = typeof entry === 'function' ? entry : entry.handler;
+            const middlewares =
+                typeof entry === 'function' ? undefined : entry.middlewares;
+
+            if (isSubscriptionBuilder(ep)) {
+                subscriptions.push({ endpoint: ep, handler, middlewares });
             } else {
                 entries.push({
-                    endpoint: ep,
-                    handler: entry.handler,
-                    middlewares: entry.middlewares
+                    endpoint: ep as AnyEndpoint,
+                    handler,
+                    middlewares
                 });
             }
         }
     }
 
-    return { _entries: entries };
+    return { _entries: entries, _subscriptions: subscriptions };
 }
 
 // ---------------------------------------------------------------------------
@@ -2086,6 +2121,10 @@ type EndpointFactory<TRoles extends string = string> = {
         {}
     >;
     resource(basePath: string): ScopedEndpointFactory<TRoles>;
+    subscription<TParams = {}>(
+        basePath: string,
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): SubscriptionBuilder<TParams, {}, {}, {}, undefined, TRoles>;
 };
 
 /**
@@ -2136,5 +2175,7 @@ export const endpoint: EndpointFactory = {
         createEndpoint('HEAD', basePath, pathTemplate),
     options: (basePath, pathTemplate?) =>
         createEndpoint('OPTIONS', basePath, pathTemplate),
-    resource: createScopedFactory
+    resource: createScopedFactory,
+    subscription: (basePath, pathTemplate?) =>
+        createSubscription(basePath, pathTemplate)
 };

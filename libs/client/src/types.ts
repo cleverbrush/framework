@@ -10,7 +10,8 @@
 import type { InferType, SchemaBuilder } from '@cleverbrush/schema';
 import type {
     EndpointBuilder,
-    ApiContract as ServerApiContract
+    ApiContract as ServerApiContract,
+    SubscriptionBuilder
 } from '@cleverbrush/server/contract';
 import type { WebError } from './errors.js';
 import type { Middleware } from './middleware.js';
@@ -219,11 +220,124 @@ export type EndpointCall<E> =
               ) => AsyncIterable<string>;
           };
 
+// ---------------------------------------------------------------------------
+// Subscription types
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the typed arguments for subscribing to a subscription endpoint.
+ * Includes only the keys that carry data (params, query, headers).
+ */
+type SubscriptionArgsParts<TParams, TQuery, THeaders> =
+    (HasKeys<TParams> extends true ? { params: TParams } : {}) &
+        (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
+        (HasKeys<THeaders> extends true ? { headers: THeaders } : {});
+
+/**
+ * Extracts the subscribe call argument shape from a `SubscriptionBuilder`.
+ */
+export type SubscriptionCallArgs<E> =
+    E extends SubscriptionBuilder<
+        infer TParams,
+        infer TQuery,
+        infer THeaders,
+        any,
+        any,
+        any,
+        any,
+        any
+    >
+        ? HasKeys<
+              Simplify<SubscriptionArgsParts<TParams, TQuery, THeaders>>
+          > extends true
+            ? Simplify<SubscriptionArgsParts<TParams, TQuery, THeaders>>
+            : undefined
+        : never;
+
+/**
+ * Extracts the outgoing (server→client) event type from a `SubscriptionBuilder`.
+ */
+export type SubscriptionOutgoing<E> =
+    E extends SubscriptionBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        infer TOutgoing
+    >
+        ? TOutgoing extends SchemaBuilder<any, any, any, any, any>
+            ? InferType<TOutgoing>
+            : TOutgoing
+        : unknown;
+
+/**
+ * Extracts the incoming (client→server) message type from a `SubscriptionBuilder`.
+ */
+export type SubscriptionIncoming<E> =
+    E extends SubscriptionBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        infer TIncoming,
+        any
+    >
+        ? TIncoming extends SchemaBuilder<any, any, any, any, any>
+            ? InferType<TIncoming>
+            : TIncoming
+        : never;
+
+/**
+ * A live WebSocket subscription handle returned by `client.group.endpoint()`.
+ *
+ * Implements `AsyncIterable` for consuming server-sent events and provides
+ * `send()` for client→server messages when the subscription is bidirectional.
+ */
+export interface Subscription<TOutgoing, TIncoming = never>
+    extends AsyncIterable<TOutgoing> {
+    /** Send a message to the server. Only available on bidirectional subscriptions. */
+    send(message: TIncoming): void;
+    /** Gracefully close the WebSocket connection. */
+    close(): void;
+    /** Current connection state. */
+    readonly state: 'connecting' | 'connected' | 'reconnecting' | 'closed';
+}
+
+/**
+ * The callable signature for a subscription endpoint on the typed client.
+ *
+ * Returns a {@link Subscription} handle that is both an `AsyncIterable`
+ * and has `send()` / `close()` methods.
+ */
+export type SubscriptionCall<E> =
+    SubscriptionCallArgs<E> extends undefined
+        ? (args?: {
+              signal?: AbortSignal;
+          }) => Subscription<SubscriptionOutgoing<E>, SubscriptionIncoming<E>>
+        : (
+              args: SubscriptionCallArgs<E> & { signal?: AbortSignal }
+          ) => Subscription<SubscriptionOutgoing<E>, SubscriptionIncoming<E>>;
+
+/**
+ * Resolves the correct call type for a contract member:
+ * - `SubscriptionBuilder` → `SubscriptionCall`
+ * - `EndpointBuilder` → `EndpointCall`
+ */
+type ContractMemberCall<E> =
+    E extends SubscriptionBuilder<any, any, any, any, any, any, any, any>
+        ? SubscriptionCall<E>
+        : EndpointCall<E>;
+
 /**
  * Maps an {@link ApiContract} to a fully typed client object.
  *
  * Each group becomes a namespace and each endpoint within that group
- * becomes a callable async function.
+ * becomes a callable async function (HTTP) or subscription factory (WS).
  *
  * @typeParam T - The exact API contract type (preserving endpoint builder generics).
  *
@@ -250,7 +364,7 @@ export type EndpointCall<E> =
  */
 export type TypedClient<T extends ServerApiContract> = {
     [G in keyof T]: {
-        [E in keyof T[G]]: EndpointCall<T[G][E]>;
+        [E in keyof T[G]]: ContractMemberCall<T[G][E]>;
     };
 };
 

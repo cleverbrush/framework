@@ -1,5 +1,9 @@
 import type { ParseStringSchemaBuilder } from '@cleverbrush/schema';
-import type { EndpointRegistration, RouteMatch } from './types.js';
+import type {
+    EndpointRegistration,
+    RouteMatch,
+    SubscriptionRegistration
+} from './types.js';
 
 interface RegisteredRoute {
     readonly basePath: string;
@@ -7,6 +11,14 @@ interface RegisteredRoute {
         | string
         | ParseStringSchemaBuilder<any, any, any, any, any>;
     readonly registration: EndpointRegistration;
+}
+
+interface RegisteredSubscriptionRoute {
+    readonly basePath: string;
+    readonly routePath:
+        | string
+        | ParseStringSchemaBuilder<any, any, any, any, any>;
+    readonly registration: SubscriptionRegistration;
 }
 
 function normalizePath(p: string): string {
@@ -36,6 +48,7 @@ function isParseStringSchema(
  */
 export class Router {
     readonly #routes: Map<string, RegisteredRoute[]> = new Map();
+    readonly #subscriptionRoutes: RegisteredSubscriptionRoute[] = [];
 
     /**
      * Register an endpoint with the router.
@@ -150,6 +163,77 @@ export class Router {
                 registration: route.registration,
                 parsedPath: null
             };
+        }
+
+        return null;
+    }
+
+    // -----------------------------------------------------------------------
+    // Subscription routing
+    // -----------------------------------------------------------------------
+
+    /**
+     * Register a subscription endpoint with the router.
+     */
+    addSubscriptionRoute(registration: SubscriptionRegistration): void {
+        const { basePath, pathTemplate } = registration.endpoint;
+        const normalizedBase = normalizePath(basePath);
+
+        this.#subscriptionRoutes.push({
+            basePath: normalizedBase,
+            routePath: pathTemplate,
+            registration
+        });
+    }
+
+    /**
+     * Match an incoming WebSocket upgrade URL to a registered subscription.
+     *
+     * Returns the matched registration and parsed path params, or `null`.
+     */
+    matchSubscription(url: string): {
+        registration: SubscriptionRegistration;
+        parsedPath: Record<string, any> | null;
+    } | null {
+        let normalized: string;
+        try {
+            normalized = normalizePath(url);
+        } catch {
+            return null;
+        }
+
+        for (const route of this.#subscriptionRoutes) {
+            const { basePath, routePath } = route;
+
+            if (basePath && !normalized.startsWith(basePath)) {
+                continue;
+            }
+
+            const remainder = basePath
+                ? normalized.slice(basePath.length)
+                : normalized;
+
+            if (isParseStringSchema(routePath)) {
+                const result = routePath.validate(remainder);
+                if (result.valid) {
+                    return {
+                        registration: route.registration,
+                        parsedPath: result.object as Record<string, any>
+                    };
+                }
+                continue;
+            }
+
+            const normalizedRoutePath = normalizePath(routePath);
+            const normalizedRemainder =
+                remainder.length === 0 ? '/' : remainder;
+
+            if (normalizedRemainder === normalizedRoutePath) {
+                return {
+                    registration: route.registration,
+                    parsedPath: null
+                };
+            }
         }
 
         return null;

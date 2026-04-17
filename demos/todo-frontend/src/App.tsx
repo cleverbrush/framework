@@ -20,6 +20,7 @@ const UsersPage = lazy(() => import('./features/admin/UsersPage'));
 const ActivityPage = lazy(() => import('./features/admin/ActivityPage'));
 const ResiliencePage = lazy(() => import('./features/resilience/ResiliencePage'));
 const ReactQueryPage = lazy(() => import('./features/react-query/ReactQueryPage'));
+const LivePage = lazy(() => import('./features/live/LivePage'));
 
 const PageFallback = () => (
   <Flex justify="center" align="center" p="8">
@@ -45,6 +46,7 @@ const router = createBrowserRouter([
           { path: '/webhooks', element: <Suspense fallback={<PageFallback />}><WebhooksPage /></Suspense> },
           { path: '/resilience', element: <Suspense fallback={<PageFallback />}><ResiliencePage /></Suspense> },
           { path: '/react-query', element: <Suspense fallback={<PageFallback />}><ReactQueryPage /></Suspense> },
+          { path: '/live', element: <Suspense fallback={<PageFallback />}><LivePage /></Suspense> },
           {
             element: <ProtectedRoute adminOnly />,
             children: [

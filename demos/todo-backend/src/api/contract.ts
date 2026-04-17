@@ -16,7 +16,11 @@
  */
 
 import { array, number, object, string } from '@cleverbrush/schema';
-import { defineApi, endpoint, route } from '@cleverbrush/server/contract';
+import {
+    defineApi,
+    endpoint,
+    route
+} from '@cleverbrush/server/contract';
 import {
     CreateTodoBodySchema,
     CompletionRequestHeadersSchema,
@@ -233,5 +237,29 @@ export const api = defineApi({
             .post('/api/demo/echo')
             .body(object({ message: string() }))
             .returns(object({ message: string() }))
+    },
+
+    // ── WebSocket subscriptions ───────────────────────────────────────────
+    live: {
+        /** Real-time todo change notifications. */
+        todoUpdates: endpoint
+            .subscription('/ws/todos')
+            .outgoing(
+                object({
+                    action: string(),
+                    todoId: number(),
+                    title: string()
+                })
+            )
+            .summary('Live todo updates')
+            .tags('live'),
+
+        /** Simple bidirectional chat room. */
+        chat: endpoint
+            .subscription('/ws/chat')
+            .incoming(object({ text: string() }))
+            .outgoing(object({ user: string(), text: string(), ts: number() }))
+            .summary('Chat room')
+            .tags('live')
     }
 });

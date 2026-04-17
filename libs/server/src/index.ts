@@ -50,6 +50,15 @@ export {
     Server,
     ServerBuilder
 } from './Server.js';
+export {
+    SubscriptionBuilder,
+    type SubscriptionContext,
+    type SubscriptionHandler,
+    type SubscriptionHandlerEntry,
+    type SubscriptionMetadata,
+    type TrackedEvent,
+    tracked
+} from './Subscription.js';
 export type {
     ContentTypeHandler,
     EndpointRegistration,

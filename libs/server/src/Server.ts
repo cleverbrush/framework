@@ -1,5 +1,6 @@
 import * as http from 'node:http';
 import * as https from 'node:https';
+import type { Duplex } from 'node:stream';
 import type {
     AuthenticationContext,
     AuthenticationScheme,
@@ -13,6 +14,7 @@ import {
     requireRole
 } from '@cleverbrush/auth';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
+import { type WebSocket, WebSocketServer } from 'ws';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
 import type { EndpointBuilder, Handler, HandlerMapping } from './Endpoint.js';
@@ -26,13 +28,23 @@ import {
 } from './ProblemDetails.js';
 import { RequestContext } from './RequestContext.js';
 import { Router } from './Router.js';
+import type { SubscriptionMetadata } from './Subscription.js';
+import { isTrackedEvent } from './Subscription.js';
 import type {
     ContentTypeHandler,
     EndpointRegistration,
     Middleware,
-    ServerOptions
+    ServerOptions,
+    SubscriptionRegistration
 } from './types.js';
 import type { WebhookDefinition } from './Webhook.js';
+import {
+    errorFrame,
+    messageFrame,
+    parseClientFrame,
+    pongFrame,
+    trackedFrame
+} from './WebSocketProtocol.js';
 
 // ---------------------------------------------------------------------------
 // Authentication / Authorization Config Types
@@ -81,6 +93,7 @@ export interface AuthorizationConfig {
 export class ServerBuilder {
     readonly #serviceCollection = new ServiceCollection();
     readonly #registrations: EndpointRegistration[] = [];
+    readonly #subscriptionRegistrations: SubscriptionRegistration[] = [];
     readonly #webhooks: WebhookDefinition[] = [];
     readonly #globalMiddlewares: Middleware[] = [];
     readonly #contentNegotiator = new ContentNegotiator();
@@ -184,6 +197,13 @@ export class ServerBuilder {
                 middlewares: entry.middlewares
             });
         }
+        for (const entry of mapping._subscriptions) {
+            this.#subscriptionRegistrations.push({
+                endpoint: entry.endpoint.introspect(),
+                handler: entry.handler,
+                middlewares: entry.middlewares
+            });
+        }
         return this;
     }
 
@@ -237,6 +257,9 @@ export class ServerBuilder {
         for (const reg of this.#registrations) {
             router.addRoute(reg);
         }
+        for (const reg of this.#subscriptionRegistrations) {
+            router.addSubscriptionRoute(reg);
+        }
 
         const serviceProvider = this.#serviceCollection.buildServiceProvider({
             validateScopes: false
@@ -276,7 +299,8 @@ export class ServerBuilder {
             serviceProvider,
             this.#contentNegotiator,
             allMiddlewares,
-            this.#healthcheck
+            this.#healthcheck,
+            this.#subscriptionRegistrations.length > 0
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -298,20 +322,25 @@ export class Server {
     readonly #contentNegotiator: ContentNegotiator;
     readonly #globalMiddlewares: Middleware[];
     readonly #healthcheck: boolean;
+    readonly #hasSubscriptions: boolean;
     #httpServer: http.Server | https.Server | null = null;
+    #wss: WebSocketServer | null = null;
+    readonly #activeConnections: Set<WebSocket> = new Set();
 
     constructor(
         router: Router,
         serviceProvider: ServiceProvider,
         contentNegotiator: ContentNegotiator,
         globalMiddlewares: Middleware[],
-        healthcheck = false
+        healthcheck = false,
+        hasSubscriptions = false
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
         this.#contentNegotiator = contentNegotiator;
         this.#globalMiddlewares = globalMiddlewares;
         this.#healthcheck = healthcheck;
+        this.#hasSubscriptions = hasSubscriptions;
     }
 
     /**
@@ -349,10 +378,58 @@ export class Server {
         await new Promise<void>(resolve => {
             this.#httpServer!.listen(port, host, resolve);
         });
+
+        // Set up WebSocket server if subscriptions are registered
+        if (this.#hasSubscriptions) {
+            this.#wss = new WebSocketServer({ noServer: true });
+
+            this.#httpServer!.on(
+                'upgrade',
+                (req: http.IncomingMessage, socket: Duplex, head: Buffer) => {
+                    const urlPath = new URL(
+                        req.url ?? '/',
+                        `http://${req.headers.host ?? 'localhost'}`
+                    ).pathname;
+
+                    const result = this.#router.matchSubscription(urlPath);
+                    if (!result) {
+                        socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+                        socket.destroy();
+                        return;
+                    }
+
+                    this.#wss!.handleUpgrade(req, socket, head, ws => {
+                        this.#handleWebSocket(
+                            ws,
+                            req,
+                            result.registration,
+                            result.parsedPath
+                        );
+                    });
+                }
+            );
+        }
     }
 
     /** Gracefully stop the server and free the TCP port. */
     async close(): Promise<void> {
+        // Close all active WebSocket connections
+        for (const ws of this.#activeConnections) {
+            ws.close(1001, 'Server shutting down');
+        }
+        this.#activeConnections.clear();
+
+        // Close the WebSocket server
+        if (this.#wss) {
+            await new Promise<void>((resolve, reject) => {
+                this.#wss!.close((err?: Error) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+            this.#wss = null;
+        }
+
         if (!this.#httpServer) return;
         await new Promise<void>((resolve, reject) => {
             this.#httpServer!.close((err: Error | undefined) => {
@@ -562,6 +639,305 @@ export class Server {
                 this.#contentNegotiator
             );
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // WebSocket subscription handler
+    // -----------------------------------------------------------------------
+
+    #handleWebSocket(
+        ws: WebSocket,
+        req: http.IncomingMessage,
+        registration: SubscriptionRegistration,
+        parsedPath: Record<string, any> | null
+    ): void {
+        this.#activeConnections.add(ws);
+        const scope = this.#serviceProvider.createScope();
+        const abortController = new AbortController();
+        const meta = registration.endpoint;
+
+        // Build RequestContext for middleware / auth
+        const dummyRes = new http.ServerResponse(req);
+        const ctx = new RequestContext(req, dummyRes);
+        if (parsedPath) {
+            const rawParams: Record<string, string> = {};
+            flattenToStrings(parsedPath, '', rawParams);
+            ctx.pathParams = rawParams;
+        }
+        ctx.services = scope.serviceProvider;
+        ctx.items.set('__endpoint_meta', meta);
+
+        // Authenticate via the same auth middleware pipeline
+        const authPipeline = new MiddlewarePipeline();
+        for (const mw of this.#globalMiddlewares) {
+            authPipeline.add(mw);
+        }
+        if (registration.middlewares) {
+            for (const mw of registration.middlewares) {
+                authPipeline.add(mw);
+            }
+        }
+
+        authPipeline
+            .execute(ctx, async () => {
+                if (ctx.responded) {
+                    // Middleware rejected the request
+                    ws.close(1008, 'Unauthorized');
+                    return;
+                }
+
+                this.#runSubscription(
+                    ws,
+                    ctx,
+                    meta,
+                    registration.handler,
+                    parsedPath,
+                    scope,
+                    abortController
+                );
+            })
+            .catch(() => {
+                ws.close(1011, 'Internal Server Error');
+            });
+
+        ws.on('close', () => {
+            this.#activeConnections.delete(ws);
+            abortController.abort();
+            scope.asyncDispose().catch(() => {});
+        });
+
+        ws.on('error', () => {
+            this.#activeConnections.delete(ws);
+            abortController.abort();
+            scope.asyncDispose().catch(() => {});
+        });
+    }
+
+    #runSubscription(
+        ws: WebSocket,
+        ctx: RequestContext,
+        meta: SubscriptionMetadata,
+        handler: (...args: any[]) => any,
+        parsedPath: Record<string, any> | null,
+        scope: {
+            serviceProvider: import('@cleverbrush/di').IServiceProvider;
+            asyncDispose(): Promise<void>;
+        },
+        abortController: AbortController
+    ): void {
+        // Build incoming async iterable from client messages
+        const incomingQueue: unknown[] = [];
+        let incomingResolve: (() => void) | null = null;
+        let incomingDone = false;
+
+        const incoming: AsyncIterable<unknown> = {
+            [Symbol.asyncIterator]() {
+                return {
+                    next(): Promise<IteratorResult<unknown>> {
+                        if (incomingQueue.length > 0) {
+                            return Promise.resolve({
+                                value: incomingQueue.shift()!,
+                                done: false
+                            });
+                        }
+                        if (incomingDone) {
+                            return Promise.resolve({
+                                value: undefined,
+                                done: true
+                            });
+                        }
+                        return new Promise(resolve => {
+                            incomingResolve = () => {
+                                incomingResolve = null;
+                                if (incomingQueue.length > 0) {
+                                    resolve({
+                                        value: incomingQueue.shift()!,
+                                        done: false
+                                    });
+                                } else {
+                                    resolve({ value: undefined, done: true });
+                                }
+                            };
+                        });
+                    },
+                    return(): Promise<IteratorResult<unknown>> {
+                        incomingDone = true;
+                        return Promise.resolve({
+                            value: undefined,
+                            done: true
+                        });
+                    }
+                };
+            }
+        };
+
+        // Handle incoming WebSocket messages
+        ws.on('message', (raw: Buffer | string) => {
+            const text = typeof raw === 'string' ? raw : raw.toString('utf-8');
+            const frame = parseClientFrame(text);
+
+            if (!frame) {
+                ws.send(
+                    JSON.stringify(errorFrame(400, 'Invalid frame format'))
+                );
+                return;
+            }
+
+            if (frame.type === 'ping') {
+                ws.send(JSON.stringify(pongFrame()));
+                return;
+            }
+
+            // frame.type === 'message'
+            if (meta.incomingSchema) {
+                const result = meta.incomingSchema.validate(frame.data);
+                if (!result.valid) {
+                    const errors = (result.errors ?? [])
+                        .map((e: { message: string }) => e.message)
+                        .join('; ');
+                    ws.send(
+                        JSON.stringify(
+                            errorFrame(422, `Validation failed: ${errors}`)
+                        )
+                    );
+                    return;
+                }
+                incomingQueue.push(result.object);
+            } else {
+                incomingQueue.push(frame.data);
+            }
+
+            if (incomingResolve) incomingResolve();
+        });
+
+        // On close, finish the incoming stream
+        ws.on('close', () => {
+            incomingDone = true;
+            if (incomingResolve) incomingResolve();
+        });
+
+        // Build subscription context
+        const subscriptionCtx: Record<string, unknown> = {
+            context: ctx,
+            signal: abortController.signal
+        };
+
+        if (parsedPath && Object.keys(parsedPath).length > 0) {
+            // Validate path params through the path schema if present
+            subscriptionCtx.params = parsedPath;
+        }
+
+        // Parse query params
+        if (meta.querySchema) {
+            const queryObj: Record<string, string> = {};
+            for (const [k, v] of ctx.url.searchParams.entries()) {
+                queryObj[k] = v;
+            }
+            const result = meta.querySchema.validate(queryObj);
+            if (!result.valid) {
+                const errors = (result.errors ?? [])
+                    .map((e: { message: string }) => e.message)
+                    .join('; ');
+                ws.close(1002, `Query validation failed: ${errors}`);
+                return;
+            }
+            subscriptionCtx.query = result.object;
+        }
+
+        // Parse headers
+        if (meta.headerSchema) {
+            const result = meta.headerSchema.validate(ctx.headers);
+            if (!result.valid) {
+                const errors = (result.errors ?? [])
+                    .map((e: { message: string }) => e.message)
+                    .join('; ');
+                ws.close(1002, `Header validation failed: ${errors}`);
+                return;
+            }
+            subscriptionCtx.headers = result.object;
+        }
+
+        // Set principal if auth was performed
+        if (ctx.principal !== undefined) {
+            subscriptionCtx.principal = ctx.principal;
+        }
+
+        // Add incoming iterable if there's an incoming schema (or just the raw iterable)
+        if (meta.incomingSchema) {
+            subscriptionCtx.incoming = incoming;
+        } else {
+            subscriptionCtx.incoming = incoming;
+        }
+
+        // Resolve DI services
+        const handlerArgs: unknown[] = [subscriptionCtx];
+        if (meta.serviceSchemas) {
+            const services: Record<string, unknown> = {};
+            for (const [key, schema] of Object.entries(meta.serviceSchemas)) {
+                services[key] = scope.serviceProvider.get(schema);
+            }
+            handlerArgs.push(services);
+        }
+
+        // Run the async generator
+        (async () => {
+            try {
+                const generator = handler(...handlerArgs);
+                for await (const value of generator) {
+                    if (ws.readyState !== ws.OPEN) break;
+
+                    let frameToSend: string;
+                    if (isTrackedEvent(value)) {
+                        const outData = meta.outgoingSchema
+                            ? meta.outgoingSchema.validate(value.data)
+                            : { valid: true, object: value.data };
+
+                        if (!(outData as any).valid) {
+                            ws.send(
+                                JSON.stringify(
+                                    errorFrame(
+                                        500,
+                                        'Outgoing validation failed'
+                                    )
+                                )
+                            );
+                            continue;
+                        }
+                        frameToSend = JSON.stringify(
+                            trackedFrame(value.id, (outData as any).object)
+                        );
+                    } else {
+                        const outData = meta.outgoingSchema
+                            ? meta.outgoingSchema.validate(value)
+                            : { valid: true, object: value };
+
+                        if (!(outData as any).valid) {
+                            ws.send(
+                                JSON.stringify(
+                                    errorFrame(
+                                        500,
+                                        'Outgoing validation failed'
+                                    )
+                                )
+                            );
+                            continue;
+                        }
+                        frameToSend = JSON.stringify(
+                            messageFrame((outData as any).object)
+                        );
+                    }
+
+                    ws.send(frameToSend);
+                }
+            } catch (err) {
+                if (ws.readyState === ws.OPEN) {
+                    const msg =
+                        err instanceof Error ? err.message : 'Internal error';
+                    ws.send(JSON.stringify(errorFrame(500, msg)));
+                    ws.close(1011, 'Handler error');
+                }
+            }
+        })();
     }
 }
 

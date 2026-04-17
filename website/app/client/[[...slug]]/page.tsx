@@ -9,6 +9,7 @@ import MiddlewareSection from '../sections/middleware';
 import PerCallOverridesSection from '../sections/per-call-overrides';
 import ReactIntegrationSection from '../sections/react-integration';
 import RetrySection from '../sections/retry';
+import SubscriptionsSection from '../sections/subscriptions';
 import TimeoutSection from '../sections/timeout';
 import { ClientDocLayout } from './ClientDocLayout';
 
@@ -26,7 +27,8 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     cache: CacheSection,
     'error-handling': ErrorHandlingSection,
     'per-call-overrides': PerCallOverridesSection,
-    'react-integration': ReactIntegrationSection
+    'react-integration': ReactIntegrationSection,
+    subscriptions: SubscriptionsSection
 };
 
 export default async function ClientDocPage({

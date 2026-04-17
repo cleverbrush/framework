@@ -302,6 +302,11 @@ export const DemoEchoEndpoint = api.demo.echo
     .tags('demo')
     .operationId('demoEcho');
 
+// ── Live subscription endpoints ───────────────────────────────────────────────
+
+export const TodoUpdatesSubscription = api.live.todoUpdates;
+export const ChatSubscription = api.live.chat;
+
 // ── Grouped endpoints — used with mapHandlers() for compile-time safety ───────
 
 export const endpoints = {
@@ -339,6 +344,10 @@ export const endpoints = {
         slow: DemoSlowEndpoint,
         flaky: DemoFlakyEndpoint,
         echo: DemoEchoEndpoint
+    },
+    live: {
+        todoUpdates: TodoUpdatesSubscription,
+        chat: ChatSubscription
     }
 };
 

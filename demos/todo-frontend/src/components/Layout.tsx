@@ -24,6 +24,7 @@ const navItems: NavItem[] = [
     { to: '/todos/import', label: 'Import', emoji: '📥' },
     { to: '/resilience', label: 'Resilience', emoji: '🛡️' },
     { to: '/react-query', label: 'React Query', emoji: '⚡' },
+    { to: '/live', label: 'Live', emoji: '📡' },
     { to: '/webhooks', label: 'Webhooks', emoji: '🔔' },
     { to: '/profile', label: 'Profile', emoji: '👤' },
     { to: '/admin/users', label: 'Users', emoji: '👥', adminOnly: true },
@@ -89,7 +90,7 @@ export function Layout() {
 
                 {/* Nav links */}
                 <Flex direction="column" gap="1" style={{ flex: 1 }}>
-                    {navItems.slice(0, 4).map(item => (
+                    {visibleItems.filter(i => !i.adminOnly).map(item => (
                         <SidebarLink key={item.to} {...item} />
                     ))}
 
@@ -99,7 +100,7 @@ export function Layout() {
                             <Text size="1" color="gray" mb="1" weight="medium" style={{ paddingLeft: 'var(--space-2)', paddingRight: 'var(--space-2)' }}>
                                 ADMIN
                             </Text>
-                            {navItems.filter(i => i.adminOnly).map(item => (
+                            {visibleItems.filter(i => i.adminOnly).map(item => (
                                 <SidebarLink key={item.to} {...item} />
                             ))}
                         </>

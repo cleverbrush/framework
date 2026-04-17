@@ -17,6 +17,7 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 - **Type-safe routes** — `route()` builds typed path parameters using `ParseStringSchemaBuilder` segments.
 - **OpenAPI-ready** — `getRegistrations()` exposes endpoint metadata for `@cleverbrush/server-openapi`.
 - **Health check** — optional `/health` endpoint via `server.withHealthcheck()`.
+- **WebSocket subscriptions** — `endpoint.subscription('/ws/path')` with typed incoming/outgoing schemas, `tracked()` events, and async generator handlers.
 
 ## Installation
 
@@ -224,6 +225,93 @@ server.handle(GetUser, ({ params }) => {
 | `NotFoundError` | 404 |
 | `ConflictError` | 409 |
 | `HttpError` | any (base class) |
+
+## WebSocket Subscriptions
+
+Define real-time endpoints using `endpoint.subscription()`:
+
+```ts
+import { endpoint, tracked } from '@cleverbrush/server';
+import { object, string, number } from '@cleverbrush/schema';
+
+// Server-push subscription
+const liveUpdates = endpoint
+    .subscription('/ws/updates')
+    .outgoing(object({ action: string(), id: number() }))
+    .summary('Live updates');
+
+// Bidirectional subscription
+const chat = endpoint
+    .subscription('/ws/chat')
+    .incoming(object({ text: string() }))
+    .outgoing(object({ user: string(), text: string(), ts: number() }))
+    .authorize('user');
+```
+
+### Subscription Handlers
+
+Handlers are async generators that yield outgoing events:
+
+```ts
+import type { SubscriptionHandler } from '@cleverbrush/server';
+
+const handler: SubscriptionHandler<typeof liveUpdates> = async function* () {
+    while (true) {
+        await new Promise(r => setTimeout(r, 1000));
+        yield { action: 'tick', id: Date.now() };
+    }
+};
+
+// Bidirectional — read from `incoming` async iterable
+const chatHandler: SubscriptionHandler<typeof chat> = async function* ({ incoming, principal }) {
+    yield { user: 'system', text: `${principal.name} joined`, ts: Date.now() };
+    for await (const msg of incoming) {
+        yield { user: principal.name, text: msg.text, ts: Date.now() };
+    }
+};
+```
+
+### Tracked Events
+
+Use `tracked(id, data)` to send events with a unique ID for client-side deduplication:
+
+```ts
+yield tracked('evt-123', { action: 'created', id: 42 });
+```
+
+### Client Usage
+
+```ts
+// Direct subscription
+const sub = client.live.updates();
+for await (const event of sub) {
+    console.log(event); // typed as { action: string, id: number }
+}
+
+// Send messages (bidirectional)
+const chat = client.live.chat();
+chat.send({ text: 'hello' });
+```
+
+### React Hook
+
+```tsx
+import { useSubscription } from '@cleverbrush/client/react';
+
+function LiveFeed() {
+    const { events, state, send, close } = useSubscription(
+        () => client.live.updates(),
+        { maxEvents: 100 }
+    );
+
+    return (
+        <div>
+            <p>Status: {state}</p>
+            {events.map((e, i) => <div key={i}>{e.action} #{e.id}</div>)}
+        </div>
+    );
+}
+```
 
 ## License
 

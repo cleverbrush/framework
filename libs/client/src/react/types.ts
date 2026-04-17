@@ -9,6 +9,7 @@
  * @module
  */
 
+import type { SubscriptionBuilder } from '@cleverbrush/server/contract';
 import type {
     InfiniteData,
     QueryClient,
@@ -27,6 +28,7 @@ import type {
     EndpointCall,
     EndpointCallArgs,
     EndpointResponse,
+    SubscriptionCall,
     WebError
 } from '../index.js';
 
@@ -289,13 +291,23 @@ export type UnifiedEndpointCall<E> = EndpointCall<E> &
     EndpointQueryHooks<EndpointCallArgs<E>, EndpointResponse<E>>;
 
 /**
+ * Resolves the correct unified type for a contract member:
+ * - `SubscriptionBuilder` → `SubscriptionCall` (no query hooks)
+ * - `EndpointBuilder` → `UnifiedEndpointCall` (callable + hooks)
+ */
+type UnifiedMemberCall<E> =
+    E extends SubscriptionBuilder<any, any, any, any, any, any, any, any>
+        ? SubscriptionCall<E>
+        : UnifiedEndpointCall<E>;
+
+/**
  * A group on the unified client.
  *
  * Each endpoint is a {@link UnifiedEndpointCall} — callable with hooks.
  * The group also exposes a `queryKey()` method for bulk cache invalidation.
  */
 export type UnifiedGroup<TGroup extends Record<string, any>> = {
-    [E in keyof TGroup]: UnifiedEndpointCall<TGroup[E]>;
+    [E in keyof TGroup]: UnifiedMemberCall<TGroup[E]>;
 } & {
     /** Returns a query key prefix for this entire group. */
     queryKey(): QueryKey;

@@ -23,7 +23,7 @@ export const SECTION_GROUPS = [
     },
     {
         label: 'React',
-        slugs: ['react-integration']
+        slugs: ['react-integration', 'subscriptions']
     }
 ];
 
@@ -48,6 +48,11 @@ export const CLIENT_SECTIONS: ClientSection[] = [
     {
         slug: 'react-integration',
         title: 'React Integration',
+        group: 'React'
+    },
+    {
+        slug: 'subscriptions',
+        title: 'WebSocket Subscriptions',
         group: 'React'
     }
 ];
