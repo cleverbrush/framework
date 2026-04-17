@@ -1,12 +1,12 @@
 ---
-'@cleverbrush/web': minor
+'@cleverbrush/client': minor
 '@cleverbrush/server': minor
 '@cleverbrush/schema': minor
 ---
 
-Add typed HTTP client (`@cleverbrush/web`) and API contract system.
+Add typed HTTP client (`@cleverbrush/client`) and API contract system.
 
-### `@cleverbrush/web` (new package)
+### `@cleverbrush/client` (new package)
 
 - `createClient(contract, options)` — creates a two-level Proxy-based HTTP client
   from an API contract defined with `defineApi()`. All endpoint arguments (params,
@@ -31,4 +31,4 @@ Add typed HTTP client (`@cleverbrush/web`) and API contract system.
 
 - `ParseStringSchemaBuilder.serialize(params)` — reverse of `validate()`.
   Reconstructs a string from the template by substituting parameter values.
-  Used by `@cleverbrush/web` to build URL paths at runtime.
+  Used by `@cleverbrush/client` to build URL paths at runtime.
