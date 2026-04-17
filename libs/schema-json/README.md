@@ -1,6 +1,6 @@
 # @cleverbrush/schema-json
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-93.2%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-92.8%25-brightgreen)
 <!-- coverage-badge-end -->
 
 Bidirectional JSON Schema (Draft 7 / 2020-12) interop for

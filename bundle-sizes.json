@@ -1,47 +1,47 @@
 {
-  "generatedAt": "2026-04-13T19:05:24.084Z",
+  "generatedAt": "2026-04-17T19:12:51.114Z",
   "entries": [
     {
       "label": "@cleverbrush/schema",
       "description": "full",
       "import": "@cleverbrush/schema",
-      "gzip": 17503,
-      "brotli": 15200
+      "gzip": 17759,
+      "brotli": 15412
     },
     {
       "label": "@cleverbrush/schema/core",
       "description": "no built-in extensions",
       "import": "@cleverbrush/schema/core",
-      "gzip": 16551,
-      "brotli": 14043
+      "gzip": 17005,
+      "brotli": 14269
     },
     {
       "label": "@cleverbrush/schema/string",
       "description": "single builder",
       "import": "@cleverbrush/schema/string",
-      "gzip": 4136,
-      "brotli": 3729
+      "gzip": 4198,
+      "brotli": 3782
     },
     {
       "label": "@cleverbrush/schema/number",
       "description": "",
       "import": "@cleverbrush/schema/number",
-      "gzip": 4133,
-      "brotli": 3756
+      "gzip": 4196,
+      "brotli": 3804
     },
     {
       "label": "@cleverbrush/schema/object",
       "description": "",
       "import": "@cleverbrush/schema/object",
-      "gzip": 6690,
-      "brotli": 6054
+      "gzip": 6806,
+      "brotli": 6165
     },
     {
       "label": "@cleverbrush/schema/array",
       "description": "",
       "import": "@cleverbrush/schema/array",
-      "gzip": 4317,
-      "brotli": 3931
+      "gzip": 4376,
+      "brotli": 3981
     }
   ]
 }
