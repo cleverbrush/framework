@@ -1,0 +1,16 @@
+services:
+  schema-website:
+    build:
+      context: .
+      dockerfile: websites/schema/Dockerfile
+    ports:
+      - "3100:3000"
+    restart: unless-stopped
+
+  docs-website:
+    build:
+      context: .
+      dockerfile: websites/docs/Dockerfile
+    ports:
+      - "3101:3000"
+    restart: unless-stopped

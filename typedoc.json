@@ -11,7 +11,7 @@
         "libs/schema-json",
         "libs/web"
     ],
-    "out": "website/public/api-docs/latest",
+    "out": "websites/docs/public/api-docs/latest",
     "name": "Libraries",
     "excludePrivate": true,
     "navigationLinks": {

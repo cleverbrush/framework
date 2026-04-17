@@ -16,7 +16,8 @@ const ZOD_DIR = join(__dirname, '..', 'node_modules', 'zod');
 const OUTPUT = join(
     __dirname,
     '..',
-    'website',
+    'websites',
+    'schema',
     'app',
     'playground',
     'zodDeclarations.ts'

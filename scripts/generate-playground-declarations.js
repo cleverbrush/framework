@@ -16,7 +16,8 @@ const DIST_DIR = join(__dirname, '..', 'libs', 'schema', 'dist');
 const OUTPUT = join(
     __dirname,
     '..',
-    'website',
+    'websites',
+    'schema',
     'app',
     'playground',
     'schemaDeclarations.ts'

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Builds a self-contained ESM bundle of @cleverbrush/schema for the
- * interactive playground. Output is placed in website/public/playground/.
+ * interactive playground. Output is placed in websites/schema/public/playground/.
  *
  * Usage:  node scripts/build-playground-bundle.js
  */
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
-const outDir = resolve(root, 'website/public/playground');
+const outDir = resolve(root, 'websites/schema/public/playground');
 
 mkdirSync(outDir, { recursive: true });
 
@@ -31,4 +31,4 @@ await build({
     tsconfig: resolve(root, 'libs/schema/tsconfig.build.json')
 });
 
-console.log('✅ Playground schema bundle built → website/public/playground/schema-bundle.js');
+console.log('✅ Playground schema bundle built → websites/schema/public/playground/schema-bundle.js');
