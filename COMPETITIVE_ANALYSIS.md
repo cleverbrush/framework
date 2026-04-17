@@ -49,11 +49,11 @@ This document compares the **@cleverbrush/framework** with the most relevant com
 | File/stream responses | ✅ `FileResult`, `StreamResult` | ❌ | ❌ | ✅ | ✅ | ❌ |
 | Middleware pipeline | ✅ `ServerBuilder.use()` | ✅ | ✅ | ✅ | ✅ Lifecycle hooks | ❌ |
 | Multi-runtime (CF Workers, Deno, Bun) | ❌ Node.js only | ✅ Via adapters | ✅ Via adapters | ✅ Native | ✅ Bun-native | ❌ Node.js only |
-| Request batching | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| Request batching | ✅ `batching()` middleware + `useBatching()` | ✅ | ❌ | ❌ | ❌ | ❌ |
 | Subscriptions / WebSockets | ✅ `endpoint.subscription()` + typed async-generator handlers | ✅ | ❌ | ✅ | ✅ | ❌ |
 | ProblemDetails (RFC 7807) | ✅ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
-**Assessment**: Strong in compile-time safety (`mapHandlers`, route templates, typed DI) and now competitive on real-time features via typed WebSocket subscriptions. The main remaining platform gap versus tRPC/Hono/Elysia is multi-runtime support.
+**Assessment**: Strong in compile-time safety (`mapHandlers`, route templates, typed DI) and now competitive on real-time features via typed WebSocket subscriptions and request batching. The main remaining platform gap versus tRPC/Hono/Elysia is multi-runtime support.
 
 ### 1.3 OpenAPI
 
@@ -149,8 +149,8 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 |---|---|---|---|
 | ~~React Query / TanStack Query integration~~ | ~~tRPC, ts-rest, Zodios~~ | ~~High~~ | ✅ Done (`@cleverbrush/client/react`) |
 | ~~WebSocket / Subscriptions~~ | ~~tRPC, Elysia, Hono~~ | ~~Medium — real-time is increasingly expected~~ | ✅ Done (`endpoint.subscription()`, typed client subscriptions, `useSubscription`) |
+| ~~Request batching~~ | ~~tRPC~~ | ~~Low–Medium — reduces HTTP overhead~~ | ✅ Done (`batching()` middleware + `ServerBuilder.useBatching()`) |
 | **Multi-runtime (CF Workers, Deno, Bun)** | Hono, Elysia, tRPC | Medium — important for edge deployment | 🟡 Medium |
-| **Request batching** | tRPC | Low–Medium — reduces HTTP overhead | 🟢 Low |
 | **Community size / adoption** | tRPC (36k★), Hono (24k★) | High — ecosystem, docs, plugins, hiring | 🟡 Medium |
 | **Interactive documentation / playground** | Hono, Elysia | Low — nice-to-have for developer experience | 🟢 Low |
 | **Client-side response validation** | Zodios | Low — useful for untrusted APIs | 🟢 Low |
@@ -189,13 +189,17 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 - AsyncAPI 3.0 document generation via `generateAsyncApiSpec()` and `serveAsyncApi()` in `@cleverbrush/server-openapi`
 - `ServerBuilder.getSubscriptionRegistrations()` for programmatic spec generation
 
-#### 1.3 Request Batching (Client)
-**Why**: Reduces HTTP overhead for chatty UIs making many parallel requests.
+#### 1.3 Request Batching — ✅ IMPLEMENTED
+**Status**: Shipped. Concurrent client requests are transparently coalesced into a single `POST /__batch`, fanned back out to individual callers with their own typed responses.
 
-**Scope**:
-- `createClient(api, { batching: { maxSize: 10, windowMs: 10 } })`
-- Server: `ServerBuilder.useBatching()` middleware to unpack/repack
-- Transparent to individual call sites — same `client.todos.list()` API
+**Delivered scope**:
+- `batching()` middleware from `@cleverbrush/client/batching` — configurable `maxSize`, `windowMs`, `batchPath`, and `skip` predicate; single-item passthrough avoids overhead for isolated calls
+- `ServerBuilder.useBatching(options?)` — registers the `/__batch` endpoint; each sub-request is processed through the full middleware/auth/handler pipeline; parallel or sequential execution via `parallel` option
+- `VirtualIncomingMessage` / `VirtualServerResponse` — in-process virtual HTTP layer for sub-request dispatch
+- Wire protocol: `POST /__batch` with `{ requests: [...] }` → `{ responses: [...] }`; per-sub-request status codes; one sub-request failing does not fail the batch
+- Demo page (`/batching`) in the todo app showing parallel batch, single passthrough, and burst scenarios
+- Documentation section on the website client docs (`/client/batching`)
+- Unit tests for the client middleware (14 tests) and server integration tests (13 tests)
 
 ### Phase 2 — Medium Priority (Expand Reach)
 
@@ -272,13 +276,13 @@ Our `extern()` bridge solves the trade-off: use our schema for full integration,
 ## 5. Recommended Prioritization
 
 ```
-Q1: TanStack Query integration (1.1) — immediately addresses #1 gap
-Q2: Multi-runtime adapters (2.1) — enables edge deployment
-Q2: Request batching (1.3) — performance optimization
-Q3: Testing utilities (2.2) — developer experience
-Q3: Typed file upload (2.3) — completeness
-Q4: Middleware presets (3.1) — ecosystem growth
-Q4: CLI tool (3.2) — onboarding experience
+Q1: TanStack Query integration (1.1) — ✅ Done
+Q2: Request batching (1.3)           — ✅ Done
+Q2: Multi-runtime adapters (2.1)     — enables edge deployment
+Q3: Testing utilities (2.2)          — developer experience
+Q3: Typed file upload (2.3)          — completeness
+Q4: Middleware presets (3.1)         — ecosystem growth
+Q4: CLI tool (3.2)                   — onboarding experience
 ```
 
 ---
