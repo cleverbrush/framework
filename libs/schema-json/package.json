@@ -26,7 +26,7 @@
     "sideEffects": false,
     "name": "@cleverbrush/schema-json",
     "peerDependencies": {
-        "@cleverbrush/schema": "^2.0.0",
+        "@cleverbrush/schema": "^3.0.0",
         "@standard-schema/spec": "^1.1.0"
     },
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/schema-json#readme",
@@ -41,5 +41,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "2.0.0"
+    "version": "3.0.0"
 }
