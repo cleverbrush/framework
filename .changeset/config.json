@@ -12,7 +12,13 @@
             "@cleverbrush/mapper",
             "@cleverbrush/knex-clickhouse",
             "@cleverbrush/react-form",
-            "@cleverbrush/env"
+            "@cleverbrush/env",
+            "@cleverbrush/auth",
+            "@cleverbrush/client",
+            "@cleverbrush/di",
+            "@cleverbrush/knex-schema",
+            "@cleverbrush/server",
+            "@cleverbrush/server-openapi"
         ]
     ],
     "linked": [],

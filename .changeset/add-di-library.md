@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/di': minor
+'@cleverbrush/di': major
 ---
 
 Add `@cleverbrush/di` — dependency injection container

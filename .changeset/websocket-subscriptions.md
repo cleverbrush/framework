@@ -1,6 +1,6 @@
 ---
-'@cleverbrush/client': minor
-'@cleverbrush/server': minor
+'@cleverbrush/client': major
+'@cleverbrush/server': major
 ---
 
 Add first-class WebSocket subscription support across the server and client libraries.

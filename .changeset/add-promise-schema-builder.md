@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/schema': minor
+'@cleverbrush/schema': major
 ---
 
 Add `promise()` schema builder

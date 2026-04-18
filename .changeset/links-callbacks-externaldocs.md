@@ -1,6 +1,6 @@
 ---
-'@cleverbrush/server': minor
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/server': major
+'@cleverbrush/server-openapi': major
 ---
 
 Add `externalDocs`, `links`, and `callbacks` to `EndpointBuilder`.

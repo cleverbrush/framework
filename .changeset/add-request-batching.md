@@ -1,6 +1,6 @@
 ---
-'@cleverbrush/client': minor
-'@cleverbrush/server': minor
+'@cleverbrush/client': major
+'@cleverbrush/server': major
 ---
 
 Add request batching support.

@@ -1,7 +1,7 @@
 ---
-'@cleverbrush/schema': minor
-'@cleverbrush/schema-json': minor
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/schema': major
+'@cleverbrush/schema-json': major
+'@cleverbrush/server-openapi': major
 ---
 
 Add `.schemaName()` and `components/schemas` `$ref` deduplication

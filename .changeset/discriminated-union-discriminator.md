@@ -1,6 +1,6 @@
 ---
-'@cleverbrush/schema': minor
-'@cleverbrush/schema-json': minor
+'@cleverbrush/schema': major
+'@cleverbrush/schema-json': major
 ---
 
 Emit the OpenAPI `discriminator` keyword for discriminated unions

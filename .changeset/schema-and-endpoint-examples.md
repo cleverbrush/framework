@@ -1,8 +1,8 @@
 ---
-'@cleverbrush/schema': minor
-'@cleverbrush/schema-json': minor
-'@cleverbrush/server': minor
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/schema': major
+'@cleverbrush/schema-json': major
+'@cleverbrush/server': major
+'@cleverbrush/server-openapi': major
 ---
 
 Add `.example()` to `SchemaBuilder` and `.example()` / `.examples()` to `EndpointBuilder`

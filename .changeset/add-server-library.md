@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/server': minor
+'@cleverbrush/server': major
 ---
 
 Add `@cleverbrush/server` — schema-first HTTP server framework

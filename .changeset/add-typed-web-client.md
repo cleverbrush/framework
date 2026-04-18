@@ -1,7 +1,7 @@
 ---
-'@cleverbrush/client': minor
-'@cleverbrush/server': minor
-'@cleverbrush/schema': minor
+'@cleverbrush/client': major
+'@cleverbrush/server': major
+'@cleverbrush/schema': major
 ---
 
 Add typed HTTP client (`@cleverbrush/client`) and API contract system.

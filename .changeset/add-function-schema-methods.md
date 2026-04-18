@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/schema': minor
+'@cleverbrush/schema': major
 ---
 
 Add `addParameter()` and `hasReturnType()` to `FunctionSchemaBuilder`

@@ -1,6 +1,6 @@
 ---
-'@cleverbrush/schema-json': minor
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/schema-json': major
+'@cleverbrush/server-openapi': major
 ---
 
 Add recursive / lazy schema support via `$ref`

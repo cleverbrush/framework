@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/schema': minor
+'@cleverbrush/schema': major
 ---
 
 Support property-targeted errors from object-level validators

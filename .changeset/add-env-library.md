@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/env': minor
+'@cleverbrush/env': major
 ---
 
 # @cleverbrush/env — Type-safe environment variables

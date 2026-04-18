@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/server-openapi': major
 ---
 
 Add `@cleverbrush/server-openapi` — OpenAPI 3.1 spec generation for `@cleverbrush/server`

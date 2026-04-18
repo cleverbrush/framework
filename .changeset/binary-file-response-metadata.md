@@ -1,6 +1,6 @@
 ---
-'@cleverbrush/server': minor
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/server': major
+'@cleverbrush/server-openapi': major
 ---
 
 Add `.producesFile()` to `EndpointBuilder` for binary / file response metadata

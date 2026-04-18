@@ -1,5 +1,5 @@
 ---
-"@cleverbrush/client": minor
+"@cleverbrush/client": major
 ---
 
 Added middleware system and lifecycle hooks for request/response interception.

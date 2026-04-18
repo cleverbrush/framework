@@ -1,7 +1,7 @@
 ---
-'@cleverbrush/client': minor
-'@cleverbrush/server': minor
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/client': major
+'@cleverbrush/server': major
+'@cleverbrush/server-openapi': major
 ---
 
 Add automatic WebSocket reconnection with exponential backoff and AsyncAPI 3.0 document generation.

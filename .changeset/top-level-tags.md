@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/server-openapi': minor
+'@cleverbrush/server-openapi': major
 ---
 
 Add top-level `tags` with descriptions to OpenAPI spec generation

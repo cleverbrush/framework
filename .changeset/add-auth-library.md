@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/auth': minor
+'@cleverbrush/auth': major
 ---
 
 Add `@cleverbrush/auth` — transport-agnostic authentication and authorization

@@ -1,5 +1,5 @@
 ---
-"@cleverbrush/async": minor
+"@cleverbrush/async": major
 ---
 
 Added `withTimeout()` utility for generic promise timeout with AbortSignal support.

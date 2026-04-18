@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/knex-schema': minor
+'@cleverbrush/knex-schema': major
 ---
 
 Add `@cleverbrush/knex-schema` — schema-driven query builder for Knex
