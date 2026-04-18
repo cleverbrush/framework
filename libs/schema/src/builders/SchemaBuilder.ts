@@ -60,8 +60,31 @@ export type InferType<T> = T extends {
 
 /**
  * Represents a single validation error with a human-readable error message.
+ *
+ * When returned from an object-level validator (via {@link SchemaBuilder.addValidator | addValidator}),
+ * the optional `property` selector can route the error to a specific property
+ * so that {@link ObjectSchemaValidationResult.getErrorsFor | getErrorsFor()} reports it
+ * on that property rather than only on the root object.
+ *
+ * ```ts
+ * .addValidator((v) => ({
+ *     valid: false,
+ *     errors: [{
+ *         message: 'Passwords do not match',
+ *         property: (t) => t.confirmPassword
+ *     }]
+ * }))
+ * ```
  */
-export type ValidationError = { message: string };
+export type ValidationError = {
+    message: string;
+    /**
+     * Optional property selector that targets this error to a specific
+     * property of the validated object. Uses the same selector signature
+     * as `getErrorsFor()` and react-form's `forProperty`.
+     */
+    property?: (tree: any) => any;
+};
 
 /**
  * Used to represent a validation result for nested
@@ -221,6 +244,8 @@ export type SchemaBuilderProps<T> = {
     catchValue?: T | (() => T);
     hasCatch?: boolean;
     description?: string;
+    schemaName?: string;
+    example?: unknown;
 };
 
 export type ValidationContext<
@@ -457,6 +482,21 @@ export type PropertyDescriptorInner<
     // >
     //     ? TParentPropertyDescriptor
     //     : never;
+
+    /**
+     * The name of this property within its parent object, or `undefined`
+     * for the root descriptor.
+     */
+    propertyName: string | undefined;
+
+    /**
+     * Returns a JSON Pointer (RFC 6901) string representing this
+     * property's path from the root descriptor.
+     *
+     * Property names are escaped per RFC 6901 (`~` → `~0`, `/` → `~1`).
+     * The root descriptor returns an empty string (`''`).
+     */
+    toJsonPointer: () => string;
 };
 
 /**
@@ -697,6 +737,7 @@ export abstract class SchemaBuilder<
     #isNullable = false;
     #isReadonly = false;
     #description: string | undefined;
+    #schemaName: string | undefined;
     #preprocessors: PreprocessorEntry<TResult>[] = [];
     #validators: ValidatorEntry<TResult>[] = [];
     #hasMutating = false;
@@ -710,6 +751,7 @@ export abstract class SchemaBuilder<
     #defaultValue: TResult | (() => TResult) | undefined = undefined;
     #catchValue: TResult | (() => TResult) | undefined = undefined;
     #hasCatch = false;
+    #example: unknown | undefined = undefined;
     /**
      * Cached result of the first `['~standard']` access. Stored so that
      * repeated property reads return the exact same object reference, which
@@ -1394,13 +1436,24 @@ export abstract class SchemaBuilder<
              */
             description: this.#description,
             /**
+             * The logical name attached to this schema via `.schemaName()`,
+             * or `undefined` if none was set.
+             */
+            schemaName: this.#schemaName,
+            /**
              * Whether a catch/fallback value has been set on this schema via `.catch()`.
              */
+
             hasCatch: this.#hasCatch,
             /**
              * The catch/fallback value or factory function set via `.catch()`.
              */
-            catchValue: this.#catchValue
+            catchValue: this.#catchValue,
+            /**
+             * An example value attached to this schema via `.example()`,
+             * or `undefined` if none was set.
+             */
+            example: this.#example
         };
     }
 
@@ -1552,6 +1605,61 @@ export abstract class SchemaBuilder<
         return this.createFromProps({
             ...this.introspect(),
             description: text
+        }) as unknown as this;
+    }
+
+    /**
+     * Attaches an example value to this schema instance.
+     *
+     * The example is purely metadata — it has no effect on validation.
+     * It is accessible via `.introspect().example` and is emitted as the
+     * `example` keyword in JSON Schema output and OpenAPI spec generation.
+     *
+     * @example
+     * ```ts
+     * import { string } from '@cleverbrush/schema';
+     *
+     * const Email = string().example('user@example.com');
+     *
+     * Email.introspect().example; // 'user@example.com'
+     * ```
+     */
+    public example(value: TResult): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            example: value
+        }) as unknown as this;
+    }
+
+    /**
+     * Attaches a logical name to this schema instance.
+     *
+     * The name is purely metadata — it has no effect on validation. It is
+     * accessible via `.introspect().schemaName` and can be consumed by any
+     * tool that introspects schemas at runtime, such as OpenAPI spec
+     * generators, documentation tools, form libraries, or code generators.
+     *
+     * **Uniqueness** is the responsibility of the consuming tool. Passing the
+     * same constant (same object reference) to multiple consumers is always
+     * safe; how conflicts between different instances with the same name are
+     * handled depends on the tool.
+     *
+     * @example
+     * ```ts
+     * import { object, string, number } from '@cleverbrush/schema';
+     *
+     * export const UserSchema = object({
+     *   id:   number(),
+     *   name: string(),
+     * }).schemaName('User');
+     *
+     * UserSchema.introspect().schemaName; // 'User'
+     * ```
+     */
+    public schemaName(name: string): this {
+        return this.createFromProps({
+            ...this.introspect(),
+            schemaName: name
         }) as unknown as this;
     }
 
@@ -1988,6 +2096,14 @@ export abstract class SchemaBuilder<
 
         if (typeof props.description === 'string') {
             this.#description = props.description;
+        }
+
+        if (typeof props.schemaName === 'string') {
+            this.#schemaName = props.schemaName;
+        }
+
+        if (props.example !== undefined) {
+            this.#example = props.example;
         }
 
         this.#requiredErrorMessageProvider =

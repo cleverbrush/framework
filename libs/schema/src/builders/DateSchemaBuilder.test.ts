@@ -1087,3 +1087,57 @@ test('#buildResult: null value on optional parseFromJson schema → valid (line 
     expect(result.valid).toBe(true);
     expect(result.object).toBeNull();
 });
+
+// ---------------------------------------------------------------------------
+// coerce()
+// ---------------------------------------------------------------------------
+
+test('coerce - converts ISO date string to Date', () => {
+    const schema = date().coerce();
+    const result = schema.validate('2024-01-15T00:00:00.000Z' as any);
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeInstanceOf(Date);
+    expect(result.object!.toISOString()).toEqual('2024-01-15T00:00:00.000Z');
+
+    const typeCheck: InferType<typeof schema> = new Date();
+    expectTypeOf(typeCheck).toEqualTypeOf<Date>();
+});
+
+test('coerce - converts date-only string to Date', () => {
+    const schema = date().coerce();
+    const result = schema.validate('2024-01-15' as any);
+    expect(result.valid).toBe(true);
+    expect(result.object).toBeInstanceOf(Date);
+});
+
+test('coerce - invalid date string is left unchanged and fails', () => {
+    const schema = date().coerce();
+    const result = schema.validate('not-a-date' as any);
+    expect(result.valid).toBe(false);
+});
+
+test('coerce - passes through Date values unchanged', () => {
+    const schema = date().coerce();
+    const d = new Date('2024-06-01');
+    const result = schema.validate(d);
+    expect(result.valid).toBe(true);
+    expect(result.object).toEqual(d);
+});
+
+test('coerce - passes through non-string non-Date values unchanged', () => {
+    const schema = date().coerce();
+    const result = schema.validate(12345 as any);
+    expect(result.valid).toBe(false);
+});
+
+test('coerce - immutability: does not mutate original schema', () => {
+    const original = date();
+    const coerced = original.coerce();
+    expect((original as any) !== (coerced as any)).toEqual(true);
+    // original should reject strings
+    const r1 = original.validate('2024-01-15' as any);
+    expect(r1.valid).toBe(false);
+    // coerced should accept date strings
+    const r2 = coerced.validate('2024-01-15' as any);
+    expect(r2.valid).toBe(true);
+});

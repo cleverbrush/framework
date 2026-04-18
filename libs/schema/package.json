@@ -8,7 +8,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_schema.html",
+    "homepage": "https://schema.cleverbrush.com/docs/getting-started",
     "keywords": [
         "schema",
         "validation",
@@ -78,6 +78,14 @@
         "./extern": {
             "types": "./dist/builders/ExternSchemaBuilder.d.ts",
             "import": "./dist/builders/ExternSchemaBuilder.js"
+        },
+        "./promise": {
+            "types": "./dist/builders/PromiseSchemaBuilder.d.ts",
+            "import": "./dist/builders/PromiseSchemaBuilder.js"
+        },
+        "./parse-string": {
+            "types": "./dist/builders/ParseStringSchemaBuilder.d.ts",
+            "import": "./dist/builders/ParseStringSchemaBuilder.js"
         }
     },
     "sideEffects": false,
@@ -89,7 +97,7 @@
     },
     "scripts": {
         "watch": "tsc --build --watch",
-        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "type": "module",

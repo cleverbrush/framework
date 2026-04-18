@@ -1,6 +1,7 @@
 import { expect, expectTypeOf, test } from 'vitest';
 import { array } from './ArraySchemaBuilder.js';
 import { date } from './DateSchemaBuilder.js';
+import { func } from './FunctionSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder, object } from './ObjectSchemaBuilder.js';
 import { PropertyValidationResult } from './PropertyValidationResult.js';
@@ -3028,6 +3029,249 @@ test('getErrorsFor - root errors from validator', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Property-targeted validator errors
+// ---------------------------------------------------------------------------
+
+test('addValidator - property-targeted error appears on getErrorsFor', () => {
+    const schema = object({
+        password: string().minLength(6),
+        confirmPassword: string().minLength(6)
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate(
+        { password: 'secret1', confirmPassword: 'secret2' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    const confirmErrors = result.getErrorsFor(t => t.confirmPassword);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Passwords do not match');
+
+    const passwordErrors = result.getErrorsFor(t => t.password);
+    expect(passwordErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - property-targeted error without doNotStopOnFirstError', () => {
+    const schema = object({
+        password: string().minLength(6),
+        confirmPassword: string().minLength(6)
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate({
+        password: 'secret1',
+        confirmPassword: 'secret2'
+    });
+
+    expect(result.valid).toEqual(false);
+
+    const confirmErrors = result.getErrorsFor(t => t.confirmPassword);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Passwords do not match');
+
+    const passwordErrors = result.getErrorsFor(t => t.password);
+    expect(passwordErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - multiple errors targeting different properties', () => {
+    const schema = object({
+        startDate: string(),
+        endDate: string(),
+        name: string()
+    }).addValidator(value => {
+        if (value.startDate > value.endDate) {
+            return {
+                valid: false as const,
+                errors: [
+                    {
+                        message: 'Start date must be before end date',
+                        property: t => t.startDate
+                    },
+                    {
+                        message: 'End date must be after start date',
+                        property: t => t.endDate
+                    }
+                ]
+            };
+        }
+        return { valid: true as const };
+    });
+
+    const result = schema.validate(
+        { startDate: '2026-12-01', endDate: '2026-01-01', name: 'test' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    const startErrors = result.getErrorsFor(t => t.startDate);
+    expect(startErrors.errors.length).toEqual(1);
+    expect(startErrors.errors[0]).toEqual('Start date must be before end date');
+
+    const endErrors = result.getErrorsFor(t => t.endDate);
+    expect(endErrors.errors.length).toEqual(1);
+    expect(endErrors.errors[0]).toEqual('End date must be after start date');
+
+    const nameErrors = result.getErrorsFor(t => t.name);
+    expect(nameErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - mix of targeted and untargeted errors', () => {
+    const schema = object({
+        password: string(),
+        confirmPassword: string()
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    },
+                    { message: 'Form has errors' }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate(
+        { password: 'abc', confirmPassword: 'xyz' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    // Targeted error goes to confirmPassword
+    const confirmErrors = result.getErrorsFor(t => t.confirmPassword);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Passwords do not match');
+
+    // Untargeted error goes to root
+    const rootErrors = result.getErrorsFor();
+    expect(rootErrors.errors).toContain('Form has errors');
+
+    // Both errors present in flat errors array
+    expect(result.errors).toBeDefined();
+    expect(result.errors!.length).toEqual(2);
+});
+
+test('addValidator - async validator with property targeting', async () => {
+    const schema = object({
+        email: string(),
+        confirmEmail: string()
+    }).addValidator(async value => {
+        if (value.email !== value.confirmEmail) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Emails do not match',
+                        property: t => t.confirmEmail
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = await schema.validateAsync(
+        { email: 'a@b.com', confirmEmail: 'c@d.com' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+
+    const confirmErrors = result.getErrorsFor(t => t.confirmEmail);
+    expect(confirmErrors.errors.length).toEqual(1);
+    expect(confirmErrors.errors[0]).toEqual('Emails do not match');
+
+    const emailErrors = result.getErrorsFor(t => t.email);
+    expect(emailErrors.errors.length).toEqual(0);
+});
+
+test('addValidator - property-targeted error also in flat errors array', () => {
+    const schema = object({
+        password: string(),
+        confirmPassword: string()
+    }).addValidator(value => {
+        if (value.password !== value.confirmPassword) {
+            return {
+                valid: false,
+                errors: [
+                    {
+                        message: 'Passwords do not match',
+                        property: t => t.confirmPassword
+                    }
+                ]
+            };
+        }
+        return { valid: true };
+    });
+
+    const result = schema.validate(
+        { password: 'abc', confirmPassword: 'xyz' },
+        { doNotStopOnFirstError: true }
+    );
+
+    expect(result.valid).toEqual(false);
+    // Error is still in the flat errors array for backward compat
+    expect(result.errors).toBeDefined();
+    expect(result.errors!.length).toEqual(1);
+    expect(result.errors![0].message).toEqual('Passwords do not match');
+});
+
+test('addValidator - property selector callback receives PropertyDescriptorTree', () => {
+    object({
+        password: string(),
+        confirmPassword: string()
+    }).addValidator(_value => {
+        return {
+            valid: false,
+            errors: [
+                {
+                    message: 'test',
+                    property: t => {
+                        // t should have 'password' and 'confirmPassword' keys
+                        expectTypeOf(t).toHaveProperty('password');
+                        expectTypeOf(t).toHaveProperty('confirmPassword');
+                        return t.confirmPassword;
+                    }
+                }
+            ]
+        };
+    });
+});
+
+// ---------------------------------------------------------------------------
 // clearDefault (line 397)
 // ---------------------------------------------------------------------------
 
@@ -3202,4 +3446,246 @@ test('PropertyValidationResult: constructor with initial errors array (line 121)
         ['pre-existing error']
     );
     expect(pvr.errors).toEqual(['pre-existing error']);
+});
+
+// ---------------------------------------------------------------------------
+// addConstructor / clearConstructors
+// ---------------------------------------------------------------------------
+
+test('addConstructor: inferred type includes construct signature (single constructor)', () => {
+    const schema = object({ name: string() }).addConstructor(
+        func().addParameter(string())
+    );
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: string): { name: string };
+    }>();
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{ name: string }>();
+});
+
+test('addConstructor: inferred type supports two chained constructors', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .addConstructor(func().addParameter(string()).addParameter(number()));
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: string): { name: string };
+    }>();
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: string, p1: number): { name: string };
+    }>();
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{ name: string }>();
+});
+
+test('addConstructor: type is preserved through addProp', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(number()))
+        .addProp('age', number());
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<{
+        new (p0: number): { name: string; age: number };
+    }>();
+});
+
+test('addConstructor: type is preserved through optional()', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .optional();
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toMatchTypeOf<
+        ({ new (p0: string): { name: string } } & { name: string }) | undefined
+    >();
+});
+
+test('clearConstructors: reverts inferred type to plain props', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .clearConstructors();
+
+    type Inferred = InferType<typeof schema>;
+
+    expectTypeOf<Inferred>().toEqualTypeOf<{ name: string }>();
+});
+
+test('addConstructor: introspect exposes constructorSchemas', () => {
+    const funcSchema = func().addParameter(string());
+    const schema = object({ name: string() }).addConstructor(funcSchema);
+
+    const { constructorSchemas } = schema.introspect();
+    expect(constructorSchemas).toHaveLength(1);
+    expect(constructorSchemas[0]).toBe(funcSchema);
+});
+
+test('addConstructor: chained calls accumulate constructorSchemas', () => {
+    const f1 = func().addParameter(string());
+    const f2 = func().addParameter(number());
+    const schema = object({ name: string() })
+        .addConstructor(f1)
+        .addConstructor(f2);
+
+    const { constructorSchemas } = schema.introspect();
+    expect(constructorSchemas).toHaveLength(2);
+    expect(constructorSchemas[0]).toBe(f1);
+    expect(constructorSchemas[1]).toBe(f2);
+});
+
+test('clearConstructors: introspect returns empty constructorSchemas', () => {
+    const schema = object({ name: string() })
+        .addConstructor(func().addParameter(string()))
+        .clearConstructors();
+
+    const { constructorSchemas } = schema.introspect();
+    expect(constructorSchemas).toHaveLength(0);
+});
+
+test('addConstructor: validate still works with plain objects', async () => {
+    const schema = object({ name: string() }).addConstructor(
+        func().addParameter(string())
+    );
+
+    const { valid } = await schema.validate({ name: 'Alice' });
+    expect(valid).toBe(true);
+});
+
+test('addConstructor: validate rejects invalid plain objects', async () => {
+    const schema = object({ name: string() }).addConstructor(
+        func().addParameter(string())
+    );
+
+    const { valid } = await schema.validate({ name: 123 } as any);
+    expect(valid).toBe(false);
+});
+
+test('addConstructor: no effect on empty constructor list for inferred type', () => {
+    const schema = object({ name: string() });
+    type Inferred = InferType<typeof schema>;
+    expectTypeOf<Inferred>().toEqualTypeOf<{ name: string }>();
+});
+
+// ---------------------------------------------------------------------------
+// Regression: Object.keys(null) crash when doNotStopOnFirstError is true
+// Prior to the fix, passing null to a required object schema with
+// doNotStopOnFirstError:true would throw "Cannot convert undefined or null
+// to object" at Object.keys() inside #setupValidation.
+// ---------------------------------------------------------------------------
+
+test('regression: null input with doNotStopOnFirstError:true does not throw', async () => {
+    const schema = object({ msg: string().required() });
+    const result = await schema.validateAsync(null as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toBe(false);
+    expect(Array.isArray(result.errors)).toBe(true);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('regression: null input with doNotStopOnFirstError:false does not throw', async () => {
+    const schema = object({ msg: string().required() });
+    const result = await schema.validateAsync(null as any, {
+        doNotStopOnFirstError: false
+    });
+    expect(result.valid).toBe(false);
+    expect(Array.isArray(result.errors)).toBe(true);
+    expect(result.errors!.length).toBeGreaterThan(0);
+});
+
+test('toJsonPointer returns correct path for nested descriptors', () => {
+    const schema = object({
+        name: string(),
+        address: object({
+            city: string(),
+            country: string()
+        })
+    });
+
+    const props = ObjectSchemaBuilder.getPropertiesFor(schema);
+    expect(props[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()).toBe('');
+    expect(
+        (props as any).name[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()
+    ).toBe('/name');
+    expect(
+        (props as any).address[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ].toJsonPointer()
+    ).toBe('/address');
+    expect(
+        (props as any).address.city[
+            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+        ].toJsonPointer()
+    ).toBe('/address/city');
+});
+
+test('toJsonPointer escapes ~ and / in property names per RFC 6901', () => {
+    const schema = object({
+        'a/b': string(),
+        'c~d': string()
+    });
+
+    const props = ObjectSchemaBuilder.getPropertiesFor(schema);
+    expect(
+        (props as any)['a/b'][SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()
+    ).toBe('/a~1b');
+    expect(
+        (props as any)['c~d'][SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer()
+    ).toBe('/c~0d');
+});
+
+test('getInvalidProperties returns entries with correct toJsonPointer for nested errors', async () => {
+    const schema = object({
+        name: string(),
+        address: object({
+            city: string(),
+            zip: number()
+        })
+    });
+
+    const result = await schema.validateAsync(
+        { name: 'Leo', address: { city: 123, zip: 'bad' } } as any,
+        { doNotStopOnFirstError: true }
+    );
+    expect(result.valid).toBe(false);
+    expect(typeof result.getInvalidProperties).toBe('function');
+
+    const invalid = result.getInvalidProperties();
+    expect(invalid.length).toBeGreaterThanOrEqual(2);
+
+    const pointers = invalid.map(r => r.descriptor.toJsonPointer());
+    expect(pointers).toContain('/address/city');
+    expect(pointers).toContain('/address/zip');
+});
+
+test('getInvalidProperties returns root-level error for non-object body', async () => {
+    const schema = object({ name: string() });
+
+    const result = await schema.validateAsync('not an object' as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toBe(false);
+
+    const invalid = result.getInvalidProperties();
+    expect(invalid.length).toBeGreaterThanOrEqual(1);
+    expect(invalid.some(r => r.descriptor.toJsonPointer() === '')).toBe(true);
+});
+
+test('getInvalidProperties returns empty array when validation passes', async () => {
+    const schema = object({ name: string() });
+
+    const result = await schema.validateAsync({ name: 'Leo' } as any, {
+        doNotStopOnFirstError: true
+    });
+    expect(result.valid).toBe(true);
+
+    const invalid = result.getInvalidProperties();
+    expect(invalid).toEqual([]);
 });

@@ -823,6 +823,33 @@ export class NumberSchemaBuilder<
     }
 
     /**
+     * Adds a preprocessor that coerces a string value to a number
+     * using `Number(value)`. Useful when the input is captured from
+     * a string source (e.g. a parse-string schema, URL parameter,
+     * or form input).
+     *
+     * @example ```ts
+     * const schema = number().coerce();
+     * const result = schema.validate('42');
+     * // result.valid === true
+     * // result.object === 42
+     * ```
+     */
+    public coerce(): NumberSchemaBuilder<
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault,
+        TExtensions
+    > &
+        TExtensions {
+        return this.addPreprocessor(
+            ((v: any) => (typeof v === 'string' ? Number(v) : v)) as any,
+            { mutates: true }
+        ) as any;
+    }
+
+    /**
      * Restrict number to be at least `minValue`.
      */
     public min(

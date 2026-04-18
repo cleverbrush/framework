@@ -1,0 +1,401 @@
+# Cleverbrush Framework
+
+> A schema-first TypeScript web framework. Define schemas once — get a type-safe HTTP server, auto-typed client with resilience, OpenAPI 3.1 docs, auth, dependency injection, schema-driven forms, and object mapping. Zero codegen, zero type duplication.
+
+The key differentiator is **contract-first architecture**: a shared API contract (defined with `@cleverbrush/schema`) is the single source of truth for both server and client. TypeScript enforces exhaustive handler mapping at compile time — add an endpoint to the contract and forget a handler? Compilation fails.
+
+## Packages
+
+| Package | Description | Docs |
+|---------|-------------|------|
+| `@cleverbrush/server` | HTTP server with typed endpoints, middleware, batching, WebSocket | [/server](/server) |
+| `@cleverbrush/client` | Auto-typed REST client with retry, timeout, dedup, cache, batching | [/client](/client) |
+| `@cleverbrush/auth` | JWT, cookies, OAuth2, OIDC, policy-based authorization | [/auth](/auth) |
+| `@cleverbrush/di` | Dependency injection with schema-as-key tokens | [/di](/di) |
+| `@cleverbrush/server-openapi` | OpenAPI 3.1 generation (links, callbacks, webhooks, security) | [/server-openapi](/server-openapi) |
+| `@cleverbrush/env` | Typed environment config with schema validation | [/env](/env) |
+| `@cleverbrush/knex-schema` | Schema-aware Knex query builder (`.hasTableName()`, `.hasColumnName()`) | [/knex-schema](/knex-schema) |
+| `@cleverbrush/react-form` | Headless schema-driven React forms | [/react-form](/react-form) |
+| `@cleverbrush/mapper` | Schema-to-schema object mapping with compile-time completeness | [/mapper](/mapper) |
+| `@cleverbrush/scheduler` | Job scheduling with worker thread isolation | [/scheduler](/scheduler) |
+| `@cleverbrush/schema` | Schema validation library (see [schema.cleverbrush.com](https://schema.cleverbrush.com)) | — |
+
+## Core Workflow
+
+### 1. Define schemas (shared)
+
+```typescript
+import { object, string, number, array } from '@cleverbrush/schema';
+
+const CreateTodoBody = object({
+  title: string().minLength(1).maxLength(200),
+  description: string().optional(),
+});
+
+const Todo = object({
+  id: number().integer(),
+  title: string(),
+  description: string().optional(),
+  completed: boolean(),
+});
+```
+
+### 2. Define the API contract (shared)
+
+```typescript
+import { defineApi, endpoint } from '@cleverbrush/server';
+
+const api = defineApi({
+  todos: {
+    list: endpoint.get('/api/todos').returns(array(Todo)),
+    create: endpoint.post('/api/todos').body(CreateTodoBody).returns(Todo),
+    update: endpoint.patch('/api/todos/:id').body(UpdateTodoBody).returns(Todo),
+    delete: endpoint.delete('/api/todos/:id'),
+  },
+});
+```
+
+### 3. Server — exhaustive handler mapping
+
+```typescript
+import { createServer, mapHandlers } from '@cleverbrush/server';
+
+const server = createServer()
+  .useAuthentication({ defaultScheme: 'jwt', schemes: [jwtScheme({ secret })] })
+  .useAuthorization()
+  .services(svc => configureDI(svc))
+  .useBatching()
+  .withHealthcheck();
+
+mapHandlers(server, api, {
+  todos: {
+    list: async ({ query }) => db.todos.findAll(query),
+    create: async ({ body }) => db.todos.insert(body),
+    update: async ({ params, body }) => db.todos.update(params.id, body),
+    delete: async ({ params }) => db.todos.delete(params.id),
+    // TypeScript error if any endpoint is missing
+  },
+});
+
+server.listen(3000);
+```
+
+### 4. Client — typed, resilient
+
+```typescript
+import { createClient, retry, timeout, dedupe, throttlingCache, batching } from '@cleverbrush/client';
+
+const client = createClient(api, {
+  baseUrl: 'http://localhost:3000',
+  getToken: () => loadToken(),
+  middlewares: [
+    retry({ limit: 3 }),
+    timeout({ timeout: 10_000 }),
+    dedupe(),
+    throttlingCache({ throttle: 2000 }),
+    batching({ maxSize: 10 }),
+  ],
+});
+
+// Fully typed — autocomplete on endpoints and params
+const todos = await client.todos.list();
+const newTodo = await client.todos.create({ body: { title: 'Buy milk' } });
+```
+
+## @cleverbrush/server
+
+Install: `npm install @cleverbrush/server @cleverbrush/schema`
+
+### Endpoint builder
+
+```typescript
+import { endpoint, route } from '@cleverbrush/server';
+
+const myEndpoint = endpoint
+  .get('/api/users/:id')           // HTTP method + path (path params auto-typed)
+  .query(QuerySchema)              // query string schema
+  .body(BodySchema)                // request body schema
+  .headers(HeadersSchema)          // typed request headers
+  .returns(ResponseSchema)         // 200 response schema
+  .responses({                     // multi-status responses
+    200: SuccessSchema,
+    404: NotFoundSchema,
+  })
+  .produces('application/json')    // content type(s)
+  .producesFile()                  // binary file response
+  .deprecated()                    // OpenAPI deprecated flag
+  .tags('users')                   // OpenAPI tags
+  .summary('Get user by ID')       // OpenAPI summary
+  .description('...')              // OpenAPI description
+  .example({ ... })               // OpenAPI request example
+  .examples([...])                 // multiple examples
+  .links({ ... })                  // OpenAPI response links
+  .callbacks({ ... })              // OpenAPI callbacks (webhooks)
+  .security([{ bearerAuth: [] }]); // OpenAPI security schemes
+```
+
+### Server setup
+
+```typescript
+const server = createServer()
+  .use(myMiddleware)                                    // global middleware
+  .services(svc => { svc.addSingleton(Token, impl); })  // DI registration
+  .useAuthentication({ defaultScheme, schemes })         // auth middleware
+  .useAuthorization()                                    // authorization middleware
+  .withHealthcheck()                                     // GET /health
+  .useBatching();                                        // request batching support
+```
+
+### ActionResult helpers
+
+```typescript
+import { ActionResult } from '@cleverbrush/server';
+
+// In handlers:
+return ActionResult.ok(data);           // 200
+return ActionResult.created(data);      // 201
+return ActionResult.noContent();        // 204
+return ActionResult.notFound();         // 404
+return ActionResult.conflict();         // 409
+return ActionResult.redirect(url);      // 302
+return ActionResult.file(buffer, mime); // binary file
+return ActionResult.stream(readable);   // streaming response
+```
+
+### WebSocket subscriptions
+
+```typescript
+const api = defineApi({
+  live: {
+    updates: endpoint.ws('/ws/updates')
+      .receives(ClientMessageSchema)
+      .sends(ServerMessageSchema),
+  },
+});
+```
+
+## @cleverbrush/client
+
+Install: `npm install @cleverbrush/client @cleverbrush/schema`
+
+### Client creation
+
+```typescript
+import { createClient } from '@cleverbrush/client';
+// Or for React: import { createClient } from '@cleverbrush/client/react';
+
+const client = createClient(api, {
+  baseUrl: 'http://localhost:3000',
+  getToken: () => localStorage.getItem('token'),
+  middlewares: [...],
+});
+```
+
+### Resilience middleware
+
+| Middleware | Purpose |
+|-----------|---------|
+| `retry({ limit, backoff, jitter })` | Retry failed requests with exponential backoff |
+| `timeout({ timeout })` | Abort requests after N ms |
+| `dedupe()` | Deduplicate identical concurrent GET requests |
+| `throttlingCache({ throttle })` | TTL cache for GET requests |
+| `batching({ maxSize, delay })` | Batch multiple requests into one HTTP call |
+
+### React integration
+
+```typescript
+import { createClient } from '@cleverbrush/client/react';
+
+const client = createClient(api, { baseUrl, getToken });
+
+// In components:
+const { data, error, loading } = client.todos.list.useQuery({ query: { page: 1 } });
+```
+
+## @cleverbrush/auth
+
+Install: `npm install @cleverbrush/auth @cleverbrush/schema`
+
+```typescript
+import { jwtScheme, signJwt } from '@cleverbrush/auth';
+
+// Configure JWT auth scheme
+const jwt = jwtScheme({
+  secret: process.env.JWT_SECRET,
+  mapClaims: (claims) => ({
+    userId: claims.sub,
+    role: claims.role,
+  }),
+});
+
+// Sign tokens
+const token = await signJwt({ sub: user.id, role: 'admin' }, secret, { expiresIn: '1h' });
+
+// Server setup
+server.useAuthentication({
+  defaultScheme: 'jwt',
+  schemes: [jwt],
+});
+
+// Per-endpoint authorization
+endpoint.get('/admin/users')
+  .authorize('admin')  // role-based
+  .authorize((principal) => principal.role === 'admin');  // policy-based
+```
+
+## @cleverbrush/di
+
+Install: `npm install @cleverbrush/di @cleverbrush/schema`
+
+Uses schema builders as DI tokens — fully typed, no string keys or decorators.
+
+```typescript
+import { any } from '@cleverbrush/schema';
+
+// Define tokens
+const DbToken = any().hasType<Database>();
+const LoggerToken = any().hasType<Logger>();
+
+// Register services
+server.services(svc => {
+  svc.addSingleton(DbToken, () => new Database(config));
+  svc.addScoped(LoggerToken, () => new Logger());
+});
+
+// Resolve in handlers (injected via context)
+const handler = async ({ services }) => {
+  const db = services.resolve(DbToken);     // typed as Database
+  const logger = services.resolve(LoggerToken); // typed as Logger
+};
+```
+
+## @cleverbrush/server-openapi
+
+Install: `npm install @cleverbrush/server-openapi`
+
+```typescript
+import { generateOpenApiSpec, serveAsyncApi } from '@cleverbrush/server-openapi';
+
+// Generate OpenAPI 3.1 spec
+const spec = generateOpenApiSpec(server, api, {
+  info: { title: 'My API', version: '1.0.0' },
+  servers: [{ url: 'https://api.example.com' }],
+});
+
+// Serve at GET /openapi.json
+server.get('/openapi.json', () => ActionResult.ok(spec));
+
+// AsyncAPI for WebSocket endpoints
+const asyncSpec = serveAsyncApi(server, api, { ... });
+```
+
+Features: response links, callbacks, webhooks, response headers, security schemes, discriminated union `discriminator` mapping, tags, deprecation.
+
+## @cleverbrush/env
+
+Install: `npm install @cleverbrush/env @cleverbrush/schema`
+
+```typescript
+import { env, parseEnv } from '@cleverbrush/env';
+import { string, number } from '@cleverbrush/schema';
+
+const config = parseEnv({
+  db: {
+    host: env('DB_HOST', string().default('localhost')),
+    port: env('DB_PORT', number().coerce().default(5432)),
+    name: env('DB_NAME', string()),
+  },
+  jwt: {
+    secret: env('JWT_SECRET', string().minLength(32)),
+  },
+  port: env('PORT', number().coerce().default(3000)),
+});
+// config is fully typed: { db: { host: string; port: number; name: string }; ... }
+// Throws with clear error messages if env vars are missing or invalid
+```
+
+## @cleverbrush/knex-schema
+
+Install: `npm install @cleverbrush/knex-schema @cleverbrush/schema knex`
+
+Schema-aware Knex query builder. Attach table/column metadata to schemas, then query with type-safe selectors.
+
+```typescript
+import { object, string, number } from '@cleverbrush/schema';
+
+// Attach DB metadata to schemas
+const UserSchema = object({
+  id: number().integer(),
+  name: string(),
+  email: string().email(),
+  createdAt: date().hasColumnName('created_at'),
+}).hasTableName('users');
+
+// Query with type-safe selectors
+import { createQuery } from '@cleverbrush/knex-schema';
+
+const db = createQuery(knex);
+const users = await db(UserSchema)
+  .where(u => u.email, 'alice@example.com')
+  .orderBy(u => u.createdAt, 'desc')
+  .select();
+```
+
+## @cleverbrush/mapper
+
+Install: `npm install @cleverbrush/mapper @cleverbrush/schema`
+
+Schema-to-schema object mapping with compile-time completeness. Unmapped target properties are TypeScript errors.
+
+```typescript
+import { mapper } from '@cleverbrush/mapper';
+
+const registry = mapper()
+  .configure(SourceSchema, TargetSchema, (m) =>
+    m
+      .for(t => t.fullName).compute(s => `${s.firstName} ${s.lastName}`)
+      .for(t => t.age).from(s => s.birthYear)  // auto-transform
+      .for(t => t.internal).ignore()
+      // Same-name, same-type properties are auto-mapped
+  );
+
+const mapFn = registry.getMapper(SourceSchema, TargetSchema);
+const result = await mapFn(sourceObject);
+```
+
+## @cleverbrush/scheduler
+
+Install: `npm install @cleverbrush/scheduler`
+
+Job scheduling with worker thread isolation, retries, and event streaming. Requires Node.js 16+.
+
+```typescript
+import { JobScheduler } from '@cleverbrush/scheduler';
+
+const scheduler = new JobScheduler({ rootFolder: './jobs' });
+
+scheduler.addJob({
+  id: 'cleanup',
+  path: 'cleanup.js',
+  schedule: { every: 'day', interval: 1, hour: 3, minute: 0 },
+  timeout: 60_000,
+  maxRetries: 3,
+  noConcurrentRuns: true,
+});
+
+scheduler.on('job:end', ({ jobId }) => console.log(`${jobId} done`));
+scheduler.on('job:error', ({ jobId, error }) => console.error(jobId, error));
+
+scheduler.start();
+```
+
+Schedule types: `minute`, `day`, `week`, `month`, `year` — each with `interval` and time fields.
+
+## Links
+
+- [Getting Started](/getting-started): End-to-end tutorial
+- [Why Cleverbrush?](/why): Problem statement and design philosophy
+- [Comparisons](/comparisons): Feature matrix vs tRPC, ts-rest, Hono
+- [Examples](/examples): Full-stack Todo app demo
+- [Schema Library](https://schema.cleverbrush.com): Schema validation docs, playground, benchmarks
+- [GitHub](https://github.com/cleverbrush/framework): Source code

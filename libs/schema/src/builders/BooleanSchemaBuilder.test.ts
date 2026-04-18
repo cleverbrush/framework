@@ -286,3 +286,49 @@ test('full-path: equalsTo fails with custom provider (lines 301-303)', () => {
     expect(result.valid).toEqual(false);
     expect(result.errors?.[0].message).toContain('true');
 });
+
+// ---------------------------------------------------------------------------
+// coerce()
+// ---------------------------------------------------------------------------
+
+test('coerce - converts "true" string to true', () => {
+    const schema = boolean().coerce();
+    const result = schema.validate('true' as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(true);
+
+    const typeCheck: InferType<typeof schema> = true;
+    expectTypeOf(typeCheck).toBeBoolean();
+});
+
+test('coerce - converts "false" string to false', () => {
+    const schema = boolean().coerce();
+    const result = schema.validate('false' as any);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(false);
+});
+
+test('coerce - unrecognized string is left unchanged and fails', () => {
+    const schema = boolean().coerce();
+    const result = schema.validate('yes' as any);
+    expect(result.valid).toEqual(false);
+});
+
+test('coerce - passes through non-string values unchanged', () => {
+    const schema = boolean().coerce();
+    const result = schema.validate(true);
+    expect(result.valid).toEqual(true);
+    expect(result.object).toEqual(true);
+});
+
+test('coerce - immutability: does not mutate original schema', () => {
+    const original = boolean();
+    const coerced = original.coerce();
+    expect((original as any) !== (coerced as any)).toEqual(true);
+    // original should reject strings
+    const r1 = original.validate('true' as any);
+    expect(r1.valid).toEqual(false);
+    // coerced should accept strings
+    const r2 = coerced.validate('true' as any);
+    expect(r2.valid).toEqual(true);
+});

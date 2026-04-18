@@ -1,0 +1,54 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "private": true,
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "dependencies": {
+        "@cleverbrush/auth": "*",
+        "@cleverbrush/di": "*",
+        "@cleverbrush/env": "*",
+        "@cleverbrush/knex-schema": "*",
+        "@cleverbrush/mapper": "*",
+        "@cleverbrush/schema": "*",
+        "@cleverbrush/schema-json": "*",
+        "@cleverbrush/server": "*",
+        "@cleverbrush/server-openapi": "*",
+        "google-auth-library": "^9.15.0",
+        "knex": "^3.1.0",
+        "pg": "^8.13.3"
+    },
+    "description": "Production-ready ToDo management REST API using @cleverbrush/* framework",
+    "files": [
+        "dist"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./contract": {
+            "types": "./src/contract.ts",
+            "default": "./src/contract.ts"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/todo-backend",
+    "scripts": {
+        "start": "node dist/index.js",
+        "watch": "tsc --build tsconfig.build.json --watch",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "tsup": "^8.5.1",
+        "typescript": "^6.0.2"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "1.0.0"
+}

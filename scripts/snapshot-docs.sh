@@ -10,7 +10,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
-DOCS_DIR="$ROOT_DIR/website/public/api-docs"
+DOCS_DIR="$ROOT_DIR/websites/docs/public/api-docs"
 LATEST_DIR="$DOCS_DIR/latest"
 
 # Determine version

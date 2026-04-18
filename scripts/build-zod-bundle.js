@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Builds a self-contained IIFE bundle of Zod for the interactive playground.
- * Output is placed in website/public/playground/ alongside schema-bundle.js.
+ * Output is placed in websites/schema/public/playground/ alongside schema-bundle.js.
  *
  * Usage:  node scripts/build-zod-bundle.js
  */
@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, '..');
-const outDir = resolve(root, 'website/public/playground');
+const outDir = resolve(root, 'websites/schema/public/playground');
 
 mkdirSync(outDir, { recursive: true });
 
@@ -30,5 +30,5 @@ await build({
 });
 
 console.log(
-    '✅ Playground Zod bundle built → website/public/playground/zod-bundle.js'
+    '✅ Playground Zod bundle built → websites/schema/public/playground/zod-bundle.js'
 );

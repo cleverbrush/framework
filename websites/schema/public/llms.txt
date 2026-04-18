@@ -1,0 +1,505 @@
+# @cleverbrush
+
+> A TypeScript monorepo containing a high-performance schema validation library and supporting packages. `@cleverbrush/schema` is **14/15 benchmarks faster than Zod**, **14 KB gzipped** (3× smaller than Zod v4), and [Standard Schema v1](https://standardschema.dev/) compliant — meaning it works with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, and 50+ tools out of the box.
+
+The key architectural differentiator is **PropertyDescriptors**: every schema exposes a full runtime introspection tree, enabling schema-driven object mapping (`@cleverbrush/mapper`) and headless form generation (`@cleverbrush/react-form`) from a single schema definition. No competitor provides this level of runtime metadata.
+
+Important notes:
+
+- All builders are **immutable** — every method returns a new instance; the original is never mutated
+- The **extension system** (`defineExtension` / `withExtensions`) is type-safe and introspectable — not just opaque `.refine()` callbacks
+- `InferType<typeof schema>` derives the TypeScript type at compile time
+- Standard Schema v1 `['~standard']` getter is present on every builder
+- Sub-path imports (`@cleverbrush/schema/string`, `/object`, etc.) provide tree-shakeable bundles (~4 KB gzip per builder)
+- `@cleverbrush/mapper`, `@cleverbrush/react-form`, and `@cleverbrush/schema-json` all have `@cleverbrush/schema` as a peer dependency
+
+## Packages
+
+- [API Reference (TypeDoc)](/api-docs/latest/): Full generated API docs for all packages
+- [Playground](/playground): Interactive editor with 40+ runnable examples, live type inference, validation output
+- [Schema docs](/schema): @cleverbrush/schema — validation library
+- [Mapper docs](/mapper): @cleverbrush/mapper — schema-driven object mapping
+- [React Form docs](/react-form): @cleverbrush/react-form — headless schema-driven forms
+- [Schema JSON docs](/schema-json): @cleverbrush/schema-json — bidirectional JSON Schema interop
+- [Migrating from Zod](/migrating-from-zod): Side-by-side migration guide
+
+## @cleverbrush/schema — Core API
+
+Install: `npm install @cleverbrush/schema`
+
+### Builder factory functions
+
+```typescript
+import {
+  string, number, boolean, date, func, any, nul,
+  object, array, tuple, record, union, enumOf, lazy
+} from '@cleverbrush/schema';
+```
+
+| Factory | Returns | Description |
+|---------|---------|-------------|
+| `string()` | `StringSchemaBuilder` | String with constraints |
+| `number()` | `NumberSchemaBuilder` | Number with constraints |
+| `boolean()` | `BooleanSchemaBuilder` | Boolean value |
+| `date()` | `DateSchemaBuilder` | `Date` instance |
+| `func()` | `FunctionSchemaBuilder` | Function value |
+| `any()` | `AnySchemaBuilder` | Any value (like TS `any`) |
+| `nul()` | `NullSchemaBuilder` | Exactly `null` |
+| `object(props)` | `ObjectSchemaBuilder` | Object with typed properties |
+| `array()` | `ArraySchemaBuilder` | Array with optional element schema |
+| `tuple([...schemas])` | `TupleSchemaBuilder` | Fixed-length array, per-position types |
+| `record(keySchema, valueSchema)` | `RecordSchemaBuilder` | Dynamic-key `Record<K, V>` |
+| `union(schema)` | `UnionSchemaBuilder` | Union type, chain via `.or()` |
+| `enumOf(...values)` | `StringSchemaBuilder` | String enum (sugar for `string().oneOf(...)`) |
+| `lazy(() => schema)` | `LazySchemaBuilder` | Recursive/self-referential schemas |
+| `generic()` | `GenericSchemaBuilder` | Parameterized schemas (constraints applied later) |
+| `extern(zodSchema)` | `ExternSchemaBuilder` | Wraps any Standard Schema-compatible validator (Zod, Valibot, etc.) |
+
+### Base SchemaBuilder methods (all builders inherit)
+
+```typescript
+const schema = string()
+  .optional()                        // T | undefined
+  .required('Field is required')     // back to required (with optional error msg)
+  .nullable()                        // T | null
+  .default('fallback')               // return default when input is undefined
+  .default(() => new Date())         // factory function default
+  .catch('fallback')                 // return fallback when validation fails (never throws)
+  .describe('Human-readable label')  // metadata, flows into IDE tooltips + JSON Schema
+  .brand<'UserId'>()                 // branded type
+  .readonly()                        // Readonly<T> at type level
+  .addValidator((val, ctx) => {      // custom sync validator; return string = error
+    if (val.includes('bad')) return 'Invalid value';
+  })
+  .addPreprocessor((val) => val.trim()) // transform before validation
+  .clearValidators()                 // remove all custom validators
+  .clearPreprocessors()              // remove all preprocessors
+  .withExtension('myKey', myValue)   // attach arbitrary metadata
+  .getExtension('myKey');            // retrieve metadata
+```
+
+**Validation methods:**
+```typescript
+schema.validate(data)           // → ValidationResult<T> (sync)
+schema.validateAsync(data)      // → Promise<ValidationResult<T>>
+schema.parse(data)              // → T or throws SchemaValidationError
+schema.parseAsync(data)         // → Promise<T> or throws
+schema.safeParse(data)          // → { success, data } | { success: false, error }
+schema.safeParseAsync(data)     // async variant
+schema.introspect()             // → runtime PropertyDescriptor metadata
+```
+
+**ValidationResult shape:**
+```typescript
+type ValidationResult<T> = {
+  valid: boolean;
+  object: T | undefined;
+  errors: ValidationError[];
+  getErrorsFor?: (selector: (t) => any) => ValidationError[];
+};
+```
+
+### string() methods
+
+```typescript
+string()
+  .minLength(3)
+  .maxLength(100)
+  .matches(/^[a-z]+$/)
+  .email()
+  .url()
+  .uuid()
+  .ip({ version: 'v4' | 'v6' })   // optional version constraint
+  .trim()                           // preprocessor: trims whitespace
+  .toLowerCase()                    // preprocessor: lowercases
+  .nonempty()                       // minLength(1)
+  .oneOf('admin', 'user', 'guest') // narrows type to literal union
+```
+
+### number() methods
+
+```typescript
+number()
+  .min(0)
+  .max(100)
+  .integer()
+  .positive()    // > 0
+  .negative()    // < 0
+  .finite()
+  .multipleOf(5)
+  .oneOf(1, 2, 3)  // narrows type to literal union
+```
+
+### array() methods
+
+```typescript
+array()
+  .of(string())     // element schema
+  .minLength(1)
+  .maxLength(10)
+  .nonempty()       // minLength(1)
+  .unique()         // no duplicate elements
+```
+
+### object(props) usage
+
+```typescript
+const UserSchema = object({
+  id: number().integer(),
+  name: string().minLength(1),
+  email: string().email().optional(),
+  role: enumOf('admin', 'user'),
+});
+
+type User = InferType<typeof UserSchema>;
+// { id: number; name: string; email?: string; role: 'admin' | 'user' }
+
+// Per-field error access:
+const result = UserSchema.validate(data);
+result.getErrorsFor((u) => u.email); // ValidationError[] for email field
+```
+
+### union() usage
+
+```typescript
+const Schema = union(string()).or(number()).or(nul());
+// type: string | number | null
+```
+
+### tuple() usage
+
+```typescript
+const Point = tuple([number(), number()]);
+const RGB = tuple([number(), number(), number()]).rest(number());
+```
+
+### record() usage
+
+```typescript
+const Dict = record(string(), number());
+// type: Record<string, number>
+
+const result = Dict.validate(data);
+// result.getNestedErrors() for per-key errors
+```
+
+### lazy() for recursive schemas
+
+```typescript
+type Tree = { value: number; children: Tree[] };
+const TreeSchema: SchemaBuilder<Tree> = object({
+  value: number(),
+  children: array().of(lazy(() => TreeSchema)),
+});
+```
+
+### Extension system
+
+Extensions add reusable methods to schema builders (like plugins). They are type-safe and introspectable.
+
+```typescript
+import { defineExtension, withExtensions, StringSchemaBuilder } from '@cleverbrush/schema';
+
+// 1. Define extension: adds .slug() method to StringSchemaBuilder
+const slugExtension = defineExtension('slug', function(this: StringSchemaBuilder) {
+  return this.matches(/^[a-z0-9-]+$/).withExtension('slug', true);
+});
+
+// 2. Apply to builder class — returns a factory function
+const { string: extString } = withExtensions(StringSchemaBuilder, [slugExtension]);
+
+// 3. Use it
+const SlugSchema = extString().slug(); // type-safe, introspectable
+SlugSchema.introspect().extensions.slug // → true
+```
+
+Extension metadata auto-inference:
+- 0 args → extension value is `true`
+- 1 arg → extension value is that argument
+- N args → extension value is array of arguments
+- Manual: call `this.withExtension(key, value)` explicitly
+
+### generic() — Parameterized schemas
+
+```typescript
+import { generic, object, string, number } from '@cleverbrush/schema';
+
+// Define a generic "paginated" wrapper
+const Paginated = generic((T) =>
+  object({
+    items: array().of(T),
+    total: number().integer(),
+    page: number().integer(),
+  })
+);
+
+// Apply it
+const UserPage = Paginated(UserSchema);
+type UserPage = InferType<typeof UserPage>;
+// { items: User[]; total: number; page: number }
+```
+
+### extern() — Wrap external validators
+
+```typescript
+import { extern } from '@cleverbrush/schema';
+import { z } from 'zod';
+
+// Wrap a Zod schema for use inside Cleverbrush schemas
+const ZodEmail = extern(z.string().email());
+
+const MySchema = object({
+  email: ZodEmail,           // works in Cleverbrush object schemas
+  name: string().minLength(1),
+});
+```
+
+### Discriminated unions (automatic)
+
+```typescript
+const Cat = object({
+  type: string().equals('cat'),
+  meows: boolean()
+});
+
+const Dog = object({
+  type: string().equals('dog'),
+  barks: boolean()
+});
+
+const Animal = union(Cat).or(Dog);
+// Discriminator on 'type' detected automatically — O(1) validation
+// Validates against the matching branch directly
+```
+
+### Type inference
+
+```typescript
+import { InferType } from '@cleverbrush/schema';
+
+const OrderSchema = object({
+  id: string().uuid(),
+  items: array().of(object({ sku: string(), qty: number().integer() })),
+  total: number().positive(),
+});
+
+type Order = InferType<typeof OrderSchema>;
+// Fully inferred — no manual type declaration needed
+```
+
+### Standard Schema v1 interop
+
+Every builder exposes `['~standard']` getter, enabling plug-in use with:
+- **tRPC**: procedure input/output validation
+- **TanStack Form**: `standardSchemaValidator(schema)`
+- **React Hook Form**: `standardSchemaResolver(schema)`
+- **T3 Env**: `createEnv({ server: { PORT: number().integer() } })`
+- **Hono**: request body / query validation middleware
+
+```typescript
+const schema = string().email();
+const standard = schema['~standard'];
+// standard.version === 1
+// standard.vendor === '@cleverbrush/schema'
+// standard.validate(value) → { value } | { issues: [{ message, path }] }
+```
+
+### Sub-path imports (tree-shaking)
+
+```typescript
+import { string } from '@cleverbrush/schema/string';  // ~3.8 KB gz
+import { number } from '@cleverbrush/schema/number';  // ~3.8 KB gz
+import { object } from '@cleverbrush/schema/object';  // ~5.8 KB gz
+import { array }  from '@cleverbrush/schema/array';   // ~4.0 KB gz
+// Full index: @cleverbrush/schema                    // ~14 KB gz
+// Core (no extensions): @cleverbrush/schema/core     // ~12.6 KB gz
+```
+
+## @cleverbrush/mapper — Schema-Driven Object Mapping
+
+Install: `npm install @cleverbrush/mapper @cleverbrush/schema`
+
+Compile-time complete mapping of objects between two schemas. Unmapped properties are TypeScript type errors, not runtime surprises. Uses PropertyDescriptor selectors like C# expression trees.
+
+```typescript
+import { mapper } from '@cleverbrush/mapper';
+import { object, string, number } from '@cleverbrush/schema';
+
+const UserSchema = object({ id: number(), name: string(), email: string() });
+const DtoSchema  = object({ userId: string(), displayName: string() });
+
+const registry = mapper()
+  .configure(UserSchema, DtoSchema, (m) =>
+    m
+      .for((dto) => dto.userId).compute((user) => String(user.id))
+      .for((dto) => dto.displayName).from((user) => user.name)
+  );
+
+const mapUser = registry.getMapper(UserSchema, DtoSchema);
+const dto = await mapUser(user);  // type-safe async mapping
+```
+
+**Key API:**
+- `mapper()` — creates empty `MappingRegistry`
+- `.configure(fromSchema, toSchema, callback)` — registers a mapping; callback receives `Mapper` whose `.for((t) => t.prop)` returns `PropertyMappingBuilder`
+- `PropertyMappingBuilder` methods: `.from((s) => s.prop)`, `.compute((src) => expr)`, `.ignore()`
+- `.getMapper(fromSchema, toSchema)` — returns `(source) => Promise<target>`
+- Auto-maps same-name properties with compatible `InferType` primitives
+
+## @cleverbrush/react-form — Headless Schema-Driven Forms
+
+Install: `npm install @cleverbrush/react-form @cleverbrush/schema react`
+
+UI-agnostic, headless form system. Register renderers once globally; fields bind to schema properties via type-safe function selectors (no string names).
+
+```typescript
+// 1. Register renderers once at app root:
+import { FormSystemProvider } from '@cleverbrush/react-form';
+
+<FormSystemProvider renderers={{
+  string: ({ value, onChange, error, label }) => (
+    <div>
+      <label>{label}</label>
+      <input value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+      {error && <span>{error}</span>}
+    </div>
+  ),
+  'string:password': ({ value, onChange }) => (
+    <input type="password" value={value ?? ''} onChange={(e) => onChange(e.target.value)} />
+  ),
+  number: ({ value, onChange }) => (
+    <input type="number" value={value ?? ''} onChange={(e) => onChange(Number(e.target.value))} />
+  ),
+}}>
+  <App />
+</FormSystemProvider>
+
+// 2. Define schema and create form:
+import { useSchemaForm, FormProvider, Field } from '@cleverbrush/react-form';
+
+const LoginSchema = object({ email: string().email(), password: string().minLength(8) });
+
+function LoginForm() {
+  const form = useSchemaForm(LoginSchema);
+
+  return (
+    <FormProvider form={form}>
+      <Field forProperty={(f) => f.email} label="Email" />
+      <Field forProperty={(f) => f.password} label="Password" variant="password" />
+      <button onClick={() => form.submit()}>Login</button>
+    </FormProvider>
+  );
+}
+```
+
+**Key API:**
+- `useSchemaForm(schema, options?)` → `SchemaFormInstance`
+- `SchemaFormInstance`: `.submit()`, `.validate()`, `.reset(values?)`, `.getValue()`, `.setValue(partial)`, `.useField((tree) => tree.field)`
+- `useField(selector, form)` → `{ value, onChange, onBlur, error, touched, dirty }`
+- `Field` props: `forProperty`, `form`, `variant`, `label`, `name`, `fieldProps`
+- `useFormSystem()` — access global renderer config
+
+## @cleverbrush/schema-json — Bidirectional JSON Schema
+
+Install: `npm install @cleverbrush/schema-json @cleverbrush/schema`
+
+```typescript
+import { toJsonSchema, fromJsonSchema, InferFromJsonSchema } from '@cleverbrush/schema-json';
+
+// Schema → JSON Schema
+const jsonSchema = toJsonSchema(UserSchema);
+// { type: 'object', properties: { ... }, required: [...] }
+
+// JSON Schema → Schema (with full TypeScript inference)
+const schema = fromJsonSchema({
+  type: 'object',
+  properties: {
+    name: { type: 'string', minLength: 1 },
+    age:  { type: 'integer', minimum: 0 },
+  },
+  required: ['name'],
+} as const);  // 'as const' required for precise type inference
+
+// Type inference from JSON Schema literal (no runtime call):
+type User = InferFromJsonSchema<typeof jsonSchemaLiteral>;
+```
+
+**Supported JSON Schema keywords:** `type`, `properties`, `required`, `additionalProperties`, `const`, `enum`, `anyOf`, `minLength`, `maxLength`, `pattern`, `minimum`, `maximum`, `exclusiveMinimum`, `exclusiveMaximum`, `multipleOf`, `minItems`, `maxItems`, `format` (email/uuid/uri/url/ipv4/ipv6/date-time), `readOnly`, `description`.
+
+## @cleverbrush/deep — Deep Utilities
+
+Install: `npm install @cleverbrush/deep`
+
+```typescript
+import { deepEqual, deepExtend, deepFlatten, HashObject } from '@cleverbrush/deep';
+
+deepEqual(a, b)                           // recursive equality; handles Date, circular refs
+deepEqual(a, b, { disregardArrayOrder: true })
+deepExtend(obj1, obj2, obj3)              // deep merge → new object (immutable)
+deepFlatten({ a: { b: { c: 1 } } })      // → { 'a.b.c': 1 }
+deepFlatten(obj, '_')                     // custom delimiter
+HashObject({ name: 'Alice', age: 30 })   // → stable hash string
+```
+
+## @cleverbrush/async — Async Utilities
+
+Install: `npm install @cleverbrush/async`
+
+```typescript
+import { Collector, debounce, throttle, retry } from '@cleverbrush/async';
+
+// Collect named key/value pairs, resolve when all keys received:
+const c = new Collector<{ a: string; b: number }>(['a', 'b'], 5000 /* timeout ms */);
+c.collect('a', 'hello').collect('b', 42);
+const result = await c.toPromise(); // { a: 'hello', b: 42 }
+
+// Debounce / throttle:
+const debouncedSave = debounce(save, 300);
+const throttledScroll = throttle(onScroll, 100);
+
+// Retry with exponential backoff:
+await retry(fetchData, {
+  maxRetries: 3,
+  minDelay: 100,
+  delayFactor: 2,
+  shouldRetry: (err) => err.status >= 500,
+});
+```
+
+## @cleverbrush/scheduler — Job Scheduler
+
+Install: `npm install @cleverbrush/scheduler`
+
+Cron-like scheduler that runs tasks in **worker threads**. Schema-validated job definitions. Requires Node.js 16+.
+
+```typescript
+import { JobScheduler } from '@cleverbrush/scheduler';
+
+const scheduler = new JobScheduler({
+  rootFolder: './jobs',  // folder containing job worker files
+});
+
+scheduler.addJob({
+  id: 'daily-report',
+  path: 'daily-report.js',
+  schedule: { every: 'day', interval: 1, hour: 9, minute: 0 },
+  timeout: 1000 * 60 * 5,
+  maxRetries: 3,
+  noConcurrentRuns: true,
+});
+
+scheduler.start();
+```
+
+**Schedule types:** `{ every: 'minute', interval: N }`, `{ every: 'day', interval: N, hour, minute }`, `{ every: 'week', interval: N, dayOfWeek: [0-6], hour, minute }`, `{ every: 'month', interval: N, dayOfMonth, hour, minute }`, `{ every: 'year', interval: N, month, dayOfMonth, hour, minute }`.
+
+**Events:** `job:start`, `job:end`, `job:error`, `job:timeout`, `job:message` — each with `{ jobId, instanceId, ... }`.
+
+**Persistence:** Default in-memory; implement `IJobRepository` for database-backed storage.
+
+## Optional
+
+- [Playground: Standard Schema with TanStack Form](/showcases/tanstack-form): Live showcase — 5-field registration form using `standardSchemaValidator`
+- [Playground: Standard Schema with T3 Env](/showcases/t3-env): Live showcase — `createEnv` with server + client env validation
+- [Migrating from Zod](/migrating-from-zod): Side-by-side API comparison and migration patterns
+- [Benchmark results](https://github.com/cleverbrush/framework): 14/15 benchmarks faster than Zod — 1.2–2.65x faster on valid input, 8–204x faster on invalid input

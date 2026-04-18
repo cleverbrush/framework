@@ -16,7 +16,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "CHANGE ME",
+    "homepage": "https://docs.cleverbrush.com/knex-schema",
     "keywords": [
         "knex",
         "query builder",
@@ -40,7 +40,7 @@
     },
     "scripts": {
         "watch": "tsc --build --watch",
-        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "type": "module",

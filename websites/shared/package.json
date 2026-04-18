@@ -1,0 +1,19 @@
+{
+    "name": "@cleverbrush/website-shared",
+    "version": "0.0.0",
+    "private": true,
+    "type": "module",
+    "exports": {
+        "./styles/globals.css": "./styles/globals.css",
+        "./components/Navbar": "./components/Navbar.tsx",
+        "./components/Footer": "./components/Footer.tsx",
+        "./components/InstallBanner": "./components/InstallBanner.tsx",
+        "./components/ThemeProvider": "./components/ThemeProvider.tsx",
+        "./lib/highlight": "./lib/highlight.ts",
+        "./lib/bundleSizes": "./lib/bundleSizes.ts"
+    },
+    "dependencies": {
+        "next": "^16.2.1",
+        "react": "^19.1.0"
+    }
+}

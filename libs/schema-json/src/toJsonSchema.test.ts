@@ -3,9 +3,11 @@ import {
     array,
     boolean,
     date,
+    lazy,
     nul,
     number,
     object,
+    type SchemaBuilder,
     string,
     tuple,
     union
@@ -221,6 +223,90 @@ test('toJsonSchema - 28: mixed union → anyOf', () => {
 });
 
 // ---------------------------------------------------------------------------
+// discriminated unions → discriminator keyword
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 28a: discriminated union → anyOf + discriminator', () => {
+    const schema = union(object({ type: string('cat'), name: string() })).or(
+        object({ type: string('dog'), breed: string() })
+    );
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        anyOf: [
+            {
+                type: 'object',
+                properties: {
+                    type: { const: 'cat' },
+                    name: { type: 'string' }
+                },
+                required: ['type', 'name'],
+                additionalProperties: false
+            },
+            {
+                type: 'object',
+                properties: {
+                    type: { const: 'dog' },
+                    breed: { type: 'string' }
+                },
+                required: ['type', 'breed'],
+                additionalProperties: false
+            }
+        ],
+        discriminator: { propertyName: 'type' }
+    });
+});
+
+test('toJsonSchema - 28b: non-discriminated union → no discriminator key', () => {
+    const schema = union(string()).or(number().isFloat());
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).not.toHaveProperty('discriminator');
+});
+
+test('toJsonSchema - 28c: nullable discriminated union → discriminator preserved', () => {
+    const schema = union(object({ kind: string('a'), x: number() }))
+        .or(object({ kind: string('b'), y: number() }))
+        .nullable();
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result['discriminator']).toEqual({ propertyName: 'kind' });
+    // anyOf should include { type: 'null' } for nullable
+    const anyOf = result['anyOf'] as any[];
+    expect(anyOf.some((o: any) => o.type === 'null')).toBe(true);
+});
+
+test('toJsonSchema - 28d: discriminated union with nameResolver → mapping', () => {
+    const catSchema = object({
+        type: string('cat'),
+        name: string()
+    }).schemaName('Cat');
+    const dogSchema = object({
+        type: string('dog'),
+        breed: string()
+    }).schemaName('Dog');
+    const schema = union(catSchema).or(dogSchema);
+
+    const resolver = (s: any) => {
+        const info = s.introspect();
+        return info.schemaName ?? null;
+    };
+
+    const result = toJsonSchema(schema, {
+        $schema: false,
+        nameResolver: resolver
+    });
+    expect(result['discriminator']).toEqual({
+        propertyName: 'type',
+        mapping: {
+            cat: '#/components/schemas/Cat',
+            dog: '#/components/schemas/Dog'
+        }
+    });
+    // anyOf entries should be $refs
+    const anyOf = result['anyOf'] as any[];
+    expect(anyOf[0]).toEqual({ $ref: '#/components/schemas/Cat' });
+    expect(anyOf[1]).toEqual({ $ref: '#/components/schemas/Dog' });
+});
+
+// ---------------------------------------------------------------------------
 // any
 // ---------------------------------------------------------------------------
 
@@ -377,4 +463,221 @@ test('toJsonSchema - 39: tuple([boolean(), string()]) → prefixItems order pres
         maxItems: 2,
         items: false
     });
+});
+
+// ---------------------------------------------------------------------------
+// nullable
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 40: string().nullable() → type: [string, null]', () => {
+    const result = toJsonSchema(string().nullable(), { $schema: false });
+    expect(result).toEqual({ type: ['string', 'null'] });
+});
+
+test('toJsonSchema - 41: number().nullable() → type: [integer, null]', () => {
+    const result = toJsonSchema(number().nullable(), { $schema: false });
+    expect(result).toEqual({ type: ['integer', 'null'] });
+});
+
+test('toJsonSchema - 42: number().isInteger().nullable() → type: [integer, null]', () => {
+    const result = toJsonSchema(number().isInteger().nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: ['integer', 'null'] });
+});
+
+test('toJsonSchema - 43: object({...}).nullable() → type with null', () => {
+    const result = toJsonSchema(object({ name: string() }).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: ['object', 'null'],
+        properties: { name: { type: 'string' } },
+        required: ['name'],
+        additionalProperties: false
+    });
+});
+
+test('toJsonSchema - 44: array(string()).nullable()', () => {
+    const result = toJsonSchema(array(string()).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        type: ['array', 'null'],
+        items: { type: 'string' }
+    });
+});
+
+test('toJsonSchema - 45: union nullable adds null to anyOf', () => {
+    const result = toJsonSchema(union(string()).or(number()).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        anyOf: [{ type: 'string' }, { type: 'integer' }, { type: 'null' }]
+    });
+});
+
+test('toJsonSchema - 46: union with nul() + nullable does not duplicate null', () => {
+    const result = toJsonSchema(union(string()).or(nul()).nullable(), {
+        $schema: false
+    });
+    expect(result).toEqual({
+        anyOf: [{ type: 'string' }, { type: 'null' }]
+    });
+});
+
+// ---------------------------------------------------------------------------
+// default
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 47: string().default("hello") → default: "hello"', () => {
+    const result = toJsonSchema(string().default('hello'), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'string', default: 'hello' });
+});
+
+test('toJsonSchema - 48: number().default(42) → default: 42', () => {
+    const result = toJsonSchema(number().default(42), { $schema: false });
+    expect(result).toEqual({ type: 'integer', default: 42 });
+});
+
+test('toJsonSchema - 49: boolean().default(false) → default: false', () => {
+    const result = toJsonSchema(boolean().default(false), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'boolean', default: false });
+});
+
+test('toJsonSchema - 50: string().default(() => "x") → no default (factory)', () => {
+    const result = toJsonSchema(
+        string().default(() => 'x'),
+        {
+            $schema: false
+        }
+    );
+    expect(result).toEqual({ type: 'string' });
+    expect(result).not.toHaveProperty('default');
+});
+
+// ---------------------------------------------------------------------------
+// oneOf extension → enum
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 51: string().oneOf("a","b","c") → enum', () => {
+    const result = toJsonSchema(string().oneOf('a', 'b', 'c'), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'string', enum: ['a', 'b', 'c'] });
+});
+
+test('toJsonSchema - 52: number().oneOf(1,2,3) → enum', () => {
+    const result = toJsonSchema(number().oneOf(1, 2, 3), {
+        $schema: false
+    });
+    expect(result).toEqual({ type: 'integer', enum: [1, 2, 3] });
+});
+
+// ---------------------------------------------------------------------------
+// lazy schema support
+// ---------------------------------------------------------------------------
+
+test('toJsonSchema - 53: lazy(() => string()) → { type: "string" }', () => {
+    const result = toJsonSchema(
+        lazy(() => string()),
+        { $schema: false }
+    );
+    expect(result).toEqual({ type: 'string' });
+});
+
+test('toJsonSchema - 54: lazy wrapping nullable number', () => {
+    const result = toJsonSchema(
+        lazy(() => number().nullable()),
+        {
+            $schema: false
+        }
+    );
+    expect(result).toEqual({ type: ['integer', 'null'] });
+});
+
+test('toJsonSchema - 55: lazy wrapping named schema emits $ref via nameResolver', () => {
+    const UserSchema = object({ id: number(), name: string() }).schemaName(
+        'User'
+    );
+    const result = toJsonSchema(
+        lazy(() => UserSchema),
+        {
+            $schema: false,
+            nameResolver: s =>
+                (s.introspect() as any).schemaName === 'User' ? 'User' : null
+        }
+    );
+    expect(result).toEqual({ $ref: '#/components/schemas/User' });
+});
+
+test('toJsonSchema - 56: self-referential tree emits $ref for recursive children', () => {
+    // Must annotate explicitly to satisfy TypeScript recursive type
+    const treeNode: SchemaBuilder<any, any, any, any, any> = object({
+        value: number(),
+        children: array(lazy(() => treeNode))
+    }).schemaName('TreeNode');
+
+    const nameResolver = (s: any) =>
+        (s.introspect() as any).schemaName === 'TreeNode' ? 'TreeNode' : null;
+
+    // Convert the root without resolving its own name the first time (simulate
+    // component schema conversion where the root is inlined but nested refs are
+    // resolved). A `rootSeen` flag ensures we only skip the root once; the
+    // second encounter (via the lazy self-reference) must emit a $ref to break
+    // the cycle.
+    let rootSeen = false;
+    const result = toJsonSchema(treeNode, {
+        $schema: false,
+        nameResolver: (s: any) => {
+            if (s === treeNode && !rootSeen) {
+                rootSeen = true;
+                return null;
+            }
+            return nameResolver(s);
+        }
+    });
+
+    expect(result.type).toBe('object');
+    const props = result.properties as any;
+    expect(props.children.type).toBe('array');
+    expect(props.children.items).toEqual({
+        $ref: '#/components/schemas/TreeNode'
+    });
+});
+
+// ---------------------------------------------------------------------------
+// .example() emission
+// ---------------------------------------------------------------------------
+
+test('57. string schema with .example() emits examples array', () => {
+    const schema = string().example('hello@example.com');
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        type: 'string',
+        examples: ['hello@example.com']
+    });
+});
+
+test('58. number schema with .example() emits examples array', () => {
+    const schema = number().example(42);
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result).toEqual({
+        type: 'integer',
+        examples: [42]
+    });
+});
+
+test('59. object schema with .example() emits examples array', () => {
+    const schema = object({
+        name: string(),
+        age: number()
+    }).example({ name: 'Alice', age: 30 });
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result.type).toBe('object');
+    expect(result.examples).toEqual([{ name: 'Alice', age: 30 }]);
 });

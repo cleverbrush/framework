@@ -18,6 +18,7 @@ import type { DateSchemaBuilder } from '../builders/DateSchemaBuilder.js';
 import type { FunctionSchemaBuilder } from '../builders/FunctionSchemaBuilder.js';
 import type { NumberSchemaBuilder } from '../builders/NumberSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from '../builders/ObjectSchemaBuilder.js';
+import type { PromiseSchemaBuilder } from '../builders/PromiseSchemaBuilder.js';
 import type { RecordSchemaBuilder } from '../builders/RecordSchemaBuilder.js';
 import type {
     SchemaBuilder,
@@ -117,7 +118,7 @@ export type ExtendedDate = DateSchemaBuilder<Date, true, false, false, {}> &
 /** An `ObjectSchemaBuilder` with built-in extension methods. */
 export type ExtendedObject<
     TProps extends Record<string, SchemaBuilder<any, any, any, any, any>> = {}
-> = ObjectSchemaBuilder<TProps, true, false, undefined, false, {}> &
+> = ObjectSchemaBuilder<TProps, true, false, undefined, false, {}, []> &
     HiddenExtensionMethods;
 
 /** A `UnionSchemaBuilder` with built-in extension methods. */
@@ -133,6 +134,21 @@ export type ExtendedFunc = FunctionSchemaBuilder<
     undefined,
     false,
     {}
+> &
+    HiddenExtensionMethods;
+
+/** A `PromiseSchemaBuilder` with built-in extension methods. */
+export type ExtendedPromise<
+    TResolvedTypeSchema extends
+        | SchemaBuilder<any, any, any, any, any>
+        | undefined = undefined
+> = PromiseSchemaBuilder<
+    true,
+    false,
+    undefined,
+    false,
+    {},
+    TResolvedTypeSchema
 > &
     HiddenExtensionMethods;
 
@@ -223,6 +239,10 @@ export const record: <
     keySchema: TKeySchema,
     valueSchema: TValueSchema
 ) => ExtendedRecord<TKeySchema, TValueSchema> = s.record as any;
+
+export const promise: <TWrapped extends SchemaBuilder<any, any, any, any, any>>(
+    wrapped: TWrapped
+) => ExtendedPromise<TWrapped> = s.promise as any;
 
 /**
  * Creates a string schema constrained to the given literal values.

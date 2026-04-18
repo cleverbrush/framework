@@ -43,10 +43,13 @@
     "files": {
         "includes": [
             "libs/**",
-            "website/app/**",
-            "website/lib/**",
-            "website/*.ts",
-            "!website/app/playground/schemaDeclarations.ts"
+            "websites/shared/**",
+            "websites/schema/app/**",
+            "websites/schema/lib/**",
+            "websites/schema/*.ts",
+            "websites/docs/app/**",
+            "websites/docs/*.ts",
+            "!websites/schema/app/playground/schemaDeclarations.ts"
         ]
     },
     "overrides": [
@@ -62,11 +65,13 @@
         },
         {
             "includes": [
-                "website/app/page.tsx",
-                "website/app/mapper/page.tsx",
-                "website/app/layout.tsx",
-                "website/app/playground/PlaygroundClient.tsx",
-                "website/app/playground/panels/TypePanel.tsx"
+                "websites/schema/app/page.tsx",
+                "websites/schema/app/mapper/page.tsx",
+                "websites/schema/app/layout.tsx",
+                "websites/schema/app/playground/PlaygroundClient.tsx",
+                "websites/schema/app/playground/panels/TypePanel.tsx",
+                "websites/docs/app/page.tsx",
+                "websites/docs/app/layout.tsx"
             ],
             "linter": {
                 "rules": {

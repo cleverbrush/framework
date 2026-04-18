@@ -7,7 +7,18 @@ function escapeRegex(s: string): string {
     return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
+function escapeJsonPointerSegment(s: string): string {
+    return s.replace(/~/g, '~0').replace(/\//g, '~1');
+}
+
+type Resolver =
+    | ((schema: SchemaBuilder<any, any, any>) => string | null)
+    | undefined;
+
+function convertNodeInner(
+    schema: SchemaBuilder<any, any, any>,
+    resolver: Resolver
+): Out {
     const info = schema.introspect() as any;
     const ext: Record<string, unknown> = info.extensions ?? {};
     const readOnly: Out = info.isReadonly === true ? { readOnly: true } : {};
@@ -49,6 +60,8 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
             } else if (info.endsWith !== undefined) {
                 out['pattern'] = `${escapeRegex(info.endsWith)}$`;
             }
+            if (Array.isArray(ext['oneOf']) && ext['oneOf'].length > 0)
+                out['enum'] = [...(ext['oneOf'] as unknown[])];
             return out;
         }
 
@@ -65,6 +78,8 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 out['multipleOf'] = ext['multipleOf'];
             if (ext['positive'] === true) out['exclusiveMinimum'] = 0;
             if (ext['negative'] === true) out['exclusiveMaximum'] = 0;
+            if (Array.isArray(ext['oneOf']) && ext['oneOf'].length > 0)
+                out['enum'] = [...(ext['oneOf'] as unknown[])];
             return out;
         }
 
@@ -80,7 +95,7 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
         case 'array': {
             const out: Out = { ...readOnly, type: 'array' };
             if (info.elementSchema)
-                out['items'] = convertNode(info.elementSchema);
+                out['items'] = convertNode(info.elementSchema, resolver);
             if (info.minLength !== undefined) out['minItems'] = info.minLength;
             if (info.maxLength !== undefined) out['maxItems'] = info.maxLength;
             if (ext['nonempty'] === true && out['minItems'] === undefined)
@@ -93,11 +108,11 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 info.elements ?? [];
             const out: Out = {
                 type: 'array',
-                prefixItems: elements.map(convertNode),
+                prefixItems: elements.map(e => convertNode(e, resolver)),
                 minItems: elements.length
             };
             if (info.restSchema) {
-                out['items'] = convertNode(info.restSchema);
+                out['items'] = convertNode(info.restSchema, resolver);
             } else {
                 out['items'] = false;
                 out['maxItems'] = elements.length;
@@ -114,7 +129,7 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 const outProps: Record<string, unknown> = {};
                 const required: string[] = [];
                 for (const [key, propSchema] of Object.entries(props)) {
-                    outProps[key] = convertNode(propSchema);
+                    outProps[key] = convertNode(propSchema, resolver);
                     if ((propSchema.introspect() as any).isRequired !== false)
                         required.push(key);
                 }
@@ -148,7 +163,62 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
                 }
             }
             if (allConst) return { ...readOnly, enum: enumValues };
-            return { ...readOnly, anyOf: options.map(convertNode) };
+
+            const converted = options.map(o => convertNode(o, resolver));
+            const out: Out = {
+                ...readOnly,
+                anyOf: converted
+            };
+
+            // Emit discriminator keyword for discriminated unions
+            const discriminatorProp: string | undefined =
+                info.discriminatorPropertyName;
+            if (discriminatorProp) {
+                const disc: Out = { propertyName: discriminatorProp };
+                // Only emit mapping when every option resolved to a $ref
+                // and every discriminator value can be populated.
+                const mapping: Record<string, string> = {};
+                let allRefsMapped = options.length > 0;
+                for (let i = 0; i < options.length; i++) {
+                    const ref = converted[i]['$ref'];
+                    if (typeof ref !== 'string') {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    const oi = options[i].introspect() as any;
+                    const props:
+                        | Record<string, SchemaBuilder<any, any, any>>
+                        | undefined = oi.properties;
+                    const discriminatorSchema = props?.[discriminatorProp];
+                    if (!discriminatorSchema) {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    const propInfo = discriminatorSchema.introspect() as any;
+                    if (propInfo.equalsTo === undefined) {
+                        allRefsMapped = false;
+                        break;
+                    }
+
+                    mapping[String(propInfo.equalsTo)] = ref;
+                }
+                if (allRefsMapped) disc['mapping'] = mapping;
+                out['discriminator'] = disc;
+            }
+
+            return out;
+        }
+
+        case 'lazy': {
+            // Resolve the lazy schema once and delegate conversion.
+            // If the resolved schema has a name registered in the nameResolver,
+            // convertNode will short-circuit to a $ref — breaking recursive cycles.
+            // Recursive schemas without a registered name will cause infinite
+            // recursion here; callers must use .schemaName() to break the cycle.
+            const resolved: SchemaBuilder<any, any, any> = info.getter();
+            return convertNode(resolved, resolver);
         }
 
         default:
@@ -156,11 +226,59 @@ function convertNodeInner(schema: SchemaBuilder<any, any, any>): Out {
     }
 }
 
-function convertNode(schema: SchemaBuilder<any, any, any>): Out {
-    const out = convertNodeInner(schema);
+function convertNode(
+    schema: SchemaBuilder<any, any, any>,
+    resolver: Resolver
+): Out {
+    if (resolver) {
+        const name = resolver(schema);
+        if (typeof name === 'string' && name.length > 0) {
+            return {
+                $ref: `#/components/schemas/${escapeJsonPointerSegment(name)}`
+            };
+        }
+    }
+    const out = convertNodeInner(schema, resolver);
     const info = schema.introspect() as any;
     if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
+
+    // Emit example value if set
+    if (info.example !== undefined) {
+        out['examples'] = [info.example];
+    }
+
+    // Emit default for serializable primitives (not factory functions)
+    if (
+        info.hasDefault === true &&
+        info.defaultValue !== undefined &&
+        typeof info.defaultValue !== 'function'
+    ) {
+        out['default'] = info.defaultValue;
+    }
+
+    // Handle nullable — JSON Schema 2020-12 style: type becomes an array
+    if (info.isNullable === true) {
+        if (out['anyOf'] !== undefined) {
+            // Union type — add { type: 'null' } to anyOf if not already present
+            const anyOf = out['anyOf'] as Out[];
+            const hasNull = anyOf.some(o => o['type'] === 'null');
+            if (!hasNull) anyOf.push({ type: 'null' });
+        } else if (out['enum'] !== undefined) {
+            // Enum — add null to enum values if not already present
+            const enumValues = out['enum'] as unknown[];
+            if (!enumValues.includes(null)) out['enum'] = [...enumValues, null];
+        } else if (typeof out['type'] === 'string') {
+            // Simple type — make it an array: ["string", "null"]
+            out['type'] = [out['type'], 'null'];
+        } else if (out['const'] !== undefined) {
+            // Const value — convert to oneOf with null
+            const constVal = out['const'];
+            delete out['const'];
+            out['anyOf'] = [{ const: constVal }, { type: 'null' }];
+        }
+    }
+
     return out;
 }
 
@@ -225,10 +343,10 @@ function convertNode(schema: SchemaBuilder<any, any, any>): Out {
  * ```
  */
 export function toJsonSchema(
-    schema: SchemaBuilder<any, any, any>,
+    schema: SchemaBuilder<any, any, any, any, any>,
     opts?: ToJsonSchemaOptions
 ): Record<string, unknown> {
-    const body = convertNode(schema);
+    const body = convertNode(schema, opts?.nameResolver);
     if (opts?.$schema === false) return body;
     const draft = opts?.draft ?? '2020-12';
     const uri =

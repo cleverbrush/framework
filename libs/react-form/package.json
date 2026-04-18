@@ -18,7 +18,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/modules/_cleverbrush_react_form.html",
+    "homepage": "https://docs.cleverbrush.com/react-form",
     "keywords": [
         "react forms",
         "schema validation",
@@ -42,7 +42,7 @@
     },
     "scripts": {
         "watch": "tsc --build --watch",
-        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.tsbuildinfo"
     },
     "type": "module",

@@ -3,16 +3,29 @@
     "entryPointStrategy": "packages",
     "entryPoints": [
         "libs/async",
+        "libs/auth",
+        "libs/client",
         "libs/deep",
+        "libs/di",
+        "libs/env",
+        "libs/knex-clickhouse",
+        "libs/knex-schema",
         "libs/mapper",
         "libs/react-form",
         "libs/scheduler",
         "libs/schema",
-        "libs/schema-json"
+        "libs/schema-json",
+        "libs/server",
+        "libs/server-openapi"
     ],
-    "out": "website/public/api-docs/latest",
+    "out": "websites/docs/public/api-docs/latest",
     "name": "Libraries",
     "excludePrivate": true,
+    "exclude": [
+        "**/node_modules/**",
+        "websites/**",
+        "demos/**"
+    ],
     "navigationLinks": {
         "← Back to Website": "/",
         "All Versions": "/api-docs/"

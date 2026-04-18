@@ -4,7 +4,7 @@
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](./LICENSE)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-97.9%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-88.1%25-green)
 <!-- coverage-badge-end -->
 
 A monorepo of production-quality TypeScript libraries. Written with zero runtime dependencies, strict types, and a strong focus on correctness — every package ships with unit tests, full TypeScript type coverage, and automated CI on every pull request.
@@ -24,6 +24,7 @@ The flagship package is **`@cleverbrush/schema`** — a schema validation librar
 | [`@cleverbrush/async`](./libs/async) | Async utilities: `Collector`, `debounce`, `throttle`, `retry` |
 | [`@cleverbrush/deep`](./libs/deep) | Deep operations on objects: deep equality, deep merge, flattening, hashing |
 | [`@cleverbrush/scheduler`](./libs/scheduler) | Cron-like job scheduler for Node.js using worker threads |
+| [`@cleverbrush/client`](./libs/client) | Typed HTTP client for `@cleverbrush/server` API contracts — Proxy-based, zero codegen, full type inference. Optional React + TanStack Query integration via `/react` subpath |
 | [`@cleverbrush/knex-clickhouse`](./libs/knex-clickhouse) | Knex query builder dialect for ClickHouse |
 
 ---

@@ -1,0 +1,417 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>Libraries</title><meta name="description" content="Documentation for Libraries"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script><script async src="assets/hierarchy.js" id="tsd-hierarchy-script"></script><!-- Google Tag Manager --><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({"gtm.start":new Date().getTime(),event:"gtm.js"});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!="dataLayer"?"&l="+l:"";j.async=true;j.src="https://www.googletagmanager.com/gtm.js?id="+i+dl;f.parentNode.insertBefore(j,f);})(window,document,"script","dataLayer","GTM-WRLXDMG");</script><!-- End Google Tag Manager --></head><body><!-- Google Tag Manager (noscript) --><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WRLXDMG" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript><!-- End Google Tag Manager (noscript) --><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="index.html" class="title">Libraries</a><div id="tsd-toolbar-links"><a href="/">← Back to Website</a><a href="/api-docs/">All Versions</a></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><h1>Libraries</h1></div><div class="tsd-panel tsd-typography"><h1 id="cleverbrush-framework" class="tsd-anchor-link">Cleverbrush Framework<a href="#cleverbrush-framework" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<p><a href="https://github.com/cleverbrush/framework/actions/workflows/ci.yml"><img src="https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+<a href="./LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg" alt="License: BSD-3-Clause"></a>
+<a href="https://standardschema.dev/"><img src="https://img.shields.io/badge/Standard%20Schema-v1-blue" alt="Standard Schema v1"></a></p>
+<!-- coverage-badge-start -->
+<p><img src="https://img.shields.io/badge/coverage-88.2%25-green" alt="Coverage"></p>
+<!-- coverage-badge-end -->
+<p>A monorepo of production-quality TypeScript libraries. Written with zero runtime dependencies, strict types, and a strong focus on correctness — every package ships with unit tests, full TypeScript type coverage, and automated CI on every pull request.</p>
+<p>The flagship package is <strong><code>@cleverbrush/schema</code></strong> — a schema validation library that is faster than Zod in 14 out of 15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4 in bundle size, and compatible with 50+ ecosystem tools via <a href="https://standardschema.dev/">Standard Schema v1</a>.</p>
+<hr>
+<h2 id="packages" class="tsd-anchor-link">Packages<a href="#packages" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="modules/_cleverbrush_schema.html"><code>@cleverbrush/schema</code></a></td>
+<td>Schema definition, type inference, and runtime validation. <a href="https://standardschema.dev/">Standard Schema v1</a> compatible — works with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, and 50+ other tools. Wraps external schemas (Zod, Valibot, ArkType) via <code>extern()</code></td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_mapper.html"><code>@cleverbrush/mapper</code></a></td>
+<td>Schema-driven object mapping with compile-time completeness checking and type-safe property selectors</td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_react-form.html"><code>@cleverbrush/react-form</code></a></td>
+<td>Headless, schema-driven form system for React — type-safe field binding, auto-field rendering, UI-agnostic</td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_schema-json.html"><code>@cleverbrush/schema-json</code></a></td>
+<td>Bidirectional JSON Schema conversion: <code>toJsonSchema()</code> + <code>fromJsonSchema()</code> with full type inference</td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_async.html"><code>@cleverbrush/async</code></a></td>
+<td>Async utilities: <code>Collector</code>, <code>debounce</code>, <code>throttle</code>, <code>retry</code></td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_deep.html"><code>@cleverbrush/deep</code></a></td>
+<td>Deep operations on objects: deep equality, deep merge, flattening, hashing</td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_scheduler.html"><code>@cleverbrush/scheduler</code></a></td>
+<td>Cron-like job scheduler for Node.js using worker threads</td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_client.html"><code>@cleverbrush/client</code></a></td>
+<td>Typed HTTP client for <code>@cleverbrush/server</code> API contracts — Proxy-based, zero codegen, full type inference. Optional React + TanStack Query integration via <code>/react</code> subpath</td>
+</tr>
+<tr>
+<td><a href="modules/_cleverbrush_knex-clickhouse.html"><code>@cleverbrush/knex-clickhouse</code></a></td>
+<td>Knex query builder dialect for ClickHouse</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="why-cleverbrushschema" class="tsd-anchor-link">Why @cleverbrush/schema?<a href="#why-cleverbrushschema" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>If you have used Zod, Yup, or Joi, the fluent API will feel immediately familiar — with several important differences.</p>
+<h3 id="one-schema-four-capabilities" class="tsd-anchor-link">One schema, four capabilities<a href="#one-schema-four-capabilities" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code><span class="hl-0">@</span><span class="hl-1">cleverbrush</span><span class="hl-0">/</span><span class="hl-1">schema</span><br/><span class="hl-0">        │</span><br/><span class="hl-0">        ├── </span><span class="hl-1">TypeScript</span><span class="hl-0"> </span><span class="hl-2">inference</span><span class="hl-0">     (</span><span class="hl-1">InferType</span><span class="hl-0">&lt;</span><span class="hl-3">typeof</span><span class="hl-0"> </span><span class="hl-1">schema</span><span class="hl-0">&gt;)</span><br/><span class="hl-0">        ├── </span><span class="hl-1">Runtime</span><span class="hl-0"> </span><span class="hl-2">validation</span><span class="hl-0">       (.</span><span class="hl-2">validate</span><span class="hl-0">() / .</span><span class="hl-2">validateAsync</span><span class="hl-0">())</span><br/><span class="hl-0">        ├── @</span><span class="hl-1">cleverbrush</span><span class="hl-0">/</span><span class="hl-2">mapper</span><span class="hl-0">      (</span><span class="hl-1">type</span><span class="hl-0">-</span><span class="hl-1">safe</span><span class="hl-0"> </span><span class="hl-1">object</span><span class="hl-0"> </span><span class="hl-1">mapping</span><span class="hl-0">)</span><br/><span class="hl-0">        ├── @</span><span class="hl-1">cleverbrush</span><span class="hl-0">/</span><span class="hl-1">react</span><span class="hl-0">-</span><span class="hl-2">form</span><span class="hl-0">  (</span><span class="hl-1">auto</span><span class="hl-0">-</span><span class="hl-1">generated</span><span class="hl-0">, </span><span class="hl-1">schema</span><span class="hl-0">-</span><span class="hl-1">driven</span><span class="hl-0"> </span><span class="hl-1">forms</span><span class="hl-0">)</span><br/><span class="hl-0">        └── @</span><span class="hl-1">cleverbrush</span><span class="hl-0">/</span><span class="hl-1">schema</span><span class="hl-0">-</span><span class="hl-2">json</span><span class="hl-0"> (</span><span class="hl-1">bidirectional</span><span class="hl-0"> </span><span class="hl-4">JSON</span><span class="hl-0"> </span><span class="hl-1">Schema</span><span class="hl-0">)</span>
+</code><button>Copy</button></pre>
+
+<p>Define a schema once and get all four capabilities for free — no duplication between types, validators, mappers, and form configs.</p>
+<h3 id="quick-example" class="tsd-anchor-link">Quick example<a href="#quick-example" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="ts"><span class="hl-5">import</span><span class="hl-0"> { </span><span class="hl-1">object</span><span class="hl-0">, </span><span class="hl-1">string</span><span class="hl-0">, </span><span class="hl-1">number</span><span class="hl-0">, </span><span class="hl-1">InferType</span><span class="hl-0"> } </span><span class="hl-5">from</span><span class="hl-0"> </span><span class="hl-6">&#39;@cleverbrush/schema&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">UserSchema</span><span class="hl-0"> = </span><span class="hl-2">object</span><span class="hl-0">({</span><br/><span class="hl-0">  </span><span class="hl-1">name:</span><span class="hl-0">  </span><span class="hl-2">string</span><span class="hl-0">().</span><span class="hl-2">nonempty</span><span class="hl-0">().</span><span class="hl-2">minLength</span><span class="hl-0">(</span><span class="hl-7">2</span><span class="hl-0">),</span><br/><span class="hl-0">  </span><span class="hl-1">email:</span><span class="hl-0"> </span><span class="hl-2">string</span><span class="hl-0">().</span><span class="hl-2">email</span><span class="hl-0">(),</span><br/><span class="hl-0">  </span><span class="hl-1">age:</span><span class="hl-0">   </span><span class="hl-2">number</span><span class="hl-0">().</span><span class="hl-2">min</span><span class="hl-0">(</span><span class="hl-7">18</span><span class="hl-0">).</span><span class="hl-2">optional</span><span class="hl-0">(),</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-8">// TypeScript type — inferred automatically, no duplication</span><br/><span class="hl-3">type</span><span class="hl-0"> </span><span class="hl-9">User</span><span class="hl-0"> = </span><span class="hl-9">InferType</span><span class="hl-0">&lt;</span><span class="hl-3">typeof</span><span class="hl-0"> </span><span class="hl-1">UserSchema</span><span class="hl-0">&gt;;</span><br/><br/><span class="hl-8">// Runtime validation</span><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">result</span><span class="hl-0"> = </span><span class="hl-1">UserSchema</span><span class="hl-0">.</span><span class="hl-2">validate</span><span class="hl-0">({ </span><span class="hl-1">name:</span><span class="hl-0"> </span><span class="hl-6">&#39;Alice&#39;</span><span class="hl-0">, </span><span class="hl-1">email:</span><span class="hl-0"> </span><span class="hl-6">&#39;alice@example.com&#39;</span><span class="hl-0"> });</span><br/><span class="hl-5">if</span><span class="hl-0"> (</span><span class="hl-1">result</span><span class="hl-0">.</span><span class="hl-1">valid</span><span class="hl-0">) {</span><br/><span class="hl-0">  </span><span class="hl-1">console</span><span class="hl-0">.</span><span class="hl-2">log</span><span class="hl-0">(</span><span class="hl-1">result</span><span class="hl-0">.</span><span class="hl-1">object</span><span class="hl-0">); </span><span class="hl-8">// typed as User</span><br/><span class="hl-0">} </span><span class="hl-5">else</span><span class="hl-0"> {</span><br/><span class="hl-0">  </span><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">nameErrors</span><span class="hl-0"> = </span><span class="hl-1">result</span><span class="hl-0">.</span><span class="hl-2">getErrorsFor</span><span class="hl-0">((</span><span class="hl-1">p</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-1">p</span><span class="hl-0">.</span><span class="hl-1">name</span><span class="hl-0">);</span><br/><span class="hl-0">  </span><span class="hl-1">console</span><span class="hl-0">.</span><span class="hl-2">log</span><span class="hl-0">(</span><span class="hl-1">nameErrors</span><span class="hl-0">.</span><span class="hl-1">errors</span><span class="hl-0">); </span><span class="hl-8">// [&#39;Name must be at least 2 characters&#39;]</span><br/><span class="hl-0">}</span><br/><br/><span class="hl-8">// Standard Schema interop — pass directly to tRPC, TanStack Form, T3 Env, …</span><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">validator</span><span class="hl-0"> = </span><span class="hl-1">UserSchema</span><span class="hl-0">[</span><span class="hl-6">&#39;~standard&#39;</span><span class="hl-0">];</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="performance-vs-zod" class="tsd-anchor-link">Performance vs Zod<a href="#performance-vs-zod" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Benchmarked with <a href="https://vitest.dev/guide/features.html#benchmarking">Vitest bench</a> against Zod v4 on the same machine:</p>
+<table>
+<thead>
+<tr>
+<th>Benchmark</th>
+<th>@cleverbrush/schema</th>
+<th>Zod</th>
+<th>Ratio</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Array 100 objects — valid</td>
+<td>35,228 ops/s</td>
+<td>13,277 ops/s</td>
+<td><strong>2.65× faster</strong></td>
+</tr>
+<tr>
+<td>Array 100 objects — invalid</td>
+<td>899,329 ops/s</td>
+<td>4,396 ops/s</td>
+<td><strong>204× faster</strong></td>
+</tr>
+<tr>
+<td>Complex order — valid</td>
+<td>198,988 ops/s</td>
+<td>136,090 ops/s</td>
+<td><strong>1.46× faster</strong></td>
+</tr>
+<tr>
+<td>Complex order — invalid</td>
+<td>884,706 ops/s</td>
+<td>26,106 ops/s</td>
+<td><strong>33.9× faster</strong></td>
+</tr>
+<tr>
+<td>Flat object — valid</td>
+<td>1,001,194 ops/s</td>
+<td>840,725 ops/s</td>
+<td><strong>1.19× faster</strong></td>
+</tr>
+<tr>
+<td>Flat object — invalid</td>
+<td>2,653,630 ops/s</td>
+<td>176,222 ops/s</td>
+<td><strong>15.1× faster</strong></td>
+</tr>
+<tr>
+<td>Nested object — valid</td>
+<td>690,556 ops/s</td>
+<td>368,893 ops/s</td>
+<td><strong>1.87× faster</strong></td>
+</tr>
+<tr>
+<td>Nested object — invalid</td>
+<td>2,739,319 ops/s</td>
+<td>87,245 ops/s</td>
+<td><strong>31.4× faster</strong></td>
+</tr>
+<tr>
+<td>String — valid</td>
+<td>5,348,564 ops/s</td>
+<td>3,533,945 ops/s</td>
+<td><strong>1.51× faster</strong></td>
+</tr>
+<tr>
+<td>String — invalid</td>
+<td>5,749,087 ops/s</td>
+<td>482,961 ops/s</td>
+<td><strong>11.9× faster</strong></td>
+</tr>
+<tr>
+<td>Number — valid</td>
+<td>7,911,266 ops/s</td>
+<td>4,806,511 ops/s</td>
+<td><strong>1.65× faster</strong></td>
+</tr>
+<tr>
+<td>Number — invalid</td>
+<td>5,387,475 ops/s</td>
+<td>637,513 ops/s</td>
+<td><strong>8.45× faster</strong></td>
+</tr>
+<tr>
+<td>Union first branch</td>
+<td>1,925,508 ops/s</td>
+<td>1,529,547 ops/s</td>
+<td><strong>1.26× faster</strong></td>
+</tr>
+<tr>
+<td>Union last branch</td>
+<td>676,107 ops/s</td>
+<td>732,682 ops/s</td>
+<td>0.92×</td>
+</tr>
+<tr>
+<td>Union no match — invalid</td>
+<td>5,873,118 ops/s</td>
+<td>385,453 ops/s</td>
+<td><strong>15.2× faster</strong></td>
+</tr>
+</tbody>
+</table>
+<p><strong>14 out of 15 benchmarks.</strong> The early-exit optimization on invalid data produces especially large gains — up to 204× — because type errors are caught at the first failing field without evaluating the rest.</p>
+<p>Run the benchmarks yourself:</p>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">bench</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="bundle-size-vs-competitors" class="tsd-anchor-link">Bundle size vs competitors<a href="#bundle-size-vs-competitors" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th>Bundle</th>
+<th>Gzipped</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>@cleverbrush/schema</code> (full)</td>
+<td><strong>14 KB</strong></td>
+<td>All builders + built-in extensions</td>
+</tr>
+<tr>
+<td><code>@cleverbrush/schema/string</code></td>
+<td><strong>3.8 KB</strong></td>
+<td>Sub-path import, one builder only</td>
+</tr>
+<tr>
+<td><code>@cleverbrush/schema/object</code></td>
+<td><strong>5.8 KB</strong></td>
+<td>Sub-path import, one builder only</td>
+</tr>
+<tr>
+<td>Zod v3 (full)</td>
+<td>14.4 KB</td>
+<td>For reference</td>
+</tr>
+<tr>
+<td>Zod v4 (full)</td>
+<td><strong>41 KB</strong></td>
+<td><strong>3× larger than @cleverbrush/schema</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Sub-path exports (<code>@cleverbrush/schema/string</code>, <code>/number</code>, <code>/object</code>, <code>/array</code>, <code>/core</code>) enable fine-grained tree-shaking for bundle-critical applications.</p>
+<h3 id="competitive-feature-comparison" class="tsd-anchor-link">Competitive feature comparison<a href="#competitive-feature-comparison" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>@cleverbrush/schema</th>
+<th>Zod</th>
+<th>Yup</th>
+<th>Joi</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>TypeScript type inference</td>
+<td>✓</td>
+<td>✓</td>
+<td>~</td>
+<td>✗</td>
+</tr>
+<tr>
+<td><a href="https://standardschema.dev/">Standard Schema v1</a></td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td><strong>PropertyDescriptors</strong> (runtime introspection)</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td><strong>Type-safe extension system</strong></td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td><strong>Built-in object mapper</strong></td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td><strong>Built-in form generation</strong></td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td>Bidirectional JSON Schema</td>
+<td>✓</td>
+<td>~ (output only)</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td><strong>External schema interop</strong> (<code>extern()</code>)</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td>JSDoc comment preservation</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td>Immutable fluent API</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td>Zero runtime dependencies</td>
+<td>✓</td>
+<td>✓</td>
+<td>✗</td>
+<td>✗</td>
+</tr>
+<tr>
+<td>Bundle size (full, gzipped)</td>
+<td><strong>14 KB</strong></td>
+<td>41 KB (v4)</td>
+<td>~19 KB</td>
+<td>~26 KB</td>
+</tr>
+</tbody>
+</table>
+<p><strong>PropertyDescriptors</strong> are the architectural differentiator. Every schema emits a structured descriptor tree at runtime — not just a black-box validator function. This is what enables the mapper to provide type-safe property selectors, react-form to auto-generate fields, and schema-json to produce accurate JSON Schema output. No other popular validation library exposes this level of runtime metadata.</p>
+<hr>
+<h2 id="code-quality" class="tsd-anchor-link">Code Quality<a href="#code-quality" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Every pull request must pass all of the following gates before merging — enforced by the CI pipeline:</p>
+<table>
+<thead>
+<tr>
+<th>Gate</th>
+<th>Tool</th>
+<th>What it checks</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Linting</strong></td>
+<td><a href="https://biomejs.dev/">Biome</a></td>
+<td>Code style, formatting, and static analysis across all packages and the website</td>
+</tr>
+<tr>
+<td><strong>Type checking</strong></td>
+<td>TypeScript (strict mode)</td>
+<td>Strict null-checks, no implicit <code>any</code>, full type coverage</td>
+</tr>
+<tr>
+<td><strong>Unit tests</strong></td>
+<td><a href="https://vitest.dev/">Vitest</a></td>
+<td>Runtime behaviour + type-level tests (<code>expectTypeOf</code>) — coverage spans all builders, extensions, edge cases, and error paths</td>
+</tr>
+<tr>
+<td><strong>Build</strong></td>
+<td><a href="https://tsup.egoist.dev/">tsup</a> + <a href="https://turbo.build/">Turbo</a></td>
+<td>ESM output compiles cleanly with no TypeScript errors</td>
+</tr>
+<tr>
+<td><strong>Benchmarks</strong></td>
+<td>Vitest bench</td>
+<td>Performance regressions are visible before merge</td>
+</tr>
+</tbody>
+</table>
+<p>Run everything locally before opening a PR:</p>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">lint</span><span class="hl-0">        </span><span class="hl-8"># Biome static analysis</span><br/><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">build</span><span class="hl-0">       </span><span class="hl-8"># compile all packages</span><br/><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">test</span><span class="hl-0">            </span><span class="hl-8"># unit tests + type checks</span><br/><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">bench</span><span class="hl-0">       </span><span class="hl-8"># performance benchmarks</span>
+</code><button type="button">Copy</button></pre>
+
+<hr>
+<h2 id="development" class="tsd-anchor-link">Development<a href="#development" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>This project uses <a href="https://docs.npmjs.com/cli/using-npm/workspaces">npm workspaces</a> and <a href="https://turbo.build/">Turborepo</a> for incremental builds. All library source is under <code>libs/</code>.</p>
+<h3 id="setup" class="tsd-anchor-link">Setup<a href="#setup" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">install</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="build" class="tsd-anchor-link">Build<a href="#build" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">build</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="test" class="tsd-anchor-link">Test<a href="#test" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">test</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="documentation" class="tsd-anchor-link">Documentation<a href="#documentation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>API docs are generated by <a href="https://typedoc.org/">TypeDoc</a> and published at <a href="https://docs.cleverbrush.com/">https://docs.cleverbrush.com/</a>.</p>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">docs</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Each library has its own <code>README.md</code> with usage examples and full API reference.</p>
+<hr>
+<h2 id="release" class="tsd-anchor-link">Release<a href="#release" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>This project uses <a href="https://github.com/changesets/changesets">Changesets</a> for versioning and publishing. All packages are versioned together.</p>
+<ol>
+<li>
+<p><strong>Add a changeset</strong> after making changes:</p>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">changeset</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Follow the prompts to describe the change. A changeset file is created in <code>.changeset/</code>.</p>
+</li>
+<li>
+<p><strong>Version packages</strong> when ready to release:</p>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">version</span>
+</code><button type="button">Copy</button></pre>
+
+<p>This bumps <code>package.json</code> versions and updates <code>CHANGELOG.md</code> files.</p>
+</li>
+<li>
+<p><strong>Publish</strong> to npm:</p>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">release</span>
+</code><button type="button">Copy</button></pre>
+
+<p>For a beta release:</p>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">run</span><span class="hl-0"> </span><span class="hl-6">publish:beta</span>
+</code><button type="button">Copy</button></pre>
+
+</li>
+</ol>
+<hr>
+<h2 id="contributing" class="tsd-anchor-link">Contributing<a href="#contributing" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Contributions are welcome. See <a href="media/CONTRIBUTING.md">CONTRIBUTING.md</a> for full guidelines.</p>
+<p>The short version: make sure your changes include tests, pass linting (<code>npm run lint</code>), and don't break existing tests (<code>npm test</code>). If you add or change behaviour, update the relevant JSDoc comments — that's all the documentation update that's usually needed.</p>
+<p>Extensions are the easiest place to start contributing — each one is a self-contained file with tests. Look for issues labelled <strong>good first issue</strong>.</p>
+<hr>
+<h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><a href="media/LICENSE">BSD-3-Clause</a></p>
+</div></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#cleverbrush-framework"><span>Cleverbrush <wbr/>Framework</span></a><ul><li><a href="#packages"><span>Packages</span></a></li><li><a href="#why-cleverbrushschema"><span>Why @cleverbrush/schema?</span></a></li><li><ul><li><a href="#one-schema-four-capabilities"><span>One schema, four capabilities</span></a></li><li><a href="#quick-example"><span>Quick example</span></a></li><li><a href="#performance-vs-zod"><span>Performance vs <wbr/>Zod</span></a></li><li><a href="#bundle-size-vs-competitors"><span>Bundle size vs competitors</span></a></li><li><a href="#competitive-feature-comparison"><span>Competitive feature comparison</span></a></li></ul></li><li><a href="#code-quality"><span>Code <wbr/>Quality</span></a></li><li><a href="#development"><span>Development</span></a></li><li><ul><li><a href="#setup"><span>Setup</span></a></li><li><a href="#build"><span>Build</span></a></li><li><a href="#test"><span>Test</span></a></li><li><a href="#documentation"><span>Documentation</span></a></li></ul></li><li><a href="#release"><span>Release</span></a></li><li><a href="#contributing"><span>Contributing</span></a></li><li><a href="#license"><span>License</span></a></li></ul></div></details></div><div class="site-menu"><nav id="tsd-sidebar-links" class="tsd-navigation"><a href="/" class="tsd-nav-link">← Back to Website</a><a href="/api-docs/" class="tsd-nav-link">All Versions</a></nav><nav class="tsd-navigation"><a href="modules.html">Libraries</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>

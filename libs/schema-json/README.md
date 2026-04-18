@@ -1,6 +1,6 @@
 # @cleverbrush/schema-json
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-95.5%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-92.8%25-brightgreen)
 <!-- coverage-badge-end -->
 
 Bidirectional JSON Schema (Draft 7 / 2020-12) interop for
@@ -115,6 +115,7 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `const` | literal builder (`.equals(...)`) |
 | `enum` | `union(…)` of const builders |
 | `anyOf` | `union(…)` of sub-builders |
+| `anyOf` + `discriminator` | auto-emitted for discriminated `union()` branches (see below) |
 | `allOf` | not supported — falls back to `any()` |
 | `minLength` / `maxLength` | `.minLength()` / `.maxLength()` |
 | `pattern` | `.matches(regex)` (invalid patterns silently ignored) |
@@ -153,12 +154,41 @@ function toJsonSchema(
 
 Descriptions set via `.describe(text)` are emitted as the `description` field on the corresponding JSON Schema node (including nested object properties).
 
+Examples set via `.example(value)` are emitted as the `examples` array on the corresponding JSON Schema node.
+
+#### Discriminated unions
+
+When a `union()` is a **discriminated union** — all branches are objects sharing a required property with unique literal values — `toJsonSchema()` automatically emits the `discriminator` keyword alongside `anyOf`:
+
+```ts
+const schema = union(
+    object({ type: string('cat'), name: string() })
+).or(
+    object({ type: string('dog'), breed: string() })
+);
+
+toJsonSchema(schema, { $schema: false });
+// {
+//   anyOf: [ { ... type: { const: 'cat' } ... }, { ... type: { const: 'dog' } ... } ],
+//   discriminator: { propertyName: 'type' }
+// }
+```
+
+When a `nameResolver` is provided and union branches resolve to `$ref` pointers, a `mapping` is also emitted:
+
+```ts
+// discriminator: { propertyName: 'type', mapping: { cat: '#/components/schemas/Cat', dog: '#/components/schemas/Dog' } }
+```
+
+This enables code-generation tools (openapi-generator, orval, etc.) to produce proper tagged union types.
+
 #### `ToJsonSchemaOptions`
 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `draft` | `'2020-12' \| '07'` | `'2020-12'` | JSON Schema draft version for the `$schema` URI |
 | `$schema` | `boolean` | `true` | Whether to include the `$schema` header in the output |
+| `nameResolver` | `(schema: SchemaBuilder) => string \| null` | `undefined` | Called for every node before conversion. Return a non-null string to emit `{ $ref: '#/components/schemas/<name>' }` instead of an inline schema. Used by `@cleverbrush/server-openapi` to wire named schemas from `.schemaName()` into `$ref` pointers. |
 
 ```ts
 // Embed in OpenAPI (suppress the $schema header)
@@ -167,6 +197,46 @@ toJsonSchema(schema, { $schema: false });
 // Use Draft 07
 toJsonSchema(schema, { draft: '07' });
 ```
+
+### Lazy / Recursive Schemas
+
+`toJsonSchema` resolves `lazy()` schemas transparently. When the resolved schema
+has a name returned by `nameResolver`, the output is a `$ref` pointer — which
+is the key mechanism for breaking recursive cycles:
+
+```ts
+import { object, number, array, lazy } from '@cleverbrush/schema';
+import { toJsonSchema } from '@cleverbrush/schema-json';
+
+type TreeNode = { value: number; children: TreeNode[] };
+
+const treeNode: ReturnType<typeof object> = object({
+    value: number(),
+    children: array(lazy(() => treeNode))
+}).schemaName('TreeNode');
+
+let rootSeen = false;
+toJsonSchema(treeNode, {
+    $schema: false,
+    nameResolver: s => {
+        // Inline the root once (for the definition itself), then emit $ref
+        if (s === treeNode && !rootSeen) { rootSeen = true; return null; }
+        return (s.introspect() as any).schemaName ?? null;
+    }
+});
+// {
+//   type: 'object',
+//   properties: {
+//     value: { type: 'integer' },
+//     children: { type: 'array', items: { $ref: '#/components/schemas/TreeNode' } }
+//   },
+//   ...
+// }
+```
+
+When using `@cleverbrush/server-openapi`, this is handled automatically — call
+`.schemaName()` on the root schema and `generateOpenApiSpec` will emit the
+correct `$ref` pointers and component definition with no extra configuration.
 
 ---
 
@@ -221,3 +291,4 @@ type B = JsonSchemaNodeToBuilder<typeof S>;
 | `allOf` in `fromJsonSchema` | Falls back to `SchemaBuilder<unknown>` (no deep merge) |
 | Dual IP format (`ip()` with both v4 + v6) | `format` is omitted in `toJsonSchema` output (no standard keyword covers both) |
 | JSDoc comments on properties | Not preserved in `toJsonSchema` output |
+| `nameResolver` + `$ref` / `$defs` round-trip | `nameResolver` emits `$ref` pointers based on external registry; `fromJsonSchema` does not resolve `$ref` references — they fall back to `any()` |

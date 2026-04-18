@@ -3,5 +3,6 @@ dist
 /coverage
 *.tsbuildinfo
 .turbo
-/website/public/api-docs/latest
-/website/public/playground/schema-bundle.js
+.next
+/websites/docs/public/api-docs/latest
+/websites/schema/public/playground/schema-bundle.js
