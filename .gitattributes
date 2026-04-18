@@ -1,1 +1,7 @@
 docs/** linguist-generated=true
+websites/docs/public/api-docs/** linguist-generated=true
+websites/schema/public/playground/** linguist-generated=true
+coverage/** linguist-generated=true
+bench-results.json linguist-generated=true
+bundle-sizes.json linguist-generated=true
+context7.json linguist-generated=true
