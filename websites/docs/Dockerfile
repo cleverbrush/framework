@@ -16,7 +16,6 @@ COPY libs/async/ libs/async/
 COPY libs/deep/ libs/deep/
 COPY libs/scheduler/ libs/scheduler/
 COPY libs/schema-json/ libs/schema-json/
-COPY libs/web/ libs/web/
 
 # Copy the shared package and the docs website
 COPY websites/shared/ websites/shared/
