@@ -145,6 +145,21 @@ describe('throttlingCache middleware', () => {
         expect(fetch).toHaveBeenCalledTimes(2);
     });
 
+    test('does not cache when condition always returns false', async () => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValue(new Response('ok', { status: 200 }));
+        const mw = throttlingCache({
+            throttle: 5000,
+            condition: () => false
+        })(fetch);
+
+        await mw('/api/items', { method: 'GET' });
+        await mw('/api/items', { method: 'GET' });
+
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+
     test('cached responses are independent clones', async () => {
         const fetch = vi
             .fn<FetchLike>()
