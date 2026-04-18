@@ -124,12 +124,15 @@ export function createClient<T extends ApiContract>(
 
     // Two-level proxy mirroring @cleverbrush/web's client.ts pattern
     return new Proxy(Object.create(null) as UnifiedClient<T>, {
-        get(_target, groupName: string) {
+        get(_target, groupName: PropertyKey) {
+            if (typeof groupName !== 'string') return undefined;
+
             const group = (contract as any)[groupName];
             if (!group) return undefined;
 
             return new Proxy(Object.create(null), {
-                get(_groupTarget, prop: string) {
+                get(_groupTarget, prop: PropertyKey) {
+                    if (typeof prop !== 'string') return undefined;
                     // Group-level queryKey()
                     if (prop === 'queryKey') {
                         return () => buildGroupQueryKey(groupName);
