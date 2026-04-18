@@ -51,7 +51,7 @@ import type { UnifiedClient } from './types.js';
  *
  * @example
  * ```ts
- * import { createClient } from '@cleverbrush/react-query';
+ * import { createClient } from '@cleverbrush/client/react';
  * import { api } from './contract';
  *
  * const client = createClient(api, {
