@@ -1,5 +1,8 @@
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
-import { fmtKB, loadBundleSizes } from '@cleverbrush/website-shared/lib/bundleSizes';
+import {
+    fmtKB,
+    loadBundleSizes
+} from '@cleverbrush/website-shared/lib/bundleSizes';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 
 export default function GettingStartedSection() {

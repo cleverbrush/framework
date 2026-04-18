@@ -1,10 +1,11 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import '@cleverbrush/website-shared/styles/globals.css';
-import { Navbar } from '@cleverbrush/website-shared/components/Navbar';
+import type { FooterSection } from '@cleverbrush/website-shared/components/Footer';
 import { Footer } from '@cleverbrush/website-shared/components/Footer';
 import type { NavItem } from '@cleverbrush/website-shared/components/Navbar';
-import type { FooterSection } from '@cleverbrush/website-shared/components/Footer';
+import { Navbar } from '@cleverbrush/website-shared/components/Navbar';
+import { ThemeProvider } from '@cleverbrush/website-shared/components/ThemeProvider';
 
 const GTM_ID = 'GTM-WRLXDMG';
 
@@ -12,8 +13,14 @@ const NAV_ITEMS: NavItem[] = [
     { href: '/', label: 'Home' },
     { href: '/docs', label: 'Docs' },
     { href: '/playground', label: 'Playground', highlight: true },
-    { href: '/mapper', label: 'Mapper' },
-    { href: '/schema-json', label: 'Schema JSON' },
+    {
+        href: '#',
+        label: 'Libraries',
+        children: [
+            { href: '/mapper', label: 'Mapper' },
+            { href: '/schema-json', label: 'Schema JSON' }
+        ]
+    },
     { href: '/migrating-from-zod', label: 'vs Zod' },
     { href: '/showcases', label: 'Showcases' },
     {
@@ -154,9 +161,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         style={{ display: 'none', visibility: 'hidden' }}
                     />
                 </noscript>
-                <Navbar navItems={NAV_ITEMS} brandLabel="Cleverbrush Schema" />
-                {children}
-                <Footer sections={FOOTER_SECTIONS} />
+                <ThemeProvider>
+                    <Navbar
+                        navItems={NAV_ITEMS}
+                        brandLabel="Cleverbrush Schema"
+                    />
+                    {children}
+                    <Footer sections={FOOTER_SECTIONS} />
+                </ThemeProvider>
             </body>
         </html>
     );

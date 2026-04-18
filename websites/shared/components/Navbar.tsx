@@ -2,19 +2,40 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTheme } from './ThemeProvider';
 
 export interface NavItem {
     href: string;
     label: string;
     highlight?: boolean;
     external?: boolean;
+    children?: NavItem[];
 }
 
 export interface NavbarProps {
     navItems: NavItem[];
     brandLabel?: string;
     githubUrl?: string;
+}
+
+function ChevronDown() {
+    return (
+        <svg
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            style={{ marginLeft: '3px', transition: 'transform 0.2s' }}
+        >
+            <path d="M2 3.5L5 6.5L8 3.5" />
+        </svg>
+    );
 }
 
 export function Navbar({
@@ -25,13 +46,17 @@ export function Navbar({
     const pathname = usePathname();
     const [menuOpen, setMenuOpen] = useState(false);
     const [scrolled, setScrolled] = useState(false);
+    const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+    const { theme, toggle: toggleTheme } = useTheme();
+    const navRef = useRef<HTMLElement>(null);
 
     const toggleMenu = useCallback(() => setMenuOpen(v => !v), []);
 
-    // Close menu on navigation
+    // Close menu and dropdowns on navigation
     // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is used as trigger to reset menu state on route change
     useEffect(() => {
         setMenuOpen(false);
+        setOpenDropdown(null);
         window.scrollTo(0, 0);
     }, [pathname]);
 
@@ -42,13 +67,88 @@ export function Navbar({
         return () => window.removeEventListener('scroll', onScroll);
     }, []);
 
+    // Close dropdown on click outside or Escape
+    useEffect(() => {
+        if (!openDropdown) return;
+        const onClickOutside = (e: MouseEvent) => {
+            if (navRef.current && !navRef.current.contains(e.target as Node)) {
+                setOpenDropdown(null);
+            }
+        };
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setOpenDropdown(null);
+        };
+        document.addEventListener('mousedown', onClickOutside);
+        document.addEventListener('keydown', onKeyDown);
+        return () => {
+            document.removeEventListener('mousedown', onClickOutside);
+            document.removeEventListener('keydown', onKeyDown);
+        };
+    }, [openDropdown]);
+
     const isActive = (href: string) => {
         if (href === '/') return pathname === '/';
         return pathname === href || pathname.startsWith(href + '/');
     };
 
+    const isDropdownActive = (item: NavItem) =>
+        item.children?.some(child => isActive(child.href)) ?? false;
+
+    const renderLink = (item: NavItem) =>
+        item.external ? (
+            <a
+                key={item.href}
+                href={item.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={item.highlight ? 'navbar-playground' : ''}
+            >
+                {item.label}
+            </a>
+        ) : (
+            <Link
+                key={item.href}
+                href={item.href}
+                className={`${isActive(item.href) ? 'active' : ''}${item.highlight ? ' navbar-playground' : ''}`}
+            >
+                {item.label}
+            </Link>
+        );
+
+    const renderDropdown = (item: NavItem) => {
+        const isOpen = openDropdown === item.label;
+        const hasActiveChild = isDropdownActive(item);
+        return (
+            <div
+                key={item.label}
+                className={`navbar-dropdown${isOpen ? ' open' : ''}`}
+                onMouseEnter={() => setOpenDropdown(item.label)}
+                onMouseLeave={() => setOpenDropdown(null)}
+            >
+                <button
+                    type="button"
+                    className={`navbar-dropdown-trigger${hasActiveChild ? ' active' : ''}`}
+                    onClick={() =>
+                        setOpenDropdown(v =>
+                            v === item.label ? null : item.label
+                        )
+                    }
+                    aria-expanded={isOpen}
+                    aria-haspopup="true"
+                >
+                    {item.label}
+                    <ChevronDown />
+                </button>
+                <div className="navbar-dropdown-panel">
+                    {item.children?.map(child => renderLink(child))}
+                </div>
+            </div>
+        );
+    };
+
     return (
         <nav
+            ref={navRef}
             className="navbar"
             style={
                 scrolled
@@ -107,33 +207,59 @@ export function Navbar({
             </button>
             <div className={`navbar-links${menuOpen ? ' show' : ''}`}>
                 {navItems.map(item =>
-                    item.external ? (
-                        <a
-                            key={item.href}
-                            href={item.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className={
-                                item.highlight ? 'navbar-playground' : ''
-                            }
-                        >
-                            {item.label}
-                        </a>
-                    ) : (
-                        <Link
-                            key={item.href}
-                            href={item.href}
-                            className={`${isActive(item.href) ? 'active' : ''}${item.highlight ? ' navbar-playground' : ''}`}
-                        >
-                            {item.label}
-                        </Link>
-                    )
+                    item.children ? renderDropdown(item) : renderLink(item)
                 )}
+                <button
+                    type="button"
+                    className="navbar-icon-btn"
+                    onClick={toggleTheme}
+                    aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+                >
+                    {theme === 'dark' ? (
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            role="img"
+                        >
+                            <title>Switch to light mode</title>
+                            <circle cx="12" cy="12" r="5" />
+                            <line x1="12" y1="1" x2="12" y2="3" />
+                            <line x1="12" y1="21" x2="12" y2="23" />
+                            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+                            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+                            <line x1="1" y1="12" x2="3" y2="12" />
+                            <line x1="21" y1="12" x2="23" y2="12" />
+                            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+                            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+                        </svg>
+                    ) : (
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            role="img"
+                        >
+                            <title>Switch to dark mode</title>
+                            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+                        </svg>
+                    )}
+                </button>
                 <a
                     href={githubUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    style={{ display: 'inline-flex', alignItems: 'center' }}
+                    className="navbar-icon-btn"
                 >
                     <svg
                         width="18"

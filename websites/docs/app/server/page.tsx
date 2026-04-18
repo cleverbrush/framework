@@ -284,9 +284,12 @@ server.handle(AdminEp, handler, { middlewares: [rateLimiter] });`)
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { ServiceCollection } from '@cleverbrush/di';
-import { object, func } from '@cleverbrush/schema';
+import { object, number } from '@cleverbrush/schema';
+import { UserRepository } from './UserRepository';
 
-const IUserRepo = object({ findById: func() });
+// Schemas are immutable — they work as safe, typed DI keys.
+// .hasType() brands the schema with the real class type.
+const IUserRepo = object().hasType<typeof UserRepository>();
 
 const GetUser = endpoint
     .get('/api/users')
@@ -296,7 +299,7 @@ const GetUser = endpoint
 server
     .services(svc => svc.addSingleton(IUserRepo, () => new UserRepository()))
     .handle(GetUser, ({ query }, { repo }) => {
-        // repo is fully typed: { findById: Function }
+        // repo is typed as UserRepository — full autocomplete & type safety
         return repo.findById(query.id);
     });`)
                             }}
@@ -384,8 +387,9 @@ export const api = defineApi({
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import type { SubscriptionHandler } from '@cleverbrush/server';
+import { api } from './contract';
 
-const eventsHandler: SubscriptionHandler<typeof EventsSubscription> =
+const eventsHandler: SubscriptionHandler<typeof api.live.events> =
     async function* ({ context, signal }) {
         while (!signal.aborted) {
             yield { action: 'heartbeat', id: Date.now() };
@@ -400,7 +404,7 @@ const eventsHandler: SubscriptionHandler<typeof EventsSubscription> =
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const chatHandler: SubscriptionHandler<typeof ChatSubscription> =
+                                __html: highlightTS(`const chatHandler: SubscriptionHandler<typeof api.live.chat> =
     async function* ({ incoming }) {
         for await (const msg of incoming) {
             // Echo back with server timestamp

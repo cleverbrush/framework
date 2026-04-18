@@ -7,9 +7,9 @@ import {
     useSchemaForm
 } from '@cleverbrush/react-form';
 import { number, object, string } from '@cleverbrush/schema';
-import { type ReactNode, useState } from 'react';
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { type ReactNode, useState } from 'react';
 
 /* ── Live Quick-Start form ──────────────────────────────────────── */
 

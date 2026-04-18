@@ -100,7 +100,7 @@ export function ClientDocNav({ currentSlug, collapsed, onToggle }: Props) {
                                 return (
                                     <Link
                                         key={slug}
-                                        href={`/web/${slug}`}
+                                        href={`/client/${slug}`}
                                         className={`pg-nav-item ${isCurrent ? 'pg-nav-active' : ''}`}
                                         ref={isCurrent ? activeRef : undefined}
                                     >

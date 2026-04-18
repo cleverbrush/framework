@@ -1,7 +1,7 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it is intentional */
-import Link from 'next/link';
+
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
-import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
+import Link from 'next/link';
 
 export default function DocsHomePage() {
     return (
@@ -9,29 +9,32 @@ export default function DocsHomePage() {
             {/* ── Hero ─────────────────────────────────────────────── */}
             <section className="hero">
                 <p className="hero-eyebrow">
-                    Schema-first web framework for TypeScript
+                    Schema-first full-stack TypeScript framework
                 </p>
                 <h1>
-                    Define once.
+                    One schema.
                     <br />
-                    Server, client, OpenAPI.
+                    Full stack.
                 </h1>
                 <p className="tagline">
-                    Build type-safe HTTP servers, auto-typed clients, and
-                    OpenAPI specs — all derived from a single{' '}
+                    Define your data shapes once with{' '}
                     <a
                         href="https://schema.cleverbrush.com"
                         target="_blank"
                         rel="noopener noreferrer"
                     >
                         @cleverbrush/schema
-                    </a>{' '}
-                    definition. Zero duplication, zero type drift, zero
-                    boilerplate.
+                    </a>
+                    . Get type-safe servers, auto-typed clients, OpenAPI docs,
+                    dependency injection, auth, and React forms — all from that
+                    single definition. Zero duplication. Zero drift.
                 </p>
                 <div className="hero-actions">
-                    <Link href="/server" className="hero-btn hero-btn-primary">
-                        Get Started with Server
+                    <Link
+                        href="/getting-started"
+                        className="hero-btn hero-btn-primary"
+                    >
+                        Get Started
                         <svg
                             width="16"
                             height="16"
@@ -48,27 +51,8 @@ export default function DocsHomePage() {
                             />
                         </svg>
                     </Link>
-                    <Link
-                        href="/client"
-                        className="hero-btn hero-btn-playground"
-                    >
-                        <svg
-                            width="15"
-                            height="15"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            aria-hidden="true"
-                        >
-                            <path d="M17 1l4 4-4 4" />
-                            <path d="M3 11V9a4 4 0 014-4h14" />
-                            <path d="M7 23l-4-4 4-4" />
-                            <path d="M21 13v2a4 4 0 01-4 4H3" />
-                        </svg>
-                        Explore the Client
+                    <Link href="/why" className="hero-btn hero-btn-playground">
+                        Why Cleverbrush?
                     </Link>
                     <a
                         href="https://github.com/cleverbrush/framework"
@@ -89,166 +73,56 @@ export default function DocsHomePage() {
                     </a>
                 </div>
                 <div className="hero-badges">
-                    <span className="badge">Type-safe endpoints</span>
-                    <span className="badge">Auto-typed client</span>
-                    <span className="badge">OpenAPI generation</span>
-                    <span className="badge">Built-in auth</span>
-                    <span className="badge">Dependency injection</span>
-                    <span className="badge">BSD-3 Licensed</span>
+                    <span className="badge">Contract-first</span>
+                    <span className="badge">Zero codegen</span>
+                    <span className="badge">OpenAPI 3.1</span>
+                    <span className="badge">Built-in auth &amp; DI</span>
+                    <span className="badge">Client resilience</span>
+                    <span className="badge">React integration</span>
                 </div>
             </section>
 
-            {/* ── Quick Install ────────────────────────────────────── */}
-            <section className="install-section">
-                <div className="container">
-                    <div className="install-section-header">
-                        <h2>Get started in seconds</h2>
-                        <p>
-                            Install the server and client — schemas are the
-                            glue.
-                        </p>
-                    </div>
-                    <InstallBanner
-                        commands={[
-                            {
-                                command:
-                                    'npm install @cleverbrush/server @cleverbrush/schema',
-                                label: 'Server — schema-first HTTP endpoints'
-                            },
-                            {
-                                command: 'npm install @cleverbrush/client',
-                                label: 'Client — auto-typed API consumer'
-                            },
-                            {
-                                command: 'npm install @cleverbrush/auth',
-                                label: 'Auth — JWT, sessions, RBAC (optional)'
-                            },
-                            {
-                                command: 'npm install @cleverbrush/di',
-                                label: 'DI — dependency injection (optional)'
-                            }
-                        ]}
-                        note={
-                            <>
-                                <code>@cleverbrush/server</code> depends on{' '}
-                                <code>@cleverbrush/schema</code> for request and
-                                response validation.{' '}
-                                <code>@cleverbrush/client</code> infers types
-                                from server definitions — no code generation
-                                needed.
-                            </>
-                        }
-                    />
-                </div>
-            </section>
-
-            {/* ── How It Works ─────────────────────────────────────── */}
+            {/* ── 3-Step Walkthrough ──────────────────────────────── */}
             <section className="section" id="how-it-works">
                 <div className="container">
-                    <h2 className="section-title">How it works</h2>
+                    <h2 className="section-title">
+                        Define once, use everywhere
+                    </h2>
                     <p className="subtitle" style={{ marginBottom: '2rem' }}>
-                        Define your data shapes once with{' '}
-                        <code>@cleverbrush/schema</code>. Every layer of the
-                        stack derives its types from that single source of
-                        truth.
+                        A single contract drives your server, client, and
+                        OpenAPI docs. Types flow automatically — no duplication,
+                        no drift.
                     </p>
-
-                    <div className="schema-features-grid">
-                        <div className="schema-feature">
-                            <span className="schema-feature-icon">🔷</span>
-                            <strong>1. Define a schema</strong>
-                            <p>
-                                Create your request and response schemas with{' '}
-                                <a href="https://schema.cleverbrush.com">
-                                    @cleverbrush/schema
-                                </a>
-                                . TypeScript types are inferred automatically.
-                            </p>
-                        </div>
-                        <div className="schema-feature">
-                            <span className="schema-feature-icon">⚡</span>
-                            <strong>2. Build a server</strong>
-                            <p>
-                                <code>@cleverbrush/server</code> validates
-                                incoming data against the schema and types your
-                                handlers end-to-end.
-                            </p>
-                        </div>
-                        <div className="schema-feature">
-                            <span className="schema-feature-icon">🔗</span>
-                            <strong>3. Import & use the client</strong>
-                            <p>
-                                <code>@cleverbrush/client</code> reads the
-                                server type and gives you a fully typed API
-                                client — no code generation step.
-                            </p>
-                        </div>
-                        <div className="schema-feature">
-                            <span className="schema-feature-icon">📄</span>
-                            <strong>4. Get OpenAPI for free</strong>
-                            <p>
-                                <code>@cleverbrush/server-openapi</code>{' '}
-                                introspects schemas at runtime and emits a
-                                complete OpenAPI 3.0 spec.
-                            </p>
-                        </div>
-                        <div className="schema-feature">
-                            <span className="schema-feature-icon">🔒</span>
-                            <strong>5. Add auth</strong>
-                            <p>
-                                <code>@cleverbrush/auth</code> plugs into the
-                                server with typed user context, JWT handling,
-                                and role-based access control.
-                            </p>
-                        </div>
-                        <div className="schema-feature">
-                            <span className="schema-feature-icon">📦</span>
-                            <strong>6. Wire with DI</strong>
-                            <p>
-                                <code>@cleverbrush/di</code> provides a
-                                lightweight, typed container for services,
-                                repositories, and cross-cutting concerns.
-                            </p>
-                        </div>
-                    </div>
 
                     <div className="code-block-group">
                         <div className="code-block-label">
                             <span className="code-block-badge code-block-badge--shared">
-                                shared / contract
+                                step 1
                             </span>
-                            <span className="code-block-file">api.ts</span>
+                            <span className="code-block-file">contract.ts</span>
                         </div>
                         <pre>
                             <code
                                 dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`import { defineApi, endpoint } from '@cleverbrush/server/contract';
-import { object, string, number, type InferType } from '@cleverbrush/schema';
+                                    __html: highlightTS(`import { defineApi, endpoint, route } from '@cleverbrush/server/contract';
+import { object, string, number, array } from '@cleverbrush/schema';
 
-// Schemas — written once, inferred everywhere
-const CreateUserBody = object({
+const User = object({
+  id:    string().uuid(),
   name:  string().minLength(2),
-  email: string().minLength(5),
+  email: string().email(),
   age:   number().min(0).max(150)
 });
 
-const UserResponse = object({
-  id:    string(),
-  name:  string(),
-  email: string(),
-  age:   number()
-});
-
-// TypeScript types flow directly from the schema — no duplication
-type CreateUserInput = InferType<typeof CreateUserBody>;
-//   ^ { name: string; email: string; age: number }
-type User = InferType<typeof UserResponse>;
-//   ^ { id: string; name: string; email: string; age: number }
-
-// The contract is the single source of truth for both sides of the wire
 export const api = defineApi({
   users: {
-    create: endpoint.post('/api/users').body(CreateUserBody).returns(UserResponse)
+    list:   endpoint.get('/api/users').returns(array(User)),
+    create: endpoint.post('/api/users')
+              .body(object({ name: string(), email: string(), age: number() }))
+              .returns(User),
+    get:    endpoint
+              .get('/api/users', route({ id: string() })\`/\${t => t.id}\`)
+              .returns(User)
   }
 });`)
                                 }}
@@ -260,24 +134,26 @@ export const api = defineApi({
                             style={{ marginTop: '1.5rem' }}
                         >
                             <span className="code-block-badge code-block-badge--server">
-                                server
+                                step 2
                             </span>
                             <span className="code-block-file">server.ts</span>
                         </div>
                         <pre>
                             <code
                                 dangerouslySetInnerHTML={{
-                                    __html: highlightTS(`import { createServer } from '@cleverbrush/server';
-import { api } from './api';
+                                    __html: highlightTS(`import { createServer, mapHandlers } from '@cleverbrush/server';
+import { api } from './contract';
 
 const server = createServer();
 
-server.handle(api.users.create, ({ body }) => {
-  //                               ^^^^ typed as CreateUserInput — guaranteed at runtime too
-  //                                    invalid requests are rejected before the handler runs
-  const user = { id: crypto.randomUUID(), ...body };
-  return user;
-  // return type is checked against UserResponse — wrong shape is a compile error
+// mapHandlers gives a compile error if any endpoint is missing
+mapHandlers(server, api, {
+  users: {
+    list:   async () => db.users.findAll(),
+    create: async ({ body }) => db.users.insert(body),
+    get:    async ({ params }) => db.users.findById(params.id)
+    // ^ forget one? TypeScript error: Property 'get' is missing
+  }
 });
 
 await server.listen(3000);`)
@@ -290,7 +166,7 @@ await server.listen(3000);`)
                             style={{ marginTop: '1.5rem' }}
                         >
                             <span className="code-block-badge code-block-badge--client">
-                                client
+                                step 3
                             </span>
                             <span className="code-block-file">app.ts</span>
                         </div>
@@ -298,16 +174,18 @@ await server.listen(3000);`)
                             <code
                                 dangerouslySetInnerHTML={{
                                     __html: highlightTS(`import { createClient } from '@cleverbrush/client';
-import { api } from './api';
+import { api } from './contract';
 
 const client = createClient(api, { baseUrl: 'http://localhost:3000' });
-// No codegen. Types come straight from the contract — always in sync.
 
-const user = await client.users.create({
-  name: 'Alice', email: 'alice@example.com', age: 30
-  //                                         ^^^^^^ wrong type → compile error
+// Fully typed — no codegen, no manual annotations
+const users = await client.users.list();
+//    ^ User[]
+
+const alice = await client.users.create({
+  body: { name: 'Alice', email: 'alice@example.com', age: 30 }
 });
-// user is typed as User: { id: string; name: string; email: string; age: number }`)
+//    ^ User — wrong shape is a compile error`)
                                 }}
                             />
                         </pre>
@@ -315,314 +193,146 @@ const user = await client.users.create({
                 </div>
             </section>
 
-            {/* ── Framework Libraries ──────────────────────────────── */}
-            <section className="section" id="libraries">
+            {/* ── How It Compares ──────────────────────────────────── */}
+            <section className="section" id="comparison">
                 <div className="container">
-                    <h2 className="section-title">The framework stack</h2>
+                    <h2 className="section-title">How it compares</h2>
                     <p className="subtitle" style={{ marginBottom: '2rem' }}>
-                        Each library is independent and can be used standalone,
-                        but they are designed to compose together seamlessly.
+                        Key differences from popular TypeScript frameworks at a
+                        glance.
                     </p>
 
-                    <div className="ecosystem-diagram">
-                        <div className="ecosystem-center">
-                            <a
-                                href="https://schema.cleverbrush.com"
-                                className="ecosystem-core"
-                            >
-                                <svg
-                                    width="20"
-                                    height="20"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.5"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    aria-hidden="true"
-                                >
-                                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                                </svg>
-                                @cleverbrush/schema
-                            </a>
-                        </div>
-                        <div className="ecosystem-spokes">
-                            <div className="ecosystem-spoke">
-                                <div className="ecosystem-spoke-icon">
-                                    <svg
-                                        width="18"
-                                        height="18"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <rect
-                                            x="2"
-                                            y="3"
-                                            width="20"
-                                            height="14"
-                                            rx="2"
-                                        />
-                                        <path d="M8 21h8" />
-                                        <path d="M12 17v4" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <strong>@cleverbrush/server</strong>
-                                    <span>
-                                        Schema-first HTTP server — typed
-                                        endpoints, content negotiation, DI
-                                        integration.
-                                    </span>
-                                </div>
-                                <div className="spoke-links">
-                                    <Link
-                                        href="/server"
-                                        className="ecosystem-link"
-                                    >
-                                        Docs →
-                                    </Link>
-                                    <a
-                                        href="https://www.npmjs.com/package/@cleverbrush/server"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="spoke-npm-link"
-                                    >
-                                        npm ↗
-                                    </a>
-                                </div>
-                            </div>
-                            <div className="ecosystem-spoke">
-                                <div className="ecosystem-spoke-icon">
-                                    <svg
-                                        width="18"
-                                        height="18"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M17 1l4 4-4 4" />
-                                        <path d="M3 11V9a4 4 0 014-4h14" />
-                                        <path d="M7 23l-4-4 4-4" />
-                                        <path d="M21 13v2a4 4 0 01-4 4H3" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <strong>@cleverbrush/client</strong>
-                                    <span>
-                                        Auto-typed API client — infers types
-                                        from the server definition, no codegen
-                                        needed.
-                                    </span>
-                                </div>
-                                <div className="spoke-links">
-                                    <Link
-                                        href="/client"
-                                        className="ecosystem-link"
-                                    >
-                                        Docs →
-                                    </Link>
-                                    <a
-                                        href="https://www.npmjs.com/package/@cleverbrush/client"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="spoke-npm-link"
-                                    >
-                                        npm ↗
-                                    </a>
-                                </div>
-                            </div>
-                            <div className="ecosystem-spoke">
-                                <div className="ecosystem-spoke-icon">
-                                    <svg
-                                        width="18"
-                                        height="18"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <rect
-                                            x="3"
-                                            y="11"
-                                            width="18"
-                                            height="11"
-                                            rx="2"
-                                        />
-                                        <path d="M7 11V7a5 5 0 0110 0v4" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <strong>@cleverbrush/auth</strong>
-                                    <span>
-                                        JWT, sessions, and RBAC — plugs into the
-                                        server with typed user context.
-                                    </span>
-                                </div>
-                                <div className="spoke-links">
-                                    <Link
-                                        href="/auth"
-                                        className="ecosystem-link"
-                                    >
-                                        Docs →
-                                    </Link>
-                                    <a
-                                        href="https://www.npmjs.com/package/@cleverbrush/auth"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="spoke-npm-link"
-                                    >
-                                        npm ↗
-                                    </a>
-                                </div>
-                            </div>
-                            <div className="ecosystem-spoke">
-                                <div className="ecosystem-spoke-icon">
-                                    <svg
-                                        width="18"
-                                        height="18"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
-                                        <polyline points="14 2 14 8 20 8" />
-                                        <line x1="16" y1="13" x2="8" y2="13" />
-                                        <line x1="16" y1="17" x2="8" y2="17" />
-                                        <polyline points="10 9 9 9 8 9" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <strong>@cleverbrush/server-openapi</strong>
-                                    <span>
-                                        Introspects schemas and emits a complete
-                                        OpenAPI 3.0 spec from your server
-                                        definition.
-                                    </span>
-                                </div>
-                                <div className="spoke-links">
-                                    <Link
-                                        href="/server-openapi"
-                                        className="ecosystem-link"
-                                    >
-                                        Docs →
-                                    </Link>
-                                    <a
-                                        href="https://www.npmjs.com/package/@cleverbrush/server-openapi"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="spoke-npm-link"
-                                    >
-                                        npm ↗
-                                    </a>
-                                </div>
-                            </div>
-                            <div className="ecosystem-spoke">
-                                <div className="ecosystem-spoke-icon">
-                                    <svg
-                                        width="18"
-                                        height="18"
-                                        viewBox="0 0 24 24"
-                                        fill="none"
-                                        stroke="currentColor"
-                                        strokeWidth="1.5"
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        aria-hidden="true"
-                                    >
-                                        <circle cx="12" cy="12" r="3" />
-                                        <path d="M12 1v6m0 6v6m-7-7h6m6 0h6" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <strong>@cleverbrush/di</strong>
-                                    <span>
-                                        Lightweight typed container for
-                                        services, repositories, and
-                                        cross-cutting concerns.
-                                    </span>
-                                </div>
-                                <div className="spoke-links">
-                                    <Link href="/di" className="ecosystem-link">
-                                        Docs →
-                                    </Link>
-                                    <a
-                                        href="https://www.npmjs.com/package/@cleverbrush/di"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="spoke-npm-link"
-                                    >
-                                        npm ↗
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table className="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>Feature</th>
+                                    <th>Cleverbrush</th>
+                                    <th>tRPC</th>
+                                    <th>ts-rest</th>
+                                    <th>Hono</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>Standard REST endpoints</td>
+                                    <td className="cmp-yes">Yes</td>
+                                    <td className="cmp-no">No (RPC only)</td>
+                                    <td className="cmp-yes">Yes</td>
+                                    <td className="cmp-yes">Yes</td>
+                                </tr>
+                                <tr>
+                                    <td>Typed client from contract</td>
+                                    <td className="cmp-yes">
+                                        Yes (zero codegen)
+                                    </td>
+                                    <td className="cmp-yes">Yes</td>
+                                    <td className="cmp-yes">Yes</td>
+                                    <td className="cmp-partial">
+                                        Via hc helper
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>OpenAPI 3.1 generation</td>
+                                    <td className="cmp-yes">
+                                        Full (links, callbacks, webhooks)
+                                    </td>
+                                    <td className="cmp-partial">Via plugin</td>
+                                    <td className="cmp-yes">Yes</td>
+                                    <td className="cmp-partial">
+                                        Via Zod OpenAPI
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>Exhaustive handler mapping</td>
+                                    <td className="cmp-yes">
+                                        mapHandlers() compile error
+                                    </td>
+                                    <td className="cmp-no">No</td>
+                                    <td className="cmp-yes">
+                                        Yes (Express/Fastify)
+                                    </td>
+                                    <td className="cmp-no">No</td>
+                                </tr>
+                                <tr>
+                                    <td>Built-in client resilience</td>
+                                    <td className="cmp-yes">
+                                        Retry, timeout, dedup, cache, batching
+                                    </td>
+                                    <td className="cmp-no">No (DIY)</td>
+                                    <td className="cmp-no">No (DIY)</td>
+                                    <td className="cmp-no">No client</td>
+                                </tr>
+                                <tr>
+                                    <td>Integrated auth &amp; DI</td>
+                                    <td className="cmp-yes">
+                                        JWT, RBAC, DI container
+                                    </td>
+                                    <td className="cmp-no">No</td>
+                                    <td className="cmp-no">No</td>
+                                    <td className="cmp-partial">
+                                        Auth middleware
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>WebSocket subscriptions</td>
+                                    <td className="cmp-yes">
+                                        Typed, bidirectional
+                                    </td>
+                                    <td className="cmp-yes">Yes</td>
+                                    <td className="cmp-no">No</td>
+                                    <td className="cmp-partial">Basic</td>
+                                </tr>
+                                <tr>
+                                    <td>Schema-driven forms</td>
+                                    <td className="cmp-yes">
+                                        @cleverbrush/react-form
+                                    </td>
+                                    <td className="cmp-no">No</td>
+                                    <td className="cmp-no">No</td>
+                                    <td className="cmp-no">No</td>
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
+
+                    <p style={{ textAlign: 'center', marginTop: '1.5rem' }}>
+                        <Link href="/comparisons" className="ecosystem-link">
+                            Detailed comparisons with code examples →
+                        </Link>
+                    </p>
                 </div>
             </section>
 
-            {/* ── Features ──────────────────────────────────────── */}
+            {/* ── What You Get ──────────────────────────────────── */}
             <section className="section" id="features">
                 <div className="container">
-                    <h2 className="section-title">Built-in, not bolted on</h2>
+                    <h2 className="section-title">
+                        Everything you need, nothing you don&apos;t
+                    </h2>
                     <p className="subtitle" style={{ marginBottom: '2rem' }}>
-                        Everything you need for production APIs — fully typed,
-                        zero glue code.
+                        Each library works standalone, but they compose into a
+                        seamless full-stack platform.
                     </p>
 
                     <div className="features-grid">
                         <Link href="/server" className="feature-card">
-                            <span className="feature-icon">✅</span>
-                            <strong>Runtime validation</strong>
+                            <span className="feature-icon">⚡</span>
+                            <strong>Schema-first server</strong>
                             <span>
-                                Body, query, and path params are validated at
-                                runtime using the same schemas that power your
-                                types.
+                                Typed endpoints, runtime validation, content
+                                negotiation, and RFC 9457 errors — from your
+                                schema definition.
                             </span>
                         </Link>
 
-                        <Link href="/server" className="feature-card">
-                            <span className="feature-icon">🛡️</span>
-                            <strong>RFC 9457 Problem Details</strong>
-                            <span>
-                                Validation errors and HTTP exceptions become
-                                structured, machine-readable JSON responses
-                                automatically.
-                            </span>
-                        </Link>
-
-                        <Link href="/server" className="feature-card">
+                        <Link href="/client" className="feature-card">
                             <span className="feature-icon">🔗</span>
-                            <strong>Typed route &amp; query params</strong>
+                            <strong>Auto-typed client</strong>
                             <span>
-                                Path parameters and query strings are inferred
-                                from the route pattern and schema — no manual
-                                casting.
-                            </span>
-                        </Link>
-
-                        <Link href="/server" className="feature-card">
-                            <span className="feature-icon">🔌</span>
-                            <strong>WebSocket subscriptions</strong>
-                            <span>
-                                Real-time channels with typed events, tracked
-                                delivery, and bidirectional messaging built into
-                                the contract.
+                                Zero-codegen Proxy client with built-in retry,
+                                timeout, deduplication, caching, and request
+                                batching.
                             </span>
                         </Link>
 
@@ -630,29 +340,29 @@ const user = await client.users.create({
                             <span className="feature-icon">📄</span>
                             <strong>OpenAPI &amp; AsyncAPI</strong>
                             <span>
-                                Spec is generated from your schemas and
-                                endpoints — always up-to-date, always matching
-                                real types.
+                                Full OpenAPI 3.1 with typed links, callbacks,
+                                webhooks, and security schemes — generated,
+                                never hand-written.
                             </span>
                         </Link>
 
-                        <Link href="/client" className="feature-card">
-                            <span className="feature-icon">🔄</span>
-                            <strong>Client resilience</strong>
+                        <Link href="/auth" className="feature-card">
+                            <span className="feature-icon">🔐</span>
+                            <strong>Auth &amp; RBAC</strong>
                             <span>
-                                Retries, timeouts, deduplication, and caching
-                                out of the box — fully configurable per call or
-                                globally.
+                                JWT, cookies, OAuth2, OIDC — transport-agnostic
+                                auth with typed principals and policy-based
+                                authorization.
                             </span>
                         </Link>
 
-                        <Link href="/client" className="feature-card">
-                            <span className="feature-icon">📦</span>
-                            <strong>Request batching</strong>
+                        <Link href="/di" className="feature-card">
+                            <span className="feature-icon">🧩</span>
+                            <strong>Dependency injection</strong>
                             <span>
-                                Automatically batch multiple calls into a single
-                                HTTP request to reduce round-trips and
-                                connection overhead.
+                                .NET-style DI with schemas as service keys.
+                                Singleton, scoped, and transient lifetimes. No
+                                decorators.
                             </span>
                         </Link>
 
@@ -663,35 +373,56 @@ const user = await client.users.create({
                             <span className="feature-icon">⚛️</span>
                             <strong>React Query integration</strong>
                             <span>
-                                First-class hooks for TanStack Query — typed
-                                query keys, mutations, and optimistic updates
-                                from your contract.
+                                TanStack Query hooks generated from your
+                                contract — typed queryKeys, mutations, Suspense,
+                                and prefetching.
                             </span>
                         </Link>
 
-                        <Link href="/auth" className="feature-card">
-                            <span className="feature-icon">🔐</span>
-                            <strong>Auth &amp; RBAC</strong>
+                        <Link href="/react-form" className="feature-card">
+                            <span className="feature-icon">📝</span>
+                            <strong>Schema-driven forms</strong>
                             <span>
-                                JWT, sessions, and role-based access control
-                                plug into the server with strongly typed user
-                                context.
+                                Headless React forms auto-generated from
+                                schemas. Type-safe field selectors instead of
+                                string names.
                             </span>
                         </Link>
 
-                        <Link href="/di" className="feature-card">
-                            <span className="feature-icon">🧩</span>
-                            <strong>Dependency injection</strong>
+                        <Link
+                            href="/client/subscriptions"
+                            className="feature-card"
+                        >
+                            <span className="feature-icon">🔌</span>
+                            <strong>WebSocket subscriptions</strong>
                             <span>
-                                Typed DI container for services, repositories,
-                                and cross-cutting concerns — no decorators
-                                required.
+                                Typed real-time channels with bidirectional
+                                messaging, tracked delivery, and automatic
+                                reconnection.
+                            </span>
+                        </Link>
+
+                        <Link href="/env" className="feature-card">
+                            <span className="feature-icon">🛡️</span>
+                            <strong>Type-safe env</strong>
+                            <span>
+                                Validate and coerce environment variables at
+                                startup. Compile-time enforcement that every
+                                leaf is bound.
+                            </span>
+                        </Link>
+
+                        <Link href="/knex-schema" className="feature-card">
+                            <span className="feature-icon">🗄️</span>
+                            <strong>Schema-driven queries</strong>
+                            <span>
+                                Type-safe Knex query builder with eager loading,
+                                column mapping, and CTE-based joins.
                             </span>
                         </Link>
                     </div>
                 </div>
             </section>
-
             {/* ── Schema CTA ──────────────────────────────────────── */}
             <section className="section">
                 <div className="container">

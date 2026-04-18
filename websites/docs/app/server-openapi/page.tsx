@@ -9,9 +9,11 @@ export default function ServerOpenApiPage() {
                 <div className="section-header">
                     <h1>@cleverbrush/server-openapi</h1>
                     <p className="subtitle">
-                        OpenAPI 3.1 spec generation for{' '}
-                        <code>@cleverbrush/server</code> — no annotations, no
-                        decorators, derived directly from endpoint definitions.
+                        Your endpoint definitions <strong>are</strong> your
+                        OpenAPI spec. No annotations, no decorators, no separate
+                        YAML to maintain — the schema you already write for
+                        routing and validation generates a full OpenAPI 3.1
+                        document automatically.
                     </p>
                 </div>
 
@@ -41,11 +43,14 @@ export default function ServerOpenApiPage() {
 
                     <h3>The Solution</h3>
                     <p>
-                        <code>@cleverbrush/server-openapi</code> generates the
-                        spec directly from the same endpoint definitions your
-                        server uses for routing and validation. There is no
-                        separate spec to maintain — the server <em>is</em> the
-                        spec.
+                        Your endpoint definitions already describe routes,
+                        request bodies, query params, and response types.{' '}
+                        <code>@cleverbrush/server-openapi</code> reads those
+                        definitions and emits a complete OpenAPI 3.1 document —
+                        including <code>$ref</code> deduplication, security
+                        schemes, and discriminated unions. There is no separate
+                        spec to maintain — change the code, the spec updates
+                        itself.
                     </p>
 
                     <h3>Key Features</h3>

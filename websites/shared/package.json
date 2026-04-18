@@ -8,6 +8,7 @@
         "./components/Navbar": "./components/Navbar.tsx",
         "./components/Footer": "./components/Footer.tsx",
         "./components/InstallBanner": "./components/InstallBanner.tsx",
+        "./components/ThemeProvider": "./components/ThemeProvider.tsx",
         "./lib/highlight": "./lib/highlight.ts",
         "./lib/bundleSizes": "./lib/bundleSizes.ts"
     },

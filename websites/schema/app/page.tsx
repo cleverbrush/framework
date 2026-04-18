@@ -1,8 +1,11 @@
-import Link from 'next/link';
-import { fmtKB, loadBundleSizes } from '@cleverbrush/website-shared/lib/bundleSizes';
-import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
-import { BenchmarkSection } from './BenchmarkSection';
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
+import {
+    fmtKB,
+    loadBundleSizes
+} from '@cleverbrush/website-shared/lib/bundleSizes';
+import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import Link from 'next/link';
+import { BenchmarkSection } from './BenchmarkSection';
 
 export default function HomePage() {
     const bundleSizes = loadBundleSizes();

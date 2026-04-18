@@ -12,5 +12,17 @@
     },
     "watchOptions": {
         "excludeDirectories": ["./dist"]
-    }
-}
+    },
+    "exclude": [
+        "websites",
+        "demos",
+        "docs",
+        "scripts",
+        "**/dist",
+        "**/node_modules",
+        "coverage",
+        "**/*.test.ts",
+        "**/*.bench.ts",
+        "libs/benchmarks",
+        "libs/server-integration-tests"
+    ]

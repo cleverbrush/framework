@@ -1,5 +1,5 @@
-import Link from 'next/link';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import Link from 'next/link';
 
 export default function PropertyDescriptorsSection() {
     return (

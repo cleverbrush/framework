@@ -355,12 +355,6 @@ config.db.connectionString // "postgres://localhost:5432/mydb"`)
                                 <td>✓</td>
                                 <td>✓</td>
                             </tr>
-                            <tr>
-                                <td>No Zod dependency</td>
-                                <td>✓</td>
-                                <td>✗</td>
-                                <td>✓</td>
-                            </tr>
                         </tbody>
                     </table>
                 </div>

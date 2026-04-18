@@ -96,33 +96,83 @@ export default function DiPage() {
                 <div className="card">
                     <h2>Quick Start</h2>
                     <p>
-                        Define service contracts as schemas, register
-                        implementations, build a provider, and resolve:
+                        Schemas are immutable — they work as safe, typed DI
+                        keys. Use <code>.hasType()</code> to brand a schema with
+                        a real class type for full autocomplete:
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { ServiceCollection } from '@cleverbrush/di';
-import { object, string, number, func } from '@cleverbrush/schema';
+import { object, string, number } from '@cleverbrush/schema';
+import { Logger } from './Logger';
+import { AppConfig } from './AppConfig';
 
-// Define service contracts as schemas
+// Schema instances as service keys — .hasType() gives real class typing
+const ILogger = object().hasType<typeof Logger>();
 const IConfig = object({ port: number(), host: string() });
-const ILogger = object({ info: func().addParameter(string()) });
 
-// Register services
 const services = new ServiceCollection();
 services.addSingleton(IConfig, { port: 3000, host: 'localhost' });
-services.addSingleton(ILogger, () => ({
-    info: (msg: string) => console.log(msg)
-}));
+services.addSingleton(ILogger, () => new Logger());
 
-// Build the provider
 const provider = services.buildServiceProvider();
+const config = provider.get(IConfig); // typed: { port: number, host: string }
+const logger = provider.get(ILogger); // typed: Logger`)
+                            }}
+                        />
+                    </pre>
+                </div>
 
-// Resolve — fully typed, no explicit generics needed
-const config = provider.get(IConfig);
-console.log(config.port); // number
-console.log(config.host); // string`)
+                {/* ── DI with Endpoint Handlers ───────────────────── */}
+                <div className="card">
+                    <h2>DI with Endpoint Handlers</h2>
+                    <p>
+                        The real power of <code>@cleverbrush/di</code> shows
+                        when paired with <code>@cleverbrush/server</code>. Use{' '}
+                        <code>.inject()</code> on an endpoint to declare
+                        services — they are resolved per request and passed as
+                        the second handler argument:
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { endpoint, createServer } from '@cleverbrush/server';
+import { object, number } from '@cleverbrush/schema';
+import { UserRepository } from './UserRepository';
+import { EmailService } from './EmailService';
+
+// Schema keys branded with real types
+const IUserRepo = object().hasType<typeof UserRepository>();
+const IEmailSvc = object().hasType<typeof EmailService>();
+
+const GetUser = endpoint
+    .get('/api/users')
+    .query(object({ id: number().coerce() }))
+    .inject({ repo: IUserRepo });
+
+const CreateUser = endpoint
+    .post('/api/users')
+    .body(object({ name: string(), email: string() }))
+    .inject({ repo: IUserRepo, email: IEmailSvc });
+
+const server = createServer();
+
+server
+    .services(svc => {
+        svc.addSingleton(IUserRepo, () => new UserRepository());
+        svc.addSingleton(IEmailSvc, () => new EmailService());
+    })
+    .handle(GetUser, ({ query }, { repo }) => {
+        // repo is typed as UserRepository
+        return repo.findById(query.id);
+    })
+    .handle(CreateUser, async ({ body }, { repo, email }) => {
+        // repo: UserRepository, email: EmailService
+        const user = await repo.create(body);
+        await email.sendWelcome(user.email);
+        return user;
+    });`)
                             }}
                         />
                     </pre>
@@ -130,33 +180,62 @@ console.log(config.host); // string`)
 
                 {/* ── Scoped Services ──────────────────────────────── */}
                 <div className="card">
-                    <h2>Scoped Services</h2>
+                    <h2>Scoped Services — Per-Request Lifecycle</h2>
                     <p>
-                        Create a scope per unit of work (e.g. an HTTP request).
-                        Scoped services are cached within the scope and disposed
-                        when it exits:
+                        Register services as <strong>scoped</strong> to get a
+                        fresh instance per HTTP request. The server creates a
+                        scope automatically for each request and disposes it
+                        when the response is sent:
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const IDbContext = object({
-    query: func().addParameter(string())
-});
+                                __html: highlightTS(`import { object } from '@cleverbrush/schema';
+import { DbContext } from './DbContext';
 
-services.addScoped(IDbContext, () => {
-    const conn = createConnection();
-    return {
-        query: (sql: string) => conn.execute(sql),
-        [Symbol.asyncDispose]: () => conn.close()
-    };
-});
+const IDbContext = object().hasType<typeof DbContext>();
 
-const provider = services.buildServiceProvider();
+server
+    .services(svc => {
+        // Fresh connection per request, disposed on response
+        svc.addScoped(IDbContext, () => {
+            const db = new DbContext();
+            return Object.assign(db, {
+                [Symbol.asyncDispose]: () => db.close()
+            });
+        });
+    })
+    .handle(
+        endpoint
+            .post('/api/orders')
+            .body(OrderSchema)
+            .inject({ db: IDbContext }),
+        async ({ body }, { db }) => {
+            // db is a fresh DbContext for this request
+            return db.orders.create(body);
+        }
+    );`)
+                            }}
+                        />
+                    </pre>
+                </div>
 
-// Per-request scope — db is disposed when scope exits
-await using scope = provider.createScope();
-const db = scope.serviceProvider.get(IDbContext);
-await db.query('SELECT 1');`)
+                {/* ── Three Lifetimes ─────────────────────────────── */}
+                <div className="card">
+                    <h2>Three Lifetimes</h2>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const services = new ServiceCollection();
+
+// Singleton — one instance for the entire app
+services.addSingleton(IConfig, { port: 3000, host: 'localhost' });
+
+// Scoped — one instance per scope (per HTTP request)
+services.addScoped(IDbContext, () => new DbContext());
+
+// Transient — fresh instance on every resolution
+services.addTransient(IRequestId, () => ({ id: crypto.randomUUID() }));`)
                             }}
                         />
                     </pre>
@@ -187,73 +266,6 @@ const result = provider.invoke(handler, (logger, config) => {
     return 'ok';
 });
 // result is typed as string`)
-                            }}
-                        />
-                    </pre>
-                </div>
-
-                {/* ── Schema-Driven Factories ──────────────────────── */}
-                <div className="card">
-                    <h2>Schema-Driven Factories</h2>
-                    <p>
-                        Register services whose factory dependencies are
-                        described by a <code>FunctionSchemaBuilder</code>. The
-                        container resolves the factory&apos;s parameters
-                        automatically:
-                    </p>
-                    <pre>
-                        <code
-                            dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const IGreeter = object({
-    greet: func().hasReturnType(string())
-});
-
-// Describe the factory's dependencies
-const greeterDeps = func()
-    .addParameter(IConfig)
-    .addParameter(ILogger);
-
-// Register — config and logger are auto-resolved
-services.addSingletonFromSchema(
-    IGreeter,
-    greeterDeps,
-    (config, logger) => ({
-        greet() {
-            logger.info(\`Hello from \${config.host}\`);
-            return \`Hello from \${config.host}:\${config.port}\`;
-        }
-    })
-);`)
-                            }}
-                        />
-                    </pre>
-                </div>
-
-                {/* ── Circular Detection ───────────────────────────── */}
-                <div className="card">
-                    <h2>Circular Dependency Detection</h2>
-                    <p>
-                        The container detects circular dependencies at
-                        resolution time and throws a descriptive error showing
-                        the full dependency chain:
-                    </p>
-                    <pre>
-                        <code
-                            dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const IA = object({ value: string() });
-const IB = object({ value: string() });
-
-services.addSingleton(IA, (p) => {
-    p.get(IB); // IB depends on IA → cycle!
-    return { value: 'a' };
-});
-services.addSingleton(IB, (p) => {
-    p.get(IA);
-    return { value: 'b' };
-});
-
-provider.get(IA);
-// Error: Circular dependency detected: object → object`)
                             }}
                         />
                     </pre>

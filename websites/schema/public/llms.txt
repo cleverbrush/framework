@@ -52,6 +52,8 @@ import {
 | `union(schema)` | `UnionSchemaBuilder` | Union type, chain via `.or()` |
 | `enumOf(...values)` | `StringSchemaBuilder` | String enum (sugar for `string().oneOf(...)`) |
 | `lazy(() => schema)` | `LazySchemaBuilder` | Recursive/self-referential schemas |
+| `generic()` | `GenericSchemaBuilder` | Parameterized schemas (constraints applied later) |
+| `extern(zodSchema)` | `ExternSchemaBuilder` | Wraps any Standard Schema-compatible validator (Zod, Valibot, etc.) |
 
 ### Base SchemaBuilder methods (all builders inherit)
 
@@ -193,15 +195,81 @@ const TreeSchema: SchemaBuilder<Tree> = object({
 
 ### Extension system
 
-```typescript
-import { defineExtension, withExtensions, StringSchemaBuilder } from '@cleverbrush/schema/core';
+Extensions add reusable methods to schema builders (like plugins). They are type-safe and introspectable.
 
-const myExt = defineExtension('slug', function(this: StringSchemaBuilder) {
-  return this.matches(/^[a-z0-9-]+$/);
+```typescript
+import { defineExtension, withExtensions, StringSchemaBuilder } from '@cleverbrush/schema';
+
+// 1. Define extension: adds .slug() method to StringSchemaBuilder
+const slugExtension = defineExtension('slug', function(this: StringSchemaBuilder) {
+  return this.matches(/^[a-z0-9-]+$/).withExtension('slug', true);
 });
 
-// Apply to a builder class:
-const ExtendedString = withExtensions(StringSchemaBuilder, [myExt]);
+// 2. Apply to builder class — returns a factory function
+const { string: extString } = withExtensions(StringSchemaBuilder, [slugExtension]);
+
+// 3. Use it
+const SlugSchema = extString().slug(); // type-safe, introspectable
+SlugSchema.introspect().extensions.slug // → true
+```
+
+Extension metadata auto-inference:
+- 0 args → extension value is `true`
+- 1 arg → extension value is that argument
+- N args → extension value is array of arguments
+- Manual: call `this.withExtension(key, value)` explicitly
+
+### generic() — Parameterized schemas
+
+```typescript
+import { generic, object, string, number } from '@cleverbrush/schema';
+
+// Define a generic "paginated" wrapper
+const Paginated = generic((T) =>
+  object({
+    items: array().of(T),
+    total: number().integer(),
+    page: number().integer(),
+  })
+);
+
+// Apply it
+const UserPage = Paginated(UserSchema);
+type UserPage = InferType<typeof UserPage>;
+// { items: User[]; total: number; page: number }
+```
+
+### extern() — Wrap external validators
+
+```typescript
+import { extern } from '@cleverbrush/schema';
+import { z } from 'zod';
+
+// Wrap a Zod schema for use inside Cleverbrush schemas
+const ZodEmail = extern(z.string().email());
+
+const MySchema = object({
+  email: ZodEmail,           // works in Cleverbrush object schemas
+  name: string().minLength(1),
+});
+```
+
+### Discriminated unions (automatic)
+
+```typescript
+const Cat = object({
+  type: string().equals('cat'),
+  meows: boolean()
+});
+
+const Dog = object({
+  type: string().equals('dog'),
+  barks: boolean()
+});
+
+const Animal = union(Cat).or(Dog);
+// Discriminator on 'type' detected automatically — O(1) validation
+// Validates against the matching branch directly
 ```
 
 ### Type inference
@@ -402,26 +470,32 @@ await retry(fetchData, {
 
 Install: `npm install @cleverbrush/scheduler`
 
-Cron-like scheduler that runs tasks in **worker threads**. Schema-validated job definitions.
+Cron-like scheduler that runs tasks in **worker threads**. Schema-validated job definitions. Requires Node.js 16+.
 
 ```typescript
 import { JobScheduler } from '@cleverbrush/scheduler';
 
 const scheduler = new JobScheduler({
   rootFolder: './jobs',  // folder containing job worker files
-  defaultTimeZone: 'UTC',
 });
 
-await scheduler.addJob({
+scheduler.addJob({
   id: 'daily-report',
-  schedule: { type: 'daily', time: '09:00' },
-  workerFile: 'daily-report.js',
+  path: 'daily-report.js',
+  schedule: { every: 'day', interval: 1, hour: 9, minute: 0 },
+  timeout: 1000 * 60 * 5,
+  maxRetries: 3,
+  noConcurrentRuns: true,
 });
 
 scheduler.start();
 ```
 
-**`TaskSchedule` variants:** `{ type: 'minutely' }`, `{ type: 'hourly', minute: 30 }`, `{ type: 'daily', time: '09:00' }`, `{ type: 'weekly', dayOfWeek: 1, time: '08:00' }`, `{ type: 'monthly', dayOfMonth: 1, time: '00:00' }`, `{ type: 'yearly', month: 1, dayOfMonth: 1, time: '00:00' }`.
+**Schedule types:** `{ every: 'minute', interval: N }`, `{ every: 'day', interval: N, hour, minute }`, `{ every: 'week', interval: N, dayOfWeek: [0-6], hour, minute }`, `{ every: 'month', interval: N, dayOfMonth, hour, minute }`, `{ every: 'year', interval: N, month, dayOfMonth, hour, minute }`.
+
+**Events:** `job:start`, `job:end`, `job:error`, `job:timeout`, `job:message` — each with `{ jobId, instanceId, ... }`.
+
+**Persistence:** Default in-memory; implement `IJobRepository` for database-backed storage.
 
 ## Optional
 

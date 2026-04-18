@@ -1,23 +1,36 @@
 import type { Metadata } from 'next';
 import Script from 'next/script';
 import '@cleverbrush/website-shared/styles/globals.css';
-import { Navbar } from '@cleverbrush/website-shared/components/Navbar';
+import type { FooterSection } from '@cleverbrush/website-shared/components/Footer';
 import { Footer } from '@cleverbrush/website-shared/components/Footer';
 import type { NavItem } from '@cleverbrush/website-shared/components/Navbar';
-import type { FooterSection } from '@cleverbrush/website-shared/components/Footer';
+import { Navbar } from '@cleverbrush/website-shared/components/Navbar';
+import { ThemeProvider } from '@cleverbrush/website-shared/components/ThemeProvider';
 
 const GTM_ID = 'GTM-WRLXDMG';
 
 const NAV_ITEMS: NavItem[] = [
     { href: '/', label: 'Home' },
-    { href: '/server', label: 'Server' },
-    { href: '/client', label: 'Client' },
-    { href: '/auth', label: 'Auth' },
-    { href: '/di', label: 'DI' },
-    { href: '/server-openapi', label: 'OpenAPI' },
-    { href: '/env', label: 'Env' },
-    { href: '/knex-schema', label: 'Knex Schema' },
-    { href: '/react-form', label: 'React Form' },
+    { href: '/why', label: 'Why' },
+    { href: '/getting-started', label: 'Get Started' },
+    {
+        href: '#',
+        label: 'Packages',
+        children: [
+            { href: '/server', label: 'Server' },
+            { href: '/client', label: 'Client' },
+            { href: '/auth', label: 'Auth' },
+            { href: '/di', label: 'DI' },
+            { href: '/server-openapi', label: 'OpenAPI' },
+            { href: '/env', label: 'Env' },
+            { href: '/knex-schema', label: 'Knex Schema' },
+            { href: '/react-form', label: 'React Form' },
+            { href: '/mapper', label: 'Mapper' },
+            { href: '/scheduler', label: 'Scheduler' }
+        ]
+    },
+    { href: '/comparisons', label: 'Comparisons' },
+    { href: '/examples', label: 'Examples' },
     { href: '/api-docs', label: 'API Docs' },
     {
         href: 'https://schema.cleverbrush.com',
@@ -63,22 +76,28 @@ const FOOTER_SECTIONS: FooterSection[] = [
         title: 'Resources',
         links: [
             {
-                label: 'GitHub Repository',
-                href: 'https://github.com/cleverbrush/framework',
-                external: true
+                label: 'Getting Started',
+                href: '/getting-started'
+            },
+            {
+                label: 'Why Cleverbrush?',
+                href: '/why'
+            },
+            {
+                label: 'Comparisons',
+                href: '/comparisons'
+            },
+            {
+                label: 'Example App',
+                href: '/examples'
             },
             {
                 label: 'API Reference',
                 href: '/api-docs'
             },
             {
-                label: 'Schema Library',
-                href: 'https://schema.cleverbrush.com',
-                external: true
-            },
-            {
-                label: 'Playground',
-                href: 'https://schema.cleverbrush.com/playground',
+                label: 'GitHub Repository',
+                href: 'https://github.com/cleverbrush/framework',
                 external: true
             }
         ]
@@ -175,9 +194,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                         style={{ display: 'none', visibility: 'hidden' }}
                     />
                 </noscript>
-                <Navbar navItems={NAV_ITEMS} brandLabel="Cleverbrush Docs" />
-                {children}
-                <Footer sections={FOOTER_SECTIONS} />
+                <ThemeProvider>
+                    <Navbar
+                        navItems={NAV_ITEMS}
+                        brandLabel="Cleverbrush Docs"
+                    />
+                    {children}
+                    <Footer sections={FOOTER_SECTIONS} />
+                </ThemeProvider>
             </body>
         </html>
     );

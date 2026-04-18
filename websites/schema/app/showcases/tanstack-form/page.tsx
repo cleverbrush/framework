@@ -1,9 +1,9 @@
 'use client';
 
 import { boolean, number, string } from '@cleverbrush/schema';
+import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { useForm } from '@tanstack/react-form';
 import { useState } from 'react';
-import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 
 /* ── Schemas ─────────────────────────────────────────────────────── */
 
