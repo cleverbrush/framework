@@ -3257,7 +3257,7 @@ pre code {
 
 .ecosystem-spoke {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 1rem;
     background: var(--bg-card);
     border: 1px solid var(--border-subtle);
@@ -3461,18 +3461,20 @@ pre code {
     }
 
     .ecosystem-spokes {
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(3, 1fr);
     }
 
     .ecosystem-spoke {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: center;
+        text-align: center;
     }
 
     .spoke-links {
         margin-top: auto;
         flex-direction: row;
         gap: 0.75rem;
+        justify-content: center;
     }
 
     .spoke-links .ecosystem-link {

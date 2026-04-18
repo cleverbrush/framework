@@ -6,8 +6,14 @@ export interface SchemaSection {
 
 export const SECTION_GROUPS = [
     {
-        label: 'Overview',
-        slugs: ['getting-started', 'schema-types']
+        label: 'Fundamentals',
+        slugs: [
+            'why',
+            'getting-started',
+            'schema-types',
+            'validation',
+            'type-inference'
+        ]
     },
     {
         label: 'Composition',
@@ -15,43 +21,48 @@ export const SECTION_GROUPS = [
             'immutability',
             'discriminated-unions',
             'recursive-schemas',
-            'generic-schemas',
             'parse-string',
-            'promise-schema',
             'object-constructors'
         ]
     },
     {
-        label: 'Validation',
-        slugs: ['validation', 'property-descriptors']
+        label: 'Modifiers',
+        slugs: ['schema-modifiers']
     },
     {
-        label: 'Modifiers',
+        label: 'Superpowers',
         slugs: [
-            'default-values',
-            'catch-fallback',
-            'readonly',
-            'describe',
-            'schema-name'
+            'extensions',
+            'built-in-extensions',
+            'generic-schemas',
+            'property-descriptors',
+            'extern'
         ]
     },
     {
-        label: 'Extensions',
-        slugs: ['extensions', 'built-in-extensions']
-    },
-    {
-        label: 'Integrations',
+        label: 'Ecosystem',
         slugs: ['standard-schema']
     },
     {
         label: 'Reference',
-        slugs: ['comparison', 'api-reference']
+        slugs: ['comparison', 'migrating-from-zod', 'api-reference']
     }
 ];
 
 export const SCHEMA_SECTIONS: SchemaSection[] = [
-    { slug: 'getting-started', title: 'Getting Started', group: 'Overview' },
-    { slug: 'schema-types', title: 'Schema Types', group: 'Overview' },
+    { slug: 'why', title: 'Why @cleverbrush/schema?', group: 'Fundamentals' },
+    {
+        slug: 'getting-started',
+        title: 'Getting Started',
+        group: 'Fundamentals'
+    },
+    { slug: 'schema-types', title: 'Schema Types', group: 'Fundamentals' },
+    { slug: 'validation', title: 'Validation', group: 'Fundamentals' },
+    {
+        slug: 'type-inference',
+        title: 'Type Inference',
+        group: 'Fundamentals'
+    },
     {
         slug: 'immutability',
         title: 'Immutability & Composition',
@@ -68,18 +79,8 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
         group: 'Composition'
     },
     {
-        slug: 'generic-schemas',
-        title: 'Generic Schemas',
-        group: 'Composition'
-    },
-    {
         slug: 'parse-string',
         title: 'Parse String & Coercion',
-        group: 'Composition'
-    },
-    {
-        slug: 'promise-schema',
-        title: 'Promise Schemas',
         group: 'Composition'
     },
     {
@@ -87,31 +88,55 @@ export const SCHEMA_SECTIONS: SchemaSection[] = [
         title: 'Object Constructors',
         group: 'Composition'
     },
-    { slug: 'validation', title: 'Validation', group: 'Validation' },
     {
-        slug: 'property-descriptors',
-        title: 'PropertyDescriptors',
-        group: 'Validation'
+        slug: 'schema-modifiers',
+        title: 'Schema Modifiers',
+        group: 'Modifiers'
     },
-    { slug: 'default-values', title: 'Default Values', group: 'Modifiers' },
-    { slug: 'catch-fallback', title: 'Catch / Fallback', group: 'Modifiers' },
-    { slug: 'readonly', title: 'Readonly Modifier', group: 'Modifiers' },
-    { slug: 'describe', title: 'Describe', group: 'Modifiers' },
-    { slug: 'schema-name', title: 'schemaName', group: 'Modifiers' },
-    { slug: 'extensions', title: 'Extensions', group: 'Extensions' },
+    { slug: 'extensions', title: 'Extensions', group: 'Superpowers' },
     {
         slug: 'built-in-extensions',
         title: 'Built-in Extensions',
-        group: 'Extensions'
+        group: 'Superpowers'
+    },
+    {
+        slug: 'generic-schemas',
+        title: 'Generic Schemas',
+        group: 'Superpowers'
+    },
+    {
+        slug: 'property-descriptors',
+        title: 'PropertyDescriptors',
+        group: 'Superpowers'
+    },
+    {
+        slug: 'extern',
+        title: 'extern() Interop',
+        group: 'Superpowers'
     },
     {
         slug: 'standard-schema',
         title: 'Standard Schema',
-        group: 'Integrations'
+        group: 'Ecosystem'
     },
     { slug: 'comparison', title: 'Comparison', group: 'Reference' },
+    {
+        slug: 'migrating-from-zod',
+        title: 'Migrating from Zod',
+        group: 'Reference'
+    },
     { slug: 'api-reference', title: 'API Reference', group: 'Reference' }
 ];
+
+/** Slugs that should redirect to the merged schema-modifiers page */
+export const MODIFIER_REDIRECTS: Record<string, string> = {
+    'default-values': 'schema-modifiers#default-values',
+    'catch-fallback': 'schema-modifiers#catch-fallback',
+    readonly: 'schema-modifiers#readonly',
+    describe: 'schema-modifiers#describe',
+    'schema-name': 'schema-modifiers#schema-name',
+    'promise-schema': 'schema-modifiers#promise-schema'
+};
 
 export function getSectionBySlug(slug: string): SchemaSection | undefined {
     return SCHEMA_SECTIONS.find(s => s.slug === slug);

@@ -34,7 +34,13 @@ export default function PropertyDescriptorsSection() {
             <div className="card">
                 <h2>
                     Example: type-safe form fields with{' '}
-                    <Link href="/react-form">@cleverbrush/react-form</Link>
+                    <a
+                        href="https://www.npmjs.com/package/@cleverbrush/react-form"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        @cleverbrush/react-form
+                    </a>
                 </h2>
                 <p>
                     Every popular React form library today — React Hook Form,
@@ -68,7 +74,14 @@ const { register } = useForm<User>();
                 <p>
                     The schema is the single source of truth — validation rules,
                     TypeScript types, and form field configuration all come from
-                    it. See the <Link href="/react-form">react-form page</Link>{' '}
+                    it. See the{' '}
+                    <a
+                        href="https://www.npmjs.com/package/@cleverbrush/react-form"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        react-form package
+                    </a>{' '}
                     for a full live demo.
                 </p>
             </div>

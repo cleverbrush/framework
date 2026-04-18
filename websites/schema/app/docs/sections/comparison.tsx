@@ -241,7 +241,7 @@ export default function ComparisonSection() {
                 </div>
                 <p style={{ marginTop: '1rem' }}>
                     <Link
-                        href="/migrating-from-zod"
+                        href="/docs/migrating-from-zod"
                         className="playground-link"
                     >
                         ▶ Full Zod → @cleverbrush/schema migration guide
@@ -249,12 +249,12 @@ export default function ComparisonSection() {
                 </p>
             </div>
 
-            {/* ── vs Yup / Joi ──────────────────────────────────── */}
+            {/* ── Broader comparison ──────────────────────────── */}
             <div className="card">
                 <h2>Comparison with other validation libraries</h2>
                 <p>
-                    How does <code>@cleverbrush/schema</code> compare to broader
-                    alternatives?
+                    How does <code>@cleverbrush/schema</code> compare to the
+                    full landscape of TypeScript validation libraries?
                 </p>
                 <div className="table-wrap">
                     <table className="comparison-table">
@@ -263,6 +263,8 @@ export default function ComparisonSection() {
                                 <th>Feature</th>
                                 <th>@cleverbrush/schema</th>
                                 <th>Zod</th>
+                                <th>Valibot</th>
+                                <th>ArkType</th>
                                 <th>Yup</th>
                                 <th>Joi</th>
                             </tr>
@@ -272,6 +274,8 @@ export default function ComparisonSection() {
                                 <td>TypeScript type inference</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
                                 <td className="partial">~</td>
                                 <td className="cross">✗</td>
                             </tr>
@@ -279,11 +283,15 @@ export default function ComparisonSection() {
                                 <td>Immutable schemas</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
                                 <td className="cross">✗</td>
                                 <td className="cross">✗</td>
                             </tr>
                             <tr>
                                 <td>Zero dependencies</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td className="cross">✗</td>
@@ -294,18 +302,24 @@ export default function ComparisonSection() {
                                 <td className="check">✓</td>
                                 <td className="partial">~</td>
                                 <td className="cross">✗</td>
+                                <td className="check">✓</td>
+                                <td className="cross">✗</td>
                                 <td className="partial">~</td>
                             </tr>
                             <tr>
-                                <td>PropertyDescriptors</td>
+                                <td>PropertyDescriptors / metadata</td>
                                 <td className="check">✓</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
                                 <td className="cross">✗</td>
                                 <td className="cross">✗</td>
                                 <td className="partial">~</td>
                             </tr>
                             <tr>
-                                <td>JSDoc comments preservation</td>
+                                <td>JSDoc comment preservation</td>
                                 <td className="check">✓</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
                                 <td className="cross">✗</td>
                                 <td className="cross">✗</td>
                                 <td className="cross">✗</td>
@@ -316,18 +330,33 @@ export default function ComparisonSection() {
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
                             </tr>
                             <tr>
-                                <td>Per-property error inspection</td>
+                                <td>Typed property-targeted errors</td>
                                 <td className="check">✓</td>
-                                <td className="partial">~</td>
-                                <td className="partial">~</td>
-                                <td className="partial">~</td>
+                                <td className="partial">path-based</td>
+                                <td className="partial">path-based</td>
+                                <td className="partial">path-based</td>
+                                <td className="partial">path-based</td>
+                                <td className="partial">path-based</td>
+                            </tr>
+                            <tr>
+                                <td>Branded / opaque types</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
                             </tr>
                             <tr>
                                 <td>Sync + async validation</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="cross">sync only</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
                             </tr>
@@ -335,15 +364,28 @@ export default function ComparisonSection() {
                                 <td>Standard Schema v1</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
                                 <td className="cross">✗</td>
                                 <td className="cross">✗</td>
                             </tr>
                             <tr>
-                                <td>Extension / plugin system</td>
+                                <td>Type-safe extension system</td>
                                 <td className="check">✓</td>
-                                <td className="partial">~</td>
+                                <td className="partial">refine only</td>
+                                <td className="partial">pipe-based</td>
+                                <td className="partial">narrow only</td>
                                 <td className="cross">✗</td>
                                 <td className="partial">~</td>
+                            </tr>
+                            <tr>
+                                <td>Generic / parameterized schemas</td>
+                                <td className="check">✓</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
                             </tr>
                             <tr>
                                 <td>
@@ -354,9 +396,22 @@ export default function ComparisonSection() {
                                 <td className="cross">✗</td>
                                 <td className="cross">✗</td>
                                 <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                            </tr>
+                            <tr>
+                                <td>Object constructors</td>
+                                <td className="check">✓</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
+                                <td className="cross">✗</td>
                             </tr>
                             <tr>
                                 <td>Built-in validators (email…)</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
@@ -368,10 +423,20 @@ export default function ComparisonSection() {
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
                                 <td className="check">✓</td>
+                                <td className="check">✓</td>
+                                <td className="check">✓</td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
+                <p
+                    className="muted"
+                    style={{ marginTop: '0.75rem', fontSize: '0.85rem' }}
+                >
+                    ✓ = full support, ~ = partial or undocumented, ✗ = not
+                    supported. Claims verified against each library&apos;s
+                    latest stable release as of this writing.
+                </p>
             </div>
         </>
     );

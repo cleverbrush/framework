@@ -13,15 +13,6 @@ const NAV_ITEMS: NavItem[] = [
     { href: '/', label: 'Home' },
     { href: '/docs', label: 'Docs' },
     { href: '/playground', label: 'Playground', highlight: true },
-    {
-        href: '#',
-        label: 'Libraries',
-        children: [
-            { href: '/mapper', label: 'Mapper' },
-            { href: '/schema-json', label: 'Schema JSON' }
-        ]
-    },
-    { href: '/migrating-from-zod', label: 'vs Zod' },
     { href: '/showcases', label: 'Showcases' },
     {
         href: 'https://docs.cleverbrush.com',
