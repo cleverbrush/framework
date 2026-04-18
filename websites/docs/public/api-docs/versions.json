@@ -1,4 +1,5 @@
 [
+  { "version": "v3.0.0", "path": "v3.0.0/index.html" },
   { "version": "v2.0.0", "path": "v2.0.0/index.html" },
   { "version": "v1.1.10", "path": "v1.1.10/index.html" }
 ]
