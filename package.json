@@ -5,7 +5,7 @@
     "description": "Cleverbrush Framework - a set of libraries used by Cleverbrush, a web-based publishing application",
     "packageManager": "npm@24.13.0",
     "scripts": {
-        "build": "turbo run build",
+        "build": "turbo run build --filter=!website-schema --filter=!website-docs",
         "build:all": "npm run lint:fix && npm run build && node scripts/update-bundle-badge.js && node scripts/measure-bundle-sizes.js && npm run test && npm run docs && npm run build:schema-site && npm run build:docs-site && npm run test:coverage && npm run bench:json",
         "build:schema-site": "cd websites/schema && npm run build && cd ../..",
         "build:docs-site": "cd websites/docs && npm run build && cd ../..",
