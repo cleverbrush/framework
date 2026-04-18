@@ -58,7 +58,7 @@ describe('buildQueryKey', () => {
         ]);
     });
 
-    test('same args produce equal keys (stable serialization)', () => {
+    test('structurally equal args produce equal keys', () => {
         const args1 = { query: { page: 1, limit: 10 } };
         const args2 = { query: { page: 1, limit: 10 } };
         expect(buildQueryKey('todos', 'list', args1)).toEqual(
