@@ -1,3 +1,4 @@
+/** biome-ignore-all lint/security/noDangerouslySetInnerHtml: need for code examples */
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import Link from 'next/link';
 
