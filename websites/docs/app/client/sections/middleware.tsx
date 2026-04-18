@@ -86,7 +86,7 @@ const logger: Middleware = (next) => async (url, init) => {
     retry(),     // outermost — retries the entire inner chain
     timeout(),   // aborts if a single attempt takes too long
     dedupe(),    // deduplicates concurrent identical requests
-    cache(),     // serves cached responses within TTL
+    throttlingCache(),     // serves cached responses within TTL
 ]`)
                         }}
                     />

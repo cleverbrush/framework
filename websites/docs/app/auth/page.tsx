@@ -105,7 +105,6 @@ const scheme = jwtScheme<UserClaims>({
     issuer: 'https://my-app.com',
     audience: 'my-api',
     clockTolerance: 5,           // seconds
-    roleClaim: 'role',           // claim key used for hasRole()
     mapClaims: claims => ({
         sub: claims.sub as string,
         role: claims.role as string
@@ -252,13 +251,13 @@ const header = serializeCookie('session', 'token-value', {
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { ServerBuilder, endpoint } from '@cleverbrush/server';
+                                __html: highlightTS(`import { createServer, endpoint } from '@cleverbrush/server';
 import { jwtScheme } from '@cleverbrush/auth';
 import { object, string } from '@cleverbrush/schema';
 
 const UserPrincipal = object({ sub: string(), role: string() });
 
-const server = new ServerBuilder();
+const server = createServer();
 
 server
     .useAuthentication({

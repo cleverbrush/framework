@@ -89,7 +89,7 @@ export default function ServerPage() {
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { ServerBuilder, endpoint, ActionResult } from '@cleverbrush/server';
+                                __html: highlightTS(`import { createServer, endpoint, ActionResult } from '@cleverbrush/server';
 import { object, string, number } from '@cleverbrush/schema';
 
 const CreateUserBody = object({ name: string(), age: number() });
@@ -98,7 +98,7 @@ const createUser = endpoint
     .post('/api/users')
     .body(CreateUserBody);
 
-const server = new ServerBuilder();
+const server = createServer();
 
 server.handle(createUser, ({ body }) => {
     // body is typed: { name: string; age: number }
@@ -161,10 +161,11 @@ server.handle(GetUser, ({ query, principal }) => {
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { endpoint, route } from '@cleverbrush/server';
-import { object, number } from '@cleverbrush/schema';
+import { number } from '@cleverbrush/schema';
 
 const GetUser = endpoint.get(
-    route(object({ id: number().coerce() }), $t => $t\`/api/users/\${t => t.id}\`)
+    '/api/users',
+    route({ id: number().coerce() })\`/\${t => t.id}\`
 );
 
 server.handle(GetUser, ({ params }) => {
@@ -315,6 +316,8 @@ server
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`import { jwtScheme } from '@cleverbrush/auth';
+import { endpoint, route } from '@cleverbrush/server';
+import { number } from '@cleverbrush/schema';
 
 server
     .useAuthentication({
@@ -333,7 +336,7 @@ server
 
 // Protect an endpoint
 const AdminEp = endpoint
-    .delete('/api/users/:id')
+    .delete('/api/users', route({ id: number().coerce() })\`/\${t => t.id}\`)
     .authorize(UserPrincipal, 'admin');`)
                             }}
                         />

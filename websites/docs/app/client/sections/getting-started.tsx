@@ -67,14 +67,14 @@ export const api = defineApi({
     todos: {
         list: endpoint.get('/api/todos').returns(array(Todo)),
         get: endpoint
-            .get(route(object({ id: number().coerce() }), $t => $t\`/api/todos/\${t => t.id}\`))
+            .get('/api/todos', route({ id: number().coerce() })\`/\${t => t.id}\`)
             .returns(Todo),
         create: endpoint
             .post('/api/todos')
             .body(object({ title: string() }))
             .returns(Todo),
         delete: endpoint
-            .delete(route(object({ id: number().coerce() }), $t => $t\`/api/todos/\${t => t.id}\`))
+            .delete('/api/todos', route({ id: number().coerce() })\`/\${t => t.id}\`)
     }
 });`)
                         }}

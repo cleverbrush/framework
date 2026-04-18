@@ -63,7 +63,7 @@ export default function SchemaNameSection() {
                     dangerouslySetInnerHTML={{
                         __html: highlightTS(
                             `import { object, string, number, array } from '@cleverbrush/schema';
-import { endpoint } from '@cleverbrush/server';
+import { endpoint, route } from '@cleverbrush/server';
 import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
 
 // Mark the schema with a name — export as a constant and reuse everywhere
@@ -84,7 +84,9 @@ const AddressSchema = object({
     .describe('A physical address');
 
 // --- OpenAPI integration ---
-const GetUser   = endpoint.get('/api/users/:id').returns(UserSchema);
+const GetUser   = endpoint
+    .get('/api/users', route({ id: number().coerce() })\`/\${t => t.id}\`)
+    .returns(UserSchema);
 const ListUsers = endpoint.get('/api/users').returns(array(UserSchema));
 
 const spec = generateOpenApiSpec({

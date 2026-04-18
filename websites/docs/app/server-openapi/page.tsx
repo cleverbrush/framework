@@ -117,16 +117,16 @@ export default function ServerOpenApiPage() {
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { ServerBuilder, endpoint } from '@cleverbrush/server';
+                                __html: highlightTS(`import { createServer, endpoint, route } from '@cleverbrush/server';
 import { serveOpenApi } from '@cleverbrush/server-openapi';
 import { object, string, number } from '@cleverbrush/schema';
 
 const GetUser = endpoint
-    .get('/api/users/:id')
+    .get('/api/users', route({ id: number().coerce() })\`/\${t => t.id}\`)
     .summary('Get a user by ID')
     .tags('users');
 
-const server = new ServerBuilder();
+const server = createServer();
 
 server
     .use(serveOpenApi({
@@ -211,7 +211,7 @@ await writeOpenApiSpec({
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(
                                     `import { object, string, number, array } from '@cleverbrush/schema';
-import { endpoint } from '@cleverbrush/server';
+import { endpoint, route } from '@cleverbrush/server';
 import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
 
 // Export as a constant — reuse the same reference everywhere
@@ -220,7 +220,9 @@ export const UserSchema = object({
     name: string().nonempty(),
 }).schemaName('User');
 
-const GetUser   = endpoint.get('/api/users/:id').returns(UserSchema);
+const GetUser   = endpoint
+    .get('/api/users', route({ id: number().coerce() })\`/\${t => t.id}\`)
+    .returns(UserSchema);
 const ListUsers = endpoint.get('/api/users').returns(array(UserSchema));
 
 const spec = generateOpenApiSpec({
@@ -502,25 +504,22 @@ const Download = endpoint
                 <div className="card">
                     <h2>Path Parameters</h2>
                     <p>
-                        Both colon-style paths and{' '}
-                        <code>ParseStringSchemaBuilder</code> templates are
-                        converted to OpenAPI <code>{'{param}'}</code> format
-                        with per-parameter JSON Schema:
+                        Use <code>route()</code> to define typed path
+                        parameters. The generated spec converts them to OpenAPI{' '}
+                        <code>{'{param}'}</code> format with per-parameter JSON
+                        Schema:
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`// Colon style → { name: 'id', in: 'path', schema: { type: 'string' } }
-endpoint.get('/api/users/:id');
+                                __html: highlightTS(`import { endpoint, route } from '@cleverbrush/server';
+import { number } from '@cleverbrush/schema';
 
-// ParseStringSchemaBuilder → { name: 'id', in: 'path', schema: { type: 'number' } }
-import { route } from '@cleverbrush/server';
-import { object, number } from '@cleverbrush/schema';
-
-endpoint.get(route(
-    object({ id: number().coerce() }),
-    $t => $t\`/api/users/\${t => t.id}\`
-));`)
+// route() template → { name: 'id', in: 'path', schema: { type: 'number' } }
+endpoint.get(
+    '/api/users',
+    route({ id: number().coerce() })\`/\${t => t.id}\`
+);`)
                             }}
                         />
                     </pre>
