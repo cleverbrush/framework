@@ -16,7 +16,7 @@
     "files": [
         "dist"
     ],
-    "homepage": "https://docs.cleverbrush.com/knex-clickhouse",
+    "homepage": "https://docs.cleverbrush.com/knex-schema",
     "keywords": [
         "knex",
         "query builder",
