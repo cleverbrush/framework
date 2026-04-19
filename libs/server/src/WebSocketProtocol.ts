@@ -19,6 +19,8 @@
  * @internal
  */
 
+import { safeJsonParse } from './safeJson.js';
+
 // ---------------------------------------------------------------------------
 // Client → Server frame types
 // ---------------------------------------------------------------------------
@@ -96,7 +98,7 @@ export function errorFrame(code: number, message: string): ServerErrorFrame {
 export function parseClientFrame(raw: string): ClientFrame | null {
     let parsed: unknown;
     try {
-        parsed = JSON.parse(raw);
+        parsed = safeJsonParse(raw);
     } catch {
         return null;
     }

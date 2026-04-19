@@ -10,6 +10,8 @@ import {
     record,
     string
 } from '@cleverbrush/schema';
+import { HttpError } from './HttpError.js';
+import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 
 /**
  * IRequestContext — the schema definition for the request context.
@@ -41,6 +43,9 @@ export const IRequestContext = object({
  * };
  * ```
  */
+/** Default maximum request body size: 5 MB. */
+export const DEFAULT_MAX_BODY_SIZE = 5 * 1024 * 1024;
+
 export class RequestContext {
     readonly request: IncomingMessage;
     readonly response: ServerResponse;
@@ -48,6 +53,7 @@ export class RequestContext {
     readonly method: string;
     readonly headers: Record<string, string>;
     readonly items: Map<string, unknown> = new Map();
+    readonly maxBodySize: number;
 
     #pathParams: Record<string, string> = {};
     /** @internal — overridable for testing */
@@ -67,10 +73,15 @@ export class RequestContext {
      */
     principal: unknown = undefined;
 
-    constructor(request: IncomingMessage, response: ServerResponse) {
+    constructor(
+        request: IncomingMessage,
+        response: ServerResponse,
+        maxBodySize?: number
+    ) {
         this.request = request;
         this.response = response;
         this.method = (request.method ?? 'GET').toUpperCase();
+        this.maxBodySize = maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
 
         // Parse URL — use a placeholder host for relative URLs
         const rawUrl = request.url ?? '/';
@@ -125,7 +136,16 @@ export class RequestContext {
 
         this.#bodyBuffer = await new Promise<Buffer>((resolve, reject) => {
             const chunks: Buffer[] = [];
-            this.request.on('data', (chunk: Buffer) => chunks.push(chunk));
+            let totalSize = 0;
+            this.request.on('data', (chunk: Buffer) => {
+                totalSize += chunk.length;
+                if (totalSize > this.maxBodySize) {
+                    this.request.destroy();
+                    reject(new HttpError(413, 'Payload Too Large'));
+                    return;
+                }
+                chunks.push(chunk);
+            });
             this.request.on('end', () => resolve(Buffer.concat(chunks)));
             this.request.on('error', reject);
         });
@@ -139,7 +159,10 @@ export class RequestContext {
 
         const buf = await this.body();
         const text = buf.toString('utf-8');
-        this.#jsonCache = text.length > 0 ? JSON.parse(text) : undefined;
+        if (text.length > 0) {
+            this.#jsonCache = safeJsonParse(text);
+            checkJsonDepth(this.#jsonCache);
+        }
         this.#jsonParsed = true;
         return this.#jsonCache;
     }
