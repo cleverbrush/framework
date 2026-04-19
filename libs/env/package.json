@@ -5,10 +5,10 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/deep": "^3.0.0"
+        "@cleverbrush/deep": "^3.0.1"
     },
     "peerDependencies": {
-        "@cleverbrush/schema": "^3.0.0"
+        "@cleverbrush/schema": "^3.0.1"
     },
     "description": "Type-safe environment variable parsing with @cleverbrush/schema — validated, coerced, structured configs from process.env",
     "files": [
@@ -50,5 +50,5 @@
         "@types/node": "^25.4.0"
     },
     "types": "./dist/index.d.ts",
-    "version": "3.0.0"
+    "version": "3.0.1"
 }
