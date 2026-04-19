@@ -1,5 +1,12 @@
 # @cleverbrush/async
 
+## 3.0.0
+
+### Major Changes
+
+- 4ee352a: Added `withTimeout()` utility for generic promise timeout with AbortSignal support.
+  Added `dedupe()` utility for deduplicating concurrent async calls by key.
+
 ## 2.0.0
 
 ### Major Changes
