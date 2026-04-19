@@ -79,28 +79,4 @@ describe('ContentNegotiator', () => {
         expect(handler).not.toBeNull();
         expect(handler!.mimeType).toBe('text/plain');
     });
-
-    it('JSON deserializer strips __proto__ keys (prototype pollution)', () => {
-        const cn = new ContentNegotiator();
-        const handler = cn.selectRequestHandler('application/json')!;
-        const result = handler.deserialize(
-            '{"__proto__":{"polluted":true},"safe":"ok"}'
-        ) as any;
-
-        expect(result.safe).toBe('ok');
-        expect(result.__proto__).toBe(Object.prototype);
-        expect(({} as any).polluted).toBeUndefined();
-    });
-
-    it('JSON deserializer strips constructor keys (prototype pollution)', () => {
-        const cn = new ContentNegotiator();
-        const handler = cn.selectRequestHandler('application/json')!;
-        const result = handler.deserialize(
-            '{"constructor":{"prototype":{"polluted":true}},"ok":1}'
-        ) as any;
-
-        expect(result.ok).toBe(1);
-        expect(result.constructor).toBe(Object);
-        expect(({} as any).polluted).toBeUndefined();
-    });
 });

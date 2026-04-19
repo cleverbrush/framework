@@ -1,4 +1,4 @@
-import { safeJsonParse } from './safeJson.js';
+import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 import type { ContentTypeHandler } from './types.js';
 
 const JSON_HANDLER: ContentTypeHandler = {
@@ -7,7 +7,9 @@ const JSON_HANDLER: ContentTypeHandler = {
         return JSON.stringify(value);
     },
     deserialize(raw: string): unknown {
-        return safeJsonParse(raw);
+        const parsed = safeJsonParse(raw);
+        checkJsonDepth(parsed);
+        return parsed;
     }
 };
 
