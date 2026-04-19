@@ -10,6 +10,8 @@ function createReqRes(
         method?: string;
         headers?: Record<string, string>;
         body?: string;
+        /** Supply a Buffer directly for binary/chunked tests. */
+        bodyBuffer?: Buffer;
     } = {}
 ) {
     const socket = new Socket();
@@ -21,10 +23,13 @@ function createReqRes(
     }
 
     // If body provided, simulate readable stream
-    if (options.body !== undefined) {
+    const rawBody =
+        options.bodyBuffer ??
+        (options.body !== undefined ? Buffer.from(options.body) : undefined);
+    if (rawBody !== undefined) {
         const readable = new Readable({
             read() {
-                this.push(Buffer.from(options.body!));
+                this.push(rawBody);
                 this.push(null);
             }
         });

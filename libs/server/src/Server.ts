@@ -26,10 +26,11 @@ import {
     PROBLEM_JSON_CONTENT_TYPE,
     serializeProblemDetails
 } from './ProblemDetails.js';
-import { RequestContext } from './RequestContext.js';
+import { DEFAULT_MAX_BODY_SIZE, RequestContext } from './RequestContext.js';
 import { Router } from './Router.js';
 import type { SubscriptionMetadata } from './Subscription.js';
 import { isTrackedEvent } from './Subscription.js';
+import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 import type {
     ContentTypeHandler,
     EndpointRegistration,
@@ -341,7 +342,8 @@ export class ServerBuilder {
             allMiddlewares,
             this.#healthcheck,
             this.#subscriptionRegistrations.length > 0,
-            this.#batchConfig
+            this.#batchConfig,
+            this.#options.maxBodySize
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -357,6 +359,9 @@ export class ServerBuilder {
  *
  * Use `close()` to gracefully shut down the server.
  */
+/** Maximum number of queued incoming WebSocket messages before the connection is closed. */
+const MAX_WS_QUEUE_SIZE = 1024;
+
 export class Server {
     readonly #router: Router;
     readonly #serviceProvider: ServiceProvider;
@@ -365,6 +370,7 @@ export class Server {
     readonly #healthcheck: boolean;
     readonly #hasSubscriptions: boolean;
     readonly #batchConfig: ServerBatchingOptions | null;
+    readonly #maxBodySize: number;
     #httpServer: http.Server | https.Server | null = null;
     #wss: WebSocketServer | null = null;
     readonly #activeConnections: Set<WebSocket> = new Set();
@@ -376,7 +382,8 @@ export class Server {
         globalMiddlewares: Middleware[],
         healthcheck = false,
         hasSubscriptions = false,
-        batchConfig: ServerBatchingOptions | null = null
+        batchConfig: ServerBatchingOptions | null = null,
+        maxBodySize: number = DEFAULT_MAX_BODY_SIZE
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
@@ -385,6 +392,7 @@ export class Server {
         this.#healthcheck = healthcheck;
         this.#hasSubscriptions = hasSubscriptions;
         this.#batchConfig = batchConfig;
+        this.#maxBodySize = maxBodySize;
     }
 
     /**
@@ -425,7 +433,10 @@ export class Server {
 
         // Set up WebSocket server if subscriptions are registered
         if (this.#hasSubscriptions) {
-            this.#wss = new WebSocketServer({ noServer: true });
+            this.#wss = new WebSocketServer({
+                noServer: true,
+                maxPayload: this.#maxBodySize
+            });
 
             this.#httpServer!.on(
                 'upgrade',
@@ -501,7 +512,7 @@ export class Server {
         const scope = this.#serviceProvider.createScope();
 
         try {
-            const ctx = new RequestContext(req, res);
+            const ctx = new RequestContext(req, res, this.#maxBodySize);
             const urlPath = ctx.url.pathname;
             const method = ctx.method;
 
@@ -691,14 +702,24 @@ export class Server {
         // Read the outer body.
         let outerBody: { requests: Array<BatchSubRequest> };
         try {
-            const raw = await readBuffer(req);
-            outerBody = JSON.parse(raw.toString('utf-8')) as {
+            const raw = await readBuffer(req, this.#maxBodySize);
+            const parsed = safeJsonParse(raw.toString('utf-8'));
+            checkJsonDepth(parsed);
+            outerBody = parsed as {
                 requests: Array<BatchSubRequest>;
             };
             if (!Array.isArray(outerBody?.requests)) {
                 throw new Error('requests must be an array');
             }
-        } catch {
+        } catch (err) {
+            if (err instanceof HttpError && err.status === 413) {
+                const pd = createProblemDetails(413, 'Payload Too Large');
+                res.writeHead(413, {
+                    'content-type': PROBLEM_JSON_CONTENT_TYPE
+                });
+                res.end(serializeProblemDetails(pd));
+                return;
+            }
             const pd = createProblemDetails(400, 'Invalid batch request body');
             res.writeHead(400, { 'content-type': PROBLEM_JSON_CONTENT_TYPE });
             res.end(serializeProblemDetails(pd));
@@ -914,6 +935,20 @@ export class Server {
                 return;
             }
 
+            // Enforce queue size limit to prevent memory exhaustion
+            if (incomingQueue.length >= MAX_WS_QUEUE_SIZE) {
+                ws.send(
+                    JSON.stringify(
+                        errorFrame(
+                            429,
+                            'Message queue full — slow down or reconnect'
+                        )
+                    )
+                );
+                ws.close(1008, 'Message queue overflow');
+                return;
+            }
+
             // frame.type === 'message'
             if (meta.incomingSchema) {
                 const result = meta.incomingSchema.validate(frame.data);
@@ -1057,9 +1092,14 @@ export class Server {
                 }
             } catch (err) {
                 if (ws.readyState === ws.OPEN) {
-                    const msg =
-                        err instanceof Error ? err.message : 'Internal error';
-                    ws.send(JSON.stringify(errorFrame(500, msg)));
+                    // Never leak raw error messages to clients
+                    if (err instanceof Error) {
+                        console.error(
+                            '[server] Subscription handler error:',
+                            err
+                        );
+                    }
+                    ws.send(JSON.stringify(errorFrame(500, 'Internal error')));
                     ws.close(1011, 'Handler error');
                 }
             }
@@ -1097,10 +1137,22 @@ interface BatchSubResponse {
 }
 
 /** Reads the entire body of an `IncomingMessage` into a `Buffer`. */
-function readBuffer(req: http.IncomingMessage): Promise<Buffer> {
+function readBuffer(
+    req: http.IncomingMessage,
+    maxSize: number = DEFAULT_MAX_BODY_SIZE
+): Promise<Buffer> {
     return new Promise<Buffer>((resolve, reject) => {
         const chunks: Buffer[] = [];
-        req.on('data', (chunk: Buffer) => chunks.push(chunk));
+        let totalSize = 0;
+        req.on('data', (chunk: Buffer) => {
+            totalSize += chunk.length;
+            if (totalSize > maxSize) {
+                req.destroy();
+                reject(new HttpError(413, 'Payload Too Large'));
+                return;
+            }
+            chunks.push(chunk);
+        });
         req.on('end', () => resolve(Buffer.concat(chunks)));
         req.on('error', reject);
     });

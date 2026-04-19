@@ -41,7 +41,11 @@ export {
     type ProblemDetails,
     type ValidationErrorItem
 } from './ProblemDetails.js';
-export { IRequestContext, RequestContext } from './RequestContext.js';
+export {
+    DEFAULT_MAX_BODY_SIZE,
+    IRequestContext,
+    RequestContext
+} from './RequestContext.js';
 export { route } from './route.js';
 export {
     type AuthenticationConfig,

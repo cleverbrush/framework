@@ -106,6 +106,16 @@ export interface ServerOptions {
         readonly key: string;
         readonly cert: string;
     };
+
+    /**
+     * Maximum allowed size (in bytes) for incoming request bodies, batch
+     * payloads, and WebSocket messages.
+     *
+     * Requests that exceed this limit are rejected with `413 Payload Too Large`.
+     *
+     * @default 5_242_880 (5 MB)
+     */
+    readonly maxBodySize?: number;
 }
 
 // ---------------------------------------------------------------------------

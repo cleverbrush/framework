@@ -76,5 +76,47 @@ describe('WebSocketProtocol', () => {
                 parseClientFrame(JSON.stringify({ data: 'hello' }))
             ).toBeNull();
         });
+
+        test('returns null for excessively deep JSON payloads', () => {
+            let nested: unknown = 1;
+            for (let i = 0; i < 65; i++) {
+                nested = { child: nested };
+            }
+
+            expect(
+                parseClientFrame(
+                    JSON.stringify({ type: 'message', data: nested })
+                )
+            ).toBeNull();
+        });
+
+        test('strips __proto__ keys from message data (prototype pollution)', () => {
+            const raw = JSON.stringify({
+                type: 'message',
+                data: { __proto__: { polluted: true }, safe: 'ok' }
+            });
+            const frame = parseClientFrame(raw);
+            expect(frame).not.toBeNull();
+            expect(frame!.type).toBe('message');
+            if (frame!.type === 'message') {
+                const data = frame?.data as any;
+                expect(data?.safe).toBe('ok');
+                expect(data?.__proto__).toBe(Object.prototype);
+                expect(({} as any).polluted).toBeUndefined();
+            }
+        });
+
+        test('strips constructor keys from parsed frames (prototype pollution)', () => {
+            const malicious =
+                '{"type":"message","data":{"constructor":{"prototype":{"polluted":true}},"ok":1}}';
+            const frame = parseClientFrame(malicious);
+            expect(frame).not.toBeNull();
+            if (frame!.type === 'message') {
+                const data = frame?.data as any;
+                expect(data?.ok).toBe(1);
+                expect(data?.constructor).toBe(Object);
+                expect(({} as any).polluted).toBeUndefined();
+            }
+        });
     });
 });
