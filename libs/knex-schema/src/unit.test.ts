@@ -1662,7 +1662,7 @@ describe('transaction support', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Default Extensions Perists
+// Default Extensions Persist
 // ═══════════════════════════════════════════════════════════════════════════
 describe('default extensions', () => {
     it('transaction() is a function on the bound factory', () => {
