@@ -1660,3 +1660,19 @@ describe('transaction support', () => {
         });
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Default Extensions Persist
+// ═══════════════════════════════════════════════════════════════════════════
+describe('default extensions', () => {
+    it('composes default extensions with hasColumnName() and hasTableName()', () => {
+        const db = createQuery(knex);
+        const Schema = object({
+            id: string().uuid().hasColumnName('id')
+        }).hasTableName('test');
+        const sql = db(Schema)
+            .where(t => t.id, '=', '1234')
+            .toQuery();
+        expect(sql).toContain('"id" = \'1234\'');
+    });
+});
