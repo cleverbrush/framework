@@ -5,7 +5,7 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^3.0.0"
+        "@cleverbrush/schema": "^3.0.1"
     },
     "description": "Type-safe, schema-driven object mapper for @cleverbrush/schema — compile-time completeness, selector-based field mapping, auto-mapping",
     "files": [
@@ -42,5 +42,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "3.0.0"
+    "version": "3.0.1"
 }

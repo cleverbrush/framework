@@ -1,5 +1,11 @@
 # @cleverbrush/deep
 
+## 3.0.1
+
+### Patch Changes
+
+- 53d2b8f: `@cleverbrush/knex-schema`: compose default schema extensions (`stringExtensions`, `numberExtensions`, `arrayExtensions`) alongside `dbExtension` so that builders exported from the package expose built-in methods such as `.uuid()`, `.email()`, `.positive()`, and `.nonempty()` in addition to `.hasColumnName()` / `.hasTableName()`.
+
 ## 3.0.0
 
 ## 2.0.0
