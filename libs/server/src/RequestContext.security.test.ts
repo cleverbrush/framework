@@ -46,75 +46,56 @@ function createReqRes(
     return { req, res };
 }
 
+function createStreamingContext(
+    chunks: Buffer[],
+    maxBodySize: number
+): RequestContext {
+    const req = new IncomingMessage(new Socket());
+    req.url = '/';
+    req.method = 'POST';
+
+    const readable = new Readable({
+        read() {
+            for (const chunk of chunks) {
+                this.push(chunk);
+            }
+            this.push(null);
+        }
+    });
+
+    const origDestroy = req.destroy.bind(req);
+    req.destroy = ((err?: Error) => {
+        readable.destroy();
+        return origDestroy(err);
+    }) as any;
+
+    const origOn = req.on.bind(req);
+    req.on = ((event: string, listener: (...args: any[]) => void) => {
+        if (event === 'data' || event === 'end' || event === 'error') {
+            readable.on(event, listener);
+            return req;
+        }
+        return origOn(event, listener);
+    }) as any;
+
+    const res = new ServerResponse(req);
+    return new RequestContext(req, res, maxBodySize);
+}
+
 describe('RequestContext — security', () => {
-    it('rejects body exceeding maxBodySize with HttpError 413', async () => {
-        const socket = new Socket();
-        const req = new IncomingMessage(socket);
-        req.url = '/';
-        req.method = 'POST';
-
+    it('rejects chunked body exceeding maxBodySize with HttpError 413', async () => {
         const chunk = Buffer.alloc(512, 'x');
-        const readable = new Readable({
-            read() {
-                this.push(chunk);
-                this.push(chunk);
-                this.push(null);
-            }
-        });
-
-        const origDestroy = req.destroy.bind(req);
-        req.destroy = ((err?: Error) => {
-            readable.destroy();
-            return origDestroy(err);
-        }) as any;
-
-        const origOn = req.on.bind(req);
-        req.on = ((event: string, listener: (...args: any[]) => void) => {
-            if (event === 'data' || event === 'end' || event === 'error') {
-                readable.on(event, listener);
-                return req;
-            }
-            return origOn(event, listener);
-        }) as any;
-
-        const res = new ServerResponse(req);
-        const ctx = new RequestContext(req, res, 512);
+        const ctx = createStreamingContext([chunk, chunk], 512);
 
         await expect(ctx.body()).rejects.toThrow(HttpError);
+    });
 
-        const req2 = new IncomingMessage(new Socket());
-        req2.url = '/';
-        req2.method = 'POST';
-        const readable2 = new Readable({
-            read() {
-                this.push(Buffer.alloc(1024, 'x'));
-                this.push(null);
-            }
+    it('rejects single oversized chunk with status 413', async () => {
+        const ctx = createStreamingContext([Buffer.alloc(1024, 'x')], 512);
+
+        await expect(ctx.body()).rejects.toMatchObject({
+            status: 413
         });
-        const origDestroy2 = req2.destroy.bind(req2);
-        req2.destroy = ((err?: Error) => {
-            readable2.destroy();
-            return origDestroy2(err);
-        }) as any;
-        const origOn2 = req2.on.bind(req2);
-        req2.on = ((event: string, listener: (...args: any[]) => void) => {
-            if (event === 'data' || event === 'end' || event === 'error') {
-                readable2.on(event, listener);
-                return req2;
-            }
-            return origOn2(event, listener);
-        }) as any;
-
-        const res2 = new ServerResponse(req2);
-        const ctx2 = new RequestContext(req2, res2, 512);
-
-        try {
-            await ctx2.body();
-            expect.unreachable('should have thrown');
-        } catch (err) {
-            expect(err).toBeInstanceOf(HttpError);
-            expect((err as HttpError).status).toBe(413);
-        }
     });
 
     it('accepts body within maxBodySize', async () => {
