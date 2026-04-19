@@ -30,6 +30,7 @@ import { DEFAULT_MAX_BODY_SIZE, RequestContext } from './RequestContext.js';
 import { Router } from './Router.js';
 import type { SubscriptionMetadata } from './Subscription.js';
 import { isTrackedEvent } from './Subscription.js';
+import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 import type {
     ContentTypeHandler,
     EndpointRegistration,
@@ -43,7 +44,6 @@ import {
     VirtualServerResponse
 } from './VirtualHttp.js';
 import type { WebhookDefinition } from './Webhook.js';
-import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 import {
     errorFrame,
     messageFrame,
