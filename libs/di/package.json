@@ -5,7 +5,7 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^3.0.1"
+        "@cleverbrush/schema": "^3.1.0"
     },
     "description": ".NET-style dependency injection container for TypeScript — schema-driven service registration, three lifetimes, function injection",
     "files": [
@@ -43,5 +43,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "3.0.1"
+    "version": "3.1.0"
 }

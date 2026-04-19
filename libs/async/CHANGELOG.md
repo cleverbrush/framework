@@ -1,5 +1,7 @@
 # @cleverbrush/async
 
+## 3.1.0
+
 ## 3.0.1
 
 ### Patch Changes
