@@ -13,7 +13,13 @@ import type {
     StringSchemaBuilder,
     UnionSchemaBuilder
 } from '@cleverbrush/schema';
-import { defineExtension, withExtensions } from '@cleverbrush/schema';
+import {
+    arrayExtensions,
+    defineExtension,
+    numberExtensions,
+    stringExtensions,
+    withExtensions
+} from '@cleverbrush/schema';
 
 // ---------------------------------------------------------------------------
 // Shared implementations
@@ -199,7 +205,12 @@ export const dbExtension = defineExtension({
 // Extended factory functions
 // ---------------------------------------------------------------------------
 
-const extended = withExtensions(dbExtension);
+const extended = withExtensions(
+    stringExtensions,
+    numberExtensions,
+    arrayExtensions,
+    dbExtension
+);
 
 export const string = extended.string;
 export const number = extended.number;
