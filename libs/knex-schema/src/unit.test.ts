@@ -1665,7 +1665,7 @@ describe('transaction support', () => {
 // Default Extensions Persist
 // ═══════════════════════════════════════════════════════════════════════════
 describe('default extensions', () => {
-    it('transaction() is a function on the bound factory', () => {
+    it('composes default extensions with hasColumnName() and hasTableName()', () => {
         const db = createQuery(knex);
         const Schema = object({
             id: string().uuid().hasColumnName('id')
