@@ -5,7 +5,7 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/deep": "^3.0.1"
+        "@cleverbrush/deep": "^3.1.0"
     },
     "peerDependencies": {
         "@cleverbrush/schema": "^3.0.1"
@@ -50,5 +50,5 @@
         "@types/node": "^25.4.0"
     },
     "types": "./dist/index.d.ts",
-    "version": "3.0.1"
+    "version": "3.1.0"
 }

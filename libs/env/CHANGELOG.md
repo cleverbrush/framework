@@ -1,5 +1,11 @@
 # @cleverbrush/env
 
+## 3.1.0
+
+### Patch Changes
+
+- @cleverbrush/deep@3.1.0
+
 ## 3.0.1
 
 ### Patch Changes

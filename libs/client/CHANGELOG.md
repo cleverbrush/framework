@@ -1,5 +1,13 @@
 # @cleverbrush/client
 
+## 3.1.0
+
+### Patch Changes
+
+- Updated dependencies [25da8ac]
+  - @cleverbrush/server@3.1.0
+  - @cleverbrush/schema@3.1.0
+
 ## 3.0.1
 
 ### Patch Changes
