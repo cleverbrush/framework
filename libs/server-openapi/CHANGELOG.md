@@ -1,5 +1,15 @@
 # @cleverbrush/server-openapi
 
+## 4.0.0
+
+### Patch Changes
+
+- Updated dependencies [25da8ac]
+  - @cleverbrush/server@4.0.0
+  - @cleverbrush/schema@4.0.0
+  - @cleverbrush/schema-json@4.0.0
+  - @cleverbrush/auth@4.0.0
+
 ## 3.0.1
 
 ### Patch Changes
