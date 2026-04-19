@@ -77,6 +77,19 @@ describe('WebSocketProtocol', () => {
             ).toBeNull();
         });
 
+        test('returns null for excessively deep JSON payloads', () => {
+            let nested: unknown = 1;
+            for (let i = 0; i < 65; i++) {
+                nested = { child: nested };
+            }
+
+            expect(
+                parseClientFrame(
+                    JSON.stringify({ type: 'message', data: nested })
+                )
+            ).toBeNull();
+        });
+
         test('strips __proto__ keys from message data (prototype pollution)', () => {
             const raw = JSON.stringify({
                 type: 'message',

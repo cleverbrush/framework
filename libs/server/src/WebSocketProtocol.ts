@@ -19,7 +19,7 @@
  * @internal
  */
 
-import { safeJsonParse } from './safeJson.js';
+import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 
 // ---------------------------------------------------------------------------
 // Client → Server frame types
@@ -99,6 +99,7 @@ export function parseClientFrame(raw: string): ClientFrame | null {
     let parsed: unknown;
     try {
         parsed = safeJsonParse(raw);
+        checkJsonDepth(parsed);
     } catch {
         return null;
     }
