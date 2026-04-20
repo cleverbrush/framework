@@ -1,7 +1,7 @@
 import {
     defineWebhook
 } from '@cleverbrush/server';
-import { BoundQueryToken } from '../di/tokens.js';
+import { BoundQueryToken, LoggerToken } from '../di/tokens.js';
 import {
     PrincipalSchema,
     TodoNotificationPayloadSchema,
@@ -66,7 +66,7 @@ export const GetTodoWithAuthorEndpoint = api.todos.getWithAuthor
 
 export const CreateTodoEndpoint = api.todos.create
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: BoundQueryToken, logger: LoggerToken })
     .summary('Create a todo')
     .description('Creates a new todo owned by the authenticated user.')
     .tags('todos')
@@ -74,7 +74,7 @@ export const CreateTodoEndpoint = api.todos.create
 
 export const UpdateTodoEndpoint = api.todos.update
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: BoundQueryToken, logger: LoggerToken })
     .summary('Update a todo')
     .description(
         'Partially updates a todo. Users can only update their own todos; admins can update any todo.'
@@ -84,7 +84,7 @@ export const UpdateTodoEndpoint = api.todos.update
 
 export const DeleteTodoEndpoint = api.todos.delete
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: BoundQueryToken, logger: LoggerToken })
     .summary('Delete a todo')
     .description(
         'Deletes a todo. Users can only delete their own todos; admins can delete any todo.'
@@ -94,7 +94,7 @@ export const DeleteTodoEndpoint = api.todos.delete
 
 export const SendTodoEventEndpoint = api.todos.sendEvent
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: BoundQueryToken, logger: LoggerToken })
     .summary('Send a todo event')
     .description(
         'Accepts a discriminated-union event for a todo (assigned / commented / completed). ' +
@@ -130,7 +130,7 @@ export const DeleteUserEndpoint = api.users.delete
 
 export const ExportTodosEndpoint = api.todos.exportCsv
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: BoundQueryToken, logger: LoggerToken })
     .produces({ 'text/csv': {} })
     .externalDocs(
         'https://tools.ietf.org/html/rfc4180',
@@ -164,7 +164,7 @@ export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
 
 export const ImportTodosEndpoint = api.todos.importBulk
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: BoundQueryToken, logger: LoggerToken })
     .example({ items: [{ title: 'Buy groceries' }] } as any)
     .examples({
         minimal: {
@@ -212,7 +212,7 @@ export const LegacyReplaceTodoEndpoint = api.todos.legacyReplace
 
 export const CompleteTodoEndpoint = api.todos.complete
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: BoundQueryToken, logger: LoggerToken })
     .summary('Complete a todo with conflict detection')
     .description(
         'Marks a todo as completed. Supports optimistic concurrency via the `If-Match` header — ' +

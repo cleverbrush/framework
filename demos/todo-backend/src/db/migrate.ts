@@ -1,5 +1,7 @@
+import type { Logger } from '@cleverbrush/log';
 import type { Knex } from 'knex';
 import { up as migration001Up } from './migrations/001_initial.js';
+import { MigrationRan } from '../logTemplates.js';
 
 type MigrationEntry = {
     name: string;
@@ -10,7 +12,7 @@ const migrations: MigrationEntry[] = [
     { name: '001_initial', up: migration001Up }
 ];
 
-export async function runMigrations(knex: Knex): Promise<void> {
+export async function runMigrations(knex: Knex, logger?: Logger): Promise<void> {
     // Ensure the migrations tracking table exists
     const hasMigrationsTable = await knex.schema.hasTable('_migrations');
     if (!hasMigrationsTable) {
@@ -37,6 +39,6 @@ export async function runMigrations(knex: Knex): Promise<void> {
             await trx('_migrations').insert({ name: migration.name });
         });
 
-        console.log(`[migrations] ran ${migration.name}`);
+        logger?.info(MigrationRan, { MigrationName: migration.name });
     }
 }

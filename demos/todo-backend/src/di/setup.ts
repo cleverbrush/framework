@@ -1,12 +1,16 @@
 import type { IServiceProvider, ServiceCollection } from '@cleverbrush/di';
 import { createQuery } from '@cleverbrush/knex-schema';
+import type { Logger } from '@cleverbrush/log';
 import knex from 'knex';
 import type { Config } from '../config.js';
-import { BoundQueryToken, ConfigToken, KnexToken } from './tokens.js';
+import { BoundQueryToken, ConfigToken, KnexToken, LoggerToken } from './tokens.js';
 
-export function configureDI(services: ServiceCollection, config: Config): void {
+export function configureDI(services: ServiceCollection, config: Config, logger: Logger): void {
     // Application config — available everywhere
     services.addSingleton(ConfigToken, config);
+
+    // Structured logger — available everywhere via DI
+    services.addSingleton(LoggerToken, logger);
 
     // Knex instance — single connection pool for the whole application
     services.addSingleton(KnexToken, () =>

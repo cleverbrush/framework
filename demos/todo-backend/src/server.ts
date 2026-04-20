@@ -1,4 +1,6 @@
 import { jwtScheme } from '@cleverbrush/auth';
+import type { Logger } from '@cleverbrush/log';
+import { useLogging } from '@cleverbrush/log';
 import {
     createServer,
     endpoint,
@@ -20,20 +22,28 @@ import { exportTodosHandler } from './api/handlers/todos.js';
 import { activityLogHandler } from './api/handlers/admin.js';
 import type { Config } from './config.js';
 import { configureDI } from './di/setup.js';
+import { AuditEnd, AuditStart } from './logTemplates.js';
 
 // ── Per-endpoint middlewares ──────────────────────────────────────────────────
 
-/** Audit logging middleware — logs export requests to stdout. */
-const auditLogMiddleware: Middleware = async (ctx, next) => {
-    const start = Date.now();
-    console.log(
-        `[audit] ${ctx.method} ${ctx.url.pathname} by principal=${JSON.stringify(ctx.principal ?? 'anonymous')}`
-    );
-    await next();
-    console.log(
-        `[audit] ${ctx.method} ${ctx.url.pathname} completed in ${Date.now() - start}ms`
-    );
-};
+/** Audit logging middleware — logs export requests via structured logger. */
+function createAuditLogMiddleware(logger: Logger): Middleware {
+    const auditLog = logger.forContext('SourceContext', 'AuditLog');
+    return async (ctx, next) => {
+        const start = Date.now();
+        auditLog.info(AuditStart, {
+            Method: ctx.method,
+            Path: ctx.url.pathname,
+            Principal: String(ctx.principal ?? 'anonymous')
+        });
+        await next();
+        auditLog.info(AuditEnd, {
+            Method: ctx.method,
+            Path: ctx.url.pathname,
+            ElapsedMs: Date.now() - start
+        });
+    };
+}
 
 /** Request timing middleware — adds X-Response-Time header. */
 const timingMiddleware: Middleware = async (ctx, next) => {
@@ -42,7 +52,9 @@ const timingMiddleware: Middleware = async (ctx, next) => {
     ctx.response.setHeader('x-response-time', `${Date.now() - start}ms`);
 };
 
-export function buildServer(config: Config) {
+export function buildServer(config: Config, logger: Logger) {
+    const auditLogMiddleware = createAuditLogMiddleware(logger);
+
     const corsMiddleware: Middleware = async (ctx, next) => {
         ctx.response.setHeader('Access-Control-Allow-Origin', '*');
         ctx.response.setHeader(
@@ -61,9 +73,15 @@ export function buildServer(config: Config) {
         await next();
     };
 
+    const [correlationMiddleware, requestLogMiddleware] = useLogging(logger, {
+        excludePaths: ['/health']
+    });
+
     const server = createServer()
         .use(corsMiddleware)
-        .services(svc => configureDI(svc, config))
+        .use(correlationMiddleware)
+        .use(requestLogMiddleware)
+        .services(svc => configureDI(svc, config, logger))
         .useAuthentication({
             defaultScheme: 'jwt',
             schemes: [

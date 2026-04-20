@@ -15,6 +15,7 @@ COPY libs/di/package.json ./libs/di/
 COPY libs/env/package.json ./libs/env/
 COPY libs/knex-clickhouse/package.json ./libs/knex-clickhouse/
 COPY libs/knex-schema/package.json ./libs/knex-schema/
+COPY libs/log/package.json ./libs/log/
 COPY libs/mapper/package.json ./libs/mapper/
 COPY libs/react-form/package.json ./libs/react-form/
 COPY libs/schema/package.json ./libs/schema/
@@ -62,7 +63,8 @@ WORKDIR /app
 COPY --from=builder /app/runtime_modules/ ./node_modules/
 COPY --from=builder /app/demos/todo-backend/dist/ ./dist/
 
-RUN chown -R appuser:appgroup /app
+# Create logs directory for file sink
+RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
 USER appuser
 
 ENV NODE_ENV=production

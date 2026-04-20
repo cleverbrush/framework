@@ -1,4 +1,5 @@
 import type { BoundQuery } from '@cleverbrush/knex-schema';
+import type { Logger } from '@cleverbrush/log';
 import { any } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import type { Config } from '../config.js';
@@ -19,3 +20,8 @@ export const BoundQueryToken = any().hasType<BoundQuery>();
  * DI token for the parsed application configuration.
  */
 export const ConfigToken = any().hasType<Config>();
+
+/**
+ * DI token for the structured logger.
+ */
+export const LoggerToken = any().hasType<Logger>();

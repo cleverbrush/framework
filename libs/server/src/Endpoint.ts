@@ -1477,6 +1477,32 @@ export class EndpointBuilder<
         );
     }
 
+    /**
+     * The full path for this endpoint, combining `basePath` and `pathTemplate`.
+     *
+     * For static routes this is the exact URL path (e.g. `"/todos"`).
+     * For dynamic routes the template placeholders are included
+     * (e.g. `"/todos/:id"`).
+     */
+    get path(): string {
+        const base = this.#basePath;
+        const tpl = this.#pathTemplate;
+        let suffix: string;
+        if (typeof tpl === 'string') {
+            suffix = tpl;
+        } else {
+            const { literals, segments } = tpl.introspect().templateDefinition;
+            let s = '';
+            for (let i = 0; i < segments.length; i++) {
+                s += literals[i] + `:${segments[i].path}`;
+            }
+            s += literals[segments.length] ?? '';
+            suffix = s;
+        }
+        if (suffix === '/') return base || '/';
+        return base + suffix;
+    }
+
     /** Return an immutable snapshot of this builder's configuration as {@link EndpointMetadata}. */
     introspect(): EndpointMetadata {
         return {

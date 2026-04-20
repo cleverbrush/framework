@@ -1,5 +1,14 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
 import { TodoDbSchema, UserDbSchema } from '../../db/schemas.js';
+import {
+    TodoCompleted,
+    TodoCreated,
+    TodoDeleted,
+    TodoEventReceived,
+    TodosExported,
+    TodosImported,
+    TodoUpdated
+} from '../../logTemplates.js';
 import type {
     CompleteTodoEndpoint,
     CreateTodoEndpoint,
@@ -74,7 +83,7 @@ export const getTodoHandler: Handler<typeof GetTodoEndpoint> = async (
 
 export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
     { body, principal },
-    { db }
+    { db, logger }
 ) => {
     const now = new Date();
     const todo = await db(TodoDbSchema).insert({
@@ -86,6 +95,12 @@ export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
         updatedAt: now
     });
 
+    logger.info(TodoCreated, {
+        TodoId: todo.id,
+        Title: body.title,
+        UserId: principal.userId
+    });
+
     return ActionResult.created(await mapTodo(todo), `/api/todos/${todo.id}`);
 };
 
@@ -93,7 +108,7 @@ export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
 
 export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
     { params, body, principal },
-    { db }
+    { db, logger }
 ) => {
     const todo = await db(TodoDbSchema)
         .where(t => t.id, params.id)
@@ -126,6 +141,11 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
         .where(t => t.id, params.id)
         .update(patch);
 
+    logger.info(TodoUpdated, {
+        TodoId: params.id,
+        UserId: principal.userId
+    });
+
     return mapTodo(updated);
 };
 
@@ -133,7 +153,7 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
 
 export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
     { params, principal },
-    { db }
+    { db, logger }
 ) => {
     const todo = await db(TodoDbSchema)
         .where(t => t.id, params.id)
@@ -154,6 +174,11 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
     await db(TodoDbSchema)
         .where(t => t.id, params.id)
         .delete();
+
+    logger.info(TodoDeleted, {
+        TodoId: params.id,
+        UserId: principal.userId
+    });
 
     return ActionResult.noContent();
 };
@@ -199,7 +224,7 @@ export const getTodoWithAuthorHandler: Handler<
 
 export const sendTodoEventHandler: Handler<
     typeof SendTodoEventEndpoint
-> = async ({ params, body, principal }, { db }) => {
+> = async ({ params, body, principal }, { db, logger }) => {
     const todo = await db(TodoDbSchema)
         .where(t => t.id, params.id)
         .first();
@@ -217,6 +242,12 @@ export const sendTodoEventHandler: Handler<
     }
 
     // Echo the event back so the caller can confirm what was received.
+    logger.info(TodoEventReceived, {
+        TodoId: params.id,
+        EventType: body.type,
+        UserId: principal.userId
+    });
+
     return body;
 };
 
@@ -224,7 +255,7 @@ export const sendTodoEventHandler: Handler<
 
 export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
     { principal, context },
-    { db }
+    { db, logger }
 ) => {
     let builder = db(TodoDbSchema).orderBy(t => t.createdAt, 'desc');
 
@@ -245,6 +276,11 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
 
     context.response.setHeader('x-total-count', String(todos.length));
     context.response.setHeader('x-export-format', 'csv');
+
+    logger.info(TodosExported, {
+        Count: todos.length,
+        UserId: principal.userId
+    });
 
     return ActionResult.content(csv, 'text/csv');
 };
@@ -293,7 +329,7 @@ export const downloadAttachmentHandler: Handler<
 
 export const importTodosHandler: Handler<typeof ImportTodosEndpoint> = async (
     { body, principal },
-    { db }
+    { db, logger }
 ) => {
     const items = body.items;
 
@@ -336,6 +372,12 @@ export const importTodosHandler: Handler<typeof ImportTodosEndpoint> = async (
     }
 
     // 207 Multi-Status with per-item results (demo of ActionResult.json with custom status)
+    logger.info(TodosImported, {
+        Imported: imported,
+        Total: items.length,
+        UserId: principal.userId
+    });
+
     return ActionResult.json(
         { imported, total: items.length, items: results },
         207
@@ -354,7 +396,7 @@ export const legacyReplaceTodoHandler: Handler<
 
 export const completeTodoHandler: Handler<
     typeof CompleteTodoEndpoint
-> = async ({ params, headers, principal }, { db }) => {
+> = async ({ params, headers, principal }, { db, logger }) => {
     const todo = await db(TodoDbSchema)
         .where(t => t.id, params.id)
         .first();
@@ -389,6 +431,11 @@ export const completeTodoHandler: Handler<
     const [updated] = await db(TodoDbSchema)
         .where(t => t.id, params.id)
         .update({ completed: true, updatedAt: new Date() });
+
+    logger.info(TodoCompleted, {
+        TodoId: params.id,
+        UserId: principal.userId
+    });
 
     return mapTodo(updated);
 };

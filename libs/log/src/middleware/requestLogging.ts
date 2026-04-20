@@ -7,8 +7,8 @@ import { LogLevel, type LogLevelName, parseLogLevel } from '../LogLevel.js';
 export interface RequestLoggingOptions {
     /** Customize log level based on status code and elapsed time. */
     getLevel?: (statusCode: number, elapsedMs: number) => LogLevelName;
-    /** Paths to exclude from request logging. */
-    excludePaths?: string[];
+    /** Paths to exclude from request logging. Accepts plain strings or objects with a `path` property (e.g. endpoint builders). */
+    excludePaths?: (string | { readonly path: string })[];
     /** Extract custom properties from the request context. */
     enrichRequest?: (ctx: any) => Record<string, unknown>;
     /** Whether to log request bodies. @default false */
@@ -33,7 +33,7 @@ export interface RequestLoggingOptions {
  * @example
  * ```ts
  * server.use(requestLoggingMiddleware(logger, {
- *     excludePaths: ['/health'],
+ *     excludePaths: ['/health', myEndpoint],
  *     getLevel: (status) => status >= 500 ? 'error' : 'information',
  * }));
  * ```
@@ -42,7 +42,11 @@ export function requestLoggingMiddleware(
     logger: Logger,
     options?: RequestLoggingOptions
 ) {
-    const excludePaths = new Set(options?.excludePaths ?? []);
+    const excludePaths = new Set(
+        (options?.excludePaths ?? []).map(p =>
+            typeof p === 'string' ? p : p.path
+        )
+    );
     const getLevel = options?.getLevel;
     const enrichRequest = options?.enrichRequest;
     const logRequestStart = options?.logRequestStart ?? false;

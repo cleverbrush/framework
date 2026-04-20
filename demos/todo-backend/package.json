@@ -10,6 +10,7 @@
         "@cleverbrush/di": "*",
         "@cleverbrush/env": "*",
         "@cleverbrush/knex-schema": "*",
+        "@cleverbrush/log": "*",
         "@cleverbrush/mapper": "*",
         "@cleverbrush/schema": "*",
         "@cleverbrush/schema-json": "*",

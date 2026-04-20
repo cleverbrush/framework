@@ -1,10 +1,44 @@
+import {
+    createLogger,
+    consoleSink,
+    fileSink,
+    hostnameEnricher,
+    processIdEnricher
+} from '@cleverbrush/log';
 import knex from 'knex';
 import { config } from './config.js';
 import { runMigrations } from './db/migrate.js';
+import {
+    AppStarting,
+    ForcedShutdown,
+    HttpServerClosed,
+    Listening,
+    MigrationsComplete,
+    MigrationsRunning,
+    OpenApiSpec,
+    ShutdownError,
+    ShutdownReceived
+} from './logTemplates.js';
 import { buildServer } from './server.js';
 
 async function main() {
-    console.log(`[app] starting in ${config.nodeEnv} mode`);
+    // Create structured logger with console + file sinks
+    const logger = createLogger({
+        minimumLevel: 'debug',
+        sinks: [
+            consoleSink({ theme: 'dark' }),
+            fileSink({
+                path: './logs/app.log',
+                rotation: { strategy: 'time', interval: 'daily', retainCount: 7 }
+            })
+        ],
+        enrichers: [hostnameEnricher(), processIdEnricher()],
+        handleProcessExit: true
+    });
+
+    logger.info(AppStarting, {
+        Environment: config.nodeEnv
+    });
 
     // Standalone knex instance used only for running migrations at startup.
     // The DI container manages the long-lived application instance.
@@ -15,43 +49,53 @@ async function main() {
     });
 
     try {
-        console.log('[app] running database migrations…');
-        await runMigrations(migrationKnex);
-        console.log('[app] migrations complete');
+        logger.info(MigrationsRunning, {});
+        await runMigrations(migrationKnex, logger);
+        logger.info(MigrationsComplete, {});
     } finally {
         await migrationKnex.destroy();
     }
 
-    const server = buildServer(config);
+    const server = buildServer(config, logger);
     const httpServer = await server.listen(
         config.server.port,
         config.server.host
     );
 
-    console.log(
-        `[app] listening on http://${config.server.host}:${config.server.port}`
-    );
-    console.log(
-        `[app] OpenAPI spec → http://${config.server.host === '0.0.0.0' ? 'localhost' : config.server.host}:${config.server.port}/openapi.json`
-    );
+    logger.info(Listening, {
+        Host: config.server.host,
+        Port: config.server.port
+    });
+    logger.info(OpenApiSpec, {
+        Host:
+            config.server.host === '0.0.0.0'
+                ? 'localhost'
+                : config.server.host,
+        Port: config.server.port
+    });
 
     // Graceful shutdown
     const shutdown = async (signal: string) => {
-        console.log(`[app] received ${signal}, shutting down…`);
+        logger.info(ShutdownReceived, { Signal: signal });
 
         // Force exit if graceful shutdown takes too long
         const timer = setTimeout(() => {
-            console.error('[app] forced shutdown after timeout');
+            logger.fatal(ForcedShutdown, {});
             process.exit(1);
         }, 10_000);
         timer.unref();
 
         try {
             await httpServer.close();
-            console.log('[app] HTTP server closed');
+            logger.info(HttpServerClosed, {});
         } catch (err) {
-            console.error('[app] error during shutdown:', err);
+            logger.error(
+                err instanceof Error ? err : new Error(String(err)),
+                ShutdownError,
+                {}
+            );
         } finally {
+            await logger.dispose();
             process.exit(0);
         }
     };
