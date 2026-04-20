@@ -6,14 +6,16 @@ export {
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
-
-// Schema extension (hasColumnName / hasTableName)
+// DDL generation
+export { generateCreateTable } from './ddl.js';
+// Schema extension (hasColumnName / hasTableName + DDL/ORM)
 export {
     any,
     array,
     boolean,
     date,
     dbExtension,
+    ddlExtension,
     func,
     getColumnName,
     getTableName,
@@ -24,6 +26,14 @@ export {
 } from './extension.js';
 // Mappers (from knex-eager)
 export { clearRow, MAPPERS, mapObject, mapValue } from './mappers.js';
+// Migration generation
+export {
+    diffSchema,
+    generateMigration,
+    introspectDatabase
+} from './migration.js';
+// Raw query execution
+export { rawQuery } from './raw.js';
 export type { BoundQuery } from './SchemaQueryBuilder.js';
 // Main entry point
 export {
@@ -34,10 +44,23 @@ export {
 
 // Types
 export type {
+    AddColumnDiff,
+    AddForeignKeyDiff,
+    AddIndexDiff,
+    AlterColumnDiff,
     ColumnRef,
+    CursorPaginationResult,
+    DatabaseCheckInfo,
+    DatabaseColumnInfo,
+    DatabaseForeignKeyInfo,
+    DatabaseIndexInfo,
+    DatabaseTableState,
     InsertType,
     JoinManySpec,
     JoinOneSpec,
+    MigrationDiff,
+    PaginationResult,
+    RelationSpec,
     SchemaKeys,
     ValidatedJoinManySpec,
     ValidatedJoinOneSpec,

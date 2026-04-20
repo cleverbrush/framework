@@ -202,6 +202,439 @@ export const dbExtension = defineExtension({
 });
 
 // ---------------------------------------------------------------------------
+// DDL + ORM extension
+// ---------------------------------------------------------------------------
+
+type FKAction = 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
+
+/**
+ * DDL and ORM extension that adds database DDL metadata, relationship
+ * definitions, and ORM conveniences to schema builders.
+ *
+ * Column-level methods: `.primaryKey()`, `.references()`, `.unique()`,
+ * `.index()`, `.defaultTo()`, `.columnType()`, `.check()`, `.defaultToRaw()`.
+ *
+ * Object-level methods: `.hasIndex()`, `.hasUnique()`, `.hasCheck()`,
+ * `.hasPrimaryKey()`, `.hasRawColumn()`, `.hasRawIndex()`, `.hasMany()`,
+ * `.hasOne()`, `.belongsTo()`, `.belongsToMany()`, `.hasTimestamps()`,
+ * `.softDelete()`, `.scope()`, `.defaultScope()`, `.beforeInsert()`,
+ * `.afterInsert()`, `.beforeUpdate()`, `.beforeDelete()`.
+ */
+export const ddlExtension = defineExtension({
+    number: {
+        /** Mark this column as a primary key.
+         * @param opts - Options. `autoIncrement` defaults to `true`.
+         */
+        primaryKey(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            opts?: { autoIncrement?: boolean }
+        ) {
+            return this.withExtension('primaryKey', {
+                autoIncrement: opts?.autoIncrement ?? true
+            });
+        },
+        /** Add a foreign key reference to another table.
+         * @param table - The referenced table name.
+         * @param column - The referenced column (defaults to `'id'`).
+         */
+        references(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            table: string,
+            column: string = 'id'
+        ) {
+            return this.withExtension('references', { table, column });
+        },
+        /** Set the ON DELETE action for a foreign key. */
+        onDelete(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            action: FKAction
+        ) {
+            return this.withExtension('onDelete', action);
+        },
+        /** Set the ON UPDATE action for a foreign key. */
+        onUpdate(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            action: FKAction
+        ) {
+            return this.withExtension('onUpdate', action);
+        },
+        /** Set a default value for this column. */
+        defaultTo(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            value: number | 'auto_increment'
+        ) {
+            return this.withExtension('defaultTo', value);
+        },
+        /** Add an index on this column.
+         * @param name - Optional index name.
+         */
+        index(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            name?: string
+        ) {
+            return this.withExtension('index', name ?? true);
+        },
+        /** Add a unique constraint on this column.
+         * @param name - Optional constraint name.
+         */
+        unique(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            name?: string
+        ) {
+            return this.withExtension('unique', name ?? true);
+        },
+        /** Override the SQL column type (e.g. `'bigint'`, `'smallint'`). */
+        columnType(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            type: string
+        ) {
+            return this.withExtension('columnType', type);
+        },
+        /** Set a raw SQL default expression.
+         * @param expression - Raw SQL expression (e.g. `"nextval('my_seq')"`).
+         */
+        defaultToRaw(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            expression: string
+        ) {
+            return this.withExtension('defaultTo', { raw: expression });
+        }
+    },
+    string: {
+        /** Mark this column as a primary key (non-auto-increment). */
+        primaryKey(this: StringSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('primaryKey', {
+                autoIncrement: false
+            });
+        },
+        /** Override the SQL column type (e.g. `'text'`, `'uuid'`, `'jsonb'`, `'citext'`). */
+        columnType(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            type: string
+        ) {
+            return this.withExtension('columnType', type);
+        },
+        /** Add a foreign key reference to another table. */
+        references(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            table: string,
+            column: string = 'id'
+        ) {
+            return this.withExtension('references', { table, column });
+        },
+        /** Set the ON DELETE action for a foreign key. */
+        onDelete(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            action: FKAction
+        ) {
+            return this.withExtension('onDelete', action);
+        },
+        /** Set the ON UPDATE action for a foreign key. */
+        onUpdate(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            action: FKAction
+        ) {
+            return this.withExtension('onUpdate', action);
+        },
+        /** Add a unique constraint on this column. */
+        unique(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            name?: string
+        ) {
+            return this.withExtension('unique', name ?? true);
+        },
+        /** Add an index on this column. */
+        index(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            name?: string
+        ) {
+            return this.withExtension('index', name ?? true);
+        },
+        /** Set a default value for this column. */
+        defaultTo(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            value: string
+        ) {
+            return this.withExtension('defaultTo', value);
+        },
+        /** Add a CHECK constraint with raw SQL.
+         * @param sql - SQL expression for the check (e.g. `"role IN ('user','admin')"`).
+         */
+        check(this: StringSchemaBuilder<any, any, any, any, any>, sql: string) {
+            return this.withExtension('check', sql);
+        },
+        /** Set a raw SQL default expression. */
+        defaultToRaw(
+            this: StringSchemaBuilder<any, any, any, any, any>,
+            expression: string
+        ) {
+            return this.withExtension('defaultTo', { raw: expression });
+        }
+    },
+    boolean: {
+        /** Set a default value for this column. */
+        defaultTo(
+            this: BooleanSchemaBuilder<any, any, any, any, any, any, any>,
+            value: boolean
+        ) {
+            return this.withExtension('defaultTo', value);
+        }
+    },
+    date: {
+        /** Set a default value (`'now'` for current timestamp). */
+        defaultTo(
+            this: DateSchemaBuilder<any, any, any, any, any>,
+            value: 'now'
+        ) {
+            return this.withExtension('defaultTo', value);
+        },
+        /** Add an index on this column. */
+        index(this: DateSchemaBuilder<any, any, any, any, any>, name?: string) {
+            return this.withExtension('index', name ?? true);
+        },
+        /** Set a raw SQL default expression. */
+        defaultToRaw(
+            this: DateSchemaBuilder<any, any, any, any, any>,
+            expression: string
+        ) {
+            return this.withExtension('defaultTo', { raw: expression });
+        }
+    },
+    object: {
+        /** Add a composite index on multiple columns.
+         * @param columns - Column names to index.
+         * @param opts - Optional index name and unique flag.
+         */
+        hasIndex(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            columns: string[],
+            opts?: { name?: string; unique?: boolean }
+        ) {
+            const existing = (this.getExtension('indexes') as any[]) ?? [];
+            return this.withExtension('indexes', [
+                ...existing,
+                { columns, ...opts }
+            ]);
+        },
+        /** Add a composite unique constraint.
+         * @param columns - Column names.
+         * @param name - Optional constraint name.
+         */
+        hasUnique(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            columns: string[],
+            name?: string
+        ) {
+            const existing = (this.getExtension('uniques') as any[]) ?? [];
+            return this.withExtension('uniques', [
+                ...existing,
+                { columns, name }
+            ]);
+        },
+        /** Add a table-level CHECK constraint.
+         * @param sql - Raw SQL expression for the check.
+         */
+        hasCheck(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            sql: string
+        ) {
+            const existing = (this.getExtension('checks') as any[]) ?? [];
+            return this.withExtension('checks', [...existing, sql]);
+        },
+        /** Set a composite primary key.
+         * @param columns - Column names forming the primary key.
+         */
+        hasPrimaryKey(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            columns: string[]
+        ) {
+            return this.withExtension('compositePrimaryKey', columns);
+        },
+        /** Add a raw SQL column definition not backed by a schema property.
+         * @param name - Column name.
+         * @param definition - SQL type and constraints (e.g. `"tsvector GENERATED ALWAYS AS (...) STORED"`).
+         */
+        hasRawColumn(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string,
+            definition: string
+        ) {
+            const existing = (this.getExtension('rawColumns') as any[]) ?? [];
+            return this.withExtension('rawColumns', [
+                ...existing,
+                { name, definition }
+            ]);
+        },
+        /** Add a raw SQL index statement executed after table creation.
+         * @param sql - Full `CREATE INDEX` SQL statement.
+         */
+        hasRawIndex(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            sql: string
+        ) {
+            const existing = (this.getExtension('rawIndexes') as any[]) ?? [];
+            return this.withExtension('rawIndexes', [...existing, sql]);
+        },
+        /** Define a one-to-many relationship.
+         * @param name - Relation name used with `include()`.
+         * @param opts - `{ schema, foreignKey }` — `foreignKey` is a ColumnRef on the foreign schema.
+         */
+        hasMany(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string,
+            opts: { schema: any; foreignKey: any }
+        ) {
+            const existing = (this.getExtension('relations') as any[]) ?? [];
+            return this.withExtension('relations', [
+                ...existing,
+                { type: 'hasMany', name, ...opts }
+            ]);
+        },
+        /** Define a one-to-one relationship (FK on foreign table).
+         * @param name - Relation name used with `include()`.
+         * @param opts - `{ schema, foreignKey }` — `foreignKey` is a ColumnRef on the foreign schema.
+         */
+        hasOne(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string,
+            opts: { schema: any; foreignKey: any }
+        ) {
+            const existing = (this.getExtension('relations') as any[]) ?? [];
+            return this.withExtension('relations', [
+                ...existing,
+                { type: 'hasOne', name, ...opts }
+            ]);
+        },
+        /** Define a belongs-to relationship (FK on local table).
+         * @param name - Relation name used with `include()`.
+         * @param opts - `{ schema, foreignKey }` — `foreignKey` is a ColumnRef on the local schema.
+         */
+        belongsTo(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string,
+            opts: { schema: any; foreignKey: any }
+        ) {
+            const existing = (this.getExtension('relations') as any[]) ?? [];
+            return this.withExtension('relations', [
+                ...existing,
+                { type: 'belongsTo', name, ...opts }
+            ]);
+        },
+        /** Define a many-to-many relationship through a pivot table.
+         * @param name - Relation name used with `include()`.
+         * @param opts - `{ schema, through: { table, localKey, foreignKey } }`.
+         */
+        belongsToMany(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string,
+            opts: {
+                schema: any;
+                through: {
+                    table: string;
+                    localKey: string;
+                    foreignKey: string;
+                };
+            }
+        ) {
+            const existing = (this.getExtension('relations') as any[]) ?? [];
+            return this.withExtension('relations', [
+                ...existing,
+                { type: 'belongsToMany', name, ...opts }
+            ]);
+        },
+        /** Auto-add `created_at` and `updated_at` timestamp columns.
+         * @param opts - Optional custom column names.
+         */
+        hasTimestamps(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            opts?: { createdAt?: string; updatedAt?: string }
+        ) {
+            return this.withExtension('timestamps', {
+                createdAt: opts?.createdAt ?? 'created_at',
+                updatedAt: opts?.updatedAt ?? 'updated_at'
+            });
+        },
+        /** Enable soft deletes (adds a `deleted_at` column, auto-filters queries).
+         * @param opts - Optional custom column name.
+         */
+        softDelete(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            opts?: { column?: string }
+        ) {
+            return this.withExtension('softDelete', {
+                column: opts?.column ?? 'deleted_at'
+            });
+        },
+        /** Register a named query scope.
+         * @param name - Scope name to use with `.scoped(name)`.
+         * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
+         */
+        scope(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string,
+            fn: Function
+        ) {
+            const existing =
+                (this.getExtension('scopes') as Record<string, Function>) ?? {};
+            return this.withExtension('scopes', { ...existing, [name]: fn });
+        },
+        /** Set a default scope applied to all queries unless `.unscoped()` is called.
+         * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
+         */
+        defaultScope(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            fn: Function
+        ) {
+            return this.withExtension('defaultScope', fn);
+        },
+        /** Register a before-insert lifecycle hook.
+         * @param fn - Async function `(data) => data` called before inserting.
+         */
+        beforeInsert(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            fn: Function
+        ) {
+            const existing =
+                (this.getExtension('beforeInsert') as Function[]) ?? [];
+            return this.withExtension('beforeInsert', [...existing, fn]);
+        },
+        /** Register an after-insert lifecycle hook.
+         * @param fn - Async function `(row)` called after inserting.
+         */
+        afterInsert(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            fn: Function
+        ) {
+            const existing =
+                (this.getExtension('afterInsert') as Function[]) ?? [];
+            return this.withExtension('afterInsert', [...existing, fn]);
+        },
+        /** Register a before-update lifecycle hook.
+         * @param fn - Async function `(data) => data` called before updating.
+         */
+        beforeUpdate(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            fn: Function
+        ) {
+            const existing =
+                (this.getExtension('beforeUpdate') as Function[]) ?? [];
+            return this.withExtension('beforeUpdate', [...existing, fn]);
+        },
+        /** Register a before-delete lifecycle hook.
+         * @param fn - Async function `(query)` called before deleting.
+         */
+        beforeDelete(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            fn: Function
+        ) {
+            const existing =
+                (this.getExtension('beforeDelete') as Function[]) ?? [];
+            return this.withExtension('beforeDelete', [...existing, fn]);
+        }
+    }
+});
+
+// ---------------------------------------------------------------------------
 // Extended factory functions
 // ---------------------------------------------------------------------------
 
@@ -209,7 +642,8 @@ const extended = withExtensions(
     stringExtensions,
     numberExtensions,
     arrayExtensions,
-    dbExtension
+    dbExtension,
+    ddlExtension
 );
 
 export const string = extended.string;

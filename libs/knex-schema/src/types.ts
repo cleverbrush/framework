@@ -192,3 +192,142 @@ export type ValidatedSpec =
 export type InsertType<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = InferType<ReturnType<T['makeAllPropsOptional']>>;
+
+// ---------------------------------------------------------------------------
+// Pagination result types
+// ---------------------------------------------------------------------------
+
+/** Result of offset-based pagination via {@link SchemaQueryBuilder.paginate}. */
+export interface PaginationResult<T> {
+    /** The rows for the current page. */
+    data: T[];
+    /** Total number of matching rows across all pages. */
+    total: number;
+    /** Current page number (1-based). */
+    page: number;
+    /** Number of rows per page. */
+    pageSize: number;
+    /** Total number of pages. */
+    totalPages: number;
+    /** Whether a next page exists. */
+    hasNextPage: boolean;
+    /** Whether a previous page exists. */
+    hasPreviousPage: boolean;
+}
+
+/** Result of cursor-based pagination via {@link SchemaQueryBuilder.paginateAfter}. */
+export interface CursorPaginationResult<T> {
+    /** The rows for the current page. */
+    data: T[];
+    /** Cursor value for the next page, or `null` if no more rows. */
+    nextCursor: string | null;
+    /** Whether more rows exist after this page. */
+    hasMore: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Relation specification (stored in schema extensions)
+// ---------------------------------------------------------------------------
+
+/** @internal Relation metadata stored via `.hasMany()`, `.belongsTo()`, etc. */
+export interface RelationSpec {
+    type: 'hasMany' | 'hasOne' | 'belongsTo' | 'belongsToMany';
+    name: string;
+    schema: any;
+    foreignKey?: any;
+    through?: { table: string; localKey: string; foreignKey: string };
+}
+
+// ---------------------------------------------------------------------------
+// Database introspection types (for migration generation)
+// ---------------------------------------------------------------------------
+
+/** Column information read from the database. */
+export interface DatabaseColumnInfo {
+    name: string;
+    type: string;
+    nullable: boolean;
+    defaultValue: string | null;
+    maxLength: number | null;
+    numericPrecision: number | null;
+}
+
+/** Index information read from the database. */
+export interface DatabaseIndexInfo {
+    name: string;
+    columns: string[];
+    unique: boolean;
+    definition: string;
+}
+
+/** Foreign key information read from the database. */
+export interface DatabaseForeignKeyInfo {
+    constraintName: string;
+    columnName: string;
+    foreignTable: string;
+    foreignColumn: string;
+    deleteRule: string;
+    updateRule: string;
+}
+
+/** Check constraint information read from the database. */
+export interface DatabaseCheckInfo {
+    name: string;
+    definition: string;
+}
+
+/** Full database table state from introspection. */
+export interface DatabaseTableState {
+    columns: Record<string, DatabaseColumnInfo>;
+    indexes: DatabaseIndexInfo[];
+    foreignKeys: DatabaseForeignKeyInfo[];
+    checks: DatabaseCheckInfo[];
+}
+
+// ---------------------------------------------------------------------------
+// Migration diff types
+// ---------------------------------------------------------------------------
+
+/** A column to add in a migration. */
+export interface AddColumnDiff {
+    name: string;
+    type: string;
+    nullable: boolean;
+    defaultValue?: any;
+    references?: { table: string; column: string };
+    onDelete?: string;
+    onUpdate?: string;
+}
+
+/** Changes to apply to an existing column. */
+export interface AlterColumnDiff {
+    name: string;
+    changes: Record<string, { from: any; to: any }>;
+}
+
+/** An index to add in a migration. */
+export interface AddIndexDiff {
+    columns: string[];
+    name?: string;
+    unique?: boolean;
+}
+
+/** A foreign key to add in a migration. */
+export interface AddForeignKeyDiff {
+    column: string;
+    foreignTable: string;
+    foreignColumn: string;
+    onDelete?: string;
+    onUpdate?: string;
+}
+
+/** Schema diff result between the code-first model and the live database. */
+export interface MigrationDiff {
+    addColumns: AddColumnDiff[];
+    dropColumns: string[];
+    alterColumns: AlterColumnDiff[];
+    addIndexes: AddIndexDiff[];
+    dropIndexes: string[];
+    addForeignKeys: AddForeignKeyDiff[];
+    dropForeignKeys: string[];
+}

@@ -6,14 +6,21 @@ import {
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import { buildColumnMap, resolveColumnRef } from './columns.js';
-import { getTableName } from './extension.js';
+import {
+    buildColumnMap,
+    resolveColumnRef,
+    resolvePropertyKey
+} from './columns.js';
+import { getColumnName, getTableName } from './extension.js';
 import { clearRow } from './mappers.js';
 import type {
     ColumnRef,
+    CursorPaginationResult,
     InsertType,
     JoinManySpec,
     JoinOneSpec,
+    PaginationResult,
+    RelationSpec,
     ValidatedSpec,
     WithJoinedMany,
     WithJoinedOne
@@ -84,6 +91,13 @@ export class SchemaQueryBuilder<
      */
     #explicitSelects: string[] | null = null;
 
+    /** When true, soft-delete filter is not applied to SELECT queries. */
+    #includeDeleted = false;
+    /** When true, only soft-deleted rows are returned. */
+    #onlyDeleted = false;
+    /** When true, default scope is not applied. */
+    #skipDefaultScope = false;
+
     /**
      * @param knex - A configured Knex instance.
      * @param localSchema - The `ObjectSchemaBuilder` for the primary table.
@@ -113,6 +127,91 @@ export class SchemaQueryBuilder<
             this.#localSchema,
             label
         );
+    }
+
+    /** @internal Read soft-delete extension from schema. */
+    #getSoftDelete(): { column: string } | null {
+        const ext = (this.#localSchema as any).getExtension?.('softDelete');
+        return ext ?? null;
+    }
+
+    /** @internal Read default scope function from schema. */
+    #getDefaultScope(): Function | null {
+        const fn = (this.#localSchema as any).getExtension?.('defaultScope');
+        return typeof fn === 'function' ? fn : null;
+    }
+
+    /** @internal Read timestamps config from schema. */
+    #getTimestamps(): { createdAt: string; updatedAt: string } | null {
+        const ts = (this.#localSchema as any).getExtension?.('timestamps');
+        return ts ?? null;
+    }
+
+    /**
+     * Build the effective base query with soft-delete and default-scope
+     * filters applied lazily. Does NOT include CTE wrapping.
+     */
+    #getEffectiveBaseQuery(): Knex.QueryBuilder {
+        let effectiveBase = this.#baseQuery;
+        let cloned = false;
+
+        // Apply soft delete filter
+        const softDelete = this.#getSoftDelete();
+        if (softDelete && this.#onlyDeleted) {
+            if (!cloned) {
+                effectiveBase = effectiveBase.clone();
+                cloned = true;
+            }
+            effectiveBase.whereNotNull(softDelete.column);
+        } else if (softDelete && !this.#includeDeleted) {
+            if (!cloned) {
+                effectiveBase = effectiveBase.clone();
+                cloned = true;
+            }
+            effectiveBase.whereNull(softDelete.column);
+        }
+
+        // Apply default scope
+        if (!this.#skipDefaultScope) {
+            const defaultScopeFn = this.#getDefaultScope();
+            if (defaultScopeFn) {
+                if (!cloned) {
+                    effectiveBase = effectiveBase.clone();
+                    cloned = true;
+                }
+                const proxy = new SchemaQueryBuilder(
+                    this.#knex,
+                    this.#localSchema,
+                    effectiveBase
+                );
+                proxy.#skipDefaultScope = true;
+                defaultScopeFn(proxy);
+            }
+        }
+
+        return effectiveBase;
+    }
+
+    /** @internal Resolve a lazy schema reference `schema | () => schema`. */
+    #resolveSchema(
+        schema: any
+    ): ObjectSchemaBuilder<any, any, any, any, any, any, any> {
+        return typeof schema === 'function' ? schema() : schema;
+    }
+
+    /** @internal Find the primary key column name from schema extensions. */
+    #findPrimaryKeyColumn(
+        schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    ): string {
+        const introspected = schema.introspect() as any;
+        const properties = introspected.properties ?? {};
+        for (const [key, propSchema] of Object.entries(properties)) {
+            const ext = (propSchema as any).introspect?.().extensions ?? {};
+            if (ext.primaryKey) {
+                return getColumnName(propSchema as any, key);
+            }
+        }
+        return 'id';
     }
 
     // =======================================================================
@@ -854,11 +953,41 @@ export class SchemaQueryBuilder<
      * ```
      */
     async insert(data: InsertType<TLocalSchema>): Promise<TResult> {
-        const mapped = this.#mapObjectToColumns(data as Record<string, any>);
+        let processedData = { ...(data as Record<string, any>) };
+
+        // Run beforeInsert hooks
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of beforeHooks) {
+            processedData = (await hook(processedData)) ?? processedData;
+        }
+
+        const mapped = this.#mapObjectToColumns(processedData);
+
+        // Apply timestamps
+        const timestamps = this.#getTimestamps();
+        if (timestamps) {
+            mapped[timestamps.createdAt] = this.#knex.fn.now();
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
         const [row] = await this.#knex(this.#tableName)
             .insert(mapped)
             .returning('*');
-        return this.#mapRow(row) as TResult;
+        const result = this.#mapRow(row) as TResult;
+
+        // Run afterInsert hooks
+        const afterHooks =
+            ((this.#localSchema as any).getExtension?.('afterInsert') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of afterHooks) {
+            await hook(result);
+        }
+
+        return result;
     }
 
     /**
@@ -869,13 +998,43 @@ export class SchemaQueryBuilder<
      * @returns The full inserted rows in insertion order.
      */
     async insertMany(data: InsertType<TLocalSchema>[]): Promise<TResult[]> {
-        const mapped = data.map(d =>
-            this.#mapObjectToColumns(d as Record<string, any>)
-        );
+        const timestamps = this.#getTimestamps();
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+
+        const mapped = [];
+        for (const d of data) {
+            let processedData = { ...(d as Record<string, any>) };
+            for (const hook of beforeHooks) {
+                processedData = (await hook(processedData)) ?? processedData;
+            }
+            const m = this.#mapObjectToColumns(processedData);
+            if (timestamps) {
+                m[timestamps.createdAt] = this.#knex.fn.now();
+                m[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+            mapped.push(m);
+        }
+
         const rows = await this.#knex(this.#tableName)
             .insert(mapped)
             .returning('*');
-        return rows.map((row: any) => this.#mapRow(row) as TResult);
+        const results = rows.map((row: any) => this.#mapRow(row) as TResult);
+
+        // Run afterInsert hooks
+        const afterHooks =
+            ((this.#localSchema as any).getExtension?.('afterInsert') as
+                | Function[]
+                | undefined) ?? [];
+        for (const result of results) {
+            for (const hook of afterHooks) {
+                await hook(result);
+            }
+        }
+
+        return results;
     }
 
     /**
@@ -896,14 +1055,37 @@ export class SchemaQueryBuilder<
      * ```
      */
     async update(data: Partial<InferType<TLocalSchema>>): Promise<TResult[]> {
-        const mapped = this.#mapObjectToColumns(data as Record<string, any>);
+        let processedData = { ...(data as Record<string, any>) };
+
+        // Run beforeUpdate hooks
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeUpdate') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of beforeHooks) {
+            processedData = (await hook(processedData)) ?? processedData;
+        }
+
+        const mapped = this.#mapObjectToColumns(processedData);
+
+        // Apply timestamps
+        const timestamps = this.#getTimestamps();
+        if (timestamps) {
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
         const rows = await this.#baseQuery.update(mapped).returning('*');
         return rows.map((row: any) => this.#mapRow(row) as TResult);
     }
 
     /**
      * Delete all rows that match the current `WHERE` clause.
-     * @returns The number of rows deleted.
+     *
+     * If the schema has soft-delete enabled via `.softDelete()`, this performs
+     * an `UPDATE SET deleted_at = NOW()` instead of a real `DELETE`.
+     * Use {@link hardDelete} for permanent deletion.
+     *
+     * @returns The number of rows deleted (or soft-deleted).
      *
      * @example
      * ```ts
@@ -911,6 +1093,21 @@ export class SchemaQueryBuilder<
      * ```
      */
     async delete(): Promise<number> {
+        // Run beforeDelete hooks
+        const hooks =
+            ((this.#localSchema as any).getExtension?.('beforeDelete') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of hooks) {
+            await hook(this);
+        }
+
+        const softDelete = this.#getSoftDelete();
+        if (softDelete) {
+            return this.#baseQuery.update({
+                [softDelete.column]: this.#knex.fn.now()
+            });
+        }
         return this.#baseQuery.delete();
     }
 
@@ -988,7 +1185,417 @@ export class SchemaQueryBuilder<
         builder.#explicitSelects = this.#explicitSelects
             ? [...this.#explicitSelects]
             : null;
+        builder.#includeDeleted = this.#includeDeleted;
+        builder.#onlyDeleted = this.#onlyDeleted;
+        builder.#skipDefaultScope = this.#skipDefaultScope;
         return builder;
+    }
+
+    // =======================================================================
+    // Include (relation-based eager loading)
+    // =======================================================================
+
+    /**
+     * Eager-load a named relation defined via `.hasMany()`, `.belongsTo()`,
+     * `.hasOne()`, or `.belongsToMany()` on the schema.
+     *
+     * @param relationName - The relation name passed to the schema's relation method.
+     * @param customize - Optional callback to customise the foreign query
+     *   (e.g. add ordering, limits).
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * const posts = await query(db, PostWithRelations)
+     *     .include('author')
+     *     .include('tags');
+     * ```
+     */
+    include(
+        relationName: string,
+        customize?: (q: SchemaQueryBuilder<any, any>) => void
+    ): this {
+        const relations: RelationSpec[] =
+            (this.#localSchema as any).getExtension?.('relations') ?? [];
+        const relation = relations.find(
+            (r: RelationSpec) => r.name === relationName
+        );
+        if (!relation) {
+            throw new Error(
+                `Unknown relation "${relationName}" on schema for table "${this.#tableName}"`
+            );
+        }
+
+        const foreignSchema = this.#resolveSchema(relation.schema);
+        const foreignTableName = getTableName(foreignSchema);
+
+        switch (relation.type) {
+            case 'belongsTo': {
+                const localColumn = resolveColumnRef(
+                    relation.foreignKey,
+                    this.#localSchema,
+                    'foreignKey'
+                );
+                const foreignColumn = this.#findPrimaryKeyColumn(foreignSchema);
+
+                const foreignQuery1: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery1
+                    );
+                    customize(proxy);
+                }
+
+                this.joinOne({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn,
+                    as: relationName,
+                    foreignQuery: foreignQuery1
+                } as any);
+                break;
+            }
+            case 'hasOne': {
+                const localColumn = this.#findPrimaryKeyColumn(
+                    this.#localSchema
+                );
+                const foreignColumn = resolveColumnRef(
+                    relation.foreignKey,
+                    foreignSchema,
+                    'foreignKey'
+                );
+
+                const foreignQuery2: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery2
+                    );
+                    customize(proxy);
+                }
+
+                this.joinOne({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn,
+                    as: relationName,
+                    required: false,
+                    foreignQuery: foreignQuery2
+                } as any);
+                break;
+            }
+            case 'hasMany': {
+                const localColumn = this.#findPrimaryKeyColumn(
+                    this.#localSchema
+                );
+                const foreignColumn = resolveColumnRef(
+                    relation.foreignKey,
+                    foreignSchema,
+                    'foreignKey'
+                );
+
+                const foreignQuery3: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery3
+                    );
+                    customize(proxy);
+                }
+
+                this.joinMany({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn,
+                    as: relationName,
+                    foreignQuery: foreignQuery3
+                } as any);
+                break;
+            }
+            case 'belongsToMany': {
+                const through = relation.through!;
+                const localColumn = this.#findPrimaryKeyColumn(
+                    this.#localSchema
+                );
+
+                const foreignQuery = this.#knex(foreignTableName)
+                    .join(
+                        through.table,
+                        `${through.table}.${through.foreignKey}`,
+                        `${foreignTableName}.${this.#findPrimaryKeyColumn(foreignSchema)}`
+                    )
+                    .select(
+                        `${foreignTableName}.*`,
+                        `${through.table}.${through.localKey}`
+                    );
+
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery
+                    );
+                    customize(proxy);
+                }
+
+                this.joinMany({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn: through.localKey,
+                    as: relationName,
+                    foreignQuery
+                } as any);
+                break;
+            }
+        }
+
+        return this;
+    }
+
+    // =======================================================================
+    // Scopes
+    // =======================================================================
+
+    /**
+     * Apply a named scope defined on the schema via `.scope(name, fn)`.
+     *
+     * @param name - The scope name.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * await query(db, Post).scoped('published').scoped('recent');
+     * ```
+     */
+    scoped(name: string): this {
+        const scopes = (this.#localSchema as any).getExtension?.('scopes') as
+            | Record<string, Function>
+            | undefined;
+        const scopeFn = scopes?.[name];
+        if (!scopeFn) {
+            throw new Error(
+                `Unknown scope "${name}" on schema for table "${this.#tableName}"`
+            );
+        }
+        scopeFn(this);
+        return this;
+    }
+
+    /**
+     * Bypass the default scope (and soft-delete scope) for this query.
+     *
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * await query(db, Post).unscoped().where(t => t.id, 1);
+     * ```
+     */
+    unscoped(): this {
+        this.#skipDefaultScope = true;
+        this.#includeDeleted = true;
+        return this;
+    }
+
+    // =======================================================================
+    // Soft delete methods
+    // =======================================================================
+
+    /**
+     * Include soft-deleted rows in the results.
+     *
+     * By default, schemas with `.softDelete()` automatically filter out
+     * rows where `deleted_at IS NOT NULL`. Call `.withDeleted()` to
+     * include them.
+     *
+     * @returns `this` for chaining.
+     */
+    withDeleted(): this {
+        this.#includeDeleted = true;
+        return this;
+    }
+
+    /**
+     * Return only soft-deleted rows (`WHERE deleted_at IS NOT NULL`).
+     *
+     * @returns `this` for chaining.
+     */
+    onlyDeleted(): this {
+        this.#onlyDeleted = true;
+        this.#includeDeleted = true;
+        return this;
+    }
+
+    /**
+     * Permanently delete rows matching the current WHERE clause, bypassing
+     * the soft-delete mechanism.
+     *
+     * @returns The number of rows deleted.
+     */
+    async hardDelete(): Promise<number> {
+        // Run beforeDelete hooks
+        const hooks =
+            ((this.#localSchema as any).getExtension?.('beforeDelete') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of hooks) {
+            await hook(this);
+        }
+        return this.#baseQuery.delete();
+    }
+
+    /**
+     * Restore soft-deleted rows by setting `deleted_at = NULL`.
+     *
+     * @returns The restored rows.
+     */
+    async restore(): Promise<TResult[]> {
+        const softDelete = this.#getSoftDelete();
+        if (!softDelete) {
+            throw new Error(
+                'Schema does not have soft delete enabled. Use .softDelete() on the schema.'
+            );
+        }
+        const rows = await this.#baseQuery
+            .update({ [softDelete.column]: null })
+            .returning('*');
+        return rows.map((row: any) => this.#mapRow(row) as TResult);
+    }
+
+    // =======================================================================
+    // Pagination
+    // =======================================================================
+
+    /**
+     * Execute an offset-based paginated query.
+     *
+     * Runs a count query and a data query in parallel. Returns the page data
+     * along with pagination metadata.
+     *
+     * @param opts - `{ page, pageSize }` — 1-based page number and page size.
+     * @returns A {@link PaginationResult} with data, total count, and page info.
+     *
+     * @example
+     * ```ts
+     * const page = await query(db, Post)
+     *     .where(t => t.status, 'published')
+     *     .paginate({ page: 2, pageSize: 20 });
+     * // page.data, page.total, page.totalPages, page.hasNextPage, ...
+     * ```
+     */
+    async paginate(opts: {
+        page: number;
+        pageSize: number;
+    }): Promise<PaginationResult<TResult>> {
+        const { page, pageSize } = opts;
+
+        const effectiveBase = this.#getEffectiveBaseQuery();
+
+        // Count query (no CTE, no ordering, no eager loading)
+        const countResult = await effectiveBase
+            .clone()
+            .clearSelect()
+            .clearOrder()
+            .count('* as count')
+            .first();
+        const total = Number((countResult as any)?.count ?? 0);
+
+        // Data query (with CTE for eager loading)
+        this.limit(pageSize).offset((page - 1) * pageSize);
+        const data = await this.execute();
+
+        const totalPages = Math.ceil(total / pageSize);
+
+        return {
+            data,
+            total,
+            page,
+            pageSize,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1
+        };
+    }
+
+    /**
+     * Execute a cursor-based (keyset) paginated query.
+     *
+     * More efficient than offset pagination for large datasets. Fetches one
+     * extra row to determine whether more data exists.
+     *
+     * @param opts - `{ cursor, limit, column?, direction? }`.
+     * @returns A {@link CursorPaginationResult} with data, next cursor, and
+     *   `hasMore` flag.
+     *
+     * @example
+     * ```ts
+     * const page = await query(db, Post)
+     *     .orderBy(t => t.createdAt, 'desc')
+     *     .paginateAfter({ cursor: lastCreatedAt, limit: 20 });
+     * ```
+     */
+    async paginateAfter(opts: {
+        cursor?: any;
+        limit: number;
+        column?: ColumnRef<TLocalSchema>;
+        direction?: 'asc' | 'desc';
+    }): Promise<CursorPaginationResult<TResult>> {
+        const direction = opts.direction ?? 'desc';
+        const column = opts.column ?? ('id' as any);
+
+        if (opts.cursor != null) {
+            const op = direction === 'desc' ? '<' : '>';
+            this.where(column, op, opts.cursor);
+        }
+
+        this.orderBy(column, direction).limit(opts.limit + 1);
+        const rows = await this.execute();
+
+        const hasMore = rows.length > opts.limit;
+        const data = hasMore ? rows.slice(0, opts.limit) : rows;
+
+        const propKey =
+            typeof column === 'string'
+                ? column
+                : resolvePropertyKey(
+                      column as any,
+                      this.#localSchema,
+                      'cursor'
+                  );
+
+        const nextCursor =
+            hasMore && data.length > 0
+                ? String((data[data.length - 1] as any)[propKey])
+                : null;
+
+        return { data, nextCursor, hasMore };
+    }
+
+    // =======================================================================
+    // Select Raw
+    // =======================================================================
+
+    /**
+     * Add a raw SQL expression to the SELECT clause.
+     *
+     * @param sql - Raw SQL (e.g. `'*, ts_rank(vector, query) AS rank'`).
+     * @param bindings - Optional parameter bindings.
+     * @returns `this` for chaining.
+     */
+    selectRaw(sql: string, bindings?: any[]): this {
+        if (bindings) {
+            this.#baseQuery.select(this.#knex.raw(sql, bindings));
+        } else {
+            this.#baseQuery.select(this.#knex.raw(sql));
+        }
+        return this;
     }
 
     // =======================================================================
@@ -996,8 +1603,10 @@ export class SchemaQueryBuilder<
     // =======================================================================
 
     #buildQuery(): Knex.QueryBuilder {
+        const effectiveBase = this.#getEffectiveBaseQuery();
+
         if (this.#specs.length === 0) {
-            return this.#baseQuery;
+            return effectiveBase;
         }
 
         const knex = this.#knex;
@@ -1013,7 +1622,7 @@ export class SchemaQueryBuilder<
         // included in the CTE so the join conditions work at runtime.
         // Track which columns we added so they can be excluded from the
         // final SELECT (preserving the original column set the caller asked for).
-        let cteQuery = this.#baseQuery;
+        let cteQuery = effectiveBase;
         let extraColumns: string[] = [];
 
         if (this.#explicitSelects !== null) {
@@ -1022,7 +1631,7 @@ export class SchemaQueryBuilder<
                 col => !selectedSet.has(col)
             );
             if (extraColumns.length > 0) {
-                cteQuery = this.#baseQuery.clone();
+                cteQuery = effectiveBase.clone();
                 for (const col of extraColumns) {
                     cteQuery.column(col);
                 }
