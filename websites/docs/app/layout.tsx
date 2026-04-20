@@ -26,7 +26,8 @@ const NAV_ITEMS: NavItem[] = [
             { href: '/knex-schema', label: 'Knex Schema' },
             { href: '/react-form', label: 'React Form' },
             { href: '/mapper', label: 'Mapper' },
-            { href: '/scheduler', label: 'Scheduler' }
+            { href: '/scheduler', label: 'Scheduler' },
+            { href: '/log', label: 'Log' }
         ]
     },
     { href: '/comparisons', label: 'Comparisons' },
