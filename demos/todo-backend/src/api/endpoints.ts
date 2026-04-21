@@ -120,6 +120,17 @@ export const SendTodoEventEndpoint = api.todos.sendEvent
     .tags('todos')
     .operationId('sendTodoEvent');
 
+export const ListTodoActivityEndpoint = api.todos.listActivity
+    .authorize(PrincipalSchema)
+    .inject({ db: BoundQueryToken })
+    .summary('List todo activity')
+    .description(
+        'Returns all activity events for a todo in reverse-chronological order. ' +
+            'Demonstrates polymorphic CTI + STI result mapping with `withVariants()`.'
+    )
+    .tags('todos')
+    .operationId('listTodoActivity');
+
 // ── User management endpoints (admin only) ────────────────────────────────────
 
 export const ListUsersEndpoint = api.users.list

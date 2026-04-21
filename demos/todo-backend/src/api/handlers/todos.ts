@@ -1,5 +1,12 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
-import { TodoDbSchema, UserDbSchema } from '../../db/schemas.js';
+import {
+    TodoActivityAssignedDbSchema,
+    TodoActivityBaseDbSchema,
+    TodoActivityCommentedDbSchema,
+    TodoActivityDbSchema,
+    TodoDbSchema,
+    UserDbSchema
+} from '../../db/schemas.js';
 import {
     TodoCompleted,
     TodoCreated,
@@ -19,11 +26,12 @@ import type {
     GetTodoWithAuthorEndpoint,
     ImportTodosEndpoint,
     LegacyReplaceTodoEndpoint,
+    ListTodoActivityEndpoint,
     ListTodosEndpoint,
     SendTodoEventEndpoint,
     UpdateTodoEndpoint
 } from '../endpoints.js';
-import { mapTodo, mapUser } from '../mappers.js';
+import { mapTodo, mapTodoActivity, mapUser } from '../mappers.js';
 
 // ── List todos ────────────────────────────────────────────────────────────────
 
@@ -236,14 +244,73 @@ export const sendTodoEventHandler: Handler<
         });
     }
 
-    // Echo the event back so the caller can confirm what was received.
+    const activityId = await db.transaction(async dbTrx => {
+        const base = await dbTrx(TodoActivityBaseDbSchema).insert({
+            todoId: params.id,
+            type: body.type,
+            actorUserId: principal.userId,
+            ...(body.type === 'completed' && body.completedAt
+                ? { completedAt: body.completedAt }
+                : {})
+        });
+
+        if (body.type === 'assigned') {
+            await dbTrx(TodoActivityAssignedDbSchema).insert({
+                activityId: base.id,
+                type: 'assigned',
+                assignedToUserId: body.assignedTo
+            });
+        } else if (body.type === 'commented') {
+            await dbTrx(TodoActivityCommentedDbSchema).insert({
+                activityId: base.id,
+                type: 'commented',
+                comment: body.comment
+            });
+        }
+
+        return base.id;
+    });
+
+    const row = await db(TodoActivityDbSchema)
+        .where(a => a.id, activityId)
+        .first();
+
     logger.info(TodoEventReceived, {
         TodoId: params.id,
         EventType: body.type,
         UserId: principal.userId
     });
 
-    return body;
+    return mapTodoActivity(row!);
+};
+
+// ── List todo activity ───────────────────────────────────────────────────────────
+
+export const listTodoActivityHandler: Handler<
+    typeof ListTodoActivityEndpoint
+> = async ({ params, principal }, { db }) => {
+    const todo = await db(TodoDbSchema)
+        .projected('ownership')
+        .where(t => t.id, params.id)
+        .first();
+
+    if (!todo) {
+        return ActionResult.notFound({
+            message: `Todo ${params.id} not found.`
+        });
+    }
+
+    if (principal.role !== 'admin' && todo.userId !== principal.userId) {
+        return ActionResult.forbidden({
+            message: 'You do not have access to this todo.'
+        });
+    }
+
+    const rows = await db(TodoActivityDbSchema)
+        .where(a => a.todoId, params.id)
+        .orderBy(a => a.createdAt, 'desc');
+
+    return rows.map(mapTodoActivity);
 };
 
 // ── Export todos as CSV ───────────────────────────────────────────────────────

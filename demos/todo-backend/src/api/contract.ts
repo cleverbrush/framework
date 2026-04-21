@@ -29,6 +29,7 @@ import {
     LoginBodySchema,
     PaginationQuerySchema,
     RegisterBodySchema,
+    TodoActivityResponseSchema,
     TodoEventSchema,
     TodoListQuerySchema,
     TodoResponseSchema,
@@ -121,7 +122,7 @@ export const api = defineApi({
             .post(route({ id: number().coerce() })`/${t => t.id}/events`)
             .body(TodoEventSchema)
             .responses({
-                200: TodoEventSchema,
+                200: TodoActivityResponseSchema,
                 403: ErrorResponseSchema,
                 404: ErrorResponseSchema
             }),
@@ -160,7 +161,17 @@ export const api = defineApi({
 
         downloadAttachment: todosResource.get(
             route({ id: number().coerce() })`/${t => t.id}/attachment`
-        )
+        ),
+
+        listActivity: todosResource
+            .get(
+                route({ id: number().coerce() })`/${t => t.id}/activity`
+            )
+            .responses({
+                200: array(TodoActivityResponseSchema),
+                403: ErrorResponseSchema,
+                404: ErrorResponseSchema
+            })
     },
 
     users: {

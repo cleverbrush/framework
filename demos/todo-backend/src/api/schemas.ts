@@ -268,3 +268,44 @@ export const WebhookSubscriptionResponseSchema = object({
         .coerce()
         .describe('ISO 8601 timestamp of when the subscription was created.')
 }).schemaName('WebhookSubscriptionResponse');
+
+// ── Todo Activity responses ───────────────────────────────────────────────────
+
+const activityCommonFields = {
+    id: number().describe('Unique identifier of the activity record.'),
+    todoId: number().describe('ID of the todo this activity belongs to.'),
+    actorUserId: number()
+        .optional()
+        .describe('ID of the user who performed the action.'),
+    createdAt: date()
+        .coerce()
+        .describe('ISO 8601 timestamp of when the activity was recorded.')
+};
+
+export const TodoActivityAssignedResponseSchema = object({
+    ...activityCommonFields,
+    type: string().equals('assigned').describe('Activity type discriminator.'),
+    assignedToUserId: number().describe('ID of the user who was assigned.')
+}).schemaName('TodoActivityAssignedResponse');
+
+export const TodoActivityCommentedResponseSchema = object({
+    ...activityCommonFields,
+    type: string().equals('commented').describe('Activity type discriminator.'),
+    comment: string().describe('The comment text.')
+}).schemaName('TodoActivityCommentedResponse');
+
+export const TodoActivityCompletedResponseSchema = object({
+    ...activityCommonFields,
+    type: string().equals('completed').describe('Activity type discriminator.'),
+    completedAt: date()
+        .coerce()
+        .optional()
+        .describe('ISO 8601 timestamp when the todo was completed.')
+}).schemaName('TodoActivityCompletedResponse');
+
+export const TodoActivityResponseSchema = union(TodoActivityAssignedResponseSchema)
+    .or(TodoActivityCommentedResponseSchema)
+    .or(TodoActivityCompletedResponseSchema)
+    .schemaName('TodoActivityResponse');
+
+export type TodoActivityResponse = InferType<typeof TodoActivityResponseSchema>;

@@ -1,0 +1,14 @@
+{
+    "Servers": {
+        "1": {
+            "Name": "todo-postgres",
+            "Group": "Servers",
+            "Host": "postgres",
+            "Port": 5432,
+            "MaintenanceDB": "todo_db",
+            "Username": "todo_user",
+            "SSLMode": "prefer",
+            "PassFile": "/pgpass"
+        }
+    }
+}

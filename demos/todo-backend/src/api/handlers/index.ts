@@ -21,6 +21,7 @@ import {
     getTodoWithAuthorHandler,
     importTodosHandler,
     legacyReplaceTodoHandler,
+    listTodoActivityHandler,
     listTodosHandler,
     sendTodoEventHandler,
     updateTodoHandler
@@ -50,7 +51,8 @@ export const handlers: HandlerMap<typeof endpoints> = {
         downloadAttachment: downloadAttachmentHandler,
         importBulk: importTodosHandler,
         legacyReplace: legacyReplaceTodoHandler,
-        complete: completeTodoHandler
+        complete: completeTodoHandler,
+        listActivity: listTodoActivityHandler
     },
     users: {
         list: listUsersHandler,
