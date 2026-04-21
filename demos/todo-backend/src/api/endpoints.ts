@@ -350,7 +350,8 @@ export const endpoints = {
         downloadAttachment: DownloadAttachmentEndpoint,
         importBulk: ImportTodosEndpoint,
         legacyReplace: LegacyReplaceTodoEndpoint,
-        complete: CompleteTodoEndpoint
+        complete: CompleteTodoEndpoint,
+        listActivity: ListTodoActivityEndpoint
     },
     users: {
         list: ListUsersEndpoint,
