@@ -32,26 +32,22 @@ export const listTodosHandler: Handler<typeof ListTodosEndpoint> = async (
     { db }
 ) => {
     const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-    const offset = (page - 1) * limit;
+    const pageSize = Math.min(100, Math.max(1, query.limit ?? 20));
 
-    let builder = db(TodoDbSchema)
-        .orderBy(t => t.createdAt, 'desc')
-        .limit(limit)
-        .offset(offset);
+    let builder = db(TodoDbSchema).projected('response').scoped('recentFirst');
 
     if (principal.role === 'admin') {
         // Admins may optionally filter by a specific user
         if (query.userId != null) {
-            builder = builder.where(t => t.userId, query.userId!);
+            builder = builder.where(t => t.userId, query.userId);
         }
     } else {
         // Regular users only see their own todos
         builder = builder.where(t => t.userId, principal.userId);
     }
 
-    const rows = await builder;
-    return Promise.all(rows.map(mapTodo));
+    const rows = await builder.paginate({ page, pageSize });
+    return Promise.all(rows.data.map(mapTodo));
 };
 
 // ── Get todo by ID ────────────────────────────────────────────────────────────
@@ -61,6 +57,7 @@ export const getTodoHandler: Handler<typeof GetTodoEndpoint> = async (
     { db }
 ) => {
     const todo = await db(TodoDbSchema)
+        .projected('response')
         .where(t => t.id, params.id)
         .first();
 
@@ -85,14 +82,11 @@ export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
     { body, principal },
     { db, logger }
 ) => {
-    const now = new Date();
     const todo = await db(TodoDbSchema).insert({
         title: body.title,
         description: body.description,
         completed: false,
-        userId: principal.userId,
-        createdAt: now,
-        updatedAt: now
+        userId: principal.userId
     });
 
     logger.info(TodoCreated, {
@@ -111,6 +105,7 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
     { db, logger }
 ) => {
     const todo = await db(TodoDbSchema)
+        .projected('ownership')
         .where(t => t.id, params.id)
         .first();
 
@@ -130,8 +125,7 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
         title: string;
         description: string | undefined;
         completed: boolean;
-        updatedAt: Date;
-    }> = { updatedAt: new Date() };
+    }> = {};
 
     if (body.title !== undefined) patch.title = body.title;
     if (body.description !== undefined) patch.description = body.description;
@@ -156,6 +150,7 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
     { db, logger }
 ) => {
     const todo = await db(TodoDbSchema)
+        .projected('ownership')
         .where(t => t.id, params.id)
         .first();
 
@@ -188,35 +183,34 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
 export const getTodoWithAuthorHandler: Handler<
     typeof GetTodoWithAuthorEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todo = await db(TodoDbSchema)
+    const todoWithAuthor = await db(TodoDbSchema)
         .where(t => t.id, params.id)
+        .joinOne({
+            foreignSchema: UserDbSchema,
+            localColumn: t => t.userId,
+            foreignColumn: u => u.id,
+            as: 'author'
+        })
         .first();
 
-    if (!todo) {
+    if (!todoWithAuthor) {
         return ActionResult.notFound({
             message: `Todo ${params.id} not found.`
         });
     }
 
-    if (principal.role !== 'admin' && todo.userId !== principal.userId) {
+    if (
+        principal.role !== 'admin' &&
+        todoWithAuthor.userId !== principal.userId
+    ) {
         return ActionResult.forbidden({
             message: 'You do not have access to this todo.'
         });
     }
 
-    const author = await db(UserDbSchema)
-        .where(u => u.id, todo.userId)
-        .first();
-
-    if (!author) {
-        return ActionResult.notFound({
-            message: `Author for todo ${params.id} not found.`
-        });
-    }
-
     return {
-        todo: await mapTodo(todo),
-        author: await mapUser(author)
+        todo: await mapTodo(todoWithAuthor),
+        author: await mapUser(todoWithAuthor.author)
     };
 };
 
@@ -226,6 +220,7 @@ export const sendTodoEventHandler: Handler<
     typeof SendTodoEventEndpoint
 > = async ({ params, body, principal }, { db, logger }) => {
     const todo = await db(TodoDbSchema)
+        .projected('ownership')
         .where(t => t.id, params.id)
         .first();
 
@@ -257,7 +252,7 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
     { principal, context },
     { db, logger }
 ) => {
-    let builder = db(TodoDbSchema).orderBy(t => t.createdAt, 'desc');
+    let builder = db(TodoDbSchema).projected('response').orderBy(t => t.createdAt, 'desc');
 
     if (principal.role !== 'admin') {
         builder = builder.where(t => t.userId, principal.userId);
@@ -291,6 +286,7 @@ export const downloadAttachmentHandler: Handler<
     typeof DownloadAttachmentEndpoint
 > = async ({ params, principal }, { db }) => {
     const todo = await db(TodoDbSchema)
+        .projected('response')
         .where(t => t.id, params.id)
         .first();
 
@@ -351,14 +347,11 @@ export const importTodosHandler: Handler<typeof ImportTodosEndpoint> = async (
 
     for (const item of items) {
         try {
-            const now = new Date();
             await db(TodoDbSchema).insert({
                 title: item.title,
                 description: item.description,
                 completed: false,
-                userId: principal.userId,
-                createdAt: now,
-                updatedAt: now
+                userId: principal.userId
             });
             results.push({ title: item.title, success: true });
             imported++;
@@ -394,10 +387,12 @@ export const legacyReplaceTodoHandler: Handler<
 
 // ── Complete todo with conflict detection ─────────────────────────────────────
 
-export const completeTodoHandler: Handler<
-    typeof CompleteTodoEndpoint
-> = async ({ params, headers, principal }, { db, logger }) => {
+export const completeTodoHandler: Handler<typeof CompleteTodoEndpoint> = async (
+    { params, headers, principal },
+    { db, logger }
+) => {
     const todo = await db(TodoDbSchema)
+        .projected('response')
         .where(t => t.id, params.id)
         .first();
 
@@ -430,7 +425,7 @@ export const completeTodoHandler: Handler<
 
     const [updated] = await db(TodoDbSchema)
         .where(t => t.id, params.id)
-        .update({ completed: true, updatedAt: new Date() });
+        .update({ completed: true });
 
     logger.info(TodoCompleted, {
         TodoId: params.id,

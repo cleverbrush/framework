@@ -677,9 +677,27 @@ describe('scopes', () => {
     });
 
     it('scoped() throws for unknown scope', () => {
-        expect(() => query(knex, ScopedPost).scoped('nonexistent')).toThrow(
-            'Unknown scope "nonexistent"'
-        );
+        expect(() =>
+            // @ts-expect-error — 'nonexistent' is not a registered scope name
+            query(knex, ScopedPost).scoped('nonexistent')
+        ).toThrow('Unknown scope "nonexistent"');
+    });
+
+    it('scoped() type: only registered scope names are accepted', () => {
+        // Type-level check: 'published' and 'recent' are valid; TS would error
+        // on any other string (verified by the @ts-expect-error above).
+        type Scopes = Parameters<
+            ReturnType<typeof query<typeof ScopedPost>>['scoped']
+        >[0];
+        // Scopes should be exactly 'published' | 'recent'
+        const _check1: 'published' extends Scopes ? true : false = true;
+        const _check2: 'recent' extends Scopes ? true : false = true;
+        // Verify that an unregistered name is NOT in the union
+        const _check3: 'bogus' extends Scopes ? false : true = true;
+        // Suppress unused-variable warnings
+        void _check1;
+        void _check2;
+        void _check3;
     });
 
     it('default scope is applied automatically', () => {
@@ -690,6 +708,141 @@ describe('scopes', () => {
     it('unscoped() bypasses default scope', () => {
         const sql = query(knex, ScopedPost).unscoped().toQuery();
         expect(sql).not.toContain('is_active');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Projections
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('projections', () => {
+    const PostSchema = object({
+        id: number().primaryKey(),
+        title: string(),
+        body: string(),
+        status: string(),
+        isActive: boolean().hasColumnName('is_active')
+    })
+        .hasTableName('posts')
+        .projection('summary', 'id', 'title')
+        .projection(
+            'withStatus',
+            t => t.id,
+            t => t.status
+        );
+
+    it('projection() stores tuple-form keys', () => {
+        const projections = (PostSchema as any).getExtension('projections');
+        expect(projections).toBeDefined();
+        expect(projections.summary.keys).toEqual(['id', 'title']);
+    });
+
+    it('projection() stores accessor-form keys', () => {
+        const projections = (PostSchema as any).getExtension('projections');
+        expect(projections.withStatus.keys).toEqual(['id', 'status']);
+    });
+
+    it('projected() emits correct SELECT columns (tuple form)', () => {
+        const sql = query(knex, PostSchema).projected('summary').toQuery();
+        expect(sql).toContain('"id"');
+        expect(sql).toContain('"title"');
+        expect(sql).not.toContain('"body"');
+        expect(sql).not.toContain('"is_active"');
+    });
+
+    it('projected() resolves hasColumnName mappings', () => {
+        const ColSchema = object({
+            id: number().primaryKey(),
+            isActive: boolean().hasColumnName('is_active')
+        })
+            .hasTableName('items')
+            .projection('compact', 'id', 'isActive');
+
+        const sql = query(knex, ColSchema).projected('compact').toQuery();
+        expect(sql).toContain('"id"');
+        expect(sql).toContain('"is_active"');
+    });
+
+    it('projected() emits correct SELECT columns (accessor form)', () => {
+        const sql = query(knex, PostSchema).projected('withStatus').toQuery();
+        expect(sql).toContain('"id"');
+        expect(sql).toContain('"status"');
+        expect(sql).not.toContain('"title"');
+        expect(sql).not.toContain('"body"');
+    });
+
+    it('projected() can be combined with where()', () => {
+        const sql = query(knex, PostSchema)
+            .projected('summary')
+            .where(t => t.status, 'published')
+            .toQuery();
+        expect(sql).toContain('"id"');
+        expect(sql).toContain('"title"');
+        expect(sql).toContain('"status" = \'published\'');
+    });
+
+    it('projected() throws for unknown projection name', () => {
+        expect(() =>
+            // @ts-expect-error — 'bogus' is not a registered projection name
+            query(knex, PostSchema).projected('bogus')
+        ).toThrow('Unknown projection "bogus"');
+    });
+
+    it('projected() type: only registered names are accepted', () => {
+        type Projections = Parameters<
+            ReturnType<typeof query<typeof PostSchema>>['projected']
+        >[0];
+        const _check1: 'summary' extends Projections ? true : false = true;
+        const _check2: 'withStatus' extends Projections ? true : false = true;
+        const _check3: 'bogus' extends Projections ? false : true = true;
+        void _check1;
+        void _check2;
+        void _check3;
+    });
+
+    it('projected() after select() throws', () => {
+        expect(() =>
+            query(knex, PostSchema)
+                .select(t => t.id)
+                .projected('summary')
+        ).toThrow(/projected.*select|select.*projected/i);
+    });
+
+    it('select() after projected() throws', () => {
+        expect(() =>
+            query(knex, PostSchema)
+                .projected('summary')
+                .select(t => t.id)
+        ).toThrow(/select.*projected|projected.*select/i);
+    });
+
+    it('count() after projected() throws', () => {
+        expect(() =>
+            query(knex, PostSchema).projected('summary').count()
+        ).toThrow(/count.*projected|projected.*count/i);
+    });
+
+    it('projected() after count() throws', () => {
+        expect(() =>
+            query(knex, PostSchema).count().projected('summary')
+        ).toThrow(/projected.*aggregate|aggregate.*projected/i);
+    });
+
+    it('two projected() calls throw', () => {
+        expect(() =>
+            query(knex, PostSchema).projected('summary').projected('withStatus')
+        ).toThrow(
+            /Cannot call .projected\(\).*projected\(|Only one projection/i
+        );
+    });
+
+    it('projection() throws on duplicate name', () => {
+        expect(() =>
+            object({ id: number() })
+                .hasTableName('t')
+                .projection('dup', 'id')
+                .projection('dup', 'id')
+        ).toThrow(/projection.*dup.*already registered|already registered/i);
     });
 });
 

@@ -5,44 +5,32 @@
  * TypeScript will error if any endpoint is missing a handler.
  */
 
-import { activityLogHandler } from './admin.js';
-import {
-    registerHandler,
-    loginHandler,
-    googleLoginHandler
-} from './auth.js';
-import {
-    listTodosHandler,
-    getTodoHandler,
-    getTodoWithAuthorHandler,
-    createTodoHandler,
-    updateTodoHandler,
-    deleteTodoHandler,
-    sendTodoEventHandler,
-    exportTodosHandler,
-    downloadAttachmentHandler,
-    importTodosHandler,
-    legacyReplaceTodoHandler,
-    completeTodoHandler
-} from './todos.js';
-import {
-    listUsersHandler,
-    deleteUserHandler,
-    getMyProfileHandler
-} from './users.js';
-import { subscribeWebhookHandler } from './webhooks.js';
-import {
-    demoSlowHandler,
-    demoFlakyHandler,
-    demoEchoHandler
-} from './demo.js';
-import {
-    todoUpdatesHandler,
-    chatHandler
-} from './live.js';
-
 import type { HandlerMap } from '@cleverbrush/server';
 import type { endpoints } from '../endpoints.js';
+import { activityLogHandler } from './admin.js';
+import { googleLoginHandler, loginHandler, registerHandler } from './auth.js';
+import { demoEchoHandler, demoFlakyHandler, demoSlowHandler } from './demo.js';
+import { chatHandler, todoUpdatesHandler } from './live.js';
+import {
+    completeTodoHandler,
+    createTodoHandler,
+    deleteTodoHandler,
+    downloadAttachmentHandler,
+    exportTodosHandler,
+    getTodoHandler,
+    getTodoWithAuthorHandler,
+    importTodosHandler,
+    legacyReplaceTodoHandler,
+    listTodosHandler,
+    sendTodoEventHandler,
+    updateTodoHandler
+} from './todos.js';
+import {
+    deleteUserHandler,
+    getMyProfileHandler,
+    listUsersHandler
+} from './users.js';
+import { subscribeWebhookHandler } from './webhooks.js';
 
 export const handlers: HandlerMap<typeof endpoints> = {
     auth: {

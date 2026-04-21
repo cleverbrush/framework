@@ -14,15 +14,14 @@ export const listUsersHandler: Handler<typeof ListUsersEndpoint> = async (
     { db }
 ) => {
     const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-    const offset = (page - 1) * limit;
+    const pageSize = Math.min(100, Math.max(1, query.limit ?? 20));
 
     const rows = await db(UserDbSchema)
+        .projected('public')
         .orderBy(t => t.createdAt, 'desc')
-        .limit(limit)
-        .offset(offset);
+        .paginate({ page, pageSize });
 
-    return Promise.all(rows.map(mapUser));
+    return Promise.all(rows.data.map(mapUser));
 };
 
 // ── Delete user (admin only) ──────────────────────────────────────────────────
@@ -39,6 +38,7 @@ export const deleteUserHandler: Handler<typeof DeleteUserEndpoint> = async (
     }
 
     const user = await db(UserDbSchema)
+        .projected('public')
         .where(t => t.id, params.id)
         .first();
 
@@ -62,6 +62,7 @@ export const getMyProfileHandler: Handler<typeof GetMyProfileEndpoint> = async (
     { db }
 ) => {
     const user = await db(UserDbSchema)
+        .projected('public')
         .where(t => t.id, principal.userId)
         .first();
 

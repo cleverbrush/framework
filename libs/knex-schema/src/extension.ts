@@ -9,6 +9,8 @@ import type {
     GenericSchemaBuilder,
     NumberSchemaBuilder,
     ObjectSchemaBuilder,
+    PropertyDescriptor,
+    PropertyDescriptorTree,
     SchemaBuilder,
     StringSchemaBuilder,
     UnionSchemaBuilder
@@ -16,10 +18,20 @@ import type {
 import {
     arrayExtensions,
     defineExtension,
+    EXTRA_TYPE_BRAND,
+    METHOD_LITERAL_BRAND,
     numberExtensions,
+    ObjectSchemaBuilder as ObjectSchemaBuilderClass,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     stringExtensions,
     withExtensions
 } from '@cleverbrush/schema';
+
+// Re-export these symbols so consumer packages can name them when generating
+// TypeScript declarations for schemas built with @cleverbrush/knex-schema.
+// Without these exports, tsc emits TS4023 ("cannot be named") errors for any
+// file that exports a variable whose inferred type traverses FixedMethods.
+export { EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND } from '@cleverbrush/schema';
 
 // ---------------------------------------------------------------------------
 // Shared implementations
@@ -569,14 +581,157 @@ export const ddlExtension = defineExtension({
          * @param name - Scope name to use with `.scoped(name)`.
          * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
          */
-        scope(
+        scope<N extends string>(
             this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-            name: string,
+            name: N,
             fn: Function
-        ) {
+        ): typeof this & { readonly [METHOD_LITERAL_BRAND]?: N } {
             const existing =
                 (this.getExtension('scopes') as Record<string, Function>) ?? {};
-            return this.withExtension('scopes', { ...existing, [name]: fn });
+            return this.withExtension('scopes', {
+                ...existing,
+                [name]: fn
+            }) as typeof this & { readonly [METHOD_LITERAL_BRAND]?: N };
+        },
+        /**
+         * Register a **named projection** — a reusable column subset that can be
+         * applied at query time via `.projected(name)`.
+         *
+         * When a projection is applied the query builder:
+         * 1. Issues `SELECT <cols>` instead of `SELECT *`.
+         * 2. Narrows the TypeScript result row type to `Pick<Row, Keys>`.
+         *
+         * Columns are passed as **rest parameters**. Each argument can be either:
+         *
+         * - A **string** literal of a property name (autocompleted against the
+         *   schema's properties):
+         *   ```ts
+         *   .projection('summary', 'id', 'title', 'completed')
+         *   ```
+         * - An **accessor callback** (refactor-safe — renaming a property
+         *   updates the projection automatically):
+         *   ```ts
+         *   .projection('listView', t => t.id, t => t.title, t => t.userId)
+         *   ```
+         *
+         * The two forms can be mixed freely:
+         * ```ts
+         * .projection('mixed', 'id', t => t.title)
+         * ```
+         *
+         * The literal property keys flow through the type system, so
+         * `.projected('listView')` still narrows the result type to
+         * `Pick<Row, 'id' | 'title' | 'userId'>`.
+         *
+         * @param name    - Unique projection name (used with `.projected()`).
+         * @param columns - One argument per column: either a property name
+         *   string or a `t => t.propName` accessor callback.
+         *
+         * @example
+         * ```ts
+         * const PostSchema = object({ id: number(), title: string(), body: string() })
+         *   .hasTableName('posts')
+         *   .projection('summary', 'id', 'title')
+         *   .projection('detail',  t => t.id, t => t.title, t => t.body);
+         *
+         * // Later:
+         * const rows = await query(db, PostSchema).projected('summary');
+         * // rows: Array<Pick<Post, 'id' | 'title'>>
+         * ```
+         *
+         * @see {@link SchemaQueryBuilder.projected}
+         */
+        projection<
+            TProperties extends Record<
+                string,
+                SchemaBuilder<any, any, any, any, any>
+            >,
+            const N extends string,
+            const TKey extends keyof TProperties & string
+        >(
+            this: ObjectSchemaBuilder<
+                TProperties,
+                any,
+                any,
+                any,
+                any,
+                any,
+                any
+            >,
+            name: N,
+            ...columns: ReadonlyArray<
+                | TKey
+                | ((
+                      t: PropertyDescriptorTree<
+                          ObjectSchemaBuilder<
+                              TProperties,
+                              any,
+                              any,
+                              any,
+                              any,
+                              any,
+                              any
+                          >,
+                          ObjectSchemaBuilder<
+                              TProperties,
+                              any,
+                              any,
+                              any,
+                              any,
+                              any,
+                              any
+                          >
+                      >
+                  ) => PropertyDescriptor<any, any, any, TKey>)
+            >
+        ): typeof this & {
+            readonly [EXTRA_TYPE_BRAND]?: { [P in N]: readonly TKey[] };
+        } {
+            const tree = ObjectSchemaBuilderClass.getPropertiesFor(this as any);
+            const keys: string[] = (
+                columns as ReadonlyArray<
+                    | string
+                    | ((t: any) => PropertyDescriptor<any, any, any, any>)
+                >
+            ).map(col => {
+                if (typeof col === 'string') {
+                    return col;
+                }
+                const descriptor = col(tree);
+                const inner = (descriptor as any)[
+                    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                ];
+                if (!inner) {
+                    throw new Error(
+                        `projection('${name}'): each accessor must return a valid PropertyDescriptor. ` +
+                            `Use \`t => t.propName\`.`
+                    );
+                }
+                if (typeof inner.propertyName !== 'string') {
+                    throw new Error(
+                        `projection('${name}'): could not resolve property name from descriptor. ` +
+                            `Ensure the accessor returns a top-level property descriptor.`
+                    );
+                }
+                return inner.propertyName as string;
+            });
+            const existing =
+                (this.getExtension('projections') as Record<
+                    string,
+                    { keys: readonly string[] }
+                >) ?? {};
+            if (Object.hasOwn(existing, name)) {
+                throw new Error(
+                    `projection('${name}'): a projection with this name is already registered on this schema. ` +
+                        `Each projection name must be unique.`
+                );
+            }
+            return this.withExtension('projections', {
+                ...existing,
+                [name]: { keys }
+            }) as typeof this & {
+                readonly [EXTRA_TYPE_BRAND]?: { [P in N]: readonly TKey[] };
+            };
         },
         /** Set a default scope applied to all queries unless `.unscoped()` is called.
          * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
@@ -686,4 +841,30 @@ export function getTableName(
         );
     }
     return table;
+}
+
+/**
+ * Retrieve the named projections registered on a schema via
+ * `.projection(name, columns)`.
+ *
+ * Returns a map of `{ [name]: { keys: readonly string[] } }` where each
+ * entry's `keys` array contains the **property keys** (not SQL column names)
+ * for that projection. Returns an empty object when no projections are
+ * defined.
+ *
+ * @example
+ * ```ts
+ * const projs = getProjections(PostSchema);
+ * // { summary: { keys: ['id', 'title'] } }
+ * ```
+ */
+export function getProjections(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): Record<string, { keys: readonly string[] }> {
+    return (
+        (schema.getExtension('projections') as Record<
+            string,
+            { keys: readonly string[] }
+        >) ?? {}
+    );
 }

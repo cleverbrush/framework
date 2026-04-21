@@ -3,9 +3,18 @@ import { createQuery } from '@cleverbrush/knex-schema';
 import type { Logger } from '@cleverbrush/log';
 import knex from 'knex';
 import type { Config } from '../config.js';
-import { BoundQueryToken, ConfigToken, KnexToken, LoggerToken } from './tokens.js';
+import {
+    BoundQueryToken,
+    ConfigToken,
+    KnexToken,
+    LoggerToken
+} from './tokens.js';
 
-export function configureDI(services: ServiceCollection, config: Config, logger: Logger): void {
+export function configureDI(
+    services: ServiceCollection,
+    config: Config,
+    logger: Logger
+): void {
     // Application config — available everywhere
     services.addSingleton(ConfigToken, config);
 

@@ -2,6 +2,8 @@
 
 import type { InferType } from '@cleverbrush/schema';
 import {
+    EXTRA_TYPE_BRAND,
+    METHOD_LITERAL_BRAND,
     ObjectSchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
@@ -11,7 +13,7 @@ import {
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
-import { getColumnName, getTableName } from './extension.js';
+import { getColumnName, getProjections, getTableName } from './extension.js';
 import { clearRow } from './mappers.js';
 import type {
     ColumnRef,
@@ -30,6 +32,54 @@ import {
     validateJoinOne,
     validateUniqueFieldNames
 } from './validate.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the scope names registered on a schema via `.scope(name, fn)`.
+ * Returns `never` when no scopes are defined (making `.scoped()` uncallable).
+ * Falls back to `string` for `any`-typed schemas to preserve loose behaviour.
+ *
+ * @internal
+ */
+type ScopesOf<S> = S extends {
+    readonly [METHOD_LITERAL_BRAND]?: infer N;
+}
+    ? Extract<N, string>
+    : never;
+
+/**
+ * Extracts the named projection map from a schema type.
+ * Returns a `Record<name, readonly keys[]>` type where each key is a
+ * registered projection name and the value is the tuple of property keys.
+ * Returns `Record<never, never>` (no projections) when the schema has none,
+ * making `.projected()` uncallable on undecorated schemas.
+ *
+ * @internal
+ */
+type ProjectionsOf<S> = S extends {
+    readonly [EXTRA_TYPE_BRAND]?: infer P;
+}
+    ? P extends Record<string, readonly string[]>
+        ? P
+        : Record<never, never>
+    : Record<never, never>;
+
+/**
+ * Extracts the string-key union for a specific projection name from a schema
+ * type. This indirection is needed because TypeScript cannot directly index
+ * `ProjectionsOf<S>[K]` with `number` inside a generic function signature.
+ *
+ * @internal
+ */
+type ProjectionKeysOf<
+    S,
+    K extends keyof ProjectionsOf<S> & string
+> = ProjectionsOf<S>[K] extends readonly (infer T extends string)[]
+    ? T
+    : string;
 
 // ---------------------------------------------------------------------------
 // SchemaQueryBuilder
@@ -90,6 +140,20 @@ export class SchemaQueryBuilder<
      * `null` means no explicit select was made (SELECT *).
      */
     #explicitSelects: string[] | null = null;
+
+    /**
+     * Tracks which column-selection mode is active on this builder.
+     * - `null`          — no explicit SELECT issued yet (SELECT *).
+     * - `'select'`      — `.select()` / `.distinct()` was called.
+     * - `'aggregate'`   — `.count()` / `.countDistinct()` / `.min()` / etc.
+     * - `'projection'`  — `.projected()` was called.
+     *
+     * Only one mode is allowed per query. Calling a method that would switch
+     * to a different mode throws an error.
+     */
+    #selectionMode: 'select' | 'aggregate' | 'projection' | null = null;
+    /** Name of the projection currently applied, for use in error messages. */
+    #appliedProjection: string | null = null;
 
     /** When true, soft-delete filter is not applied to SELECT queries. */
     #includeDeleted = false;
@@ -839,6 +903,8 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
+        this.#assertNotProjection('select');
+        this.#selectionMode = 'select';
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.select(...(resolved as string[]));
         // Track the string-resolved columns (not Knex.Raw) for CTE column management
@@ -849,6 +915,38 @@ export class SchemaQueryBuilder<
             }
         }
         return this;
+    }
+
+    /** @internal Throw if a projection has already been applied. */
+    #assertNotProjection(method: string): void {
+        if (this.#selectionMode === 'projection') {
+            throw new Error(
+                `Cannot call .${method}() after .projected('${
+                    this.#appliedProjection
+                }'). Choose one column-selection mode per query.`
+            );
+        }
+    }
+
+    /** @internal Throw if .select() or .projected() has already been applied. */
+    #assertNotExplicitSelect(method: string): void {
+        if (this.#selectionMode === 'select') {
+            throw new Error(
+                `Cannot call .${method}() after .select(). Choose one column-selection mode per query.`
+            );
+        }
+        if (this.#selectionMode === 'aggregate') {
+            throw new Error(
+                `Cannot call .${method}() after an aggregate method. Choose one column-selection mode per query.`
+            );
+        }
+        if (this.#selectionMode === 'projection') {
+            throw new Error(
+                `Cannot call .${method}() after .projected('${
+                    this.#appliedProjection
+                }'). Choose one column-selection mode per query.`
+            );
+        }
     }
 
     /**
@@ -872,6 +970,8 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     count(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#assertNotProjection('count');
+        this.#selectionMode = 'aggregate';
         if (column) {
             this.#baseQuery.count(this.#resolveColumnArg(column) as string);
         } else {
@@ -886,6 +986,8 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     countDistinct(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#assertNotProjection('countDistinct');
+        this.#selectionMode = 'aggregate';
         if (column) {
             this.#baseQuery.countDistinct(
                 this.#resolveColumnArg(column) as string
@@ -901,6 +1003,8 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     min(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#assertNotProjection('min');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.min(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -910,6 +1014,8 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     max(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#assertNotProjection('max');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.max(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -919,6 +1025,8 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     sum(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#assertNotProjection('sum');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.sum(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -928,6 +1036,8 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     avg(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#assertNotProjection('avg');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.avg(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -1185,6 +1295,8 @@ export class SchemaQueryBuilder<
         builder.#explicitSelects = this.#explicitSelects
             ? [...this.#explicitSelects]
             : null;
+        builder.#selectionMode = this.#selectionMode;
+        builder.#appliedProjection = this.#appliedProjection;
         builder.#includeDeleted = this.#includeDeleted;
         builder.#onlyDeleted = this.#onlyDeleted;
         builder.#skipDefaultScope = this.#skipDefaultScope;
@@ -1366,6 +1478,10 @@ export class SchemaQueryBuilder<
     /**
      * Apply a named scope defined on the schema via `.scope(name, fn)`.
      *
+     * The `name` parameter is constrained to the literal scope names registered
+     * on the schema, so IDEs show only valid completions and typos are caught
+     * at compile time.
+     *
      * @param name - The scope name.
      * @returns `this` for chaining.
      *
@@ -1374,7 +1490,79 @@ export class SchemaQueryBuilder<
      * await query(db, Post).scoped('published').scoped('recent');
      * ```
      */
-    scoped(name: string): this {
+    /**
+     * Apply a **named projection** defined on the schema via
+     * `.projection(name, columns)`.
+     *
+     * Calling `.projected()` on the query builder does two things:
+     * 1. Restricts the SQL `SELECT` clause to the columns registered under
+     *    `name` (SQL column names are resolved via `.hasColumnName()`).
+     * 2. Narrows the TypeScript result row type to `Pick<Row, Keys>` so
+     *    accessing columns outside the projection is a compile-time error.
+     *
+     * The `name` parameter is constrained to the literal projection names
+     * registered on the schema — TypeScript will report an error for any
+     * unregistered name.
+     *
+     * Calling `.projected()` after `.select()`, any aggregate method
+     * (`.count()`, `.min()`, etc.), or a second `.projected()` call throws
+     * at runtime with a clear error message.
+     *
+     * @param name - The projection name.
+     * @returns A new builder whose result type is `Pick<Row, ProjectionKeys>`.
+     *
+     * @example
+     * ```ts
+     * const PostSchema = object({ id: number(), title: string(), body: string() })
+     *   .hasTableName('posts')
+     *   .projection('summary', 'id', 'title');
+     *
+     * const rows = await query(db, PostSchema)
+     *   .scoped('published')
+     *   .projected('summary');
+     * // rows: Array<Pick<Post, 'id' | 'title'>>
+     * // rows[0].body  // ← TS error: not in projection
+     * ```
+     *
+     * @see {@link ddlExtension} `.projection()` for schema-side definition.
+     */
+    projected<K extends keyof ProjectionsOf<TLocalSchema> & string>(
+        name: K
+    ): SchemaQueryBuilder<
+        TLocalSchema,
+        Pick<TResult, ProjectionKeysOf<TLocalSchema, K> & keyof TResult>
+    > {
+        this.#assertNotExplicitSelect('projected');
+        if (this.#selectionMode === 'projection') {
+            throw new Error(
+                `Cannot call .projected('${name}') — .projected('${
+                    this.#appliedProjection
+                }') was already applied. Only one projection per query.`
+            );
+        }
+        const projections = getProjections(this.#localSchema as any);
+        const projection = projections[name];
+        if (!projection) {
+            throw new Error(
+                `Unknown projection "${name}" on schema for table "${
+                    this.#tableName
+                }"`
+            );
+        }
+        // Translate property keys → SQL column names
+        const { propToCol } = buildColumnMap(this.#localSchema as any);
+        const sqlCols = projection.keys.map(key => propToCol.get(key) ?? key);
+        this.#baseQuery.select(...sqlCols);
+        this.#explicitSelects ??= [];
+        for (const col of sqlCols) {
+            this.#explicitSelects.push(col);
+        }
+        this.#selectionMode = 'projection';
+        this.#appliedProjection = name;
+        return this as any;
+    }
+
+    scoped<K extends ScopesOf<TLocalSchema>>(name: K): this {
         const scopes = (this.#localSchema as any).getExtension?.('scopes') as
             | Record<string, Function>
             | undefined;

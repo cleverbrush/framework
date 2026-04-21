@@ -56,19 +56,22 @@ export const ShutdownError = parseString(
 
 export const AuditStart = parseString(
     object({ Method: string(), Path: string(), Principal: string() }),
-    $t => $t`Audit start: ${t => t.Method} ${t => t.Path} by ${t => t.Principal}`
+    $t =>
+        $t`Audit start: ${t => t.Method} ${t => t.Path} by ${t => t.Principal}`
 );
 
 export const AuditEnd = parseString(
     object({ Method: string(), Path: string(), ElapsedMs: number() }),
-    $t => $t`Audit end: ${t => t.Method} ${t => t.Path} completed in ${t => t.ElapsedMs}ms`
+    $t =>
+        $t`Audit end: ${t => t.Method} ${t => t.Path} completed in ${t => t.ElapsedMs}ms`
 );
 
 // ── Todos ────────────────────────────────────────────────────────────────────
 
 export const TodoCreated = parseString(
     object({ TodoId: number(), Title: string(), UserId: number() }),
-    $t => $t`Todo created: #${t => t.TodoId} "${t => t.Title}" by user ${t => t.UserId}`
+    $t =>
+        $t`Todo created: #${t => t.TodoId} "${t => t.Title}" by user ${t => t.UserId}`
 );
 
 export const TodoUpdated = parseString(
@@ -88,12 +91,14 @@ export const TodoDeleted = parseString(
 
 export const TodoEventReceived = parseString(
     object({ TodoId: number(), EventType: string(), UserId: number() }),
-    $t => $t`Todo event: ${t => t.EventType} on #${t => t.TodoId} by user ${t => t.UserId}`
+    $t =>
+        $t`Todo event: ${t => t.EventType} on #${t => t.TodoId} by user ${t => t.UserId}`
 );
 
 export const TodosImported = parseString(
     object({ Imported: number(), Total: number(), UserId: number() }),
-    $t => $t`Todos imported: ${t => t.Imported}/${t => t.Total} by user ${t => t.UserId}`
+    $t =>
+        $t`Todos imported: ${t => t.Imported}/${t => t.Total} by user ${t => t.UserId}`
 );
 
 export const TodosExported = parseString(

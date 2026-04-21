@@ -24,18 +24,14 @@ const TodoRowSchema = object({
 
 export const mappingRegistry = mapper()
     .configure(UserRowSchema, UserResponseSchema, m =>
-        m
-            .for(t => t.authProvider)
-            .compute(f => f.authProvider)
+        m.for(t => t.authProvider).compute(f => f.authProvider)
     )
     .configure(TodoRowSchema, TodoResponseSchema, m =>
-        m
-            .for(t => t.description)
-            .compute(f => f.description ?? undefined)
+        m.for(t => t.description).compute(f => f.description ?? undefined)
     );
 
 const _mapUserFn = mappingRegistry.getMapper(UserRowSchema, UserResponseSchema);
 const _mapTodoFn = mappingRegistry.getMapper(TodoRowSchema, TodoResponseSchema);
 
-export const mapUser = (row: UserDb) => _mapUserFn(row as any);
-export const mapTodo = (row: TodoDb) => _mapTodoFn(row as any);
+export const mapUser = (row: UserDb) => _mapUserFn(row);
+export const mapTodo = (row: TodoDb) => _mapTodoFn(row);

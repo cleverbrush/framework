@@ -81,7 +81,14 @@ export type {
     CleanExtended,
     ExtensionConfig,
     ExtensionDescriptor,
+    ExtraTypeBrandSymbol,
     FixedMethods,
-    HiddenExtensionMethods
+    HiddenExtensionMethods,
+    MethodLiteralBrandSymbol
 } from './extension.js';
-export { defineExtension, withExtensions } from './extension.js';
+export {
+    defineExtension,
+    EXTRA_TYPE_BRAND,
+    METHOD_LITERAL_BRAND,
+    withExtensions
+} from './extension.js';

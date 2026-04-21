@@ -403,19 +403,22 @@ export type PropertyDescriptorInnerFromPropertyDescriptor<T> =
     T extends PropertyDescriptor<
         infer TSchema,
         infer TPropertySchema,
-        infer TParentPropertyDescriptor
+        infer TParentPropertyDescriptor,
+        infer TPropertyKey extends string
     >
         ? PropertyDescriptorInner<
               TSchema,
               TPropertySchema,
-              TParentPropertyDescriptor
+              TParentPropertyDescriptor,
+              TPropertyKey
           >
         : undefined;
 
 export type PropertyDescriptorInner<
     TSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
     TPropertySchema,
-    TParentPropertyDescriptor
+    TParentPropertyDescriptor,
+    TPropertyKey extends string = string
 > = {
     /**
      * Sets a new value to the property. If the process was successful,
@@ -486,8 +489,14 @@ export type PropertyDescriptorInner<
     /**
      * The name of this property within its parent object, or `undefined`
      * for the root descriptor.
+     *
+     * When the property was created from a `PropertyDescriptorTree` leaf the
+     * type narrows to the literal key string (e.g. `'id'`), enabling
+     * accessor-function-based column inference in query builders.
+     *
+     * @typeParam TPropertyKey - The literal property name, or `string` for root/unknown descriptors.
      */
-    propertyName: string | undefined;
+    propertyName: TPropertyKey | undefined;
 
     /**
      * Returns a JSON Pointer (RFC 6901) string representing this
@@ -507,12 +516,14 @@ export type PropertyDescriptorInner<
 export type PropertyDescriptor<
     TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>,
     TPropertySchema,
-    TParentPropertyDescriptor
+    TParentPropertyDescriptor,
+    TPropertyKey extends string = string
 > = {
     [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: PropertyDescriptorInner<
         TRootSchema,
         TPropertySchema,
-        TParentPropertyDescriptor
+        TParentPropertyDescriptor,
+        TPropertyKey
     >;
 };
 
@@ -559,7 +570,8 @@ export type PropertyDescriptorTree<
                               TRootSchema,
                               TSchema,
                               TParentPropertyDescriptor
-                          >
+                          >,
+                          K & string
                       > &
                           ExternOutputPropertyDescriptors<
                               TExternResult,
@@ -571,7 +583,8 @@ export type PropertyDescriptorTree<
                                       TRootSchema,
                                       TSchema,
                                       TParentPropertyDescriptor
-                                  >
+                                  >,
+                                  K & string
                               >
                           >
                     : TProperties[K] extends ArraySchemaBuilder<
@@ -593,7 +606,8 @@ export type PropertyDescriptorTree<
                                     TRootSchema,
                                     TSchema,
                                     TParentPropertyDescriptor
-                                >
+                                >,
+                                K & string
                             >
                           : InferType<TProperties[K]> extends TAssignableTo
                             ? PropertyDescriptor<
@@ -603,7 +617,8 @@ export type PropertyDescriptorTree<
                                       TRootSchema,
                                       TSchema,
                                       TParentPropertyDescriptor
-                                  >
+                                  >,
+                                  K & string
                               >
                             : never
                       : InferType<TProperties[K]> extends TAssignableTo
@@ -614,7 +629,8 @@ export type PropertyDescriptorTree<
                                   TRootSchema,
                                   TSchema,
                                   TParentPropertyDescriptor
-                              >
+                              >,
+                              K & string
                           >
                         : never;
           }
@@ -649,7 +665,8 @@ type ExternOutputPropertyDescriptors<
             [K in keyof TOutput]: PropertyDescriptor<
                 TRootSchema,
                 SchemaBuilder<TOutput[K], true, false, false, {}>,
-                TParentPropertyDescriptor
+                TParentPropertyDescriptor,
+                K & string
             > &
                 ExternOutputPropertyDescriptors<
                     TOutput[K],
@@ -657,7 +674,8 @@ type ExternOutputPropertyDescriptors<
                     PropertyDescriptor<
                         TRootSchema,
                         SchemaBuilder<TOutput[K], true, false, false, {}>,
-                        TParentPropertyDescriptor
+                        TParentPropertyDescriptor,
+                        K & string
                     >
                 >;
         }

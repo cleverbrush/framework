@@ -1,13 +1,28 @@
-import {
-    defineWebhook
-} from '@cleverbrush/server';
+import { defineWebhook } from '@cleverbrush/server';
 import { BoundQueryToken, LoggerToken } from '../di/tokens.js';
+import { api } from './contract.js';
 import {
+    type ImportTodosBody,
+    type ImportTodosBodySchema,
     PrincipalSchema,
     TodoNotificationPayloadSchema,
     WebhookAckSchema
 } from './schemas.js';
-import { api } from './contract.js';
+
+const importTodosExample: ImportTodosBody = {
+    items: [{ title: 'Buy groceries' }]
+};
+
+const importTodosMinimalExample: ImportTodosBody = {
+    items: [{ title: 'Task 1' }]
+};
+
+const importTodosFullExample: ImportTodosBody = {
+    items: [
+        { title: 'Task 1', description: 'First task details' },
+        { title: 'Task 2', description: 'Second task details' }
+    ]
+};
 
 // ── Auth endpoints ────────────────────────────────────────────────────────────
 
@@ -28,7 +43,9 @@ export const LoginEndpoint = api.auth.login
 export const GoogleLoginEndpoint = api.auth.googleLogin
     .inject({ db: BoundQueryToken })
     .summary('Login with Google')
-    .description('Exchanges a Google ID token for an application JWT. Auto-provisions the user on first login.')
+    .description(
+        'Exchanges a Google ID token for an application JWT. Auto-provisions the user on first login.'
+    )
     .tags('auth')
     .operationId('googleLogin');
 
@@ -165,22 +182,17 @@ export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
 export const ImportTodosEndpoint = api.todos.importBulk
     .authorize(PrincipalSchema)
     .inject({ db: BoundQueryToken, logger: LoggerToken })
-    .example({ items: [{ title: 'Buy groceries' }] } as any)
+    .example(importTodosExample as unknown as typeof ImportTodosBodySchema)
     .examples({
         minimal: {
             summary: 'Minimal import',
             description: 'Import a single todo with only a title.',
-            value: { items: [{ title: 'Task 1' }] } as any
+            value: importTodosMinimalExample as unknown as typeof ImportTodosBodySchema
         },
         full: {
             summary: 'Full import with descriptions',
             description: 'Import multiple todos with optional descriptions.',
-            value: {
-                items: [
-                    { title: 'Task 1', description: 'First task details' },
-                    { title: 'Task 2', description: 'Second task details' }
-                ]
-            } as any
+            value: importTodosFullExample as unknown as typeof ImportTodosBodySchema
         }
     })
     .summary('Bulk import todos')

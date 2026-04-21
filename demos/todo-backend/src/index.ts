@@ -1,6 +1,6 @@
 import {
-    createLogger,
     consoleSink,
+    createLogger,
     fileSink,
     hostnameEnricher,
     processIdEnricher
@@ -29,7 +29,11 @@ async function main() {
             consoleSink({ theme: 'dark' }),
             fileSink({
                 path: './logs/app.log',
-                rotation: { strategy: 'time', interval: 'daily', retainCount: 7 }
+                rotation: {
+                    strategy: 'time',
+                    interval: 'daily',
+                    retainCount: 7
+                }
             })
         ],
         enrichers: [hostnameEnricher(), processIdEnricher()],
@@ -68,9 +72,7 @@ async function main() {
     });
     logger.info(OpenApiSpec, {
         Host:
-            config.server.host === '0.0.0.0'
-                ? 'localhost'
-                : config.server.host,
+            config.server.host === '0.0.0.0' ? 'localhost' : config.server.host,
         Port: config.server.port
     });
 
