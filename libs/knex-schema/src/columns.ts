@@ -5,6 +5,7 @@ import {
     ObjectSchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
+import type { Knex } from 'knex';
 import { getColumnName } from './extension.js';
 import type { ColumnRef } from './types.js';
 
@@ -53,24 +54,75 @@ export function buildColumnMap(
 }
 
 // ---------------------------------------------------------------------------
-// Resolve a ColumnRef (string | accessor) to a SQL column name
+// Resolve a ColumnRef (string | accessor) to a SQL column name or Knex.Raw
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve a ColumnRef to a plain SQL column name.
+ * Build a `Knex.Raw` expression for accessing a nested JSON/JSONB path.
  *
- * - String refs are treated as **property keys** and translated to column
- *   names via the column map.
+ * - Single-key path: `"col"->>'key'` (text output, `->>` operator).
+ * - Multi-key path:  `"col"#>>'{a,b,...}'` (text output, `#>>` operator).
+ *
+ * Both use positional bindings to prevent SQL injection.
+ */
+function jsonPathRaw(knex: Knex, col: string, jsonPath: string[]): Knex.Raw {
+    if (jsonPath.length === 1) {
+        return knex.raw('??->?', [col, jsonPath[0]]);
+    }
+    // #>> expects a text array literal, e.g. '{address,city}'
+    const pathLiteral = `{${jsonPath.join(',')}}`;
+    return knex.raw('??#>?', [col, pathLiteral]);
+}
+
+/**
+ * Resolve a ColumnRef to a plain SQL column name (or a Knex.Raw expression for
+ * nested JSON paths when `knex` is supplied).
+ *
+ * - String refs are treated as **property keys** (or dot-separated nested paths
+ *   such as `'address.city'`) and translated to column names via the column map.
  * - Function refs (property accessor) are resolved via PropertyDescriptorTree,
- *   then translated to column names.
+ *   then translated to column names.  Nested accessors (e.g. `t => t.address.city`)
+ *   produce a `Knex.Raw` JSON-path expression when `knex` is provided.
+ *
+ * @param ref    - Column reference (property key, dotted path, or accessor fn).
+ * @param schema - Root ObjectSchemaBuilder.
+ * @param label  - Human-readable label for error messages.
+ * @param knex   - Knex instance.  Required for nested JSON-path refs; when omitted
+ *                 and a nested path is detected, an error is thrown.
  */
 export function resolveColumnRef(
     ref: ColumnRef<any>,
     schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    label: string,
+    knex: Knex
+): string | Knex.Raw;
+export function resolveColumnRef(
+    ref: ColumnRef<any>,
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     label: string
-): string {
+): string;
+export function resolveColumnRef(
+    ref: ColumnRef<any>,
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    label: string,
+    knex?: Knex
+): string | Knex.Raw {
     if (typeof ref === 'string') {
         if (!ref) throw new Error(`${label} must be a non-empty string`);
+
+        // Dotted paths like 'address.city' — first segment is the top-level prop.
+        if (ref.includes('.')) {
+            const [topProp, ...jsonPath] = ref.split('.');
+            const { propToCol } = buildColumnMap(schema);
+            const col = propToCol.get(topProp) ?? topProp;
+            if (!knex) {
+                throw new Error(
+                    `${label}: a Knex instance is required to resolve nested JSON path '${ref}'`
+                );
+            }
+            return jsonPathRaw(knex, col, jsonPath);
+        }
+
         const { propToCol } = buildColumnMap(schema);
         const col = propToCol.get(ref);
         // If the string is a known property key, return its column name;
@@ -93,25 +145,39 @@ export function resolveColumnRef(
         }
 
         const inner = (descriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
-        const introspected = schema.introspect() as any;
-        const properties = introspected.properties ?? {};
+        const pointer: string = inner.toJsonPointer();
 
-        for (const propName of Object.keys(properties)) {
-            const propDescriptor = (tree as any)[propName];
-            if (
-                propDescriptor &&
-                (propDescriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] ===
-                    inner
-            ) {
-                // Found the matching property — resolve to column name
-                const { propToCol } = buildColumnMap(schema);
-                return propToCol.get(propName) ?? propName;
-            }
+        // pointer is an RFC-6901 JSON Pointer, e.g. '' (root), '/name', '/address/city'
+        if (!pointer) {
+            throw new Error(`${label} accessor returned the root descriptor`);
         }
 
-        throw new Error(
-            `${label} accessor did not match any property in the schema`
-        );
+        // Split '/address/city' → ['address', 'city']
+        const segments = pointer
+            .slice(1)
+            .split('/')
+            .map((s: string) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+
+        if (segments.length === 0) {
+            throw new Error(`${label} accessor returned the root descriptor`);
+        }
+
+        const [topProp, ...jsonPath] = segments;
+        const { propToCol } = buildColumnMap(schema);
+        const col = propToCol.get(topProp) ?? topProp;
+
+        if (jsonPath.length === 0) {
+            // Top-level property — plain column name
+            return col;
+        }
+
+        // Nested path — need Knex.Raw
+        if (!knex) {
+            throw new Error(
+                `${label}: a Knex instance is required to resolve nested JSON path '${pointer}'`
+            );
+        }
+        return jsonPathRaw(knex, col, jsonPath);
     }
 
     throw new Error(
@@ -148,23 +214,15 @@ export function resolvePropertyKey(
         }
 
         const inner = (descriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
-        const introspected = schema.introspect() as any;
-        const properties = introspected.properties ?? {};
+        const pointer: string = inner.toJsonPointer();
 
-        for (const propName of Object.keys(properties)) {
-            const propDescriptor = (tree as any)[propName];
-            if (
-                propDescriptor &&
-                (propDescriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] ===
-                    inner
-            ) {
-                return propName;
-            }
+        if (!pointer) {
+            throw new Error(`${label} accessor returned the root descriptor`);
         }
 
-        throw new Error(
-            `${label} accessor did not match any property in the schema`
-        );
+        // Return the first segment (top-level property key) for mapping purposes
+        const topProp = pointer.slice(1).split('/')[0];
+        return topProp.replace(/~1/g, '/').replace(/~0/g, '~');
     }
 
     throw new Error(

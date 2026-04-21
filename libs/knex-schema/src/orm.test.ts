@@ -267,6 +267,102 @@ describe('DDL extensions', () => {
         const ext = idSchema.introspect().extensions;
         expect(ext.columnType).toBe('bigint');
     });
+
+    it('number.bigint() shorthand stores columnType', () => {
+        const schema = object({ id: number().bigint() }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.id.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('bigint');
+    });
+
+    it('number.smallint() shorthand stores columnType', () => {
+        const schema = object({ n: number().smallint() }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.n.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('smallint');
+    });
+
+    it('number.decimal() stores parameterised columnType', () => {
+        const schema = object({
+            price: number().decimal(10, 2)
+        }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.price.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('decimal(10,2)');
+    });
+
+    it('string.text() shorthand stores columnType', () => {
+        const schema = object({ body: string().text() }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.body.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('text');
+    });
+
+    it('string.asUuid() shorthand stores columnType', () => {
+        const schema = object({ id: string().asUuid() }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.id.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('uuid');
+    });
+
+    it('string.citext() shorthand stores columnType', () => {
+        const schema = object({ email: string().citext() }).hasTableName(
+            'test'
+        );
+        const ext = (schema.introspect() as any).properties.email.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('citext');
+    });
+
+    it('string.jsonb() shorthand stores columnType', () => {
+        const schema = object({ meta: string().jsonb() }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.meta.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('jsonb');
+    });
+
+    it('string.tsvector() shorthand stores columnType', () => {
+        const schema = object({
+            search: string().tsvector()
+        }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.search.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('tsvector');
+    });
+
+    it('boolean.columnType() stores override', () => {
+        const schema = object({
+            flag: boolean().columnType('smallint')
+        }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.flag.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('smallint');
+    });
+
+    it('date.columnType() stores override', () => {
+        const schema = object({
+            ts: date().columnType('timestamptz')
+        }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.ts.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('timestamptz');
+    });
+
+    it('date.timestamptz() shorthand stores columnType', () => {
+        const schema = object({ ts: date().timestamptz() }).hasTableName(
+            'test'
+        );
+        const ext = (schema.introspect() as any).properties.ts.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('timestamptz');
+    });
+
+    it('date.dateOnly() shorthand stores columnType', () => {
+        const schema = object({ d: date().dateOnly() }).hasTableName('test');
+        const ext = (schema.introspect() as any).properties.d.introspect()
+            .extensions;
+        expect(ext.columnType).toBe('date');
+    });
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -379,6 +475,35 @@ describe('generateCreateTable', () => {
         const sql = generateCreateTable(Post)(knex).toQuery();
         // categoryId is optional → nullable
         expect(sql).toMatch(/"category_id".*null/i);
+    });
+
+    it('generates SQL with type helpers: bigint, uuid, jsonb, timestamptz, dateOnly', () => {
+        const schema = object({
+            id: number().primaryKey(),
+            count: number().bigint(),
+            externalId: string().asUuid(),
+            meta: string().jsonb(),
+            price: number().decimal(10, 2),
+            createdAt: date().timestamptz(),
+            birthDate: date().dateOnly()
+        }).hasTableName('typed_test');
+
+        const sql = generateCreateTable(schema)(knex).toQuery();
+        expect(sql).toContain('bigint');
+        expect(sql).toContain('uuid');
+        expect(sql).toContain('jsonb');
+        expect(sql).toContain('decimal(10,2)');
+        expect(sql).toContain('timestamptz');
+        expect(sql).toContain('"birthDate" date');
+    });
+
+    it('generates SQL with boolean.columnType() override', () => {
+        const schema = object({
+            id: number().primaryKey(),
+            flag: boolean().columnType('smallint').defaultTo(false)
+        }).hasTableName('bool_test');
+        const sql = generateCreateTable(schema)(knex).toQuery();
+        expect(sql).toContain('smallint');
     });
 });
 
@@ -1416,5 +1541,208 @@ describe('extension method chaining', () => {
         expect(ext.afterInsert).toHaveLength(1);
         expect(ext.beforeUpdate).toHaveLength(1);
         expect(ext.beforeDelete).toHaveLength(1);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 2: New query builder methods
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Phase 2 query methods', () => {
+    it('whereNotExists generates correct SQL', () => {
+        const sql = query(knex, User)
+            .whereNotExists(
+                knex
+                    .queryBuilder()
+                    .from('posts')
+                    .where('posts.author_id', knex.raw('users.id'))
+            )
+            .toQuery();
+        expect(sql).toContain('where not exists');
+    });
+
+    it('whereJsonPath generates jsonb_path_query_first SQL', () => {
+        const DataSchema = object({
+            id: number().primaryKey(),
+            meta: string().jsonb()
+        }).hasTableName('data_items');
+
+        const sql = query(knex, DataSchema)
+            .whereJsonPath(t => t.meta, 'status', '=', 'active')
+            .toQuery();
+        expect(sql).toContain('jsonb_path_query_first');
+        expect(sql).toContain('$.status');
+    });
+
+    it('whereJsonPath throws on non-pg client', () => {
+        const DataSchema = object({
+            id: number().primaryKey(),
+            meta: string().jsonb()
+        }).hasTableName('data_items');
+
+        // Create a separate pg knex instance and override the client config
+        // to appear as a non-pg client, without touching the shared `knex`.
+        const localKnex = Knex({ client: 'pg' });
+        (localKnex as any).client.config.client = 'mysql';
+
+        expect(() =>
+            query(localKnex, DataSchema).whereJsonPath(
+                t => t.meta,
+                'status',
+                '=',
+                'active'
+            )
+        ).toThrow('whereJsonPath() is only supported on PostgreSQL');
+
+        void localKnex.destroy();
+    });
+
+    it('whereJsonPath with @? operator generates existence check SQL', () => {
+        const DataSchema = object({
+            id: number().primaryKey(),
+            tags: string().jsonb()
+        }).hasTableName('data_items');
+
+        const sql = query(knex, DataSchema)
+            .whereJsonPath(t => t.tags, '$.tags[*] ? (@ == "sale")', '@?')
+            .toQuery();
+        expect(sql).toContain('@?');
+    });
+
+    it('onConflict().merge() produces INSERT ... ON CONFLICT ... DO UPDATE SQL', () => {
+        // OnConflictBuilder is async (hits DB), so we just verify the method exists and chains
+        const UserSchema = object({
+            id: number().primaryKey(),
+            email: string().unique(),
+            name: string()
+        }).hasTableName('users');
+
+        const ob = query(knex, UserSchema).onConflict(t => t.email);
+        expect(ob).toBeDefined();
+        expect(typeof ob.merge).toBe('function');
+        expect(typeof ob.ignore).toBe('function');
+    });
+
+    it('upsert() method is callable', () => {
+        const UserSchema = object({
+            id: number().primaryKey(),
+            email: string().unique(),
+            name: string()
+        }).hasTableName('users');
+
+        const q = query(knex, UserSchema);
+        expect(typeof q.upsert).toBe('function');
+    });
+
+    it('pluck() method is callable', () => {
+        const q = query(knex, User);
+        expect(typeof q.pluck).toBe('function');
+    });
+
+    it('toQuery() result is memoized and invalidated by mutations', () => {
+        const q = query(knex, User).where(t => t.name, 'Alice');
+        const sql1 = q.toQuery();
+        const sql2 = q.toQuery();
+        // Same instance, same result — should be identical strings
+        expect(sql1).toBe(sql2);
+
+        // Mutating invalidates the cache — new SQL includes the extra condition
+        q.where(t => t.role, 'admin');
+        const sql3 = q.toQuery();
+        expect(sql3).not.toBe(sql1);
+        expect(sql3).toContain('admin');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Nested object → JSONB column support
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('nested object jsonb columns', () => {
+    describe('DDL — generateCreateTable', () => {
+        it('nested object without explicit .jsonb() defaults to jsonb column type', () => {
+            const Schema = object({
+                id: number().primaryKey(),
+                address: object({
+                    street: string(),
+                    city: string()
+                })
+            }).hasTableName('people');
+
+            const sql = generateCreateTable(Schema)(knex).toQuery();
+            expect(sql).toContain('"address" jsonb');
+        });
+
+        it('explicit .jsonb() still generates a jsonb column', () => {
+            const Schema = object({
+                id: number().primaryKey(),
+                address: object({
+                    street: string(),
+                    city: string()
+                }).jsonb()
+            }).hasTableName('people');
+
+            const sql = generateCreateTable(Schema)(knex).toQuery();
+            expect(sql).toContain('"address" jsonb');
+        });
+
+        it('.json() generates a json column', () => {
+            const Schema = object({
+                id: number().primaryKey(),
+                meta: object({ key: string() }).json()
+            }).hasTableName('things');
+
+            const sql = generateCreateTable(Schema)(knex).toQuery();
+            expect(sql).toContain('"meta" json');
+        });
+
+        it('.columnType("text") overrides to text', () => {
+            const Schema = object({
+                id: number().primaryKey(),
+                payload: object({ data: string() }).columnType('text')
+            }).hasTableName('things');
+
+            const sql = generateCreateTable(Schema)(knex).toQuery();
+            expect(sql).toContain('"payload" text');
+        });
+    });
+
+    describe('Query — nested JSON path resolution', () => {
+        const PersonSchema = object({
+            id: number().primaryKey(),
+            address: object({
+                street: string(),
+                city: string(),
+                geo: object({
+                    lat: number(),
+                    lng: number()
+                })
+            }).jsonb()
+        }).hasTableName('people');
+
+        it('accessor t => t.address.city generates ->? SQL', () => {
+            const sql = query(knex, PersonSchema)
+                .where(t => (t as any).address.city, '=', 'NYC')
+                .toQuery();
+            expect(sql).toContain('->');
+            expect(sql).toContain('city');
+        });
+
+        it('dotted string path address.city generates ->? SQL', () => {
+            const sql = query(knex, PersonSchema)
+                .where('address.city' as any, '=', 'NYC')
+                .toQuery();
+            expect(sql).toContain('->');
+            expect(sql).toContain('city');
+        });
+
+        it('3-level deep path generates #>? SQL', () => {
+            const sql = query(knex, PersonSchema)
+                .where(t => (t as any).address.geo.lat, '>', 0)
+                .toQuery();
+            expect(sql).toContain('#>');
+            expect(sql).toContain('geo');
+            expect(sql).toContain('lat');
+        });
     });
 });

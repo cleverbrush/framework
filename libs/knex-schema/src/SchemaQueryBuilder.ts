@@ -82,6 +82,125 @@ type ProjectionKeysOf<
     : string;
 
 // ---------------------------------------------------------------------------
+// OnConflictBuilder
+// ---------------------------------------------------------------------------
+
+/**
+ * Intermediate builder returned by {@link SchemaQueryBuilder.onConflict}.
+ * Call `.merge()` or `.ignore()` to complete the upsert/insert-ignore operation.
+ *
+ * @internal
+ */
+export class OnConflictBuilder<
+    TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TResult
+> {
+    readonly #knex: Knex;
+    readonly #localSchema: TLocalSchema;
+    readonly #conflictColumns: string[];
+
+    /** @internal */
+    constructor(
+        knex: Knex,
+        localSchema: TLocalSchema,
+        _parent: SchemaQueryBuilder<TLocalSchema, TResult>,
+        conflictColumns: string[]
+    ) {
+        this.#knex = knex;
+        this.#localSchema = localSchema;
+        this.#conflictColumns = conflictColumns;
+    }
+
+    /**
+     * Insert and merge (update) conflicting rows.
+     *
+     * @param data - Row to insert.
+     * @param updateData - Optional partial object of columns to update on
+     *   conflict. If omitted, all inserted columns are updated.
+     * @returns The resulting row.
+     */
+    async merge(
+        data: InsertType<TLocalSchema>,
+        updateData?: Partial<InferType<TLocalSchema>>
+    ): Promise<TResult> {
+        return this.#execute(data, 'merge', updateData) as Promise<TResult>;
+    }
+
+    /**
+     * Insert and silently ignore conflicts.
+     *
+     * @param data - Row to insert.
+     * @returns The row if inserted, or `undefined` if the conflict was ignored.
+     */
+    async ignore(data: InsertType<TLocalSchema>): Promise<TResult | undefined> {
+        return this.#execute(data, 'ignore');
+    }
+
+    async #execute(
+        data: InsertType<TLocalSchema>,
+        mode: 'merge' | 'ignore',
+        updateData?: Partial<InferType<TLocalSchema>>
+    ): Promise<TResult | undefined> {
+        const tableName = getTableName(this.#localSchema);
+        const timestamps: { createdAt: string; updatedAt: string } | null =
+            (this.#localSchema as any).getExtension?.('timestamps') ?? null;
+
+        const beforeHooks: Function[] =
+            (this.#localSchema as any).getExtension?.('beforeInsert') ?? [];
+
+        let processed = { ...(data as Record<string, any>) };
+        for (const hook of beforeHooks) {
+            processed = (await hook(processed)) ?? processed;
+        }
+
+        const { propToCol } = buildColumnMap(this.#localSchema as any);
+        const mapped: Record<string, any> = {};
+        for (const [key, val] of Object.entries(processed)) {
+            mapped[propToCol.get(key) ?? key] = val;
+        }
+        if (timestamps) {
+            mapped[timestamps.createdAt] = this.#knex.fn.now();
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
+        let qb = this.#knex(tableName)
+            .insert(mapped)
+            .onConflict(this.#conflictColumns);
+
+        if (mode === 'ignore') {
+            qb = (qb as any).ignore();
+        } else {
+            let mergeObj: Record<string, any>;
+            if (updateData) {
+                mergeObj = {};
+                for (const [key, val] of Object.entries(
+                    updateData as Record<string, any>
+                )) {
+                    mergeObj[propToCol.get(key) ?? key] = val;
+                }
+            } else {
+                mergeObj = { ...mapped };
+                if (timestamps) {
+                    delete mergeObj[timestamps.createdAt];
+                    mergeObj[timestamps.updatedAt] = this.#knex.fn.now();
+                }
+            }
+            qb = (qb as any).merge(mergeObj);
+        }
+
+        const rows = await (qb as any).returning('*');
+        if (!rows || rows.length === 0) return undefined;
+
+        const { colToProp } = buildColumnMap(this.#localSchema as any);
+        const result: Record<string, any> = {};
+        for (const [col, val] of Object.entries(rows[0])) {
+            result[colToProp.get(col) ?? col] = val;
+        }
+        return result as TResult;
+    }
+}
+
+// ---------------------------------------------------------------------------
 // SchemaQueryBuilder
 // ---------------------------------------------------------------------------
 
@@ -163,6 +282,25 @@ export class SchemaQueryBuilder<
     #skipDefaultScope = false;
 
     /**
+     * Memoized result of `#buildQuery()`. Invalidated by any mutating method
+     * (where, orderBy, limit, etc.) and re-built lazily on the next read.
+     */
+    #cachedBuiltQuery: Knex.QueryBuilder | null = null;
+
+    /** Invalidate the compiled-query cache. Called by every mutating method. */
+    #invalidateCache(): void {
+        this.#cachedBuiltQuery = null;
+    }
+
+    /** Return the built query, building it once and caching the result. */
+    #getQuery(): Knex.QueryBuilder {
+        if (!this.#cachedBuiltQuery) {
+            this.#cachedBuiltQuery = this.#buildQuery();
+        }
+        return this.#cachedBuiltQuery;
+    }
+
+    /**
      * @param knex - A configured Knex instance.
      * @param localSchema - The `ObjectSchemaBuilder` for the primary table.
      *   Must have a table name set via `.hasTableName()`.
@@ -185,11 +323,15 @@ export class SchemaQueryBuilder<
     // Private helpers
     // =======================================================================
 
-    #resolveColumn(ref: any, label = 'column'): string {
+    #resolveColumn(
+        ref: any,
+        label = 'column'
+    ): string | import('knex').Knex.Raw {
         return resolveColumnRef(
             ref as ColumnRef<any>,
             this.#localSchema,
-            label
+            label,
+            this.#knex
         );
     }
 
@@ -347,6 +489,7 @@ export class SchemaQueryBuilder<
         const validated = validateJoinOne(spec, this.#localSchema, this.#knex);
         this.#specs.push({ type: 'one' as const, ...validated });
         validateUniqueFieldNames(this.#specs);
+        this.#invalidateCache();
         return this as any;
     }
 
@@ -416,6 +559,7 @@ export class SchemaQueryBuilder<
         const validated = validateJoinMany(spec, this.#localSchema, this.#knex);
         this.#specs.push({ type: 'many' as const, ...validated });
         validateUniqueFieldNames(this.#specs);
+        this.#invalidateCache();
         return this as any;
     }
 
@@ -453,6 +597,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -497,6 +642,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -539,6 +685,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -581,6 +728,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -612,8 +760,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereIn(
-            this.#resolveColumn(column, 'whereIn'),
+            this.#resolveColumn(column, 'whereIn') as any,
             values as any
         );
         return this;
@@ -629,8 +778,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereNotIn(
-            this.#resolveColumn(column, 'whereNotIn'),
+            this.#resolveColumn(column, 'whereNotIn') as any,
             values as any
         );
         return this;
@@ -644,6 +794,7 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereIn(
             this.#resolveColumn(column, 'orWhereIn'),
             values as any
@@ -659,6 +810,7 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereNotIn(
             this.#resolveColumn(column, 'orWhereNotIn'),
             values as any
@@ -671,7 +823,10 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereNull(column: ColumnRef<TLocalSchema>): this {
-        this.#baseQuery.whereNull(this.#resolveColumn(column, 'whereNull'));
+        this.#invalidateCache();
+        this.#baseQuery.whereNull(
+            this.#resolveColumn(column, 'whereNull') as any
+        );
         return this;
     }
 
@@ -680,8 +835,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereNotNull(column: ColumnRef<TLocalSchema>): this {
+        this.#invalidateCache();
         this.#baseQuery.whereNotNull(
-            this.#resolveColumn(column, 'whereNotNull')
+            this.#resolveColumn(column, 'whereNotNull') as any
         );
         return this;
     }
@@ -691,6 +847,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     orWhereNull(column: ColumnRef<TLocalSchema>): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereNull(
             this.#resolveColumn(column, 'orWhereNull')
         );
@@ -702,6 +859,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     orWhereNotNull(column: ColumnRef<TLocalSchema>): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereNotNull(
             this.#resolveColumn(column, 'orWhereNotNull')
         );
@@ -717,8 +875,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         range: readonly [any, any]
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereBetween(
-            this.#resolveColumn(column, 'whereBetween'),
+            this.#resolveColumn(column, 'whereBetween') as any,
             range as [any, any]
         );
         return this;
@@ -733,8 +892,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         range: readonly [any, any]
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereNotBetween(
-            this.#resolveColumn(column, 'whereNotBetween'),
+            this.#resolveColumn(column, 'whereNotBetween') as any,
             range as [any, any]
         );
         return this;
@@ -746,6 +906,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereLike(column: ColumnRef<TLocalSchema>, value: string): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).whereLike(
             this.#resolveColumn(column, 'whereLike'),
             value
@@ -759,6 +920,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereILike(column: ColumnRef<TLocalSchema>, value: string): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).whereILike(
             this.#resolveColumn(column, 'whereILike'),
             value
@@ -773,6 +935,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.whereRaw(sql, ...bindings);
         return this;
     }
@@ -783,7 +946,84 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereExists(callback: Knex.QueryCallback | Knex.QueryBuilder): this {
+        this.#invalidateCache();
         this.#baseQuery.whereExists(callback as any);
+        return this;
+    }
+
+    /**
+     * Add a `WHERE NOT EXISTS (subquery)` clause.
+     * @param callback - A Knex query callback or sub-query builder.
+     * @returns `this` for chaining.
+     */
+    whereNotExists(callback: Knex.QueryCallback | Knex.QueryBuilder): this {
+        this.#invalidateCache();
+        (this.#baseQuery as any).whereNotExists(callback as any);
+        return this;
+    }
+
+    /**
+     * Add a PostgreSQL JSON path filter using `@?` / `@@` operators or
+     * a path-based equality test via `jsonb_path_query_first`.
+     *
+     * Only supported on `pg` clients — throws at runtime on others.
+     *
+     * @param column - Column reference for the `jsonb` column.
+     * @param path   - Dot-separated property path (e.g. `'a.b.c'`) or a
+     *   JSONPath expression string (e.g. `'$.a.b ? (@ == 1)'`).
+     * @param operator - Comparison operator (`=`, `!=`, `<`, `<=`, `>`, `>=`,
+     *   `@?`, `@@`). Use `@?` / `@@` for JSONPath existence / predicate tests.
+     * @param value  - The right-hand side value. Ignored for `@?` and `@@`.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * // Filter rows where data->>'status' = 'active'
+     * query(db, Schema).whereJsonPath(t => t.data, 'status', '=', 'active');
+     *
+     * // JSONPath existence
+     * query(db, Schema).whereJsonPath(t => t.data, '$.tags[*] ? (@ == "sale")', '@?');
+     * ```
+     */
+    whereJsonPath(
+        column: ColumnRef<TLocalSchema>,
+        path: string,
+        operator?: string,
+        value?: any
+    ): this {
+        this.#invalidateCache();
+        const client = (this.#knex as any).client?.config?.client as
+            | string
+            | undefined;
+        if (
+            client !== 'pg' &&
+            client !== 'postgresql' &&
+            client !== 'postgres'
+        ) {
+            throw new Error(
+                `whereJsonPath() is only supported on PostgreSQL (got client: "${client ?? 'unknown'}")`
+            );
+        }
+
+        const col = this.#resolveColumn(column, 'whereJsonPath');
+        const op = operator ?? '=';
+
+        if (op === '@?' || op === '@@') {
+            // JSONPath existence / predicate.
+            // Note: `@?` contains a `?` which Knex would treat as a binding
+            // placeholder inside whereRaw. Escape it with `\?` → `\\?` in JS.
+            const escapedOp = op === '@?' ? '@\\?' : '@@';
+            this.#baseQuery.whereRaw(`?? ${escapedOp} ?`, [col, path]);
+        } else {
+            // Path-based value test: jsonb_path_query_first(col, path) op value
+            const jsonPath = path.startsWith('$')
+                ? path
+                : `$.${path.replace(/\./g, '.')}`;
+            this.#baseQuery.whereRaw(
+                `jsonb_path_query_first(??, ?) ${op} ?::jsonb`,
+                [col, jsonPath, JSON.stringify(value)]
+            );
+        }
         return this;
     }
 
@@ -806,6 +1046,7 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema> | Knex.Raw,
         direction?: 'asc' | 'desc'
     ): this {
+        this.#invalidateCache();
         const col = this.#resolveColumnArg(column);
         this.#baseQuery.orderBy(col as string, direction);
         return this;
@@ -817,6 +1058,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     orderByRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.orderByRaw(sql, ...bindings);
         return this;
     }
@@ -831,6 +1073,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     groupBy(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
+        this.#invalidateCache();
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.groupBy(...(resolved as string[]));
         return this;
@@ -841,6 +1084,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     groupByRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.groupByRaw(sql, ...bindings);
         return this;
     }
@@ -854,6 +1098,7 @@ export class SchemaQueryBuilder<
         operator: string,
         value: any
     ): this {
+        this.#invalidateCache();
         const col = this.#resolveColumnArg(column);
         this.#baseQuery.having(col as string, operator, value);
         return this;
@@ -864,6 +1109,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     havingRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.havingRaw(sql, ...bindings);
         return this;
     }
@@ -878,6 +1124,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     limit(n: number): this {
+        this.#invalidateCache();
         this.#baseQuery.limit(n);
         return this;
     }
@@ -888,6 +1135,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     offset(n: number): this {
+        this.#invalidateCache();
         this.#baseQuery.offset(n);
         return this;
     }
@@ -903,6 +1151,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
+        this.#invalidateCache();
         this.#assertNotProjection('select');
         this.#selectionMode = 'select';
         const resolved = columns.map(c => this.#resolveColumnArg(c));
@@ -955,6 +1204,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     distinct(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
+        this.#invalidateCache();
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.distinct(...(resolved as string[]));
         return this;
@@ -970,6 +1220,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     count(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
         this.#assertNotProjection('count');
         this.#selectionMode = 'aggregate';
         if (column) {
@@ -986,6 +1237,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     countDistinct(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
         this.#assertNotProjection('countDistinct');
         this.#selectionMode = 'aggregate';
         if (column) {
@@ -1003,6 +1255,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     min(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
         this.#assertNotProjection('min');
         this.#selectionMode = 'aggregate';
         this.#baseQuery.min(this.#resolveColumnArg(column) as string);
@@ -1014,6 +1267,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     max(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
         this.#assertNotProjection('max');
         this.#selectionMode = 'aggregate';
         this.#baseQuery.max(this.#resolveColumnArg(column) as string);
@@ -1025,6 +1279,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     sum(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
         this.#assertNotProjection('sum');
         this.#selectionMode = 'aggregate';
         this.#baseQuery.sum(this.#resolveColumnArg(column) as string);
@@ -1036,6 +1291,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     avg(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
         this.#assertNotProjection('avg');
         this.#selectionMode = 'aggregate';
         this.#baseQuery.avg(this.#resolveColumnArg(column) as string);
@@ -1148,6 +1404,117 @@ export class SchemaQueryBuilder<
     }
 
     /**
+     * Insert a row (or rows) with an `ON CONFLICT` clause.
+     *
+     * Returns a chainable object with `.merge()` and `.ignore()` methods.
+     *
+     * - `.merge(updateData?)` — updates the conflicting row with the provided
+     *   fields (or all insert fields if omitted).
+     * - `.ignore()` — skips the insert when a conflict occurs (INSERT IGNORE).
+     *
+     * @param conflictColumns - Column references that define the conflict target.
+     * @returns A chainable conflict builder.
+     *
+     * @example
+     * ```ts
+     * // Upsert: insert or update on conflict
+     * await query(db, UserSchema)
+     *     .onConflict(t => t.email)
+     *     .merge({ name: 'Bob' });
+     *
+     * // Insert and ignore on conflict
+     * await query(db, UserSchema)
+     *     .onConflict(t => t.email)
+     *     .ignore();
+     * ```
+     */
+    onConflict(
+        ...conflictColumns: ColumnRef<TLocalSchema>[]
+    ): OnConflictBuilder<TLocalSchema, TResult> {
+        const cols = conflictColumns.map(
+            c => this.#resolveColumn(c, 'onConflict') as string
+        );
+        return new OnConflictBuilder(this.#knex, this.#localSchema, this, cols);
+    }
+
+    /**
+     * Insert or update a row based on a conflict target (upsert shorthand).
+     *
+     * Equivalent to calling `.onConflict(conflictColumns).merge(updateData)`.
+     *
+     * @param data - The row data to insert.
+     * @param opts - `{ conflictColumns, updateColumns? }`.
+     * @returns The resulting row (inserted or updated).
+     *
+     * @example
+     * ```ts
+     * const user = await query(db, UserSchema).upsert(
+     *     { email: 'alice@example.com', name: 'Alice' },
+     *     { conflictColumns: [t => t.email], updateColumns: [t => t.name] }
+     * );
+     * ```
+     */
+    async upsert(
+        data: InsertType<TLocalSchema>,
+        opts: {
+            conflictColumns: ColumnRef<TLocalSchema>[];
+            updateColumns?: ColumnRef<TLocalSchema>[];
+        }
+    ): Promise<TResult> {
+        const timestamps = this.#getTimestamps();
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+
+        let processedData = { ...(data as Record<string, any>) };
+        for (const hook of beforeHooks) {
+            processedData = (await hook(processedData)) ?? processedData;
+        }
+
+        const mapped = this.#mapObjectToColumns(processedData);
+        if (timestamps) {
+            mapped[timestamps.createdAt] = this.#knex.fn.now();
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
+        const conflictCols = opts.conflictColumns.map(
+            c => this.#resolveColumn(c, 'upsert conflict') as string
+        );
+
+        let qb = this.#knex(this.#tableName)
+            .insert(mapped)
+            .onConflict(conflictCols);
+
+        if (opts.updateColumns && opts.updateColumns.length > 0) {
+            const updateCols = opts.updateColumns.map(
+                c => this.#resolveColumn(c, 'upsert update') as string
+            );
+            const updateData: Record<string, any> = {};
+            for (const col of updateCols) {
+                if (col in mapped) {
+                    updateData[col] = mapped[col];
+                }
+            }
+            if (timestamps) {
+                updateData[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+            qb = (qb as any).merge(updateData);
+        } else {
+            const updateData = { ...mapped };
+            // Don't overwrite createdAt on upsert
+            if (timestamps) {
+                delete updateData[timestamps.createdAt];
+                updateData[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+            qb = (qb as any).merge(updateData);
+        }
+
+        const [row] = await (qb as any).returning('*');
+        return this.#mapRow(row) as TResult;
+    }
+
+    /**
      * Update all rows that match the current `WHERE` clause and return the
      * updated records.
      *
@@ -1241,6 +1608,7 @@ export class SchemaQueryBuilder<
      * ```
      */
     apply(fn: (builder: Knex.QueryBuilder) => void): this {
+        this.#invalidateCache();
         fn(this.#baseQuery);
         return this;
     }
@@ -1327,6 +1695,7 @@ export class SchemaQueryBuilder<
         relationName: string,
         customize?: (q: SchemaQueryBuilder<any, any>) => void
     ): this {
+        this.#invalidateCache();
         const relations: RelationSpec[] =
             (this.#localSchema as any).getExtension?.('relations') ?? [];
         const relation = relations.find(
@@ -1559,10 +1928,12 @@ export class SchemaQueryBuilder<
         }
         this.#selectionMode = 'projection';
         this.#appliedProjection = name;
+        this.#invalidateCache();
         return this as any;
     }
 
     scoped<K extends ScopesOf<TLocalSchema>>(name: K): this {
+        this.#invalidateCache();
         const scopes = (this.#localSchema as any).getExtension?.('scopes') as
             | Record<string, Function>
             | undefined;
@@ -1587,6 +1958,7 @@ export class SchemaQueryBuilder<
      * ```
      */
     unscoped(): this {
+        this.#invalidateCache();
         this.#skipDefaultScope = true;
         this.#includeDeleted = true;
         return this;
@@ -1606,6 +1978,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     withDeleted(): this {
+        this.#invalidateCache();
         this.#includeDeleted = true;
         return this;
     }
@@ -1616,6 +1989,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     onlyDeleted(): this {
+        this.#invalidateCache();
         this.#onlyDeleted = true;
         this.#includeDeleted = true;
         return this;
@@ -1778,6 +2152,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     selectRaw(sql: string, bindings?: any[]): this {
+        this.#invalidateCache();
         if (bindings) {
             this.#baseQuery.select(this.#knex.raw(sql, bindings));
         } else {
@@ -2205,7 +2580,7 @@ export class SchemaQueryBuilder<
      * Does not execute the query against the database.
      */
     toQuery(): string {
-        return this.#buildQuery().toQuery();
+        return this.#getQuery().toQuery();
     }
 
     /**
@@ -2214,14 +2589,14 @@ export class SchemaQueryBuilder<
      * that expects a raw `Knex.QueryBuilder`.
      */
     toKnexQuery(): Knex.QueryBuilder {
-        return this.#buildQuery();
+        return this.#getQuery();
     }
 
     /**
      * Alias for {@link toQuery} — returns the raw SQL string.
      */
     toString(): string {
-        return this.#buildQuery().toString();
+        return this.#getQuery().toString();
     }
 
     /**
@@ -2237,7 +2612,7 @@ export class SchemaQueryBuilder<
      * ```
      */
     async execute(): Promise<TResult[]> {
-        const query = this.#buildQuery();
+        const query = this.#getQuery();
         const rows = await query;
 
         if (!rows) return [];
@@ -2258,11 +2633,34 @@ export class SchemaQueryBuilder<
      * ```
      */
     async first(): Promise<TResult | undefined> {
-        const query = this.#buildQuery().first();
+        const query = this.#getQuery().first();
         const row = await query;
 
         if (!row) return undefined;
         return this.#cleanAndMapRow(row) as TResult;
+    }
+
+    /**
+     * Execute the query and return an array of values for a single column.
+     *
+     * @param column - Column reference (property accessor or string key) for
+     *   the column whose values should be returned.
+     * @returns A promise resolving to an array of values for that column.
+     *
+     * @example
+     * ```ts
+     * const names = await query(db, UserSchema).pluck(t => t.name);
+     * // names: string[]
+     * ```
+     */
+    async pluck<K extends keyof TResult & string>(
+        column: ColumnRef<TLocalSchema>
+    ): Promise<TResult[K][]> {
+        const col = this.#resolveColumn(column, 'pluck') as string;
+        const rows = await this.#buildQuery().select(col);
+        return rows.map(
+            (row: any) => row[col] ?? row[column as string]
+        ) as TResult[K][];
     }
 
     /**

@@ -302,6 +302,28 @@ export const ddlExtension = defineExtension({
         ) {
             return this.withExtension('columnType', type);
         },
+        /** Shorthand for `.columnType('bigint')`. */
+        bigint(this: NumberSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'bigint');
+        },
+        /** Shorthand for `.columnType('smallint')`. */
+        smallint(this: NumberSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'smallint');
+        },
+        /** Shorthand for `.columnType('decimal(p,s)')` — exact numeric.
+         * @param precision - Total digits.
+         * @param scale     - Digits after decimal point.
+         */
+        decimal(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            precision: number,
+            scale: number
+        ) {
+            return this.withExtension(
+                'columnType',
+                `decimal(${precision},${scale})`
+            );
+        },
         /** Set a raw SQL default expression.
          * @param expression - Raw SQL expression (e.g. `"nextval('my_seq')"`).
          */
@@ -325,6 +347,29 @@ export const ddlExtension = defineExtension({
             type: string
         ) {
             return this.withExtension('columnType', type);
+        },
+        /** Shorthand for `.columnType('text')` — unlimited-length text. */
+        text(this: StringSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'text');
+        },
+        /** Shorthand for `.columnType('uuid')` — UUID column type.
+         * Note: this sets the *storage type* — for UUID format validation use
+         * the schema-level `.uuid()` validator instead.
+         */
+        asUuid(this: StringSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'uuid');
+        },
+        /** Shorthand for `.columnType('citext')` — case-insensitive text (Postgres). */
+        citext(this: StringSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'citext');
+        },
+        /** Shorthand for `.columnType('jsonb')` — binary JSON (Postgres). */
+        jsonb(this: StringSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'jsonb');
+        },
+        /** Shorthand for `.columnType('tsvector')` — full-text search vector (Postgres). */
+        tsvector(this: StringSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'tsvector');
         },
         /** Add a foreign key reference to another table. */
         references(
@@ -390,6 +435,27 @@ export const ddlExtension = defineExtension({
             value: boolean
         ) {
             return this.withExtension('defaultTo', value);
+        },
+        /** Override the SQL column type (e.g. `'smallint'`, `'integer'`). */
+        columnType(
+            this: BooleanSchemaBuilder<any, any, any, any, any, any, any>,
+            type: string
+        ) {
+            return this.withExtension('columnType', type);
+        },
+        /** Add an index on this column. */
+        index(
+            this: BooleanSchemaBuilder<any, any, any, any, any, any, any>,
+            name?: string
+        ) {
+            return this.withExtension('index', name ?? true);
+        },
+        /** Add a unique constraint on this column. */
+        unique(
+            this: BooleanSchemaBuilder<any, any, any, any, any, any, any>,
+            name?: string
+        ) {
+            return this.withExtension('unique', name ?? true);
         }
     },
     date: {
@@ -399,6 +465,15 @@ export const ddlExtension = defineExtension({
             value: 'now'
         ) {
             return this.withExtension('defaultTo', value);
+        },
+        /** Override the SQL column type
+         * (e.g. `'timestamptz'`, `'date'`, `'time'`).
+         */
+        columnType(
+            this: DateSchemaBuilder<any, any, any, any, any>,
+            type: string
+        ) {
+            return this.withExtension('columnType', type);
         },
         /** Add an index on this column. */
         index(this: DateSchemaBuilder<any, any, any, any, any>, name?: string) {
@@ -410,9 +485,40 @@ export const ddlExtension = defineExtension({
             expression: string
         ) {
             return this.withExtension('defaultTo', { raw: expression });
+        },
+        /** Shorthand for `.columnType('timestamptz')`. */
+        timestamptz(this: DateSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'timestamptz');
+        },
+        /** Shorthand for `.columnType('date')` (date-only, no time). */
+        dateOnly(this: DateSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('columnType', 'date');
         }
     },
     object: {
+        /** Override the SQL column type for an object property stored inline.
+         * Object-typed properties default to `jsonb` when used as columns in
+         * a parent schema's table.
+         */
+        columnType(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            type: string
+        ) {
+            return this.withExtension('columnType', type);
+        },
+        /** Shorthand for `.columnType('jsonb')` — store this nested object as
+         * a `jsonb` column (Postgres). Nested objects already default to
+         * `jsonb` in DDL; calling `.jsonb()` makes the intent explicit.
+         */
+        jsonb(this: ObjectSchemaBuilder<any, any, any, any, any, any, any>) {
+            return this.withExtension('columnType', 'jsonb');
+        },
+        /** Shorthand for `.columnType('json')` — store this nested object as
+         * a plain `json` column (Postgres / MySQL).
+         */
+        json(this: ObjectSchemaBuilder<any, any, any, any, any, any, any>) {
+            return this.withExtension('columnType', 'json');
+        },
         /** Add a composite index on multiple columns.
          * @param columns - Column names to index.
          * @param opts - Optional index name and unique flag.

@@ -44,6 +44,9 @@ function resolveColumnType(
             return table.boolean(col);
         case 'date':
             return table.timestamp(col);
+        case 'object':
+            // Nested objects are stored as jsonb by default; override via .columnType()
+            return table.specificType(col, 'jsonb');
         default:
             return table.specificType(col, 'text');
     }
