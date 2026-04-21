@@ -13,7 +13,13 @@ import {
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
-import { getColumnName, getProjections, getTableName } from './extension.js';
+import {
+    getColumnName,
+    getProjections,
+    getTableName,
+    getVariants,
+    POLYMORPHIC_TYPE_BRAND
+} from './extension.js';
 import { clearRow } from './mappers.js';
 import type {
     ColumnRef,
@@ -23,7 +29,9 @@ import type {
     JoinOneSpec,
     PaginationResult,
     RelationSpec,
+    ResolvedVariantConfig,
     ValidatedSpec,
+    VariantWhereFilter,
     WithJoinedMany,
     WithJoinedOne
 } from './types.js';
@@ -80,6 +88,23 @@ type ProjectionKeysOf<
 > = ProjectionsOf<S>[K] extends readonly (infer T extends string)[]
     ? T
     : string;
+
+// ---------------------------------------------------------------------------
+// Polymorphic result type — driven by POLYMORPHIC_TYPE_BRAND phantom type
+// ---------------------------------------------------------------------------
+
+/**
+ * When a schema carries the `POLYMORPHIC_TYPE_BRAND` phantom type (set by
+ * `.withVariants()`), extract the discriminated-union result type from it.
+ * Otherwise fall back to `InferType<TLocalSchema>`.
+ *
+ * @internal
+ */
+type QueryResultType<TLocalSchema> = TLocalSchema extends {
+    readonly [POLYMORPHIC_TYPE_BRAND]?: infer U;
+}
+    ? NonNullable<U>
+    : InferType<TLocalSchema>;
 
 // ---------------------------------------------------------------------------
 // OnConflictBuilder
@@ -281,6 +306,25 @@ export class SchemaQueryBuilder<
     /** When true, default scope is not applied. */
     #skipDefaultScope = false;
 
+    // -----------------------------------------------------------------------
+    // Polymorphic variant state
+    // -----------------------------------------------------------------------
+
+    /**
+     * Resolved variant config, lazily populated from the schema's `'variants'`
+     * extension. `undefined` = not yet read; `null` = schema is not polymorphic.
+     */
+    #variantConfig: ResolvedVariantConfig | null | undefined = undefined;
+
+    /**
+     * When set, only these discriminator values are returned (added to WHERE).
+     * `null` means all variants are included.
+     */
+    #enabledVariants: Set<string> | null = null;
+
+    /** Pending per-variant WHERE filters registered via `.whereVariant()`. */
+    #variantWhereFilters: VariantWhereFilter[] = [];
+
     /**
      * Memoized result of `#buildQuery()`. Invalidated by any mutating method
      * (where, orderBy, limit, etc.) and re-built lazily on the next read.
@@ -351,6 +395,239 @@ export class SchemaQueryBuilder<
     #getTimestamps(): { createdAt: string; updatedAt: string } | null {
         const ts = (this.#localSchema as any).getExtension?.('timestamps');
         return ts ?? null;
+    }
+
+    // -----------------------------------------------------------------------
+    // Polymorphic helpers
+    // -----------------------------------------------------------------------
+
+    /**
+     * Read and cache the variant config from the schema. Returns `null` when
+     * the schema is not polymorphic.
+     * @internal
+     */
+    #getVariantConfig(): ResolvedVariantConfig | null {
+        if (this.#variantConfig !== undefined) return this.#variantConfig;
+
+        const raw = getVariants(this.#localSchema);
+        if (!raw) {
+            this.#variantConfig = null;
+            return null;
+        }
+
+        // Resolve discriminator property key → SQL column name
+        const { propToCol } = buildColumnMap(this.#localSchema);
+        const discCol =
+            propToCol.get(raw.discriminatorKey) ?? raw.discriminatorKey;
+
+        this.#variantConfig = {
+            ...raw,
+            discriminatorColumn: discCol
+        };
+        return this.#variantConfig;
+    }
+
+    /**
+     * Validate allowed SQL operators for `whereVariant`.
+     * Guards against SQL injection via the `op` parameter.
+     * @internal
+     */
+    static #ALLOWED_OPS = new Set([
+        '=',
+        '!=',
+        '<>',
+        '<',
+        '>',
+        '<=',
+        '>=',
+        'like',
+        'not like',
+        'ilike',
+        'not ilike',
+        'in',
+        'not in',
+        'is',
+        'is not'
+    ]);
+
+    /**
+     * Apply variant LEFT JOINs and aliased column selects to a base query,
+     * then add any `whereVariant` / `selectVariants` filters.
+     *
+     * For CTI variants:
+     *   - `LEFT JOIN variantTable AS __v_<key> ON __v_<key>.<fk> = base.<pk> AND base.<disc> = '<key>'`
+     *   - `SELECT __v_<key>.<col> AS __v_<key>__<col>` for every column (incl. FK for orphan detection)
+     *
+     * For STI variants:
+     *   - No extra JOIN needed; columns are already in the base row.
+     *
+     * @internal
+     */
+    #applyVariantJoins(
+        base: Knex.QueryBuilder,
+        variantConfig: ResolvedVariantConfig
+    ): Knex.QueryBuilder {
+        const knex = this.#knex;
+        const baseTable = this.#tableName;
+        const basePkCol = this.#findPrimaryKeyColumn(this.#localSchema);
+        const discCol = variantConfig.discriminatorColumn;
+
+        // Clone base and ensure we SELECT base.* so variant aliases don't
+        // collide with the base column list when the caller used SELECT *.
+        const qb = base.clone().select(`${baseTable}.*`);
+
+        for (const [key, spec] of Object.entries(variantConfig.variants)) {
+            // Skip disabled variants when selectVariants() was called
+            if (
+                this.#enabledVariants !== null &&
+                !this.#enabledVariants.has(key)
+            )
+                continue;
+
+            if (spec.storage === 'cti') {
+                const variantAlias = `__v_${key}`;
+                const variantTable = spec.tableName!;
+                const fkCol = spec.foreignKey!;
+
+                // LEFT JOIN with discriminator gate so we only pick up rows
+                // for the matching variant.
+                qb.leftJoin(
+                    `${variantTable} as ${variantAlias}`,
+                    knex.raw(`?? = ?? AND ?? = ?`, [
+                        `${variantAlias}.${fkCol}`,
+                        `${baseTable}.${basePkCol}`,
+                        `${baseTable}.${discCol}`,
+                        key
+                    ])
+                );
+
+                // SELECT each variant column with a namespaced alias
+                const { propToCol } = buildColumnMap(spec.schema);
+                const variantIntrospect = spec.schema.introspect() as any;
+                const variantProps: Record<string, unknown> =
+                    variantIntrospect.properties ?? {};
+
+                for (const propKey of Object.keys(variantProps)) {
+                    const colName = propToCol.get(propKey) ?? propKey;
+                    // Alias: __v_image.width AS __v_image__width
+                    qb.select(
+                        knex.raw('?? as ??', [
+                            `${variantAlias}.${colName}`,
+                            `${variantAlias}__${colName}`
+                        ])
+                    );
+                }
+            }
+            // STI: no extra JOIN — variant columns are already in the base row
+        }
+
+        // Apply per-variant WHERE filters (added via .whereVariant())
+        for (const filter of this.#variantWhereFilters) {
+            const discColFull = `${baseTable}.${discCol}`;
+            // (base.disc = 'key' AND variant_col op value) OR base.disc != 'key'
+            // → restricts matching rows, passes through non-matching variants
+            qb.where(function (this: Knex.QueryBuilder) {
+                this.where(discColFull, filter.key)
+                    .andWhere(filter.qualifiedColumn, filter.op, filter.value)
+                    .orWhere(discColFull, '!=', filter.key);
+            });
+        }
+
+        // Apply selectVariants restriction
+        if (this.#enabledVariants !== null) {
+            qb.whereIn(`${baseTable}.${discCol}`, [...this.#enabledVariants]);
+        }
+
+        return qb;
+    }
+
+    /**
+     * Map a raw SQL row from a polymorphic query to a schema-property-named
+     * object for the active variant.
+     *
+     * - Base columns are mapped via the base schema's `colToProp` map.
+     * - CTI variant columns (aliased as `__v_<key>__<col>`) are mapped via
+     *   the variant schema's `colToProp` map for the matching discriminator value.
+     * - STI variant columns are already in the base row; they are mapped via
+     *   the variant schema's `colToProp` map.
+     * - The CTI FK column alias (`__v_<key>__<fkCol>`) is used only for orphan
+     *   detection and is NOT included in the result.
+     *
+     * @internal
+     */
+    #mapPolymorphicRow(
+        row: Record<string, any>,
+        variantConfig: ResolvedVariantConfig
+    ): Record<string, any> {
+        const { colToProp: baseColToProp } = buildColumnMap(this.#localSchema);
+        const result: Record<string, any> = {};
+
+        // Pass 1: map base columns (skip __v_* aliases)
+        for (const [colName, value] of Object.entries(row)) {
+            if (colName.startsWith('__v_')) continue;
+            const propName = baseColToProp.get(colName);
+            if (propName) {
+                result[propName] = value;
+            } else {
+                // Unknown column (raw expression, joined field) — pass through
+                result[colName] = value;
+            }
+        }
+
+        // Pass 2: map variant columns for the active discriminator value
+        const discPropKey = variantConfig.discriminatorKey;
+        const discValue: string | undefined = result[discPropKey];
+
+        if (discValue != null) {
+            const variantSpec = variantConfig.variants[discValue];
+            if (variantSpec) {
+                if (variantSpec.storage === 'cti') {
+                    const { colToProp: varColToProp } = buildColumnMap(
+                        variantSpec.schema
+                    );
+                    const variantAlias = `__v_${discValue}`;
+                    const prefix = `${variantAlias}__`;
+                    const fkCol = variantSpec.foreignKey;
+
+                    // Check for orphaned discriminator (FK alias is NULL)
+                    if (fkCol) {
+                        const fkAlias = `${prefix}${fkCol}`;
+                        if (!variantSpec.allowOrphan && row[fkAlias] == null) {
+                            throw new Error(
+                                `Polymorphic orphan: "${discPropKey}" = "${discValue}" ` +
+                                    `but no matching row found in variant table ` +
+                                    `"${variantSpec.tableName}". ` +
+                                    `Set allowOrphan: true on this variant to suppress.`
+                            );
+                        }
+                    }
+
+                    for (const [colName, value] of Object.entries(row)) {
+                        if (!colName.startsWith(prefix)) continue;
+                        const origCol = colName.slice(prefix.length);
+                        // Skip FK column — it duplicates the base PK
+                        if (origCol === fkCol) continue;
+                        const propName = varColToProp.get(origCol) ?? origCol;
+                        result[propName] = value;
+                    }
+                } else {
+                    // STI: variant columns are in the base row (no prefix)
+                    const { colToProp: varColToProp } = buildColumnMap(
+                        variantSpec.schema
+                    );
+                    for (const [colName, value] of Object.entries(row)) {
+                        if (colName.startsWith('__v_')) continue;
+                        if (baseColToProp.has(colName)) continue; // already mapped
+                        const propName = varColToProp.get(colName);
+                        if (propName) {
+                            result[propName] = value;
+                        }
+                    }
+                }
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -1668,6 +1945,13 @@ export class SchemaQueryBuilder<
         builder.#includeDeleted = this.#includeDeleted;
         builder.#onlyDeleted = this.#onlyDeleted;
         builder.#skipDefaultScope = this.#skipDefaultScope;
+        // Copy polymorphic variant state
+        builder.#variantConfig = this.#variantConfig;
+        builder.#enabledVariants =
+            this.#enabledVariants !== null
+                ? new Set(this.#enabledVariants)
+                : null;
+        builder.#variantWhereFilters = [...this.#variantWhereFilters];
         return builder;
     }
 
@@ -1965,6 +2249,107 @@ export class SchemaQueryBuilder<
     }
 
     // =======================================================================
+    // Polymorphic variant methods
+    // =======================================================================
+
+    /**
+     * Add a WHERE condition that applies **only to rows matching a specific
+     * variant** of a polymorphic schema. Rows for other variants pass through
+     * unaffected (the condition is ORed away for non-matching discriminator values).
+     *
+     * The column name is resolved against the **variant's** schema properties.
+     *
+     * Only valid on a polymorphic schema (created via `.withVariants()`).
+     *
+     * @param key - The discriminator value identifying the variant (e.g. `'image'`).
+     * @param column - Property key on the variant's schema (e.g. `'width'`).
+     * @param operator - SQL comparison operator (`'='`, `'>'`, `'<'`, `'like'`, etc.).
+     * @param value - The value to compare against.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * // Return all documents and only images wider than 1024 px
+     * const files = await query(db, FileSchema)
+     *     .whereVariant('image', 'width', '>', 1024);
+     * ```
+     */
+    whereVariant(
+        key: string,
+        column: string,
+        operator: string,
+        value: any
+    ): this {
+        const variantConfig = this.#getVariantConfig();
+        if (!variantConfig) {
+            throw new Error(
+                'whereVariant() can only be used on a polymorphic schema (created with .withVariants())'
+            );
+        }
+
+        const spec = variantConfig.variants[key];
+        if (!spec) {
+            throw new Error(
+                `whereVariant: unknown variant key "${key}". ` +
+                    `Valid keys: ${Object.keys(variantConfig.variants).join(', ')}`
+            );
+        }
+
+        const op = operator.toLowerCase();
+        if (!SchemaQueryBuilder.#ALLOWED_OPS.has(op)) {
+            throw new Error(
+                `whereVariant: operator "${operator}" is not allowed. ` +
+                    `Allowed operators: ${[...SchemaQueryBuilder.#ALLOWED_OPS].join(', ')}`
+            );
+        }
+
+        // Resolve property key → SQL column name via variant schema column map
+        const { propToCol } = buildColumnMap(spec.schema);
+        const colName = propToCol.get(column) ?? column;
+
+        let qualifiedColumn: string;
+        if (spec.storage === 'cti') {
+            qualifiedColumn = `__v_${key}.${colName}`;
+        } else {
+            // STI: column is on the base table
+            qualifiedColumn = `${this.#tableName}.${colName}`;
+        }
+
+        this.#variantWhereFilters.push({ key, qualifiedColumn, op, value });
+        this.#invalidateCache();
+        return this;
+    }
+
+    /**
+     * Restrict the query to only return rows for the specified variant keys.
+     *
+     * Adds `WHERE <discriminator> IN (...)` to the query and skips the LEFT
+     * JOINs for excluded variants. This is more efficient than filtering after
+     * loading all variants.
+     *
+     * Only valid on a polymorphic schema (created via `.withVariants()`).
+     *
+     * @param keys - Discriminator values to include (e.g. `['image', 'document']`).
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * const images = await query(db, FileSchema).selectVariants(['image']);
+     * // images: Array<{ id; name; type: 'image'; width; height; format }>
+     * ```
+     */
+    selectVariants(keys: string[]): this {
+        if (!this.#getVariantConfig()) {
+            throw new Error(
+                'selectVariants() can only be used on a polymorphic schema (created with .withVariants())'
+            );
+        }
+        this.#enabledVariants = new Set(keys);
+        this.#invalidateCache();
+        return this;
+    }
+
+    // =======================================================================
     // Soft delete methods
     // =======================================================================
 
@@ -2168,8 +2553,16 @@ export class SchemaQueryBuilder<
     #buildQuery(): Knex.QueryBuilder {
         const effectiveBase = this.#getEffectiveBaseQuery();
 
+        // Apply polymorphic variant joins (CTI LEFT JOINs + selectVariants /
+        // whereVariant filters) before any CTE wrapping so the CTE also
+        // contains variant columns.
+        const variantConfig = this.#getVariantConfig();
+        const queryBase = variantConfig
+            ? this.#applyVariantJoins(effectiveBase, variantConfig)
+            : effectiveBase;
+
         if (this.#specs.length === 0) {
-            return effectiveBase;
+            return queryBase;
         }
 
         const knex = this.#knex;
@@ -2185,7 +2578,7 @@ export class SchemaQueryBuilder<
         // included in the CTE so the join conditions work at runtime.
         // Track which columns we added so they can be excluded from the
         // final SELECT (preserving the original column set the caller asked for).
-        let cteQuery = effectiveBase;
+        let cteQuery = queryBase;
         let extraColumns: string[] = [];
 
         if (this.#explicitSelects !== null) {
@@ -2194,7 +2587,7 @@ export class SchemaQueryBuilder<
                 col => !selectedSet.has(col)
             );
             if (extraColumns.length > 0) {
-                cteQuery = effectiveBase.clone();
+                cteQuery = queryBase.clone();
                 for (const col of extraColumns) {
                     cteQuery.column(col);
                 }
@@ -2451,9 +2844,15 @@ export class SchemaQueryBuilder<
     /**
      * Map a SQL result row (column names) back to schema property names.
      * Also handles joined fields (which are already named by `as`).
+     * Delegates to `#mapPolymorphicRow` for polymorphic schemas.
      */
     #mapRow(row: Record<string, any>): Record<string, any> {
         if (!row) return row;
+
+        const variantConfig = this.#getVariantConfig();
+        if (variantConfig) {
+            return this.#mapPolymorphicRow(row, variantConfig);
+        }
 
         const { colToProp } = buildColumnMap(this.#localSchema);
         const result: Record<string, any> = {};
@@ -2716,7 +3115,7 @@ export function query<
 >(
     knex: Knex,
     schema: TLocalSchema
-): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
 
 /**
  * Create a typed {@link SchemaQueryBuilder} from an existing Knex query builder.
@@ -2742,7 +3141,7 @@ export function query<
     knex: Knex,
     schema: TLocalSchema,
     baseQuery: Knex.QueryBuilder
-): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
 
 export function query<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
@@ -2750,8 +3149,8 @@ export function query<
     knex: Knex,
     schema: TLocalSchema,
     baseQuery?: Knex.QueryBuilder
-): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>> {
-    return new SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>(
+): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>> {
+    return new SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>(
         knex,
         schema,
         baseQuery
@@ -2776,7 +3175,7 @@ export interface BoundQuery {
         >
     >(
         schema: TLocalSchema
-    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+    ): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
     <
         TLocalSchema extends ObjectSchemaBuilder<
             any,
@@ -2790,7 +3189,7 @@ export interface BoundQuery {
     >(
         schema: TLocalSchema,
         baseQuery: Knex.QueryBuilder
-    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+    ): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
     /**
      * Return a version of this bound factory whose queries all run within the
      * given Knex transaction. Equivalent to calling `.transacting(trx)` on
@@ -2873,7 +3272,7 @@ export function createQuery(knexInstance: Knex): BoundQuery {
     >(
         schema: TLocalSchema,
         baseQuery?: Knex.QueryBuilder
-    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>> {
+    ): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>> {
         return baseQuery
             ? query(knexInstance, schema, baseQuery)
             : query(knexInstance, schema);

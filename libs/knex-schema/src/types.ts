@@ -226,6 +226,93 @@ export interface CursorPaginationResult<T> {
 }
 
 // ---------------------------------------------------------------------------
+// Polymorphic / variant types
+// ---------------------------------------------------------------------------
+
+/** Storage strategy for a polymorphic variant. */
+export type VariantStorageType = 'cti' | 'sti';
+
+/**
+ * Input spec for one polymorphic variant as passed to `.withVariants()`.
+ * @public
+ */
+export interface VariantSpecInput<
+    TSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > = ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> {
+    /** The extra-fields schema for this variant. */
+    schema: TSchema;
+    /**
+     * `'cti'` — Class Table Inheritance: extra fields in a separate table,
+     * joined via `foreignKey`.
+     *
+     * `'sti'` — Single Table Inheritance: extra fields are nullable columns
+     * on the base table itself.
+     */
+    storage: VariantStorageType;
+    /**
+     * CTI only: a PropertyDescriptor accessor pointing to the FK property on
+     * the variant schema — e.g. `t => t.fileId`. The resolved SQL column name
+     * is used to JOIN the variant table back to the base table.
+     * Required for `storage: 'cti'`.
+     */
+    foreignKey?: (
+        t: PropertyDescriptorTree<TSchema, TSchema>
+    ) => PropertyDescriptor<any, any, any, any>;
+    /**
+     * If `true`, a CTI row without a matching variant-table row is silently
+     * accepted (the variant properties are omitted). Defaults to `false`
+     * (throws on orphan).
+     */
+    allowOrphan?: boolean;
+    /**
+     * STI only: when `true`, the DDL generator emits a `CHECK` constraint
+     * ensuring variant columns are `NULL` when the discriminator doesn't match.
+     */
+    enforceCheck?: boolean;
+}
+
+/** @internal Resolved, normalised variant spec stored in schema extensions. */
+export interface ResolvedVariantSpec {
+    storage: VariantStorageType;
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+    /** CTI: FK column name on the variant table. */
+    foreignKey?: string;
+    /** CTI: variant table name (from `schema.hasTableName()`). */
+    tableName?: string;
+    allowOrphan: boolean;
+    enforceCheck: boolean;
+}
+
+/** @internal Full variant config stored in the schema extension `'variants'`. */
+export interface ResolvedVariantConfig {
+    /** Property key on the base schema that is the discriminator. */
+    discriminatorKey: string;
+    /** SQL column name corresponding to `discriminatorKey`. Filled by query builder. */
+    discriminatorColumn: string;
+    /** Map from discriminator value → resolved variant spec. */
+    variants: Record<string, ResolvedVariantSpec>;
+}
+
+/** @internal Pending filter registered via `.whereVariant()`. */
+export interface VariantWhereFilter {
+    /** The discriminator value this filter applies to (e.g. `'image'`). */
+    key: string;
+    /** SQL column expression on the variant alias (e.g. `__v_image.width`). */
+    qualifiedColumn: string;
+    /** SQL comparison operator (validated). */
+    op: string;
+    value: any;
+}
+
+// ---------------------------------------------------------------------------
 // Relation specification (stored in schema extensions)
 // ---------------------------------------------------------------------------
 

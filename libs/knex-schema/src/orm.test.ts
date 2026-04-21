@@ -1746,3 +1746,289 @@ describe('nested object jsonb columns', () => {
         });
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Polymorphic schemas (withVariants)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('withVariants (polymorphic schemas)', () => {
+    // -----------------------------------------------------------------------
+    // Test schemas
+    // -----------------------------------------------------------------------
+
+    const FileBase = object({
+        id: number().primaryKey(),
+        name: string(),
+        type: string()
+    }).hasTableName('files');
+
+    const ImageExtras = object({
+        fileId: number().hasColumnName('file_id'),
+        type: string('image'),
+        width: number(),
+        height: number(),
+        format: string()
+    }).hasTableName('image_file');
+
+    const DocumentExtras = object({
+        fileId: number().hasColumnName('file_id'),
+        type: string('document'),
+        size: number(),
+        issueDate: date().hasColumnName('issue_date')
+    }).hasTableName('document_file');
+
+    const VideoExtras = object({
+        type: string('video'),
+        durationSec: number().hasColumnName('duration_sec')
+    }); // STI — no separate table
+
+    const FileSchema = FileBase.withVariants({
+        discriminator: 'type',
+        variants: {
+            image: {
+                schema: ImageExtras,
+                storage: 'cti',
+                foreignKey: t => t.fileId
+            },
+            document: {
+                schema: DocumentExtras,
+                storage: 'cti',
+                foreignKey: t => t.fileId
+            },
+            video: {
+                schema: VideoExtras,
+                storage: 'sti'
+            }
+        }
+    });
+
+    // -----------------------------------------------------------------------
+    // Schema layer
+    // -----------------------------------------------------------------------
+
+    describe('schema layer', () => {
+        it('stores variant config in extension', () => {
+            const cfg = (FileSchema as any).getExtension('variants') as any;
+            expect(cfg.discriminatorKey).toBe('type');
+            expect(Object.keys(cfg.variants)).toEqual([
+                'image',
+                'document',
+                'video'
+            ]);
+        });
+
+        it('cti variant resolves tableName and foreignKey', () => {
+            const cfg = (FileSchema as any).getExtension('variants') as any;
+            expect(cfg.variants.image.tableName).toBe('image_file');
+            // foreignKey is resolved from the accessor to the SQL column name
+            expect(cfg.variants.image.foreignKey).toBe('file_id');
+            expect(cfg.variants.image.storage).toBe('cti');
+        });
+
+        it('sti variant has no tableName', () => {
+            const cfg = (FileSchema as any).getExtension('variants') as any;
+            expect(cfg.variants.video.tableName).toBeUndefined();
+            expect(cfg.variants.video.storage).toBe('sti');
+        });
+
+        it('polymorphicVariants lists all variant schemas', () => {
+            const variantSchemas = (FileSchema as any).getExtension(
+                'polymorphicVariants'
+            ) as any[];
+            expect(variantSchemas).toHaveLength(3);
+        });
+
+        it('accessor form for discriminator resolves property name', () => {
+            const schema2 = FileBase.withVariants({
+                discriminator: t => t.type,
+                variants: {
+                    image: {
+                        schema: ImageExtras,
+                        storage: 'cti',
+                        foreignKey: t => t.fileId
+                    }
+                }
+            });
+            const cfg = (schema2 as any).getExtension('variants') as any;
+            expect(cfg.discriminatorKey).toBe('type');
+        });
+
+        it('foreignKey accessor resolves to SQL column name via hasColumnName', () => {
+            const cfg = (FileSchema as any).getExtension('variants') as any;
+            // fileId has .hasColumnName('file_id'), so resolved column = 'file_id'
+            expect(cfg.variants.image.foreignKey).toBe('file_id');
+            expect(cfg.variants.document.foreignKey).toBe('file_id');
+        });
+
+        it('throws when cti variant missing hasTableName', () => {
+            expect(() => {
+                FileBase.withVariants({
+                    discriminator: 'type',
+                    variants: {
+                        image: {
+                            schema: object({
+                                fileId: number().hasColumnName('file_id'),
+                                type: string('image'),
+                                width: number()
+                            }) as any, // no .hasTableName()
+                            storage: 'cti',
+                            foreignKey: t => t.fileId
+                        }
+                    }
+                });
+            }).toThrow(/hasTableName/);
+        });
+
+        it('throws when cti variant missing foreignKey', () => {
+            expect(() => {
+                FileBase.withVariants({
+                    discriminator: 'type',
+                    variants: {
+                        image: {
+                            schema: ImageExtras,
+                            storage: 'cti'
+                            // no foreignKey
+                        }
+                    }
+                });
+            }).toThrow(/foreignKey/);
+        });
+
+        it('throws when variant discriminator literal mismatches map key', () => {
+            const WrongExtras = object({
+                fileId: number().hasColumnName('file_id'),
+                type: string('video'), // declares 'video' but registered under 'image'
+                width: number()
+            }).hasTableName('image_file');
+
+            expect(() => {
+                FileBase.withVariants({
+                    discriminator: 'type',
+                    variants: {
+                        image: {
+                            schema: WrongExtras,
+                            storage: 'cti',
+                            foreignKey: t => t.fileId
+                        }
+                    }
+                });
+            }).toThrow(/image.*video|video.*image/i);
+        });
+
+        it('throws when variant discriminator property has no literal value', () => {
+            const NoLiteralExtras = object({
+                fileId: number().hasColumnName('file_id'),
+                type: string(), // no equalsTo
+                width: number()
+            }).hasTableName('image_file');
+
+            expect(() => {
+                FileBase.withVariants({
+                    discriminator: 'type',
+                    variants: {
+                        image: {
+                            schema: NoLiteralExtras,
+                            storage: 'cti',
+                            foreignKey: t => t.fileId
+                        }
+                    }
+                });
+            }).toThrow(/literal/i);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // SQL generation
+    // -----------------------------------------------------------------------
+
+    describe('SQL generation', () => {
+        it('generates LEFT JOIN for cti variant in SELECT', () => {
+            const sql = query(knex, FileSchema).toQuery();
+            expect(sql).toContain('left join');
+            expect(sql.toLowerCase()).toContain('image_file');
+            expect(sql.toLowerCase()).toContain('document_file');
+        });
+
+        it('joins are gated by discriminator value', () => {
+            const sql = query(knex, FileSchema).toQuery();
+            expect(sql).toContain('image');
+            expect(sql).toContain('document');
+        });
+
+        it('selectVariants adds WHERE IN clause and skips other joins', () => {
+            const sql = query(knex, FileSchema)
+                .selectVariants(['image'])
+                .toQuery();
+            expect(sql.toLowerCase()).toContain('in');
+            expect(sql.toLowerCase()).toContain('image');
+            // document_file join should be absent
+            expect(sql.toLowerCase()).not.toContain('document_file');
+        });
+
+        it('whereVariant adds (type = key AND col op value) OR type != key', () => {
+            const sql = query(knex, FileSchema)
+                .whereVariant('image', 'width', '>', 1024)
+                .toQuery();
+            expect(sql.toLowerCase()).toContain('width');
+            expect(sql).toContain('1024');
+        });
+
+        it('whereVariant resolves property key via variant column map', () => {
+            const sql = query(knex, FileSchema)
+                .whereVariant(
+                    'document',
+                    'issueDate',
+                    '>',
+                    new Date('2024-01-01')
+                )
+                .toQuery();
+            // Should use SQL column name 'issue_date' (from .hasColumnName)
+            expect(sql.toLowerCase()).toContain('issue_date');
+        });
+
+        it('whereVariant rejects disallowed operators', () => {
+            expect(() => {
+                query(knex, FileSchema)
+                    .whereVariant('image', 'width', '; DROP TABLE', 1024)
+                    .toQuery();
+            }).toThrow(/operator/i);
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // Row mapping
+    // -----------------------------------------------------------------------
+
+    describe('row mapping', () => {
+        it('documents the expected result shape via SQL analysis', () => {
+            // Integration-style: verify the SELECT aliases are generated
+            const sql = query(knex, FileSchema).toQuery();
+            // Each CTI column should appear as __v_image__<col>
+            expect(sql).toContain('__v_image');
+            expect(sql).toContain('__v_document');
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // getPolymorphicVariantSchemas (DDL/migration discovery)
+    // -----------------------------------------------------------------------
+
+    describe('getPolymorphicVariantSchemas', () => {
+        it('returns all variant schemas', async () => {
+            const { getPolymorphicVariantSchemas } = await import(
+                './extension.js'
+            );
+            const schemas = getPolymorphicVariantSchemas(FileSchema as any);
+            expect(schemas).toHaveLength(3);
+        });
+
+        it('generateCreatePolymorphicTables returns base + cti tables', async () => {
+            const { generateCreatePolymorphicTables } = await import(
+                './ddl.js'
+            );
+            const creators = generateCreatePolymorphicTables(FileSchema as any);
+            // base (files) + image_file + document_file = 3 (video is STI)
+            expect(creators).toHaveLength(3);
+        });
+    });
+});

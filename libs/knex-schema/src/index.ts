@@ -7,7 +7,7 @@ export {
     resolvePropertyKey
 } from './columns.js';
 // DDL generation
-export { generateCreateTable } from './ddl.js';
+export { generateCreatePolymorphicTables, generateCreateTable } from './ddl.js';
 // Schema extension (hasColumnName / hasTableName + DDL/ORM)
 export {
     any,
@@ -19,11 +19,14 @@ export {
     EXTRA_TYPE_BRAND,
     func,
     getColumnName,
+    getPolymorphicVariantSchemas,
     getProjections,
     getTableName,
+    getVariants,
     METHOD_LITERAL_BRAND,
     number,
     object,
+    POLYMORPHIC_TYPE_BRAND,
     string,
     union
 } from './extension.js';
@@ -64,10 +67,14 @@ export type {
     MigrationDiff,
     PaginationResult,
     RelationSpec,
+    ResolvedVariantConfig,
+    ResolvedVariantSpec,
     SchemaKeys,
     ValidatedJoinManySpec,
     ValidatedJoinOneSpec,
     ValidatedSpec,
+    VariantSpecInput,
+    VariantStorageType,
     WithJoinedMany,
     WithJoinedOne
 } from './types.js';

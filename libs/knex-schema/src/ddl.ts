@@ -2,7 +2,11 @@
 
 import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import { getColumnName, getTableName } from './extension.js';
+import {
+    getColumnName,
+    getPolymorphicVariantSchemas,
+    getTableName
+} from './extension.js';
 
 // ---------------------------------------------------------------------------
 // Type mapping
@@ -262,4 +266,50 @@ export function generateCreateTable(
 
         return builder;
     };
+}
+
+// ---------------------------------------------------------------------------
+// generateCreatePolymorphicTables
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a series of Knex `schema.createTable()` calls for a polymorphic
+ * schema and all its CTI variant tables.
+ *
+ * Returns an array of `(knex: Knex) => Knex.SchemaBuilder` functions — one
+ * for the base table and one for each CTI variant. STI variants add their
+ * columns to the base table itself so no extra table is needed.
+ *
+ * Execute them sequentially in a migration:
+ *
+ * @param schema - The base `ObjectSchemaBuilder` with `.withVariants()` applied.
+ * @returns An array of table-creation functions to execute in order.
+ *
+ * @example
+ * ```ts
+ * const creators = generateCreatePolymorphicTables(FileSchema);
+ * for (const create of creators) {
+ *     await create(knex);
+ * }
+ * ```
+ */
+export function generateCreatePolymorphicTables(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): Array<(knex: Knex) => Knex.SchemaBuilder> {
+    const result: Array<(knex: Knex) => Knex.SchemaBuilder> = [
+        generateCreateTable(schema)
+    ];
+
+    const variantSchemas = getPolymorphicVariantSchemas(schema);
+    for (const variantSchema of variantSchemas) {
+        // Only CTI variants have their own table
+        const tableName = variantSchema.getExtension('tableName') as
+            | string
+            | undefined;
+        if (tableName) {
+            result.push(generateCreateTable(variantSchema));
+        }
+    }
+
+    return result;
 }
