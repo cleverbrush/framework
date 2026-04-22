@@ -1,6 +1,8 @@
 import {
+    array,
     boolean,
     date,
+    defineEntity,
     number,
     object,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -8,7 +10,14 @@ import {
     string
 } from '@cleverbrush/knex-schema';
 
-const UserBaseSchema = object({
+// ── Users ────────────────────────────────────────────────────────────────────
+//
+// User has no outgoing typed relations needed by the demo, so we keep it as a
+// plain schema (no nav properties) and expose it directly. The chained
+// projection methods rely on the `EXTRA_TYPE_BRAND` phantom that would be
+// dropped by `addProps()`, so this also avoids that pitfall.
+
+export const UserDbSchema = object({
     id: number().primaryKey(),
     email: string(),
     passwordHash: string().optional().hasColumnName('password_hash'),
@@ -18,43 +27,15 @@ const UserBaseSchema = object({
 })
     .hasTableName('users')
     .projection('public', 'id', 'email', 'role', 'authProvider', 'createdAt')
-    .projection('auth' , 'id', 'email', 'role', 'passwordHash', 'authProvider')
+    .projection('auth', 'id', 'email', 'role', 'passwordHash', 'authProvider')
     .projection('summary', 'id', 'email');
 
-const TodoBaseSchema = object({
-    id: number().primaryKey(),
-    title: string(),
-    description: string().optional(),
-    completed: boolean().defaultTo(false),
-    userId: number()
-        .hasColumnName('user_id')
-        .references('users', 'id')
-        .onDelete('CASCADE')
-        .index('idx_todos_user_id'),
-    createdAt: date().hasColumnName('created_at'),
-    updatedAt: date().hasColumnName('updated_at')
-})
-    .hasTableName('todos')
-    .hasTimestamps({ createdAt: 'created_at', updatedAt: 'updated_at' })
-    .softDelete({ column: 'deleted_at' })
-    .projection(
-        'response',
-        'id',
-        'title',
-        'description',
-        'completed',
-        'userId',
-        'createdAt',
-        'updatedAt'
-    )
-    .projection('ownership', 'id', 'userId')
-    .scope(
-        'recentFirst',
-        (q: { orderBy: (column: string, direction: 'asc' | 'desc') => unknown }) =>
-            q.orderBy('created_at', 'desc')
-    );
-
-// ── Todo Activity (polymorphic) ──────────────────────────────────────────────
+// ── Todo Activity (polymorphic CTI + STI) ────────────────────────────────────
+//
+// Variant relations (e.g. `assigned.assignee → User`) are still declared
+// inline via the schema-level `withVariants({ relations: ... })` API because
+// variant tables intentionally do NOT carry navigation properties — those
+// would be SELECTed verbatim during variant column expansion and break SQL.
 
 export const TodoActivityAssignedDbSchema = object({
     activityId: number().hasColumnName('activity_id'),
@@ -117,22 +98,67 @@ export const TodoActivityDbSchema = TodoActivityBaseDbSchema.withVariants({
     }
 });
 
-// ── Relations ─────────────────────────────────────────────────────────────────
+// ── Todo (uses the new defineEntity API) ─────────────────────────────────────
+//
+// The schema is declared with `author` and `activity` navigation properties
+// inline so `defineEntity().belongsTo() / .hasMany()` can resolve foreign
+// schemas at runtime AND track them as `TRels` in the type. Nav props are
+// `.optional()` so they don't interfere with inserts; they're virtual at
+// runtime (Knex `select *` only fetches real DB columns).
 
-export const UserDbSchema = UserBaseSchema.hasMany('todos', {
-    schema: () => TodoDbSchema,
-    foreignKey: (t: { userId: number }) => t.userId
-});
+const TodoSchema = object({
+    id: number().primaryKey(),
+    title: string(),
+    description: string().optional(),
+    completed: boolean().defaultTo(false),
+    userId: number()
+        .hasColumnName('user_id')
+        .references('users', 'id')
+        .onDelete('CASCADE')
+        .index('idx_todos_user_id'),
+    createdAt: date().hasColumnName('created_at'),
+    updatedAt: date().hasColumnName('updated_at'),
+    // navigation properties consumed by `defineEntity()`
+    author: UserDbSchema.optional(),
+    activity: array(TodoActivityDbSchema).optional()
+})
+    .hasTableName('todos')
+    .hasTimestamps({ createdAt: 'created_at', updatedAt: 'updated_at' })
+    .softDelete({ column: 'deleted_at' })
+    .projection(
+        'response',
+        'id',
+        'title',
+        'description',
+        'completed',
+        'userId',
+        'createdAt',
+        'updatedAt'
+    )
+    .projection('ownership', 'id', 'userId')
+    .scope(
+        'recentFirst',
+        (q: {
+            orderBy: (column: string, direction: 'asc' | 'desc') => unknown;
+        }) => q.orderBy('created_at', 'desc')
+    );
 
-export const TodoDbSchema = TodoBaseSchema
-    .belongsTo('author', {
-        schema: () => UserDbSchema,
-        foreignKey: (t: { userId: number }) => t.userId
-    })
-    .hasMany('activity', {
-        schema: () => TodoActivityDbSchema,
-        foreignKey: (t: { todoId: number }) => t.todoId
-    });
+export const TodoEntity = defineEntity(TodoSchema)
+    .belongsTo(
+        t => t.author,
+        l => l.userId,
+        r => r.id,
+        { optional: true }
+    )
+    .hasMany(
+        t => t.activity,
+        l => l.id,
+        r => r.todoId
+    );
+
+// `entity.schema` is a plain `ObjectSchemaBuilder` with the `relations`
+// extension populated, so it works seamlessly with `db(schema).include(...)`.
+export const TodoDbSchema = TodoEntity.schema;
 
 export type ActivityDb = {
     id: number;

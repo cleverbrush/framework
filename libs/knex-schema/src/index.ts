@@ -8,6 +8,19 @@ export {
 } from './columns.js';
 // DDL generation
 export { generateCreatePolymorphicTables, generateCreateTable } from './ddl.js';
+// Entity wrapper
+export { defineEntity, Entity } from './entity.js';
+export type {
+    EntityRelationKeys,
+    EntityRelations,
+    EntitySchema,
+    EntityVariantInput,
+    KeyTree,
+    RelationInfo,
+    SchemaProps,
+    UnwrapNavSchema,
+    WithRelation
+} from './entity.js';
 // Schema extension (hasColumnName / hasTableName + DDL/ORM)
 export {
     any,

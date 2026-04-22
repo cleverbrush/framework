@@ -4,8 +4,7 @@ import {
     TodoActivityBaseDbSchema,
     TodoActivityCommentedDbSchema,
     TodoActivityDbSchema,
-    TodoDbSchema,
-    UserDbSchema
+    TodoDbSchema
 } from '../../db/schemas.js';
 import {
     TodoCompleted,
@@ -195,12 +194,7 @@ export const getTodoWithAuthorHandler: Handler<
 > = async ({ params, principal }, { db }) => {
     const todoWithAuthor = await db(TodoDbSchema)
         .where(t => t.id, params.id)
-        .joinOne({
-            foreignSchema: UserDbSchema,
-            localColumn: t => t.userId,
-            foreignColumn: u => u.id,
-            as: 'author'
-        })
+        .include('author')
         .first();
 
     if (!todoWithAuthor) {
@@ -215,6 +209,12 @@ export const getTodoWithAuthorHandler: Handler<
     ) {
         return ActionResult.forbidden({
             message: 'You do not have access to this todo.'
+        });
+    }
+
+    if (!todoWithAuthor.author) {
+        return ActionResult.notFound({
+            message: `Author for todo ${params.id} not found.`
         });
     }
 
