@@ -42,9 +42,12 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
 
     let detail: React.ReactNode;
     if (event.type === 'assigned') {
+        const assigneeLabel = (event as any).assignee?.email
+            ? `${(event as any).assignee.email} (#${event.assignedToUserId})`
+            : `#${event.assignedToUserId}`;
         detail = (
             <Text size="2" color="gray">
-                Assigned to user #{event.assignedToUserId}
+                Assigned to {assigneeLabel}
             </Text>
         );
     } else if (event.type === 'commented') {

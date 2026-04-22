@@ -45,12 +45,18 @@ export function mapTodoActivity(row: ActivityDb & Record<string, unknown>): Todo
         createdAt: row.createdAt instanceof Date ? row.createdAt : new Date(row.createdAt as string)
     };
     switch (row.type) {
-        case 'assigned':
+        case 'assigned': {
+            const assignee = (row as any).assignee as
+                | { id: number; email: string }
+                | null
+                | undefined;
             return {
                 ...base,
                 type: 'assigned',
-                assignedToUserId: row.assignedToUserId as number
+                assignedToUserId: row.assignedToUserId as number,
+                assignee: assignee ?? undefined
             };
+        }
         case 'commented':
             return {
                 ...base,

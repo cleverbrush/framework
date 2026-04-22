@@ -285,7 +285,14 @@ const activityCommonFields = {
 export const TodoActivityAssignedResponseSchema = object({
     ...activityCommonFields,
     type: string().equals('assigned').describe('Activity type discriminator.'),
-    assignedToUserId: number().describe('ID of the user who was assigned.')
+    assignedToUserId: number().describe('ID of the user who was assigned.'),
+    assignee: object({
+        id: number(),
+        email: string()
+    })
+        .optional()
+        .nullable()
+        .describe('Eagerly-loaded assignee user summary (id + email).')
 }).schemaName('TodoActivityAssignedResponse');
 
 export const TodoActivityCommentedResponseSchema = object({

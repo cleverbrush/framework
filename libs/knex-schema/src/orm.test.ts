@@ -2032,3 +2032,249 @@ describe('withVariants (polymorphic schemas)', () => {
         });
     });
 });
+
+// =============================================================================
+// withVariants — per-variant relations
+// =============================================================================
+
+describe('withVariants — per-variant relations', () => {
+    // -------------------------------------------------------------------------
+    // Shared schemas
+    // -------------------------------------------------------------------------
+
+    const Owner = object({
+        id: number().primaryKey(),
+        email: string(),
+        name: string().optional()
+    }).hasTableName('owners');
+
+    const AssetBase = object({
+        id: number().primaryKey(),
+        kind: string()
+    }).hasTableName('assets');
+
+    const LicensedExtras = object({
+        assetId: number().hasColumnName('asset_id'),
+        kind: string('licensed'),
+        ownerId: number().hasColumnName('owner_id')
+    }).hasTableName('licensed_asset');
+
+    const FreeExtras = object({
+        kind: string('free'),
+        note: string().optional()
+    });
+
+    const AssetSchema = AssetBase.withVariants({
+        discriminator: 'kind',
+        variants: {
+            licensed: {
+                schema: LicensedExtras,
+                storage: 'cti',
+                foreignKey: t => t.assetId,
+                relations: {
+                    owner: {
+                        type: 'belongsTo',
+                        schema: Owner,
+                        foreignKey: t => t.ownerId
+                    }
+                }
+            },
+            free: {
+                schema: FreeExtras,
+                storage: 'sti'
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // Schema layer — resolution
+    // -------------------------------------------------------------------------
+
+    it('resolves variant relations in withVariants config', () => {
+        const cfg = (AssetSchema as any).getExtension('variants') as any;
+        const licensedSpec = cfg.variants.licensed;
+        expect(licensedSpec.relations).toHaveLength(1);
+        const ownerRel = licensedSpec.relations[0];
+        expect(ownerRel.name).toBe('owner');
+        expect(ownerRel.type).toBe('belongsTo');
+        expect(ownerRel.foreignKey).toBe('owner_id');
+    });
+
+    it('sti variant with no relations has empty array', () => {
+        const cfg = (AssetSchema as any).getExtension('variants') as any;
+        expect(cfg.variants.free.relations).toEqual([]);
+    });
+
+    // -------------------------------------------------------------------------
+    // SQL generation — includeVariant
+    // -------------------------------------------------------------------------
+
+    it('includeVariant generates LEFT JOIN with namespaced alias', () => {
+        const sql = query(knex, AssetSchema)
+            .includeVariant('licensed', 'owner')
+            .toQuery();
+
+        expect(sql.toLowerCase()).toContain('left join');
+        expect(sql.toLowerCase()).toContain('owners');
+        expect(sql).toContain('__v_licensed__rel_owner');
+    });
+
+    it('includeVariant selects foreign columns with prefix', () => {
+        const sql = query(knex, AssetSchema)
+            .includeVariant('licensed', 'owner')
+            .toQuery();
+
+        expect(sql).toContain('__v_licensed__rel_owner__id');
+        expect(sql).toContain('__v_licensed__rel_owner__email');
+    });
+
+    it('includeVariant with projection selects only projected columns', () => {
+        const OwnerWithProj = Owner.projection('summary', 'id', 'email');
+        const AssetWithProj = AssetBase.withVariants({
+            discriminator: 'kind',
+            variants: {
+                licensed: {
+                    schema: LicensedExtras,
+                    storage: 'cti',
+                    foreignKey: t => t.assetId,
+                    relations: {
+                        owner: {
+                            type: 'belongsTo',
+                            schema: OwnerWithProj,
+                            foreignKey: t => t.ownerId
+                        }
+                    }
+                },
+                free: { schema: FreeExtras, storage: 'sti' }
+            }
+        });
+
+        const sql = query(knex, AssetWithProj)
+            .includeVariant('licensed', 'owner', q =>
+                q.projected('summary' as never)
+            )
+            .toQuery();
+
+        expect(sql).toContain('__v_licensed__rel_owner__id');
+        expect(sql).toContain('__v_licensed__rel_owner__email');
+        expect(sql).not.toContain('__v_licensed__rel_owner__name');
+    });
+
+    // -------------------------------------------------------------------------
+    // include() auto-routing fallback
+    // -------------------------------------------------------------------------
+
+    it('include() auto-routes to includeVariant when relation is unambiguous', () => {
+        const sql = query(knex, AssetSchema).include('owner').toQuery();
+        expect(sql).toContain('__v_licensed__rel_owner');
+    });
+
+    it('include() throws for truly unknown relations on polymorphic schema', () => {
+        expect(() => {
+            query(knex, AssetSchema).include('nonexistent').toQuery();
+        }).toThrow(/Unknown relation/);
+    });
+
+    it('include() throws ambiguous error when relation name appears on multiple variants', () => {
+        const AmbigSchema = AssetBase.withVariants({
+            discriminator: 'kind',
+            variants: {
+                licensed: {
+                    schema: LicensedExtras,
+                    storage: 'cti',
+                    foreignKey: t => t.assetId,
+                    relations: {
+                        owner: {
+                            type: 'belongsTo',
+                            schema: Owner,
+                            foreignKey: t => t.ownerId
+                        }
+                    }
+                },
+                free: {
+                    schema: FreeExtras,
+                    storage: 'sti',
+                    relations: {
+                        owner: {
+                            type: 'belongsTo',
+                            schema: Owner
+                        }
+                    }
+                }
+            }
+        });
+
+        expect(() => {
+            query(knex, AmbigSchema).include('owner').toQuery();
+        }).toThrow(/[Aa]mbiguous/);
+    });
+
+    // -------------------------------------------------------------------------
+    // includeVariant validation errors
+    // -------------------------------------------------------------------------
+
+    it('includeVariant throws for non-polymorphic schema', () => {
+        const Plain = object({ id: number().primaryKey() }).hasTableName('t');
+        expect(() => {
+            query(knex, Plain).includeVariant('x', 'y');
+        }).toThrow(/not polymorphic/);
+    });
+
+    it('includeVariant throws for unknown variant key', () => {
+        expect(() => {
+            query(knex, AssetSchema).includeVariant('unknown_variant', 'owner');
+        }).toThrow(/unknown variant key/);
+    });
+
+    it('includeVariant throws for unknown relation name', () => {
+        expect(() => {
+            query(knex, AssetSchema).includeVariant('licensed', 'nonexistent');
+        }).toThrow(/unknown relation/);
+    });
+
+    // -------------------------------------------------------------------------
+    // Row mapping — Pass 3 (observable via SQL + alias presence)
+    // -------------------------------------------------------------------------
+
+    it('includeVariant generates relation column aliases in SQL (Pass 3 input)', () => {
+        // Verify all 3 Owner columns are aliased into the query result so that
+        // Pass 3 of #mapPolymorphicRow can read them.
+        const sql = query(knex, AssetSchema)
+            .includeVariant('licensed', 'owner')
+            .toQuery();
+
+        expect(sql).toContain('__v_licensed__rel_owner__id');
+        expect(sql).toContain('__v_licensed__rel_owner__email');
+        expect(sql).toContain('__v_licensed__rel_owner__name');
+    });
+
+    it('STI variant with includeVariant generates correct ON discriminator gate', () => {
+        // STI variant: no separate table alias, gate uses base table discriminator
+        const StiSchema = AssetBase.withVariants({
+            discriminator: 'kind',
+            variants: {
+                licensed: { schema: LicensedExtras, storage: 'sti' },
+                free: {
+                    schema: FreeExtras,
+                    storage: 'sti',
+                    relations: {
+                        owner: {
+                            type: 'belongsTo',
+                            schema: Owner,
+                            foreignKey: t => t.note // pretend note is a FK
+                        }
+                    }
+                }
+            }
+        });
+
+        const sql = query(knex, StiSchema)
+            .includeVariant('free', 'owner')
+            .toQuery();
+
+        // Should join owners and gate ON discriminator = 'free'
+        expect(sql.toLowerCase()).toContain('owners');
+        expect(sql).toContain('__v_free__rel_owner');
+        expect(sql).toContain('free');
+    });
+});

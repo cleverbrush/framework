@@ -27,9 +27,12 @@ import {
     stringExtensions,
     withExtensions
 } from '@cleverbrush/schema';
+import { buildColumnMap } from './columns.js';
 import type {
     ResolvedVariantConfig,
+    ResolvedVariantRelationSpec,
     ResolvedVariantSpec,
+    VariantRelationSpec,
     VariantSpecInput,
     VariantStorageType
 } from './types.js';
@@ -43,6 +46,46 @@ export { EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND } from '@cleverbrush/schema';
 // ---------------------------------------------------------------------------
 // Polymorphic type brand
 // ---------------------------------------------------------------------------
+
+/** @internal Helper to resolve a variant's `relations` map into normalised specs. */
+function resolveVariantRelations(
+    variantKey: string,
+    variantSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    relations: Record<string, VariantRelationSpec>
+): ResolvedVariantRelationSpec[] {
+    const { propToCol } = buildColumnMap(variantSchema);
+    const result: ResolvedVariantRelationSpec[] = [];
+    const varTree = ObjectSchemaBuilderClass.getPropertiesFor(
+        variantSchema as any
+    );
+
+    for (const [relName, relSpec] of Object.entries(relations)) {
+        let resolvedFk: string | undefined;
+
+        if (relSpec.foreignKey) {
+            const descriptor = (relSpec.foreignKey as Function)(varTree as any);
+            const inner = (descriptor as any)?.[
+                SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+            ];
+            if (!inner?.propertyName) {
+                throw new Error(
+                    `withVariants: variant "${variantKey}" relation "${relName}" foreignKey accessor must return a top-level property descriptor`
+                );
+            }
+            const fkPropKey: string = inner.propertyName;
+            resolvedFk = propToCol.get(fkPropKey) ?? fkPropKey;
+        }
+
+        result.push({
+            name: relName,
+            type: relSpec.type,
+            schema: relSpec.schema,
+            foreignKey: resolvedFk,
+            through: relSpec.through
+        });
+    }
+    return result;
+}
 
 /**
  * Phantom-type brand placed on an `ObjectSchemaBuilder` by `.withVariants()`.
@@ -1181,7 +1224,12 @@ export const ddlExtension = defineExtension({
                     foreignKey: resolvedForeignKey,
                     tableName,
                     allowOrphan: spec.allowOrphan ?? false,
-                    enforceCheck: spec.enforceCheck ?? false
+                    enforceCheck: spec.enforceCheck ?? false,
+                    relations: resolveVariantRelations(
+                        key,
+                        varSchema,
+                        (spec as VariantSpecInput).relations ?? {}
+                    )
                 };
 
                 variantSchemas.push(varSchema);

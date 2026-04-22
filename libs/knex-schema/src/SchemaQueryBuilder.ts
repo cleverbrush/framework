@@ -30,6 +30,7 @@ import type {
     PaginationResult,
     RelationSpec,
     ResolvedVariantConfig,
+    ResolvedVariantRelationSpec,
     ValidatedSpec,
     VariantWhereFilter,
     WithJoinedMany,
@@ -326,6 +327,17 @@ export class SchemaQueryBuilder<
     #variantWhereFilters: VariantWhereFilter[] = [];
 
     /**
+     * Variant-relation eager-load requests registered via `.includeVariant()`.
+     * Each entry names the variant key and the relation name to load.
+     * Processed inside `#applyVariantJoins()`.
+     */
+    #variantRelationIncludes: Array<{
+        variantKey: string;
+        relationName: string;
+        customize?: (q: SchemaQueryBuilder<any, any>) => void;
+    }> = [];
+
+    /**
      * Memoized result of `#buildQuery()`. Invalidated by any mutating method
      * (where, orderBy, limit, etc.) and re-built lazily on the next read.
      */
@@ -521,6 +533,96 @@ export class SchemaQueryBuilder<
             // STI: no extra JOIN — variant columns are already in the base row
         }
 
+        // Apply variant-relation eager-load JOINs (registered via .includeVariant())
+        for (const vrInc of this.#variantRelationIncludes) {
+            const variantSpec = variantConfig.variants[vrInc.variantKey];
+            if (!variantSpec) continue;
+
+            const relSpec = variantSpec.relations.find(
+                (r: ResolvedVariantRelationSpec) =>
+                    r.name === vrInc.relationName
+            );
+            if (!relSpec) continue;
+
+            const foreignSchema = this.#resolveSchema(relSpec.schema);
+            const foreignTableName = getTableName(foreignSchema);
+            const relAlias = `__v_${vrInc.variantKey}__rel_${vrInc.relationName}`;
+
+            if (relSpec.type === 'belongsTo' || relSpec.type === 'hasOne') {
+                // Determine join condition columns
+                let localCol: string;
+                let foreignCol: string;
+
+                if (relSpec.type === 'belongsTo') {
+                    // FK is on the variant table (or base table for STI)
+                    localCol =
+                        relSpec.foreignKey ??
+                        ((): string => {
+                            throw new Error(
+                                `includeVariant: relation "${vrInc.relationName}" on variant "${vrInc.variantKey}" requires foreignKey`
+                            );
+                        })();
+                    foreignCol = this.#findPrimaryKeyColumn(foreignSchema);
+                } else {
+                    // hasOne: FK is on the foreign table
+                    localCol = this.#findPrimaryKeyColumn(this.#localSchema);
+                    foreignCol =
+                        relSpec.foreignKey ??
+                        ((): string => {
+                            throw new Error(
+                                `includeVariant: relation "${vrInc.relationName}" on variant "${vrInc.variantKey}" requires foreignKey`
+                            );
+                        })();
+                }
+
+                // Build the join ON condition, gated by the discriminator
+                let onExpr: string;
+                const variantAlias = `__v_${vrInc.variantKey}`;
+
+                if (variantSpec.storage === 'cti') {
+                    if (relSpec.type === 'belongsTo') {
+                        // FK lives on the CTI variant alias table
+                        onExpr = `${relAlias}.${foreignCol} = ${variantAlias}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    } else {
+                        // hasOne: FK on foreign table, local col is base PK
+                        onExpr = `${relAlias}.${foreignCol} = ${baseTable}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    }
+                } else {
+                    // STI: all columns are in the base table
+                    if (relSpec.type === 'belongsTo') {
+                        onExpr = `${relAlias}.${foreignCol} = ${baseTable}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    } else {
+                        onExpr = `${relAlias}.${foreignCol} = ${baseTable}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    }
+                }
+
+                // Build the foreign query (applying customize if provided)
+                const foreignKnex: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+
+                // Determine which columns to select from the foreign table.
+                // Run customize on a probe proxy to capture projection/explicit-select state.
+                const selectionSql = this.#buildVariantRelationSelect(
+                    foreignSchema,
+                    relAlias,
+                    foreignTableName,
+                    vrInc.customize
+                );
+
+                qb.leftJoin(
+                    knex.raw(`?? as ??`, [foreignTableName, relAlias]),
+                    knex.raw(onExpr)
+                );
+                void foreignKnex; // probe was used only for column determination
+
+                for (const sel of selectionSql) {
+                    qb.select(sel);
+                }
+            }
+            // NOTE: hasMany / belongsToMany on variants are not yet supported
+            // via inline JOINs (they would multiply rows). Future: secondary query.
+        }
+
         // Apply per-variant WHERE filters (added via .whereVariant())
         for (const filter of this.#variantWhereFilters) {
             const discColFull = `${baseTable}.${discCol}`;
@@ -539,6 +641,61 @@ export class SchemaQueryBuilder<
         }
 
         return qb;
+    }
+
+    /**
+     * Build the list of `knex.raw("?? as ??", ...)` select expressions that
+     * project a variant-relation alias table's columns into the namespaced
+     * prefix `__v_<key>__rel_<name>__<col>`.
+     *
+     * When `customize` applies a projection, only the projected columns are
+     * selected.  Otherwise every column in the foreign schema is selected.
+     *
+     * @internal
+     */
+    #buildVariantRelationSelect(
+        foreignSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+        relAlias: string,
+        foreignTableName: string,
+        customize?: (q: SchemaQueryBuilder<any, any>) => void
+    ): Knex.Raw[] {
+        const knex = this.#knex;
+        const { propToCol } = buildColumnMap(foreignSchema);
+        const foreignIntrospect = foreignSchema.introspect() as any;
+        const foreignProps: Record<string, unknown> =
+            foreignIntrospect.properties ?? {};
+
+        // Determine which property keys to include.
+        // Run customize on a probe proxy to capture #explicitSelects state.
+        let columnsToSelect: string[];
+
+        if (customize) {
+            const probe = new SchemaQueryBuilder(
+                this.#knex,
+                foreignSchema,
+                this.#knex(foreignTableName)
+            );
+            customize(probe);
+            const explicit = probe.#explicitSelects;
+            if (explicit && explicit.length > 0) {
+                columnsToSelect = explicit;
+            } else {
+                columnsToSelect = Object.keys(foreignProps).map(
+                    p => propToCol.get(p) ?? p
+                );
+            }
+        } else {
+            columnsToSelect = Object.keys(foreignProps).map(
+                p => propToCol.get(p) ?? p
+            );
+        }
+
+        return columnsToSelect.map(colName =>
+            knex.raw('?? as ??', [
+                `${relAlias}.${colName}`,
+                `${relAlias}__${colName}`
+            ])
+        );
     }
 
     /**
@@ -622,6 +779,49 @@ export class SchemaQueryBuilder<
                         if (propName) {
                             result[propName] = value;
                         }
+                    }
+                }
+            }
+        }
+
+        // Pass 3: extract variant-relation nested objects
+        if (this.#variantRelationIncludes.length > 0 && discValue != null) {
+            const variantSpec3 = variantConfig.variants[discValue];
+            if (variantSpec3) {
+                for (const vrInc of this.#variantRelationIncludes) {
+                    if (vrInc.variantKey !== discValue) continue;
+
+                    const relSpec = variantSpec3.relations.find(
+                        (r: ResolvedVariantRelationSpec) =>
+                            r.name === vrInc.relationName
+                    );
+                    if (!relSpec) continue;
+
+                    if (
+                        relSpec.type === 'belongsTo' ||
+                        relSpec.type === 'hasOne'
+                    ) {
+                        const relAlias = `__v_${discValue}__rel_${vrInc.relationName}`;
+                        const prefix = `${relAlias}__`;
+                        const foreignSchema = this.#resolveSchema(
+                            relSpec.schema
+                        );
+                        const { colToProp: relColToProp } =
+                            buildColumnMap(foreignSchema);
+                        const nested: Record<string, unknown> = {};
+                        let anyNonNull = false;
+
+                        for (const [colName, value] of Object.entries(row)) {
+                            if (!colName.startsWith(prefix)) continue;
+                            const origCol = colName.slice(prefix.length);
+                            const propName =
+                                relColToProp.get(origCol) ?? origCol;
+                            nested[propName] = value;
+                            if (value !== null && value !== undefined) {
+                                anyNonNull = true;
+                            }
+                        }
+                        result[vrInc.relationName] = anyNonNull ? nested : null;
                     }
                 }
             }
@@ -1952,6 +2152,7 @@ export class SchemaQueryBuilder<
                 ? new Set(this.#enabledVariants)
                 : null;
         builder.#variantWhereFilters = [...this.#variantWhereFilters];
+        builder.#variantRelationIncludes = [...this.#variantRelationIncludes];
         return builder;
     }
 
@@ -1986,6 +2187,35 @@ export class SchemaQueryBuilder<
             (r: RelationSpec) => r.name === relationName
         );
         if (!relation) {
+            // Try variant relations as fallback (auto-routing)
+            const variantConfig = this.#getVariantConfig();
+            if (variantConfig) {
+                const matches: Array<{ variantKey: string }> = [];
+                for (const [vKey, vSpec] of Object.entries(
+                    variantConfig.variants
+                )) {
+                    if (
+                        vSpec.relations.some(
+                            (r: ResolvedVariantRelationSpec) =>
+                                r.name === relationName
+                        )
+                    ) {
+                        matches.push({ variantKey: vKey });
+                    }
+                }
+                if (matches.length === 1) {
+                    return this.includeVariant(
+                        matches[0].variantKey,
+                        relationName,
+                        customize
+                    );
+                }
+                if (matches.length > 1) {
+                    throw new Error(
+                        `Ambiguous relation "${relationName}" — found on variants: ${matches.map(m => m.variantKey).join(', ')}. Use .includeVariant(key, name) to be explicit.`
+                    );
+                }
+            }
             throw new Error(
                 `Unknown relation "${relationName}" on schema for table "${this.#tableName}"`
             );
@@ -2121,6 +2351,57 @@ export class SchemaQueryBuilder<
             }
         }
 
+        return this;
+    }
+
+    /**
+     * Eager-load a named relation declared inside a `withVariants` variant spec.
+     *
+     * The relation is loaded via a LEFT JOIN on the variant's alias table and
+     * only populated on rows whose discriminator matches `variantKey`.
+     *
+     * @param variantKey - The variant key (e.g. `'assigned'`).
+     * @param relationName - The relation name declared in `variants[key].relations`.
+     * @param customize - Optional callback to restrict which columns are
+     *   selected from the foreign table (scope / projection).
+     *
+     * @example
+     * ```ts
+     * await query(db, TodoActivity)
+     *   .includeVariant('assigned', 'assignee', q => q.projected('summary'));
+     * ```
+     */
+    includeVariant(
+        variantKey: string,
+        relationName: string,
+        customize?: (q: SchemaQueryBuilder<any, any>) => void
+    ): this {
+        this.#invalidateCache();
+        const variantConfig = this.#getVariantConfig();
+        if (!variantConfig) {
+            throw new Error(
+                `includeVariant: schema for table "${this.#tableName}" is not polymorphic (no .withVariants() config found)`
+            );
+        }
+        const variantSpec = variantConfig.variants[variantKey];
+        if (!variantSpec) {
+            throw new Error(
+                `includeVariant: unknown variant key "${variantKey}" on schema for table "${this.#tableName}"`
+            );
+        }
+        const relSpec = variantSpec.relations.find(
+            (r: ResolvedVariantRelationSpec) => r.name === relationName
+        );
+        if (!relSpec) {
+            throw new Error(
+                `includeVariant: unknown relation "${relationName}" on variant "${variantKey}" of table "${this.#tableName}"`
+            );
+        }
+        this.#variantRelationIncludes.push({
+            variantKey,
+            relationName,
+            customize
+        });
         return this;
     }
 

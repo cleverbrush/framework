@@ -327,6 +327,7 @@ export const listAllActivityHandler: Handler<
     const limit = Math.min(100, Math.max(1, query?.limit ?? 10));
 
     const rows = await db(TodoActivityDbSchema)
+        .includeVariant('assigned', 'assignee', q => q.projected('summary' as never))
         .orderBy(a => a.createdAt, 'desc')
         .limit(limit);
 

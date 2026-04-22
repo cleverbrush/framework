@@ -233,6 +233,48 @@ export interface CursorPaginationResult<T> {
 export type VariantStorageType = 'cti' | 'sti';
 
 /**
+ * Input spec for a relation scoped to a single polymorphic variant.
+ * Mirrors {@link RelationSpec} but `foreignKey` is typed against the variant's
+ * own schema so only variant-specific columns are accessible.
+ * @public
+ */
+export interface VariantRelationSpec<
+    TSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > = ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> {
+    type: 'hasMany' | 'hasOne' | 'belongsTo' | 'belongsToMany';
+    /** The foreign schema to join against. */
+    schema: any;
+    /**
+     * FK column accessor — typed against the **variant** schema.
+     * For `belongsTo`/`hasOne`, this is the FK on the variant table.
+     * For `hasMany`, this is the FK on the foreign table.
+     */
+    foreignKey?: (
+        t: PropertyDescriptorTree<TSchema, TSchema>
+    ) => PropertyDescriptor<any, any, any, any>;
+    /** `belongsToMany` only — pivot table configuration. */
+    through?: { table: string; localKey: string; foreignKey: string };
+}
+
+/** @internal Resolved form of {@link VariantRelationSpec} stored on {@link ResolvedVariantSpec}. */
+export interface ResolvedVariantRelationSpec {
+    name: string;
+    type: 'hasMany' | 'hasOne' | 'belongsTo' | 'belongsToMany';
+    schema: any;
+    /** Resolved FK *column* name on the variant or foreign table. */
+    foreignKey?: string;
+    through?: { table: string; localKey: string; foreignKey: string };
+}
+
+/**
  * Input spec for one polymorphic variant as passed to `.withVariants()`.
  * @public
  */
@@ -277,6 +319,12 @@ export interface VariantSpecInput<
      * ensuring variant columns are `NULL` when the discriminator doesn't match.
      */
     enforceCheck?: boolean;
+    /**
+     * Optional relations scoped to **this variant only**.
+     * Loaded via `.includeVariant(variantKey, relationName)` on the query builder.
+     * The `foreignKey` accessor is typed against the variant's own schema.
+     */
+    relations?: Record<string, VariantRelationSpec<TSchema>>;
 }
 
 /** @internal Resolved, normalised variant spec stored in schema extensions. */
@@ -289,6 +337,8 @@ export interface ResolvedVariantSpec {
     tableName?: string;
     allowOrphan: boolean;
     enforceCheck: boolean;
+    /** Variant-scoped relations (resolved), populated by `.withVariants()`. */
+    relations: ResolvedVariantRelationSpec[];
 }
 
 /** @internal Full variant config stored in the schema extension `'variants'`. */

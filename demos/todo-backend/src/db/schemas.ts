@@ -18,7 +18,8 @@ const UserBaseSchema = object({
 })
     .hasTableName('users')
     .projection('public', 'id', 'email', 'role', 'authProvider', 'createdAt')
-    .projection('auth' , 'id', 'email', 'role', 'passwordHash', 'authProvider');
+    .projection('auth' , 'id', 'email', 'role', 'passwordHash', 'authProvider')
+    .projection('summary', 'id', 'email');
 
 const TodoBaseSchema = object({
     id: number().primaryKey(),
@@ -95,7 +96,14 @@ export const TodoActivityDbSchema = TodoActivityBaseDbSchema.withVariants({
         assigned: {
             schema: TodoActivityAssignedDbSchema,
             storage: 'cti',
-            foreignKey: t => t.activityId
+            foreignKey: t => t.activityId,
+            relations: {
+                assignee: {
+                    type: 'belongsTo' as const,
+                    schema: () => UserDbSchema,
+                    foreignKey: (t: any) => t.assignedToUserId
+                }
+            }
         },
         commented: {
             schema: TodoActivityCommentedDbSchema,

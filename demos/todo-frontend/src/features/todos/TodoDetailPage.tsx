@@ -46,6 +46,9 @@ export function TodoDetailPage() {
     const [eventLoading, setEventLoading] = useState(false);
     const [eventResult, setEventResult] = useState<string | null>(null);
 
+    // User list for the "assigned" picker
+    const [users, setUsers] = useState<Array<{ id: number; email: string }>>([]);
+
     const editForm = useSchemaForm(UpdateTodoBodySchema);
 
     const load = useCallback(async () => {
@@ -69,6 +72,14 @@ export function TodoDetailPage() {
             setLoading(false);
         }
     }, [id]);
+
+    // Load user list once for the "assigned" picker
+    useEffect(() => {
+        client.users
+            .list({ query: { page: 1, limit: 100 } })
+            .then(rows => setUsers(rows.map(u => ({ id: u.id, email: u.email }))))
+            .catch(() => {/* ignore — picker will fall back to text input */});
+    }, []);
 
     useEffect(() => { load(); }, [load]);
 
@@ -280,13 +291,30 @@ export function TodoDetailPage() {
                     )}
                     {eventType === 'assigned' && (
                         <Box>
-                            <Text size="1" weight="medium" mb="1" style={{ display: 'block' }}>Assign to User ID</Text>
-                            <TextField.Root
-                                type="number"
-                                value={eventAssignedTo}
-                                onChange={(e) => setEventAssignedTo(e.target.value)}
-                                style={{ width: 120 }}
-                            />
+                            <Text size="1" weight="medium" mb="1" style={{ display: 'block' }}>Assign to User</Text>
+                            {users.length > 0 ? (
+                                <Select.Root
+                                    value={eventAssignedTo}
+                                    onValueChange={setEventAssignedTo}
+                                >
+                                    <Select.Trigger placeholder="Select user…" />
+                                    <Select.Content>
+                                        {users.map(u => (
+                                            <Select.Item key={u.id} value={String(u.id)}>
+                                                {u.email} (#{u.id})
+                                            </Select.Item>
+                                        ))}
+                                    </Select.Content>
+                                </Select.Root>
+                            ) : (
+                                <TextField.Root
+                                    type="number"
+                                    value={eventAssignedTo}
+                                    onChange={(e) => setEventAssignedTo(e.target.value)}
+                                    placeholder="User ID"
+                                    style={{ width: 120 }}
+                                />
+                            )}
                         </Box>
                     )}
                     {eventType === 'completed' && (
