@@ -8,7 +8,6 @@ import { signJwt } from '@cleverbrush/auth';
 import { ActionResult, type Handler } from '@cleverbrush/server';
 import { OAuth2Client } from 'google-auth-library';
 import { config } from '../../config.js';
-import { UserDbSchema } from '../../db/schemas.js';
 import type {
     GoogleLoginEndpoint,
     LoginEndpoint,
@@ -72,7 +71,7 @@ export const registerHandler: Handler<typeof RegisterEndpoint> = async (
     { body },
     { db }
 ) => {
-    const existing = await db(UserDbSchema)
+    const existing = await db.users
         .projected('public')
         .where(t => t.email, body.email)
         .first();
@@ -83,7 +82,7 @@ export const registerHandler: Handler<typeof RegisterEndpoint> = async (
     }
 
     const passwordHash = await hashPassword(body.password);
-    const user = await db(UserDbSchema).insert({
+    const user = await db.users.insert({
         email: body.email,
         passwordHash,
         role: 'user',
@@ -99,7 +98,7 @@ export const loginHandler: Handler<typeof LoginEndpoint> = async (
     { body },
     { db }
 ) => {
-    const user = await db(UserDbSchema)
+    const user = await db.users
         .projected('auth')
         .where(t => t.email, body.email)
         .first();
@@ -171,13 +170,13 @@ export const googleLoginHandler: Handler<typeof GoogleLoginEndpoint> = async (
     }
 
     // Find or auto-provision user
-    const foundUser = await db(UserDbSchema)
+    const foundUser = await db.users
         .projected('public')
         .where(t => t.email, email)
         .first();
     const user =
         foundUser ??
-        (await db(UserDbSchema).insert({
+        (await db.users.insert({
             email,
             passwordHash: undefined,
             role: 'user',

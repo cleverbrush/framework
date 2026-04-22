@@ -1,11 +1,14 @@
 import type { IServiceProvider, ServiceCollection } from '@cleverbrush/di';
-import { createQuery } from '@cleverbrush/knex-schema';
+import { createQuery } from '@cleverbrush/orm';
 import type { Logger } from '@cleverbrush/log';
+import { createDb } from '@cleverbrush/orm';
 import knex from 'knex';
 import type { Config } from '../config.js';
+import { entityMap } from '../db/schemas.js';
 import {
     BoundQueryToken,
     ConfigToken,
+    DbToken,
     KnexToken,
     LoggerToken
 } from './tokens.js';
@@ -38,4 +41,14 @@ export function configureDI(
         >[0];
         return createQuery(knexInstance);
     });
+
+    // Typed DbContext — `db.todos`, `db.users`, ... with `.include()`,
+    // `.where()`, etc. exposed as `DbSet` instances per entity.
+    services.addSingleton(DbToken, (provider: IServiceProvider) => {
+        const knexInstance = provider.get(KnexToken) as Parameters<
+            typeof createDb
+        >[0];
+        return createDb(knexInstance, entityMap);
+    });
 }
+

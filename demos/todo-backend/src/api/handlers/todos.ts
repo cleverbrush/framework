@@ -1,12 +1,5 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
 import {
-    TodoActivityAssignedDbSchema,
-    TodoActivityBaseDbSchema,
-    TodoActivityCommentedDbSchema,
-    TodoActivityDbSchema,
-    TodoDbSchema
-} from '../../db/schemas.js';
-import {
     TodoCompleted,
     TodoCreated,
     TodoDeleted,
@@ -43,7 +36,7 @@ export const listTodosHandler: Handler<typeof ListTodosEndpoint> = async (
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.limit ?? 20));
 
-    let builder = db(TodoDbSchema).projected('response').scoped('recentFirst');
+    let builder = db.todos.projected('response').scoped('recentFirst');
 
     if (principal.role === 'admin') {
         // Admins may optionally filter by a specific user
@@ -65,7 +58,7 @@ export const getTodoHandler: Handler<typeof GetTodoEndpoint> = async (
     { params, principal },
     { db }
 ) => {
-    const todo = await db(TodoDbSchema)
+    const todo = await db.todos
         .projected('response')
         .where(t => t.id, params.id)
         .first();
@@ -91,7 +84,7 @@ export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
     { body, principal },
     { db, logger }
 ) => {
-    const todo = await db(TodoDbSchema).insert({
+    const todo = await db.todos.insert({
         title: body.title,
         description: body.description,
         completed: false,
@@ -113,7 +106,7 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
     { params, body, principal },
     { db, logger }
 ) => {
-    const todo = await db(TodoDbSchema)
+    const todo = await db.todos
         .projected('ownership')
         .where(t => t.id, params.id)
         .first();
@@ -140,7 +133,7 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
     if (body.description !== undefined) patch.description = body.description;
     if (body.completed !== undefined) patch.completed = body.completed;
 
-    const [updated] = await db(TodoDbSchema)
+    const [updated] = await db.todos
         .where(t => t.id, params.id)
         .update(patch);
 
@@ -158,7 +151,7 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
     { params, principal },
     { db, logger }
 ) => {
-    const todo = await db(TodoDbSchema)
+    const todo = await db.todos
         .projected('ownership')
         .where(t => t.id, params.id)
         .first();
@@ -175,9 +168,7 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
         });
     }
 
-    await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .delete();
+    await db.todos.where(t => t.id, params.id).delete();
 
     logger.info(TodoDeleted, {
         TodoId: params.id,
@@ -192,9 +183,9 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
 export const getTodoWithAuthorHandler: Handler<
     typeof GetTodoWithAuthorEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todoWithAuthor = await db(TodoDbSchema)
+    const todoWithAuthor = await db.todos
+        .include(t => t.author)
         .where(t => t.id, params.id)
-        .include('author')
         .first();
 
     if (!todoWithAuthor) {
@@ -229,7 +220,7 @@ export const getTodoWithAuthorHandler: Handler<
 export const sendTodoEventHandler: Handler<
     typeof SendTodoEventEndpoint
 > = async ({ params, body, principal }, { db, logger }) => {
-    const todo = await db(TodoDbSchema)
+    const todo = await db.todos
         .projected('ownership')
         .where(t => t.id, params.id)
         .first();
@@ -247,7 +238,7 @@ export const sendTodoEventHandler: Handler<
     }
 
     const activityId = await db.transaction(async dbTrx => {
-        const base = await dbTrx(TodoActivityBaseDbSchema).insert({
+        const base = await dbTrx.todoActivityBase.insert({
             todoId: params.id,
             type: body.type,
             actorUserId: principal.userId,
@@ -257,13 +248,13 @@ export const sendTodoEventHandler: Handler<
         });
 
         if (body.type === 'assigned') {
-            await dbTrx(TodoActivityAssignedDbSchema).insert({
+            await dbTrx.todoActivityAssigned.insert({
                 activityId: base.id,
                 type: 'assigned',
                 assignedToUserId: body.assignedTo
             });
         } else if (body.type === 'commented') {
-            await dbTrx(TodoActivityCommentedDbSchema).insert({
+            await dbTrx.todoActivityCommented.insert({
                 activityId: base.id,
                 type: 'commented',
                 comment: body.comment
@@ -273,9 +264,7 @@ export const sendTodoEventHandler: Handler<
         return base.id;
     });
 
-    const row = await db(TodoActivityDbSchema)
-        .where(a => a.id, activityId)
-        .first();
+    const row = await db.todoActivity.where(a => a.id, activityId).first();
 
     const mapped = mapTodoActivity(row!);
 
@@ -295,7 +284,7 @@ export const sendTodoEventHandler: Handler<
 export const listTodoActivityHandler: Handler<
     typeof ListTodoActivityEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todo = await db(TodoDbSchema)
+    const todo = await db.todos
         .projected('ownership')
         .where(t => t.id, params.id)
         .first();
@@ -312,7 +301,7 @@ export const listTodoActivityHandler: Handler<
         });
     }
 
-    const rows = await db(TodoActivityDbSchema)
+    const rows = await db.todoActivity
         .where(a => a.todoId, params.id)
         .orderBy(a => a.createdAt, 'desc');
 
@@ -326,7 +315,7 @@ export const listAllActivityHandler: Handler<
 > = async ({ query }, { db }) => {
     const limit = Math.min(100, Math.max(1, query?.limit ?? 10));
 
-    const rows = await db(TodoActivityDbSchema)
+    const rows = await db.todoActivity
         .includeVariant('assigned', 'assignee', q => q.projected('summary' as never))
         .orderBy(a => a.createdAt, 'desc')
         .limit(limit);
@@ -340,7 +329,7 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
     { principal, context },
     { db, logger }
 ) => {
-    let builder = db(TodoDbSchema).projected('response').orderBy(t => t.createdAt, 'desc');
+    let builder = db.todos.projected('response').orderBy(t => t.createdAt, 'desc');
 
     if (principal.role !== 'admin') {
         builder = builder.where(t => t.userId, principal.userId);
@@ -373,7 +362,7 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
 export const downloadAttachmentHandler: Handler<
     typeof DownloadAttachmentEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todo = await db(TodoDbSchema)
+    const todo = await db.todos
         .projected('response')
         .where(t => t.id, params.id)
         .first();
@@ -435,7 +424,7 @@ export const importTodosHandler: Handler<typeof ImportTodosEndpoint> = async (
 
     for (const item of items) {
         try {
-            await db(TodoDbSchema).insert({
+            await db.todos.insert({
                 title: item.title,
                 description: item.description,
                 completed: false,
@@ -479,7 +468,7 @@ export const completeTodoHandler: Handler<typeof CompleteTodoEndpoint> = async (
     { params, headers, principal },
     { db, logger }
 ) => {
-    const todo = await db(TodoDbSchema)
+    const todo = await db.todos
         .projected('response')
         .where(t => t.id, params.id)
         .first();
@@ -511,7 +500,7 @@ export const completeTodoHandler: Handler<typeof CompleteTodoEndpoint> = async (
         return mapTodo(todo);
     }
 
-    const [updated] = await db(TodoDbSchema)
+    const [updated] = await db.todos
         .where(t => t.id, params.id)
         .update({ completed: true });
 

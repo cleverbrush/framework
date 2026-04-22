@@ -1,5 +1,4 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
-import { UserDbSchema } from '../../db/schemas.js';
 import type {
     DeleteUserEndpoint,
     GetMyProfileEndpoint,
@@ -16,7 +15,7 @@ export const listUsersHandler: Handler<typeof ListUsersEndpoint> = async (
     const page = Math.max(1, query.page ?? 1);
     const pageSize = Math.min(100, Math.max(1, query.limit ?? 20));
 
-    const rows = await db(UserDbSchema)
+    const rows = await db.users
         .projected('public')
         .orderBy(t => t.createdAt, 'desc')
         .paginate({ page, pageSize });
@@ -37,7 +36,7 @@ export const deleteUserHandler: Handler<typeof DeleteUserEndpoint> = async (
         });
     }
 
-    const user = await db(UserDbSchema)
+    const user = await db.users
         .projected('public')
         .where(t => t.id, params.id)
         .first();
@@ -48,9 +47,7 @@ export const deleteUserHandler: Handler<typeof DeleteUserEndpoint> = async (
         });
     }
 
-    await db(UserDbSchema)
-        .where(t => t.id, params.id)
-        .delete();
+    await db.users.where(t => t.id, params.id).delete();
 
     return ActionResult.noContent();
 };
@@ -61,7 +58,7 @@ export const getMyProfileHandler: Handler<typeof GetMyProfileEndpoint> = async (
     { principal },
     { db }
 ) => {
-    const user = await db(UserDbSchema)
+    const user = await db.users
         .projected('public')
         .where(t => t.id, principal.userId)
         .first();
@@ -74,3 +71,4 @@ export const getMyProfileHandler: Handler<typeof GetMyProfileEndpoint> = async (
 
     return mapUser(user);
 };
+

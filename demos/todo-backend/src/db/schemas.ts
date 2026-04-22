@@ -5,17 +5,14 @@ import {
     defineEntity,
     number,
     object,
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    POLYMORPHIC_TYPE_BRAND,
     string
-} from '@cleverbrush/knex-schema';
+} from '@cleverbrush/orm';
 
 // ── Users ────────────────────────────────────────────────────────────────────
 //
-// User has no outgoing typed relations needed by the demo, so we keep it as a
-// plain schema (no nav properties) and expose it directly. The chained
-// projection methods rely on the `EXTRA_TYPE_BRAND` phantom that would be
-// dropped by `addProps()`, so this also avoids that pitfall.
+// User has no outgoing nav properties (the demo only needs `author` from the
+// other side). Keeping it as a plain object avoids dropping the
+// `EXTRA_TYPE_BRAND` phantom that powers `.projection()`/`.scope()` typing.
 
 export const UserDbSchema = object({
     id: number().primaryKey(),
@@ -30,12 +27,9 @@ export const UserDbSchema = object({
     .projection('auth', 'id', 'email', 'role', 'passwordHash', 'authProvider')
     .projection('summary', 'id', 'email');
 
+export const UserEntity = defineEntity(UserDbSchema);
+
 // ── Todo Activity (polymorphic CTI + STI) ────────────────────────────────────
-//
-// Variant relations (e.g. `assigned.assignee → User`) are still declared
-// inline via the schema-level `withVariants({ relations: ... })` API because
-// variant tables intentionally do NOT carry navigation properties — those
-// would be SELECTed verbatim during variant column expansion and break SQL.
 
 export const TodoActivityAssignedDbSchema = object({
     activityId: number().hasColumnName('activity_id'),
@@ -43,11 +37,19 @@ export const TodoActivityAssignedDbSchema = object({
     assignedToUserId: number().hasColumnName('assigned_to_user_id')
 }).hasTableName('todo_activity_assigned');
 
+export const TodoActivityAssignedEntity = defineEntity(
+    TodoActivityAssignedDbSchema
+);
+
 export const TodoActivityCommentedDbSchema = object({
     activityId: number().hasColumnName('activity_id'),
     type: string('commented'),
     comment: string()
 }).hasTableName('todo_activity_commented');
+
+export const TodoActivityCommentedEntity = defineEntity(
+    TodoActivityCommentedDbSchema
+);
 
 const CompletedExtras = object({
     type: string('completed'),
@@ -71,6 +73,12 @@ export const TodoActivityBaseDbSchema = object({
     createdAt: date().hasColumnName('created_at')
 }).hasTableName('todo_activity');
 
+export const TodoActivityBaseEntity = defineEntity(TodoActivityBaseDbSchema);
+
+// Variant relations are declared inline via the schema-level `withVariants`
+// API because variant tables intentionally do NOT carry navigation
+// properties — those would be SELECTed verbatim during variant column
+// expansion and break SQL.
 export const TodoActivityDbSchema = TodoActivityBaseDbSchema.withVariants({
     discriminator: 'type',
     variants: {
@@ -98,13 +106,9 @@ export const TodoActivityDbSchema = TodoActivityBaseDbSchema.withVariants({
     }
 });
 
+export const TodoActivityEntity = defineEntity(TodoActivityDbSchema);
+
 // ── Todo (uses the new defineEntity API) ─────────────────────────────────────
-//
-// The schema is declared with `author` and `activity` navigation properties
-// inline so `defineEntity().belongsTo() / .hasMany()` can resolve foreign
-// schemas at runtime AND track them as `TRels` in the type. Nav props are
-// `.optional()` so they don't interfere with inserts; they're virtual at
-// runtime (Knex `select *` only fetches real DB columns).
 
 const TodoSchema = object({
     id: number().primaryKey(),
@@ -156,9 +160,29 @@ export const TodoEntity = defineEntity(TodoSchema)
         r => r.todoId
     );
 
-// `entity.schema` is a plain `ObjectSchemaBuilder` with the `relations`
-// extension populated, so it works seamlessly with `db(schema).include(...)`.
 export const TodoDbSchema = TodoEntity.schema;
+
+// ── Entity map for createDb ─────────────────────────────────────────────────
+
+export type AppEntityMap = {
+    todos: typeof TodoEntity;
+    users: typeof UserEntity;
+    todoActivity: typeof TodoActivityEntity;
+    todoActivityBase: typeof TodoActivityBaseEntity;
+    todoActivityAssigned: typeof TodoActivityAssignedEntity;
+    todoActivityCommented: typeof TodoActivityCommentedEntity;
+};
+
+export const entityMap: AppEntityMap = {
+    todos: TodoEntity,
+    users: UserEntity,
+    todoActivity: TodoActivityEntity,
+    todoActivityBase: TodoActivityBaseEntity,
+    todoActivityAssigned: TodoActivityAssignedEntity,
+    todoActivityCommented: TodoActivityCommentedEntity
+};
+
+// ── Plain row types (used by mappers) ───────────────────────────────────────
 
 export type ActivityDb = {
     id: number;

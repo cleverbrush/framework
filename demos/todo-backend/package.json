@@ -11,6 +11,7 @@
         "@cleverbrush/env": "*",
         "@cleverbrush/knex-schema": "*",
         "@cleverbrush/log": "*",
+        "@cleverbrush/orm": "*",
         "@cleverbrush/mapper": "*",
         "@cleverbrush/schema": "*",
         "@cleverbrush/schema-json": "*",

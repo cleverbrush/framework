@@ -47,17 +47,10 @@ export interface RelationInfo<
  *
  * @public
  */
-export type SchemaProps<T> = T extends ObjectSchemaBuilder<
-    infer P,
-    any,
-    any,
-    any,
-    any,
-    any,
-    any
->
-    ? P
-    : never;
+export type SchemaProps<T> =
+    T extends ObjectSchemaBuilder<infer P, any, any, any, any, any, any>
+        ? P
+        : never;
 
 /**
  * Selector tree: a record `{ [propName]: propName }` enabling
@@ -65,9 +58,10 @@ export type SchemaProps<T> = T extends ObjectSchemaBuilder<
  *
  * @public
  */
-export type KeyTree<TSchema> = SchemaProps<TSchema> extends infer P
-    ? { readonly [K in keyof P & string]: K }
-    : never;
+export type KeyTree<TSchema> =
+    SchemaProps<TSchema> extends infer P
+        ? { readonly [K in keyof P & string]: K }
+        : never;
 
 /**
  * Peel `.optional()` / `array(...)` wrappers off a navigation property's
@@ -80,15 +74,7 @@ export type UnwrapNavSchema<TProp> =
         ? TEl extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
             ? TEl
             : never
-        : TProp extends ObjectSchemaBuilder<
-                any,
-                any,
-                any,
-                any,
-                any,
-                any,
-                any
-            >
+        : TProp extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
           ? TProp
           : TProp extends SchemaBuilder<infer T, any, any, any, any>
             ? T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
@@ -125,7 +111,7 @@ export type WithRelation<
  * @public
  */
 export type EntityVariantInput<
-    TBase extends ObjectSchemaBuilder<any, any, any, any, any, any, any> = any
+    _TBase extends ObjectSchemaBuilder<any, any, any, any, any, any, any> = any
 > =
     | {
           entity: Entity<
@@ -158,9 +144,9 @@ type MergedVariantRels<TVariants> = UnionToIntersection<
     }[keyof TVariants]
 >;
 
-type UnionToIntersection<U> = (
-    U extends any ? (k: U) => void : never
-) extends (k: infer I) => void
+type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
+    k: infer I
+) => void
     ? I
     : never;
 
@@ -235,7 +221,7 @@ export class Entity<
         > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>
     >(
         navSel: (t: KeyTree<TSchema>) => TKey,
-        localSel: (l: KeyTree<TSchema>) => string,
+        _localSel: (l: KeyTree<TSchema>) => string,
         remoteSel: (r: KeyTree<TForeign>) => string,
         opts?: { optional?: boolean }
     ): WithRelation<TSchema, TRels, TKey, 'hasOne', TForeign> {
@@ -272,7 +258,7 @@ export class Entity<
         > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>
     >(
         navSel: (t: KeyTree<TSchema>) => TKey,
-        localSel: (l: KeyTree<TSchema>) => string,
+        _localSel: (l: KeyTree<TSchema>) => string,
         remoteSel: (r: KeyTree<TForeign>) => string
     ): WithRelation<TSchema, TRels, TKey, 'hasMany', TForeign> {
         const navName = navSel(this._keyTree() as KeyTree<TSchema>);
@@ -307,7 +293,7 @@ export class Entity<
     >(
         navSel: (t: KeyTree<TSchema>) => TKey,
         localSel: (l: KeyTree<TSchema>) => string,
-        remoteSel: (r: KeyTree<TForeign>) => string,
+        _remoteSel: (r: KeyTree<TForeign>) => string,
         opts?: { optional?: boolean }
     ): WithRelation<TSchema, TRels, TKey, 'belongsTo', TForeign> {
         const navName = navSel(this._keyTree() as KeyTree<TSchema>);
@@ -438,7 +424,10 @@ export class Entity<
             return intro.elementSchema;
         }
         // Object schema directly (with or without optional)
-        if (intro.type === 'object' || propSchema.constructor?.name === 'ObjectSchemaBuilder') {
+        if (
+            intro.type === 'object' ||
+            propSchema.constructor?.name === 'ObjectSchemaBuilder'
+        ) {
             return propSchema;
         }
         // Fall back: assume it's already the schema
@@ -487,6 +476,5 @@ export type EntitySchema<E> = E extends Entity<infer S, any> ? S : never;
  * navigation properties from accepted input.
  * @public
  */
-export type EntityRelationKeys<E> = E extends Entity<any, infer R>
-    ? keyof R & string
-    : never;
+export type EntityRelationKeys<E> =
+    E extends Entity<any, infer R> ? keyof R & string : never;
