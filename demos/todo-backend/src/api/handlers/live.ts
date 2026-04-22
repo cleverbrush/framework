@@ -3,10 +3,13 @@
  */
 
 import type { SubscriptionHandler } from '@cleverbrush/server';
+import type { TodoActivityResponse } from '../schemas.js';
 import type {
+    ActivityFeedSubscription,
     ChatSubscription,
     TodoUpdatesSubscription
 } from '../endpoints.js';
+import { subscribeActivity } from './activityBus.js';
 
 // ── Todo updates — broadcasts simulated todo changes ──────────────────────────
 
@@ -97,3 +100,32 @@ export const chatHandler: SubscriptionHandler<typeof ChatSubscription> =
             await incomingDone.catch(() => {});
         }
     };
+
+// ── Activity feed — server-push subscription backed by activityBus ────────────
+
+export const activityFeedHandler: SubscriptionHandler<
+    typeof ActivityFeedSubscription
+> = async function* () {
+    const pending: TodoActivityResponse[] = [];
+    let resolve: (() => void) | null = null;
+
+    const unsubscribe = subscribeActivity(event => {
+        pending.push(event);
+        resolve?.();
+    });
+
+    try {
+        while (true) {
+            if (pending.length === 0) {
+                await new Promise<void>(r => {
+                    resolve = r;
+                });
+            }
+            while (pending.length > 0) {
+                yield pending.shift()!;
+            }
+        }
+    } finally {
+        unsubscribe();
+    }
+};

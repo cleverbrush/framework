@@ -10,7 +10,7 @@ import type { endpoints } from '../endpoints.js';
 import { activityLogHandler } from './admin.js';
 import { googleLoginHandler, loginHandler, registerHandler } from './auth.js';
 import { demoEchoHandler, demoFlakyHandler, demoSlowHandler } from './demo.js';
-import { chatHandler, todoUpdatesHandler } from './live.js';
+import { activityFeedHandler, chatHandler, todoUpdatesHandler } from './live.js';
 import {
     completeTodoHandler,
     createTodoHandler,
@@ -21,6 +21,7 @@ import {
     getTodoWithAuthorHandler,
     importTodosHandler,
     legacyReplaceTodoHandler,
+    listAllActivityHandler,
     listTodoActivityHandler,
     listTodosHandler,
     sendTodoEventHandler,
@@ -65,6 +66,9 @@ export const handlers: HandlerMap<typeof endpoints> = {
     admin: {
         activityLog: activityLogHandler
     },
+    activity: {
+        listAll: listAllActivityHandler
+    },
     demo: {
         slow: demoSlowHandler,
         flaky: demoFlakyHandler,
@@ -72,6 +76,7 @@ export const handlers: HandlerMap<typeof endpoints> = {
     },
     live: {
         todoUpdates: todoUpdatesHandler,
-        chat: chatHandler
+        chat: chatHandler,
+        activityFeed: activityFeedHandler
     }
 };

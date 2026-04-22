@@ -3,6 +3,7 @@ import type { Knex } from 'knex';
 import { MigrationRan } from '../logTemplates.js';
 import { up as migration001Up } from './migrations/001_initial.js';
 import { up as migration002Up } from './migrations/002_todos_soft_delete.js';
+import { up as migration003Up } from './migrations/003_todo_activity.js';
 
 type MigrationEntry = {
     name: string;
@@ -11,7 +12,8 @@ type MigrationEntry = {
 
 const migrations: MigrationEntry[] = [
     { name: '001_initial', up: migration001Up },
-    { name: '002_todos_soft_delete', up: migration002Up }
+    { name: '002_todos_soft_delete', up: migration002Up },
+    { name: '003_todo_activity', up: migration003Up }
 ];
 
 export async function runMigrations(

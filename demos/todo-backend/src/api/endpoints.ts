@@ -329,6 +329,20 @@ export const DemoEchoEndpoint = api.demo.echo
 
 export const TodoUpdatesSubscription = api.live.todoUpdates;
 export const ChatSubscription = api.live.chat;
+export const ActivityFeedSubscription = api.live.activityFeed;
+
+// ── Activity endpoints ────────────────────────────────────────────────────────
+
+export const ListAllActivityEndpoint = api.activity.listAll
+    .authorize(PrincipalSchema)
+    .inject({ db: BoundQueryToken })
+    .summary('List recent activity')
+    .description(
+        'Returns the most recent activity events across all todos (default: 10, max: 100). ' +
+            'Intended as a seed for the live activity feed page.'
+    )
+    .tags('activity')
+    .operationId('listAllActivity');
 
 // ── Grouped endpoints — used with mapHandlers() for compile-time safety ───────
 
@@ -364,6 +378,9 @@ export const endpoints = {
     admin: {
         activityLog: AdminActivityEndpoint
     },
+    activity: {
+        listAll: ListAllActivityEndpoint
+    },
     demo: {
         slow: DemoSlowEndpoint,
         flaky: DemoFlakyEndpoint,
@@ -371,7 +388,8 @@ export const endpoints = {
     },
     live: {
         todoUpdates: TodoUpdatesSubscription,
-        chat: ChatSubscription
+        chat: ChatSubscription,
+        activityFeed: ActivityFeedSubscription
     }
 };
 

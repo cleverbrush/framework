@@ -18,6 +18,7 @@
 import { array, number, object, string } from '@cleverbrush/schema';
 import { defineApi, endpoint, route } from '@cleverbrush/server/contract';
 import {
+    TodoActivityResponseSchema,
     CompletionRequestHeadersSchema,
     CreateTodoBodySchema,
     ErrorResponseSchema,
@@ -29,7 +30,6 @@ import {
     LoginBodySchema,
     PaginationQuerySchema,
     RegisterBodySchema,
-    TodoActivityResponseSchema,
     TodoEventSchema,
     TodoListQuerySchema,
     TodoResponseSchema,
@@ -49,6 +49,7 @@ const ById = route({ id: number().coerce() })`/${t => t.id}`;
 
 const todosResource = endpoint.resource('/api/todos');
 const usersResource = endpoint.resource('/api/users');
+const activityResource = endpoint.resource('/api/activity');
 
 // ── Contract ──────────────────────────────────────────────────────────────────
 
@@ -199,6 +200,13 @@ export const api = defineApi({
             })
     },
 
+    activity: {
+        listAll: activityResource
+            .get()
+            .query(object({ limit: number().coerce().optional() }))
+            .responses({ 200: array(TodoActivityResponseSchema) })
+    },
+
     admin: {
         activityLog: endpoint.get('/api/admin/activity').returns(string())
     },
@@ -250,6 +258,13 @@ export const api = defineApi({
             .incoming(object({ text: string() }))
             .outgoing(object({ user: string(), text: string(), ts: number() }))
             .summary('Chat room')
+            .tags('live'),
+
+        /** Real-time todo activity feed (all todos). */
+        activityFeed: endpoint
+            .subscription('/ws/activity')
+            .outgoing(TodoActivityResponseSchema)
+            .summary('Live activity feed')
             .tags('live')
     }
 });

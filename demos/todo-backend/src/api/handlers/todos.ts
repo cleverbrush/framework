@@ -26,12 +26,14 @@ import type {
     GetTodoWithAuthorEndpoint,
     ImportTodosEndpoint,
     LegacyReplaceTodoEndpoint,
+    ListAllActivityEndpoint,
     ListTodoActivityEndpoint,
     ListTodosEndpoint,
     SendTodoEventEndpoint,
     UpdateTodoEndpoint
 } from '../endpoints.js';
 import { mapTodo, mapTodoActivity, mapUser } from '../mappers.js';
+import { publishActivity } from './activityBus.js';
 
 // ── List todos ────────────────────────────────────────────────────────────────
 
@@ -275,13 +277,17 @@ export const sendTodoEventHandler: Handler<
         .where(a => a.id, activityId)
         .first();
 
+    const mapped = mapTodoActivity(row!);
+
+    publishActivity(mapped);
+
     logger.info(TodoEventReceived, {
         TodoId: params.id,
         EventType: body.type,
         UserId: principal.userId
     });
 
-    return mapTodoActivity(row!);
+    return mapped;
 };
 
 // ── List todo activity ───────────────────────────────────────────────────────────
@@ -309,6 +315,20 @@ export const listTodoActivityHandler: Handler<
     const rows = await db(TodoActivityDbSchema)
         .where(a => a.todoId, params.id)
         .orderBy(a => a.createdAt, 'desc');
+
+    return rows.map(mapTodoActivity);
+};
+
+// ── List all activity (global feed seed) ────────────────────────────────────
+
+export const listAllActivityHandler: Handler<
+    typeof ListAllActivityEndpoint
+> = async ({ query }, { db }) => {
+    const limit = Math.min(100, Math.max(1, query?.limit ?? 10));
+
+    const rows = await db(TodoActivityDbSchema)
+        .orderBy(a => a.createdAt, 'desc')
+        .limit(limit);
 
     return rows.map(mapTodoActivity);
 };
