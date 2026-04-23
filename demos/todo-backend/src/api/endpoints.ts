@@ -1,7 +1,7 @@
 import { defineWebhook } from '@cleverbrush/server';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
-import { DbToken, LoggerToken } from '../di/tokens.js';
+import { DbToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
 import { api } from './contract.js';
 import {
     type ImportTodosBody,
@@ -93,7 +93,7 @@ export const CreateTodoEndpoint = api.todos.create
 
 export const UpdateTodoEndpoint = api.todos.update
     .authorize(PrincipalSchema)
-    .inject({ db: DbToken, logger: LoggerToken })
+    .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
     .summary('Update a todo')
     .description(
         'Partially updates a todo. Users can only update their own todos; admins can update any todo.'
@@ -103,7 +103,7 @@ export const UpdateTodoEndpoint = api.todos.update
 
 export const DeleteTodoEndpoint = api.todos.delete
     .authorize(PrincipalSchema)
-    .inject({ db: DbToken, logger: LoggerToken })
+    .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
     .summary('Delete a todo')
     .description(
         'Deletes a todo. Users can only delete their own todos; admins can delete any todo.'
@@ -237,7 +237,7 @@ export const LegacyReplaceTodoEndpoint = api.todos.legacyReplace
 
 export const CompleteTodoEndpoint = api.todos.complete
     .authorize(PrincipalSchema)
-    .inject({ db: DbToken, logger: LoggerToken })
+    .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
     .summary('Complete a todo with conflict detection')
     .description(
         'Marks a todo as completed. Supports optimistic concurrency via the `If-Match` header — ' +

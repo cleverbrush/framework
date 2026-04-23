@@ -106,7 +106,7 @@ if (activity?.type === 'assigned') {
 
 ---
 
-### C. Migrations & CLI
+### C. Migrations & CLI - DONE
 
 #### 6. `@cleverbrush/orm-cli` — new package
 

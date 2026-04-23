@@ -10,6 +10,7 @@
 
 import {
     type ArraySchemaBuilder,
+    type InferType,
     ObjectSchemaBuilder,
     type PropertyDescriptorTree,
     type SchemaBuilder,
@@ -136,8 +137,21 @@ export type UnwrapNavSchema<TProp> =
             : never;
 
 /**
+ * Merge type for a single polymorphic variant branch: variant schema fields
+ * overlay base schema fields (narrowing the discriminator from `string` to its
+ * specific literal value).
+ *
+ * @public
+ */
+export type VariantBranch<
+    TBaseSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TVarSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> = Omit<InferType<TBaseSchema>, keyof InferType<TVarSchema>> &
+    InferType<TVarSchema>;
+
+/**
  * Return type for an Entity method that adds a relation: keeps `TSchema`,
- * extends `TRels` with one more entry.
+ * extends `TRels` with one more entry, and preserves `TVariantUnion`.
  *
  * @public
  */
@@ -146,8 +160,13 @@ export type WithRelation<
     TRels extends Record<string, RelationInfo>,
     TKey extends string,
     TKind extends 'belongsTo' | 'hasOne' | 'hasMany' | 'belongsToMany',
-    TForeign extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-> = Entity<TSchema, TRels & Record<TKey, RelationInfo<TKind, TForeign>>>;
+    TForeign extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TVariantUnion = never
+> = Entity<
+    TSchema,
+    TRels & Record<TKey, RelationInfo<TKind, TForeign>>,
+    TVariantUnion
+>;
 
 // ---------------------------------------------------------------------------
 // Entity
@@ -166,13 +185,17 @@ export type WithRelation<
  */
 export class Entity<
     TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-    TRels extends Record<string, RelationInfo> = {}
+    TRels extends Record<string, RelationInfo> = {},
+    TVariantUnion = never
 > {
     /** The underlying schema (relations registered via `withExtension('relations', ...)`). */
     readonly schema: TSchema;
 
     /** @internal Phantom slot to retain `TRels` in inferred types. */
     declare readonly __relations__: TRels;
+
+    /** @internal Phantom slot to retain `TVariantUnion` in inferred types. */
+    declare readonly __variantUnion__: TVariantUnion;
 
     constructor(schema: TSchema) {
         this.schema = schema;
@@ -223,7 +246,7 @@ export class Entity<
         _localSel: EntityPropSelector<TSchema>,
         remoteSel: EntityPropSelector<TForeign>,
         opts?: { optional?: boolean }
-    ): WithRelation<TSchema, TRels, TKey, 'hasOne', TForeign> {
+    ): WithRelation<TSchema, TRels, TKey, 'hasOne', TForeign, TVariantUnion> {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
             this.schema
@@ -265,7 +288,7 @@ export class Entity<
         navSel: EntityPropSelector<TSchema, TKey>,
         _localSel: EntityPropSelector<TSchema>,
         remoteSel: EntityPropSelector<TForeign>
-    ): WithRelation<TSchema, TRels, TKey, 'hasMany', TForeign> {
+    ): WithRelation<TSchema, TRels, TKey, 'hasMany', TForeign, TVariantUnion> {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
             this.schema
@@ -306,7 +329,14 @@ export class Entity<
         localSel: EntityPropSelector<TSchema>,
         _remoteSel: EntityPropSelector<TForeign>,
         opts?: { optional?: boolean }
-    ): WithRelation<TSchema, TRels, TKey, 'belongsTo', TForeign> {
+    ): WithRelation<
+        TSchema,
+        TRels,
+        TKey,
+        'belongsTo',
+        TForeign,
+        TVariantUnion
+    > {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
             this.schema
@@ -343,7 +373,14 @@ export class Entity<
     >(
         navSel: EntityPropSelector<TSchema, TKey>,
         through: { table: string; localKey: string; foreignKey: string }
-    ): WithRelation<TSchema, TRels, TKey, 'belongsToMany', TForeign> {
+    ): WithRelation<
+        TSchema,
+        TRels,
+        TKey,
+        'belongsToMany',
+        TForeign,
+        TVariantUnion
+    > {
         const navName = this._resolvePropName(
             navSel as EntityPropSelector<TSchema>,
             this.schema
@@ -378,7 +415,7 @@ export class Entity<
      */
     discriminator<TKey extends keyof SchemaProps<TSchema> & string>(
         sel: TKey | EntityPropSelector<TSchema, TKey>
-    ): Entity<TSchema, TRels> {
+    ): Entity<TSchema, TRels, never> {
         const discKey =
             typeof sel === 'string'
                 ? (sel as string)
@@ -427,7 +464,11 @@ export class Entity<
             allowOrphan?: boolean;
             relations?: Record<string, VariantRelationInput<TVarSchema>>;
         }
-    ): Entity<TSchema, TRels> {
+    ): Entity<
+        TSchema,
+        TRels,
+        TVariantUnion | VariantBranch<TSchema, TVarSchema>
+    > {
         const builder = (this as any)._variantBuilder as
             | VariantBuilderState
             | undefined;
@@ -456,7 +497,9 @@ export class Entity<
                 ]
             }
         };
-        return this._withVariantBuilder(builder.discKey, nextVariants);
+        return this._withVariantBuilder<
+            TVariantUnion | VariantBranch<TSchema, TVarSchema>
+        >(builder.discKey, nextVariants);
     }
 
     /**
@@ -481,7 +524,11 @@ export class Entity<
             enforceCheck?: boolean;
             relations?: Record<string, VariantRelationInput<TVarSchema>>;
         }
-    ): Entity<TSchema, TRels> {
+    ): Entity<
+        TSchema,
+        TRels,
+        TVariantUnion | VariantBranch<TSchema, TVarSchema>
+    > {
         const builder = (this as any)._variantBuilder as
             | VariantBuilderState
             | undefined;
@@ -510,14 +557,16 @@ export class Entity<
                 ]
             }
         };
-        return this._withVariantBuilder(builder.discKey, nextVariants);
+        return this._withVariantBuilder<
+            TVariantUnion | VariantBranch<TSchema, TVarSchema>
+        >(builder.discKey, nextVariants);
     }
 
     /** @internal Apply the variant extension to the schema and return a new Entity. */
-    private _withVariantBuilder(
+    private _withVariantBuilder<TNewUnion>(
         discKey: string,
         variants: Record<string, VariantInputForResolver>
-    ): Entity<TSchema, TRels> {
+    ): Entity<TSchema, TRels, TNewUnion> {
         let newSchema = applyVariantsToSchema(
             this.schema,
             discKey,
@@ -529,7 +578,11 @@ export class Entity<
         if (existingRelations.length) {
             newSchema = newSchema.withExtension('relations', existingRelations);
         }
-        const next = new Entity(newSchema as TSchema) as Entity<TSchema, TRels>;
+        const next = new Entity(newSchema as TSchema) as Entity<
+            TSchema,
+            TRels,
+            TNewUnion
+        >;
         (next as any)._variantBuilder = { discKey, variants };
         return next;
     }
@@ -757,13 +810,22 @@ export function defineEntity<
  * Type-level helper: extract `TRels` from any `Entity` type.
  * @public
  */
-export type EntityRelations<E> = E extends Entity<any, infer R> ? R : never;
+export type EntityRelations<E> =
+    E extends Entity<any, infer R, any> ? R : never;
 
 /**
  * Type-level helper: extract the underlying schema type from any `Entity`.
  * @public
  */
-export type EntitySchema<E> = E extends Entity<infer S, any> ? S : never;
+export type EntitySchema<E> = E extends Entity<infer S, any, any> ? S : never;
+
+/**
+ * Type-level helper: extract the accumulated variant union from any `Entity`.
+ * Resolves to `never` for non-polymorphic entities.
+ * @public
+ */
+export type EntityVariantUnion<E> =
+    E extends Entity<any, any, infer U> ? U : never;
 
 /**
  * Type-level helper: union of relation key names declared on an entity.
@@ -772,4 +834,4 @@ export type EntitySchema<E> = E extends Entity<infer S, any> ? S : never;
  * @public
  */
 export type EntityRelationKeys<E> =
-    E extends Entity<any, infer R> ? keyof R & string : never;
+    E extends Entity<any, infer R, any> ? keyof R & string : never;

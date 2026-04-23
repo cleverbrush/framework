@@ -1,7 +1,7 @@
 // @cleverbrush/knex-schema — Schema snapshot serialization
 
 import { readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import type { Entity } from './entity.js';
 import { getPolymorphicVariantSchemas, getTableName } from './extension.js';
 import { entitySchemaToTableState } from './migration.js';

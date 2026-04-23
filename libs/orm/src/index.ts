@@ -7,17 +7,34 @@
 // custom query scenarios that don't fit the entity/DbSet model.
 
 export * from '@cleverbrush/knex-schema';
-export type { DbContext, EntityMap } from './dbcontext.js';
-
+export type {
+    EntityEntry,
+    EntryState,
+    SavingChangesHook
+} from './change-tracker.js';
+export type {
+    DbContext,
+    EntityMap,
+    TrackedDbContext
+} from './dbcontext.js';
 export { createDb } from './dbcontext.js';
 export type { DbSet, EntityQuery } from './dbset.js';
-export { EntityNotFoundError } from './errors.js';
+export {
+    ConcurrencyError,
+    EntityNotFoundError,
+    InvariantViolationError,
+    PendingChangesError
+} from './errors.js';
 export type {
     EntityResult,
     EntityResultByVariant,
+    ExtractBranch,
     RelKeyTree,
     ResolvedRel,
     SaveGraph,
+    VariantInsertPayload,
+    VariantResult,
+    VariantUpdatePayload,
     WithIncluded,
     WithVariantIncluded
 } from './result-types.js';

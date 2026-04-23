@@ -2,7 +2,10 @@
 //
 // Covers DbContext / DbSet / EntityQuery proxy semantics, find / findOrFail /
 // findMany behaviour (SQL + validation + EntityNotFoundError), include /
-// includeVariant forwarding, and saveGraph topology + validation paths.
+// includeVariant forwarding, saveGraph topology + validation paths,
+// polymorphic write API (insertVariant, updateVariant, deleteVariant,
+// findVariant), and tracked DbContext (identity map, saveChanges,
+// discardChanges, reload, onSavingChanges, Symbol.asyncDispose).
 //
 // All tests run against a Knex `pg` client whose connection layer is
 // stubbed (`acquireConnection` / `_query` / `processResponse`) so SQL is
@@ -20,7 +23,13 @@ import {
 import type { Knex as KnexT } from 'knex';
 import Knex from 'knex';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createDb, EntityNotFoundError } from './index.js';
+import {
+    ConcurrencyError,
+    createDb,
+    EntityNotFoundError,
+    InvariantViolationError,
+    PendingChangesError
+} from './index.js';
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Knex stub: capture SQL without hitting a real database.
@@ -452,7 +461,7 @@ describe('DbSet.find / findOrFail / findMany', () => {
 
     it('find with the wrong tuple length throws', async () => {
         const db = createDb(mock.knex, { postTags: PostTagEntity });
-        await expect(db.postTags.find([1, 2, 3])).rejects.toThrow(
+        await expect(db.postTags.find([1, 2, 3] as any)).rejects.toThrow(
             /expected 2 primary-key value/i
         );
     });
@@ -763,5 +772,856 @@ describe('DbSet.save — graph persistence', () => {
         // Pivot row must reference the new tag's PK (77) and the new
         // todo's PK (41).
         expect(pivot!.bindings).toEqual(expect.arrayContaining([41, 77]));
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Polymorphic write API — insertVariant / updateVariant / deleteVariant /
+// findVariant
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ---------------------------------------------------------------------------
+// Shared polymorphic entity definitions (CTI + STI)
+// ---------------------------------------------------------------------------
+
+// Base schema: STI shape — everything in one table.
+const ActivityBaseSchema = object({
+    id: number().primaryKey(),
+    type: string(),
+    todoId: number().hasColumnName('todo_id'),
+    userId: number().hasColumnName('user_id')
+}).hasTableName('activities');
+
+const AssignedExtrasSTI = object({
+    type: string('assigned'),
+    assigneeId: number().hasColumnName('assignee_id').optional()
+}); // no separate table — STI
+
+const CommentedExtrasSTI = object({
+    type: string('commented'),
+    body: string().optional()
+}); // STI
+
+// STI entity: all variants share the 'activities' table
+const ActivityEntitySTI = defineEntity(ActivityBaseSchema)
+    .discriminator('type')
+    .stiVariant('assigned', AssignedExtrasSTI)
+    .stiVariant('commented', CommentedExtrasSTI);
+
+// CTI shape: variant rows live in separate tables
+const CTIBaseSchema = object({
+    id: number().primaryKey(),
+    type: string(),
+    todoId: number().hasColumnName('todo_id')
+}).hasTableName('activities');
+
+const AssignedExtrasCTI = object({
+    activityId: number().hasColumnName('activity_id'),
+    type: string('assigned'),
+    assigneeId: number().hasColumnName('assignee_id')
+}).hasTableName('assigned_activities');
+
+const CommentedExtrasCTI = object({
+    activityId: number().hasColumnName('activity_id'),
+    type: string('commented'),
+    body: string()
+}).hasTableName('commented_activities');
+
+const ActivityEntityCTI = defineEntity(CTIBaseSchema)
+    .discriminator('type')
+    .ctiVariant(
+        'assigned',
+        defineEntity(AssignedExtrasCTI),
+        t => t.activityId,
+        { allowOrphan: true }
+    )
+    .ctiVariant(
+        'commented',
+        defineEntity(CommentedExtrasCTI),
+        t => t.activityId,
+        { allowOrphan: true }
+    );
+
+// ---------------------------------------------------------------------------
+// insertVariant
+// ---------------------------------------------------------------------------
+
+describe('DbSet.insertVariant', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('STI: inserts a single row into the base table with discriminator set', async () => {
+        stubTransaction();
+        mock.responses.push([
+            { id: 1, type: 'assigned', todo_id: 42, assignee_id: 9, user_id: 7 }
+        ]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        const result = await db.activities.insertVariant('assigned', {
+            todoId: 42,
+            userId: 7,
+            assigneeId: 9
+        });
+
+        // Should have emitted exactly one INSERT into 'activities'.
+        const inserts = mock.captured.filter(c => /^insert /i.test(c.sql));
+        expect(inserts).toHaveLength(1);
+        expect(inserts[0].sql).toContain('"activities"');
+        expect(result).toMatchObject({ type: 'assigned' });
+    });
+
+    it('CTI: inserts base row then variant row in a transaction', async () => {
+        stubTransaction();
+        // Base row insert returns generated PK.
+        mock.responses.push([{ id: 5, type: 'assigned', todo_id: 42 }]);
+        // Variant row insert.
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntityCTI });
+        const result = await db.activities.insertVariant('assigned', {
+            todoId: 42,
+            assigneeId: 9
+        });
+
+        const inserts = mock.captured.filter(c => /^insert /i.test(c.sql));
+        expect(inserts).toHaveLength(2);
+        // First insert → base table
+        expect(inserts[0].sql).toContain('"activities"');
+        // Second insert → variant table
+        expect(inserts[1].sql).toContain('"assigned_activities"');
+        // Variant row must carry the base PK as FK.
+        expect(inserts[1].bindings).toContain(5);
+        // Returned result contains the merged shape.
+        expect(result).toMatchObject({
+            id: 5,
+            type: 'assigned',
+            assigneeId: 9
+        });
+    });
+
+    it('CTI: discriminator is set automatically on the base row', async () => {
+        stubTransaction();
+        mock.responses.push([{ id: 7, type: 'commented', todo_id: 1 }]);
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntityCTI });
+        await db.activities.insertVariant('commented', {
+            todoId: 1,
+            body: 'hi'
+        });
+
+        const baseInsert = mock.captured.find(c =>
+            c.sql.includes('"activities"')
+        );
+        expect(baseInsert).toBeDefined();
+        // The 'commented' discriminator value must be in the bindings.
+        expect(baseInsert!.bindings).toContain('commented');
+    });
+
+    it('throws when the schema is not polymorphic', async () => {
+        const db = createDb(mock.knex, { users: UserEntity });
+        await expect(
+            (db.users as any).insertVariant('foo', {})
+        ).rejects.toThrow(/not polymorphic/i);
+    });
+
+    it('throws when the variant key is unknown', async () => {
+        stubTransaction();
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        await expect(
+            db.activities.insertVariant('nonexistent' as any, {})
+        ).rejects.toThrow(/unknown/i);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// updateVariant (via EntityQuery chain)
+// ---------------------------------------------------------------------------
+
+describe('EntityQuery.updateVariant', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('STI: emits an UPDATE on the base table filtered by discriminator', async () => {
+        // First query: execute() to collect PKs → returns matching rows.
+        mock.responses.push([
+            { id: 3, type: 'assigned', todo_id: 10, user_id: 1, assignee_id: 4 }
+        ]);
+        // Second query: the UPDATE itself.
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        await db.activities
+            .where(t => t.id, 3)
+            .updateVariant('assigned', { assigneeId: 99 });
+
+        const updates = mock.captured.filter(c => /^update /i.test(c.sql));
+        expect(updates).toHaveLength(1);
+        expect(updates[0].sql).toContain('"activities"');
+        expect(updates[0].bindings).toContain(99);
+    });
+
+    it('CTI: emits an UPDATE on the variant table', async () => {
+        stubTransaction();
+        // execute() returns matched base-table rows.
+        mock.responses.push([{ id: 5, type: 'assigned', todo_id: 1 }]);
+        // UPDATE on the variant table.
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntityCTI });
+        await db.activities
+            .where(t => t.id, 5)
+            .updateVariant('assigned', { assigneeId: 10 });
+
+        const updates = mock.captured.filter(c => /^update /i.test(c.sql));
+        expect(updates).toHaveLength(1);
+        expect(updates[0].sql).toContain('"assigned_activities"');
+        expect(updates[0].bindings).toContain(10);
+    });
+
+    it('is a no-op when the WHERE clause matches no rows', async () => {
+        // execute() returns empty result set.
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        await db.activities
+            .where(t => t.id, 999)
+            .updateVariant('assigned', { assigneeId: 1 });
+
+        const updates = mock.captured.filter(c => /^update /i.test(c.sql));
+        expect(updates).toHaveLength(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// deleteVariant (via EntityQuery chain)
+// ---------------------------------------------------------------------------
+
+describe('EntityQuery.deleteVariant', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('STI: emits a DELETE on the base table with discriminator filter', async () => {
+        stubTransaction();
+        // execute() to collect PKs.
+        mock.responses.push([{ id: 2, type: 'commented', todo_id: 1 }]);
+        // The DELETE.
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        await db.activities.where(t => t.id, 2).deleteVariant('commented');
+
+        const deletes = mock.captured.filter(c => /^delete /i.test(c.sql));
+        expect(deletes).toHaveLength(1);
+        expect(deletes[0].sql).toContain('"activities"');
+    });
+
+    it('CTI: deletes variant row first then base row', async () => {
+        stubTransaction();
+        // execute() → matched base rows.
+        mock.responses.push([{ id: 7, type: 'assigned', todo_id: 3 }]);
+        // DELETE from variant table.
+        mock.responses.push([]);
+        // DELETE from base table.
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntityCTI });
+        await db.activities.where(t => t.id, 7).deleteVariant('assigned');
+
+        const deletes = mock.captured.filter(c => /^delete /i.test(c.sql));
+        expect(deletes).toHaveLength(2);
+        // Variant table first.
+        expect(deletes[0].sql).toContain('"assigned_activities"');
+        // Base table second.
+        expect(deletes[1].sql).toContain('"activities"');
+    });
+
+    it('is a no-op when no rows match', async () => {
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        await db.activities.where(t => t.id, 0).deleteVariant('assigned');
+
+        const deletes = mock.captured.filter(c => /^delete /i.test(c.sql));
+        expect(deletes).toHaveLength(0);
+    });
+});
+
+// ---------------------------------------------------------------------------
+// findVariant
+// ---------------------------------------------------------------------------
+
+describe('DbSet.findVariant', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('returns the matched row', async () => {
+        mock.responses.push([
+            { id: 3, type: 'assigned', todo_id: 5, user_id: 1, assignee_id: 2 }
+        ]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        const result = await db.activities.findVariant('assigned', 3);
+        expect(result).toMatchObject({ id: 3, type: 'assigned' });
+    });
+
+    it('returns undefined when no row matches', async () => {
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        const result = await db.activities.findVariant('assigned', 999);
+        expect(result).toBeUndefined();
+    });
+
+    it('emits a WHERE clause for the supplied PK', async () => {
+        mock.responses.push([]);
+
+        const db = createDb(mock.knex, { activities: ActivityEntitySTI });
+        await db.activities.findVariant('assigned', 42);
+
+        expect(mock.captured).toHaveLength(1);
+        expect(mock.captured[0].sql).toContain('"id"');
+        expect(mock.captured[0].bindings).toContain(42);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — identity map + saveChanges + discardChanges + reload
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    // -------------------------------------------------------------------------
+    // createDb with tracking option
+    // -------------------------------------------------------------------------
+
+    it('createDb({ tracking: true }) returns a context with saveChanges', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        expect(typeof db.saveChanges).toBe('function');
+        expect(typeof db.discardChanges).toBe('function');
+        expect(typeof db.attach).toBe('function');
+        expect(typeof db.detach).toBe('function');
+        expect(typeof db.entry).toBe('function');
+        expect(typeof db.reload).toBe('function');
+        expect(typeof db.onSavingChanges).toBe('function');
+        expect(typeof db[Symbol.asyncDispose]).toBe('function');
+    });
+
+    it('createDb without tracking option does not expose saveChanges', () => {
+        const db = createDb(mock.knex, { users: UserEntity });
+        expect((db as any).saveChanges).toBeUndefined();
+    });
+
+    // -------------------------------------------------------------------------
+    // Identity map
+    // -------------------------------------------------------------------------
+
+    it('querying the same PK twice returns the same object reference', async () => {
+        mock.responses.push([{ id: 1, email: 'a@b', name: 'A' }]);
+        mock.responses.push([{ id: 1, email: 'a@b', name: 'A' }]);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const a = await db.users.find(1);
+        const b = await db.users.find(1);
+        expect(a).toBeDefined();
+        expect(a).toBe(b); // strict identity
+    });
+
+    it('rows returned from all() are attached to the tracker', async () => {
+        mock.responses.push([
+            { id: 1, email: 'a@b', name: 'A' },
+            { id: 2, email: 'c@d', name: 'B' }
+        ]);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const rows = (await db.users.execute()) as any[];
+
+        // Querying one of the same PKs should return the existing object.
+        mock.responses.push([{ id: 1, email: 'a@b', name: 'A' }]);
+        const reloaded = await db.users.find(1);
+        expect(reloaded).toBe(rows[0]);
+    });
+
+    // -------------------------------------------------------------------------
+    // attach / detach / entry
+    // -------------------------------------------------------------------------
+
+    it('attach adds an entity to the tracker; entry() reads its state', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 10, email: 'x@y', name: 'X' };
+        db.attach('users', user);
+        const e = db.entry(user);
+        expect(e.state).toBe('Unchanged');
+        expect(e.currentValues).toBe(user);
+    });
+
+    it('attach returns existing tracked object for duplicate PK', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const u1 = { id: 5, email: 'a@b', name: 'A' };
+        const u2 = { id: 5, email: 'c@d', name: 'C' }; // same PK, different object
+        db.attach('users', u1);
+        const returned = db.attach('users', u2);
+        expect(returned).toBe(u1); // identity-map: existing wins
+    });
+
+    it('entry().isModified() returns false on unmodified entity', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        expect(db.entry(user).isModified()).toBe(false);
+    });
+
+    it('entry().isModified() returns true after mutation', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'Changed';
+        expect(db.entry(user).isModified()).toBe(true);
+        expect(db.entry(user).isModified('name')).toBe(true);
+        expect(db.entry(user).isModified('email')).toBe(false);
+    });
+
+    it('entry().reset() reverts mutations', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'Changed';
+        db.entry(user).reset();
+        expect(user.name).toBe('A');
+        expect(db.entry(user).state).toBe('Unchanged');
+    });
+
+    it('entry() throws for untracked entity', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 99, email: 'x', name: 'X' };
+        expect(() => db.entry(user)).toThrow(/not tracked/i);
+    });
+
+    it('detach removes entity from tracker; entry throws afterwards', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        db.detach(user);
+        expect(() => db.entry(user)).toThrow(/not tracked/i);
+    });
+
+    // -------------------------------------------------------------------------
+    // remove / Deleted state
+    // -------------------------------------------------------------------------
+
+    it('remove() marks a tracked entity as Deleted', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        db.remove(user);
+        expect(db.entry(user).state).toBe('Deleted');
+    });
+
+    it('remove() throws for untracked entity', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        expect(() => db.remove({ id: 1, email: 'x', name: 'X' })).toThrow();
+    });
+
+    // -------------------------------------------------------------------------
+    // saveChanges — UPDATE path
+    // -------------------------------------------------------------------------
+
+    it('saveChanges() detects silently mutated Unchanged entries and emits UPDATE', async () => {
+        stubTransaction();
+        mock.responses.push([{ id: 1, email_address: 'a@b', name: 'Updated' }]);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'Updated'; // mutate without calling any set-state method
+
+        const result = await db.saveChanges();
+        expect(result.updated).toBe(1);
+        expect(result.inserted).toBe(0);
+        expect(result.deleted).toBe(0);
+
+        const updates = mock.captured.filter(c => /^update /i.test(c.sql));
+        expect(updates).toHaveLength(1);
+        expect(updates[0].sql).toContain('"users"');
+        expect(updates[0].bindings).toContain('Updated');
+    });
+
+    it('saveChanges() emits no SQL when nothing changed', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+
+        const result = await db.saveChanges();
+        expect(result).toEqual({ inserted: 0, updated: 0, deleted: 0 });
+        expect(mock.captured).toHaveLength(0);
+    });
+
+    // -------------------------------------------------------------------------
+    // saveChanges — INSERT path (Added)
+    // -------------------------------------------------------------------------
+
+    it('saveChanges() inserts Added entities', async () => {
+        stubTransaction();
+        mock.responses.push([{ id: 42, email_address: 'new@e', name: 'New' }]);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        // Attach with no PK — treated as Added
+        const user = { id: undefined as any, email: 'new@e', name: 'New' };
+        db.attach('users', user);
+
+        const result = await db.saveChanges();
+        expect(result.inserted).toBe(1);
+
+        const inserts = mock.captured.filter(c => /^insert /i.test(c.sql));
+        expect(inserts).toHaveLength(1);
+        expect(inserts[0].sql).toContain('"users"');
+    });
+
+    // -------------------------------------------------------------------------
+    // saveChanges — DELETE path
+    // -------------------------------------------------------------------------
+
+    it('saveChanges() deletes Deleted entities', async () => {
+        stubTransaction();
+        mock.responses.push([]); // DELETE response
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 3, email: 'x@y', name: 'X' };
+        db.attach('users', user);
+        db.remove(user);
+
+        const result = await db.saveChanges();
+        expect(result.deleted).toBe(1);
+
+        const deletes = mock.captured.filter(c => /^delete /i.test(c.sql));
+        expect(deletes).toHaveLength(1);
+        expect(deletes[0].sql).toContain('"users"');
+        expect(deletes[0].bindings).toContain(3);
+    });
+
+    it('saveChanges() refreshes snapshot so subsequent saves are no-ops', async () => {
+        stubTransaction();
+        mock.responses.push([]); // first UPDATE
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'B';
+
+        await db.saveChanges();
+        // No further mutation → second saveChanges should be a no-op
+        const result2 = await db.saveChanges();
+        expect(result2).toEqual({ inserted: 0, updated: 0, deleted: 0 });
+    });
+
+    // -------------------------------------------------------------------------
+    // saveChanges — PK / discriminator invariant checks
+    // -------------------------------------------------------------------------
+
+    it('saveChanges() throws InvariantViolationError when PK is mutated', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        (user as any).id = 99; // mutate PK
+
+        await expect(db.saveChanges()).rejects.toBeInstanceOf(
+            InvariantViolationError
+        );
+    });
+
+    // -------------------------------------------------------------------------
+    // discardChanges
+    // -------------------------------------------------------------------------
+
+    it('discardChanges() reverts Modified entries to snapshot', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'Changed';
+
+        db.discardChanges();
+        expect(user.name).toBe('A');
+        expect(db.entry(user).state).toBe('Unchanged');
+    });
+
+    it('discardChanges() restores Deleted entries to Unchanged', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        db.remove(user);
+        expect(db.entry(user).state).toBe('Deleted');
+
+        db.discardChanges();
+        expect(db.entry(user).state).toBe('Unchanged');
+    });
+
+    // -------------------------------------------------------------------------
+    // onSavingChanges hooks
+    // -------------------------------------------------------------------------
+
+    it('onSavingChanges hook is called for each dirty entry before flush', async () => {
+        stubTransaction();
+        mock.responses.push([]);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'B';
+
+        const hookEntries: string[] = [];
+        db.onSavingChanges(entry => {
+            hookEntries.push(entry.state);
+        });
+
+        await db.saveChanges();
+        expect(hookEntries).toContain('Modified');
+    });
+
+    // -------------------------------------------------------------------------
+    // reload
+    // -------------------------------------------------------------------------
+
+    it('reload() refreshes entity values from DB', async () => {
+        mock.responses.push([
+            { id: 1, email_address: 'new@b', name: 'Refreshed' }
+        ]);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'Dirty'; // simulate dirty state
+
+        await db.reload(user);
+
+        expect(user.name).toBe('Refreshed');
+        // After reload the snapshot is fresh, so entry is Unchanged.
+        expect(db.entry(user).state).toBe('Unchanged');
+        expect(db.entry(user).isModified()).toBe(false);
+    });
+
+    // -------------------------------------------------------------------------
+    // Symbol.asyncDispose
+    // -------------------------------------------------------------------------
+
+    it('[Symbol.asyncDispose]() is a no-op when there are no pending changes', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        // No mutations → dispose should not throw.
+        await expect(db[Symbol.asyncDispose]()).resolves.toBeUndefined();
+    });
+
+    it('[Symbol.asyncDispose]() throws PendingChangesError when dirty entries exist', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'Dirty';
+
+        await expect(db[Symbol.asyncDispose]()).rejects.toBeInstanceOf(
+            PendingChangesError
+        );
+    });
+
+    it('[Symbol.asyncDispose]() clears tracker even when it throws', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b', name: 'A' };
+        db.attach('users', user);
+        user.name = 'Dirty';
+
+        await expect(db[Symbol.asyncDispose]()).rejects.toBeInstanceOf(
+            PendingChangesError
+        );
+        // After dispose, entry should no longer be tracked.
+        expect(() => db.entry(user)).toThrow(/not tracked/i);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// New error classes
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('ConcurrencyError', () => {
+    it('extends Error with typed fields', () => {
+        const e = new ConcurrencyError('users', 1, 42);
+        expect(e).toBeInstanceOf(Error);
+        expect(e.name).toBe('ConcurrencyError');
+        expect(e.entity).toBe('users');
+        expect(e.pk).toBe(1);
+        expect(e.expected).toBe(42);
+        expect(e.message).toContain('users');
+        expect(e.message).toContain('42');
+    });
+});
+
+describe('InvariantViolationError', () => {
+    it('extends Error with typed fields', () => {
+        const e = new InvariantViolationError('todos', 5, 'id', 'PK changed');
+        expect(e).toBeInstanceOf(Error);
+        expect(e.name).toBe('InvariantViolationError');
+        expect(e.entity).toBe('todos');
+        expect(e.pk).toBe(5);
+        expect(e.field).toBe('id');
+        expect(e.message).toContain('PK changed');
+    });
+});
+
+describe('PendingChangesError', () => {
+    it('extends Error with pendingCount field', () => {
+        const e = new PendingChangesError(3, '(3 Modified)');
+        expect(e).toBeInstanceOf(Error);
+        expect(e.name).toBe('PendingChangesError');
+        expect(e.pendingCount).toBe(3);
+        expect(e.message).toContain('3');
     });
 });

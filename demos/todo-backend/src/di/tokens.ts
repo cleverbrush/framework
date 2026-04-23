@@ -1,4 +1,4 @@
-import type { BoundQuery, DbContext } from '@cleverbrush/orm';
+import type { BoundQuery, DbContext, TrackedDbContext } from '@cleverbrush/orm';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
 import type { Logger } from '@cleverbrush/log';
@@ -28,6 +28,15 @@ export const BoundQueryToken = any().hasType<BoundQuery>();
  * `DbSet`s (`db.todos`, `db.users`, etc.).
  */
 export const DbToken = any().hasType<DbContext<AppEntityMap>>();
+
+/**
+ * DI token for a **per-request** `TrackedDbContext`.
+ *
+ * Registered as `addTransient` so every resolution creates a fresh identity
+ * map — handlers that use `saveChanges()` / `remove()` get isolated tracking
+ * without cross-request contamination.
+ */
+export const TrackedDbToken = any().hasType<TrackedDbContext<AppEntityMap>>();
 
 /**
  * DI token for the parsed application configuration.

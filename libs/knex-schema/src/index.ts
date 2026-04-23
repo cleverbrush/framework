@@ -1,10 +1,15 @@
 // @cleverbrush/knex-schema — Type-safe schema-driven query builder for Knex
 
-export type { PrimaryKeyColumns } from './columns.js';
+export type {
+    PrimaryKeyColumns,
+    RowVersionColumn,
+    RowVersionStrategy
+} from './columns.js';
 // Column resolution
 export {
     buildColumnMap,
     getPrimaryKeyColumns,
+    getRowVersionColumn,
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
@@ -19,9 +24,11 @@ export type {
     EntityRelationKeys,
     EntityRelations,
     EntitySchema,
+    EntityVariantUnion,
     RelationInfo,
     SchemaProps,
     UnwrapNavSchema,
+    VariantBranch,
     WithRelation
 } from './entity.js';
 // Entity wrapper

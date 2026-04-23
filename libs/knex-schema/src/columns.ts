@@ -319,3 +319,64 @@ export function getPrimaryKeyColumns(
 
     return { propertyKeys: [], columnNames: [] };
 }
+
+// ---------------------------------------------------------------------------
+// Row-version introspection
+// ---------------------------------------------------------------------------
+
+/**
+ * Concurrency-token strategy stored by `.rowVersion()`.
+ * - `'increment'` — ORM increments an integer counter on each UPDATE.
+ * - `'timestamp'` — ORM sets the value to `new Date()` on each UPDATE.
+ * - `'manual'`    — caller supplies the new value; ORM only enforces the check.
+ *
+ * @public
+ */
+export type RowVersionStrategy = 'increment' | 'timestamp' | 'manual';
+
+/**
+ * Resolved row-version column for a schema, returned by
+ * {@link getRowVersionColumn}.
+ *
+ * @public
+ */
+export interface RowVersionColumn {
+    /** Schema property name. */
+    propertyKey: string;
+    /** SQL column name (after any `hasColumnName()` override). */
+    columnName: string;
+    /** Concurrency-token update strategy. */
+    strategy: RowVersionStrategy;
+}
+
+/**
+ * Find the first column marked `.rowVersion()` on the schema and return its
+ * metadata. Returns `null` when no row-version column is declared.
+ *
+ * @public
+ */
+export function getRowVersionColumn(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): RowVersionColumn | null {
+    const introspected = schema.introspect() as {
+        properties?: Record<
+            string,
+            { introspect?: () => { extensions?: Record<string, unknown> } }
+        >;
+    };
+    const properties = introspected.properties ?? {};
+    const { propToCol } = buildColumnMap(schema);
+
+    for (const [propKey, propSchema] of Object.entries(properties)) {
+        const ext = propSchema.introspect?.()?.extensions ?? {};
+        const rv = ext.rowVersion as { strategy?: string } | undefined;
+        if (rv) {
+            return {
+                propertyKey: propKey,
+                columnName: propToCol.get(propKey) ?? propKey,
+                strategy: (rv.strategy as RowVersionStrategy) ?? 'increment'
+            };
+        }
+    }
+    return null;
+}

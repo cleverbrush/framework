@@ -1,7 +1,6 @@
 import type { IServiceProvider, ServiceCollection } from '@cleverbrush/di';
-import { createQuery } from '@cleverbrush/orm';
+import { createQuery, createDb } from '@cleverbrush/orm';
 import type { Logger } from '@cleverbrush/log';
-import { createDb } from '@cleverbrush/orm';
 import knex from 'knex';
 import type { Config } from '../config.js';
 import { entityMap } from '../db/schemas.js';
@@ -10,7 +9,8 @@ import {
     ConfigToken,
     DbToken,
     KnexToken,
-    LoggerToken
+    LoggerToken,
+    TrackedDbToken
 } from './tokens.js';
 
 export function configureDI(
@@ -49,6 +49,16 @@ export function configureDI(
             typeof createDb
         >[0];
         return createDb(knexInstance, entityMap);
+    });
+
+    // Tracked DbContext — fresh identity map per resolution (addTransient).
+    // Handlers that use `saveChanges()`, `remove()`, or mutation-then-save
+    // patterns inject this token instead of (or alongside) DbToken.
+    services.addTransient(TrackedDbToken, (provider: IServiceProvider) => {
+        const knexInstance = provider.get(KnexToken) as Parameters<
+            typeof createDb
+        >[0];
+        return createDb(knexInstance, entityMap, { tracking: true });
     });
 }
 

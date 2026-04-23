@@ -370,6 +370,25 @@ export const ddlExtension = defineExtension({
             expression: string
         ) {
             return this.withExtension('defaultTo', { raw: expression });
+        },
+        /**
+         * Mark this integer column as an optimistic-concurrency row-version
+         * token checked by the ORM on every UPDATE / DELETE.
+         *
+         * A mismatch between the stored value and the snapshot taken at read
+         * time throws `ConcurrencyError`.
+         *
+         * @param opts.strategy
+         *   - `'increment'` (default) — ORM adds 1 on each UPDATE.
+         *   - `'manual'`    — caller supplies the new value.
+         */
+        rowVersion(
+            this: NumberSchemaBuilder<any, any, any, any, any>,
+            opts?: { strategy?: 'increment' | 'manual' }
+        ) {
+            return this.withExtension('rowVersion', {
+                strategy: opts?.strategy ?? 'increment'
+            });
         }
     },
     string: {
@@ -458,6 +477,14 @@ export const ddlExtension = defineExtension({
             expression: string
         ) {
             return this.withExtension('defaultTo', { raw: expression });
+        },
+        /**
+         * Mark this string column as an optimistic-concurrency row-version
+         * token (e.g. a UUID or opaque hash). Strategy is always `'manual'`
+         * — the caller must supply a new value on each UPDATE.
+         */
+        rowVersion(this: StringSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('rowVersion', { strategy: 'manual' });
         }
     },
     boolean: {
@@ -525,6 +552,14 @@ export const ddlExtension = defineExtension({
         /** Shorthand for `.columnType('date')` (date-only, no time). */
         dateOnly(this: DateSchemaBuilder<any, any, any, any, any>) {
             return this.withExtension('columnType', 'date');
+        },
+        /**
+         * Mark this date column as an optimistic-concurrency row-version
+         * token (timestamp-based). Strategy is always `'timestamp'` —
+         * the ORM sets the value to `new Date()` on each UPDATE.
+         */
+        rowVersion(this: DateSchemaBuilder<any, any, any, any, any>) {
+            return this.withExtension('rowVersion', { strategy: 'timestamp' });
         }
     },
     object: {

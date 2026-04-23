@@ -28,10 +28,18 @@ import type {
     EntityResult,
     RelKeyTree,
     SaveGraph,
+    VariantInsertPayload,
+    VariantResult,
+    VariantUpdatePayload,
     WithIncluded,
     WithVariantIncluded
 } from './result-types.js';
 import { saveGraph } from './save-graph.js';
+import {
+    deleteVariant as _deleteVariant,
+    insertVariant as _insertVariant,
+    updateVariant as _updateVariant
+} from './variant-write.js';
 
 // ---------------------------------------------------------------------------
 // EntityQuery — public typed query handle
@@ -48,7 +56,7 @@ import { saveGraph } from './save-graph.js';
  *
  * @public
  */
-export interface EntityQuery<TEntity extends Entity<any, any>, TResult>
+export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
     extends Omit<
         SchemaQueryBuilder<EntitySchema<TEntity>, TResult>,
         'include' | 'includeVariant'
@@ -117,6 +125,38 @@ export interface EntityQuery<TEntity extends Entity<any, any>, TResult>
     findMany(
         pks: ReadonlyArray<PrimaryKeyValueOf<EntitySchema<TEntity>>>
     ): Promise<TResult[]>;
+
+    /**
+     * Update variant-specific columns for all rows matching the current
+     * WHERE clause whose discriminator equals `variantKey`.
+     *
+     * For CTI variants only the variant table is updated. For STI variants
+     * the base table is updated with a discriminator filter applied.
+     *
+     * ```ts
+     * await db.activities
+     *     .where(t => t.id, activityId)
+     *     .updateVariant('assigned', { assigneeId: 10 });
+     * ```
+     */
+    updateVariant<K extends string>(
+        variantKey: K,
+        set: VariantUpdatePayload<TEntity, K>
+    ): Promise<void>;
+
+    /**
+     * Delete rows matching the current WHERE clause for the given variant.
+     *
+     * For CTI: deletes the variant row first (FK-constraint order), then
+     * deletes the base row. Both deletes are atomic.
+     *
+     * ```ts
+     * await db.activities
+     *     .where(t => t.id, activityId)
+     *     .deleteVariant('assigned');
+     * ```
+     */
+    deleteVariant(variantKey: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,7 +176,7 @@ export interface EntityQuery<TEntity extends Entity<any, any>, TResult>
  *
  * @public
  */
-export interface DbSet<TEntity extends Entity<any, any>>
+export interface DbSet<TEntity extends Entity<any, any, any>>
     extends EntityQuery<TEntity, EntityResult<TEntity>> {
     /** The wrapped entity definition. */
     readonly entity: TEntity;
@@ -171,6 +211,46 @@ export interface DbSet<TEntity extends Entity<any, any>>
      * automatically rolled back on failure.
      */
     save(graph: SaveGraph<TEntity>): Promise<EntityResult<TEntity>>;
+
+    /**
+     * Transactionally insert a polymorphic entity row for the given variant.
+     *
+     * For CTI variants, inserts the base row first (with the discriminator
+     * set to `variantKey`), then inserts the variant row with the shared PK.
+     * For STI variants, inserts a single row.
+     *
+     * The discriminator field is set automatically from `variantKey` and
+     * must not be included in `payload`.
+     *
+     * ```ts
+     * const activity = await db.activities.insertVariant('assigned', {
+     *     todoId: 42,
+     *     userId: 7,
+     *     assigneeId: 9,
+     * });
+     * // activity.type === 'assigned'
+     * // activity.assigneeId === 9
+     * ```
+     */
+    insertVariant<K extends string>(
+        variantKey: K,
+        payload: VariantInsertPayload<TEntity, K>
+    ): Promise<VariantResult<TEntity, K>>;
+
+    /**
+     * Find a single entity by primary key, restricting to the given variant.
+     * Returns the merged base + variant row narrowed to the matching branch,
+     * or `undefined` when no row exists.
+     *
+     * ```ts
+     * const a = await db.activities.findVariant('assigned', activityId);
+     * // → { type: 'assigned'; assigneeId: number; … } | undefined
+     * ```
+     */
+    findVariant<K extends string>(
+        variantKey: K,
+        pk: PrimaryKeyValueOf<EntitySchema<TEntity>>
+    ): Promise<VariantResult<TEntity, K> | undefined>;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,7 +259,7 @@ export interface DbSet<TEntity extends Entity<any, any>>
 
 const ENTITY_KEY_TREE_CACHE = new WeakMap<object, Record<string, string>>();
 
-function getEntityKeyTree(entity: Entity<any, any>): Record<string, string> {
+function getEntityKeyTree(entity: Entity<any, any, any>): Record<string, string> {
     const cached = ENTITY_KEY_TREE_CACHE.get(entity);
     if (cached) return cached;
     const props =
@@ -195,15 +275,25 @@ function getEntityKeyTree(entity: Entity<any, any>): Record<string, string> {
 }
 
 /**
+ * Extract the Knex instance from a `SchemaQueryBuilder`.
+ * SchemaQueryBuilder stores it as `#knex` (private), but the `query()`
+ * factory function passes it as the first constructor argument.
+ * We retrieve it via the `.toQuery()` builder's knex client reference.
+ * @internal
+ */
+
+/**
  * Wrap a `SchemaQueryBuilder` in a Proxy that overlays typed
  * `.include()` / `.includeVariant()` methods and re-wraps `this`-returning
  * methods so chains keep their typed wrapper.
  *
  * @internal
  */
-function wrapQuery<TEntity extends Entity<any, any>, TResult>(
+function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
     sqb: SchemaQueryBuilder<EntitySchema<TEntity>, TResult>,
-    entity: TEntity
+    entity: TEntity,
+    knexInst: Knex,
+    onResults?: (items: unknown[]) => unknown[] | undefined
 ): EntityQuery<TEntity, TResult> {
     const proxy: EntityQuery<TEntity, TResult> = new Proxy(
         sqb as unknown as object,
@@ -264,12 +354,133 @@ function wrapQuery<TEntity extends Entity<any, any>, TResult>(
                     );
                 }
 
+                if (prop === 'updateVariant') {
+                    return async (
+                        variantKey: string,
+                        set: Record<string, unknown>
+                    ): Promise<void> => {
+                        const pkInfo = getPrimaryKeyColumns(
+                            entity.schema as Parameters<
+                                typeof getPrimaryKeyColumns
+                            >[0]
+                        );
+                        const rows = (await (
+                            proxy as unknown as {
+                                execute: () => Promise<
+                                    Array<Record<string, unknown>>
+                                >;
+                            }
+                        ).execute()) as Array<Record<string, unknown>>;
+                        const pkProp = pkInfo.propertyKeys[0];
+                        const pkValues = rows
+                            .map(r => r[pkProp])
+                            .filter(v => v !== undefined);
+                        const maybeTrx = (
+                            knexInst as unknown as { isTransaction?: boolean }
+                        ).isTransaction
+                            ? (knexInst as unknown as Knex.Transaction)
+                            : undefined;
+                        await _updateVariant(
+                            knexInst,
+                            entity.schema,
+                            variantKey,
+                            set,
+                            pkValues,
+                            maybeTrx
+                        );
+                    };
+                }
+
+                if (prop === 'deleteVariant') {
+                    return async (variantKey: string): Promise<void> => {
+                        const pkInfo = getPrimaryKeyColumns(
+                            entity.schema as Parameters<
+                                typeof getPrimaryKeyColumns
+                            >[0]
+                        );
+                        const rows = (await (
+                            proxy as unknown as {
+                                execute: () => Promise<
+                                    Array<Record<string, unknown>>
+                                >;
+                            }
+                        ).execute()) as Array<Record<string, unknown>>;
+                        const pkProp = pkInfo.propertyKeys[0];
+                        const pkValues = rows
+                            .map(r => r[pkProp])
+                            .filter(v => v !== undefined);
+                        const maybeTrx = (
+                            knexInst as unknown as { isTransaction?: boolean }
+                        ).isTransaction
+                            ? (knexInst as unknown as Knex.Transaction)
+                            : undefined;
+                        await _deleteVariant(
+                            knexInst,
+                            entity.schema,
+                            variantKey,
+                            pkValues,
+                            maybeTrx
+                        );
+                    };
+                }
+
                 const value = Reflect.get(target, prop, receiver);
                 if (typeof value !== 'function') return value;
                 return function (this: unknown, ...args: unknown[]) {
                     const result = (value as Function).apply(sqb, args);
                     // Re-wrap `this`-returning methods so chains keep typing.
-                    return result === sqb ? proxy : result;
+                    if (result === sqb) return proxy;
+                    // Wrap Promise results to auto-attach tracked entities.
+                    if (
+                        onResults != null &&
+                        result != null &&
+                        typeof (result as any).then === 'function'
+                    ) {
+                        return (result as Promise<unknown>).then(
+                            (resolved: unknown) => {
+                                if (Array.isArray(resolved)) {
+                                    const entities = resolved.filter(
+                                        r =>
+                                            r !== null &&
+                                            r !== undefined &&
+                                            typeof r === 'object'
+                                    );
+                                    if (entities.length > 0) {
+                                        const mapped = onResults(entities);
+                                        if (mapped) {
+                                            const entityToMapped = new Map<
+                                                unknown,
+                                                unknown
+                                            >();
+                                            for (
+                                                let i = 0;
+                                                i < entities.length;
+                                                i++
+                                            ) {
+                                                entityToMapped.set(
+                                                    entities[i],
+                                                    mapped[i]
+                                                );
+                                            }
+                                            return resolved.map(
+                                                r => entityToMapped.get(r) ?? r
+                                            );
+                                        }
+                                    }
+                                } else if (
+                                    resolved !== null &&
+                                    resolved !== undefined &&
+                                    typeof resolved === 'object'
+                                ) {
+                                    const mapped = onResults([resolved]);
+                                    if (mapped && mapped.length > 0)
+                                        return mapped[0];
+                                }
+                                return resolved;
+                            }
+                        );
+                    }
+                    return result;
                 };
             }
         }
@@ -290,7 +501,7 @@ function wrapQuery<TEntity extends Entity<any, any>, TResult>(
  *
  * @internal
  */
-function makeFindMethod<TEntity extends Entity<any, any>>(
+function makeFindMethod<TEntity extends Entity<any, any, any>>(
     method: 'find' | 'findOrFail' | 'findMany',
     sqb: SchemaQueryBuilder<any, any>,
     entity: TEntity,
@@ -433,9 +644,10 @@ function normalisePkTuple(
  *
  * @internal — use {@link createDb} for normal application code.
  */
-export function makeDbSet<TEntity extends Entity<any, any>>(
+export function makeDbSet<TEntity extends Entity<any, any, any>>(
     knex: Knex,
-    entity: TEntity
+    entity: TEntity,
+    onResults?: (items: unknown[]) => unknown[] | undefined
 ): DbSet<TEntity> {
     const proxy: DbSet<TEntity> = new Proxy({} as object, {
         get(_target, prop) {
@@ -451,13 +663,15 @@ export function makeDbSet<TEntity extends Entity<any, any>>(
                             EntitySchema<TEntity>,
                             EntityResult<TEntity>
                         >,
-                        entity
+                        entity,
+                        knex,
+                        onResults
                     );
                 };
             }
             if (prop === 'withTransaction') {
                 return (trx: Knex.Transaction) =>
-                    makeDbSet(trx as unknown as Knex, entity);
+                    makeDbSet(trx as unknown as Knex, entity, onResults);
             }
             if (prop === 'save') {
                 return (graph: Record<string, unknown>) => {
@@ -477,6 +691,65 @@ export function makeDbSet<TEntity extends Entity<any, any>>(
                     ) as Promise<unknown>;
                 };
             }
+            if (prop === 'insertVariant') {
+                return async (
+                    variantKey: string,
+                    payload: Record<string, unknown>
+                ) => {
+                    const maybeTrx = (
+                        knex as unknown as { isTransaction?: boolean }
+                    ).isTransaction
+                        ? (knex as unknown as Knex.Transaction)
+                        : undefined;
+                    const result = await _insertVariant(
+                        knex,
+                        entity.schema,
+                        variantKey,
+                        payload,
+                        maybeTrx
+                    );
+                    if (
+                        onResults &&
+                        result != null &&
+                        typeof result === 'object'
+                    ) {
+                        onResults([result]);
+                    }
+                    return result;
+                };
+            }
+            if (prop === 'findVariant') {
+                return async (
+                    variantKey: string,
+                    pk: unknown
+                ): Promise<unknown> => {
+                    // Build a fresh query, filter by PK, then execute
+                    const fresh = schemaQuery(
+                        knex,
+                        entity.schema as EntitySchema<TEntity>
+                    );
+                    const q = wrapQuery(
+                        fresh as SchemaQueryBuilder<
+                            EntitySchema<TEntity>,
+                            EntityResult<TEntity>
+                        >,
+                        entity,
+                        knex,
+                        onResults
+                    );
+                    // Apply variant filter (select only this variant)
+                    (
+                        q as unknown as {
+                            selectVariants: (keys: string[]) => void;
+                        }
+                    ).selectVariants?.([variantKey]);
+                    return (
+                        q as unknown as {
+                            find: (pk: unknown) => Promise<unknown>;
+                        }
+                    ).find(pk);
+                };
+            }
             // Any other property/method: allocate a fresh query and
             // forward.  Methods are bound so callers can use `.method(...)`.
             const fresh = schemaQuery(
@@ -488,7 +761,9 @@ export function makeDbSet<TEntity extends Entity<any, any>>(
                     EntitySchema<TEntity>,
                     EntityResult<TEntity>
                 >,
-                entity
+                entity,
+                knex,
+                onResults
             );
             const value = (
                 query as unknown as Record<string | symbol, unknown>

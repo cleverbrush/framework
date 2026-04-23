@@ -8,7 +8,6 @@ import type {
     Entity,
     EntityRelations,
     EntitySchema,
-    POLYMORPHIC_TYPE_BRAND,
     RelationInfo
 } from '@cleverbrush/knex-schema';
 import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
@@ -29,11 +28,11 @@ import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
  *
  * @public
  */
-export type EntityResult<TEntity extends Entity<any, any>> =
-    EntitySchema<TEntity> extends {
-        readonly [POLYMORPHIC_TYPE_BRAND]?: infer U;
-    }
-        ? NonNullable<U>
+export type EntityResult<TEntity extends Entity<any, any, any>> =
+    TEntity extends Entity<any, any, infer U>
+        ? [U] extends [never]
+            ? InferType<EntitySchema<TEntity>>
+            : U
         : InferType<EntitySchema<TEntity>>;
 
 /**
@@ -42,11 +41,11 @@ export type EntityResult<TEntity extends Entity<any, any>> =
  *
  * @public
  */
-export type EntityResultByVariant<TEntity extends Entity<any, any>> =
-    EntitySchema<TEntity> extends {
-        readonly [POLYMORPHIC_TYPE_BRAND]?: infer U;
-    }
-        ? NonNullable<U>
+export type EntityResultByVariant<TEntity extends Entity<any, any, any>> =
+    TEntity extends Entity<any, any, infer U>
+        ? [U] extends [never]
+            ? never
+            : U
         : never;
 
 /**
@@ -71,7 +70,7 @@ export type ResolvedRel<R> =
  *
  * @public
  */
-export type RelKeyTree<TEntity extends Entity<any, any>> = {
+export type RelKeyTree<TEntity extends Entity<any, any, any>> = {
     readonly [K in keyof EntityRelations<TEntity> & string]: K;
 };
 
@@ -81,7 +80,7 @@ export type RelKeyTree<TEntity extends Entity<any, any>> = {
  * @public
  */
 export type WithIncluded<
-    TEntity extends Entity<any, any>,
+    TEntity extends Entity<any, any, any>,
     TResult,
     K extends keyof EntityRelations<TEntity> & string
 > = TResult & { [P in K]: ResolvedRel<EntityRelations<TEntity>[P]> };
@@ -94,7 +93,7 @@ export type WithIncluded<
  * @public
  */
 export type WithVariantIncluded<
-    TEntity extends Entity<any, any>,
+    TEntity extends Entity<any, any, any>,
     TResult,
     Variant extends string,
     Rel extends keyof EntityRelations<TEntity> & string
@@ -113,9 +112,102 @@ export type WithVariantIncluded<
     : never;
 
 /**
- * @internal Resolve the entity wrapper that backs a relation's foreign
- * schema, so {@link SaveGraph} can recurse through nested relations.
+ * @internal Extract the branch of a discriminated union whose discriminator
+ * property has exactly the literal type `K`. Works without knowing the
+ * discriminator property name by scanning all properties of each branch.
+ *
+ * Example:
+ * ```ts
+ * // Union = { type: 'assigned'; ... } | { type: 'commented'; ... }
+ * ExtractBranch<Union, 'assigned'>  // → { type: 'assigned'; ... }
+ * ```
  */
+type ExtractBranch<Union, K extends string> = Union extends infer B
+    ? {
+          [P in keyof B]-?: B[P] extends K
+              ? K extends B[P]
+                  ? true
+                  : never
+              : never;
+      }[keyof B] extends never
+        ? never
+        : B
+    : never;
+
+/**
+ * The concrete result shape for a specific polymorphic variant.
+ *
+ * For a polymorphic entity that uses `.withVariants()`, resolves to the
+ * branch of the discriminated union where the discriminator equals `K`.
+ * Resolves to `never` for non-polymorphic entities or unknown keys.
+ *
+ * @example
+ * ```ts
+ * type AssignedActivity = VariantResult<typeof ActivityEntity, 'assigned'>;
+ * // → { type: 'assigned'; id: number; todoId: number; assigneeId: number; … }
+ * ```
+ *
+ * @public
+ */
+export type VariantResult<
+    TEntity extends Entity<any, any, any>,
+    K extends string
+> = ExtractBranch<EntityResultByVariant<TEntity>, K>;
+
+/**
+ * Write payload for `DbSet.insertVariant(key, payload)`.
+ *
+ * All columns from the matching variant branch are **optional** (so
+ * auto-generated PKs and columns with DB defaults can be omitted), and the
+ * discriminator field is **excluded** (it is set automatically from `key`).
+ *
+ * @example
+ * ```ts
+ * // Only valid fields for the 'assigned' variant; type-checked at compile time:
+ * await db.activities.insertVariant('assigned', {
+ *     todoId: 42,
+ *     userId: 7,
+ *     assigneeId: 9,
+ * });
+ * ```
+ *
+ * @public
+ */
+export type VariantInsertPayload<
+    TEntity extends Entity<any, any, any>,
+    K extends string
+> =
+    VariantResult<TEntity, K> extends infer B extends Record<string, unknown>
+        ? Omit<
+              { [P in keyof B]?: B[P] },
+              {
+                  [P in keyof B]-?: B[P] extends K
+                      ? K extends B[P]
+                          ? P
+                          : never
+                      : never;
+              }[keyof B]
+          >
+        : never;
+
+/**
+ * Write payload for `EntityQuery.updateVariant(key, set)`.
+ *
+ * Same shape as {@link VariantInsertPayload} — partial of the variant
+ * branch with the discriminator excluded.
+ *
+ * @public
+ */
+export type VariantUpdatePayload<
+    TEntity extends Entity<any, any, any>,
+    K extends string
+> = VariantInsertPayload<TEntity, K>;
+
+/**
+ * @internal Re-export ExtractBranch for use in DbSet/EntityQuery types.
+ */
+export type { ExtractBranch };
+
 type EntityFromForeign<F> =
     F extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
         ? Entity<F, any>
@@ -134,7 +226,7 @@ type EntityFromForeign<F> =
  *
  * @public
  */
-export type SaveGraph<TEntity extends Entity<any, any>> = Partial<
+export type SaveGraph<TEntity extends Entity<any, any, any>> = Partial<
     EntityResult<TEntity>
 > & {
     [K in keyof EntityRelations<TEntity>]?: EntityRelations<TEntity>[K] extends RelationInfo<

@@ -3,8 +3,8 @@
 // Applies schema changes directly to the live database without writing a
 // migration file.  Intended for development only.
 
-import readline from 'node:readline';
 import path from 'node:path';
+import readline from 'node:readline';
 import {
     applyDiff,
     diffSchema,
