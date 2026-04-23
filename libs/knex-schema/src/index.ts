@@ -9,7 +9,11 @@ export {
     resolvePropertyKey
 } from './columns.js';
 // DDL generation
-export { generateCreatePolymorphicTables, generateCreateTable } from './ddl.js';
+export {
+    generateCreatePolymorphicTables,
+    generateCreateTable,
+    generateCreateTableSource
+} from './ddl.js';
 export type {
     EntityPropSelector,
     EntityRelationKeys,
@@ -50,9 +54,13 @@ export {
 export { clearRow, MAPPERS, mapObject, mapValue } from './mappers.js';
 // Migration generation
 export {
+    applyDiff,
     diffSchema,
     generateMigration,
-    introspectDatabase
+    generateMigrationsForContext,
+    introspectDatabase,
+    isDiffEmpty,
+    tableExistsInDb
 } from './migration.js';
 // Raw query execution
 export { rawQuery } from './raw.js';

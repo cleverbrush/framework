@@ -2,7 +2,13 @@
 
 import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import { getColumnName } from './extension.js';
+import { generateCreateTableSource } from './ddl.js';
+import type { Entity } from './entity.js';
+import {
+    getColumnName,
+    getPolymorphicVariantSchemas,
+    getTableName
+} from './extension.js';
 import type {
     AddColumnDiff,
     AddForeignKeyDiff,
@@ -365,6 +371,315 @@ export function generateMigration(
     diff: MigrationDiff,
     tableName: string
 ): { up: string; down: string; full: string } {
+    const { up, down } = buildAlterTableFragments(diff, tableName);
+
+    const full = `import type { Knex } from 'knex';
+
+export async function up(knex: Knex): Promise<void> {
+${up}
+}
+
+export async function down(knex: Knex): Promise<void> {
+${down}
+}
+`;
+
+    return { up, down, full };
+}
+
+// ---------------------------------------------------------------------------
+// tableExistsInDb
+// ---------------------------------------------------------------------------
+
+/**
+ * Check whether a table exists in the connected PostgreSQL database.
+ *
+ * @param knex - A configured Knex instance (or transaction).
+ * @param tableName - The table name to check.
+ * @returns `true` when the table exists.
+ *
+ * @example
+ * ```ts
+ * const exists = await tableExistsInDb(knex, 'users');
+ * if (!exists) await generateCreateTable(UserSchema)(knex);
+ * ```
+ */
+export async function tableExistsInDb(
+    knex: Knex,
+    tableName: string
+): Promise<boolean> {
+    return knex.schema.hasTable(tableName);
+}
+
+// ---------------------------------------------------------------------------
+// isDiffEmpty
+// ---------------------------------------------------------------------------
+
+/**
+ * Return `true` when a {@link MigrationDiff} has no operations — i.e. the
+ * database table is already in sync with the schema.
+ */
+export function isDiffEmpty(diff: MigrationDiff): boolean {
+    return (
+        diff.addColumns.length === 0 &&
+        diff.dropColumns.length === 0 &&
+        diff.alterColumns.length === 0 &&
+        diff.addIndexes.length === 0 &&
+        diff.dropIndexes.length === 0 &&
+        diff.addForeignKeys.length === 0 &&
+        diff.dropForeignKeys.length === 0
+    );
+}
+
+// ---------------------------------------------------------------------------
+// applyDiff
+// ---------------------------------------------------------------------------
+
+/**
+ * Execute a {@link MigrationDiff} directly against a live database without
+ * writing a migration file. Intended for `db push` (dev-only schema sync).
+ *
+ * Foreign-key constraint drops are executed as raw `ALTER TABLE … DROP
+ * CONSTRAINT` statements before the main `alterTable` call.
+ *
+ * @param knex - A configured Knex instance or transaction.
+ * @param diff - The diff from {@link diffSchema}.
+ * @param tableName - The table to alter.
+ *
+ * @example
+ * ```ts
+ * const dbState = await introspectDatabase(knex, 'users');
+ * const diff = diffSchema(UserSchema, dbState);
+ * if (!isDiffEmpty(diff)) await applyDiff(knex, diff, 'users');
+ * ```
+ */
+export async function applyDiff(
+    knex: Knex,
+    diff: MigrationDiff,
+    tableName: string
+): Promise<void> {
+    if (isDiffEmpty(diff)) return;
+
+    // FK constraint drops require raw SQL (we only have constraint names, not
+    // column names, in the diff so Knex's dropForeign helper cannot be used).
+    for (const constraintName of diff.dropForeignKeys) {
+        await knex.raw('ALTER TABLE ?? DROP CONSTRAINT ??', [
+            tableName,
+            constraintName
+        ]);
+    }
+
+    const hasTableChanges =
+        diff.addColumns.length > 0 ||
+        diff.dropColumns.length > 0 ||
+        diff.alterColumns.length > 0 ||
+        diff.addIndexes.length > 0 ||
+        diff.dropIndexes.length > 0 ||
+        diff.addForeignKeys.length > 0;
+
+    if (!hasTableChanges) return;
+
+    await knex.schema.alterTable(tableName, table => {
+        // Add columns
+        for (const col of diff.addColumns) {
+            let column = buildColumnFromDbType(
+                table as unknown as Knex.CreateTableBuilder,
+                col.name,
+                col.type
+            );
+            if (col.nullable) column = column.nullable();
+            else column = column.notNullable();
+            if (col.defaultValue !== undefined) {
+                if (col.defaultValue === 'now') {
+                    column = column.defaultTo(knex.fn.now());
+                } else if (
+                    typeof col.defaultValue === 'object' &&
+                    col.defaultValue !== null &&
+                    col.defaultValue.raw
+                ) {
+                    column = column.defaultTo(knex.raw(col.defaultValue.raw));
+                } else {
+                    column = column.defaultTo(col.defaultValue);
+                }
+            }
+            if (col.references) {
+                const fkBuilder = column
+                    .references(col.references.column)
+                    .inTable(col.references.table);
+                if (col.onDelete) fkBuilder.onDelete(col.onDelete);
+                if (col.onUpdate) fkBuilder.onUpdate(col.onUpdate);
+            }
+        }
+
+        // Drop columns
+        for (const colName of diff.dropColumns) {
+            table.dropColumn(colName);
+        }
+
+        // Alter nullable
+        for (const col of diff.alterColumns) {
+            for (const [key, change] of Object.entries(col.changes)) {
+                if (key === 'nullable') {
+                    if (change.to) {
+                        (table as any).setNullable(col.name);
+                    } else {
+                        (table as any).dropNullable(col.name);
+                    }
+                }
+            }
+        }
+
+        // Add indexes
+        for (const idx of diff.addIndexes) {
+            if (idx.unique) {
+                table.unique(
+                    idx.columns,
+                    idx.name ? { indexName: idx.name } : undefined
+                );
+            } else {
+                table.index(idx.columns, idx.name);
+            }
+        }
+
+        // Drop indexes
+        for (const idx of diff.dropIndexes) {
+            table.dropIndex([], idx);
+        }
+
+        // Add foreign keys
+        for (const fk of diff.addForeignKeys) {
+            let builder = table
+                .foreign(fk.column)
+                .references(fk.foreignColumn)
+                .inTable(fk.foreignTable);
+            if (fk.onDelete) builder = builder.onDelete(fk.onDelete);
+            if (fk.onUpdate) builder = builder.onUpdate(fk.onUpdate);
+        }
+    });
+}
+
+// ---------------------------------------------------------------------------
+// generateMigrationsForContext
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate a single combined migration (up + down) for a set of entities.
+ *
+ * For each entity's table the function:
+ * - Detects new tables via {@link tableExistsInDb} and emits `CREATE TABLE`.
+ * - For existing tables, runs {@link introspectDatabase} + {@link diffSchema}
+ *   and emits `ALTER TABLE` if the diff is non-empty.
+ * - Handles polymorphic (CTI) entities by including each variant table.
+ * - Orders tables topologically by FK dependencies so parent tables are
+ *   created before child tables in `up` (and dropped after in `down`).
+ *
+ * @param entities - The entities from your {@link EntityMap}.
+ * @param knex - A live Knex connection used to introspect the database.
+ * @returns A single `{ up, down, full, isEmpty }` migration source.
+ *
+ * @example
+ * ```ts
+ * const result = await generateMigrationsForContext(
+ *     Object.values({ todos: TodoEntity, users: UserEntity }),
+ *     knex
+ * );
+ * if (!result.isEmpty) {
+ *     fs.writeFileSync('migrations/20260423000000_init.ts', result.full);
+ * }
+ * ```
+ */
+export async function generateMigrationsForContext(
+    entities: Entity<any, any>[],
+    knex: Knex
+): Promise<{ up: string; down: string; full: string; isEmpty: boolean }> {
+    // 1. Collect all (schema, tableName) pairs including CTI variant tables
+    const tableEntries: {
+        schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+        tableName: string;
+    }[] = [];
+
+    for (const entity of entities) {
+        const schema = entity.schema;
+        const tableName = getTableName(schema);
+        tableEntries.push({ schema, tableName });
+
+        // CTI variant tables each have their own tableName extension set
+        for (const vs of getPolymorphicVariantSchemas(schema)) {
+            const variantTableName = vs.getExtension('tableName') as
+                | string
+                | undefined;
+            if (variantTableName) {
+                tableEntries.push({ schema: vs, tableName: variantTableName });
+            }
+        }
+    }
+
+    // 2. Deduplicate (STI variants share the base table)
+    const seen = new Set<string>();
+    const uniqueEntries = tableEntries.filter(e => {
+        if (seen.has(e.tableName)) return false;
+        seen.add(e.tableName);
+        return true;
+    });
+
+    // 3. Topological sort by FK dependencies
+    const sorted = topologicalSort(uniqueEntries);
+
+    // 4. Generate CREATE or ALTER fragment for each table
+    const upParts: string[] = [];
+    const downParts: string[] = [];
+
+    for (const { schema, tableName } of sorted) {
+        const exists = await tableExistsInDb(knex, tableName);
+        if (!exists) {
+            const { up, down } = generateCreateTableSource(schema);
+            upParts.push(up);
+            downParts.push(down);
+        } else {
+            const dbState = await introspectDatabase(knex, tableName);
+            const diff = diffSchema(schema, dbState);
+            if (!isDiffEmpty(diff)) {
+                const { up, down } = buildAlterTableFragments(diff, tableName);
+                upParts.push(up);
+                downParts.push(down);
+            }
+        }
+    }
+
+    const isEmpty = upParts.length === 0;
+
+    // Down reverses creation order so child tables are dropped before parents
+    const up = upParts.join('\n\n');
+    const down = [...downParts].reverse().join('\n\n');
+
+    const full = `import type { Knex } from 'knex';
+
+export async function up(knex: Knex): Promise<void> {
+${isEmpty ? '    // No changes needed' : up}
+}
+
+export async function down(knex: Knex): Promise<void> {
+${isEmpty ? '    // No changes needed' : down}
+}
+`;
+
+    return { up, down, full, isEmpty };
+}
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * @internal
+ * Extract the body of a MigrationDiff into up/down Knex schema code strings
+ * (indented 4 spaces, wrapped in `alterTable` when non-empty).
+ * Used by both {@link generateMigration} and {@link generateMigrationsForContext}.
+ */
+function buildAlterTableFragments(
+    diff: MigrationDiff,
+    tableName: string
+): { up: string; down: string } {
     const upLines: string[] = [];
     const downLines: string[] = [];
 
@@ -464,23 +779,105 @@ export function generateMigration(
         ? `    // No changes needed`
         : `    await knex.schema.alterTable('${tableName}', (table) => {\n${downLines.join('\n')}\n    });`;
 
-    const full = `import type { Knex } from 'knex';
-
-export async function up(knex: Knex): Promise<void> {
-${up}
+    return { up, down };
 }
 
-export async function down(knex: Knex): Promise<void> {
-${down}
+/** @internal Build a Knex ColumnBuilder from a PostgreSQL data type string (runtime use). */
+function buildColumnFromDbType(
+    table: Knex.CreateTableBuilder,
+    name: string,
+    dbType: string
+): Knex.ColumnBuilder {
+    switch (dbType) {
+        case 'integer':
+            return table.integer(name);
+        case 'character varying':
+            return table.string(name);
+        case 'text':
+            return table.text(name);
+        case 'boolean':
+            return table.boolean(name);
+        case 'timestamp without time zone':
+        case 'timestamp':
+            return table.timestamp(name);
+        case 'double precision':
+        case 'float':
+            return table.float(name);
+        case 'jsonb':
+        case 'json':
+            return table.specificType(name, 'jsonb');
+        case 'uuid':
+            return table.uuid(name);
+        default:
+            return table.specificType(name, dbType);
+    }
 }
-`;
 
-    return { up, down, full };
+/**
+ * @internal
+ * Topologically sort table entries by FK dependency so parent tables
+ * come first in `up` (and last in `down`). Falls back to original order
+ * for cycles or external references.
+ */
+function topologicalSort(
+    entries: {
+        schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+        tableName: string;
+    }[]
+): typeof entries {
+    const tableSet = new Set(entries.map(e => e.tableName));
+    const deps = new Map<string, Set<string>>();
+
+    for (const { schema, tableName } of entries) {
+        const depSet = new Set<string>();
+        const properties: Record<string, any> =
+            (schema.introspect() as any).properties ?? {};
+        for (const [, propSchema] of Object.entries(properties)) {
+            const ext =
+                ((propSchema as any).introspect?.() as any)?.extensions ?? {};
+            if (ext.references?.table && tableSet.has(ext.references.table)) {
+                depSet.add(ext.references.table);
+            }
+        }
+        deps.set(tableName, depSet);
+    }
+
+    // Kahn's algorithm
+    const inDegree = new Map<string, number>();
+    const graph = new Map<string, string[]>(); // dep -> tables that depend on it
+    for (const { tableName } of entries) {
+        inDegree.set(tableName, 0);
+        graph.set(tableName, []);
+    }
+    for (const { tableName } of entries) {
+        for (const dep of deps.get(tableName) ?? []) {
+            graph.get(dep)!.push(tableName);
+            inDegree.set(tableName, (inDegree.get(tableName) ?? 0) + 1);
+        }
+    }
+
+    const queue: string[] = [];
+    for (const [t, deg] of inDegree) {
+        if (deg === 0) queue.push(t);
+    }
+
+    const sortedNames: string[] = [];
+    while (queue.length > 0) {
+        const t = queue.shift()!;
+        sortedNames.push(t);
+        for (const dependent of graph.get(t) ?? []) {
+            const newDeg = inDegree.get(dependent)! - 1;
+            inDegree.set(dependent, newDeg);
+            if (newDeg === 0) queue.push(dependent);
+        }
+    }
+
+    // Append any cycles / unresolved entries in their original relative order
+    const sortedSet = new Set(sortedNames);
+    const remaining = entries.filter(e => !sortedSet.has(e.tableName));
+    const byName = new Map(entries.map(e => [e.tableName, e]));
+    return [...sortedNames.map(t => byName.get(t)!), ...remaining];
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 /** @internal Map a PostgreSQL data type string to a Knex column method name. */
 function mapTypeToKnex(type: string): string {

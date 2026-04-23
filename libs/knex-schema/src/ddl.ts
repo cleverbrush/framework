@@ -269,6 +269,221 @@ export function generateCreateTable(
 }
 
 // ---------------------------------------------------------------------------
+// generateCreateTableSource
+// ---------------------------------------------------------------------------
+
+/**
+ * Generate `up` and `down` TypeScript code *strings* (4-space-indented\n * fragments) for creating a table from a schema.
+ *
+ * Unlike {@link generateCreateTable} (which returns a Knex callback), the
+ * output is plain source text suitable for writing into a migration file. The
+ * fragments are designed to be embedded directly inside `up()` / `down()`
+ * functions.
+ *
+ * @param schema - An `ObjectSchemaBuilder` with `.hasTableName()` and column
+ *   DDL extensions.
+ * @returns `{ up, down }` source fragments.
+ *
+ * @example
+ * ```ts
+ * const { up, down } = generateCreateTableSource(UserSchema);
+ * // up:  "    await knex.schema.createTable('users', (table) => { … });"
+ * // down: "    await knex.schema.dropTableIfExists('users');"
+ * ```
+ */
+export function generateCreateTableSource(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): { up: string; down: string } {
+    const tableName = getTableName(schema);
+    const introspected = schema.introspect() as any;
+    const tableExt: Record<string, any> = introspected.extensions ?? {};
+    const properties: Record<
+        string,
+        SchemaBuilder<any, any, any>
+    > = introspected.properties ?? {};
+
+    const lines: string[] = [];
+
+    for (const [propKey, propSchema] of Object.entries(properties)) {
+        const col = getColumnName(propSchema, propKey);
+        const propIntrospected = propSchema.introspect() as any;
+        const ext: Record<string, any> = propIntrospected.extensions ?? {};
+
+        let line: string;
+
+        if (ext.primaryKey?.autoIncrement) {
+            line = `        table.increments('${col}')`;
+        } else {
+            line = `        ${_colTypeCode(col, propIntrospected, ext)}`;
+        }
+
+        // Primary key (non-auto-increment)
+        if (ext.primaryKey && !ext.primaryKey.autoIncrement) {
+            line += '.primary()';
+        }
+
+        // Unique
+        if (ext.unique) {
+            if (typeof ext.unique === 'string') {
+                line += `.unique({ indexName: '${ext.unique}' })`;
+            } else {
+                line += '.unique()';
+            }
+        }
+
+        // Index
+        if (ext.index) {
+            if (typeof ext.index === 'string') {
+                line += `.index('${ext.index}')`;
+            } else {
+                line += '.index()';
+            }
+        }
+
+        // Default value
+        if (ext.defaultTo !== undefined) {
+            line += `.defaultTo(${_fmtDefault(ext.defaultTo)})`;
+        }
+
+        // Nullability
+        if (propIntrospected.isRequired && !ext.primaryKey?.autoIncrement) {
+            line += '.notNullable()';
+        } else if (!propIntrospected.isRequired) {
+            line += '.nullable()';
+        }
+
+        // Foreign key references
+        if (ext.references) {
+            line += `.references('${ext.references.column}').inTable('${ext.references.table}')`;
+            if (ext.onDelete) line += `.onDelete('${ext.onDelete}')`;
+            if (ext.onUpdate) line += `.onUpdate('${ext.onUpdate}')`;
+        }
+
+        lines.push(line + ';');
+
+        // Column-level CHECK (separate statement after column line)
+        if (ext.check) {
+            lines.push(`        table.check(${JSON.stringify(ext.check)});`);
+        }
+    }
+
+    // Composite indexes
+    for (const idx of tableExt.indexes ?? []) {
+        const cols = JSON.stringify(idx.columns);
+        if (idx.unique) {
+            lines.push(
+                `        table.unique(${cols}${idx.name ? `, { indexName: '${idx.name}' }` : ''});`
+            );
+        } else {
+            lines.push(
+                `        table.index(${cols}${idx.name ? `, '${idx.name}'` : ''});`
+            );
+        }
+    }
+
+    // Composite unique constraints
+    for (const unq of tableExt.uniques ?? []) {
+        const cols = JSON.stringify(unq.columns);
+        lines.push(
+            `        table.unique(${cols}${unq.name ? `, { indexName: '${unq.name}' }` : ''});`
+        );
+    }
+
+    // Table-level CHECK constraints
+    for (const chk of tableExt.checks ?? []) {
+        lines.push(`        table.check(${JSON.stringify(chk)});`);
+    }
+
+    // Composite primary key
+    if (tableExt.compositePrimaryKey) {
+        lines.push(
+            `        table.primary(${JSON.stringify(tableExt.compositePrimaryKey)});`
+        );
+    }
+
+    // Raw columns
+    for (const rawCol of tableExt.rawColumns ?? []) {
+        lines.push(
+            `        table.specificType('${rawCol.name}', '${rawCol.definition}');`
+        );
+    }
+
+    // Timestamps
+    if (tableExt.timestamps) {
+        lines.push(
+            `        table.timestamp('${tableExt.timestamps.createdAt}').notNullable().defaultTo(knex.fn.now());`
+        );
+        lines.push(
+            `        table.timestamp('${tableExt.timestamps.updatedAt}').notNullable().defaultTo(knex.fn.now());`
+        );
+    }
+
+    // Soft-delete column
+    if (tableExt.softDelete) {
+        lines.push(
+            `        table.timestamp('${tableExt.softDelete.column}').nullable();`
+        );
+    }
+
+    const rawIndexes: string[] = tableExt.rawIndexes ?? [];
+    const rawIndexLines = rawIndexes.map(
+        ri => `    await knex.raw(${JSON.stringify(ri)});`
+    );
+
+    const up =
+        `    await knex.schema.createTable('${tableName}', (table) => {\n${lines.join('\n')}\n    });` +
+        (rawIndexLines.length > 0 ? '\n' + rawIndexLines.join('\n') : '');
+
+    const down = `    await knex.schema.dropTableIfExists('${tableName}');`;
+
+    return { up, down };
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers for generateCreateTableSource
+// ---------------------------------------------------------------------------
+
+/** @internal Render a column type expression for code generation. */
+function _colTypeCode(
+    col: string,
+    introspected: any,
+    ext: Record<string, any>
+): string {
+    if (ext.columnType)
+        return `table.specificType('${col}', '${ext.columnType}')`;
+    switch (introspected.type) {
+        case 'string': {
+            const maxLen = ext.maxLength ?? introspected.maxLength ?? undefined;
+            return maxLen
+                ? `table.string('${col}', ${maxLen})`
+                : `table.string('${col}')`;
+        }
+        case 'number':
+            return introspected.isInteger !== false
+                ? `table.integer('${col}')`
+                : `table.float('${col}')`;
+        case 'boolean':
+            return `table.boolean('${col}')`;
+        case 'date':
+            return `table.timestamp('${col}')`;
+        case 'object':
+            return `table.specificType('${col}', 'jsonb')`;
+        default:
+            return `table.specificType('${col}', 'text')`;
+    }
+}
+
+/** @internal Format a defaultTo value as a code string for migration source. */
+function _fmtDefault(value: any): string {
+    if (value === 'now') return 'knex.fn.now()';
+    if (typeof value === 'object' && value !== null && value.raw) {
+        return `knex.raw('${String(value.raw).replace(/'/g, "\\'")}')`;
+    }
+    if (typeof value === 'string') return `'${value.replace(/'/g, "\\'")}'`;
+    return String(value);
+}
+
+// ---------------------------------------------------------------------------
 // generateCreatePolymorphicTables
 // ---------------------------------------------------------------------------
 

@@ -6,7 +6,7 @@ Mid-term roadmap of 8 features prioritising DX, type-safety, migrations/CLI, pol
 
 ## Features
 
-### A. DX & Convenience
+### A. DX & Convenience - DONE
 
 #### 1. `.find(pk)` / `.findMany(pks[])` / `.findOrFail()`
 
@@ -66,7 +66,7 @@ await db.todos.bulkUpsert(rows, { conflictColumns: ['id'] });
 
 ---
 
-### B. Type-safety Enhancements
+### B. Type-safety Enhancements - DONE
 
 #### 4. Ad-hoc DTO projections via `.select(t => ({ … }))`
 
