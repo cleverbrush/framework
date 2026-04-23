@@ -16,6 +16,14 @@ import {
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
 
+import { buildColumnMap } from './columns.js';
+import {
+    applyVariantsToSchema,
+    getColumnName,
+    type VariantInputForResolver
+} from './extension.js';
+import type { ResolvedVariantRelationSpec } from './types.js';
+
 // ---------------------------------------------------------------------------
 // Type-level helpers
 // ---------------------------------------------------------------------------
@@ -140,60 +148,6 @@ export type WithRelation<
     TKind extends 'belongsTo' | 'hasOne' | 'hasMany' | 'belongsToMany',
     TForeign extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = Entity<TSchema, TRels & Record<TKey, RelationInfo<TKind, TForeign>>>;
-
-// ---------------------------------------------------------------------------
-// Variant input shape (no `storage` field — derived from { entity } vs { schema })
-// ---------------------------------------------------------------------------
-
-/**
- * One variant entry passed to {@link Entity.withVariants}. Two shapes:
- *
- * - `{ entity, foreignKey }` — Class Table Inheritance: variant has its own
- *   table (described by an Entity wrapper) joined back via `foreignKey`.
- * - `{ schema }` — Single Table Inheritance: extra columns merged onto the
- *   base table, no separate table.
- *
- * @public
- */
-export type EntityVariantInput<
-    _TBase extends ObjectSchemaBuilder<any, any, any, any, any, any, any> = any
-> =
-    | {
-          entity: Entity<
-              ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-              any
-          >;
-          foreignKey: (t: any) => any;
-          allowOrphan?: boolean;
-      }
-    | {
-          schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
-          enforceCheck?: boolean;
-      };
-
-/**
- * @internal Extract the relations record from a variant's entity (if any).
- */
-type VariantRels<V> = V extends {
-    entity: Entity<any, infer R>;
-}
-    ? R
-    : {};
-
-/**
- * @internal Union of all variant entities' `TRels` merged into one map.
- */
-type MergedVariantRels<TVariants> = UnionToIntersection<
-    {
-        [K in keyof TVariants]: VariantRels<TVariants[K]>;
-    }[keyof TVariants]
->;
-
-type UnionToIntersection<U> = (U extends any ? (k: U) => void : never) extends (
-    k: infer I
-) => void
-    ? I
-    : never;
 
 // ---------------------------------------------------------------------------
 // Entity
@@ -404,57 +358,180 @@ export class Entity<
     }
 
     /**
-     * Mark this entity as polymorphic with a discriminator property and a
-     * variant map. CTI variants are described by `{ entity, foreignKey }`,
-     * STI variants by `{ schema }` (no separate table). Storage type is
-     * inferred from the shape.
+     * Mark this entity as polymorphic by selecting the discriminator
+     * property. Returns a new `Entity` whose `.ctiVariant()` /
+     * `.stiVariant()` methods declare each variant.
      *
-     * Variant entities' relations are merged into the resulting entity's
-     * `TRels`, so `db(entity).include(t => t.someVariantRelation)` works
-     * across variants.
+     * Declare ordinary relations (`.belongsTo()` etc.) on this entity BEFORE
+     * `.discriminator()`. After `.discriminator()` you are in the
+     * polymorphic-builder phase: `.hasOne/.hasMany/.belongsTo/.belongsToMany`
+     * still work, but the per-variant relations live on the `.ctiVariant()`
+     * / `.stiVariant()` calls.
+     *
+     * @example
+     * ```ts
+     * const FileEntity = defineEntity(FileSchema)
+     *     .discriminator(t => t.type)
+     *     .ctiVariant('image',    ImageEntity,    t => t.fileId)
+     *     .ctiVariant('document', DocumentEntity, t => t.fileId);
+     * ```
      */
-    withVariants<
-        const TDiscKey extends keyof SchemaProps<TSchema> & string,
-        const TVariants extends Record<string, EntityVariantInput<TSchema>>
-    >(config: {
-        discriminator: TDiscKey | EntityPropSelector<TSchema, TDiscKey>;
-        variants: TVariants;
-    }): Entity<TSchema, TRels & MergedVariantRels<TVariants>> {
+    discriminator<TKey extends keyof SchemaProps<TSchema> & string>(
+        sel: TKey | EntityPropSelector<TSchema, TKey>
+    ): Entity<TSchema, TRels> {
         const discKey =
-            typeof config.discriminator === 'string'
-                ? config.discriminator
+            typeof sel === 'string'
+                ? (sel as string)
                 : this._resolvePropName(
-                      config.discriminator as EntityPropSelector<TSchema>,
+                      sel as EntityPropSelector<TSchema>,
                       this.schema
                   );
+        const next = new Entity(this.schema) as Entity<TSchema, TRels>;
+        // Carry the variant-builder state on the new Entity so subsequent
+        // `.ctiVariant()`/`.stiVariant()` calls can extend it. Stored on
+        // the instance (not in the schema) so the original schema is
+        // unchanged until the first variant is added.
+        (next as any)._variantBuilder = {
+            discKey,
+            variants: {} as Record<string, VariantInputForResolver>
+        };
+        return next;
+    }
 
-        // Translate to legacy `withVariants` shape used by the schema-level
-        // `dbExtension` (no API change in the schema layer).
-        const legacyVariants: Record<string, any> = {};
-        for (const [vKey, vSpec] of Object.entries(
-            config.variants as Record<string, EntityVariantInput<TSchema>>
-        )) {
-            if ('entity' in vSpec) {
-                legacyVariants[vKey] = {
-                    schema: vSpec.entity.schema,
-                    storage: 'cti',
-                    foreignKey: vSpec.foreignKey,
-                    allowOrphan: vSpec.allowOrphan
-                };
-            } else {
-                legacyVariants[vKey] = {
-                    schema: vSpec.schema,
-                    storage: 'sti',
-                    enforceCheck: vSpec.enforceCheck
-                };
-            }
+    /**
+     * Declare a CTI (Class Table Inheritance) variant. Only valid after
+     * `.discriminator()`. Returns a new `Entity` whose schema carries the
+     * updated `'variants'` extension.
+     *
+     * @param key      Discriminator literal (e.g. `'image'`).
+     * @param variant  Entity wrapping the variant table schema.
+     * @param fkSel    Accessor returning the FK property on the variant
+     *                 schema that joins back to the base PK.
+     * @param opts     `{ allowOrphan?: boolean; relations?: ... }` — see CTI docs.
+     */
+    ctiVariant<
+        TVarSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
+    >(
+        key: string,
+        variant: Entity<TVarSchema, any>,
+        fkSel: (t: EntityTree<TVarSchema>) => any,
+        opts?: {
+            allowOrphan?: boolean;
+            relations?: Record<string, VariantRelationInput<TVarSchema>>;
         }
+    ): Entity<TSchema, TRels> {
+        const builder = (this as any)._variantBuilder as
+            | VariantBuilderState
+            | undefined;
+        if (!builder) {
+            throw new Error(
+                'ctiVariant: call `.discriminator(...)` first to begin a polymorphic builder chain'
+            );
+        }
+        const fkColumn = resolveCtiForeignKeyColumn(
+            variant.schema,
+            fkSel as (t: any) => any
+        );
+        const nextVariants: Record<string, VariantInputForResolver> = {
+            ...builder.variants,
+            [key]: {
+                schema: variant.schema,
+                storage: 'cti',
+                foreignKeyColumn: fkColumn,
+                allowOrphan: opts?.allowOrphan,
+                relations: [
+                    ...entityRelationsToVariantRelations(variant),
+                    ...resolveInlineVariantRelations(
+                        variant.schema,
+                        opts?.relations
+                    )
+                ]
+            }
+        };
+        return this._withVariantBuilder(builder.discKey, nextVariants);
+    }
 
-        const next = (this.schema as any).withVariants({
-            discriminator: discKey,
-            variants: legacyVariants
-        });
-        return new Entity(next) as any;
+    /**
+     * Declare an STI (Single Table Inheritance) variant. Only valid after
+     * `.discriminator()`. Accepts either an {@link Entity} or a bare
+     * {@link ObjectSchemaBuilder}.
+     */
+    stiVariant<
+        TVarSchema extends ObjectSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
+    >(
+        key: string,
+        body: Entity<TVarSchema, any> | TVarSchema,
+        opts?: {
+            enforceCheck?: boolean;
+            relations?: Record<string, VariantRelationInput<TVarSchema>>;
+        }
+    ): Entity<TSchema, TRels> {
+        const builder = (this as any)._variantBuilder as
+            | VariantBuilderState
+            | undefined;
+        if (!builder) {
+            throw new Error(
+                'stiVariant: call `.discriminator(...)` first to begin a polymorphic builder chain'
+            );
+        }
+        const isEntity = body instanceof Entity;
+        const varSchema = (
+            isEntity ? (body as Entity<any, any>).schema : body
+        ) as ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+        const nextVariants: Record<string, VariantInputForResolver> = {
+            ...builder.variants,
+            [key]: {
+                schema: varSchema,
+                storage: 'sti',
+                enforceCheck: opts?.enforceCheck,
+                relations: [
+                    ...(isEntity
+                        ? entityRelationsToVariantRelations(
+                              body as Entity<any, any>
+                          )
+                        : []),
+                    ...resolveInlineVariantRelations(varSchema, opts?.relations)
+                ]
+            }
+        };
+        return this._withVariantBuilder(builder.discKey, nextVariants);
+    }
+
+    /** @internal Apply the variant extension to the schema and return a new Entity. */
+    private _withVariantBuilder(
+        discKey: string,
+        variants: Record<string, VariantInputForResolver>
+    ): Entity<TSchema, TRels> {
+        let newSchema = applyVariantsToSchema(
+            this.schema,
+            discKey,
+            variants
+        ) as any;
+        // Preserve any existing `relations` extension across the rebuild.
+        const existingRelations =
+            (this.schema as any).getExtension?.('relations') ?? [];
+        if (existingRelations.length) {
+            newSchema = newSchema.withExtension('relations', existingRelations);
+        }
+        const next = new Entity(newSchema as TSchema) as Entity<TSchema, TRels>;
+        (next as any)._variantBuilder = { discKey, variants };
+        return next;
     }
 
     /**
@@ -511,6 +588,146 @@ export class Entity<
         // Fall back: assume it's already the schema
         return propSchema;
     }
+}
+
+// ---------------------------------------------------------------------------
+// Polymorphic variant helpers (used by Entity.discriminator/ctiVariant/stiVariant)
+// ---------------------------------------------------------------------------
+
+/** @internal Variant-builder state carried on an Entity instance during a
+ * `.discriminator().ctiVariant()/.stiVariant()` chain. */
+interface VariantBuilderState {
+    discKey: string;
+    variants: Record<string, VariantInputForResolver>;
+}
+
+/**
+ * @internal Convert an Entity's stored relations (which use property-name
+ * foreign keys) into the column-name form required by
+ * {@link ResolvedVariantRelationSpec}.
+ */
+function entityRelationsToVariantRelations(
+    varEntity: Entity<any, any>
+): ResolvedVariantRelationSpec[] {
+    const rels: any[] =
+        (varEntity.schema as any).getExtension?.('relations') ?? [];
+    if (rels.length === 0) return [];
+
+    const { propToCol } = buildColumnMap(varEntity.schema as any);
+
+    return rels.map(r => {
+        // belongsToMany has no `foreignKey` on the spec itself (uses through.*).
+        const fkPropName: string | undefined =
+            typeof r.foreignKey === 'string' ? r.foreignKey : undefined;
+        const fkColName = fkPropName
+            ? (propToCol.get(fkPropName) ?? fkPropName)
+            : undefined;
+        return {
+            name: r.name,
+            type: r.type,
+            schema: r.schema,
+            foreignKey: fkColName,
+            through: r.through
+        } satisfies ResolvedVariantRelationSpec;
+    });
+}
+
+/**
+ * @internal Resolve a foreign-key accessor (`t => t.fileId`) against a
+ * variant schema to a SQL column name.
+ */
+function resolveCtiForeignKeyColumn(
+    varSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    fkSel: (t: any) => any
+): string {
+    const tree = ObjectSchemaBuilder.getPropertiesFor(varSchema as any);
+    const desc = fkSel(tree as any);
+    const inner = (desc as any)?.[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+    if (!inner?.propertyName) {
+        throw new Error(
+            'ctiVariant: foreignKey accessor must return a top-level property descriptor on the variant schema'
+        );
+    }
+    const propKey: string = inner.propertyName;
+    const props = (varSchema as any).introspect?.()?.properties ?? {};
+    const propSchema = props[propKey];
+    if (!propSchema) {
+        throw new Error(
+            `ctiVariant: foreignKey property "${propKey}" not found on variant schema`
+        );
+    }
+    return getColumnName(propSchema, propKey);
+}
+
+/**
+ * Inline relation spec accepted by {@link Entity.ctiVariant} /
+ * {@link Entity.stiVariant} via `opts.relations`. The `foreignKey`
+ * accessor (when given) is typed against the variant's own schema and
+ * resolved to a SQL column name.
+ *
+ * @public
+ */
+export interface VariantRelationInput<
+    TVarSchema extends ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    > = ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> {
+    type: 'belongsTo' | 'hasOne' | 'hasMany' | 'belongsToMany';
+    /**
+     * Foreign side — accept either a bare schema, an Entity wrapper, or a
+     * lazy thunk for forward references.
+     */
+    schema?:
+        | ObjectSchemaBuilder<any, any, any, any, any, any, any>
+        | (() => ObjectSchemaBuilder<any, any, any, any, any, any, any>);
+    entity?: Entity<any, any>;
+    foreignKey?: (t: EntityTree<TVarSchema>) => any;
+    through?: { table: string; localKey: string; foreignKey: string };
+}
+
+/**
+ * @internal Resolve a map of {@link VariantRelationInput} into the
+ * column-resolved {@link ResolvedVariantRelationSpec[]} shape stored on a
+ * resolved variant spec.
+ */
+function resolveInlineVariantRelations(
+    varSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    relations: Record<string, VariantRelationInput<any>> | undefined
+): ResolvedVariantRelationSpec[] {
+    if (!relations) return [];
+    const { propToCol } = buildColumnMap(varSchema);
+    const result: ResolvedVariantRelationSpec[] = [];
+    const tree = ObjectSchemaBuilder.getPropertiesFor(varSchema as any);
+
+    for (const [name, spec] of Object.entries(relations)) {
+        let foreignKey: string | undefined;
+        if (spec.foreignKey) {
+            const desc = spec.foreignKey(tree as any);
+            const inner = (desc as any)?.[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+            if (!inner?.propertyName) {
+                throw new Error(
+                    `variant relation "${name}": foreignKey accessor must return a top-level property descriptor on the variant schema`
+                );
+            }
+            const propKey: string = inner.propertyName;
+            foreignKey = propToCol.get(propKey) ?? propKey;
+        }
+        const targetSchema = spec.entity ? spec.entity.schema : spec.schema;
+        result.push({
+            name,
+            type: spec.type,
+            schema: targetSchema,
+            foreignKey,
+            through: spec.through
+        });
+    }
+    return result;
 }
 
 /**

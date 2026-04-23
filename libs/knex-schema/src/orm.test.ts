@@ -5,6 +5,7 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 import {
     boolean,
     date,
+    defineEntity,
     diffSchema,
     generateCreateTable,
     generateMigration,
@@ -1782,25 +1783,11 @@ describe('withVariants (polymorphic schemas)', () => {
         durationSec: number().hasColumnName('duration_sec')
     }); // STI — no separate table
 
-    const FileSchema = FileBase.withVariants({
-        discriminator: 'type',
-        variants: {
-            image: {
-                schema: ImageExtras,
-                storage: 'cti',
-                foreignKey: t => t.fileId
-            },
-            document: {
-                schema: DocumentExtras,
-                storage: 'cti',
-                foreignKey: t => t.fileId
-            },
-            video: {
-                schema: VideoExtras,
-                storage: 'sti'
-            }
-        }
-    });
+    const FileSchema = defineEntity(FileBase)
+        .discriminator('type')
+        .ctiVariant('image', defineEntity(ImageExtras), t => t.fileId)
+        .ctiVariant('document', defineEntity(DocumentExtras), t => t.fileId)
+        .stiVariant('video', VideoExtras).schema;
 
     // -----------------------------------------------------------------------
     // Schema layer
@@ -1839,16 +1826,13 @@ describe('withVariants (polymorphic schemas)', () => {
         });
 
         it('accessor form for discriminator resolves property name', () => {
-            const schema2 = FileBase.withVariants({
-                discriminator: t => t.type,
-                variants: {
-                    image: {
-                        schema: ImageExtras,
-                        storage: 'cti',
-                        foreignKey: t => t.fileId
-                    }
-                }
-            });
+            const schema2 = defineEntity(FileBase)
+                .discriminator(t => t.type)
+                .ctiVariant(
+                    'image',
+                    defineEntity(ImageExtras),
+                    t => t.fileId
+                ).schema;
             const cfg = (schema2 as any).getExtension('variants') as any;
             expect(cfg.discriminatorKey).toBe('type');
         });
@@ -1862,36 +1846,35 @@ describe('withVariants (polymorphic schemas)', () => {
 
         it('throws when cti variant missing hasTableName', () => {
             expect(() => {
-                FileBase.withVariants({
-                    discriminator: 'type',
-                    variants: {
-                        image: {
-                            schema: object({
+                defineEntity(FileBase)
+                    .discriminator('type')
+                    .ctiVariant(
+                        'image',
+                        defineEntity(
+                            object({
                                 fileId: number().hasColumnName('file_id'),
                                 type: string('image'),
                                 width: number()
-                            }) as any, // no .hasTableName()
-                            storage: 'cti',
-                            foreignKey: t => t.fileId
-                        }
-                    }
-                });
+                            }) as any // no .hasTableName()
+                        ),
+                        t => t.fileId
+                    );
             }).toThrow(/hasTableName/);
         });
 
         it('throws when cti variant missing foreignKey', () => {
+            // The new API requires a foreignKey accessor argument; calling
+            // without one is a TypeScript error. The runtime guard still
+            // applies if the accessor returns no descriptor.
             expect(() => {
-                FileBase.withVariants({
-                    discriminator: 'type',
-                    variants: {
-                        image: {
-                            schema: ImageExtras,
-                            storage: 'cti'
-                            // no foreignKey
-                        }
-                    }
-                });
-            }).toThrow(/foreignKey/);
+                defineEntity(FileBase)
+                    .discriminator('type')
+                    .ctiVariant(
+                        'image',
+                        defineEntity(ImageExtras),
+                        (() => undefined) as any
+                    );
+            }).toThrow(/property descriptor/);
         });
 
         it('throws when variant discriminator literal mismatches map key', () => {
@@ -1902,16 +1885,13 @@ describe('withVariants (polymorphic schemas)', () => {
             }).hasTableName('image_file');
 
             expect(() => {
-                FileBase.withVariants({
-                    discriminator: 'type',
-                    variants: {
-                        image: {
-                            schema: WrongExtras,
-                            storage: 'cti',
-                            foreignKey: t => t.fileId
-                        }
-                    }
-                });
+                defineEntity(FileBase)
+                    .discriminator('type')
+                    .ctiVariant(
+                        'image',
+                        defineEntity(WrongExtras),
+                        t => t.fileId
+                    );
             }).toThrow(/image.*video|video.*image/i);
         });
 
@@ -1923,16 +1903,13 @@ describe('withVariants (polymorphic schemas)', () => {
             }).hasTableName('image_file');
 
             expect(() => {
-                FileBase.withVariants({
-                    discriminator: 'type',
-                    variants: {
-                        image: {
-                            schema: NoLiteralExtras,
-                            storage: 'cti',
-                            foreignKey: t => t.fileId
-                        }
-                    }
-                });
+                defineEntity(FileBase)
+                    .discriminator('type')
+                    .ctiVariant(
+                        'image',
+                        defineEntity(NoLiteralExtras),
+                        t => t.fileId
+                    );
             }).toThrow(/literal/i);
         });
     });
@@ -2064,27 +2041,18 @@ describe('withVariants — per-variant relations', () => {
         note: string().optional()
     });
 
-    const AssetSchema = AssetBase.withVariants({
-        discriminator: 'kind',
-        variants: {
-            licensed: {
-                schema: LicensedExtras,
-                storage: 'cti',
-                foreignKey: t => t.assetId,
-                relations: {
-                    owner: {
-                        type: 'belongsTo',
-                        schema: Owner,
-                        foreignKey: t => t.ownerId
-                    }
+    const AssetSchema = defineEntity(AssetBase)
+        .discriminator('kind')
+        .ctiVariant('licensed', defineEntity(LicensedExtras), t => t.assetId, {
+            relations: {
+                owner: {
+                    type: 'belongsTo',
+                    schema: Owner,
+                    foreignKey: t => t.ownerId
                 }
-            },
-            free: {
-                schema: FreeExtras,
-                storage: 'sti'
             }
-        }
-    });
+        })
+        .stiVariant('free', FreeExtras).schema;
 
     // -------------------------------------------------------------------------
     // Schema layer — resolution
@@ -2130,13 +2098,13 @@ describe('withVariants — per-variant relations', () => {
 
     it('includeVariant with projection selects only projected columns', () => {
         const OwnerWithProj = Owner.projection('summary', 'id', 'email');
-        const AssetWithProj = AssetBase.withVariants({
-            discriminator: 'kind',
-            variants: {
-                licensed: {
-                    schema: LicensedExtras,
-                    storage: 'cti',
-                    foreignKey: t => t.assetId,
+        const AssetWithProj = defineEntity(AssetBase)
+            .discriminator('kind')
+            .ctiVariant(
+                'licensed',
+                defineEntity(LicensedExtras),
+                t => t.assetId,
+                {
                     relations: {
                         owner: {
                             type: 'belongsTo',
@@ -2144,10 +2112,9 @@ describe('withVariants — per-variant relations', () => {
                             foreignKey: t => t.ownerId
                         }
                     }
-                },
-                free: { schema: FreeExtras, storage: 'sti' }
-            }
-        });
+                }
+            )
+            .stiVariant('free', FreeExtras).schema;
 
         const sql = query(knex, AssetWithProj)
             .includeVariant('licensed', 'owner', q =>
@@ -2176,13 +2143,13 @@ describe('withVariants — per-variant relations', () => {
     });
 
     it('include() throws ambiguous error when relation name appears on multiple variants', () => {
-        const AmbigSchema = AssetBase.withVariants({
-            discriminator: 'kind',
-            variants: {
-                licensed: {
-                    schema: LicensedExtras,
-                    storage: 'cti',
-                    foreignKey: t => t.assetId,
+        const AmbigSchema = defineEntity(AssetBase)
+            .discriminator('kind')
+            .ctiVariant(
+                'licensed',
+                defineEntity(LicensedExtras),
+                t => t.assetId,
+                {
                     relations: {
                         owner: {
                             type: 'belongsTo',
@@ -2190,19 +2157,16 @@ describe('withVariants — per-variant relations', () => {
                             foreignKey: t => t.ownerId
                         }
                     }
-                },
-                free: {
-                    schema: FreeExtras,
-                    storage: 'sti',
-                    relations: {
-                        owner: {
-                            type: 'belongsTo',
-                            schema: Owner
-                        }
+                }
+            )
+            .stiVariant('free', FreeExtras, {
+                relations: {
+                    owner: {
+                        type: 'belongsTo',
+                        schema: Owner
                     }
                 }
-            }
-        });
+            }).schema;
 
         expect(() => {
             query(knex, AmbigSchema).include('owner').toQuery();
@@ -2250,23 +2214,18 @@ describe('withVariants — per-variant relations', () => {
 
     it('STI variant with includeVariant generates correct ON discriminator gate', () => {
         // STI variant: no separate table alias, gate uses base table discriminator
-        const StiSchema = AssetBase.withVariants({
-            discriminator: 'kind',
-            variants: {
-                licensed: { schema: LicensedExtras, storage: 'sti' },
-                free: {
-                    schema: FreeExtras,
-                    storage: 'sti',
-                    relations: {
-                        owner: {
-                            type: 'belongsTo',
-                            schema: Owner,
-                            foreignKey: t => t.note // pretend note is a FK
-                        }
+        const StiSchema = defineEntity(AssetBase)
+            .discriminator('kind')
+            .stiVariant('licensed', LicensedExtras)
+            .stiVariant('free', FreeExtras, {
+                relations: {
+                    owner: {
+                        type: 'belongsTo',
+                        schema: Owner,
+                        foreignKey: t => t.note // pretend note is a FK
                     }
                 }
-            }
-        });
+            }).schema;
 
         const sql = query(knex, StiSchema)
             .includeVariant('free', 'owner')

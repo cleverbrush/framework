@@ -15,7 +15,6 @@ export type {
     EntityRelationKeys,
     EntityRelations,
     EntitySchema,
-    EntityVariantInput,
     RelationInfo,
     SchemaProps,
     UnwrapNavSchema,
@@ -94,7 +93,6 @@ export type {
     ValidatedJoinManySpec,
     ValidatedJoinOneSpec,
     ValidatedSpec,
-    VariantSpecInput,
     VariantStorageType,
     WithJoinedMany,
     WithJoinedOne

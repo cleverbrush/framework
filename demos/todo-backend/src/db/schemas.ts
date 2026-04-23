@@ -75,38 +75,34 @@ export const TodoActivityBaseDbSchema = object({
 
 export const TodoActivityBaseEntity = defineEntity(TodoActivityBaseDbSchema);
 
-// Variant relations are declared inline via the schema-level `withVariants`
-// API because variant tables intentionally do NOT carry navigation
+// Variant relations are declared inline via the per-variant `opts.relations`
+// option because variant tables intentionally do NOT carry navigation
 // properties — those would be SELECTed verbatim during variant column
 // expansion and break SQL.
-export const TodoActivityDbSchema = TodoActivityBaseDbSchema.withVariants({
-    discriminator: 'type',
-    variants: {
-        assigned: {
-            schema: TodoActivityAssignedDbSchema,
-            storage: 'cti',
-            foreignKey: t => t.activityId,
+export const TodoActivityEntity = defineEntity(TodoActivityBaseDbSchema)
+    .discriminator('type')
+    .ctiVariant(
+        'assigned',
+        TodoActivityAssignedEntity,
+        t => t.activityId,
+        {
             relations: {
                 assignee: {
-                    type: 'belongsTo' as const,
+                    type: 'belongsTo',
                     schema: () => UserDbSchema,
                     foreignKey: (t: any) => t.assignedToUserId
                 }
             }
-        },
-        commented: {
-            schema: TodoActivityCommentedDbSchema,
-            storage: 'cti',
-            foreignKey: t => t.activityId
-        },
-        completed: {
-            schema: CompletedExtras,
-            storage: 'sti'
         }
-    }
-});
+    )
+    .ctiVariant(
+        'commented',
+        TodoActivityCommentedEntity,
+        t => t.activityId
+    )
+    .stiVariant('completed', CompletedExtras);
 
-export const TodoActivityEntity = defineEntity(TodoActivityDbSchema);
+export const TodoActivityDbSchema = TodoActivityEntity.schema;
 
 // ── Todo (uses the new defineEntity API) ─────────────────────────────────────
 

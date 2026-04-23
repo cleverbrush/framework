@@ -370,39 +370,7 @@ export interface CursorPaginationResult<T> {
 /** Storage strategy for a polymorphic variant. */
 export type VariantStorageType = 'cti' | 'sti';
 
-/**
- * Input spec for a relation scoped to a single polymorphic variant.
- * Mirrors {@link RelationSpec} but `foreignKey` is typed against the variant's
- * own schema so only variant-specific columns are accessible.
- * @public
- */
-export interface VariantRelationSpec<
-    TSchema extends ObjectSchemaBuilder<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    > = ObjectSchemaBuilder<any, any, any, any, any, any, any>
-> {
-    type: 'hasMany' | 'hasOne' | 'belongsTo' | 'belongsToMany';
-    /** The foreign schema to join against. */
-    schema: any;
-    /**
-     * FK column accessor — typed against the **variant** schema.
-     * For `belongsTo`/`hasOne`, this is the FK on the variant table.
-     * For `hasMany`, this is the FK on the foreign table.
-     */
-    foreignKey?: (
-        t: PropertyDescriptorTree<TSchema, TSchema>
-    ) => PropertyDescriptor<any, any, any, any>;
-    /** `belongsToMany` only — pivot table configuration. */
-    through?: { table: string; localKey: string; foreignKey: string };
-}
-
-/** @internal Resolved form of {@link VariantRelationSpec} stored on {@link ResolvedVariantSpec}. */
+/** @internal Resolved form of a variant relation stored on {@link ResolvedVariantSpec}. */
 export interface ResolvedVariantRelationSpec {
     name: string;
     type: 'hasMany' | 'hasOne' | 'belongsTo' | 'belongsToMany';
@@ -410,59 +378,6 @@ export interface ResolvedVariantRelationSpec {
     /** Resolved FK *column* name on the variant or foreign table. */
     foreignKey?: string;
     through?: { table: string; localKey: string; foreignKey: string };
-}
-
-/**
- * Input spec for one polymorphic variant as passed to `.withVariants()`.
- * @public
- */
-export interface VariantSpecInput<
-    TSchema extends ObjectSchemaBuilder<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    > = ObjectSchemaBuilder<any, any, any, any, any, any, any>
-> {
-    /** The extra-fields schema for this variant. */
-    schema: TSchema;
-    /**
-     * `'cti'` — Class Table Inheritance: extra fields in a separate table,
-     * joined via `foreignKey`.
-     *
-     * `'sti'` — Single Table Inheritance: extra fields are nullable columns
-     * on the base table itself.
-     */
-    storage: VariantStorageType;
-    /**
-     * CTI only: a PropertyDescriptor accessor pointing to the FK property on
-     * the variant schema — e.g. `t => t.fileId`. The resolved SQL column name
-     * is used to JOIN the variant table back to the base table.
-     * Required for `storage: 'cti'`.
-     */
-    foreignKey?: (
-        t: PropertyDescriptorTree<TSchema, TSchema>
-    ) => PropertyDescriptor<any, any, any, any>;
-    /**
-     * If `true`, a CTI row without a matching variant-table row is silently
-     * accepted (the variant properties are omitted). Defaults to `false`
-     * (throws on orphan).
-     */
-    allowOrphan?: boolean;
-    /**
-     * STI only: when `true`, the DDL generator emits a `CHECK` constraint
-     * ensuring variant columns are `NULL` when the discriminator doesn't match.
-     */
-    enforceCheck?: boolean;
-    /**
-     * Optional relations scoped to **this variant only**.
-     * Loaded via `.includeVariant(variantKey, relationName)` on the query builder.
-     * The `foreignKey` accessor is typed against the variant's own schema.
-     */
-    relations?: Record<string, VariantRelationSpec<TSchema>>;
 }
 
 /** @internal Resolved, normalised variant spec stored in schema extensions. */

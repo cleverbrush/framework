@@ -7,7 +7,6 @@ import type {
     DateSchemaBuilder,
     FunctionSchemaBuilder,
     GenericSchemaBuilder,
-    InferType,
     NumberSchemaBuilder,
     ObjectSchemaBuilder,
     PropertyDescriptor,
@@ -29,13 +28,10 @@ import {
     stringExtensions,
     withExtensions
 } from '@cleverbrush/schema';
-import { buildColumnMap } from './columns.js';
 import type {
     ResolvedVariantConfig,
     ResolvedVariantRelationSpec,
     ResolvedVariantSpec,
-    VariantRelationSpec,
-    VariantSpecInput,
     VariantStorageType
 } from './types.js';
 
@@ -74,46 +70,6 @@ export const COMPOSITE_PRIMARY_KEY_BRAND: unique symbol = Symbol.for(
 // Polymorphic type brand
 // ---------------------------------------------------------------------------
 
-/** @internal Helper to resolve a variant's `relations` map into normalised specs. */
-function resolveVariantRelations(
-    variantKey: string,
-    variantSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-    relations: Record<string, VariantRelationSpec>
-): ResolvedVariantRelationSpec[] {
-    const { propToCol } = buildColumnMap(variantSchema);
-    const result: ResolvedVariantRelationSpec[] = [];
-    const varTree = ObjectSchemaBuilderClass.getPropertiesFor(
-        variantSchema as any
-    );
-
-    for (const [relName, relSpec] of Object.entries(relations)) {
-        let resolvedFk: string | undefined;
-
-        if (relSpec.foreignKey) {
-            const descriptor = (relSpec.foreignKey as Function)(varTree as any);
-            const inner = (descriptor as any)?.[
-                SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-            ];
-            if (!inner?.propertyName) {
-                throw new Error(
-                    `withVariants: variant "${variantKey}" relation "${relName}" foreignKey accessor must return a top-level property descriptor`
-                );
-            }
-            const fkPropKey: string = inner.propertyName;
-            resolvedFk = propToCol.get(fkPropKey) ?? fkPropKey;
-        }
-
-        result.push({
-            name: relName,
-            type: relSpec.type,
-            schema: relSpec.schema,
-            foreignKey: resolvedFk,
-            through: relSpec.through
-        });
-    }
-    return result;
-}
-
 /**
  * Phantom-type brand placed on an `ObjectSchemaBuilder` by `.withVariants()`.
  * The brand carries the discriminated-union result type so that
@@ -125,35 +81,6 @@ function resolveVariantRelations(
 export const POLYMORPHIC_TYPE_BRAND: unique symbol = Symbol.for(
     '@cleverbrush/knex-schema:polymorphicType'
 );
-
-// ---------------------------------------------------------------------------
-// VariantUnion — infers the discriminated-union result type
-// ---------------------------------------------------------------------------
-
-/**
- * Given a base `ObjectSchemaBuilder`, a discriminator property key, and a
- * map of variant specs, computes the discriminated union of all variant
- * row types.
- *
- * For each variant key `K`:
- *   - start from `InferType<TBase>` (all base fields)
- *   - override the discriminator field with the literal `K`
- *   - merge in `InferType<TVariantMap[K]['schema']>` (extra fields)
- *
- * @internal
- */
-type VariantUnion<
-    TBase extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-    TDiscKey extends string,
-    TVariantMap extends Record<
-        string,
-        { schema: ObjectSchemaBuilder<any, any, any, any, any, any, any> }
-    >
-> = {
-    [K in keyof TVariantMap & string]: Omit<InferType<TBase>, TDiscKey> &
-        Record<TDiscKey, K> &
-        InferType<TVariantMap[K]['schema']>;
-}[keyof TVariantMap & string];
 
 // ---------------------------------------------------------------------------
 // Shared implementations
@@ -987,7 +914,7 @@ export const ddlExtension = defineExtension({
             const existing =
                 (this.getExtension('beforeDelete') as Function[]) ?? [];
             return this.withExtension('beforeDelete', [...existing, fn]);
-        },
+        }
 
         /**
          * Declare polymorphic variants for this schema.
@@ -1048,209 +975,129 @@ export const ddlExtension = defineExtension({
          * // >
          * ```
          */
-        withVariants<
-            TProperties extends Record<
-                string,
-                SchemaBuilder<any, any, any, any, any>
-            >,
-            const TDiscKey extends keyof TProperties & string,
-            TVariantMap extends Record<string, VariantSpecInput<any>>
-        >(
-            this: ObjectSchemaBuilder<
-                TProperties,
-                any,
-                any,
-                any,
-                any,
-                any,
-                any
-            >,
-            config: {
-                /** Property key on this schema used to select the variant. */
-                discriminator:
-                    | TDiscKey
-                    | ((
-                          t: PropertyDescriptorTree<
-                              ObjectSchemaBuilder<
-                                  TProperties,
-                                  any,
-                                  any,
-                                  any,
-                                  any,
-                                  any,
-                                  any
-                              >,
-                              ObjectSchemaBuilder<
-                                  TProperties,
-                                  any,
-                                  any,
-                                  any,
-                                  any,
-                                  any,
-                                  any
-                              >
-                          >
-                      ) => PropertyDescriptor<any, any, any, TDiscKey>);
-                /** Map from discriminator value → variant spec. */
-                variants: {
-                    [K in keyof TVariantMap]: VariantSpecInput<
-                        TVariantMap[K]['schema']
-                    >;
-                };
-            }
-        ): typeof this & {
-            readonly [POLYMORPHIC_TYPE_BRAND]?: VariantUnion<
-                ObjectSchemaBuilder<TProperties, any, any, any, any, any, any>,
-                TDiscKey,
-                TVariantMap
-            >;
-        } {
-            // 1. Resolve discriminator property key
-            let discKey: string;
-            if (typeof config.discriminator === 'string') {
-                discKey = config.discriminator;
-            } else {
-                const tree = ObjectSchemaBuilderClass.getPropertiesFor(
-                    this as any
-                );
-                const descriptor = (config.discriminator as Function)(
-                    tree as any
-                );
-                const inner = (descriptor as any)?.[
-                    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-                ];
-                if (!inner?.propertyName) {
-                    throw new Error(
-                        'withVariants: discriminator accessor must return a top-level property descriptor'
-                    );
-                }
-                discKey = inner.propertyName as string;
-            }
-
-            // 2. Validate & normalise each variant spec
-            const resolvedVariants: Record<string, ResolvedVariantSpec> = {};
-            const variantSchemas: ObjectSchemaBuilder<
-                any,
-                any,
-                any,
-                any,
-                any,
-                any,
-                any
-            >[] = [];
-
-            for (const [key, spec] of Object.entries(
-                config.variants as Record<string, VariantSpecInput>
-            )) {
-                const varSchema = spec.schema as ObjectSchemaBuilder<
-                    any,
-                    any,
-                    any,
-                    any,
-                    any,
-                    any,
-                    any
-                >;
-                let tableName: string | undefined;
-
-                // Validate: if the variant schema declares the discriminator
-                // property, its equalsTo literal must match the map key.
-                const varIntrospected = varSchema.introspect() as any;
-                const varProps: Record<string, any> =
-                    varIntrospected.properties ?? {};
-                if (discKey in varProps) {
-                    const discPropIntrospected = varProps[
-                        discKey
-                    ].introspect() as any;
-                    const equalsTo: string | undefined =
-                        discPropIntrospected.equalsTo;
-                    if (equalsTo === undefined) {
-                        throw new Error(
-                            `withVariants: variant "${key}" declares discriminator property "${discKey}" ` +
-                                `but it has no literal value — use string('${key}') instead of string()`
-                        );
-                    }
-                    if (equalsTo !== key) {
-                        throw new Error(
-                            `withVariants: variant "${key}" declares discriminator "${discKey}" = ` +
-                                `string('${equalsTo}') but the map key is '${key}' — they must match`
-                        );
-                    }
-                }
-
-                // Resolve & validate CTI-specific fields.
-                let resolvedForeignKey: string | undefined;
-                if (spec.storage === 'cti') {
-                    tableName = varSchema.getExtension('tableName') as
-                        | string
-                        | undefined;
-                    if (!tableName) {
-                        throw new Error(
-                            `withVariants: CTI variant "${key}" schema must have .hasTableName() configured`
-                        );
-                    }
-                    if (!spec.foreignKey) {
-                        throw new Error(
-                            `withVariants: CTI variant "${key}" must specify foreignKey (the FK property accessor on the variant schema)`
-                        );
-                    }
-                    // Resolve the accessor to a property key, then to a column name.
-                    const varTree = ObjectSchemaBuilderClass.getPropertiesFor(
-                        varSchema as any
-                    );
-                    const fkDescriptor = (spec.foreignKey as Function)(
-                        varTree as any
-                    );
-                    const fkInner = (fkDescriptor as any)?.[
-                        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
-                    ];
-                    if (!fkInner?.propertyName) {
-                        throw new Error(
-                            `withVariants: CTI variant "${key}" foreignKey accessor must return a top-level property descriptor`
-                        );
-                    }
-                    const fkPropKey: string = fkInner.propertyName;
-                    const fkPropSchema = varProps[fkPropKey];
-                    if (!fkPropSchema) {
-                        throw new Error(
-                            `withVariants: CTI variant "${key}" foreignKey property "${fkPropKey}" not found in variant schema`
-                        );
-                    }
-                    resolvedForeignKey = getColumnName(fkPropSchema, fkPropKey);
-                }
-
-                resolvedVariants[key] = {
-                    storage: spec.storage as VariantStorageType,
-                    schema: varSchema,
-                    foreignKey: resolvedForeignKey,
-                    tableName,
-                    allowOrphan: spec.allowOrphan ?? false,
-                    enforceCheck: spec.enforceCheck ?? false,
-                    relations: resolveVariantRelations(
-                        key,
-                        varSchema,
-                        (spec as VariantSpecInput).relations ?? {}
-                    )
-                };
-
-                variantSchemas.push(varSchema);
-            }
-
-            // 3. Store resolved config + migration-discovery array
-            const variantConfig: Omit<
-                ResolvedVariantConfig,
-                'discriminatorColumn'
-            > = {
-                discriminatorKey: discKey,
-                variants: resolvedVariants
-            };
-
-            return (this as any)
-                .withExtension('variants', variantConfig)
-                .withExtension('polymorphicVariants', variantSchemas);
-        }
+        // NOTE: the public `.withVariants()` schema-level method has been
+        // removed. Variants are now declared on the {@link Entity} chain via
+        // `defineEntity(...).discriminator(...).ctiVariant(...).stiVariant(...)`.
+        // The internal worker {@link applyVariantsToSchema} (below this
+        // `defineExtension` block) is invoked by the Entity layer and stores
+        // the same `'variants'` / `'polymorphicVariants'` extensions that
+        // `SchemaQueryBuilder` reads at runtime.
     }
 });
+
+// ---------------------------------------------------------------------------
+// Variant resolution worker (used by the Entity layer)
+// ---------------------------------------------------------------------------
+
+/**
+ * @internal Input to {@link applyVariantsToSchema}: a single resolved variant
+ * entry, as produced by `Entity.ctiVariant()` / `Entity.stiVariant()`.
+ */
+export interface VariantInputForResolver {
+    /** CTI-only: FK column name on the variant table that joins back to base PK. */
+    foreignKeyColumn?: string;
+    /** Variant body schema (CTI table or STI extras). */
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+    storage: VariantStorageType;
+    allowOrphan?: boolean;
+    enforceCheck?: boolean;
+    /**
+     * Variant-scoped relations (already resolved to FK column names). When
+     * the variant entry is sourced from another `Entity`, these are read
+     * from that entity's `'relations'` extension and passed in here.
+     */
+    relations?: ResolvedVariantRelationSpec[];
+}
+
+/**
+ * @internal Validate + apply a fully-resolved variant config to a base
+ * schema. Stores the `'variants'` and `'polymorphicVariants'` extensions
+ * read by {@link SchemaQueryBuilder}.
+ *
+ * Called by the {@link Entity} chain (`.discriminator().ctiVariant().stiVariant()`).
+ * Replaces the previous schema-level `.withVariants()` method.
+ */
+export function applyVariantsToSchema(
+    baseSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    discriminatorKey: string,
+    variants: Record<string, VariantInputForResolver>
+): ObjectSchemaBuilder<any, any, any, any, any, any, any> {
+    const resolvedVariants: Record<string, ResolvedVariantSpec> = {};
+    const variantSchemas: ObjectSchemaBuilder<
+        any,
+        any,
+        any,
+        any,
+        any,
+        any,
+        any
+    >[] = [];
+
+    for (const [key, spec] of Object.entries(variants)) {
+        const varSchema = spec.schema;
+
+        // Validate: if the variant schema declares the discriminator
+        // property, its equalsTo literal must match the map key.
+        const varIntrospected = varSchema.introspect() as any;
+        const varProps: Record<string, any> = varIntrospected.properties ?? {};
+        if (discriminatorKey in varProps) {
+            const discPropIntrospected = varProps[
+                discriminatorKey
+            ].introspect() as any;
+            const equalsTo: string | undefined = discPropIntrospected.equalsTo;
+            if (equalsTo === undefined) {
+                throw new Error(
+                    `withVariants: variant "${key}" declares discriminator property "${discriminatorKey}" ` +
+                        `but it has no literal value — use string('${key}') instead of string()`
+                );
+            }
+            if (equalsTo !== key) {
+                throw new Error(
+                    `withVariants: variant "${key}" declares discriminator "${discriminatorKey}" = ` +
+                        `string('${equalsTo}') but the map key is '${key}' — they must match`
+                );
+            }
+        }
+
+        let tableName: string | undefined;
+        if (spec.storage === 'cti') {
+            tableName = varSchema.getExtension('tableName') as
+                | string
+                | undefined;
+            if (!tableName) {
+                throw new Error(
+                    `withVariants: CTI variant "${key}" schema must have .hasTableName() configured`
+                );
+            }
+            if (!spec.foreignKeyColumn) {
+                throw new Error(
+                    `withVariants: CTI variant "${key}" must specify foreignKey (the FK property accessor on the variant schema)`
+                );
+            }
+        }
+
+        resolvedVariants[key] = {
+            storage: spec.storage,
+            schema: varSchema,
+            foreignKey: spec.foreignKeyColumn,
+            tableName,
+            allowOrphan: spec.allowOrphan ?? false,
+            enforceCheck: spec.enforceCheck ?? false,
+            relations: spec.relations ?? []
+        };
+
+        variantSchemas.push(varSchema);
+    }
+
+    const variantConfig: Omit<ResolvedVariantConfig, 'discriminatorColumn'> = {
+        discriminatorKey,
+        variants: resolvedVariants
+    };
+
+    return (baseSchema as any)
+        .withExtension('variants', variantConfig)
+        .withExtension('polymorphicVariants', variantSchemas);
+}
 
 // ---------------------------------------------------------------------------
 // Extended factory functions

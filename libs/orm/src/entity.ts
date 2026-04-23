@@ -15,7 +15,6 @@ export type {
     EntityRelationKeys,
     EntityRelations,
     EntitySchema,
-    EntityVariantInput,
     RelationInfo,
     SchemaProps,
     UnwrapNavSchema,
