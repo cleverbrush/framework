@@ -8,10 +8,12 @@
 // Relations are still stored at runtime in the schema's `relations`
 // extension (compatible with the existing query/include implementation).
 
-import type {
-    ArraySchemaBuilder,
+import {
+    type ArraySchemaBuilder,
     ObjectSchemaBuilder,
-    SchemaBuilder
+    type PropertyDescriptorTree,
+    type SchemaBuilder,
+    SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
 
 // ---------------------------------------------------------------------------
@@ -53,15 +55,58 @@ export type SchemaProps<T> =
         : never;
 
 /**
- * Selector tree: a record `{ [propName]: propName }` enabling
- * `t => t.someProp` selectors that return the literal property key.
+ * Strips the `withExtensions()` overlay from a schema type, reducing it to a
+ * plain `ObjectSchemaBuilder<TProps, TReq>` so `PropertyDescriptorTree<...>`
+ * resolves without hitting TypeScript's recursion depth limit.
+ *
+ * @internal
+ */
+type EntitySchemaBase<
+    T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> =
+    T extends ObjectSchemaBuilder<infer P, infer Req, any, any, any, any, any>
+        ? ObjectSchemaBuilder<P, Req>
+        : never;
+
+/**
+ * `PropertyDescriptorTree` overlay that pins each top-level property's
+ * literal `propertyName` into its descriptor. Required because
+ * `PropertyDescriptorTree` widens `propertyName` to `string` for sub-trees
+ * whose property is itself an `ObjectSchemaBuilder` (since
+ * `PropertyDescriptorTree` lacks a `TPropertyKey` generic).
+ *
+ * @internal
+ */
+type EntityTree<
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> = PropertyDescriptorTree<
+    EntitySchemaBase<TSchema>,
+    EntitySchemaBase<TSchema>
+> & {
+    readonly [K in keyof SchemaProps<TSchema> & string]: {
+        readonly [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+            readonly propertyName: K;
+        };
+    };
+};
+
+/**
+ * Selector callback that receives a real {@link PropertyDescriptorTree} so
+ * `t => t.someProp` navigates to the property definition and preserves its
+ * JSDoc in IDE tooltips. The return shape is matched structurally on the
+ * `[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].propertyName` field, which captures
+ * the literal property key as `TKey`.
  *
  * @public
  */
-export type KeyTree<TSchema> =
-    SchemaProps<TSchema> extends infer P
-        ? { readonly [K in keyof P & string]: K }
-        : never;
+export type EntityPropSelector<
+    TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TKey extends string = string
+> = (t: EntityTree<TSchema>) => {
+    readonly [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+        readonly propertyName: TKey;
+    };
+};
 
 /**
  * Peel `.optional()` / `array(...)` wrappers off a navigation property's
@@ -220,14 +265,20 @@ export class Entity<
             any
         > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>
     >(
-        navSel: (t: KeyTree<TSchema>) => TKey,
-        _localSel: (l: KeyTree<TSchema>) => string,
-        remoteSel: (r: KeyTree<TForeign>) => string,
+        navSel: EntityPropSelector<TSchema, TKey>,
+        _localSel: EntityPropSelector<TSchema>,
+        remoteSel: EntityPropSelector<TForeign>,
         opts?: { optional?: boolean }
     ): WithRelation<TSchema, TRels, TKey, 'hasOne', TForeign> {
-        const navName = navSel(this._keyTree() as KeyTree<TSchema>);
+        const navName = this._resolvePropName(
+            navSel as EntityPropSelector<TSchema>,
+            this.schema
+        );
         const foreignSchema = this._resolveForeignSchema(navName);
-        const remoteKey = remoteSel(this._keyTreeOf(foreignSchema));
+        const remoteKey = this._resolvePropName(
+            remoteSel as EntityPropSelector<any>,
+            foreignSchema
+        );
         // For hasOne the FK is on the FOREIGN table → store remoteKey.
         return this._addRelation({
             type: 'hasOne',
@@ -257,13 +308,19 @@ export class Entity<
             any
         > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>
     >(
-        navSel: (t: KeyTree<TSchema>) => TKey,
-        _localSel: (l: KeyTree<TSchema>) => string,
-        remoteSel: (r: KeyTree<TForeign>) => string
+        navSel: EntityPropSelector<TSchema, TKey>,
+        _localSel: EntityPropSelector<TSchema>,
+        remoteSel: EntityPropSelector<TForeign>
     ): WithRelation<TSchema, TRels, TKey, 'hasMany', TForeign> {
-        const navName = navSel(this._keyTree() as KeyTree<TSchema>);
+        const navName = this._resolvePropName(
+            navSel as EntityPropSelector<TSchema>,
+            this.schema
+        );
         const foreignSchema = this._resolveForeignSchema(navName);
-        const remoteKey = remoteSel(this._keyTreeOf(foreignSchema));
+        const remoteKey = this._resolvePropName(
+            remoteSel as EntityPropSelector<any>,
+            foreignSchema
+        );
         return this._addRelation({
             type: 'hasMany',
             name: navName,
@@ -291,14 +348,17 @@ export class Entity<
             any
         > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>
     >(
-        navSel: (t: KeyTree<TSchema>) => TKey,
-        localSel: (l: KeyTree<TSchema>) => string,
-        _remoteSel: (r: KeyTree<TForeign>) => string,
+        navSel: EntityPropSelector<TSchema, TKey>,
+        localSel: EntityPropSelector<TSchema>,
+        _remoteSel: EntityPropSelector<TForeign>,
         opts?: { optional?: boolean }
     ): WithRelation<TSchema, TRels, TKey, 'belongsTo', TForeign> {
-        const navName = navSel(this._keyTree() as KeyTree<TSchema>);
+        const navName = this._resolvePropName(
+            navSel as EntityPropSelector<TSchema>,
+            this.schema
+        );
         const foreignSchema = this._resolveForeignSchema(navName);
-        const localKey = localSel(this._keyTree() as KeyTree<TSchema>);
+        const localKey = this._resolvePropName(localSel, this.schema);
         // For belongsTo the FK is on THIS table → store localKey.
         return this._addRelation({
             type: 'belongsTo',
@@ -327,10 +387,13 @@ export class Entity<
             any
         > = UnwrapNavSchema<SchemaProps<TSchema>[TKey]>
     >(
-        navSel: (t: KeyTree<TSchema>) => TKey,
+        navSel: EntityPropSelector<TSchema, TKey>,
         through: { table: string; localKey: string; foreignKey: string }
     ): WithRelation<TSchema, TRels, TKey, 'belongsToMany', TForeign> {
-        const navName = navSel(this._keyTree() as KeyTree<TSchema>);
+        const navName = this._resolvePropName(
+            navSel as EntityPropSelector<TSchema>,
+            this.schema
+        );
         const foreignSchema = this._resolveForeignSchema(navName);
         return this._addRelation({
             type: 'belongsToMany',
@@ -354,14 +417,15 @@ export class Entity<
         const TDiscKey extends keyof SchemaProps<TSchema> & string,
         const TVariants extends Record<string, EntityVariantInput<TSchema>>
     >(config: {
-        discriminator: TDiscKey | ((t: KeyTree<TSchema>) => TDiscKey);
+        discriminator: TDiscKey | EntityPropSelector<TSchema, TDiscKey>;
         variants: TVariants;
     }): Entity<TSchema, TRels & MergedVariantRels<TVariants>> {
         const discKey =
             typeof config.discriminator === 'string'
                 ? config.discriminator
-                : (config.discriminator as Function)(
-                      this._keyTree() as KeyTree<TSchema>
+                : this._resolvePropName(
+                      config.discriminator as EntityPropSelector<TSchema>,
+                      this.schema
                   );
 
         // Translate to legacy `withVariants` shape used by the schema-level
@@ -393,20 +457,34 @@ export class Entity<
         return new Entity(next) as any;
     }
 
-    /** @internal */
-    private _keyTree(): Record<string, string> {
-        const props = (this.schema as any).introspect?.()?.properties ?? {};
-        const tree: Record<string, string> = {};
-        for (const k of Object.keys(props)) tree[k] = k;
-        return tree;
-    }
-
-    /** @internal */
-    private _keyTreeOf(schema: any): any {
-        const props = schema?.introspect?.()?.properties ?? {};
-        const tree: Record<string, string> = {};
-        for (const k of Object.keys(props)) tree[k] = k;
-        return tree;
+    /**
+     * @internal
+     * Resolve a selector callback against the real `PropertyDescriptorTree`
+     * of the given schema, returning the top-level property name. Throws if
+     * the accessor does not yield a valid descriptor.
+     */
+    private _resolvePropName(
+        selector: (t: any) => any,
+        schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    ): string {
+        const tree = ObjectSchemaBuilder.getPropertiesFor(schema as any);
+        const descriptor = selector(tree as any);
+        if (
+            !descriptor ||
+            typeof descriptor !== 'object' ||
+            !(SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in descriptor)
+        ) {
+            throw new Error(
+                'Entity relation selector must return a property descriptor, e.g. `t => t.author`.'
+            );
+        }
+        const inner = (descriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+        if (typeof inner.propertyName !== 'string') {
+            throw new Error(
+                'Entity relation selector must return a top-level property descriptor.'
+            );
+        }
+        return inner.propertyName as string;
     }
 
     /** @internal Resolve the foreign schema from a nav property. */

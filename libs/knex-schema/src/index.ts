@@ -9,11 +9,11 @@ export {
 // DDL generation
 export { generateCreatePolymorphicTables, generateCreateTable } from './ddl.js';
 export type {
+    EntityPropSelector,
     EntityRelationKeys,
     EntityRelations,
     EntitySchema,
     EntityVariantInput,
-    KeyTree,
     RelationInfo,
     SchemaProps,
     UnwrapNavSchema,

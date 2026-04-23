@@ -151,8 +151,7 @@ export const TodoEntity = defineEntity(TodoSchema)
     .belongsTo(
         t => t.author,
         l => l.userId,
-        r => r.id,
-        { optional: true }
+        r => r.id
     )
     .hasMany(
         t => t.activity,

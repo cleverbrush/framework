@@ -11,11 +11,11 @@
 // typed.
 
 export type {
+    EntityPropSelector,
     EntityRelationKeys,
     EntityRelations,
     EntitySchema,
     EntityVariantInput,
-    KeyTree,
     RelationInfo,
     SchemaProps,
     UnwrapNavSchema,
