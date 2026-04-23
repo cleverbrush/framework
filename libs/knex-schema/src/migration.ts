@@ -407,8 +407,12 @@ export function diffSchema(
             }
 
             // Compare defaultValue (null / undefined both mean "no default")
-            // Skip columns whose default is controlled by a table-level extension.
-            if (!extensionOwnedDefaults.has(col)) {
+            // Skip columns whose default is controlled by a table-level extension,
+            // or auto-increment PKs whose nextval(...) default is DB-managed.
+            if (
+                !extensionOwnedDefaults.has(col) &&
+                !ext.primaryKey?.autoIncrement
+            ) {
                 const snapshotDefault = dbCol.defaultValue ?? null;
                 const schemaDefault = ext.defaultTo ?? null;
                 if (snapshotDefault !== schemaDefault) {

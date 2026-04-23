@@ -144,13 +144,10 @@ export function generateCreateTable(
                     const ext: Record<string, any> =
                         propIntrospected.extensions ?? {};
 
-                    // Skip navigation properties (object/array without an
-                    // explicit columnType override — these are ORM relations).
-                    if (
-                        (propIntrospected.type === 'object' ||
-                            propIntrospected.type === 'array') &&
-                        !ext.columnType
-                    ) {
+                    // Skip array navigation properties without an explicit
+                    // columnType override — these are ORM relations. Nested
+                    // object properties default to jsonb and are NOT skipped.
+                    if (propIntrospected.type === 'array' && !ext.columnType) {
                         continue;
                     }
                     // Skip columns owned by table-level extensions.

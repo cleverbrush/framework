@@ -1,6 +1,4 @@
 import type { BoundQuery, DbContext, TrackedDbContext } from '@cleverbrush/orm';
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
 import type { Logger } from '@cleverbrush/log';
 import { any } from '@cleverbrush/schema';
 import type { Knex } from 'knex';

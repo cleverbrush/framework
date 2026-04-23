@@ -90,7 +90,7 @@ export const TodoActivityEntity = defineEntity(TodoActivityBaseDbSchema)
                 assignee: {
                     type: 'belongsTo',
                     schema: () => UserDbSchema,
-                    foreignKey: (t: any) => t.assignedToUserId
+                    foreignKey: t => t.assignedToUserId
                 }
             }
         }

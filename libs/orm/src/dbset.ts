@@ -259,7 +259,9 @@ export interface DbSet<TEntity extends Entity<any, any, any>>
 
 const ENTITY_KEY_TREE_CACHE = new WeakMap<object, Record<string, string>>();
 
-function getEntityKeyTree(entity: Entity<any, any, any>): Record<string, string> {
+function getEntityKeyTree(
+    entity: Entity<any, any, any>
+): Record<string, string> {
     const cached = ENTITY_KEY_TREE_CACHE.get(entity);
     if (cached) return cached;
     const props =
