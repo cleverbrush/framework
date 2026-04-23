@@ -5859,7 +5859,7 @@ export type FixedMethods<TRawMethods, TBase, TAccum extends string = never, TExt
         readonly [METHOD_LITERAL_BRAND]?: TAccum | TName;
     } & ([keyof TExtraTypes] extends [never] ? {} : {
         readonly [EXTRA_TYPE_BRAND]?: TExtraTypes;
-    }) : (...args: A) => R & TBase & FixedMethods<TRawMethods, TBase, TAccum, TExtraTypes> & HiddenExtensionMethods & ([TAccum] extends [never] ? {} : {
+    }) : (...args: A) => TBase & FixedMethods<TRawMethods, TBase, TAccum, TExtraTypes> & HiddenExtensionMethods & ([TAccum] extends [never] ? {} : {
         readonly [METHOD_LITERAL_BRAND]?: TAccum;
     }) & ([keyof TExtraTypes] extends [never] ? {} : {
         readonly [EXTRA_TYPE_BRAND]?: TExtraTypes;

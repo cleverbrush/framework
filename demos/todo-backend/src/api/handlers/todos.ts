@@ -58,10 +58,7 @@ export const getTodoHandler: Handler<typeof GetTodoEndpoint> = async (
     { params, principal },
     { db }
 ) => {
-    const todo = await db.todos
-        .projected('response')
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -106,10 +103,7 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
     { params, body, principal },
     { db, logger }
 ) => {
-    const todo = await db.todos
-        .projected('ownership')
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -151,10 +145,7 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
     { params, principal },
     { db, logger }
 ) => {
-    const todo = await db.todos
-        .projected('ownership')
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -185,8 +176,7 @@ export const getTodoWithAuthorHandler: Handler<
 > = async ({ params, principal }, { db }) => {
     const todoWithAuthor = await db.todos
         .include(t => t.author)
-        .where(t => t.id, params.id)
-        .first();
+        .find(params.id);
 
     if (!todoWithAuthor) {
         return ActionResult.notFound({
@@ -220,10 +210,7 @@ export const getTodoWithAuthorHandler: Handler<
 export const sendTodoEventHandler: Handler<
     typeof SendTodoEventEndpoint
 > = async ({ params, body, principal }, { db, logger }) => {
-    const todo = await db.todos
-        .projected('ownership')
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -284,10 +271,7 @@ export const sendTodoEventHandler: Handler<
 export const listTodoActivityHandler: Handler<
     typeof ListTodoActivityEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todo = await db.todos
-        .projected('ownership')
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -362,10 +346,7 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
 export const downloadAttachmentHandler: Handler<
     typeof DownloadAttachmentEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todo = await db.todos
-        .projected('response')
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -468,10 +449,7 @@ export const completeTodoHandler: Handler<typeof CompleteTodoEndpoint> = async (
     { params, headers, principal },
     { db, logger }
 ) => {
-    const todo = await db.todos
-        .projected('response')
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({

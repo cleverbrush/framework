@@ -21,8 +21,10 @@ import {
     defineExtension,
     EXTRA_TYPE_BRAND,
     METHOD_LITERAL_BRAND,
+    NumberSchemaBuilder as NumberSchemaBuilderClass,
     numberExtensions,
     ObjectSchemaBuilder as ObjectSchemaBuilderClass,
+    StringSchemaBuilder as StringSchemaBuilderClass,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR,
     stringExtensions,
     withExtensions
@@ -354,21 +356,6 @@ type FKAction = 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
  */
 export const ddlExtension = defineExtension({
     number: {
-        /** Mark this column as a primary key.
-         * @param opts - Options. `autoIncrement` defaults to `true`.
-         */
-        primaryKey(
-            this: NumberSchemaBuilder<any, any, any, any, any>,
-            opts?: { autoIncrement?: boolean }
-        ): typeof this & {
-            readonly [PRIMARY_KEY_BRAND]?: true;
-        } {
-            return this.withExtension('primaryKey', {
-                autoIncrement: opts?.autoIncrement ?? true
-            }) as typeof this & {
-                readonly [PRIMARY_KEY_BRAND]?: true;
-            };
-        },
         /** Add a foreign key reference to another table.
          * @param table - The referenced table name.
          * @param column - The referenced column (defaults to `'id'`).
@@ -459,18 +446,6 @@ export const ddlExtension = defineExtension({
         }
     },
     string: {
-        /** Mark this column as a primary key (non-auto-increment). */
-        primaryKey(
-            this: StringSchemaBuilder<any, any, any, any, any>
-        ): typeof this & {
-            readonly [PRIMARY_KEY_BRAND]?: true;
-        } {
-            return this.withExtension('primaryKey', {
-                autoIncrement: false
-            }) as typeof this & {
-                readonly [PRIMARY_KEY_BRAND]?: true;
-            };
-        },
         /** Override the SQL column type (e.g. `'text'`, `'uuid'`, `'jsonb'`, `'citext'`). */
         columnType(
             this: StringSchemaBuilder<any, any, any, any, any>,
@@ -688,23 +663,6 @@ export const ddlExtension = defineExtension({
         ) {
             const existing = (this.getExtension('checks') as any[]) ?? [];
             return this.withExtension('checks', [...existing, sql]);
-        },
-        /** Set a composite primary key.
-         * @param columns - Column names (or property keys) forming the primary key,
-         *   in declaration order. Use `as const` to preserve ordering at the type level.
-         */
-        hasPrimaryKey<const TCols extends readonly string[]>(
-            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-            columns: TCols
-        ): typeof this & {
-            readonly [COMPOSITE_PRIMARY_KEY_BRAND]?: TCols;
-        } {
-            return this.withExtension(
-                'compositePrimaryKey',
-                columns as readonly string[]
-            ) as typeof this & {
-                readonly [COMPOSITE_PRIMARY_KEY_BRAND]?: TCols;
-            };
         },
         /** Add a raw SQL column definition not backed by a schema property.
          * @param name - Column name.
@@ -1315,6 +1273,110 @@ export const array = extended.array;
 export const union = extended.union;
 export const func = extended.func;
 export const any = extended.any;
+
+// ---------------------------------------------------------------------------
+// Primary-key methods (declared & patched out-of-band)
+// ---------------------------------------------------------------------------
+//
+// `.primaryKey()` and `.hasPrimaryKey()` are declared here via TypeScript
+// declaration merging on the base builder classes (NumberSchemaBuilder,
+// StringSchemaBuilder, ObjectSchemaBuilder) instead of via `defineExtension`.
+//
+// Why: `defineExtension` methods are rewritten by the schema library's
+// `FixedMethods<>` mapped type, which replaces the declared return type of
+// every extension method with `TBase & FixedMethods<...>`. That rewriting
+// silently discards any phantom-brand intersections (such as the
+// `[PRIMARY_KEY_BRAND]` carried on the return type), so downstream type-level
+// helpers like `PrimaryKeyOf` / `PrimaryKeyValueOf` resolve to `never`.
+//
+// By declaring these methods directly on the underlying classes via module
+// augmentation, the brand intersection survives — `this & { [PRIMARY_KEY_BRAND]?: true }`
+// stays attached to the builder type stored in `TProperties[K]`, so
+// `find(id)` infers the correct primary-key value type.
+// ---------------------------------------------------------------------------
+
+declare module '@cleverbrush/schema' {
+    interface NumberSchemaBuilder<
+        TResult,
+        TRequired extends boolean,
+        TNullable extends boolean,
+        THasDefault extends boolean,
+        TExtensions
+    > {
+        /** Mark this column as a primary key.
+         * @param opts - Options. `autoIncrement` defaults to `true`.
+         */
+        primaryKey(opts?: { autoIncrement?: boolean }): this & {
+            readonly [PRIMARY_KEY_BRAND]?: true;
+        };
+    }
+
+    interface StringSchemaBuilder<
+        TResult,
+        TRequired extends boolean,
+        TNullable extends boolean,
+        THasDefault extends boolean,
+        TExtensions
+    > {
+        /** Mark this column as a primary key (non-auto-increment). */
+        primaryKey(): this & {
+            readonly [PRIMARY_KEY_BRAND]?: true;
+        };
+    }
+
+    interface ObjectSchemaBuilder<
+        TProperties extends Record<
+            string,
+            SchemaBuilder<any, any, any, any, any>
+        >,
+        TRequired extends boolean,
+        TNullable extends boolean,
+        TExplicitType,
+        THasDefault extends boolean,
+        TExtensions,
+        TConstructorSchemas
+    > {
+        /** Set a composite primary key.
+         * @param columns - Column names (or property keys) forming the primary key,
+         *   in declaration order. Use `as const` to preserve ordering at the type level.
+         */
+        hasPrimaryKey<const TCols extends readonly string[]>(
+            columns: TCols
+        ): this & {
+            readonly [COMPOSITE_PRIMARY_KEY_BRAND]?: TCols;
+        };
+    }
+}
+
+// Runtime patches: install the methods on the prototypes.
+// Idempotent — safe even if the module is loaded multiple times.
+(() => {
+    const numProto = NumberSchemaBuilderClass.prototype as any;
+    if (typeof numProto.primaryKey !== 'function') {
+        numProto.primaryKey = function (opts?: { autoIncrement?: boolean }) {
+            return this.withExtension('primaryKey', {
+                autoIncrement: opts?.autoIncrement ?? true
+            });
+        };
+    }
+
+    const strProto = StringSchemaBuilderClass.prototype as any;
+    if (typeof strProto.primaryKey !== 'function') {
+        strProto.primaryKey = function () {
+            return this.withExtension('primaryKey', { autoIncrement: false });
+        };
+    }
+
+    const objProto = ObjectSchemaBuilderClass.prototype as any;
+    if (typeof objProto.hasPrimaryKey !== 'function') {
+        objProto.hasPrimaryKey = function (columns: readonly string[]) {
+            return this.withExtension(
+                'compositePrimaryKey',
+                columns as readonly string[]
+            );
+        };
+    }
+})();
 
 // ---------------------------------------------------------------------------
 // Helpers

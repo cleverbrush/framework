@@ -36,10 +36,7 @@ export const deleteUserHandler: Handler<typeof DeleteUserEndpoint> = async (
         });
     }
 
-    const user = await db.users
-        .projected('public')
-        .where(t => t.id, params.id)
-        .first();
+    const user = await db.users.find(params.id);
 
     if (!user) {
         return ActionResult.notFound({
@@ -58,10 +55,7 @@ export const getMyProfileHandler: Handler<typeof GetMyProfileEndpoint> = async (
     { principal },
     { db }
 ) => {
-    const user = await db.users
-        .projected('public')
-        .where(t => t.id, principal.userId)
-        .first();
+    const user = await db.users.find(principal.userId);
 
     if (!user) {
         return ActionResult.notFound({
