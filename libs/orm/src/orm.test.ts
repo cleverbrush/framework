@@ -1625,3 +1625,351 @@ describe('PendingChangesError', () => {
         expect(e.message).toContain('3');
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — withTransaction / transaction (dbcontext.ts lines 195–206)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — withTransaction / transaction', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('withTransaction returns a new tracked context bound to the transaction', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const trxDb = db.withTransaction(
+            mock.knex as unknown as KnexT.Transaction
+        );
+        expect(trxDb).not.toBe(db);
+        expect(trxDb.users.entity).toBe(UserEntity);
+    });
+
+    it('transaction() on a tracked context runs the callback inside knex.transaction', async () => {
+        const fakeTrx = { __isTrx: true } as unknown as KnexT.Transaction;
+        const txSpy = vi
+            .spyOn(mock.knex, 'transaction')
+            .mockImplementation(((cb: any) => cb(fakeTrx)) as any);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const cb = vi.fn(async (innerDb: any) => {
+            expect(innerDb.users.entity).toBe(UserEntity);
+            return 'ok';
+        });
+        const result = await db.transaction(cb);
+        expect(result).toBe('ok');
+        expect(txSpy).toHaveBeenCalledOnce();
+        expect(cb).toHaveBeenCalledOnce();
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — rowVersion snapshot refresh (change-tracker.ts 852, 864)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const VersionedSchema = object({
+    id: number().primaryKey(),
+    name: string(),
+    version: number().rowVersion()
+}).hasTableName('versioned');
+const VersionedEntity = defineEntity(VersionedSchema);
+
+describe('Tracked DbContext — rowVersion snapshot refresh', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('saveChanges() refreshes rowVersion.snapshotValue on an Added entity after INSERT (line 852)', async () => {
+        stubTransaction();
+        // The INSERT returns a row with generated id and initial version.
+        mock.responses.push([{ id: 7, name: 'Test', version: 1 }]);
+
+        const db = createDb(
+            mock.knex,
+            { versioned: VersionedEntity },
+            { tracking: true }
+        );
+        // No `id` → goes into addedWithoutPk with rowVersion tracked.
+        const entity = { name: 'Test' } as any;
+        db.attach('versioned', entity);
+
+        const result = await db.saveChanges();
+        expect(result.inserted).toBe(1);
+
+        // The INSERT result propagated id and version back to the entity.
+        expect(entity.id).toBe(7);
+        expect(entity.version).toBe(1);
+
+        // Entry is now Unchanged; a second saveChanges() emits no SQL.
+        expect(db.entry(entity).state).toBe('Unchanged');
+        const result2 = await db.saveChanges();
+        expect(result2.inserted).toBe(0);
+        expect(result2.updated).toBe(0);
+    });
+
+    it('saveChanges() increments rowVersion and refreshes snapshot on a Modified entity (line 864)', async () => {
+        stubTransaction();
+        // Stub the UPDATE response (rowCount = 1).
+        mock.responses.push([]);
+
+        const db = createDb(
+            mock.knex,
+            { versioned: VersionedEntity },
+            { tracking: true }
+        );
+        const entity = { id: 3, name: 'Original', version: 0 };
+        db.attach('versioned', entity);
+
+        // Mutate a non-PK field → isDirty triggers the UPDATE path.
+        entity.name = 'Updated';
+
+        const result = await db.saveChanges();
+        expect(result.updated).toBe(1);
+
+        // The ORM increments the version by 1 in-place on the entity.
+        expect(entity.version).toBe(1);
+
+        // Snapshot refreshed → a second saveChanges() emits no UPDATE.
+        const result2 = await db.saveChanges();
+        expect(result2.updated).toBe(0);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — entities without PK, clear() (change-tracker.ts 912)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — Added-without-PK and clear()', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('[Symbol.asyncDispose]() clears addedWithoutPk entries and removes tracker symbol (line 912)', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        // Entity with no `id` → goes to addedWithoutPk.
+        const newUser = { email: 'no-pk@test.com', name: 'New' } as any;
+        db.attach('users', newUser);
+
+        // Dispose must throw because addedWithoutPk.size > 0.
+        await expect(db[Symbol.asyncDispose]()).rejects.toBeInstanceOf(
+            PendingChangesError
+        );
+
+        // After clear(), the tracker symbol is stripped → entry() throws.
+        expect(() => db.entry(newUser)).toThrow(/not tracked/i);
+    });
+
+    it('discardChanges() clears addedWithoutPk entries', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const newUser = { email: 'no-pk@test.com', name: 'New' } as any;
+        db.attach('users', newUser);
+
+        db.discardChanges();
+
+        // Entity no longer tracked.
+        expect(() => db.entry(newUser)).toThrow(/not tracked/i);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — polymorphic entity (resolveVariantKey, line 938)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — polymorphic entity attachment', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('attaches a polymorphic entity and reads discriminator for variantKey (line 938)', () => {
+        const db = createDb(
+            mock.knex,
+            { activities: ActivityEntitySTI },
+            { tracking: true }
+        );
+        const row = {
+            id: 5,
+            type: 'assigned',
+            todoId: 10,
+            userId: 1,
+            assigneeId: 2
+        };
+        db.attach('activities', row);
+        const entry = db.entry(row);
+        expect(entry.state).toBe('Unchanged');
+
+        // Mutation to non-discriminator field is tracked.
+        (row as any).assigneeId = 99;
+        expect(entry.isModified('assigneeId' as any)).toBe(true);
+    });
+
+    it('saveChanges() throws InvariantViolationError when discriminator is mutated', async () => {
+        const db = createDb(
+            mock.knex,
+            { activities: ActivityEntitySTI },
+            { tracking: true }
+        );
+        const row = { id: 5, type: 'assigned', todoId: 10, userId: 1 };
+        db.attach('activities', row);
+
+        // Mutate the discriminator (forbidden).
+        (row as any).type = 'commented';
+
+        await expect(db.saveChanges()).rejects.toBeInstanceOf(
+            InvariantViolationError
+        );
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// save-graph — belongsToMany error paths
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('DbSet.save — belongsToMany error paths', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('throws when a non-array is passed for a belongsToMany relation', async () => {
+        stubTransaction();
+        // Root entity update response (save sees PK present → UPDATE path).
+        mock.responses.push([{ id: 1, title: 'T', user_id: 1 }]);
+        const db = createDb(mock.knex, { todos: TodoWithTagsEntity });
+        await expect(
+            db.todos.save({
+                id: 1,
+                title: 'T',
+                userId: 1,
+                tags: 'not-an-array' as any
+            })
+        ).rejects.toThrow(/expects an array/i);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — insertVariant attaches result (dbset.ts line 718)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — insertVariant tracking', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('insertVariant in a tracked context attaches the result to the identity map (line 718)', async () => {
+        stubTransaction();
+        mock.responses.push([
+            {
+                id: 1,
+                type: 'assigned',
+                todo_id: 42,
+                user_id: 1,
+                assignee_id: 9
+            }
+        ]);
+
+        const db = createDb(
+            mock.knex,
+            { activities: ActivityEntitySTI },
+            { tracking: true }
+        );
+        const result = await db.activities.insertVariant('assigned', {
+            todoId: 42,
+            userId: 1,
+            assigneeId: 9
+        });
+
+        // The result should be tracked by the identity map.
+        const entry = db.entry(result as object);
+        expect(entry.state).toBe('Unchanged');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — first() single result is attached (dbset.ts line 481)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — first() single result onResults (line 481)', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('first() in a tracked context attaches the resolved single object', async () => {
+        mock.responses.push([{ id: 2, email_address: 'b@b', name: 'Bob' }]);
+
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        // Call first() directly (not via find) to exercise the single-object path.
+        const user = await db.users.where(t => t.id, 2).first();
+
+        expect(user).toBeDefined();
+        // The returned object should be in the identity map.
+        const entry = db.entry(user as object);
+        expect(entry.state).toBe('Unchanged');
+        // Mutating it marks it as modified.
+        (user as any).name = 'BobChanged';
+        expect(entry.isModified('name' as any)).toBe(true);
+    });
+});

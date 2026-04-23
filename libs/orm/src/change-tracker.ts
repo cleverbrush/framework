@@ -24,7 +24,10 @@ import { ConcurrencyError, InvariantViolationError } from './errors.js';
 // Types
 // ---------------------------------------------------------------------------
 
-/** Entry state in the identity map. Mirrors EF Core's EntityState. */
+/**
+ * Entry state in the identity map. Mirrors EF Core's EntityState.
+ * @public
+ */
 export type EntryState = 'Added' | 'Unchanged' | 'Modified' | 'Deleted';
 
 /**
@@ -233,7 +236,11 @@ function isDirty(
 // ChangeTracker
 // ---------------------------------------------------------------------------
 
-/** @internal Pre-save hook callback signature. */
+/**
+ * Pre-save hook callback signature registered via
+ * `TrackedDbContext.onSavingChanges(hook)`.
+ * @public
+ */
 export type SavingChangesHook = (
     entry: EntityEntry<object>
 ) => void | Promise<void>;
