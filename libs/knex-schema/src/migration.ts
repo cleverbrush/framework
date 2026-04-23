@@ -217,6 +217,15 @@ export function entitySchemaToTableState(
         const propIntrospected = propSchema.introspect() as any;
         const ext: Record<string, any> = propIntrospected.extensions ?? {};
 
+        // Skip navigation properties (object/array without an explicit columnType).
+        if (
+            (propIntrospected.type === 'object' ||
+                propIntrospected.type === 'array') &&
+            !ext.columnType
+        ) {
+            continue;
+        }
+
         columns[col] = {
             name: col,
             type: schemaTypeToDbType(propIntrospected, ext),
@@ -344,6 +353,15 @@ export function diffSchema(
     const addForeignKeys: AddForeignKeyDiff[] = [];
     const dropForeignKeys: string[] = [];
 
+    // Columns whose default values are owned by table-level extensions
+    // (hasTimestamps, softDelete). Don't compare defaultValue for these —
+    // the extension is authoritative.
+    const extensionOwnedDefaults = new Set<string>();
+    if (tableExt.timestamps) {
+        extensionOwnedDefaults.add(tableExt.timestamps.createdAt);
+        extensionOwnedDefaults.add(tableExt.timestamps.updatedAt);
+    }
+
     // Set of schema-defined column names
     const schemaColumns = new Set<string>();
 
@@ -352,6 +370,16 @@ export function diffSchema(
         const col = getColumnName(propSchema, propKey);
         const propIntrospected = propSchema.introspect() as any;
         const ext: Record<string, any> = propIntrospected.extensions ?? {};
+
+        // Skip navigation properties (object/array without explicit columnType).
+        if (
+            (propIntrospected.type === 'object' ||
+                propIntrospected.type === 'array') &&
+            !ext.columnType
+        ) {
+            continue;
+        }
+
         schemaColumns.add(col);
 
         const dbCol = dbState.columns[col];
@@ -376,6 +404,19 @@ export function diffSchema(
                     from: dbCol.nullable,
                     to: expectedNullable
                 };
+            }
+
+            // Compare defaultValue (null / undefined both mean "no default")
+            // Skip columns whose default is controlled by a table-level extension.
+            if (!extensionOwnedDefaults.has(col)) {
+                const snapshotDefault = dbCol.defaultValue ?? null;
+                const schemaDefault = ext.defaultTo ?? null;
+                if (snapshotDefault !== schemaDefault) {
+                    changes.defaultValue = {
+                        from: snapshotDefault,
+                        to: schemaDefault
+                    };
+                }
             }
 
             if (Object.keys(changes).length > 0) {
@@ -645,7 +686,7 @@ export async function applyDiff(
             table.dropColumn(colName);
         }
 
-        // Alter nullable
+        // Alter nullable / default
         for (const col of diff.alterColumns) {
             for (const [key, change] of Object.entries(col.changes)) {
                 if (key === 'nullable') {
@@ -653,6 +694,13 @@ export async function applyDiff(
                         (table as any).setNullable(col.name);
                     } else {
                         (table as any).dropNullable(col.name);
+                    }
+                } else if (key === 'defaultValue') {
+                    if (change.to === null) {
+                        table.dropColumn(col.name); // fallback — handled in source gen
+                    } else {
+                        // ALTER COLUMN SET DEFAULT is not directly in Knex builder;
+                        // handled via raw in source generation
                     }
                 }
             }
@@ -935,6 +983,26 @@ function buildAlterTableFragments(
                 } else {
                     upLines.push(`        table.dropNullable('${col.name}');`);
                     downLines.push(`        table.setNullable('${col.name}');`);
+                }
+            } else if (key === 'defaultValue') {
+                const toVal = change.to;
+                const fromVal = change.from;
+                if (toVal === null) {
+                    upLines.push(
+                        `        table.timestamp('${col.name}').alter();  // DROP DEFAULT`
+                    );
+                    downLines.push(
+                        `        table.timestamp('${col.name}').defaultTo(knex.fn.now()).alter();`
+                    );
+                } else {
+                    upLines.push(
+                        `        table.timestamp('${col.name}').notNullable().defaultTo(knex.fn.now()).alter();`
+                    );
+                    downLines.push(
+                        fromVal === null
+                            ? `        table.timestamp('${col.name}').notNullable().alter();`
+                            : `        table.timestamp('${col.name}').notNullable().defaultTo(knex.fn.now()).alter();`
+                    );
                 }
             }
         }

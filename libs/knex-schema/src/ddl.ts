@@ -116,6 +116,17 @@ export function generateCreateTable(
     const introspected = schema.introspect() as any;
     const tableExt: Record<string, any> = introspected.extensions ?? {};
 
+    // Column names fully managed by table-level extensions; skip them in the
+    // property loop to avoid duplicate DDL.
+    const extensionManagedCols = new Set<string>();
+    if (tableExt.timestamps) {
+        extensionManagedCols.add(tableExt.timestamps.createdAt);
+        extensionManagedCols.add(tableExt.timestamps.updatedAt);
+    }
+    if (tableExt.softDelete) {
+        extensionManagedCols.add(tableExt.softDelete.column);
+    }
+
     return (knex: Knex) => {
         const builder = knex.schema.createTable(
             tableName,
@@ -132,6 +143,20 @@ export function generateCreateTable(
                     const propIntrospected = propSchema.introspect() as any;
                     const ext: Record<string, any> =
                         propIntrospected.extensions ?? {};
+
+                    // Skip navigation properties (object/array without an
+                    // explicit columnType override — these are ORM relations).
+                    if (
+                        (propIntrospected.type === 'object' ||
+                            propIntrospected.type === 'array') &&
+                        !ext.columnType
+                    ) {
+                        continue;
+                    }
+                    // Skip columns owned by table-level extensions.
+                    if (extensionManagedCols.has(col)) {
+                        continue;
+                    }
 
                     // Determine column builder
                     let column: Knex.ColumnBuilder;
@@ -304,10 +329,32 @@ export function generateCreateTableSource(
 
     const lines: string[] = [];
 
+    // Column names owned by table-level extensions; skip in property loop.
+    const extensionManagedCols = new Set<string>();
+    if (tableExt.timestamps) {
+        extensionManagedCols.add(tableExt.timestamps.createdAt);
+        extensionManagedCols.add(tableExt.timestamps.updatedAt);
+    }
+    if (tableExt.softDelete) {
+        extensionManagedCols.add(tableExt.softDelete.column);
+    }
+
     for (const [propKey, propSchema] of Object.entries(properties)) {
         const col = getColumnName(propSchema, propKey);
         const propIntrospected = propSchema.introspect() as any;
         const ext: Record<string, any> = propIntrospected.extensions ?? {};
+
+        // Skip navigation properties and extension-managed columns.
+        if (
+            (propIntrospected.type === 'object' ||
+                propIntrospected.type === 'array') &&
+            !ext.columnType
+        ) {
+            continue;
+        }
+        if (extensionManagedCols.has(col)) {
+            continue;
+        }
 
         let line: string;
 

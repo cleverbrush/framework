@@ -20,7 +20,7 @@ export const UserDbSchema = object({
     passwordHash: string().optional().hasColumnName('password_hash'),
     role: string(),
     authProvider: string().hasColumnName('auth_provider'),
-    createdAt: date().hasColumnName('created_at')
+    createdAt: date().hasColumnName('created_at').defaultTo('now')
 })
     .hasTableName('users')
     .projection('public', 'id', 'email', 'role', 'authProvider', 'createdAt')
@@ -70,7 +70,7 @@ export const TodoActivityBaseDbSchema = object({
         .onDelete('SET NULL')
         .optional(),
     completedAt: date().hasColumnName('completed_at').optional(),
-    createdAt: date().hasColumnName('created_at')
+    createdAt: date().hasColumnName('created_at').defaultTo('now')
 }).hasTableName('todo_activity');
 
 export const TodoActivityBaseEntity = defineEntity(TodoActivityBaseDbSchema);

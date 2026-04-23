@@ -23,7 +23,7 @@
           "name": "created_at",
           "type": "timestamp without time zone",
           "nullable": false,
-          "defaultValue": null,
+          "defaultValue": "now",
           "maxLength": null,
           "numericPrecision": null
         },
@@ -137,22 +137,6 @@
     },
     "todos": {
       "columns": {
-        "activity": {
-          "name": "activity",
-          "type": "text",
-          "nullable": true,
-          "defaultValue": null,
-          "maxLength": null,
-          "numericPrecision": null
-        },
-        "author": {
-          "name": "author",
-          "type": "text",
-          "nullable": true,
-          "defaultValue": null,
-          "maxLength": null,
-          "numericPrecision": null
-        },
         "completed": {
           "name": "completed",
           "type": "boolean",
@@ -245,7 +229,7 @@
           "name": "created_at",
           "type": "timestamp without time zone",
           "nullable": false,
-          "defaultValue": null,
+          "defaultValue": "now",
           "maxLength": null,
           "numericPrecision": null
         },

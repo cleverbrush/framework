@@ -1,13 +1,13 @@
 // db.config.ts — @cleverbrush/orm-cli configuration for the todo-backend demo.
 //
 // Run migrations with:
-//   npx cleverbrush migrate generate <name>
-//   npx cleverbrush migrate run
-//   npx cleverbrush migrate status
-//   npx cleverbrush migrate rollback
+//   npm run db:generate [-- <name>]
+//   npm run db:run
+//   npm run db:status
+//   npm run db:rollback
 //
 // Sync schema directly (dev only):
-//   npx cleverbrush db push
+//   npm run db:push
 
 import knex from 'knex';
 import { defineConfig } from '@cleverbrush/orm-cli';

@@ -33,9 +33,10 @@ RUN npm install --ignore-scripts
 # Copy all lib sources (needed for workspace build)
 COPY libs/ ./libs/
 
-# Copy backend source and build config
+# Copy backend source, build config, and migrations
 COPY demos/todo-backend/tsconfig.build.json demos/todo-backend/tsup.config.ts ./demos/todo-backend/
 COPY demos/todo-backend/src/ ./demos/todo-backend/src/
+COPY demos/todo-backend/migrations/ ./demos/todo-backend/migrations/
 
 # Build the backend and its workspace dependencies via turbo
 RUN npx turbo run build --filter=@cleverbrush/todo-backend
@@ -62,9 +63,10 @@ WORKDIR /app
 # third-party deps (knex, pg, google-auth-library, etc.) are needed.
 COPY --from=builder /app/runtime_modules/ ./node_modules/
 COPY --from=builder /app/demos/todo-backend/dist/ ./dist/
+COPY --from=builder /app/demos/todo-backend/migrations/ ./migrations/
 
 # Create logs directory for file sink
-RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
+RUN mkdir -p /app/logs && chown -R appuser:appgroup /app /app/migrations
 USER appuser
 
 ENV NODE_ENV=production
