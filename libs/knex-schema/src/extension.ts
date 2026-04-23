@@ -44,6 +44,31 @@ import type {
 export { EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND } from '@cleverbrush/schema';
 
 // ---------------------------------------------------------------------------
+// Primary-key type brands
+// ---------------------------------------------------------------------------
+
+/**
+ * Phantom-type brand placed on a column schema by `.primaryKey()`.
+ * Carried on the property schema's type so that {@link PrimaryKeyOf} can
+ * locate primary-key columns at the type level.
+ *
+ * @public
+ */
+export const PRIMARY_KEY_BRAND: unique symbol = Symbol.for(
+    '@cleverbrush/knex-schema:primaryKey'
+);
+
+/**
+ * Phantom-type brand placed on an object schema by `.hasPrimaryKey([cols])`
+ * to record the composite primary-key column tuple at the type level.
+ *
+ * @public
+ */
+export const COMPOSITE_PRIMARY_KEY_BRAND: unique symbol = Symbol.for(
+    '@cleverbrush/knex-schema:compositePrimaryKey'
+);
+
+// ---------------------------------------------------------------------------
 // Polymorphic type brand
 // ---------------------------------------------------------------------------
 
@@ -335,10 +360,14 @@ export const ddlExtension = defineExtension({
         primaryKey(
             this: NumberSchemaBuilder<any, any, any, any, any>,
             opts?: { autoIncrement?: boolean }
-        ) {
+        ): typeof this & {
+            readonly [PRIMARY_KEY_BRAND]?: true;
+        } {
             return this.withExtension('primaryKey', {
                 autoIncrement: opts?.autoIncrement ?? true
-            });
+            }) as typeof this & {
+                readonly [PRIMARY_KEY_BRAND]?: true;
+            };
         },
         /** Add a foreign key reference to another table.
          * @param table - The referenced table name.
@@ -431,10 +460,16 @@ export const ddlExtension = defineExtension({
     },
     string: {
         /** Mark this column as a primary key (non-auto-increment). */
-        primaryKey(this: StringSchemaBuilder<any, any, any, any, any>) {
+        primaryKey(
+            this: StringSchemaBuilder<any, any, any, any, any>
+        ): typeof this & {
+            readonly [PRIMARY_KEY_BRAND]?: true;
+        } {
             return this.withExtension('primaryKey', {
                 autoIncrement: false
-            });
+            }) as typeof this & {
+                readonly [PRIMARY_KEY_BRAND]?: true;
+            };
         },
         /** Override the SQL column type (e.g. `'text'`, `'uuid'`, `'jsonb'`, `'citext'`). */
         columnType(
@@ -655,13 +690,21 @@ export const ddlExtension = defineExtension({
             return this.withExtension('checks', [...existing, sql]);
         },
         /** Set a composite primary key.
-         * @param columns - Column names forming the primary key.
+         * @param columns - Column names (or property keys) forming the primary key,
+         *   in declaration order. Use `as const` to preserve ordering at the type level.
          */
-        hasPrimaryKey(
+        hasPrimaryKey<const TCols extends readonly string[]>(
             this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-            columns: string[]
-        ) {
-            return this.withExtension('compositePrimaryKey', columns);
+            columns: TCols
+        ): typeof this & {
+            readonly [COMPOSITE_PRIMARY_KEY_BRAND]?: TCols;
+        } {
+            return this.withExtension(
+                'compositePrimaryKey',
+                columns as readonly string[]
+            ) as typeof this & {
+                readonly [COMPOSITE_PRIMARY_KEY_BRAND]?: TCols;
+            };
         },
         /** Add a raw SQL column definition not backed by a schema property.
          * @param name - Column name.

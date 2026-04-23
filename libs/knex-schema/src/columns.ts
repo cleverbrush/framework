@@ -229,3 +229,93 @@ export function resolvePropertyKey(
         `${label} must be a string or a property descriptor accessor function`
     );
 }
+
+// ---------------------------------------------------------------------------
+// Primary-key introspection
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of {@link getPrimaryKeyColumns}.
+ *
+ * `propertyKeys` are the schema property names (the keys you'd use in
+ * `.where(t => t.id, ...)` style accessors); `columnNames` are the SQL
+ * column names after applying any `hasColumnName()` overrides. Order is
+ * preserved: composite-PK ordering matches the user's `hasPrimaryKey()`
+ * declaration; single-PK arrays have length 1.
+ *
+ * @public
+ */
+export interface PrimaryKeyColumns {
+    readonly propertyKeys: readonly string[];
+    readonly columnNames: readonly string[];
+}
+
+/**
+ * Resolve the primary-key columns of a schema at runtime.
+ *
+ * Composite primary keys (declared via `.hasPrimaryKey([...])` on the
+ * object schema) take precedence over single-column primary keys. The
+ * `columns` argument to `.hasPrimaryKey()` may contain either property keys
+ * or SQL column names — both forms are accepted and normalised.
+ *
+ * Returns `{ propertyKeys: [], columnNames: [] }` when no primary key is
+ * declared.
+ *
+ * @public
+ */
+export function getPrimaryKeyColumns(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): PrimaryKeyColumns {
+    const introspected = schema.introspect() as {
+        properties?: Record<string, SchemaBuilder<any, any, any>>;
+        extensions?: Record<string, unknown>;
+    };
+    const properties = introspected.properties ?? {};
+    const extensions = introspected.extensions ?? {};
+    const { propToCol, colToProp } = buildColumnMap(schema);
+
+    // Composite PK takes precedence.
+    const composite = extensions.compositePrimaryKey as
+        | readonly string[]
+        | undefined;
+    if (composite && composite.length > 0) {
+        const propertyKeys: string[] = [];
+        const columnNames: string[] = [];
+        for (const entry of composite) {
+            // Accept either column name or property key.
+            if (propToCol.has(entry)) {
+                propertyKeys.push(entry);
+                columnNames.push(propToCol.get(entry) as string);
+            } else if (colToProp.has(entry)) {
+                columnNames.push(entry);
+                propertyKeys.push(colToProp.get(entry) as string);
+            } else {
+                // Unknown identifier — pass through as both (best effort).
+                propertyKeys.push(entry);
+                columnNames.push(entry);
+            }
+        }
+        return { propertyKeys, columnNames };
+    }
+
+    // Single-column PK — first property whose schema carries the
+    // `primaryKey` extension wins.
+    for (const [propKey, propSchema] of Object.entries(properties)) {
+        const propExt =
+            (
+                propSchema as {
+                    introspect?: () => {
+                        extensions?: Record<string, unknown>;
+                    };
+                }
+            ).introspect?.().extensions ?? {};
+        if (propExt.primaryKey) {
+            return {
+                propertyKeys: [propKey],
+                columnNames: [propToCol.get(propKey) ?? propKey]
+            };
+        }
+    }
+
+    return { propertyKeys: [], columnNames: [] };
+}

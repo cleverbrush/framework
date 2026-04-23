@@ -1,8 +1,10 @@
 // @cleverbrush/knex-schema — Type-safe schema-driven query builder for Knex
 
+export type { PrimaryKeyColumns } from './columns.js';
 // Column resolution
 export {
     buildColumnMap,
+    getPrimaryKeyColumns,
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
@@ -26,6 +28,7 @@ export {
     any,
     array,
     boolean,
+    COMPOSITE_PRIMARY_KEY_BRAND,
     date,
     dbExtension,
     ddlExtension,
@@ -40,6 +43,7 @@ export {
     number,
     object,
     POLYMORPHIC_TYPE_BRAND,
+    PRIMARY_KEY_BRAND,
     string,
     union
 } from './extension.js';
@@ -79,10 +83,14 @@ export type {
     JoinOneSpec,
     MigrationDiff,
     PaginationResult,
+    PrimaryKeyOf,
+    PrimaryKeyValueOf,
     RelationSpec,
     ResolvedVariantConfig,
     ResolvedVariantSpec,
     SchemaKeys,
+    SelectProjection,
+    SelectSelector,
     ValidatedJoinManySpec,
     ValidatedJoinOneSpec,
     ValidatedSpec,

@@ -194,6 +194,144 @@ export type InsertType<
 > = InferType<ReturnType<T['makeAllPropsOptional']>>;
 
 // ---------------------------------------------------------------------------
+// Primary-key type helpers (driven by PRIMARY_KEY_BRAND / COMPOSITE_PRIMARY_KEY_BRAND)
+// ---------------------------------------------------------------------------
+
+import type {
+    COMPOSITE_PRIMARY_KEY_BRAND,
+    PRIMARY_KEY_BRAND
+} from './extension.js';
+
+/**
+ * Detect whether a property schema is branded as a primary key (i.e. its
+ * schema was created with `.primaryKey()`).
+ *
+ * @internal
+ */
+type IsPkBranded<TPropSchema> = TPropSchema extends {
+    readonly [PRIMARY_KEY_BRAND]?: true;
+}
+    ? true
+    : false;
+
+/**
+ * Extract the primary-key column descriptor for a schema.
+ *
+ * Returns:
+ * - the literal property-key string for a single-column primary key
+ *   (e.g. `'id'`),
+ * - a tuple of property-key strings for a composite primary key
+ *   (e.g. `['userId', 'roleId']`),
+ * - or `never` if no primary key is declared.
+ *
+ * Composite primary keys are detected via the `COMPOSITE_PRIMARY_KEY_BRAND`
+ * placed on the object schema by `.hasPrimaryKey([...] as const)`. Use
+ * `as const` on the column tuple to preserve ordering at the type level.
+ *
+ * @public
+ */
+export type PrimaryKeyOf<
+    S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> = S extends {
+    readonly [COMPOSITE_PRIMARY_KEY_BRAND]?: infer TCols;
+}
+    ? TCols extends readonly string[]
+        ? TCols
+        : never
+    : {
+          [K in keyof SchemaPropsForPk<S> & string]: IsPkBranded<
+              SchemaPropsForPk<S>[K]
+          > extends true
+              ? K
+              : never;
+      }[keyof SchemaPropsForPk<S> & string];
+
+/**
+ * Extract the schema's property record for primary-key inference. Mirrors
+ * `SchemaProps` from `entity.ts` but lives here to avoid a circular import.
+ *
+ * @internal
+ */
+type SchemaPropsForPk<T> =
+    T extends ObjectSchemaBuilder<infer P, any, any, any, any, any, any>
+        ? P
+        : never;
+
+/**
+ * The runtime value type of a schema's primary key.
+ *
+ * - For a single-column PK, the inferred type of that property
+ *   (e.g. `number`).
+ * - For a composite PK, a tuple of inferred property types in declared
+ *   order (e.g. `[number, number]`).
+ * - `never` if no primary key is declared.
+ *
+ * @public
+ */
+export type PrimaryKeyValueOf<
+    S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> =
+    PrimaryKeyOf<S> extends readonly (infer _Item extends string)[]
+        ? PrimaryKeyOf<S> extends readonly string[]
+            ? PkTupleValue<S, PrimaryKeyOf<S>>
+            : never
+        : PrimaryKeyOf<S> extends string
+          ? InferType<S>[PrimaryKeyOf<S> & keyof InferType<S>]
+          : never;
+
+/**
+ * Map a tuple of PK property-key names to their inferred value types.
+ *
+ * @internal
+ */
+type PkTupleValue<
+    S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TKeys extends readonly string[]
+> = {
+    [I in keyof TKeys]: TKeys[I] extends keyof InferType<S>
+        ? InferType<S>[TKeys[I]]
+        : unknown;
+};
+
+// ---------------------------------------------------------------------------
+// DTO selector — `.select(t => ({ alias: t.col, … }))`
+// ---------------------------------------------------------------------------
+
+/**
+ * Extract the property schema captured inside a `PropertyDescriptor`.
+ *
+ * @internal
+ */
+type DescriptorPropertySchema<T> =
+    T extends PropertyDescriptor<any, infer S, any, any> ? S : never;
+
+/**
+ * Result row type produced by a {@link SelectProjection} selector.
+ *
+ * Each entry's value is the {@link InferType} of the property schema the
+ * descriptor points at, so `.select(t => ({ id: t.id, n: t.title }))`
+ * yields `{ id: number; n: string }`.
+ *
+ * @public
+ */
+export type SelectProjection<R extends Record<string, unknown>> = {
+    [K in keyof R]: InferType<DescriptorPropertySchema<R[K]>>;
+};
+
+/**
+ * Callback shape accepted by the projection overload of `select`. The
+ * callback receives the schema's property-descriptor tree and returns an
+ * `{ alias: descriptor }` record.
+ *
+ * @public
+ */
+export type SelectSelector<
+    T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> = (
+    tree: PropertyDescriptorTree<SchemaBase<T>, SchemaBase<T>>
+) => Record<string, PropertyDescriptor<any, any, any>>;
+
+// ---------------------------------------------------------------------------
 // Pagination result types
 // ---------------------------------------------------------------------------
 

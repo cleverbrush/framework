@@ -13,15 +13,25 @@
 import type {
     Entity,
     EntityRelations,
-    EntitySchema
+    EntitySchema,
+    PrimaryKeyValueOf
 } from '@cleverbrush/knex-schema';
 import {
+    getPrimaryKeyColumns,
     type SchemaQueryBuilder,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
 import type { Knex } from 'knex';
 
-import type { EntityResult, RelKeyTree, WithIncluded } from './result-types.js';
+import { EntityNotFoundError } from './errors.js';
+import type {
+    EntityResult,
+    RelKeyTree,
+    SaveGraph,
+    WithIncluded,
+    WithVariantIncluded
+} from './result-types.js';
+import { saveGraph } from './save-graph.js';
 
 // ---------------------------------------------------------------------------
 // EntityQuery — public typed query handle
@@ -56,13 +66,57 @@ export interface EntityQuery<TEntity extends Entity<any, any>, TResult>
     /**
      * Eager-load a relation declared inside a polymorphic variant (CTI/STI).
      * The relation is only populated on rows whose discriminator matches
-     * `variantKey`.
+     * `variantKey`. Type-level: when `relationName` is a key of the
+     * entity's relations, it appears only on the matching branch of the
+     * discriminated-union result; otherwise the result type is unchanged.
      */
-    includeVariant(
-        variantKey: string,
-        relationName: string,
+    includeVariant<TVariant extends string, TRel extends string>(
+        variantKey: TVariant,
+        relationName: TRel,
         customize?: (q: SchemaQueryBuilder<any, any>) => void
-    ): EntityQuery<TEntity, TResult>;
+    ): EntityQuery<
+        TEntity,
+        TRel extends keyof EntityRelations<TEntity> & string
+            ? WithVariantIncluded<TEntity, TResult, TVariant, TRel>
+            : TResult
+    >;
+
+    /**
+     * Look up a single entity by primary key. Returns `undefined` when no
+     * row matches.
+     *
+     * The PK column(s) are resolved automatically from the entity's schema
+     * via the `primaryKey` / `hasPrimaryKey` extensions. Composite PKs are
+     * passed as a tuple in declaration order:
+     *
+     * ```ts
+     * await db.todos.find(42);                 // single PK
+     * await db.userRoles.find([userId, role]); // composite PK
+     * ```
+     *
+     * Any chained `.include()` / `.includeVariant()` calls on this query
+     * are honoured by the underlying `SELECT`.
+     */
+    find(
+        pk: PrimaryKeyValueOf<EntitySchema<TEntity>>
+    ): Promise<TResult | undefined>;
+
+    /**
+     * Like {@link find} but throws {@link EntityNotFoundError} when no row
+     * matches.
+     */
+    findOrFail(pk: PrimaryKeyValueOf<EntitySchema<TEntity>>): Promise<TResult>;
+
+    /**
+     * Look up multiple entities by primary key in a single SQL statement.
+     * Returns rows in DB order (no ordering guarantee relative to `pks`).
+     *
+     * For composite PKs each element of `pks` is a tuple matching
+     * declaration order. Returns `[]` when `pks` is empty.
+     */
+    findMany(
+        pks: ReadonlyArray<PrimaryKeyValueOf<EntitySchema<TEntity>>>
+    ): Promise<TResult[]>;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +152,25 @@ export interface DbSet<TEntity extends Entity<any, any>>
      * set execute inside the transaction.
      */
     withTransaction(trx: Knex.Transaction): DbSet<TEntity>;
+
+    /**
+     * Persist a nested write graph (root + related entities) in a single
+     * transaction. Each node is INSERTed when its primary-key fields are
+     * absent and UPDATEd when they are present (composite-PK aware).
+     *
+     * Topology:
+     * - `belongsTo` parents are saved first; their PKs feed the root's FK.
+     * - The root row is then written.
+     * - `hasOne` / `hasMany` / `belongsToMany` children inherit the root's
+     *   PK into their FK column.
+     * - `belongsToMany` children may be passed as full nested graphs (new
+     *   rows) or as `{ pk: value }` references (link existing rows).
+     *
+     * If called inside an existing transaction (via `withTransaction`), the
+     * outer transaction is reused; otherwise a fresh one is opened and
+     * automatically rolled back on failure.
+     */
+    save(graph: SaveGraph<TEntity>): Promise<EntityResult<TEntity>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -178,6 +251,19 @@ function wrapQuery<TEntity extends Entity<any, any>, TResult>(
                 if (prop === '_sqb') return sqb;
                 if (prop === '_entity') return entity;
 
+                if (
+                    prop === 'find' ||
+                    prop === 'findOrFail' ||
+                    prop === 'findMany'
+                ) {
+                    return makeFindMethod(
+                        prop as 'find' | 'findOrFail' | 'findMany',
+                        sqb as unknown as SchemaQueryBuilder<any, any>,
+                        entity,
+                        proxy as unknown as EntityQuery<TEntity, TResult>
+                    );
+                }
+
                 const value = Reflect.get(target, prop, receiver);
                 if (typeof value !== 'function') return value;
                 return function (this: unknown, ...args: unknown[]) {
@@ -189,6 +275,157 @@ function wrapQuery<TEntity extends Entity<any, any>, TResult>(
         }
     ) as unknown as EntityQuery<TEntity, TResult>;
     return proxy;
+}
+
+// ---------------------------------------------------------------------------
+// find / findOrFail / findMany
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the runtime implementation of `find` / `findOrFail` / `findMany`
+ * for a given underlying `SchemaQueryBuilder` and entity.
+ *
+ * Honours composite primary keys; `pks`/`pk` are accepted as either scalars
+ * (single-column PK) or tuples (composite PK).
+ *
+ * @internal
+ */
+function makeFindMethod<TEntity extends Entity<any, any>>(
+    method: 'find' | 'findOrFail' | 'findMany',
+    sqb: SchemaQueryBuilder<any, any>,
+    entity: TEntity,
+    proxy: EntityQuery<TEntity, unknown>
+): (...args: unknown[]) => Promise<unknown> {
+    return async (...args: unknown[]): Promise<unknown> => {
+        const pkInfo = getPrimaryKeyColumns(
+            entity.schema as Parameters<typeof getPrimaryKeyColumns>[0]
+        );
+        if (pkInfo.propertyKeys.length === 0) {
+            throw new Error(
+                `${method}(): entity has no primary key declared. ` +
+                    `Use \`.primaryKey()\` on a column or \`.hasPrimaryKey([...])\` on the schema.`
+            );
+        }
+        const propertyKeys = pkInfo.propertyKeys;
+        const isComposite = propertyKeys.length > 1;
+        const tableName =
+            (
+                entity.schema as {
+                    getExtension?: (k: string) => unknown;
+                }
+            ).getExtension?.('tableName') ?? '<entity>';
+        const entityLabel = String(tableName);
+
+        const applyPkFilter = (pk: unknown): void => {
+            const tuple = normalisePkTuple(pk, isComposite, method);
+            if (tuple.length !== propertyKeys.length) {
+                throw new Error(
+                    `${method}(): expected ${propertyKeys.length} primary-key value(s), got ${tuple.length}.`
+                );
+            }
+            for (let i = 0; i < propertyKeys.length; i++) {
+                (
+                    proxy as unknown as {
+                        andWhere: (
+                            col: string,
+                            op: string,
+                            val: unknown
+                        ) => void;
+                    }
+                ).andWhere(propertyKeys[i], '=', tuple[i]);
+            }
+        };
+
+        if (method === 'findMany') {
+            const pks = (args[0] ?? []) as ReadonlyArray<unknown>;
+            if (!Array.isArray(pks)) {
+                throw new Error(
+                    'findMany(): expected an array of primary-key values.'
+                );
+            }
+            if (pks.length === 0) return [];
+            if (!isComposite) {
+                const propKey = propertyKeys[0];
+                const tuples = pks.map(p =>
+                    normalisePkTuple(p, false, 'findMany')
+                );
+                (
+                    proxy as unknown as {
+                        whereIn: (
+                            col: string,
+                            vals: readonly unknown[]
+                        ) => void;
+                    }
+                ).whereIn(
+                    propKey,
+                    tuples.map(t => t[0])
+                );
+                return await (
+                    proxy as unknown as { execute: () => Promise<unknown[]> }
+                ).execute();
+            }
+            // Composite PK — emit OR-grouped predicates. We must use
+            // COLUMN names (not property names) here because the inner
+            // knex `apply()` callback bypasses SchemaQueryBuilder's
+            // property-to-column translation.
+            const columnNames = pkInfo.columnNames;
+            (
+                sqb as unknown as {
+                    apply: (fn: (qb: Knex.QueryBuilder) => void) => void;
+                }
+            ).apply(qb => {
+                qb.andWhere(function (this: Knex.QueryBuilder) {
+                    for (const pk of pks) {
+                        const tuple = normalisePkTuple(pk, true, 'findMany');
+                        this.orWhere(function (this: Knex.QueryBuilder) {
+                            for (let i = 0; i < columnNames.length; i++) {
+                                this.andWhere(columnNames[i], tuple[i] as any);
+                            }
+                        });
+                    }
+                });
+            });
+            return await (
+                proxy as unknown as { execute: () => Promise<unknown[]> }
+            ).execute();
+        }
+
+        // find / findOrFail
+        applyPkFilter(args[0]);
+        const row = await (
+            proxy as unknown as {
+                first: () => Promise<unknown | undefined>;
+            }
+        ).first();
+        if (row === undefined && method === 'findOrFail') {
+            throw new EntityNotFoundError(entityLabel, args[0]);
+        }
+        return row;
+    };
+}
+
+/**
+ * Normalise a `find` / `findMany` PK argument to a tuple of values.
+ * Single-column PKs accept either a scalar or a length-1 tuple; composite
+ * PKs require a tuple.
+ *
+ * @internal
+ */
+function normalisePkTuple(
+    pk: unknown,
+    isComposite: boolean,
+    method: string
+): readonly unknown[] {
+    if (isComposite) {
+        if (!Array.isArray(pk)) {
+            throw new Error(
+                `${method}(): composite primary key requires a tuple argument.`
+            );
+        }
+        return pk as readonly unknown[];
+    }
+    if (Array.isArray(pk)) return pk as readonly unknown[];
+    return [pk];
 }
 
 /**
@@ -221,6 +458,24 @@ export function makeDbSet<TEntity extends Entity<any, any>>(
             if (prop === 'withTransaction') {
                 return (trx: Knex.Transaction) =>
                     makeDbSet(trx as unknown as Knex, entity);
+            }
+            if (prop === 'save') {
+                return (graph: Record<string, unknown>) => {
+                    // If `knex` is already a transaction handle (from
+                    // `withTransaction`), reuse it; otherwise saveGraph
+                    // opens a fresh transaction internally.
+                    const maybeTrx = (
+                        knex as unknown as { isTransaction?: boolean }
+                    ).isTransaction
+                        ? (knex as unknown as Knex.Transaction)
+                        : undefined;
+                    return saveGraph(
+                        knex,
+                        entity.schema,
+                        graph,
+                        maybeTrx
+                    ) as Promise<unknown>;
+                };
             }
             // Any other property/method: allocate a fresh query and
             // forward.  Methods are bound so callers can use `.method(...)`.

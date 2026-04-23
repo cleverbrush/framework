@@ -11,10 +11,13 @@ export type { DbContext, EntityMap } from './dbcontext.js';
 
 export { createDb } from './dbcontext.js';
 export type { DbSet, EntityQuery } from './dbset.js';
-
+export { EntityNotFoundError } from './errors.js';
 export type {
     EntityResult,
+    EntityResultByVariant,
     RelKeyTree,
     ResolvedRel,
-    WithIncluded
+    SaveGraph,
+    WithIncluded,
+    WithVariantIncluded
 } from './result-types.js';

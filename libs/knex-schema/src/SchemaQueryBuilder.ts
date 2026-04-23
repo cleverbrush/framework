@@ -10,11 +10,11 @@ import {
 import type { Knex } from 'knex';
 import {
     buildColumnMap,
+    getPrimaryKeyColumns,
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
 import {
-    getColumnName,
     getProjections,
     getTableName,
     getVariants,
@@ -31,6 +31,8 @@ import type {
     RelationSpec,
     ResolvedVariantConfig,
     ResolvedVariantRelationSpec,
+    SelectProjection,
+    SelectSelector,
     ValidatedSpec,
     VariantWhereFilter,
     WithJoinedMany,
@@ -886,14 +888,8 @@ export class SchemaQueryBuilder<
     #findPrimaryKeyColumn(
         schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
     ): string {
-        const introspected = schema.introspect() as any;
-        const properties = introspected.properties ?? {};
-        for (const [key, propSchema] of Object.entries(properties)) {
-            const ext = (propSchema as any).introspect?.().extensions ?? {};
-            if (ext.primaryKey) {
-                return getColumnName(propSchema as any, key);
-            }
-        }
+        const pk = getPrimaryKeyColumns(schema);
+        if (pk.columnNames.length > 0) return pk.columnNames[0];
         return 'id';
     }
 
@@ -1627,11 +1623,82 @@ export class SchemaQueryBuilder<
      * @param columns - One or more column references or raw expressions.
      * @returns `this` for chaining.
      */
-    select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
+    select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this;
+    /**
+     * DTO projection: select multiple aliased columns at once via a
+     * descriptor record. Returns a query whose result rows match the
+     * shape of the selector's return value (each value typed as the
+     * inferred schema-property type).
+     *
+     * @example
+     * ```ts
+     * const dtos = await query(db, UserSchema)
+     *     .where(t => t.id, '>', 0)
+     *     .select(t => ({ id: t.id, n: t.name }))
+     *     .execute();
+     * // dtos: { id: number; n: string }[]
+     * ```
+     */
+    select<TSel extends SelectSelector<TLocalSchema>>(
+        selector: TSel
+    ): SchemaQueryBuilder<TLocalSchema, SelectProjection<ReturnType<TSel>>>;
+    select(...args: unknown[]): SchemaQueryBuilder<TLocalSchema, any> {
+        // DTO projection overload: a single function whose return value
+        // is a Record<alias, descriptor> (NOT a single descriptor — those
+        // are handled by the column-list path via #resolveColumnArg).
+        if (args.length === 1 && typeof args[0] === 'function') {
+            const fn = args[0] as (t: any) => unknown;
+            const tree = ObjectSchemaBuilder.getPropertiesFor(
+                this.#localSchema as any
+            );
+            const result = fn(tree);
+            if (
+                result &&
+                typeof result === 'object' &&
+                !(SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in (result as object))
+            ) {
+                this.#invalidateCache();
+                this.#assertNotProjection('select');
+                this.#selectionMode = 'projection';
+                this.#appliedProjection = '<inline>';
+
+                const aliasMap: Record<string, string> = {};
+                this.#explicitSelects ??= [];
+                for (const [alias, descriptor] of Object.entries(
+                    result as Record<string, unknown>
+                )) {
+                    if (
+                        !descriptor ||
+                        typeof descriptor !== 'object' ||
+                        !(
+                            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in
+                            (descriptor as object)
+                        )
+                    ) {
+                        throw new Error(
+                            `select(selector): value for alias "${alias}" must be a property descriptor (e.g. \`t.someProp\`).`
+                        );
+                    }
+                    const col = this.#resolveColumn(
+                        (() => descriptor) as ColumnRef<TLocalSchema>,
+                        `select(selector).${alias}`
+                    );
+                    aliasMap[alias] = col as string;
+                    this.#explicitSelects.push(col as string);
+                }
+                this.#baseQuery.select(aliasMap);
+                return this as unknown as SchemaQueryBuilder<TLocalSchema, any>;
+            }
+            // Fall through: single descriptor → column-list path.
+        }
+
+        // Column-list path (existing behaviour).
         this.#invalidateCache();
         this.#assertNotProjection('select');
         this.#selectionMode = 'select';
-        const resolved = columns.map(c => this.#resolveColumnArg(c));
+        const resolved = (args as (ColumnRef<TLocalSchema> | Knex.Raw)[]).map(
+            c => this.#resolveColumnArg(c)
+        );
         this.#baseQuery.select(...(resolved as string[]));
         // Track the string-resolved columns (not Knex.Raw) for CTE column management
         this.#explicitSelects ??= [];
@@ -1640,7 +1707,7 @@ export class SchemaQueryBuilder<
                 this.#explicitSelects.push(r);
             }
         }
-        return this;
+        return this as unknown as SchemaQueryBuilder<TLocalSchema, any>;
     }
 
     /** @internal Throw if a projection has already been applied. */
@@ -2063,6 +2130,286 @@ export class SchemaQueryBuilder<
             });
         }
         return this.#baseQuery.delete();
+    }
+
+    // =======================================================================
+    // BULK WRITE OPERATIONS
+    // =======================================================================
+
+    /**
+     * Bulk-insert many rows in chunks. The default chunk size of `500` keeps
+     * comfortably below Postgres' parameter-count limit of 65535. The chunk
+     * size also auto-shrinks when the number of bindings per row would
+     * exceed that ceiling.
+     *
+     * When `opts.onConflict` is supplied each chunk is wrapped in an
+     * `INSERT ... ON CONFLICT` clause:
+     *
+     * - `'ignore'` — `ON CONFLICT (...) DO NOTHING`
+     * - `'merge'`  — `ON CONFLICT (...) DO UPDATE SET ...` (uses `conflictColumns` as
+     *   the conflict target and updates every inserted column).
+     *
+     * `beforeInsert` / `afterInsert` hooks fire per row, identically to
+     * {@link insertMany}.
+     *
+     * @returns The inserted rows (excluding rows skipped by `'ignore'`).
+     */
+    async bulkInsert(
+        rows: InsertType<TLocalSchema>[],
+        opts?: {
+            chunkSize?: number;
+            onConflict?: 'ignore' | 'merge';
+            conflictColumns?: ColumnRef<TLocalSchema>[];
+        }
+    ): Promise<TResult[]> {
+        if (rows.length === 0) return [];
+
+        const requestedChunkSize = opts?.chunkSize ?? 500;
+        const bindingsPerRow = Object.keys(rows[0] as object).length || 1;
+        const safeChunkCap = Math.max(
+            1,
+            Math.floor(60000 / Math.max(1, bindingsPerRow))
+        );
+        const chunkSize = Math.max(
+            1,
+            Math.min(requestedChunkSize, safeChunkCap)
+        );
+
+        const timestamps = this.#getTimestamps();
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+        const afterHooks =
+            ((this.#localSchema as any).getExtension?.('afterInsert') as
+                | Function[]
+                | undefined) ?? [];
+
+        const conflictCols =
+            opts?.onConflict && opts.conflictColumns
+                ? opts.conflictColumns.map(
+                      c =>
+                          this.#resolveColumn(
+                              c,
+                              'bulkInsert.onConflict'
+                          ) as string
+                  )
+                : null;
+        if (opts?.onConflict && (!conflictCols || conflictCols.length === 0)) {
+            throw new Error(
+                'bulkInsert: `conflictColumns` is required when `onConflict` is set.'
+            );
+        }
+
+        const results: TResult[] = [];
+
+        for (let i = 0; i < rows.length; i += chunkSize) {
+            const chunk = rows.slice(i, i + chunkSize);
+            const mapped: Record<string, any>[] = [];
+            for (const row of chunk) {
+                let processed = { ...(row as Record<string, any>) };
+                for (const hook of beforeHooks) {
+                    processed = (await hook(processed)) ?? processed;
+                }
+                const m = this.#mapObjectToColumns(processed);
+                if (timestamps) {
+                    m[timestamps.createdAt] = this.#knex.fn.now();
+                    m[timestamps.updatedAt] = this.#knex.fn.now();
+                }
+                mapped.push(m);
+            }
+
+            let qb: any = this.#knex(this.#tableName).insert(mapped);
+
+            if (conflictCols) {
+                qb = qb.onConflict(conflictCols);
+                if (opts!.onConflict === 'ignore') {
+                    qb = qb.ignore();
+                } else {
+                    // Merge — update every non-conflict-target column.
+                    const updateCols = new Set<string>();
+                    for (const m of mapped) {
+                        for (const k of Object.keys(m)) updateCols.add(k);
+                    }
+                    for (const c of conflictCols) updateCols.delete(c);
+                    if (timestamps) {
+                        updateCols.delete(timestamps.createdAt);
+                        updateCols.add(timestamps.updatedAt);
+                    }
+                    qb = qb.merge(Array.from(updateCols));
+                }
+            }
+
+            const inserted: any[] = await qb.returning('*');
+            for (const row of inserted) {
+                const mappedRow = this.#mapRow(row) as TResult;
+                for (const hook of afterHooks) {
+                    await hook(mappedRow);
+                }
+                results.push(mappedRow);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Bulk-upsert many rows in chunks. Equivalent to
+     * `.bulkInsert(rows, { onConflict: 'merge', conflictColumns })`.
+     */
+    async bulkUpsert(
+        rows: InsertType<TLocalSchema>[],
+        opts: {
+            conflictColumns: ColumnRef<TLocalSchema>[];
+            chunkSize?: number;
+        }
+    ): Promise<TResult[]> {
+        return this.bulkInsert(rows, {
+            chunkSize: opts.chunkSize,
+            onConflict: 'merge',
+            conflictColumns: opts.conflictColumns
+        });
+    }
+
+    /**
+     * Bulk-update many rows in a single SQL statement using a CASE
+     * expression keyed on the entity's primary key.
+     *
+     * Each entry's `where` clause must fully match the entity's primary key
+     * columns (single or composite). Updates that touch different columns
+     * are coalesced into one statement; rows whose PK appears in `updates`
+     * but whose `set` does not contain a given column retain their existing
+     * value.
+     *
+     * @returns The number of rows affected.
+     */
+    async bulkUpdate(
+        updates: ReadonlyArray<{
+            where: Partial<InferType<TLocalSchema>>;
+            set: Partial<InferType<TLocalSchema>>;
+        }>
+    ): Promise<number> {
+        if (updates.length === 0) return 0;
+
+        const pk = this.#resolvePkColumns();
+        const { propToCol } = buildColumnMap(this.#localSchema as any);
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeUpdate') as
+                | Function[]
+                | undefined) ?? [];
+        const timestamps = this.#getTimestamps();
+
+        // Pre-process: run hooks, map keys, validate PK presence in `where`.
+        const processed: Array<{
+            pkValues: unknown[];
+            set: Record<string, any>;
+        }> = [];
+        for (const entry of updates) {
+            let setData = { ...(entry.set as Record<string, any>) };
+            for (const hook of beforeHooks) {
+                setData = (await hook(setData)) ?? setData;
+            }
+            const setMapped = this.#mapObjectToColumns(setData);
+            if (timestamps) {
+                setMapped[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+
+            const whereRec = entry.where as Record<string, unknown>;
+            const pkValues: unknown[] = [];
+            for (const propKey of pk.propertyKeys) {
+                const value =
+                    propKey in whereRec
+                        ? whereRec[propKey]
+                        : (whereRec[propToCol.get(propKey) ?? propKey] as
+                              | unknown
+                              | undefined);
+                if (value === undefined) {
+                    throw new Error(
+                        `bulkUpdate: each \`where\` clause must include the entity's primary key (missing "${propKey}").`
+                    );
+                }
+                pkValues.push(value);
+            }
+            processed.push({ pkValues, set: setMapped });
+        }
+
+        // Collect every column referenced in any `set`.
+        const allSetCols = new Set<string>();
+        for (const p of processed) {
+            for (const k of Object.keys(p.set)) allSetCols.add(k);
+        }
+        if (allSetCols.size === 0) return 0;
+
+        // Build the SET clause: one CASE per column, keyed by PK.
+        const knex = this.#knex;
+        const updateExpr: Record<string, any> = {};
+        for (const col of allSetCols) {
+            const fragments: string[] = [];
+            const bindings: unknown[] = [];
+            for (const p of processed) {
+                if (!(col in p.set)) continue;
+                if (pk.columnNames.length === 1) {
+                    fragments.push('WHEN ?? = ? THEN ?');
+                    bindings.push(pk.columnNames[0], p.pkValues[0], p.set[col]);
+                } else {
+                    const conditions = pk.columnNames
+                        .map(() => '?? = ?')
+                        .join(' AND ');
+                    fragments.push(`WHEN ${conditions} THEN ?`);
+                    for (let i = 0; i < pk.columnNames.length; i++) {
+                        bindings.push(pk.columnNames[i], p.pkValues[i]);
+                    }
+                    bindings.push(p.set[col]);
+                }
+            }
+            if (fragments.length === 0) continue;
+            // ELSE keeps the existing column value untouched.
+            updateExpr[col] = knex.raw(
+                `CASE ${fragments.join(' ')} ELSE ?? END`,
+                [...bindings, col] as any
+            );
+        }
+
+        // WHERE: restrict to the PK tuples covered by the batch.
+        let qb: any = knex(this.#tableName).update(updateExpr);
+        if (pk.columnNames.length === 1) {
+            qb = qb.whereIn(
+                pk.columnNames[0],
+                processed.map(p => p.pkValues[0])
+            );
+        } else {
+            qb = qb.where(function (this: Knex.QueryBuilder) {
+                for (const p of processed) {
+                    this.orWhere(function (this: Knex.QueryBuilder) {
+                        for (let i = 0; i < pk.columnNames.length; i++) {
+                            this.andWhere(
+                                pk.columnNames[i],
+                                p.pkValues[i] as any
+                            );
+                        }
+                    });
+                }
+            });
+        }
+
+        return await qb;
+    }
+
+    /**
+     * @internal Resolve the entity's primary-key columns, throwing a clear
+     * error when none is declared. Used by bulk-update / find helpers.
+     */
+    #resolvePkColumns(): {
+        propertyKeys: readonly string[];
+        columnNames: readonly string[];
+    } {
+        const pk = getPrimaryKeyColumns(this.#localSchema as any);
+        if (pk.columnNames.length === 0) {
+            throw new Error(
+                'No primary key declared on this schema. Use `.primaryKey()` on a column or `.hasPrimaryKey([...])` on the schema.'
+            );
+        }
+        return pk;
     }
 
     // =======================================================================
