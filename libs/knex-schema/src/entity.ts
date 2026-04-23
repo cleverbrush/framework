@@ -192,10 +192,10 @@ export class Entity<
     readonly schema: TSchema;
 
     /** @internal Phantom slot to retain `TRels` in inferred types. */
-    declare readonly __relations__: TRels;
+    private declare readonly __relations__: TRels;
 
     /** @internal Phantom slot to retain `TVariantUnion` in inferred types. */
-    declare readonly __variantUnion__: TVariantUnion;
+    private declare readonly __variantUnion__: TVariantUnion;
 
     constructor(schema: TSchema) {
         this.schema = schema;
