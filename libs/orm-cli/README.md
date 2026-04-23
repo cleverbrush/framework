@@ -4,7 +4,7 @@ A standalone CLI for managing PostgreSQL schema migrations for projects built
 with [`@cleverbrush/orm`](https://github.com/cleverbrush/framework).
 
 ```
-cb-orm migrate generate <name>   # diff DB → schema, emit TS migration file
+cb-orm migrate generate [name]   # diff DB → schema, emit TS migration file (name defaults to "migration")
 cb-orm migrate run               # apply pending migrations
 cb-orm migrate rollback          # roll back last batch
 cb-orm migrate status            # list applied/pending migrations

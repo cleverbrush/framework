@@ -19,7 +19,8 @@ import type {
     DatabaseForeignKeyInfo,
     DatabaseIndexInfo,
     DatabaseTableState,
-    MigrationDiff
+    MigrationDiff,
+    SchemaSnapshot
 } from './types.js';
 
 // ---------------------------------------------------------------------------
@@ -171,6 +172,134 @@ function schemaTypeToDbType(
         default:
             return 'text';
     }
+}
+
+// ---------------------------------------------------------------------------
+// entitySchemaToTableState
+// ---------------------------------------------------------------------------
+
+/**
+ * Derive a {@link DatabaseTableState} from a code-first `ObjectSchemaBuilder`
+ * without connecting to the database.
+ *
+ * The result mirrors what {@link introspectDatabase} would return after the
+ * schema has been fully applied, so it can be fed directly into
+ * {@link diffSchema} as the `dbState` argument.  This is the foundation of
+ * snapshot-based migration generation.
+ *
+ * @param schema - An `ObjectSchemaBuilder` with DDL extensions.
+ * @returns A {@link DatabaseTableState} representing the schema's ideal DB shape.
+ *
+ * @example
+ * ```ts
+ * const state = entitySchemaToTableState(UserSchema);
+ * // state.columns, state.foreignKeys, state.indexes …
+ * ```
+ */
+export function entitySchemaToTableState(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): DatabaseTableState {
+    const tableName = getTableName(schema);
+    const introspected = schema.introspect() as any;
+    const properties: Record<
+        string,
+        SchemaBuilder<any, any, any>
+    > = introspected.properties ?? {};
+    const tableExt: Record<string, any> = introspected.extensions ?? {};
+
+    const columns: Record<string, DatabaseColumnInfo> = {};
+    const indexes: DatabaseIndexInfo[] = [];
+    const foreignKeys: DatabaseForeignKeyInfo[] = [];
+    const checks: DatabaseCheckInfo[] = [];
+
+    for (const [propKey, propSchema] of Object.entries(properties)) {
+        const col = getColumnName(propSchema, propKey);
+        const propIntrospected = propSchema.introspect() as any;
+        const ext: Record<string, any> = propIntrospected.extensions ?? {};
+
+        columns[col] = {
+            name: col,
+            type: schemaTypeToDbType(propIntrospected, ext),
+            nullable: !propIntrospected.isRequired,
+            defaultValue: ext.defaultTo ?? null,
+            maxLength: ext.maxLength ?? propIntrospected.maxLength ?? null,
+            numericPrecision: null
+        };
+
+        if (ext.references) {
+            foreignKeys.push({
+                // Use Knex's default FK constraint naming convention
+                constraintName: `${tableName}_${col}_foreign`,
+                columnName: col,
+                foreignTable: ext.references.table,
+                foreignColumn: ext.references.column,
+                deleteRule: (ext.onDelete ?? 'NO ACTION').toUpperCase(),
+                updateRule: (ext.onUpdate ?? 'NO ACTION').toUpperCase()
+            });
+        }
+    }
+
+    // Timestamp columns (created_at / updated_at)
+    if (tableExt.timestamps) {
+        const ts = tableExt.timestamps;
+        const createdAtCol: string = ts.createdAt ?? 'created_at';
+        const updatedAtCol: string = ts.updatedAt ?? 'updated_at';
+        columns[createdAtCol] = {
+            name: createdAtCol,
+            type: 'timestamp without time zone',
+            nullable: false,
+            defaultValue: 'now',
+            maxLength: null,
+            numericPrecision: null
+        };
+        columns[updatedAtCol] = {
+            name: updatedAtCol,
+            type: 'timestamp without time zone',
+            nullable: false,
+            defaultValue: 'now',
+            maxLength: null,
+            numericPrecision: null
+        };
+    }
+
+    // Soft-delete column
+    if (tableExt.softDelete) {
+        const delCol: string = tableExt.softDelete.column ?? 'deleted_at';
+        columns[delCol] = {
+            name: delCol,
+            type: 'timestamp without time zone',
+            nullable: true,
+            defaultValue: null,
+            maxLength: null,
+            numericPrecision: null
+        };
+    }
+
+    // Non-unique indexes
+    for (const idx of tableExt.indexes ?? []) {
+        const idxName: string =
+            idx.name ?? `idx_${(idx.columns as string[]).join('_')}`;
+        indexes.push({
+            name: idxName,
+            columns: idx.columns,
+            unique: idx.unique ?? false,
+            definition: ''
+        });
+    }
+
+    // Unique constraints
+    for (const unq of tableExt.uniques ?? []) {
+        const unqName: string =
+            unq.name ?? `unq_${(unq.columns as string[]).join('_')}`;
+        indexes.push({
+            name: unqName,
+            columns: unq.columns,
+            unique: true,
+            definition: ''
+        });
+    }
+
+    return { columns, indexes, foreignKeys, checks };
 }
 
 // ---------------------------------------------------------------------------
@@ -563,35 +692,47 @@ export async function applyDiff(
 // ---------------------------------------------------------------------------
 
 /**
- * Generate a single combined migration (up + down) for a set of entities.
+ * Generate a single combined migration (up + down) for a set of entities by
+ * diffing the current code-first schemas against a **serialized snapshot**
+ * stored in the repository — no live database connection required.
  *
  * For each entity's table the function:
- * - Detects new tables via {@link tableExistsInDb} and emits `CREATE TABLE`.
- * - For existing tables, runs {@link introspectDatabase} + {@link diffSchema}
- *   and emits `ALTER TABLE` if the diff is non-empty.
- * - Handles polymorphic (CTI) entities by including each variant table.
+ * - **New tables** (in entities but not in `prevSnapshot`): emits `CREATE TABLE`.
+ * - **Existing tables** (in both): diffs entity schema against the snapshot
+ *   state via {@link diffSchema} and emits `ALTER TABLE` when changes exist.
+ * - **Dropped tables** (in `prevSnapshot` but not in entities): emits
+ *   `DROP TABLE` with a best-effort `CREATE TABLE` in the `down` direction.
  * - Orders tables topologically by FK dependencies so parent tables are
  *   created before child tables in `up` (and dropped after in `down`).
  *
  * @param entities - The entities from your {@link EntityMap}.
- * @param knex - A live Knex connection used to introspect the database.
- * @returns A single `{ up, down, full, isEmpty }` migration source.
+ * @param prevSnapshot - The last committed {@link SchemaSnapshot} (empty on first run).
+ * @returns `{ up, down, full, isEmpty, nextSnapshot }` where `nextSnapshot`
+ *   should be written to disk after the migration file is created.
  *
  * @example
  * ```ts
- * const result = await generateMigrationsForContext(
+ * const prev = loadSnapshot('./migrations/snapshot.json');
+ * const result = generateMigrationsForContext(
  *     Object.values({ todos: TodoEntity, users: UserEntity }),
- *     knex
+ *     prev
  * );
  * if (!result.isEmpty) {
  *     fs.writeFileSync('migrations/20260423000000_init.ts', result.full);
+ *     writeSnapshot('./migrations/snapshot.json', result.nextSnapshot);
  * }
  * ```
  */
-export async function generateMigrationsForContext(
+export function generateMigrationsForContext(
     entities: Entity<any, any>[],
-    knex: Knex
-): Promise<{ up: string; down: string; full: string; isEmpty: boolean }> {
+    prevSnapshot: SchemaSnapshot
+): {
+    up: string;
+    down: string;
+    full: string;
+    isEmpty: boolean;
+    nextSnapshot: SchemaSnapshot;
+} {
     // 1. Collect all (schema, tableName) pairs including CTI variant tables
     const tableEntries: {
         schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
@@ -625,24 +766,38 @@ export async function generateMigrationsForContext(
     // 3. Topological sort by FK dependencies
     const sorted = topologicalSort(uniqueEntries);
 
-    // 4. Generate CREATE or ALTER fragment for each table
+    // 4. Generate CREATE or ALTER fragment for each current table
     const upParts: string[] = [];
     const downParts: string[] = [];
 
+    const currentTableNames = new Set(sorted.map(e => e.tableName));
+
     for (const { schema, tableName } of sorted) {
-        const exists = await tableExistsInDb(knex, tableName);
-        if (!exists) {
+        const snapshotState = prevSnapshot.tables[tableName];
+        if (!snapshotState) {
+            // New table — emit CREATE TABLE
             const { up, down } = generateCreateTableSource(schema);
             upParts.push(up);
             downParts.push(down);
         } else {
-            const dbState = await introspectDatabase(knex, tableName);
-            const diff = diffSchema(schema, dbState);
+            // Existing table — diff schema against snapshot (pure, no DB)
+            const diff = diffSchema(schema, snapshotState);
             if (!isDiffEmpty(diff)) {
                 const { up, down } = buildAlterTableFragments(diff, tableName);
                 upParts.push(up);
                 downParts.push(down);
             }
+        }
+    }
+
+    // 5. Tables in snapshot but absent from current entities → DROP TABLE
+    for (const tableName of Object.keys(prevSnapshot.tables)) {
+        if (!currentTableNames.has(tableName)) {
+            const state = prevSnapshot.tables[tableName];
+            const { up, down } = generateDropTableSource(tableName, state);
+            upParts.push(up);
+            // Recreate before other downs so FK deps are satisfied
+            downParts.unshift(down);
         }
     }
 
@@ -663,12 +818,71 @@ ${isEmpty ? '    // No changes needed' : down}
 }
 `;
 
-    return { up, down, full, isEmpty };
+    // Build the next snapshot from current entity schemas
+    const nextTables: Record<string, DatabaseTableState> = {};
+    for (const { schema, tableName } of sorted) {
+        nextTables[tableName] = entitySchemaToTableState(schema);
+    }
+    const nextSnapshot: SchemaSnapshot = { version: 1, tables: nextTables };
+
+    return { up, down, full, isEmpty, nextSnapshot };
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * @internal
+ * Emit `DROP TABLE` (up) and a best-effort `CREATE TABLE` reconstruction
+ * (down) from a {@link DatabaseTableState} stored in the snapshot.
+ * Called for tables that exist in the previous snapshot but are absent from
+ * the current entity set.
+ */
+function generateDropTableSource(
+    tableName: string,
+    state: DatabaseTableState
+): { up: string; down: string } {
+    const up =
+        `    // TODO: review destructive change — dropped table '${tableName}'\n` +
+        `    await knex.schema.dropTableIfExists(${JSON.stringify(tableName)});`;
+
+    // Reconstruct CREATE TABLE from snapshot state using specificType for
+    // all columns so the raw DB types are preserved faithfully.
+    const colLines: string[] = [];
+    for (const [colName, col] of Object.entries(state.columns)) {
+        let line = `        table.specificType(${JSON.stringify(colName)}, ${JSON.stringify(col.type)})`;
+        if (col.nullable) line += '.nullable()';
+        else line += '.notNullable()';
+        if (col.defaultValue !== null && col.defaultValue !== undefined) {
+            line += `.defaultTo(${JSON.stringify(col.defaultValue)})`;
+        }
+        colLines.push(line + ';');
+    }
+    for (const fk of state.foreignKeys) {
+        colLines.push(
+            `        table.foreign(${JSON.stringify(fk.columnName)}).references(${JSON.stringify(fk.foreignColumn)}).inTable(${JSON.stringify(fk.foreignTable)}).onDelete(${JSON.stringify(fk.deleteRule)}).onUpdate(${JSON.stringify(fk.updateRule)});`
+        );
+    }
+    for (const idx of state.indexes) {
+        if (idx.unique) {
+            colLines.push(
+                `        table.unique(${JSON.stringify(idx.columns)}, { indexName: ${JSON.stringify(idx.name)} });`
+            );
+        } else {
+            colLines.push(
+                `        table.index(${JSON.stringify(idx.columns)}, ${JSON.stringify(idx.name)});`
+            );
+        }
+    }
+
+    const down =
+        `    await knex.schema.createTable(${JSON.stringify(tableName)}, (table) => {\n` +
+        colLines.join('\n') +
+        '\n    });';
+
+    return { up, down };
+}
 
 /**
  * @internal

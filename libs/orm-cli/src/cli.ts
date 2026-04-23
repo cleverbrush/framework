@@ -27,10 +27,8 @@ export async function run(argv: string[]): Promise<void> {
         if (cmd === 'migrate') {
             switch (sub) {
                 case 'generate': {
-                    const name = rest.find(a => !a.startsWith('-'));
-                    if (!name) {
-                        fatal('Usage: cb-orm migrate generate <name>');
-                    }
+                    const name =
+                        rest.find(a => !a.startsWith('-')) ?? 'migration';
                     const config = await loadConfig(configPath);
                     const { generate } = await import('./commands/generate.js');
                     await generate(name, config, flags);
@@ -122,7 +120,7 @@ USAGE
   cb-orm <command> [options]
 
 COMMANDS
-  migrate generate <name>   Diff DB vs schema, emit a timestamped TS migration file
+  migrate generate [name]   Diff DB vs schema, emit a timestamped TS migration file (default name: "migration")
   migrate run               Apply pending migrations  (knex.migrate.latest)
   migrate rollback          Roll back last batch      (knex.migrate.rollback)
   migrate status            List applied and pending migrations

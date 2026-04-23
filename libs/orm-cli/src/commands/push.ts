@@ -4,15 +4,18 @@
 // migration file.  Intended for development only.
 
 import readline from 'node:readline';
+import path from 'node:path';
 import {
     applyDiff,
     diffSchema,
+    entitiesToSnapshot,
     generateCreateTable,
     getPolymorphicVariantSchemas,
     getTableName,
     introspectDatabase,
     isDiffEmpty,
-    tableExistsInDb
+    tableExistsInDb,
+    writeSnapshot
 } from '@cleverbrush/knex-schema';
 import type { OrmCliConfig } from '../types.js';
 
@@ -99,6 +102,19 @@ export async function push(
             console.log(`\nApplied ${changed} table change(s).`);
         }
     });
+
+    // Update the snapshot so that `migrate generate` won't re-emit the same
+    // changes that were just pushed directly to the database.
+    const dir = config.migrations.directory;
+    const absDir = path.resolve(process.cwd(), dir);
+    const snapshotPath =
+        config.migrations.snapshot ?? path.join(absDir, 'snapshot.json');
+    const absSnapshotPath = path.resolve(process.cwd(), snapshotPath);
+    writeSnapshot(
+        absSnapshotPath,
+        entitiesToSnapshot(Object.values(config.entities))
+    );
+    console.log(`Updated snapshot: ${absSnapshotPath}`);
 }
 
 // ---------------------------------------------------------------------------

@@ -16,6 +16,12 @@ export interface MigrationsConfig {
      * @defaultValue `'knex_migrations'`
      */
     tableName?: string;
+    /**
+     * Path to the schema snapshot file.  Must be committed to version control
+     * — it is the source of truth for `migrate generate`.
+     * @defaultValue `<directory>/snapshot.json`
+     */
+    snapshot?: string;
 }
 
 /**

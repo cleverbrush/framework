@@ -56,6 +56,7 @@ export { clearRow, MAPPERS, mapObject, mapValue } from './mappers.js';
 export {
     applyDiff,
     diffSchema,
+    entitySchemaToTableState,
     generateMigration,
     generateMigrationsForContext,
     introspectDatabase,
@@ -71,6 +72,12 @@ export {
     query,
     SchemaQueryBuilder
 } from './SchemaQueryBuilder.js';
+// Snapshot-based migration
+export {
+    entitiesToSnapshot,
+    loadSnapshot,
+    writeSnapshot
+} from './snapshot.js';
 
 // Types
 export type {
@@ -96,6 +103,7 @@ export type {
     ResolvedVariantConfig,
     ResolvedVariantSpec,
     SchemaKeys,
+    SchemaSnapshot,
     SelectProjection,
     SelectSelector,
     ValidatedJoinManySpec,

@@ -2,12 +2,19 @@
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { generateMigrationsForContext } from '@cleverbrush/knex-schema';
+import {
+    generateMigrationsForContext,
+    loadSnapshot,
+    writeSnapshot
+} from '@cleverbrush/knex-schema';
 import type { OrmCliConfig } from '../types.js';
 
 /**
- * Diff the live database against all registered entity schemas and write a
+ * Diff the current entity schemas against the committed snapshot and write a
  * single timestamped TypeScript migration file when changes are detected.
+ * Also updates the snapshot file so the next run starts from the new baseline.
+ *
+ * No live database connection is needed — the snapshot is the source of truth.
  *
  * File name pattern: `YYYYMMDDHHmmss_<name>.ts`  (matches Knex defaults).
  */
@@ -19,10 +26,14 @@ export async function generate(
     const dir =
         (flags['--dir'] as string | undefined) ?? config.migrations.directory;
     const absDir = path.resolve(process.cwd(), dir);
+    const snapshotPath =
+        config.migrations.snapshot ?? path.join(absDir, 'snapshot.json');
+    const absSnapshotPath = path.resolve(process.cwd(), snapshotPath);
+
     const entities = Object.values(config.entities);
 
-    console.log('Comparing schema against database…');
-    const result = await generateMigrationsForContext(entities, config.knex);
+    const prevSnapshot = loadSnapshot(absSnapshotPath);
+    const result = generateMigrationsForContext(entities, prevSnapshot);
 
     if (result.isEmpty) {
         console.log('No schema changes detected.');
@@ -38,6 +49,9 @@ export async function generate(
 
     writeFileSync(filepath, result.full, 'utf-8');
     console.log(`Created migration: ${filepath}`);
+
+    writeSnapshot(absSnapshotPath, result.nextSnapshot);
+    console.log(`Updated snapshot: ${absSnapshotPath}`);
 }
 
 // ---------------------------------------------------------------------------

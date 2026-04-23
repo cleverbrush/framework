@@ -474,6 +474,25 @@ export interface DatabaseTableState {
     checks: DatabaseCheckInfo[];
 }
 
+/**
+ * Serialized snapshot of all entity schemas at a given point in time.
+ *
+ * Stored in `<migrations.directory>/snapshot.json` and committed to version
+ * control. `migrate generate` diffs the current code against this snapshot
+ * (instead of a live database) to produce migration files, so no DB
+ * connection is required.
+ *
+ * Each entry in `tables` mirrors the shape that `introspectDatabase` would
+ * return — allowing `diffSchema` to be reused unchanged.
+ *
+ * @public
+ */
+export interface SchemaSnapshot {
+    version: 1;
+    /** Map of table name → database state derived from entity schemas. */
+    tables: Record<string, DatabaseTableState>;
+}
+
 // ---------------------------------------------------------------------------
 // Migration diff types
 // ---------------------------------------------------------------------------
