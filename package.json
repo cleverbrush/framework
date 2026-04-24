@@ -26,7 +26,9 @@
         "test": "vitest --run --typecheck",
         "test:coverage": "vitest --run --coverage && node scripts/update-coverage-badges.js",
         "bench": "vitest bench --run",
-        "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json"
+        "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json",
+        "dev:demo": "./scripts/dev-demo.sh",
+        "dev:demo:stop": "docker compose -f demos/docker-compose.yml stop postgres"
     },
     "workspaces": [
         "./libs/*",
@@ -45,6 +47,7 @@
         "@changesets/cli": "^2.30.0",
         "@testing-library/react": "^16.3.2",
         "@vitest/coverage-v8": "^4.1.2",
+        "concurrently": "^9.1.0",
         "jsdom": "^29.0.1",
         "tsup": "^8.5.1",
         "turbo": "^2.8.21",

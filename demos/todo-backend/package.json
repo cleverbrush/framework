@@ -46,6 +46,7 @@
     "name": "@cleverbrush/todo-backend",
     "scripts": {
         "start": "node --import ./dist/telemetry.js dist/index.js",
+        "dev": "tsx watch --env-file=.env src/index.ts",
         "watch": "tsc --build tsconfig.build.json --watch",
         "build": "tsup && tsc --noEmit --project tsconfig.build.json",
         "clean": "rm -rf dist tsconfig.build.tsbuildinfo",
@@ -60,6 +61,7 @@
     "devDependencies": {
         "@types/node": "^22.0.0",
         "tsup": "^8.5.1",
+        "tsx": "^4.19.0",
         "typescript": "^6.0.2"
     },
     "type": "module",

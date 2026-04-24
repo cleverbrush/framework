@@ -7,3 +7,4 @@ dist
 /websites/docs/public/api-docs/latest
 /websites/schema/public/playground/schema-bundle.js
 .playwright-mcp
+demos/todo-backend/logs
