@@ -9,7 +9,7 @@ import type { HandlerMap } from '@cleverbrush/server';
 import type { endpoints } from '../endpoints.js';
 import { activityLogHandler } from './admin.js';
 import { googleLoginHandler, loginHandler, registerHandler } from './auth.js';
-import { demoEchoHandler, demoFlakyHandler, demoSlowHandler } from './demo.js';
+import { demoEchoHandler, demoFlakyHandler, demoSlowHandler, demoCrashSqlHandler, demoCrashRuntimeHandler } from './demo.js';
 import { activityFeedHandler, chatHandler, todoUpdatesHandler } from './live.js';
 import {
     completeTodoHandler,
@@ -74,7 +74,9 @@ export const handlers: HandlerMap<typeof endpoints> = {
     demo: {
         slow: demoSlowHandler,
         flaky: demoFlakyHandler,
-        echo: demoEchoHandler
+        echo: demoEchoHandler,
+        crashSql: demoCrashSqlHandler,
+        crashRuntime: demoCrashRuntimeHandler
     },
     live: {
         todoUpdates: todoUpdatesHandler,

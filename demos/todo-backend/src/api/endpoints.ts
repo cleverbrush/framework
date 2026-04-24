@@ -1,7 +1,7 @@
 import { defineWebhook } from '@cleverbrush/server';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
-import { DbToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
+import { DbToken, KnexToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
 import { api } from './contract.js';
 import {
     type ImportTodosBody,
@@ -327,6 +327,25 @@ export const DemoEchoEndpoint = api.demo.echo
     .tags('demo')
     .operationId('demoEcho');
 
+export const DemoCrashSqlEndpoint = api.demo.crashSql
+    .inject({ knex: KnexToken })
+    .summary('Crash: SQL error')
+    .description(
+        'Queries a non-existent table, producing an unhandled database error. ' +
+            'Demonstrates how SQL exceptions surface in OTel traces and logs.'
+    )
+    .tags('demo')
+    .operationId('demoCrashSql');
+
+export const DemoCrashRuntimeEndpoint = api.demo.crashRuntime
+    .summary('Crash: Runtime exception')
+    .description(
+        'Throws an unhandled JavaScript Error. ' +
+            'Demonstrates how runtime exceptions surface in OTel traces and logs.'
+    )
+    .tags('demo')
+    .operationId('demoCrashRuntime');
+
 // ── Live subscription endpoints ───────────────────────────────────────────────
 
 export const TodoUpdatesSubscription = api.live.todoUpdates;
@@ -395,7 +414,9 @@ export const endpoints = {
     demo: {
         slow: DemoSlowEndpoint,
         flaky: DemoFlakyEndpoint,
-        echo: DemoEchoEndpoint
+        echo: DemoEchoEndpoint,
+        crashSql: DemoCrashSqlEndpoint,
+        crashRuntime: DemoCrashRuntimeEndpoint
     },
     live: {
         todoUpdates: TodoUpdatesSubscription,

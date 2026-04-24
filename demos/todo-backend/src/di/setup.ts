@@ -1,6 +1,7 @@
 import type { IServiceProvider, ServiceCollection } from '@cleverbrush/di';
 import { createQuery, createDb } from '@cleverbrush/orm';
 import type { Logger } from '@cleverbrush/log';
+import { instrumentKnex } from '@cleverbrush/otel';
 import knex from 'knex';
 import type { Config } from '../config.js';
 import { entityMap } from '../db/schemas.js';
@@ -24,14 +25,17 @@ export function configureDI(
     // Structured logger — available everywhere via DI
     services.addSingleton(LoggerToken, logger);
 
-    // Knex instance — single connection pool for the whole application
+    // Knex instance — single connection pool for the whole application,
+    // instrumented with OTel so every SQL statement becomes a CLIENT span.
     services.addSingleton(KnexToken, () =>
-        knex({
-            client: 'pg',
-            connection: config.db.connectionString,
-            pool: { min: 2, max: 10 },
-            acquireConnectionTimeout: 10_000
-        })
+        instrumentKnex(
+            knex({
+                client: 'pg',
+                connection: config.db.connectionString,
+                pool: { min: 2, max: 10 },
+                acquireConnectionTimeout: 10_000
+            })
+        )
     );
 
     // Schema-aware BoundQuery — wraps knex with type-safe query builder

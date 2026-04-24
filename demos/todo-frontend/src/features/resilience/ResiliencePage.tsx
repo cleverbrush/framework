@@ -22,6 +22,7 @@ type DemoResult = {
     status: 'idle' | 'loading' | 'success' | 'error';
     message: string;
     duration?: number;
+    traceId?: string;
 };
 
 function useDemoAction(action: () => Promise<string>): [DemoResult, () => void] {
@@ -43,10 +44,12 @@ function useDemoAction(action: () => Promise<string>): [DemoResult, () => void] 
             })
             .catch((err) => {
                 let message = 'Unknown error';
+                let traceId: string | undefined;
                 if (isTimeoutError(err)) {
                     message = `TimeoutError: timed out after ${err.timeout}ms`;
                 } else if (isApiError(err)) {
                     message = `ApiError: ${err.status} — ${err.message}`;
+                    traceId = err.traceId;
                 } else if (isNetworkError(err)) {
                     message = `NetworkError: ${err.message}`;
                 } else if (isWebError(err)) {
@@ -57,6 +60,7 @@ function useDemoAction(action: () => Promise<string>): [DemoResult, () => void] 
                 setResult({
                     status: 'error',
                     message,
+                    traceId,
                     duration: Math.round(performance.now() - start)
                 });
             });
@@ -116,6 +120,20 @@ function DemoCard({
                     <Code size="2" style={{ whiteSpace: 'pre-wrap' }}>
                         {result.message}
                     </Code>
+                )}
+                {result.traceId && (
+                    <Flex align="center" gap="2">
+                        <Text size="1" color="gray">
+                            Trace ID:
+                        </Text>
+                        <Code
+                            size="1"
+                            style={{ cursor: 'pointer', userSelect: 'all' }}
+                            title="Click to copy — paste into HyperDX Search"
+                        >
+                            {result.traceId}
+                        </Code>
+                    </Flex>
                 )}
             </Flex>
         </Card>
@@ -189,6 +207,20 @@ export default function ResiliencePage() {
         }, [])
     );
 
+    const [crashSqlResult, runCrashSql] = useDemoAction(
+        useCallback(async () => {
+            await client.demo.crashSql({});
+            return 'Should not reach here';
+        }, [])
+    );
+
+    const [crashRuntimeResult, runCrashRuntime] = useDemoAction(
+        useCallback(async () => {
+            await client.demo.crashRuntime({});
+            return 'Should not reach here';
+        }, [])
+    );
+
     return (
         <Box>
             <Heading size="5" mb="2">
@@ -248,6 +280,22 @@ export default function ResiliencePage() {
                     buttonLabel="Test Error"
                     result={errorResult}
                     onRun={runError}
+                />
+
+                <DemoCard
+                    title="🗄️ SQL Crash"
+                    description="Triggers an unhandled database error by querying a non-existent table. Check HyperDX — the span will be marked as failed with the SQL exception attached."
+                    buttonLabel="Crash SQL"
+                    result={crashSqlResult}
+                    onRun={runCrashSql}
+                />
+
+                <DemoCard
+                    title="💥 Runtime Crash"
+                    description="Throws an unhandled JavaScript Error on the server. Check HyperDX — the span will be marked as failed with the exception stacktrace attached."
+                    buttonLabel="Crash Runtime"
+                    result={crashRuntimeResult}
+                    onRun={runCrashRuntime}
                 />
             </Flex>
         </Box>

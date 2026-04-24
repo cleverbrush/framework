@@ -5,6 +5,18 @@ import {
     requestLoggingMiddleware
 } from './middleware/requestLogging.js';
 
+export interface UseLoggingOptions extends RequestLoggingOptions {
+    /**
+     * Header name to echo the correlation ID back on the response.
+     * Set to `false` to suppress the response header entirely — useful
+     * when an OTel `X-Trace-Id` header already serves the traceability
+     * purpose and a second ID would confuse consumers.
+     *
+     * @default 'X-Correlation-Id'
+     */
+    correlationResponseHeader?: string | false;
+}
+
 /**
  * Convenience function that returns correlation ID middleware and
  * request logging middleware, ready to spread into `ServerBuilder.use()`.
@@ -24,13 +36,15 @@ import {
  */
 export function useLogging(
     logger: Logger,
-    options?: RequestLoggingOptions
+    options?: UseLoggingOptions
 ): [
     ReturnType<typeof correlationIdMiddleware>,
     ReturnType<typeof requestLoggingMiddleware>
 ] {
     return [
-        correlationIdMiddleware(),
+        correlationIdMiddleware({
+            responseHeader: options?.correlationResponseHeader
+        }),
         requestLoggingMiddleware(logger, options)
     ];
 }

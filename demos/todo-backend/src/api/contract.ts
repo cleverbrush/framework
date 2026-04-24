@@ -239,7 +239,17 @@ export const api = defineApi({
         echo: endpoint
             .post('/api/demo/echo')
             .body(object({ message: string() }))
-            .returns(object({ message: string() }))
+            .returns(object({ message: string() })),
+
+        /** Crashes with an unhandled SQL error (non-existent table). */
+        crashSql: endpoint
+            .get('/api/demo/crash-sql')
+            .returns(object({ ok: string() })),
+
+        /** Crashes with an unhandled runtime exception. */
+        crashRuntime: endpoint
+            .get('/api/demo/crash-runtime')
+            .returns(object({ ok: string() }))
     },
 
     // ── WebSocket subscriptions ───────────────────────────────────────────

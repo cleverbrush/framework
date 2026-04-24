@@ -7,6 +7,7 @@ import {
     type Middleware,
     mapHandlers
 } from '@cleverbrush/server';
+import { tracingMiddleware } from '@cleverbrush/otel';
 import {
     generateOpenApiSpec,
     type OpenApiDocument,
@@ -65,6 +66,10 @@ export function buildServer(config: Config, logger: Logger) {
             'Access-Control-Allow-Headers',
             'Content-Type, Authorization, X-Idempotency-Key, If-Match'
         );
+        ctx.response.setHeader(
+            'Access-Control-Expose-Headers',
+            'X-Trace-Id, X-Response-Time'
+        );
         if (ctx.method === 'OPTIONS') {
             ctx.response.writeHead(204);
             ctx.response.end();
@@ -74,10 +79,12 @@ export function buildServer(config: Config, logger: Logger) {
     };
 
     const [correlationMiddleware, requestLogMiddleware] = useLogging(logger, {
-        excludePaths: ['/health']
+        excludePaths: ['/health'],
+        correlationResponseHeader: false
     });
 
     const server = createServer()
+        .use(tracingMiddleware({ excludePaths: ['/health'] }))
         .use(corsMiddleware)
         .use(correlationMiddleware)
         .use(requestLogMiddleware)

@@ -31,7 +31,7 @@ await logger.dispose();
 - **CLEF Format** — Compact Log Event Format for Seq, ClickHouse, etc.
 - **Sinks** — Console, File (with rotation), Seq, ClickHouse, custom
 - **Batching** — All network sinks batch with retry & circuit breaking
-- **Enrichers** — hostname, processId, environment, application, correlationId, caller, trace
+- **Enrichers** — hostname, processId, environment, application, correlationId, caller, trace _(deprecated; use `@cleverbrush/otel`)_
 - **Correlation IDs** — UUID v7, extracted from headers, propagated via AsyncLocalStorage
 - **Middleware** — Request logging & correlation ID for `@cleverbrush/server`
 - **DI** — `configureLogging()` for `@cleverbrush/di`

@@ -7,8 +7,8 @@ import { LogContext } from '../LogContext.js';
 export interface CorrelationIdMiddlewareOptions {
     /** Headers to read from incoming request (checked in order). @default ['X-Correlation-Id', 'X-Request-Id'] */
     requestHeaders?: string[];
-    /** Header to set on the response. @default 'X-Correlation-Id' */
-    responseHeader?: string;
+    /** Header to set on the response. Set to `false` to skip setting a response header entirely. @default 'X-Correlation-Id' */
+    responseHeader?: string | false;
     /** Custom ID generator. @default generateCorrelationId */
     generate?: () => string;
 }
@@ -32,18 +32,23 @@ export interface CorrelationIdMiddlewareOptions {
 export function correlationIdMiddleware(
     options?: CorrelationIdMiddlewareOptions
 ) {
-    const responseHeader = options?.responseHeader ?? 'X-Correlation-Id';
+    const responseHeader =
+        options?.responseHeader === false
+            ? false
+            : (options?.responseHeader ?? 'X-Correlation-Id');
     const generate = options?.generate ?? generateCorrelationId;
 
     return async (context: any, next: () => Promise<void>) => {
         const headers = context.headers ?? {};
         const correlationId = extractCorrelationId(headers) || generate();
 
-        // Set on response if possible
-        if (context.setHeader) {
-            context.setHeader(responseHeader, correlationId);
-        } else if (context.response?.setHeader) {
-            context.response.setHeader(responseHeader, correlationId);
+        // Set on response if possible (skip if responseHeader is false)
+        if (responseHeader !== false) {
+            if (context.setHeader) {
+                context.setHeader(responseHeader, correlationId);
+            } else if (context.response?.setHeader) {
+                context.response.setHeader(responseHeader, correlationId);
+            }
         }
 
         // Store in context items for other middleware

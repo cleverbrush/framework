@@ -4,9 +4,12 @@ import type { Enricher } from '../Enricher.js';
  * Enriches log events with OpenTelemetry trace and span IDs
  * from the active context, if available.
  *
- * Reads from `globalThis.__OTEL_ACTIVE_SPAN__` or the standard
- * OpenTelemetry API if installed. No-op when no tracing is active.
+ * Reads from `globalThis.opentelemetry` (a shim some applications register).
+ * No-op when no tracing is active.
  *
+ * @deprecated Use `traceEnricher` from `@cleverbrush/otel` instead. The
+ *   replacement reads the active span via `@opentelemetry/api` directly,
+ *   does not depend on a global shim, and also captures `TraceFlags`.
  * @returns an enricher that adds `{ TraceId: '...', SpanId: '...' }` if available
  */
 export function traceEnricher(): Enricher {

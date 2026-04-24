@@ -23,6 +23,7 @@ COPY libs/schema-json/package.json ./libs/schema-json/
 COPY libs/scheduler/package.json ./libs/scheduler/
 COPY libs/server/package.json ./libs/server/
 COPY libs/server-openapi/package.json ./libs/server-openapi/
+COPY libs/otel/package.json ./libs/otel/
 COPY libs/client/package.json ./libs/client/
 COPY libs/benchmarks/package.json ./libs/benchmarks/
 COPY demos/todo-backend/package.json ./demos/todo-backend/
@@ -73,4 +74,4 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "--import", "./dist/telemetry.js", "dist/index.js"]

@@ -1,3 +1,6 @@
+// IMPORTANT: telemetry must be imported FIRST so OTel auto-instrumentations
+// can patch outbound HTTP / undici before any other module loads them.
+import { otel } from './telemetry.js';
 import {
     consoleSink,
     createLogger,
@@ -5,6 +8,7 @@ import {
     hostnameEnricher,
     processIdEnricher
 } from '@cleverbrush/log';
+import { otelLogSink, traceEnricher } from '@cleverbrush/otel';
 import knex from 'knex';
 import { config } from './config.js';
 import { runMigrations } from './db/migrate.js';
@@ -22,7 +26,7 @@ import {
 import { buildServer } from './server.js';
 
 async function main() {
-    // Create structured logger with console + file sinks
+    // Create structured logger with console + file + OTLP sinks
     const logger = createLogger({
         minimumLevel: 'debug',
         sinks: [
@@ -34,9 +38,14 @@ async function main() {
                     interval: 'daily',
                     retainCount: 7
                 }
-            })
+            }),
+            otelLogSink()
         ],
-        enrichers: [hostnameEnricher(), processIdEnricher()],
+        enrichers: [
+            hostnameEnricher(),
+            processIdEnricher(),
+            traceEnricher()
+        ],
         handleProcessExit: true
     });
 
@@ -98,6 +107,7 @@ async function main() {
             );
         } finally {
             await logger.dispose();
+            await otel.shutdown();
             process.exit(0);
         }
     };

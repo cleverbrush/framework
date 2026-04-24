@@ -20,6 +20,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      hyperdx:
+        condition: service_healthy
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -31,6 +33,10 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       PORT: 3000
       NODE_ENV: production
+      OTEL_SERVICE_NAME: todo-backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://hyperdx:4318
+      OTEL_EXPORTER_OTLP_HEADERS: "authorization=2640d190-d9e3-4dfe-a3fb-b55c958e2445"
+      OTEL_LOG_LEVEL: warn
     ports:
       - "${APP_PORT:-3000}:3000"
     healthcheck:
@@ -80,6 +86,36 @@ services:
       - pgadmin_data:/var/lib/pgadmin
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
 
+  # HyperDX (ClickStack) — all-in-one OTel collector + ClickHouse + UI.
+  # UI:        http://localhost:${HYPERDX_PORT:-8091}
+  # OTLP HTTP: http://hyperdx:4318 (in-network) | http://localhost:4318 (host)
+  #
+  # First-time setup: open the UI, create an admin account, then data flows in.
+  hyperdx:
+    image: hyperdx/hyperdx-all-in-one:latest
+    restart: unless-stopped
+    ports:
+      - "${HYPERDX_PORT:-8091}:8080"
+      - "4317:4317"   # OTLP/gRPC
+      - "4318:4318"   # OTLP/HTTP
+      - "8123:8123"   # ClickHouse HTTP (debug)
+    volumes:
+      - hyperdx_data:/data
+      - hyperdx_ch_data:/var/lib/clickhouse
+      - hyperdx_ch_logs:/var/log/clickhouse-server
+    # Wait until both the UI and the OTLP ingestor are actually accepting
+    # connections before declaring the service healthy. ClickHouse can take
+    # up to ~60 s on first boot which is why start_period is generous.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null 2>&1 && wget -q --spider http://localhost:4318/ 2>/dev/null; exit 0"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+
 volumes:
   postgres_data:
   pgadmin_data:
+  hyperdx_data:
+  hyperdx_ch_data:
+  hyperdx_ch_logs:
