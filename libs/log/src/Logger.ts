@@ -7,6 +7,8 @@ import { createLogEvent } from './MessageTemplate.js';
  */
 export interface TypedTemplate<T extends Record<string, unknown>> {
     serialize(params: T): string;
+    /** The raw `{Property}` pattern string, used as `messageTemplate`. */
+    readonly template?: string;
 }
 
 /**
@@ -272,10 +274,11 @@ export class Logger implements AsyncDisposable {
         if (typeof template === 'string') {
             templateStr = template;
         } else {
-            // Typed template via ParseStringSchemaBuilder
-            templateStr = template.serialize(props);
-            // For typed templates, the rendered message IS the serialized string
-            // and the template is the serialized output
+            // Typed template via ParseStringSchemaBuilder.
+            // Use the raw {Property} pattern as messageTemplate so logs with
+            // the same shape can be grouped in observability tools; the
+            // rendered message is derived by createLogEvent from the pattern.
+            templateStr = template.template ?? template.serialize(props);
         }
 
         const mergedProps = {
