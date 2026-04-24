@@ -10,7 +10,7 @@ Add `@cleverbrush/otel` — OpenTelemetry instrumentation for the framework.
 
 End-to-end OpenTelemetry support for `@cleverbrush/server`, `@cleverbrush/orm`,
 and `@cleverbrush/log`. Ships traces, logs, and runtime metrics over OTLP/HTTP
-to any compatible backend (HyperDX / ClickStack, Grafana Tempo, Jaeger, …).
+to any compatible backend (ClickStack, Grafana Tempo, Jaeger, …).
 
 - **`setupOtel(config)`** — bootstraps the Node SDK (traces + logs + metrics)
   with sensible defaults and a single `shutdown()` hook for graceful exit.
@@ -33,14 +33,14 @@ to any compatible backend (HyperDX / ClickStack, Grafana Tempo, Jaeger, …).
   (declared as optional peer dependencies).
 
 The `todo-backend` demo is fully wired and ships traces / logs / metrics to
-a HyperDX container included in `demos/docker-compose.yml`.
+a ClickStack container included in `demos/docker-compose.yml`.
 
 ## `@cleverbrush/log`
 
 - **`TypedTemplate.template`** — new optional property on the `TypedTemplate<T>`
   interface. When present, the `Logger` uses it as the raw `{Property}` pattern
   string for `messageTemplate`, so log events with the same shape are grouped
-  correctly in Seq, HyperDX, and other structured-log UIs. `ParseStringSchemaBuilder`
+  correctly in Seq, ClickStack, and other structured-log UIs. `ParseStringSchemaBuilder`
   now implements this property automatically.
 - **`correlationIdMiddleware` / `useLogging`** — `responseHeader` (and the new
   `UseLoggingOptions.correlationResponseHeader`) now accept `false` to suppress

@@ -129,7 +129,7 @@ function DemoCard({
                         <Code
                             size="1"
                             style={{ cursor: 'pointer', userSelect: 'all' }}
-                            title="Click to copy — paste into HyperDX Search"
+                            title="Click to copy — paste into ClickStack Search"
                         >
                             {result.traceId}
                         </Code>
@@ -284,7 +284,7 @@ export default function ResiliencePage() {
 
                 <DemoCard
                     title="🗄️ SQL Crash"
-                    description="Triggers an unhandled database error by querying a non-existent table. Check HyperDX — the span will be marked as failed with the SQL exception attached."
+                    description="Triggers an unhandled database error by querying a non-existent table. Check ClickStack — the span will be marked as failed with the SQL exception attached."
                     buttonLabel="Crash SQL"
                     result={crashSqlResult}
                     onRun={runCrashSql}
@@ -292,7 +292,7 @@ export default function ResiliencePage() {
 
                 <DemoCard
                     title="💥 Runtime Crash"
-                    description="Throws an unhandled JavaScript Error on the server. Check HyperDX — the span will be marked as failed with the exception stacktrace attached."
+                    description="Throws an unhandled JavaScript Error on the server. Check ClickStack — the span will be marked as failed with the exception stacktrace attached."
                     buttonLabel="Crash Runtime"
                     result={crashRuntimeResult}
                     onRun={runCrashRuntime}

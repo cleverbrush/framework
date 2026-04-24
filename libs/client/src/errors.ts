@@ -44,7 +44,7 @@ export class ApiError extends WebError {
      * @param body - The parsed response body, if the server returned JSON.
      * @param traceId - The `X-Trace-Id` response header value, if the server
      *   set one. Useful for correlating client-side errors with backend traces
-     *   in observability tools (HyperDX, Jaeger, etc.).
+     *   in observability tools (ClickStack, Jaeger, etc.).
      */
     constructor(
         public readonly status: number,

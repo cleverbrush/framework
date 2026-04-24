@@ -276,10 +276,10 @@ span?.addEvent('cache.miss', { key: cacheKey });`)
                 <h2>🎯 See it in action</h2>
                 <p>
                     The <code>todo-backend</code> demo is fully wired and ships
-                    traces, logs, and metrics to a HyperDX (ClickStack)
-                    container included in <code>demos/docker-compose.yml</code>.
-                    Run <code>docker compose up</code> from <code>demos/</code>{' '}
-                    and open <code>http://localhost:8080</code> for the HyperDX
+                    traces, logs, and metrics to a ClickStack container included
+                    in <code>demos/docker-compose.yml</code>. Run{' '}
+                    <code>docker compose up</code> from <code>demos/</code> and
+                    open <code>http://localhost:8091</code> for the ClickStack
                     UI.
                 </p>
             </div>

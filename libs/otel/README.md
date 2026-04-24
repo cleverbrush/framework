@@ -1,6 +1,6 @@
 # @cleverbrush/otel
 
-OpenTelemetry instrumentation for the Cleverbrush framework — traces, logs, and metrics over OTLP for `@cleverbrush/server`, `@cleverbrush/orm`, and `@cleverbrush/log`. Designed to ship straight into ClickStack / HyperDX, Grafana Tempo, Jaeger, or any OTLP-compatible backend.
+OpenTelemetry instrumentation for the Cleverbrush framework — traces, logs, and metrics over OTLP for `@cleverbrush/server`, `@cleverbrush/orm`, and `@cleverbrush/log`. Designed to ship straight into ClickStack, Grafana Tempo, Jaeger, or any OTLP-compatible backend.
 
 ## Install
 

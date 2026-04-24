@@ -20,7 +20,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      hyperdx:
+      clickstack:
         condition: service_healthy
     environment:
       DB_HOST: postgres
@@ -34,8 +34,7 @@ services:
       PORT: 3000
       NODE_ENV: production
       OTEL_SERVICE_NAME: todo-backend
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://hyperdx:4318
-      OTEL_EXPORTER_OTLP_HEADERS: "authorization=2640d190-d9e3-4dfe-a3fb-b55c958e2445"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://clickstack:4318
       OTEL_LOG_LEVEL: warn
     ports:
       - "${APP_PORT:-3000}:3000"
@@ -86,36 +85,48 @@ services:
       - pgadmin_data:/var/lib/pgadmin
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
 
-  # HyperDX (ClickStack) — all-in-one OTel collector + ClickHouse + UI.
-  # UI:        http://localhost:${HYPERDX_PORT:-8091}
-  # OTLP HTTP: http://hyperdx:4318 (in-network) | http://localhost:4318 (host)
+  # ClickStack — all-in-one OTel collector + ClickHouse + UI.
+  # UI:        http://localhost:${CLICKSTACK_PORT:-8091}
+  # OTLP HTTP: http://clickstack:4318 (in-network) | http://localhost:4318 (host)
   #
-  # First-time setup: open the UI, create an admin account, then data flows in.
-  hyperdx:
-    image: hyperdx/hyperdx-all-in-one:latest
+  # NOTE: the host port MUST match the container port — the UI generates
+  # self-referential URLs using its internal port. We override the internal
+  # port via HYPERDX_APP_PORT so they always agree, freeing host port 8080.
+  #
+  # clickstack-entry.sh mounts over /etc/local/entry.sh to enable no-auth
+  # mode (IS_LOCAL_APP_MODE=DANGEROUSLY_is_local_app_mode💀) so the OTLP
+  # endpoint accepts data without an API key — suitable for local dev only.
+  clickstack:
+    image: clickhouse/clickstack-all-in-one:latest
     restart: unless-stopped
+    environment:
+      HYPERDX_APP_PORT: ${CLICKSTACK_PORT:-8091}
     ports:
-      - "${HYPERDX_PORT:-8091}:8080"
+      - "${CLICKSTACK_PORT:-8091}:${CLICKSTACK_PORT:-8091}"
       - "4317:4317"   # OTLP/gRPC
       - "4318:4318"   # OTLP/HTTP
       - "8123:8123"   # ClickHouse HTTP (debug)
     volumes:
-      - hyperdx_data:/data
-      - hyperdx_ch_data:/var/lib/clickhouse
-      - hyperdx_ch_logs:/var/log/clickhouse-server
-    # Wait until both the UI and the OTLP ingestor are actually accepting
-    # connections before declaring the service healthy. ClickHouse can take
-    # up to ~60 s on first boot which is why start_period is generous.
+      - clickstack_data:/data/db
+      - clickstack_ch_data:/var/lib/clickhouse
+      - clickstack_ch_logs:/var/log/clickhouse-server
+      - ./clickstack-entry.sh:/etc/local/entry.sh:ro
+    # Wait until the UI is accepting TCP connections before declaring the
+    # service healthy. Uses bash's built-in /dev/tcp (no `nc` / `wget`
+    # required). The OTel collector (4318) is launched by opampsupervisor
+    # after the API configures it — the backend SDK retries until it's ready,
+    # so we don't need to gate on it here.
+    # ClickHouse can take up to ~60 s on first boot.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null 2>&1 && wget -q --spider http://localhost:4318/ > /dev/null 2>&1"]
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/${CLICKSTACK_PORT:-8091}'"]
       interval: 10s
       timeout: 5s
-      retries: 12
-      start_period: 60s
+      retries: 30
+      start_period: 20s
 
 volumes:
   postgres_data:
   pgadmin_data:
-  hyperdx_data:
-  hyperdx_ch_data:
-  hyperdx_ch_logs:
+  clickstack_data:
+  clickstack_ch_data:
+  clickstack_ch_logs:

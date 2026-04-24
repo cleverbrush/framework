@@ -7,8 +7,8 @@
  * or as the very first import in `index.ts`.
  *
  * Sends traces, logs, and metrics over OTLP/HTTP to the endpoint set by
- * `OTEL_EXPORTER_OTLP_ENDPOINT` (defaults to the HyperDX/ClickStack
- * collector at `http://hyperdx:4318` in `docker-compose.yml`).
+ * `OTEL_EXPORTER_OTLP_ENDPOINT` (defaults to the ClickStack collector
+ * at `http://clickstack:4318` in `docker-compose.yml`).
  */
 import { setupOtel } from '@cleverbrush/otel';
 import {
@@ -17,7 +17,7 @@ import {
 } from '@cleverbrush/otel/instrumentations';
 
 const endpoint =
-    process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://hyperdx:4318';
+    process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://clickstack:4318';
 
 export const otel = setupOtel({
     serviceName: process.env.OTEL_SERVICE_NAME ?? 'todo-backend',

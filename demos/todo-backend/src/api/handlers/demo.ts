@@ -52,6 +52,6 @@ export const demoCrashRuntimeHandler: Handler<typeof DemoCrashRuntimeEndpoint> =
     async () => {
         // Intentionally throws an unhandled runtime exception.
         throw new Error(
-            'Simulated runtime exception — see this in HyperDX traces/logs!'
+            'Simulated runtime exception — see this in ClickStack traces/logs!'
         );
     };
