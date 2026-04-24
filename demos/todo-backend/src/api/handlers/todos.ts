@@ -11,6 +11,7 @@ import {
 import type {
     CompleteTodoEndpoint,
     CreateTodoEndpoint,
+    DeleteActivityEndpoint,
     DeleteTodoEndpoint,
     DownloadAttachmentEndpoint,
     ExportTodosEndpoint,
@@ -296,6 +297,25 @@ export const listAllActivityHandler: Handler<
         .limit(limit);
 
     return rows.map(mapTodoActivity);
+};
+
+// ── Delete activity event ────────────────────────────────────────────────────
+
+export const deleteActivityHandler: Handler<
+    typeof DeleteActivityEndpoint
+> = async ({ params }, { trackedDb }) => {
+    const row = await trackedDb.todoActivityBase.find(params.id);
+
+    if (!row) {
+        return ActionResult.notFound({
+            message: `Activity event ${params.id} not found.`
+        });
+    }
+
+    trackedDb.remove(row);
+    await trackedDb.saveChanges();
+
+    return ActionResult.noContent();
 };
 
 // ── Export todos as CSV ───────────────────────────────────────────────────────

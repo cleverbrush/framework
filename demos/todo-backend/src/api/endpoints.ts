@@ -346,6 +346,14 @@ export const ListAllActivityEndpoint = api.activity.listAll
     .tags('activity')
     .operationId('listAllActivity');
 
+export const DeleteActivityEndpoint = api.activity.delete
+    .authorize(PrincipalSchema)
+    .inject({ db: DbToken, trackedDb: TrackedDbToken })
+    .summary('Delete an activity event')
+    .description('Permanently deletes a single activity event by ID.')
+    .tags('activity')
+    .operationId('deleteActivity');
+
 // ── Grouped endpoints — used with mapHandlers() for compile-time safety ───────
 
 export const endpoints = {
@@ -381,7 +389,8 @@ export const endpoints = {
         activityLog: AdminActivityEndpoint
     },
     activity: {
-        listAll: ListAllActivityEndpoint
+        listAll: ListAllActivityEndpoint,
+        delete: DeleteActivityEndpoint
     },
     demo: {
         slow: DemoSlowEndpoint,

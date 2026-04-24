@@ -14,6 +14,7 @@ import { activityFeedHandler, chatHandler, todoUpdatesHandler } from './live.js'
 import {
     completeTodoHandler,
     createTodoHandler,
+    deleteActivityHandler,
     deleteTodoHandler,
     downloadAttachmentHandler,
     exportTodosHandler,
@@ -67,7 +68,8 @@ export const handlers: HandlerMap<typeof endpoints> = {
         activityLog: activityLogHandler
     },
     activity: {
-        listAll: listAllActivityHandler
+        listAll: listAllActivityHandler,
+        delete: deleteActivityHandler
     },
     demo: {
         slow: demoSlowHandler,

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     Badge,
     Box,
@@ -6,10 +6,12 @@ import {
     Card,
     Flex,
     Heading,
+    IconButton,
     ScrollArea,
     Separator,
     Text
 } from '@radix-ui/themes';
+import { Cross2Icon } from '@radix-ui/react-icons';
 import { useSubscription } from '@cleverbrush/client/react';
 import { client } from '../../api/client';
 
@@ -37,7 +39,13 @@ function typeColor(type: string) {
 
 // ── Activity row renderer (polymorphic) ───────────────────────────────────────
 
-function ActivityRow({ event }: { event: ActivityEvent }) {
+function ActivityRow({
+    event,
+    onDelete
+}: {
+    event: ActivityEvent;
+    onDelete: (id: number) => void;
+}) {
     const ts = new Date(event.createdAt).toLocaleTimeString();
 
     let detail: React.ReactNode;
@@ -76,7 +84,7 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
                     {ts}
                 </Text>
             </Flex>
-            <Flex direction="column" gap="1">
+            <Flex direction="column" gap="1" flexGrow="1">
                 <Text size="2">
                     Todo <Text weight="bold">#{event.todoId}</Text>
                     {event.actorUserId != null && (
@@ -85,6 +93,15 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
                 </Text>
                 {detail}
             </Flex>
+            <IconButton
+                size="1"
+                variant="ghost"
+                color="red"
+                aria-label="Delete activity"
+                onClick={() => onDelete(event.id)}
+            >
+                <Cross2Icon />
+            </IconButton>
         </Flex>
     );
 }
@@ -94,6 +111,8 @@ function ActivityRow({ event }: { event: ActivityEvent }) {
 export default function ActivityPage() {
     const [seed, setSeed] = useState<ActivityEvent[]>([]);
     const [seedLoading, setSeedLoading] = useState(true);
+    // Optimistically deleted IDs — removed immediately on click, restored on error.
+    const [deletedIds, setDeletedIds] = useState<Set<number>>(new Set());
 
     // Load latest 10 events via REST on mount
     useEffect(() => {
@@ -110,17 +129,33 @@ export default function ActivityPage() {
         { maxEvents: 200 }
     );
 
+    const handleDelete = useCallback((id: number) => {
+        // Optimistically hide the item.
+        setDeletedIds(prev => new Set([...prev, id]));
+
+        client.activity
+            .delete({ params: { id } })
+            .catch(() => {
+                // Restore on failure.
+                setDeletedIds(prev => {
+                    const next = new Set(prev);
+                    next.delete(id);
+                    return next;
+                });
+            });
+    }, []);
+
     // Merge: live first (newest), then seed — dedupe by id
     const seenIds = new Set<number>();
     const merged: ActivityEvent[] = [];
     for (const e of [...liveEvents].reverse()) {
-        if (!seenIds.has(e.id)) {
+        if (!seenIds.has(e.id) && !deletedIds.has(e.id)) {
             seenIds.add(e.id);
             merged.push(e);
         }
     }
     for (const e of seed) {
-        if (!seenIds.has(e.id)) {
+        if (!seenIds.has(e.id) && !deletedIds.has(e.id)) {
             seenIds.add(e.id);
             merged.push(e);
         }
@@ -159,7 +194,7 @@ export default function ActivityPage() {
                     <ScrollArea style={{ maxHeight: 600 }}>
                         <Flex direction="column">
                             {merged.map(e => (
-                                <ActivityRow key={e.id} event={e} />
+                                <ActivityRow key={e.id} event={e} onDelete={handleDelete} />
                             ))}
                         </Flex>
                     </ScrollArea>

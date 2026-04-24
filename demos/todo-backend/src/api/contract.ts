@@ -204,7 +204,12 @@ export const api = defineApi({
         listAll: activityResource
             .get()
             .query(object({ limit: number().coerce().optional() }))
-            .responses({ 200: array(TodoActivityResponseSchema) })
+            .responses({ 200: array(TodoActivityResponseSchema) }),
+
+        delete: activityResource.delete(ById).responses({
+            204: null,
+            404: ErrorResponseSchema
+        })
     },
 
     admin: {
