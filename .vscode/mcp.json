@@ -4,12 +4,25 @@
             "type": "http",
             "url": "https://mcp.context7.com/mcp"
         },
-        "memory": {
+        "playwright": {
             "command": "npx",
+            "args": ["@playwright/mcp", "--headless"]
+        },
+        "postgres": {
+            "command": "docker",
             "args": [
-                "-y",
-                "@modelcontextprotocol/server-memory"
-            ]
+                "run",
+                "-i",
+                "--rm",
+                "--add-host=host.docker.internal:host-gateway",
+                "-e",
+                "DATABASE_URI",
+                "crystaldba/postgres-mcp",
+                "--access-mode=unrestricted"
+            ],
+            "env": {
+                "DATABASE_URI": "postgresql://readonly:qwerty123@host.docker.internal:5445/todo_db"
+            }
         }
     }
 }
