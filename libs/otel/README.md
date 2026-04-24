@@ -100,6 +100,20 @@ const logger = createLogger({
 
 All optional auto-instrumentations and `knex` are declared as **optional peer dependencies**, so the package is usable with only `@opentelemetry/api` installed.
 
+## Accessing the Request Span from Handlers
+
+`tracingMiddleware` stores the active server span on `ctx.items` under `OTEL_SPAN_ITEM_KEY`. Use this to attach custom attributes or events from inside endpoint handlers:
+
+```ts
+import { OTEL_SPAN_ITEM_KEY } from '@cleverbrush/otel';
+import type { Span } from '@opentelemetry/api';
+
+// Inside a @cleverbrush/server endpoint handler
+const span = ctx.items.get(OTEL_SPAN_ITEM_KEY) as Span | undefined;
+span?.setAttribute('app.user_id', userId);
+span?.addEvent('cache.miss', { key: cacheKey });
+```
+
 ## Configuration
 
 `setupOtel` reads `OTEL_EXPORTER_OTLP_ENDPOINT` from the environment by default (recommended). Per-signal endpoints (`tracesEndpoint` / `logsEndpoint` / `metricsEndpoint`) and signal toggles (`disableTraces`, `disableLogs`, `disableMetrics`) let you wire up split collectors. Headers (e.g. for SaaS tokens) are passed via `headers: { authorization: 'Bearer …' }`.

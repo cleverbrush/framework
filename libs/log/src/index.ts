@@ -21,7 +21,6 @@ export { environmentEnricher } from './enrichers/environment.js';
 // ---------------------------------------------------------------------------
 export { hostnameEnricher } from './enrichers/hostname.js';
 export { processIdEnricher } from './enrichers/processId.js';
-export { traceEnricher } from './enrichers/trace.js';
 export type { LogFilter } from './Filter.js';
 // ---------------------------------------------------------------------------
 // CLEF formatting

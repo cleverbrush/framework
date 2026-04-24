@@ -232,6 +232,27 @@ const logger = createLogger({
                     </tbody>
                 </table>
 
+                {/* ── Span access from handlers ────────────────────── */}
+                <h2>🎯 Accessing the Request Span from Handlers</h2>
+                <p>
+                    <code>tracingMiddleware</code> stores the active server span
+                    on <code>ctx.items</code> under{' '}
+                    <code>OTEL_SPAN_ITEM_KEY</code>. Use it to attach custom
+                    attributes or events directly from endpoint handlers without
+                    calling <code>trace.getActiveSpan()</code>.
+                </p>
+                <div
+                    dangerouslySetInnerHTML={{
+                        __html: highlightTS(`import { OTEL_SPAN_ITEM_KEY } from '@cleverbrush/otel';
+import type { Span } from '@opentelemetry/api';
+
+// Inside a @cleverbrush/server endpoint handler
+const span = ctx.items.get(OTEL_SPAN_ITEM_KEY) as Span | undefined;
+span?.setAttribute('app.user_id', userId);
+span?.addEvent('cache.miss', { key: cacheKey });`)
+                    }}
+                />
+
                 {/* ── Privacy ──────────────────────────────────────── */}
                 <h2>🔒 Privacy &amp; Redaction</h2>
                 <ul>

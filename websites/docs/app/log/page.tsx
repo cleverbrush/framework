@@ -133,6 +133,35 @@ const logger = createLogger({
                     }}
                 />
 
+                {/* ── Typed Templates ─────────────────────────────── */}
+                <h2>🔷 Typed Templates</h2>
+                <p>
+                    Pass a <code>ParseStringSchemaBuilder</code> (from{' '}
+                    <code>@cleverbrush/schema</code>) directly to any log
+                    method. TypeScript enforces the parameter types at the call
+                    site, and the logger uses the raw{' '}
+                    <code>{'{Property}'}</code> pattern as{' '}
+                    <code>messageTemplate</code> so all events of the same shape
+                    are <strong>grouped</strong> in Seq, HyperDX, ClickHouse,
+                    etc.
+                </p>
+                <div
+                    dangerouslySetInnerHTML={{
+                        __html: highlightTS(`import { s } from '@cleverbrush/schema';
+import { createLogger, consoleSink } from '@cleverbrush/log';
+
+// Define once — compile-time checked parameter types
+const TodoCreated = s.parseString('Todo #{TodoId} "{Title}" created by {UserId}');
+
+const logger = createLogger({ sinks: [consoleSink()] });
+
+// TypeScript enforces { TodoId, Title, UserId }
+logger.info(TodoCreated, { TodoId: 1, Title: 'Buy milk', UserId: 'u-42' });
+// messageTemplate → 'Todo #{TodoId} "{Title}" created by {UserId}'
+// renderedMessage → 'Todo #1 "Buy milk" created by u-42'`)
+                    }}
+                />
+
                 {/* ── Correlation & Middleware ─────────────────────── */}
                 <h2>🔗 Correlation & Middleware</h2>
 
@@ -147,7 +176,12 @@ const logger = createLogger({
 });
 
 // Returns [correlationIdMiddleware, requestLoggingMiddleware]
-const [correlationId, requestLogging] = useLogging(logger);
+const [correlationId, requestLogging] = useLogging(logger, {
+    excludePaths: ['/health'],
+    // Set to false when @cleverbrush/otel's tracingMiddleware already
+    // sets a traceparent header — avoids a redundant second ID header
+    correlationResponseHeader: false,
+});
 
 // Add to your @cleverbrush/server pipeline
 // Every request gets a unique correlation ID, logged on completion`)
@@ -163,10 +197,7 @@ const [correlationId, requestLogging] = useLogging(logger);
 import { configureLogging, ILogger, consoleSink } from '@cleverbrush/log';
 
 const services = new ServiceCollection();
-configureLogging(services, {
-    minimumLevel: 'debug',
-    sinks: [consoleSink()],
-});
+configureLogging(services, logger);
 
 const provider = services.buildServiceProvider();
 const logger = provider.getService(ILogger);

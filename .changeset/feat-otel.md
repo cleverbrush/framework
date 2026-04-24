@@ -1,6 +1,7 @@
 ---
 '@cleverbrush/otel': minor
 '@cleverbrush/log': patch
+'@cleverbrush/schema': patch
 ---
 
 Add `@cleverbrush/otel` — OpenTelemetry instrumentation for the framework.
@@ -36,7 +37,25 @@ a HyperDX container included in `demos/docker-compose.yml`.
 
 ## `@cleverbrush/log`
 
-- **Deprecation:** `traceEnricher` from `@cleverbrush/log/enrichers/trace`
-  is deprecated. Use `traceEnricher` from `@cleverbrush/otel` instead — it
-  reads the active span via `@opentelemetry/api` directly rather than via
-  the `globalThis.opentelemetry` shim.
+- **`TypedTemplate.template`** — new optional property on the `TypedTemplate<T>`
+  interface. When present, the `Logger` uses it as the raw `{Property}` pattern
+  string for `messageTemplate`, so log events with the same shape are grouped
+  correctly in Seq, HyperDX, and other structured-log UIs. `ParseStringSchemaBuilder`
+  now implements this property automatically.
+- **`correlationIdMiddleware` / `useLogging`** — `responseHeader` (and the new
+  `UseLoggingOptions.correlationResponseHeader`) now accept `false` to suppress
+  the `X-Correlation-Id` response header entirely. Useful when OTel's
+  `traceparent` / `traceresponse` header already provides traceability and a
+  second correlation header would be redundant.
+- **`traceEnricher` removed** — the `globalThis.opentelemetry`-based enricher
+  that was included in earlier builds has been removed. Use `traceEnricher`
+  from `@cleverbrush/otel` instead — it reads the active span via
+  `@opentelemetry/api` directly and also captures `TraceFlags`.
+
+## `@cleverbrush/schema`
+
+- **`ParseStringSchemaBuilder.template`** — new read-only getter that returns
+  the human-readable `{Property}` pattern string (e.g.
+  `"Todo created: #{TodoId} \"{Title}\" by user {UserId}"`). This satisfies the
+  `TypedTemplate.template` contract, so schema-parsed log templates are
+  automatically grouped by shape in structured-log UIs.

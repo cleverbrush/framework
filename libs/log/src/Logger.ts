@@ -4,6 +4,22 @@ import { createLogEvent } from './MessageTemplate.js';
 
 /**
  * A typed message template created via `ParseStringSchemaBuilder`.
+ *
+ * When passed to a `Logger` log method, the logger uses `template` as the
+ * `messageTemplate` (so events with the same shape are grouped in Seq /
+ * HyperDX / ClickHouse) and derives the rendered message by interpolating
+ * `template` with the supplied parameters.
+ *
+ * @example
+ * ```ts
+ * import { s } from '@cleverbrush/schema';
+ *
+ * // Build a reusable typed template once
+ * const tmpl = s.parseString('Todo #{TodoId} "{Title}" created by {UserId}');
+ *
+ * // All log sites share the same messageTemplate → groupable in the UI
+ * logger.info(tmpl, { TodoId: 1, Title: 'Buy milk', UserId: 'u-42' });
+ * ```
  */
 export interface TypedTemplate<T extends Record<string, unknown>> {
     serialize(params: T): string;
@@ -18,12 +34,23 @@ export interface TypedTemplate<T extends Record<string, unknown>> {
  * Log methods are synchronous and fire-and-forget — they push events
  * into an internal async microtask pipeline.
  *
+ * Accepts both plain string templates and typed {@link TypedTemplate}
+ * objects (produced by `ParseStringSchemaBuilder` from `@cleverbrush/schema`).
+ * Typed templates carry a `template` property with the raw `{Property}` pattern,
+ * which the logger uses as `messageTemplate` so all events of the same shape
+ * are grouped correctly in Seq, HyperDX, ClickHouse, etc.
+ *
  * @example
  * ```ts
  * logger.info('Server started on port {Port}', { Port: 3000 });
  *
  * const child = logger.forContext('SourceContext', 'OrderService');
  * child.info('Processing order {OrderId}', { OrderId: 42 });
+ *
+ * // Typed template — structured grouping
+ * import { s } from '@cleverbrush/schema';
+ * const tmpl = s.parseString('Order #{OrderId} placed by {UserId}');
+ * child.info(tmpl, { OrderId: 1, UserId: 'u-99' });
  * ```
  */
 export class Logger implements AsyncDisposable {
