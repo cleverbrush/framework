@@ -32,17 +32,21 @@ describe('SelfLog', () => {
     });
 
     it('should use custom output', () => {
+        const customWrite = vi.fn<[string], void>();
         const writeSpy = vi
             .spyOn(process.stderr, 'write')
             .mockImplementation(() => true);
 
+        SelfLog.setOutput({ write: customWrite });
         SelfLog.enable();
         SelfLog.write('custom output');
 
-        expect(writeSpy).toHaveBeenCalledTimes(1);
-        const output = writeSpy.mock.calls[0][0] as string;
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(customWrite).toHaveBeenCalledTimes(1);
+        const output = customWrite.mock.calls[0][0] as string;
         expect(output).toContain('custom output');
 
+        SelfLog.setOutput(process.stderr);
         SelfLog.disable();
         writeSpy.mockRestore();
     });

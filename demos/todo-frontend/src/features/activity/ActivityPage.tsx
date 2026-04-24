@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
     Badge,
     Box,
@@ -48,7 +49,7 @@ function ActivityRow({
 }) {
     const ts = new Date(event.createdAt).toLocaleTimeString();
 
-    let detail: React.ReactNode;
+    let detail: ReactNode;
     if (event.type === 'assigned') {
         const assigneeLabel = (event as any).assignee?.email
             ? `${(event as any).assignee.email} (#${event.assignedToUserId})`

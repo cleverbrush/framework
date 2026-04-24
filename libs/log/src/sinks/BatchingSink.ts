@@ -84,47 +84,65 @@ export class BatchingSink implements LogSink {
     async flush(): Promise<void> {
         this.#clearTimer();
 
-        if (this.#buffer.length === 0) return;
-        if (this.#circuitOpen) {
-            SelfLog.write('BatchingSink circuit breaker open — dropping batch');
-            return;
-        }
-
-        const batch = this.#buffer.splice(0, this.#batchSize);
-
-        let lastError: unknown;
-        for (let attempt = 0; attempt <= this.#maxRetries; attempt++) {
-            try {
-                await this.#emitFn(batch);
-                this.#consecutiveFailures = 0;
+        while (this.#buffer.length > 0) {
+            if (this.#circuitOpen) {
+                SelfLog.write(
+                    'BatchingSink circuit breaker open — deferring flush'
+                );
                 return;
-            } catch (err) {
-                lastError = err;
-                if (attempt < this.#maxRetries) {
-                    const delay = this.#retryDelay * 2 ** attempt;
-                    await new Promise(r => setTimeout(r, delay));
+            }
+
+            const batch = this.#buffer.splice(0, this.#batchSize);
+
+            let lastError: unknown;
+            let emitted = false;
+            for (let attempt = 0; attempt <= this.#maxRetries; attempt++) {
+                try {
+                    await this.#emitFn(batch);
+                    this.#consecutiveFailures = 0;
+                    emitted = true;
+                    break;
+                } catch (err) {
+                    lastError = err;
+                    if (attempt < this.#maxRetries) {
+                        const delay = this.#retryDelay * 2 ** attempt;
+                        await new Promise(r => setTimeout(r, delay));
+                    }
                 }
             }
-        }
 
-        this.#consecutiveFailures++;
-        SelfLog.write(
-            `BatchingSink flush failed after ${this.#maxRetries + 1} attempts`,
-            lastError
-        );
+            if (!emitted) {
+                this.#consecutiveFailures++;
+                SelfLog.write(
+                    `BatchingSink flush failed after ${this.#maxRetries + 1} attempts`,
+                    lastError
+                );
 
-        if (this.#consecutiveFailures >= this.#circuitBreakerThreshold) {
-            this.#circuitOpen = true;
-            SelfLog.write(
-                `BatchingSink circuit breaker opened — backing off 30s`
-            );
-            this.#circuitResetTimer = setTimeout(() => {
-                this.#circuitOpen = false;
-                this.#consecutiveFailures = 0;
-                SelfLog.write('BatchingSink circuit breaker closed');
-            }, 30_000);
-            if (this.#circuitResetTimer.unref) {
-                this.#circuitResetTimer.unref();
+                if (
+                    this.#consecutiveFailures >= this.#circuitBreakerThreshold
+                ) {
+                    this.#circuitOpen = true;
+                    SelfLog.write(
+                        `BatchingSink circuit breaker opened — backing off 30s`
+                    );
+                    this.#circuitResetTimer = setTimeout(() => {
+                        this.#circuitOpen = false;
+                        this.#consecutiveFailures = 0;
+                        SelfLog.write('BatchingSink circuit breaker closed');
+                        if (this.#buffer.length > 0) {
+                            this.flush().catch(err => {
+                                SelfLog.write(
+                                    'BatchingSink post-circuit flush failed',
+                                    err
+                                );
+                            });
+                        }
+                    }, 30_000);
+                    if (this.#circuitResetTimer.unref) {
+                        this.#circuitResetTimer.unref();
+                    }
+                }
+                return;
             }
         }
     }

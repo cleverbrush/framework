@@ -2,6 +2,7 @@
 
 import { existsSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import type { OrmCliConfig } from './types.js';
 
 const CANDIDATE_NAMES = [
@@ -31,10 +32,9 @@ export async function loadConfig(configPath?: string): Promise<OrmCliConfig> {
     }
 
     // Use a file:// URL so Node's ESM loader accepts absolute paths on all
-    // platforms (including Windows).
-    const mod = await import(
-        process.platform === 'win32' ? `file://${resolved}` : resolved
-    );
+    // platforms (including Windows where backslashes and special characters
+    // in paths would make raw string concatenation invalid).
+    const mod = await import(pathToFileURL(resolved).href);
 
     const config: unknown = mod.default ?? mod;
     assertConfig(config);

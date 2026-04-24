@@ -107,7 +107,7 @@ services:
     # connections before declaring the service healthy. ClickHouse can take
     # up to ~60 s on first boot which is why start_period is generous.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null 2>&1 && wget -q --spider http://localhost:4318/ 2>/dev/null; exit 0"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/ > /dev/null 2>&1 && wget -q --spider http://localhost:4318/ > /dev/null 2>&1"]
       interval: 10s
       timeout: 5s
       retries: 12

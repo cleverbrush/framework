@@ -11,12 +11,17 @@ npm install @cleverbrush/log
 ## Quick Start
 
 ```ts
-import { createLogger, consoleSink } from '@cleverbrush/log';
+import {
+    createLogger,
+    consoleSink,
+    hostnameEnricher,
+    processIdEnricher,
+} from '@cleverbrush/log';
 
 const logger = createLogger({
     minimumLevel: 'information',
     sinks: [consoleSink({ theme: 'dark' })],
-    enrichers: ['hostname', 'processId'],
+    enrichers: [hostnameEnricher(), processIdEnricher()],
 });
 
 logger.info('Server started on port {Port}', { Port: 3000 });

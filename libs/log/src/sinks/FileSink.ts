@@ -44,7 +44,7 @@ export interface FileSinkOptions {
  * ```ts
  * const sink = fileSink({
  *     path: './logs/app.log',
- *     rotation: { strategy: 'daily', retainCount: 30 },
+ *     rotation: { strategy: 'time', interval: 'daily', retainCount: 30 },
  * });
  * ```
  */
