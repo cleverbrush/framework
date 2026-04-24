@@ -1,34 +1,53 @@
+import { defineWebhook } from '@cleverbrush/server';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
+import { DbToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
+import { api } from './contract.js';
 import {
-    defineWebhook
-} from '@cleverbrush/server';
-import { BoundQueryToken, LoggerToken } from '../di/tokens.js';
-import {
+    type ImportTodosBody,
+    ImportTodosBodySchema,
     PrincipalSchema,
     TodoNotificationPayloadSchema,
     WebhookAckSchema
 } from './schemas.js';
-import { api } from './contract.js';
+
+const importTodosExample: ImportTodosBody = {
+    items: [{ title: 'Buy groceries' }]
+};
+
+const importTodosMinimalExample: ImportTodosBody = {
+    items: [{ title: 'Task 1' }]
+};
+
+const importTodosFullExample: ImportTodosBody = {
+    items: [
+        { title: 'Task 1', description: 'First task details' },
+        { title: 'Task 2', description: 'Second task details' }
+    ]
+};
 
 // ── Auth endpoints ────────────────────────────────────────────────────────────
 
 export const RegisterEndpoint = api.auth.register
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('Register a new user')
     .description('Creates a new user account with the "user" role.')
     .tags('auth')
     .operationId('register');
 
 export const LoginEndpoint = api.auth.login
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('Login')
     .description('Authenticates a user and returns a signed JWT.')
     .tags('auth')
     .operationId('login');
 
 export const GoogleLoginEndpoint = api.auth.googleLogin
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('Login with Google')
-    .description('Exchanges a Google ID token for an application JWT. Auto-provisions the user on first login.')
+    .description(
+        'Exchanges a Google ID token for an application JWT. Auto-provisions the user on first login.'
+    )
     .tags('auth')
     .operationId('googleLogin');
 
@@ -36,7 +55,7 @@ export const GoogleLoginEndpoint = api.auth.googleLogin
 
 export const ListTodosEndpoint = api.todos.list
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('List todos')
     .description(
         'Returns a paginated list of todos. Users see only their own todos; admins can see all todos or filter by userId.'
@@ -46,7 +65,7 @@ export const ListTodosEndpoint = api.todos.list
 
 export const GetTodoEndpoint = api.todos.get
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('Get a todo by ID')
     .description(
         'Returns a todo by its ID. Users can only fetch their own todos.'
@@ -56,7 +75,7 @@ export const GetTodoEndpoint = api.todos.get
 
 export const GetTodoWithAuthorEndpoint = api.todos.getWithAuthor
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('Get a todo with its author')
     .description(
         'Returns a todo together with its author. Demonstrates nested $ref deduplication in the OpenAPI spec.'
@@ -66,7 +85,7 @@ export const GetTodoWithAuthorEndpoint = api.todos.getWithAuthor
 
 export const CreateTodoEndpoint = api.todos.create
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken, logger: LoggerToken })
+    .inject({ db: DbToken, logger: LoggerToken })
     .summary('Create a todo')
     .description('Creates a new todo owned by the authenticated user.')
     .tags('todos')
@@ -74,7 +93,7 @@ export const CreateTodoEndpoint = api.todos.create
 
 export const UpdateTodoEndpoint = api.todos.update
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken, logger: LoggerToken })
+    .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
     .summary('Update a todo')
     .description(
         'Partially updates a todo. Users can only update their own todos; admins can update any todo.'
@@ -84,7 +103,7 @@ export const UpdateTodoEndpoint = api.todos.update
 
 export const DeleteTodoEndpoint = api.todos.delete
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken, logger: LoggerToken })
+    .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
     .summary('Delete a todo')
     .description(
         'Deletes a todo. Users can only delete their own todos; admins can delete any todo.'
@@ -94,7 +113,7 @@ export const DeleteTodoEndpoint = api.todos.delete
 
 export const SendTodoEventEndpoint = api.todos.sendEvent
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken, logger: LoggerToken })
+    .inject({ db: DbToken, logger: LoggerToken })
     .summary('Send a todo event')
     .description(
         'Accepts a discriminated-union event for a todo (assigned / commented / completed). ' +
@@ -103,11 +122,22 @@ export const SendTodoEventEndpoint = api.todos.sendEvent
     .tags('todos')
     .operationId('sendTodoEvent');
 
+export const ListTodoActivityEndpoint = api.todos.listActivity
+    .authorize(PrincipalSchema)
+    .inject({ db: DbToken })
+    .summary('List todo activity')
+    .description(
+        'Returns all activity events for a todo in reverse-chronological order. ' +
+            'Demonstrates polymorphic CTI + STI result mapping with `withVariants()`.'
+    )
+    .tags('todos')
+    .operationId('listTodoActivity');
+
 // ── User management endpoints (admin only) ────────────────────────────────────
 
 export const ListUsersEndpoint = api.users.list
     .authorize(PrincipalSchema, 'admin')
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('List all users')
     .description(
         'Returns a paginated list of all registered users. Admin only.'
@@ -117,7 +147,7 @@ export const ListUsersEndpoint = api.users.list
 
 export const DeleteUserEndpoint = api.users.delete
     .authorize(PrincipalSchema, 'admin')
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .summary('Delete a user')
     .description(
         'Permanently deletes a user account and all their todos. Admin only.'
@@ -130,7 +160,7 @@ export const DeleteUserEndpoint = api.users.delete
 
 export const ExportTodosEndpoint = api.todos.exportCsv
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken, logger: LoggerToken })
+    .inject({ db: DbToken, logger: LoggerToken })
     .produces({ 'text/csv': {} })
     .externalDocs(
         'https://tools.ietf.org/html/rfc4180',
@@ -149,7 +179,7 @@ export const ExportTodosEndpoint = api.todos.exportCsv
 
 export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .producesFile('text/plain', 'A plain-text summary of the todo.')
     .summary('Download todo attachment')
     .description(
@@ -164,23 +194,18 @@ export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
 
 export const ImportTodosEndpoint = api.todos.importBulk
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken, logger: LoggerToken })
-    .example({ items: [{ title: 'Buy groceries' }] } as any)
+    .inject({ db: DbToken, logger: LoggerToken })
+    .example(importTodosExample as unknown as typeof ImportTodosBodySchema)
     .examples({
         minimal: {
             summary: 'Minimal import',
             description: 'Import a single todo with only a title.',
-            value: { items: [{ title: 'Task 1' }] } as any
+            value: importTodosMinimalExample as unknown as typeof ImportTodosBodySchema
         },
         full: {
             summary: 'Full import with descriptions',
             description: 'Import multiple todos with optional descriptions.',
-            value: {
-                items: [
-                    { title: 'Task 1', description: 'First task details' },
-                    { title: 'Task 2', description: 'Second task details' }
-                ]
-            } as any
+            value: importTodosFullExample as unknown as typeof ImportTodosBodySchema
         }
     })
     .summary('Bulk import todos')
@@ -212,7 +237,7 @@ export const LegacyReplaceTodoEndpoint = api.todos.legacyReplace
 
 export const CompleteTodoEndpoint = api.todos.complete
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken, logger: LoggerToken })
+    .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
     .summary('Complete a todo with conflict detection')
     .description(
         'Marks a todo as completed. Supports optimistic concurrency via the `If-Match` header — ' +
@@ -227,7 +252,7 @@ export const CompleteTodoEndpoint = api.todos.complete
 
 export const GetMyProfileEndpoint = api.users.me
     .authorize(PrincipalSchema)
-    .inject({ db: BoundQueryToken })
+    .inject({ db: DbToken })
     .links({
         GetMyTodos: {
             operationId: 'listTodos',
@@ -306,6 +331,28 @@ export const DemoEchoEndpoint = api.demo.echo
 
 export const TodoUpdatesSubscription = api.live.todoUpdates;
 export const ChatSubscription = api.live.chat;
+export const ActivityFeedSubscription = api.live.activityFeed;
+
+// ── Activity endpoints ────────────────────────────────────────────────────────
+
+export const ListAllActivityEndpoint = api.activity.listAll
+    .authorize(PrincipalSchema)
+    .inject({ db: DbToken })
+    .summary('List recent activity')
+    .description(
+        'Returns the most recent activity events across all todos (default: 10, max: 100). ' +
+            'Intended as a seed for the live activity feed page.'
+    )
+    .tags('activity')
+    .operationId('listAllActivity');
+
+export const DeleteActivityEndpoint = api.activity.delete
+    .authorize(PrincipalSchema)
+    .inject({ db: DbToken, trackedDb: TrackedDbToken })
+    .summary('Delete an activity event')
+    .description('Permanently deletes a single activity event by ID.')
+    .tags('activity')
+    .operationId('deleteActivity');
 
 // ── Grouped endpoints — used with mapHandlers() for compile-time safety ───────
 
@@ -327,7 +374,8 @@ export const endpoints = {
         downloadAttachment: DownloadAttachmentEndpoint,
         importBulk: ImportTodosEndpoint,
         legacyReplace: LegacyReplaceTodoEndpoint,
-        complete: CompleteTodoEndpoint
+        complete: CompleteTodoEndpoint,
+        listActivity: ListTodoActivityEndpoint
     },
     users: {
         list: ListUsersEndpoint,
@@ -340,6 +388,10 @@ export const endpoints = {
     admin: {
         activityLog: AdminActivityEndpoint
     },
+    activity: {
+        listAll: ListAllActivityEndpoint,
+        delete: DeleteActivityEndpoint
+    },
     demo: {
         slow: DemoSlowEndpoint,
         flaky: DemoFlakyEndpoint,
@@ -347,7 +399,8 @@ export const endpoints = {
     },
     live: {
         todoUpdates: TodoUpdatesSubscription,
-        chat: ChatSubscription
+        chat: ChatSubscription,
+        activityFeed: ActivityFeedSubscription
     }
 };
 

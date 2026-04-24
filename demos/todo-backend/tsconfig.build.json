@@ -2,7 +2,7 @@
     "compilerOptions": {
         "rootDir": "./src",
         "outDir": "./dist",
-        "declaration": true,
+        "declaration": false,
         "target": "ES2022",
         "lib": ["ES2022", "ESNext.Disposable"],
         "module": "ES2022",

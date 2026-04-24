@@ -4,22 +4,22 @@ import { useLogging } from '@cleverbrush/log';
 import {
     createServer,
     endpoint,
-    mapHandlers,
-    type Middleware
+    type Middleware,
+    mapHandlers
 } from '@cleverbrush/server';
 import {
     generateOpenApiSpec,
-    serveAsyncApi,
-    type OpenApiDocument
+    type OpenApiDocument,
+    serveAsyncApi
 } from '@cleverbrush/server-openapi';
 import {
     endpoints,
     todoCompletedWebhook,
     todoCreatedWebhook
 } from './api/endpoints.js';
+import { activityLogHandler } from './api/handlers/admin.js';
 import { handlers } from './api/handlers/index.js';
 import { exportTodosHandler } from './api/handlers/todos.js';
-import { activityLogHandler } from './api/handlers/admin.js';
 import type { Config } from './config.js';
 import { configureDI } from './di/setup.js';
 import { AuditEnd, AuditStart } from './logTemplates.js';
@@ -169,44 +169,44 @@ export function buildServer(config: Config, logger: Logger) {
     };
 
     // ── AsyncAPI spec middleware (registered after server is assigned)
-    server.use(serveAsyncApi({
-        server,
-        info: {
-            title: 'ToDo Management API – WebSocket',
-            version: '1.0.0'
-        },
-        servers: {
-            local: {
-                host: `${config.server.host === '0.0.0.0' ? 'localhost' : config.server.host}:${config.server.port}`,
-                protocol: 'ws'
+    server.use(
+        serveAsyncApi({
+            server,
+            info: {
+                title: 'ToDo Management API – WebSocket',
+                version: '1.0.0'
+            },
+            servers: {
+                local: {
+                    host: `${config.server.host === '0.0.0.0' ? 'localhost' : config.server.host}:${config.server.port}`,
+                    protocol: 'ws'
+                }
             }
-        }
-    }));
+        })
+    );
 
     // ── Register webhooks on the server (for getWebhooks() introspection)
     server.webhook(todoCreatedWebhook).webhook(todoCompletedWebhook);
 
     // ── Register all contract endpoints via compile-time checked mapping
-    server
-        .handle(openApiEndpoint, openApiHandler)
-        .handleAll(
-            mapHandlers(endpoints, {
-                ...handlers,
-                todos: {
-                    ...handlers.todos,
-                    exportCsv: {
-                        handler: exportTodosHandler,
-                        middlewares: [auditLogMiddleware]
-                    }
-                },
-                admin: {
-                    activityLog: {
-                        handler: activityLogHandler,
-                        middlewares: [timingMiddleware]
-                    }
+    server.handle(openApiEndpoint, openApiHandler).handleAll(
+        mapHandlers(endpoints, {
+            ...handlers,
+            todos: {
+                ...handlers.todos,
+                exportCsv: {
+                    handler: exportTodosHandler,
+                    middlewares: [auditLogMiddleware]
                 }
-            })
-        );
+            },
+            admin: {
+                activityLog: {
+                    handler: activityLogHandler,
+                    middlewares: [timingMiddleware]
+                }
+            }
+        })
+    );
 
     return server;
 }

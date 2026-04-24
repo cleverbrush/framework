@@ -5,44 +5,35 @@
  * TypeScript will error if any endpoint is missing a handler.
  */
 
-import { activityLogHandler } from './admin.js';
-import {
-    registerHandler,
-    loginHandler,
-    googleLoginHandler
-} from './auth.js';
-import {
-    listTodosHandler,
-    getTodoHandler,
-    getTodoWithAuthorHandler,
-    createTodoHandler,
-    updateTodoHandler,
-    deleteTodoHandler,
-    sendTodoEventHandler,
-    exportTodosHandler,
-    downloadAttachmentHandler,
-    importTodosHandler,
-    legacyReplaceTodoHandler,
-    completeTodoHandler
-} from './todos.js';
-import {
-    listUsersHandler,
-    deleteUserHandler,
-    getMyProfileHandler
-} from './users.js';
-import { subscribeWebhookHandler } from './webhooks.js';
-import {
-    demoSlowHandler,
-    demoFlakyHandler,
-    demoEchoHandler
-} from './demo.js';
-import {
-    todoUpdatesHandler,
-    chatHandler
-} from './live.js';
-
 import type { HandlerMap } from '@cleverbrush/server';
 import type { endpoints } from '../endpoints.js';
+import { activityLogHandler } from './admin.js';
+import { googleLoginHandler, loginHandler, registerHandler } from './auth.js';
+import { demoEchoHandler, demoFlakyHandler, demoSlowHandler } from './demo.js';
+import { activityFeedHandler, chatHandler, todoUpdatesHandler } from './live.js';
+import {
+    completeTodoHandler,
+    createTodoHandler,
+    deleteActivityHandler,
+    deleteTodoHandler,
+    downloadAttachmentHandler,
+    exportTodosHandler,
+    getTodoHandler,
+    getTodoWithAuthorHandler,
+    importTodosHandler,
+    legacyReplaceTodoHandler,
+    listAllActivityHandler,
+    listTodoActivityHandler,
+    listTodosHandler,
+    sendTodoEventHandler,
+    updateTodoHandler
+} from './todos.js';
+import {
+    deleteUserHandler,
+    getMyProfileHandler,
+    listUsersHandler
+} from './users.js';
+import { subscribeWebhookHandler } from './webhooks.js';
 
 export const handlers: HandlerMap<typeof endpoints> = {
     auth: {
@@ -62,7 +53,8 @@ export const handlers: HandlerMap<typeof endpoints> = {
         downloadAttachment: downloadAttachmentHandler,
         importBulk: importTodosHandler,
         legacyReplace: legacyReplaceTodoHandler,
-        complete: completeTodoHandler
+        complete: completeTodoHandler,
+        listActivity: listTodoActivityHandler
     },
     users: {
         list: listUsersHandler,
@@ -75,6 +67,10 @@ export const handlers: HandlerMap<typeof endpoints> = {
     admin: {
         activityLog: activityLogHandler
     },
+    activity: {
+        listAll: listAllActivityHandler,
+        delete: deleteActivityHandler
+    },
     demo: {
         slow: demoSlowHandler,
         flaky: demoFlakyHandler,
@@ -82,6 +78,7 @@ export const handlers: HandlerMap<typeof endpoints> = {
     },
     live: {
         todoUpdates: todoUpdatesHandler,
-        chat: chatHandler
+        chat: chatHandler,
+        activityFeed: activityFeedHandler
     }
 };

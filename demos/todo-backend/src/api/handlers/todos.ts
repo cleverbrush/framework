@@ -1,5 +1,4 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
-import { TodoDbSchema, UserDbSchema } from '../../db/schemas.js';
 import {
     TodoCompleted,
     TodoCreated,
@@ -12,6 +11,7 @@ import {
 import type {
     CompleteTodoEndpoint,
     CreateTodoEndpoint,
+    DeleteActivityEndpoint,
     DeleteTodoEndpoint,
     DownloadAttachmentEndpoint,
     ExportTodosEndpoint,
@@ -19,11 +19,14 @@ import type {
     GetTodoWithAuthorEndpoint,
     ImportTodosEndpoint,
     LegacyReplaceTodoEndpoint,
+    ListAllActivityEndpoint,
+    ListTodoActivityEndpoint,
     ListTodosEndpoint,
     SendTodoEventEndpoint,
     UpdateTodoEndpoint
 } from '../endpoints.js';
-import { mapTodo, mapUser } from '../mappers.js';
+import { mapTodo, mapTodoActivity, mapUser } from '../mappers.js';
+import { publishActivity } from './activityBus.js';
 
 // ── List todos ────────────────────────────────────────────────────────────────
 
@@ -32,26 +35,22 @@ export const listTodosHandler: Handler<typeof ListTodosEndpoint> = async (
     { db }
 ) => {
     const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-    const offset = (page - 1) * limit;
+    const pageSize = Math.min(100, Math.max(1, query.limit ?? 20));
 
-    let builder = db(TodoDbSchema)
-        .orderBy(t => t.createdAt, 'desc')
-        .limit(limit)
-        .offset(offset);
+    let builder = db.todos.projected('response').scoped('recentFirst');
 
     if (principal.role === 'admin') {
         // Admins may optionally filter by a specific user
         if (query.userId != null) {
-            builder = builder.where(t => t.userId, query.userId!);
+            builder = builder.where(t => t.userId, query.userId);
         }
     } else {
         // Regular users only see their own todos
         builder = builder.where(t => t.userId, principal.userId);
     }
 
-    const rows = await builder;
-    return Promise.all(rows.map(mapTodo));
+    const rows = await builder.paginate({ page, pageSize });
+    return Promise.all(rows.data.map(mapTodo));
 };
 
 // ── Get todo by ID ────────────────────────────────────────────────────────────
@@ -60,9 +59,7 @@ export const getTodoHandler: Handler<typeof GetTodoEndpoint> = async (
     { params, principal },
     { db }
 ) => {
-    const todo = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -85,14 +82,11 @@ export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
     { body, principal },
     { db, logger }
 ) => {
-    const now = new Date();
-    const todo = await db(TodoDbSchema).insert({
+    const todo = await db.todos.insert({
         title: body.title,
         description: body.description,
         completed: false,
-        userId: principal.userId,
-        createdAt: now,
-        updatedAt: now
+        userId: principal.userId
     });
 
     logger.info(TodoCreated, {
@@ -108,11 +102,9 @@ export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
 
 export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
     { params, body, principal },
-    { db, logger }
+    { trackedDb, logger }
 ) => {
-    const todo = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await trackedDb.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -126,38 +118,30 @@ export const updateTodoHandler: Handler<typeof UpdateTodoEndpoint> = async (
         });
     }
 
-    const patch: Partial<{
-        title: string;
-        description: string | undefined;
-        completed: boolean;
-        updatedAt: Date;
-    }> = { updatedAt: new Date() };
+    // Mutate the tracked entity in place — saveChanges() will detect the
+    // diff and emit a minimal UPDATE only for changed columns.
+    if (body.title !== undefined) todo.title = body.title;
+    if (body.description !== undefined) todo.description = body.description;
+    if (body.completed !== undefined) todo.completed = body.completed;
+    todo.updatedAt = new Date();
 
-    if (body.title !== undefined) patch.title = body.title;
-    if (body.description !== undefined) patch.description = body.description;
-    if (body.completed !== undefined) patch.completed = body.completed;
-
-    const [updated] = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .update(patch);
+    await trackedDb.saveChanges();
 
     logger.info(TodoUpdated, {
         TodoId: params.id,
         UserId: principal.userId
     });
 
-    return mapTodo(updated);
+    return mapTodo(todo);
 };
 
 // ── Delete todo ───────────────────────────────────────────────────────────────
 
 export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
     { params, principal },
-    { db, logger }
+    { trackedDb, logger }
 ) => {
-    const todo = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await trackedDb.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -171,9 +155,8 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
         });
     }
 
-    await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .delete();
+    trackedDb.remove(todo);
+    await trackedDb.saveChanges();
 
     logger.info(TodoDeleted, {
         TodoId: params.id,
@@ -188,35 +171,34 @@ export const deleteTodoHandler: Handler<typeof DeleteTodoEndpoint> = async (
 export const getTodoWithAuthorHandler: Handler<
     typeof GetTodoWithAuthorEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todo = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+    const todoWithAuthor = await db.todos
+        .include(t => t.author)
+        .find(params.id);
 
-    if (!todo) {
+    if (!todoWithAuthor) {
         return ActionResult.notFound({
             message: `Todo ${params.id} not found.`
         });
     }
 
-    if (principal.role !== 'admin' && todo.userId !== principal.userId) {
+    if (
+        principal.role !== 'admin' &&
+        todoWithAuthor.userId !== principal.userId
+    ) {
         return ActionResult.forbidden({
             message: 'You do not have access to this todo.'
         });
     }
 
-    const author = await db(UserDbSchema)
-        .where(u => u.id, todo.userId)
-        .first();
-
-    if (!author) {
+    if (!todoWithAuthor.author) {
         return ActionResult.notFound({
             message: `Author for todo ${params.id} not found.`
         });
     }
 
     return {
-        todo: await mapTodo(todo),
-        author: await mapUser(author)
+        todo: await mapTodo(todoWithAuthor),
+        author: await mapUser(todoWithAuthor.author)
     };
 };
 
@@ -225,9 +207,7 @@ export const getTodoWithAuthorHandler: Handler<
 export const sendTodoEventHandler: Handler<
     typeof SendTodoEventEndpoint
 > = async ({ params, body, principal }, { db, logger }) => {
-    const todo = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -241,14 +221,101 @@ export const sendTodoEventHandler: Handler<
         });
     }
 
-    // Echo the event back so the caller can confirm what was received.
+    // Use ofVariant — handles the two-table CTI transaction automatically
+    // (base row into todo_activity, variant row into the matching variant table).
+    const basePayload = {
+        todoId: params.id,
+        actorUserId: principal.userId
+    } as const;
+
+    let row: Record<string, unknown>;
+    if (body.type === 'assigned') {
+        row = await db.todoActivity.ofVariant('assigned').insert({
+            ...basePayload,
+            assignedToUserId: body.assignedTo
+        });
+    } else if (body.type === 'commented') {
+        row = await db.todoActivity.ofVariant('commented').insert({
+            ...basePayload,
+            comment: body.comment
+        });
+    } else {
+        row = await db.todoActivity.ofVariant('completed').insert({
+            ...basePayload,
+            ...(body.completedAt ? { completedAt: body.completedAt } : {})
+        });
+    }
+
+    const mapped = mapTodoActivity(row as any);
+    publishActivity(mapped);
+
     logger.info(TodoEventReceived, {
         TodoId: params.id,
         EventType: body.type,
         UserId: principal.userId
     });
 
-    return body;
+    return mapped;
+};
+
+// ── List todo activity ───────────────────────────────────────────────────────────
+
+export const listTodoActivityHandler: Handler<
+    typeof ListTodoActivityEndpoint
+> = async ({ params, principal }, { db }) => {
+    const todo = await db.todos.find(params.id);
+
+    if (!todo) {
+        return ActionResult.notFound({
+            message: `Todo ${params.id} not found.`
+        });
+    }
+
+    if (principal.role !== 'admin' && todo.userId !== principal.userId) {
+        return ActionResult.forbidden({
+            message: 'You do not have access to this todo.'
+        });
+    }
+
+    const rows = await db.todoActivity
+        .where(a => a.todoId, params.id)
+        .orderBy(a => a.createdAt, 'desc');
+
+    return rows.map(mapTodoActivity);
+};
+
+// ── List all activity (global feed seed) ────────────────────────────────────
+
+export const listAllActivityHandler: Handler<
+    typeof ListAllActivityEndpoint
+> = async ({ query }, { db }) => {
+    const limit = Math.min(100, Math.max(1, query?.limit ?? 10));
+
+    const rows = await db.todoActivity
+        .includeVariant('assigned', 'assignee', q => q.projected('summary' as never))
+        .orderBy(a => a.createdAt, 'desc')
+        .limit(limit);
+
+    return rows.map(mapTodoActivity);
+};
+
+// ── Delete activity event ────────────────────────────────────────────────────
+
+export const deleteActivityHandler: Handler<
+    typeof DeleteActivityEndpoint
+> = async ({ params }, { trackedDb }) => {
+    const row = await trackedDb.todoActivityBase.find(params.id);
+
+    if (!row) {
+        return ActionResult.notFound({
+            message: `Activity event ${params.id} not found.`
+        });
+    }
+
+    trackedDb.remove(row);
+    await trackedDb.saveChanges();
+
+    return ActionResult.noContent();
 };
 
 // ── Export todos as CSV ───────────────────────────────────────────────────────
@@ -257,7 +324,7 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
     { principal, context },
     { db, logger }
 ) => {
-    let builder = db(TodoDbSchema).orderBy(t => t.createdAt, 'desc');
+    let builder = db.todos.projected('response').orderBy(t => t.createdAt, 'desc');
 
     if (principal.role !== 'admin') {
         builder = builder.where(t => t.userId, principal.userId);
@@ -290,9 +357,7 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
 export const downloadAttachmentHandler: Handler<
     typeof DownloadAttachmentEndpoint
 > = async ({ params, principal }, { db }) => {
-    const todo = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+    const todo = await db.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -351,14 +416,11 @@ export const importTodosHandler: Handler<typeof ImportTodosEndpoint> = async (
 
     for (const item of items) {
         try {
-            const now = new Date();
-            await db(TodoDbSchema).insert({
+            await db.todos.insert({
                 title: item.title,
                 description: item.description,
                 completed: false,
-                userId: principal.userId,
-                createdAt: now,
-                updatedAt: now
+                userId: principal.userId
             });
             results.push({ title: item.title, success: true });
             imported++;
@@ -394,12 +456,11 @@ export const legacyReplaceTodoHandler: Handler<
 
 // ── Complete todo with conflict detection ─────────────────────────────────────
 
-export const completeTodoHandler: Handler<
-    typeof CompleteTodoEndpoint
-> = async ({ params, headers, principal }, { db, logger }) => {
-    const todo = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+export const completeTodoHandler: Handler<typeof CompleteTodoEndpoint> = async (
+    { params, headers, principal },
+    { trackedDb, logger }
+) => {
+    const todo = await trackedDb.todos.find(params.id);
 
     if (!todo) {
         return ActionResult.notFound({
@@ -428,14 +489,15 @@ export const completeTodoHandler: Handler<
         return mapTodo(todo);
     }
 
-    const [updated] = await db(TodoDbSchema)
-        .where(t => t.id, params.id)
-        .update({ completed: true, updatedAt: new Date() });
+    todo.completed = true;
+    todo.updatedAt = new Date();
+
+    await trackedDb.saveChanges();
 
     logger.info(TodoCompleted, {
         TodoId: params.id,
         UserId: principal.userId
     });
 
-    return mapTodo(updated);
+    return mapTodo(todo);
 };

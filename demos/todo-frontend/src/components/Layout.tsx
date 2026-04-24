@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
     { to: '/batching', label: 'Batching', emoji: '📦' },
     { to: '/react-query', label: 'React Query', emoji: '⚡' },
     { to: '/live', label: 'Live', emoji: '📡' },
+    { to: '/activity', label: 'Activity Feed', emoji: '🔴' },
     { to: '/webhooks', label: 'Webhooks', emoji: '🔔' },
     { to: '/profile', label: 'Profile', emoji: '👤' },
     { to: '/admin/users', label: 'Users', emoji: '👥', adminOnly: true },

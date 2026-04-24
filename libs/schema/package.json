@@ -31,6 +31,10 @@
             "types": "./dist/core.d.ts",
             "import": "./dist/core.js"
         },
+        "./extension": {
+            "types": "./dist/extension.d.ts",
+            "import": "./dist/extension.js"
+        },
         "./string": {
             "types": "./dist/builders/StringSchemaBuilder.d.ts",
             "import": "./dist/builders/StringSchemaBuilder.js"

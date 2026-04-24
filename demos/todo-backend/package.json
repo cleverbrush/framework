@@ -11,6 +11,8 @@
         "@cleverbrush/env": "*",
         "@cleverbrush/knex-schema": "*",
         "@cleverbrush/log": "*",
+        "@cleverbrush/orm": "*",
+        "@cleverbrush/orm-cli": "*",
         "@cleverbrush/mapper": "*",
         "@cleverbrush/schema": "*",
         "@cleverbrush/schema-json": "*",
@@ -41,8 +43,15 @@
     "scripts": {
         "start": "node dist/index.js",
         "watch": "tsc --build tsconfig.build.json --watch",
-        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
-        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+        "build": "tsup && tsc --noEmit --project tsconfig.build.json",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo",
+        "typecheck": "tsc --noEmit -p tsconfig.build.json",
+        "lint": "biome check ./src",
+        "db:generate": "cb-orm migrate generate",
+        "db:run": "cb-orm migrate run",
+        "db:rollback": "cb-orm migrate rollback",
+        "db:status": "cb-orm migrate status",
+        "db:push": "cb-orm db push"
     },
     "devDependencies": {
         "@types/node": "^22.0.0",

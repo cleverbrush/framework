@@ -4,6 +4,7 @@ export default defineConfig({
     entry: [
         'src/index.ts',
         'src/core.ts',
+        'src/extension.ts',
         'src/builders/StringSchemaBuilder.ts',
         'src/builders/NumberSchemaBuilder.ts',
         'src/builders/BooleanSchemaBuilder.ts',

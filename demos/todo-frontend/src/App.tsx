@@ -22,6 +22,7 @@ const ResiliencePage = lazy(() => import('./features/resilience/ResiliencePage')
 const BatchingPage = lazy(() => import('./features/batching/BatchingPage'));
 const ReactQueryPage = lazy(() => import('./features/react-query/ReactQueryPage'));
 const LivePage = lazy(() => import('./features/live/LivePage'));
+const ActivityFeedPage = lazy(() => import('./features/activity/ActivityPage'));
 
 const PageFallback = () => (
   <Flex justify="center" align="center" p="8">
@@ -49,6 +50,7 @@ const router = createBrowserRouter([
           { path: '/batching', element: <Suspense fallback={<PageFallback />}><BatchingPage /></Suspense> },
           { path: '/react-query', element: <Suspense fallback={<PageFallback />}><ReactQueryPage /></Suspense> },
           { path: '/live', element: <Suspense fallback={<PageFallback />}><LivePage /></Suspense> },
+          { path: '/activity', element: <Suspense fallback={<PageFallback />}><ActivityFeedPage /></Suspense> },
           {
             element: <ProtectedRoute adminOnly />,
             children: [

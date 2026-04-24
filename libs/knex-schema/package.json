@@ -32,6 +32,10 @@
         ".": {
             "types": "./dist/index.d.ts",
             "import": "./dist/index.js"
+        },
+        "./extension": {
+            "types": "./dist/extension.d.ts",
+            "import": "./dist/extension.js"
         }
     },
     "sideEffects": false,

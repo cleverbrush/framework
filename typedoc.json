@@ -11,6 +11,8 @@
         "libs/knex-clickhouse",
         "libs/knex-schema",
         "libs/mapper",
+        "libs/orm",
+        "libs/orm-cli",
         "libs/react-form",
         "libs/scheduler",
         "libs/schema",

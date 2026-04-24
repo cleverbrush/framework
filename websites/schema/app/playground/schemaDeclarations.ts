@@ -4057,8 +4057,8 @@ export type PropertySetterOptions = {
  * Extracts the inner property descriptor type from a \`PropertyDescriptor\`.
  * Returns \`undefined\` if \`T\` is not a valid \`PropertyDescriptor\`.
  */
-export type PropertyDescriptorInnerFromPropertyDescriptor<T> = T extends PropertyDescriptor<infer TSchema, infer TPropertySchema, infer TParentPropertyDescriptor> ? PropertyDescriptorInner<TSchema, TPropertySchema, TParentPropertyDescriptor> : undefined;
-export type PropertyDescriptorInner<TSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TPropertySchema, TParentPropertyDescriptor> = {
+export type PropertyDescriptorInnerFromPropertyDescriptor<T> = T extends PropertyDescriptor<infer TSchema, infer TPropertySchema, infer TParentPropertyDescriptor, infer TPropertyKey extends string> ? PropertyDescriptorInner<TSchema, TPropertySchema, TParentPropertyDescriptor, TPropertyKey> : undefined;
+export type PropertyDescriptorInner<TSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TPropertySchema, TParentPropertyDescriptor, TPropertyKey extends string = string> = {
     /**
      * Sets a new value to the property. If the process was successful,
      * the method returns \`true\`, otherwise \`false\`.
@@ -4114,8 +4114,14 @@ export type PropertyDescriptorInner<TSchema extends ObjectSchemaBuilder<any, any
     /**
      * The name of this property within its parent object, or \`undefined\`
      * for the root descriptor.
+     *
+     * When the property was created from a \`PropertyDescriptorTree\` leaf the
+     * type narrows to the literal key string (e.g. \`'id'\`), enabling
+     * accessor-function-based column inference in query builders.
+     *
+     * @typeParam TPropertyKey - The literal property name, or \`string\` for root/unknown descriptors.
      */
-    propertyName: string | undefined;
+    propertyName: TPropertyKey | undefined;
     /**
      * Returns a JSON Pointer (RFC 6901) string representing this
      * property's path from the root descriptor.
@@ -4130,15 +4136,15 @@ export type PropertyDescriptorInner<TSchema extends ObjectSchemaBuilder<any, any
  * holds a {@link PropertyDescriptorInner} for a particular property within
  * an object schema. Used to get/set property values on validated objects.
  */
-export type PropertyDescriptor<TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TPropertySchema, TParentPropertyDescriptor> = {
-    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: PropertyDescriptorInner<TRootSchema, TPropertySchema, TParentPropertyDescriptor>;
+export type PropertyDescriptor<TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TPropertySchema, TParentPropertyDescriptor, TPropertyKey extends string = string> = {
+    [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: PropertyDescriptorInner<TRootSchema, TPropertySchema, TParentPropertyDescriptor, TPropertyKey>;
 };
 /**
  * A tree of property descriptors for the schema.
  * Has a possibility to filter properties by the type (\`TAssignableTo\` type parameter).
  */
 export type PropertyDescriptorTree<TSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any> = TSchema, TAssignableTo = any, TParentPropertyDescriptor = undefined> = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> & (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any> ? {
-    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ExternSchemaBuilder<any, any, any, any, any, any, infer TExternResult> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> & ExternOutputPropertyDescriptors<TExternResult, TRootSchema, PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : never;
+    [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<any, any, any> ? PropertyDescriptorTree<TProperties[K], TRootSchema, any, PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>> : TProperties[K] extends ExternSchemaBuilder<any, any, any, any, any, any, infer TExternResult> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> & ExternOutputPropertyDescriptors<TExternResult, TRootSchema, PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string>> : TProperties[K] extends ArraySchemaBuilder<infer TArrayElement, any, any> ? TArrayElement extends ObjectSchemaBuilder<any, any, any, any, any> ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : never : InferType<TProperties[K]> extends TAssignableTo ? PropertyDescriptor<TRootSchema, TProperties[K], PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor>, K & string> : never;
 } : never);
 /**
  * Recursively maps the keys of an extern schema's output type into
@@ -4149,7 +4155,7 @@ export type PropertyDescriptorTree<TSchema extends ObjectSchemaBuilder<any, any,
  * @internal
  */
 type ExternOutputPropertyDescriptors<TOutput, TRootSchema extends ObjectSchemaBuilder<any, any, any, any, any>, TParentPropertyDescriptor> = TOutput extends Date | Function | readonly any[] | string | number | boolean | symbol | bigint | null | undefined ? {} : TOutput extends Record<string, any> ? {
-    [K in keyof TOutput]: PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor> & ExternOutputPropertyDescriptors<TOutput[K], TRootSchema, PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor>>;
+    [K in keyof TOutput]: PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor, K & string> & ExternOutputPropertyDescriptors<TOutput[K], TRootSchema, PropertyDescriptor<TRootSchema, SchemaBuilder<TOutput[K], true, false, false, {}>, TParentPropertyDescriptor, K & string>>;
 } : {};
 /**
  * Creates an array augmented with non-enumerable NestedValidationResult
@@ -5582,8 +5588,8 @@ export type { TupleElementValidationResults, TupleSchemaValidationResult } from 
 export { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
 export type { OptionValidationResults, UnionSchemaValidationResult } from './builders/UnionSchemaBuilder.js';
 export { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
-export type { CleanExtended, ExtensionConfig, ExtensionDescriptor, FixedMethods, HiddenExtensionMethods } from './extension.js';
-export { defineExtension, withExtensions } from './extension.js';
+export type { CleanExtended, ExtensionConfig, ExtensionDescriptor, ExtraTypeBrandSymbol, FixedMethods, HiddenExtensionMethods, MethodLiteralBrandSymbol } from './extension.js';
+export { defineExtension, EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND, withExtensions } from './extension.js';
 `,
     "file:///node_modules/@cleverbrush/schema/extension.d.ts": `/**
  * @module extension
@@ -5659,7 +5665,7 @@ import { NumberSchemaBuilder } from './builders/NumberSchemaBuilder.js';
 import { ObjectSchemaBuilder } from './builders/ObjectSchemaBuilder.js';
 import { PromiseSchemaBuilder } from './builders/PromiseSchemaBuilder.js';
 import { RecordSchemaBuilder } from './builders/RecordSchemaBuilder.js';
-import type { SchemaBuilder } from './builders/SchemaBuilder.js';
+import type { PropertyDescriptorTree, SchemaBuilder } from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder } from './builders/StringSchemaBuilder.js';
 import { TupleSchemaBuilder } from './builders/TupleSchemaBuilder.js';
 import { UnionSchemaBuilder } from './builders/UnionSchemaBuilder.js';
@@ -5764,6 +5770,45 @@ type MergeExtensionMethods<TExts extends readonly ExtensionDescriptor<any>[], TT
     ...infer TRest extends readonly ExtensionDescriptor<any>[]
 ] ? ExtractMethods<TFirst, TType> & MergeExtensionMethods<TRest, TType> : {};
 /**
+ * Unique symbol used by {@link FixedMethods} to detect extension methods whose
+ * first-argument literal should be accumulated in the return type.
+ *
+ * Declare the return type of any extension method as
+ * \`this & { readonly [METHOD_LITERAL_BRAND]?: N }\` (where \`N extends string\`)
+ * and \`FixedMethods\` will automatically make it generic so the literal name
+ * flows through the type system and accumulates across multiple calls.
+ *
+ * This powers scope-name autocomplete in \`SchemaQueryBuilder.scoped()\`.
+ */
+declare const METHOD_LITERAL_BRAND: "__cleverbrush_method_literal_brand__";
+export { METHOD_LITERAL_BRAND };
+export type MethodLiteralBrandSymbol = typeof METHOD_LITERAL_BRAND;
+/**
+ * Generic accumulator brand for extension methods that want to thread
+ * a \`Record<name, readonly string[]>\` map through the builder chain.
+ *
+ * Extension authors can declare a method's return type as
+ * \`this & { readonly [EXTRA_TYPE_BRAND]?: { [name]: TKeys } }\`
+ * and {@link FixedMethods} will automatically:
+ * - Make the first argument const-generic (to capture the literal name).
+ * - Make the second argument const-generic when it is a \`readonly string[]\`
+ *   tuple (to capture the literal key list).
+ * - Accumulate both into the 4th \`TExtraTypes\` parameter of \`FixedMethods\`
+ *   so the information survives subsequent method calls on the same builder.
+ *
+ * This is deliberately projection-agnostic — any extension that follows the
+ * \`(name: string, data: readonly string[] | function)\` signature convention
+ * can use it. Projection-specific semantics (e.g. \`PROJECTION_BRAND\`) live
+ * in the consuming library, not here.
+ *
+ * @see {@link FixedMethods} for how the accumulation works.
+ */
+declare const EXTRA_TYPE_BRAND: "__cleverbrush_extra_type_brand__";
+export { EXTRA_TYPE_BRAND };
+export type ExtraTypeBrandSymbol = typeof EXTRA_TYPE_BRAND;
+/** @internal Drops the first element of a tuple type. */
+type TailArgs<T> = T extends readonly [unknown, ...infer R] ? R : [];
+/**
  * Intersected onto consumer-facing builder types to make \`withExtension\`
  * and \`getExtension\` uncallable (\`never\`). Using an intersection instead
  * of \`Omit\` preserves the class identity so extended builders remain
@@ -5783,9 +5828,42 @@ export type HiddenExtensionMethods = {
  * The self-reference (\`FixedMethods\` appears in its own mapped return
  * types) is resolved lazily by TypeScript because the recursion sits
  * inside a function-return position within a conditional mapped type.
+ *
+ * The optional third parameter \`TAccum\` accumulates literal string names
+ * registered by methods whose raw return type includes
+ * \`{ readonly [METHOD_LITERAL_BRAND]?: any }\`. Those methods are rewritten
+ * as \`const\`-generic so the literal flows through; all other methods thread
+ * the accumulator unchanged.
+ *
+ * The optional fourth parameter \`TExtraTypes\` accumulates a
+ * \`Record<name, readonly string[]>\` map contributed by methods whose raw
+ * return type includes \`{ readonly [EXTRA_TYPE_BRAND]?: any }\`. Those
+ * methods are rewritten as const-generic for both the name and the keys
+ * tuple so the mapping flows through; all other methods thread it unchanged.
+ *
+ * For object-schema methods the accessor-form callback parameter is
+ * automatically typed as \`PropertyDescriptorTree<TBase, TBase>\` when
+ * \`TBase\` is an \`ObjectSchemaBuilder\`, giving callers IDE autocomplete over
+ * the schema's own properties.
  */
-export type FixedMethods<TRawMethods, TBase> = {
-    [K in keyof TRawMethods]: TRawMethods[K] extends (this: any, ...args: infer A) => any ? (...args: A) => TBase & FixedMethods<TRawMethods, TBase> & HiddenExtensionMethods : TRawMethods[K];
+export type FixedMethods<TRawMethods, TBase, TAccum extends string = never, TExtraTypes extends Record<string, readonly string[]> = Record<never, never>> = {
+    [K in keyof TRawMethods]: TRawMethods[K] extends (this: any, ...args: infer A) => infer R ? R extends {
+        readonly [EXTRA_TYPE_BRAND]?: any;
+    } ? <const TName extends string & A[0], const TKey extends string>(name: TName, ...columns: ReadonlyArray<TKey | (TBase extends ObjectSchemaBuilder<any, any, any, any, any> ? (t: PropertyDescriptorTree<TBase, TBase>) => any : (t: any) => any)>) => TBase & FixedMethods<TRawMethods, TBase, TAccum, TExtraTypes & Record<TName, readonly TKey[]>> & HiddenExtensionMethods & {
+        readonly [EXTRA_TYPE_BRAND]?: TExtraTypes & Record<TName, readonly TKey[]>;
+    } & ([TAccum] extends [never] ? {} : {
+        readonly [METHOD_LITERAL_BRAND]?: TAccum;
+    }) : R extends {
+        readonly [METHOD_LITERAL_BRAND]?: any;
+    } ? <const TName extends string & A[0]>(name: TName, ...rest: TailArgs<A>) => TBase & FixedMethods<TRawMethods, TBase, TAccum | TName, TExtraTypes> & HiddenExtensionMethods & {
+        readonly [METHOD_LITERAL_BRAND]?: TAccum | TName;
+    } & ([keyof TExtraTypes] extends [never] ? {} : {
+        readonly [EXTRA_TYPE_BRAND]?: TExtraTypes;
+    }) : (...args: A) => TBase & FixedMethods<TRawMethods, TBase, TAccum, TExtraTypes> & HiddenExtensionMethods & ([TAccum] extends [never] ? {} : {
+        readonly [METHOD_LITERAL_BRAND]?: TAccum;
+    }) & ([keyof TExtraTypes] extends [never] ? {} : {
+        readonly [EXTRA_TYPE_BRAND]?: TExtraTypes;
+    }) : TRawMethods[K];
 };
 /**
  * Produces the consumer-facing type for an extended builder: the base
@@ -6005,7 +6083,6 @@ export declare function defineExtension<T extends ExtensionConfig>(config: T): E
  * @see {@link ExtensionDescriptor}
  */
 export declare function withExtensions<const TExts extends readonly ExtensionDescriptor<any>[]>(...extensions: TExts): WithExtensionsResult<TExts>;
-export {};
 `,
     "file:///node_modules/@cleverbrush/schema/extensions/array.d.ts": `/**
  * Built-in array extensions for \`@cleverbrush/schema\`.
