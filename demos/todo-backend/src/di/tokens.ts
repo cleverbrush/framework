@@ -1,7 +1,9 @@
-import type { BoundQuery } from '@cleverbrush/knex-schema';
+import type { BoundQuery, DbContext, TrackedDbContext } from '@cleverbrush/orm';
+import type { Logger } from '@cleverbrush/log';
 import { any } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import type { Config } from '../config.js';
+import type { AppEntityMap } from '../db/schemas.js';
 
 /**
  * DI token for the raw Knex instance.
@@ -12,10 +14,35 @@ export const KnexToken = any().hasType<Knex>();
 
 /**
  * DI token for the schema-aware BoundQuery created from the Knex instance.
+ *
+ * Retained as an escape hatch for code that needs schema-bound query
+ * building outside the typed entity context. Most code should prefer
+ * {@link DbToken}.
  */
 export const BoundQueryToken = any().hasType<BoundQuery>();
+
+/**
+ * DI token for the typed `DbContext` containing all registered entities as
+ * `DbSet`s (`db.todos`, `db.users`, etc.).
+ */
+export const DbToken = any().hasType<DbContext<AppEntityMap>>();
+
+/**
+ * DI token for a **per-request** `TrackedDbContext`.
+ *
+ * Registered as `addTransient` so every resolution creates a fresh identity
+ * map — handlers that use `saveChanges()` / `remove()` get isolated tracking
+ * without cross-request contamination.
+ */
+export const TrackedDbToken = any().hasType<TrackedDbContext<AppEntityMap>>();
 
 /**
  * DI token for the parsed application configuration.
  */
 export const ConfigToken = any().hasType<Config>();
+
+/**
+ * DI token for the structured logger.
+ */
+export const LoggerToken = any().hasType<Logger>();
+

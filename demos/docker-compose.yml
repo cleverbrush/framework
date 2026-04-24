@@ -20,6 +20,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      clickstack:
+        condition: service_healthy
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
@@ -31,6 +33,9 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       PORT: 3000
       NODE_ENV: production
+      OTEL_SERVICE_NAME: todo-backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://clickstack:4318
+      OTEL_LOG_LEVEL: warn
     ports:
       - "${APP_PORT:-3000}:3000"
     healthcheck:
@@ -63,5 +68,65 @@ services:
     depends_on:
       - backend
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@todo.local.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "8110:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+
+  # ClickStack — all-in-one OTel collector + ClickHouse + UI.
+  # UI:        http://localhost:${CLICKSTACK_PORT:-8091}
+  # OTLP HTTP: http://clickstack:4318 (in-network) | http://localhost:4318 (host)
+  #
+  # NOTE: the host port MUST match the container port — the UI generates
+  # self-referential URLs using its internal port. We override the internal
+  # port via HYPERDX_APP_PORT so they always agree, freeing host port 8080.
+  #
+  # clickstack-entry.sh mounts over /etc/local/entry.sh to enable no-auth
+  # mode (IS_LOCAL_APP_MODE=DANGEROUSLY_is_local_app_mode💀) so the OTLP
+  # endpoint accepts data without an API key — suitable for local dev only.
+  clickstack:
+    image: clickhouse/clickstack-all-in-one:latest
+    restart: unless-stopped
+    environment:
+      HYPERDX_APP_PORT: ${CLICKSTACK_PORT:-8091}
+    ports:
+      - "${CLICKSTACK_PORT:-8091}:${CLICKSTACK_PORT:-8091}"
+      - "4317:4317"   # OTLP/gRPC
+      - "4318:4318"   # OTLP/HTTP
+      - "8123:8123"   # ClickHouse HTTP (debug)
+    volumes:
+      - clickstack_data:/data/db
+      - clickstack_ch_data:/var/lib/clickhouse
+      - clickstack_ch_logs:/var/log/clickhouse-server
+      - ./clickstack-entry.sh:/etc/local/entry.sh:ro
+    # Wait until the UI is accepting TCP connections before declaring the
+    # service healthy. Uses bash's built-in /dev/tcp (no `nc` / `wget`
+    # required). The OTel collector (4318) is launched by opampsupervisor
+    # after the API configures it — the backend SDK retries until it's ready,
+    # so we don't need to gate on it here.
+    # ClickHouse can take up to ~60 s on first boot.
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c '</dev/tcp/localhost/${CLICKSTACK_PORT:-8091}'"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
 volumes:
   postgres_data:
+  pgadmin_data:
+  clickstack_data:
+  clickstack_ch_data:
+  clickstack_ch_logs:

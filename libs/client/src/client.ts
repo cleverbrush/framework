@@ -267,7 +267,8 @@ export function createClient<T extends ApiContract>(
             const apiError = new ApiError(
                 response.status,
                 response.statusText || `HTTP ${response.status}`,
-                errorBody
+                errorBody,
+                response.headers.get('x-trace-id') ?? undefined
             );
             throw await runBeforeError(hooks, apiError);
         }

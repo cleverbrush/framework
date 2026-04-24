@@ -24,9 +24,12 @@ const NAV_ITEMS: NavItem[] = [
             { href: '/server-openapi', label: 'OpenAPI' },
             { href: '/env', label: 'Env' },
             { href: '/knex-schema', label: 'Knex Schema' },
+            { href: '/orm', label: 'ORM' },
             { href: '/react-form', label: 'React Form' },
             { href: '/mapper', label: 'Mapper' },
-            { href: '/scheduler', label: 'Scheduler' }
+            { href: '/scheduler', label: 'Scheduler' },
+            { href: '/log', label: 'Log' },
+            { href: '/otel', label: 'OpenTelemetry' }
         ]
     },
     { href: '/comparisons', label: 'Comparisons' },

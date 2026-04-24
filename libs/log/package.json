@@ -1,0 +1,69 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "description": "Enterprise structured logging — Serilog-style message templates, CLEF serialization, production sinks",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/",
+    "keywords": [
+        "logging",
+        "structured logging",
+        "serilog",
+        "clef",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./clickhouse": {
+            "types": "./dist/clickhouse.d.ts",
+            "import": "./dist/clickhouse.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/log",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/log#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build --watch",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    },
+    "dependencies": {
+        "@cleverbrush/schema": "^3.1.0",
+        "@cleverbrush/async": "^3.1.0"
+    },
+    "peerDependencies": {
+        "@cleverbrush/di": "^3.1.0",
+        "@cleverbrush/server": "^3.1.0",
+        "@cleverbrush/knex-clickhouse": "^3.1.0"
+    },
+    "peerDependenciesMeta": {
+        "@cleverbrush/di": {
+            "optional": true
+        },
+        "@cleverbrush/server": {
+            "optional": true
+        },
+        "@cleverbrush/knex-clickhouse": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@types/node": "^25.4.0"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "3.1.0"
+}

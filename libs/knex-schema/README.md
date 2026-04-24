@@ -214,6 +214,85 @@ const rows = await query(db, UserSchema)
 
 ---
 
+## Scopes
+
+Define **reusable WHERE/ORDER/LIMIT conditions** on the schema. A default scope is applied
+automatically unless bypassed with `.unscoped()`.
+
+```typescript
+const PostSchema = object({
+    id:       number(),
+    title:    string(),
+    status:   string(),
+    isActive: boolean().hasColumnName('is_active'),
+})
+    .hasTableName('posts')
+    .scope('published',  q => q.where(t => t.status, 'published'))
+    .scope('recent',     q => q.orderBy(t => t.id, 'desc').limit(10))
+    .defaultScope(       q => q.where(t => t.isActive, true));
+
+// Apply named scopes
+const posts = await query(db, PostSchema)
+    .scoped('published')
+    .scoped('recent');
+
+// Bypass default scope (also skips soft-delete filter if present)
+const all = await query(db, PostSchema).unscoped();
+```
+
+`scoped()` is statically typed: TypeScript only allows registered scope names.
+
+---
+
+## Projections
+
+Define **named column subsets** on the schema with `.projection(name, columns)`. At query time,
+`.projected(name)` restricts the `SELECT` clause **and** narrows the TypeScript result type to
+`Pick<Row, Keys>` — accessing columns outside the projection is a compile-time error.
+
+### String-tuple form
+
+```typescript
+const PostSchema = object({
+    id:    number().primaryKey(),
+    title: string(),
+    body:  string(),
+    status: string(),
+})
+    .hasTableName('posts')
+    .projection('summary',    ['id', 'title'] as const)
+    .projection('withStatus', ['id', 'title', 'status'] as const);
+
+const rows = await query(db, PostSchema)
+    .scoped('published')
+    .projected('summary');
+
+// rows: Array<Pick<Post, 'id' | 'title'>>
+// rows[0].body  // ← TypeScript error: 'body' not in projection ✓
+```
+
+### Accessor form
+
+```typescript
+.projection('withStatus', t => [t.id, t.title, t.status])
+```
+
+The accessor receives the schema's property-descriptor tree; each element resolves to the
+property name at runtime. This form is more refactor-safe but does not provide the compile-time
+`Pick<>` narrowing that the tuple form offers.
+
+### Conflict rules
+
+`.projected()` cannot be combined with `.select()`, `.distinct()`, or any aggregate
+(`.count()`, `.min()`, etc.) on the same query. Attempting to do so throws at runtime.
+
+### Column-name mapping
+
+`hasColumnName()` is respected: if `isActive` is mapped to `is_active`, the generated SQL
+uses `is_active` automatically.
+
+---
+
 ## Column Reference Patterns
 
 Both styles are equivalent and resolve to the same SQL column:
@@ -246,7 +325,7 @@ Optionally pass a `baseQuery` (e.g. a scoped `knex('users').where('deleted_at', 
 | Ordering | `.orderBy(col, dir?)`, `.orderByRaw(sql)` |
 | Grouping | `.groupBy(...cols)`, `.groupByRaw(sql)`, `.having(col, op, val)`, `.havingRaw(sql)` |
 | Pagination | `.limit(n)`, `.offset(n)` |
-| Selection | `.select(...cols)`, `.distinct(...cols)` |
+| Selection | `.select(...cols)`, `.distinct(...cols)`, `.projected(name)` |
 | Aggregates | `.count(col?)`, `.countDistinct(col?)`, `.min(col)`, `.max(col)`, `.sum(col)`, `.avg(col)` |
 | Writes | `.insert(data)`, `.insertMany(data[])`, `.update(data)`, `.delete()` |
 | Execution | `.execute()`, `.first()`, `await builder` (thenable) |

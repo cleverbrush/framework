@@ -6,5 +6,6 @@
  *
  * @module
  */
-export * from './api/schemas.js';
+
 export { api } from './api/contract.js';
+export * from './api/schemas.js';

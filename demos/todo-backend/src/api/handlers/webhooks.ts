@@ -25,5 +25,8 @@ export const subscribeWebhookHandler: Handler<
         createdAt: new Date()
     };
 
-    return ActionResult.created(subscription, `/api/webhooks/${subscription.id}`);
+    return ActionResult.created(
+        subscription,
+        `/api/webhooks/${subscription.id}`
+    );
 };

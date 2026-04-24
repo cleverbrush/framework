@@ -5,6 +5,7 @@ import {
     ObjectSchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
+import type { Knex } from 'knex';
 import { getColumnName } from './extension.js';
 import type { ColumnRef } from './types.js';
 
@@ -53,24 +54,75 @@ export function buildColumnMap(
 }
 
 // ---------------------------------------------------------------------------
-// Resolve a ColumnRef (string | accessor) to a SQL column name
+// Resolve a ColumnRef (string | accessor) to a SQL column name or Knex.Raw
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve a ColumnRef to a plain SQL column name.
+ * Build a `Knex.Raw` expression for accessing a nested JSON/JSONB path.
  *
- * - String refs are treated as **property keys** and translated to column
- *   names via the column map.
+ * - Single-key path: `"col"->>'key'` (text output, `->>` operator).
+ * - Multi-key path:  `"col"#>>'{a,b,...}'` (text output, `#>>` operator).
+ *
+ * Both use positional bindings to prevent SQL injection.
+ */
+function jsonPathRaw(knex: Knex, col: string, jsonPath: string[]): Knex.Raw {
+    if (jsonPath.length === 1) {
+        return knex.raw('??->>?', [col, jsonPath[0]]);
+    }
+    // #>> expects a text array literal, e.g. '{address,city}'
+    const pathLiteral = `{${jsonPath.join(',')}}`;
+    return knex.raw('??#>>?', [col, pathLiteral]);
+}
+
+/**
+ * Resolve a ColumnRef to a plain SQL column name (or a Knex.Raw expression for
+ * nested JSON paths when `knex` is supplied).
+ *
+ * - String refs are treated as **property keys** (or dot-separated nested paths
+ *   such as `'address.city'`) and translated to column names via the column map.
  * - Function refs (property accessor) are resolved via PropertyDescriptorTree,
- *   then translated to column names.
+ *   then translated to column names.  Nested accessors (e.g. `t => t.address.city`)
+ *   produce a `Knex.Raw` JSON-path expression when `knex` is provided.
+ *
+ * @param ref    - Column reference (property key, dotted path, or accessor fn).
+ * @param schema - Root ObjectSchemaBuilder.
+ * @param label  - Human-readable label for error messages.
+ * @param knex   - Knex instance.  Required for nested JSON-path refs; when omitted
+ *                 and a nested path is detected, an error is thrown.
  */
 export function resolveColumnRef(
     ref: ColumnRef<any>,
     schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    label: string,
+    knex: Knex
+): string | Knex.Raw;
+export function resolveColumnRef(
+    ref: ColumnRef<any>,
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     label: string
-): string {
+): string;
+export function resolveColumnRef(
+    ref: ColumnRef<any>,
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    label: string,
+    knex?: Knex
+): string | Knex.Raw {
     if (typeof ref === 'string') {
         if (!ref) throw new Error(`${label} must be a non-empty string`);
+
+        // Dotted paths like 'address.city' — first segment is the top-level prop.
+        if (ref.includes('.')) {
+            const [topProp, ...jsonPath] = ref.split('.');
+            const { propToCol } = buildColumnMap(schema);
+            const col = propToCol.get(topProp) ?? topProp;
+            if (!knex) {
+                throw new Error(
+                    `${label}: a Knex instance is required to resolve nested JSON path '${ref}'`
+                );
+            }
+            return jsonPathRaw(knex, col, jsonPath);
+        }
+
         const { propToCol } = buildColumnMap(schema);
         const col = propToCol.get(ref);
         // If the string is a known property key, return its column name;
@@ -93,25 +145,39 @@ export function resolveColumnRef(
         }
 
         const inner = (descriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
-        const introspected = schema.introspect() as any;
-        const properties = introspected.properties ?? {};
+        const pointer: string = inner.toJsonPointer();
 
-        for (const propName of Object.keys(properties)) {
-            const propDescriptor = (tree as any)[propName];
-            if (
-                propDescriptor &&
-                (propDescriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] ===
-                    inner
-            ) {
-                // Found the matching property — resolve to column name
-                const { propToCol } = buildColumnMap(schema);
-                return propToCol.get(propName) ?? propName;
-            }
+        // pointer is an RFC-6901 JSON Pointer, e.g. '' (root), '/name', '/address/city'
+        if (!pointer) {
+            throw new Error(`${label} accessor returned the root descriptor`);
         }
 
-        throw new Error(
-            `${label} accessor did not match any property in the schema`
-        );
+        // Split '/address/city' → ['address', 'city']
+        const segments = pointer
+            .slice(1)
+            .split('/')
+            .map((s: string) => s.replace(/~1/g, '/').replace(/~0/g, '~'));
+
+        if (segments.length === 0) {
+            throw new Error(`${label} accessor returned the root descriptor`);
+        }
+
+        const [topProp, ...jsonPath] = segments;
+        const { propToCol } = buildColumnMap(schema);
+        const col = propToCol.get(topProp) ?? topProp;
+
+        if (jsonPath.length === 0) {
+            // Top-level property — plain column name
+            return col;
+        }
+
+        // Nested path — need Knex.Raw
+        if (!knex) {
+            throw new Error(
+                `${label}: a Knex instance is required to resolve nested JSON path '${pointer}'`
+            );
+        }
+        return jsonPathRaw(knex, col, jsonPath);
     }
 
     throw new Error(
@@ -148,26 +214,169 @@ export function resolvePropertyKey(
         }
 
         const inner = (descriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
-        const introspected = schema.introspect() as any;
-        const properties = introspected.properties ?? {};
+        const pointer: string = inner.toJsonPointer();
 
-        for (const propName of Object.keys(properties)) {
-            const propDescriptor = (tree as any)[propName];
-            if (
-                propDescriptor &&
-                (propDescriptor as any)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR] ===
-                    inner
-            ) {
-                return propName;
-            }
+        if (!pointer) {
+            throw new Error(`${label} accessor returned the root descriptor`);
         }
 
-        throw new Error(
-            `${label} accessor did not match any property in the schema`
-        );
+        // Return the first segment (top-level property key) for mapping purposes
+        const topProp = pointer.slice(1).split('/')[0];
+        return topProp.replace(/~1/g, '/').replace(/~0/g, '~');
     }
 
     throw new Error(
         `${label} must be a string or a property descriptor accessor function`
     );
+}
+
+// ---------------------------------------------------------------------------
+// Primary-key introspection
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of {@link getPrimaryKeyColumns}.
+ *
+ * `propertyKeys` are the schema property names (the keys you'd use in
+ * `.where(t => t.id, ...)` style accessors); `columnNames` are the SQL
+ * column names after applying any `hasColumnName()` overrides. Order is
+ * preserved: composite-PK ordering matches the user's `hasPrimaryKey()`
+ * declaration; single-PK arrays have length 1.
+ *
+ * @public
+ */
+export interface PrimaryKeyColumns {
+    readonly propertyKeys: readonly string[];
+    readonly columnNames: readonly string[];
+}
+
+/**
+ * Resolve the primary-key columns of a schema at runtime.
+ *
+ * Composite primary keys (declared via `.hasPrimaryKey([...])` on the
+ * object schema) take precedence over single-column primary keys. The
+ * `columns` argument to `.hasPrimaryKey()` may contain either property keys
+ * or SQL column names — both forms are accepted and normalised.
+ *
+ * Returns `{ propertyKeys: [], columnNames: [] }` when no primary key is
+ * declared.
+ *
+ * @public
+ */
+export function getPrimaryKeyColumns(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): PrimaryKeyColumns {
+    const introspected = schema.introspect() as {
+        properties?: Record<string, SchemaBuilder<any, any, any>>;
+        extensions?: Record<string, unknown>;
+    };
+    const properties = introspected.properties ?? {};
+    const extensions = introspected.extensions ?? {};
+    const { propToCol, colToProp } = buildColumnMap(schema);
+
+    // Composite PK takes precedence.
+    const composite = extensions.compositePrimaryKey as
+        | readonly string[]
+        | undefined;
+    if (composite && composite.length > 0) {
+        const propertyKeys: string[] = [];
+        const columnNames: string[] = [];
+        for (const entry of composite) {
+            // Accept either column name or property key.
+            if (propToCol.has(entry)) {
+                propertyKeys.push(entry);
+                columnNames.push(propToCol.get(entry) as string);
+            } else if (colToProp.has(entry)) {
+                columnNames.push(entry);
+                propertyKeys.push(colToProp.get(entry) as string);
+            } else {
+                // Unknown identifier — pass through as both (best effort).
+                propertyKeys.push(entry);
+                columnNames.push(entry);
+            }
+        }
+        return { propertyKeys, columnNames };
+    }
+
+    // Single-column PK — first property whose schema carries the
+    // `primaryKey` extension wins.
+    for (const [propKey, propSchema] of Object.entries(properties)) {
+        const propExt =
+            (
+                propSchema as {
+                    introspect?: () => {
+                        extensions?: Record<string, unknown>;
+                    };
+                }
+            ).introspect?.().extensions ?? {};
+        if (propExt.primaryKey) {
+            return {
+                propertyKeys: [propKey],
+                columnNames: [propToCol.get(propKey) ?? propKey]
+            };
+        }
+    }
+
+    return { propertyKeys: [], columnNames: [] };
+}
+
+// ---------------------------------------------------------------------------
+// Row-version introspection
+// ---------------------------------------------------------------------------
+
+/**
+ * Concurrency-token strategy stored by `.rowVersion()`.
+ * - `'increment'` — ORM increments an integer counter on each UPDATE.
+ * - `'timestamp'` — ORM sets the value to `new Date()` on each UPDATE.
+ * - `'manual'`    — caller supplies the new value; ORM only enforces the check.
+ *
+ * @public
+ */
+export type RowVersionStrategy = 'increment' | 'timestamp' | 'manual';
+
+/**
+ * Resolved row-version column for a schema, returned by
+ * {@link getRowVersionColumn}.
+ *
+ * @public
+ */
+export interface RowVersionColumn {
+    /** Schema property name. */
+    propertyKey: string;
+    /** SQL column name (after any `hasColumnName()` override). */
+    columnName: string;
+    /** Concurrency-token update strategy. */
+    strategy: RowVersionStrategy;
+}
+
+/**
+ * Find the first column marked `.rowVersion()` on the schema and return its
+ * metadata. Returns `null` when no row-version column is declared.
+ *
+ * @public
+ */
+export function getRowVersionColumn(
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+): RowVersionColumn | null {
+    const introspected = schema.introspect() as {
+        properties?: Record<
+            string,
+            { introspect?: () => { extensions?: Record<string, unknown> } }
+        >;
+    };
+    const properties = introspected.properties ?? {};
+    const { propToCol } = buildColumnMap(schema);
+
+    for (const [propKey, propSchema] of Object.entries(properties)) {
+        const ext = propSchema.introspect?.()?.extensions ?? {};
+        const rv = ext.rowVersion as { strategy?: string } | undefined;
+        if (rv) {
+            return {
+                propertyKey: propKey,
+                columnName: propToCol.get(propKey) ?? propKey,
+                strategy: (rv.strategy as RowVersionStrategy) ?? 'increment'
+            };
+        }
+    }
+    return null;
 }

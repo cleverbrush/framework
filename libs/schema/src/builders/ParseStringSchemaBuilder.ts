@@ -232,6 +232,18 @@ export class ParseStringSchemaBuilder<
         return result;
     }
 
+    /**
+     * The human-readable message template pattern with `{property}` holes,
+     * e.g. `"Todo created: #{TodoId} \"{Title}\" by user {UserId}"`.
+     *
+     * Useful for structured logging — pass this as the log `messageTemplate`
+     * so events with the same shape can be grouped, and pass
+     * `serialize(params)` as the rendered message.
+     */
+    get template(): string {
+        return this.#humanPattern();
+    }
+
     // -- Introspect ----------------------------------------------------------
 
     /**

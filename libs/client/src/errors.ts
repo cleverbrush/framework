@@ -42,11 +42,15 @@ export class ApiError extends WebError {
      * @param status - The HTTP status code (e.g. 404, 500).
      * @param message - A human-readable error description.
      * @param body - The parsed response body, if the server returned JSON.
+     * @param traceId - The `X-Trace-Id` response header value, if the server
+     *   set one. Useful for correlating client-side errors with backend traces
+     *   in observability tools (ClickStack, Jaeger, etc.).
      */
     constructor(
         public readonly status: number,
         message: string,
-        public readonly body: unknown = undefined
+        public readonly body: unknown = undefined,
+        public readonly traceId?: string
     ) {
         super(message);
         this.name = 'ApiError';

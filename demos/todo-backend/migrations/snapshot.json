@@ -1,0 +1,274 @@
+{
+  "version": 1,
+  "tables": {
+    "todo_activity": {
+      "columns": {
+        "actor_user_id": {
+          "name": "actor_user_id",
+          "type": "integer",
+          "nullable": true,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "completed_at": {
+          "name": "completed_at",
+          "type": "timestamp without time zone",
+          "nullable": true,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "defaultValue": "now",
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "todo_id": {
+          "name": "todo_id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "type": {
+          "name": "type",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        }
+      },
+      "indexes": [],
+      "foreignKeys": [
+        {
+          "constraintName": "todo_activity_actor_user_id_foreign",
+          "columnName": "actor_user_id",
+          "foreignTable": "users",
+          "foreignColumn": "id",
+          "deleteRule": "SET NULL",
+          "updateRule": "NO ACTION"
+        },
+        {
+          "constraintName": "todo_activity_todo_id_foreign",
+          "columnName": "todo_id",
+          "foreignTable": "todos",
+          "foreignColumn": "id",
+          "deleteRule": "CASCADE",
+          "updateRule": "NO ACTION"
+        }
+      ],
+      "checks": []
+    },
+    "todo_activity_assigned": {
+      "columns": {
+        "activity_id": {
+          "name": "activity_id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "assigned_to_user_id": {
+          "name": "assigned_to_user_id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "type": {
+          "name": "type",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        }
+      },
+      "indexes": [],
+      "foreignKeys": [],
+      "checks": []
+    },
+    "todo_activity_commented": {
+      "columns": {
+        "activity_id": {
+          "name": "activity_id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "comment": {
+          "name": "comment",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "type": {
+          "name": "type",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        }
+      },
+      "indexes": [],
+      "foreignKeys": [],
+      "checks": []
+    },
+    "todos": {
+      "columns": {
+        "completed": {
+          "name": "completed",
+          "type": "boolean",
+          "nullable": false,
+          "defaultValue": false,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "defaultValue": "now",
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "deleted_at": {
+          "name": "deleted_at",
+          "type": "timestamp without time zone",
+          "nullable": true,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "description": {
+          "name": "description",
+          "type": "character varying",
+          "nullable": true,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "title": {
+          "name": "title",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "defaultValue": "now",
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        }
+      },
+      "indexes": [],
+      "foreignKeys": [
+        {
+          "constraintName": "todos_user_id_foreign",
+          "columnName": "user_id",
+          "foreignTable": "users",
+          "foreignColumn": "id",
+          "deleteRule": "CASCADE",
+          "updateRule": "NO ACTION"
+        }
+      ],
+      "checks": []
+    },
+    "users": {
+      "columns": {
+        "auth_provider": {
+          "name": "auth_provider",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp without time zone",
+          "nullable": false,
+          "defaultValue": "now",
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "email": {
+          "name": "email",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "character varying",
+          "nullable": true,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        },
+        "role": {
+          "name": "role",
+          "type": "character varying",
+          "nullable": false,
+          "defaultValue": null,
+          "maxLength": null,
+          "numericPrecision": null
+        }
+      },
+      "indexes": [],
+      "foreignKeys": [],
+      "checks": []
+    }
+  }
+}

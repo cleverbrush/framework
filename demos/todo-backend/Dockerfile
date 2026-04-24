@@ -15,6 +15,7 @@ COPY libs/di/package.json ./libs/di/
 COPY libs/env/package.json ./libs/env/
 COPY libs/knex-clickhouse/package.json ./libs/knex-clickhouse/
 COPY libs/knex-schema/package.json ./libs/knex-schema/
+COPY libs/log/package.json ./libs/log/
 COPY libs/mapper/package.json ./libs/mapper/
 COPY libs/react-form/package.json ./libs/react-form/
 COPY libs/schema/package.json ./libs/schema/
@@ -22,6 +23,7 @@ COPY libs/schema-json/package.json ./libs/schema-json/
 COPY libs/scheduler/package.json ./libs/scheduler/
 COPY libs/server/package.json ./libs/server/
 COPY libs/server-openapi/package.json ./libs/server-openapi/
+COPY libs/otel/package.json ./libs/otel/
 COPY libs/client/package.json ./libs/client/
 COPY libs/benchmarks/package.json ./libs/benchmarks/
 COPY demos/todo-backend/package.json ./demos/todo-backend/
@@ -32,9 +34,10 @@ RUN npm install --ignore-scripts
 # Copy all lib sources (needed for workspace build)
 COPY libs/ ./libs/
 
-# Copy backend source and build config
+# Copy backend source, build config, and migrations
 COPY demos/todo-backend/tsconfig.build.json demos/todo-backend/tsup.config.ts ./demos/todo-backend/
 COPY demos/todo-backend/src/ ./demos/todo-backend/src/
+COPY demos/todo-backend/migrations/ ./demos/todo-backend/migrations/
 
 # Build the backend and its workspace dependencies via turbo
 RUN npx turbo run build --filter=@cleverbrush/todo-backend
@@ -61,12 +64,14 @@ WORKDIR /app
 # third-party deps (knex, pg, google-auth-library, etc.) are needed.
 COPY --from=builder /app/runtime_modules/ ./node_modules/
 COPY --from=builder /app/demos/todo-backend/dist/ ./dist/
+COPY --from=builder /app/demos/todo-backend/migrations/ ./migrations/
 
-RUN chown -R appuser:appgroup /app
+# Create logs directory for file sink
+RUN mkdir -p /app/logs && chown -R appuser:appgroup /app /app/migrations
 USER appuser
 
 ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "dist/index.js"]
+CMD ["node", "--import", "./dist/telemetry.js", "dist/index.js"]

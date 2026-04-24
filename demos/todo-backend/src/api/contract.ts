@@ -16,14 +16,11 @@
  */
 
 import { array, number, object, string } from '@cleverbrush/schema';
+import { defineApi, endpoint, route } from '@cleverbrush/server/contract';
 import {
-    defineApi,
-    endpoint,
-    route
-} from '@cleverbrush/server/contract';
-import {
-    CreateTodoBodySchema,
+    TodoActivityResponseSchema,
     CompletionRequestHeadersSchema,
+    CreateTodoBodySchema,
     ErrorResponseSchema,
     ExportResponseHeadersSchema,
     GoogleAuthBodySchema,
@@ -46,12 +43,13 @@ import {
 
 // ── Shared route templates ────────────────────────────────────────────────────
 
-const ById = route({ id: number().coerce() })`/${(t) => t.id}`;
+const ById = route({ id: number().coerce() })`/${t => t.id}`;
 
 // ── Resource factories ────────────────────────────────────────────────────────
 
 const todosResource = endpoint.resource('/api/todos');
 const usersResource = endpoint.resource('/api/users');
+const activityResource = endpoint.resource('/api/activity');
 
 // ── Contract ──────────────────────────────────────────────────────────────────
 
@@ -86,19 +84,17 @@ export const api = defineApi({
             .query(TodoListQuerySchema)
             .responses({ 200: array(TodoResponseSchema) }),
 
-        get: todosResource
-            .get(ById)
-            .responses({
-                200: TodoResponseSchema,
-                403: ErrorResponseSchema,
-                404: ErrorResponseSchema
-            }),
+        get: todosResource.get(ById).responses({
+            200: TodoResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema
+        }),
 
         getWithAuthor: todosResource
             .get(
                 route({
                     id: number().coerce()
-                })`/${(t) => t.id}/with-author`
+                })`/${t => t.id}/with-author`
             )
             .responses({
                 200: TodoWithAuthorResponseSchema,
@@ -111,30 +107,23 @@ export const api = defineApi({
             .body(CreateTodoBodySchema)
             .responses({ 201: TodoResponseSchema }),
 
-        update: todosResource
-            .patch(ById)
-            .body(UpdateTodoBodySchema)
-            .responses({
-                200: TodoResponseSchema,
-                403: ErrorResponseSchema,
-                404: ErrorResponseSchema
-            }),
+        update: todosResource.patch(ById).body(UpdateTodoBodySchema).responses({
+            200: TodoResponseSchema,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema
+        }),
 
-        delete: todosResource
-            .delete(ById)
-            .responses({
-                204: null,
-                403: ErrorResponseSchema,
-                404: ErrorResponseSchema
-            }),
+        delete: todosResource.delete(ById).responses({
+            204: null,
+            403: ErrorResponseSchema,
+            404: ErrorResponseSchema
+        }),
 
         sendEvent: todosResource
-            .post(
-                route({ id: number().coerce() })`/${(t) => t.id}/events`
-            )
+            .post(route({ id: number().coerce() })`/${t => t.id}/events`)
             .body(TodoEventSchema)
             .responses({
-                200: TodoEventSchema,
+                200: TodoActivityResponseSchema,
                 403: ErrorResponseSchema,
                 404: ErrorResponseSchema
             }),
@@ -162,9 +151,7 @@ export const api = defineApi({
             .responses({ 200: TodoResponseSchema }),
 
         complete: todosResource
-            .post(
-                route({ id: number().coerce() })`/${(t) => t.id}/complete`
-            )
+            .post(route({ id: number().coerce() })`/${t => t.id}/complete`)
             .headers(CompletionRequestHeadersSchema)
             .responses({
                 200: TodoResponseSchema,
@@ -174,8 +161,18 @@ export const api = defineApi({
             }),
 
         downloadAttachment: todosResource.get(
-            route({ id: number().coerce() })`/${(t) => t.id}/attachment`
-        )
+            route({ id: number().coerce() })`/${t => t.id}/attachment`
+        ),
+
+        listActivity: todosResource
+            .get(
+                route({ id: number().coerce() })`/${t => t.id}/activity`
+            )
+            .responses({
+                200: array(TodoActivityResponseSchema),
+                403: ErrorResponseSchema,
+                404: ErrorResponseSchema
+            })
     },
 
     users: {
@@ -184,17 +181,13 @@ export const api = defineApi({
             .query(PaginationQuerySchema)
             .responses({ 200: array(UserResponseSchema) }),
 
-        delete: usersResource
-            .delete(ById)
-            .responses({
-                204: null,
-                400: ErrorResponseSchema,
-                404: ErrorResponseSchema
-            }),
+        delete: usersResource.delete(ById).responses({
+            204: null,
+            400: ErrorResponseSchema,
+            404: ErrorResponseSchema
+        }),
 
-        me: usersResource
-            .get(route({})`/me`)
-            .returns(UserResponseSchema)
+        me: usersResource.get(route({})`/me`).returns(UserResponseSchema)
     },
 
     webhooks: {
@@ -207,10 +200,20 @@ export const api = defineApi({
             })
     },
 
+    activity: {
+        listAll: activityResource
+            .get()
+            .query(object({ limit: number().coerce().optional() }))
+            .responses({ 200: array(TodoActivityResponseSchema) }),
+
+        delete: activityResource.delete(ById).responses({
+            204: null,
+            404: ErrorResponseSchema
+        })
+    },
+
     admin: {
-        activityLog: endpoint
-            .get('/api/admin/activity')
-            .returns(string())
+        activityLog: endpoint.get('/api/admin/activity').returns(string())
     },
 
     // ── Resilience demo endpoints ─────────────────────────────────────────
@@ -236,7 +239,17 @@ export const api = defineApi({
         echo: endpoint
             .post('/api/demo/echo')
             .body(object({ message: string() }))
-            .returns(object({ message: string() }))
+            .returns(object({ message: string() })),
+
+        /** Crashes with an unhandled SQL error (non-existent table). */
+        crashSql: endpoint
+            .get('/api/demo/crash-sql')
+            .returns(object({ ok: string() })),
+
+        /** Crashes with an unhandled runtime exception. */
+        crashRuntime: endpoint
+            .get('/api/demo/crash-runtime')
+            .returns(object({ ok: string() }))
     },
 
     // ── WebSocket subscriptions ───────────────────────────────────────────
@@ -260,6 +273,13 @@ export const api = defineApi({
             .incoming(object({ text: string() }))
             .outgoing(object({ user: string(), text: string(), ts: number() }))
             .summary('Chat room')
+            .tags('live'),
+
+        /** Real-time todo activity feed (all todos). */
+        activityFeed: endpoint
+            .subscription('/ws/activity')
+            .outgoing(TodoActivityResponseSchema)
+            .summary('Live activity feed')
             .tags('live')
     }
 });

@@ -1,5 +1,4 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
-import { UserDbSchema } from '../../db/schemas.js';
 import type {
     DeleteUserEndpoint,
     GetMyProfileEndpoint,
@@ -14,15 +13,14 @@ export const listUsersHandler: Handler<typeof ListUsersEndpoint> = async (
     { db }
 ) => {
     const page = Math.max(1, query.page ?? 1);
-    const limit = Math.min(100, Math.max(1, query.limit ?? 20));
-    const offset = (page - 1) * limit;
+    const pageSize = Math.min(100, Math.max(1, query.limit ?? 20));
 
-    const rows = await db(UserDbSchema)
+    const rows = await db.users
+        .projected('public')
         .orderBy(t => t.createdAt, 'desc')
-        .limit(limit)
-        .offset(offset);
+        .paginate({ page, pageSize });
 
-    return Promise.all(rows.map(mapUser));
+    return Promise.all(rows.data.map(mapUser));
 };
 
 // ── Delete user (admin only) ──────────────────────────────────────────────────
@@ -38,9 +36,7 @@ export const deleteUserHandler: Handler<typeof DeleteUserEndpoint> = async (
         });
     }
 
-    const user = await db(UserDbSchema)
-        .where(t => t.id, params.id)
-        .first();
+    const user = await db.users.find(params.id);
 
     if (!user) {
         return ActionResult.notFound({
@@ -48,9 +44,7 @@ export const deleteUserHandler: Handler<typeof DeleteUserEndpoint> = async (
         });
     }
 
-    await db(UserDbSchema)
-        .where(t => t.id, params.id)
-        .delete();
+    await db.users.where(t => t.id, params.id).delete();
 
     return ActionResult.noContent();
 };
@@ -61,9 +55,7 @@ export const getMyProfileHandler: Handler<typeof GetMyProfileEndpoint> = async (
     { principal },
     { db }
 ) => {
-    const user = await db(UserDbSchema)
-        .where(t => t.id, principal.userId)
-        .first();
+    const user = await db.users.find(principal.userId);
 
     if (!user) {
         return ActionResult.notFound({
@@ -73,3 +65,4 @@ export const getMyProfileHandler: Handler<typeof GetMyProfileEndpoint> = async (
 
     return mapUser(user);
 };
+

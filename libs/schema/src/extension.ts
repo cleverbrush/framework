@@ -84,7 +84,10 @@ import {
     promise
 } from './builders/PromiseSchemaBuilder.js';
 import { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
-import type { SchemaBuilder } from './builders/SchemaBuilder.js';
+import type {
+    PropertyDescriptorTree,
+    SchemaBuilder
+} from './builders/SchemaBuilder.js';
 import { StringSchemaBuilder, string } from './builders/StringSchemaBuilder.js';
 import { TupleSchemaBuilder, tuple } from './builders/TupleSchemaBuilder.js';
 import { UnionSchemaBuilder, union } from './builders/UnionSchemaBuilder.js';
@@ -260,6 +263,51 @@ type MergeExtensionMethods<
 // ---------------------------------------------------------------------------
 
 /**
+ * Unique string-literal brand key used by {@link FixedMethods} to detect
+ * extension methods whose first-argument literal should be accumulated in the
+ * return type.
+ *
+ * Declare the return type of any extension method as
+ * `this & { readonly [METHOD_LITERAL_BRAND]?: N }` (where `N extends string`)
+ * and `FixedMethods` will automatically make it generic so the literal name
+ * flows through the type system and accumulates across multiple calls.
+ *
+ * This powers scope-name autocomplete in `SchemaQueryBuilder.scoped()`.
+ */
+const METHOD_LITERAL_BRAND = '__cleverbrush_method_literal_brand__' as const;
+
+export { METHOD_LITERAL_BRAND };
+export type MethodLiteralBrandSymbol = typeof METHOD_LITERAL_BRAND;
+
+/**
+ * Generic accumulator brand for extension methods that want to thread
+ * a `Record<name, readonly string[]>` map through the builder chain.
+ *
+ * Extension authors can declare a method's return type as
+ * `this & { readonly [EXTRA_TYPE_BRAND]?: { [name]: TKeys } }`
+ * and {@link FixedMethods} will automatically:
+ * - Make the first argument const-generic (to capture the literal name).
+ * - Make the second argument const-generic when it is a `readonly string[]`
+ *   tuple (to capture the literal key list).
+ * - Accumulate both into the 4th `TExtraTypes` parameter of `FixedMethods`
+ *   so the information survives subsequent method calls on the same builder.
+ *
+ * This is deliberately projection-agnostic — any extension that follows the
+ * `(name: string, data: readonly string[] | function)` signature convention
+ * can use it. Projection-specific semantics (e.g. `PROJECTION_BRAND`) live
+ * in the consuming library, not here.
+ *
+ * @see {@link FixedMethods} for how the accumulation works.
+ */
+const EXTRA_TYPE_BRAND = '__cleverbrush_extra_type_brand__' as const;
+
+export { EXTRA_TYPE_BRAND };
+export type ExtraTypeBrandSymbol = typeof EXTRA_TYPE_BRAND;
+
+/** @internal Drops the first element of a tuple type. */
+type TailArgs<T> = T extends readonly [unknown, ...infer R] ? R : [];
+
+/**
  * Intersected onto consumer-facing builder types to make `withExtension`
  * and `getExtension` uncallable (`never`). Using an intersection instead
  * of `Omit` preserves the class identity so extended builders remain
@@ -280,15 +328,101 @@ export type HiddenExtensionMethods = {
  * The self-reference (`FixedMethods` appears in its own mapped return
  * types) is resolved lazily by TypeScript because the recursion sits
  * inside a function-return position within a conditional mapped type.
+ *
+ * The optional third parameter `TAccum` accumulates literal string names
+ * registered by methods whose raw return type includes
+ * `{ readonly [METHOD_LITERAL_BRAND]?: any }`. Those methods are rewritten
+ * as `const`-generic so the literal flows through; all other methods thread
+ * the accumulator unchanged.
+ *
+ * The optional fourth parameter `TExtraTypes` accumulates a
+ * `Record<name, readonly string[]>` map contributed by methods whose raw
+ * return type includes `{ readonly [EXTRA_TYPE_BRAND]?: any }`. Those
+ * methods are rewritten as const-generic for both the name and the keys
+ * tuple so the mapping flows through; all other methods thread it unchanged.
+ *
+ * For object-schema methods the accessor-form callback parameter is
+ * automatically typed as `PropertyDescriptorTree<TBase, TBase>` when
+ * `TBase` is an `ObjectSchemaBuilder`, giving callers IDE autocomplete over
+ * the schema's own properties.
  */
-export type FixedMethods<TRawMethods, TBase> = {
+export type FixedMethods<
+    TRawMethods,
+    TBase,
+    TAccum extends string = never,
+    TExtraTypes extends Record<string, readonly string[]> = Record<never, never>
+> = {
     [K in keyof TRawMethods]: TRawMethods[K] extends (
         this: any,
         ...args: infer A
-    ) => any
-        ? (
-              ...args: A
-          ) => TBase & FixedMethods<TRawMethods, TBase> & HiddenExtensionMethods
+    ) => infer R
+        ? R extends { readonly [EXTRA_TYPE_BRAND]?: any }
+            ? // Extra-type-brand method: rest-param shape `(name, ...columns)`.
+              // Each column is a property-name string or an accessor callback.
+              // The string-literal union accumulates into `TKey` and lands in
+              // the `EXTRA_TYPE_BRAND` under `TName` as `readonly TKey[]`.
+              // When `TBase` is an `ObjectSchemaBuilder` the callback `t` is
+              // typed as `PropertyDescriptorTree<TBase, TBase>` so callers get
+              // IDE autocomplete over the schema's own properties.
+              <const TName extends string & A[0], const TKey extends string>(
+                  name: TName,
+                  ...columns: ReadonlyArray<
+                      | TKey
+                      | (TBase extends ObjectSchemaBuilder<
+                            any,
+                            any,
+                            any,
+                            any,
+                            any
+                        >
+                            ? (t: PropertyDescriptorTree<TBase, TBase>) => any
+                            : (t: any) => any)
+                  >
+              ) => TBase &
+                  FixedMethods<
+                      TRawMethods,
+                      TBase,
+                      TAccum,
+                      TExtraTypes & Record<TName, readonly TKey[]>
+                  > &
+                  HiddenExtensionMethods & {
+                      readonly [EXTRA_TYPE_BRAND]?: TExtraTypes &
+                          Record<TName, readonly TKey[]>;
+                  } & ([TAccum] extends [never]
+                      ? {}
+                      : { readonly [METHOD_LITERAL_BRAND]?: TAccum })
+            : R extends { readonly [METHOD_LITERAL_BRAND]?: any }
+              ? // Literal-brand method: becomes const-generic so the first-arg
+                // literal accumulates in TAccum and in the [METHOD_LITERAL_BRAND]
+                // property of the return type.
+                <const TName extends string & A[0]>(
+                    name: TName,
+                    ...rest: TailArgs<A>
+                ) => TBase &
+                    FixedMethods<
+                        TRawMethods,
+                        TBase,
+                        TAccum | TName,
+                        TExtraTypes
+                    > &
+                    HiddenExtensionMethods & {
+                        readonly [METHOD_LITERAL_BRAND]?: TAccum | TName;
+                    } & ([keyof TExtraTypes] extends [never]
+                        ? {}
+                        : { readonly [EXTRA_TYPE_BRAND]?: TExtraTypes })
+              : // Regular method: threads both accumulators through so literals
+                // defined earlier in the chain are not lost.
+                (
+                    ...args: A
+                ) => TBase &
+                    FixedMethods<TRawMethods, TBase, TAccum, TExtraTypes> &
+                    HiddenExtensionMethods &
+                    ([TAccum] extends [never]
+                        ? {}
+                        : { readonly [METHOD_LITERAL_BRAND]?: TAccum }) &
+                    ([keyof TExtraTypes] extends [never]
+                        ? {}
+                        : { readonly [EXTRA_TYPE_BRAND]?: TExtraTypes })
         : TRawMethods[K];
 };
 
