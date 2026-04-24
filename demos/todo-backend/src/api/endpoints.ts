@@ -5,7 +5,7 @@ import { DbToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
 import { api } from './contract.js';
 import {
     type ImportTodosBody,
-    type ImportTodosBodySchema,
+    ImportTodosBodySchema,
     PrincipalSchema,
     TodoNotificationPayloadSchema,
     WebhookAckSchema

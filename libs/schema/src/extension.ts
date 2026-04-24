@@ -263,8 +263,9 @@ type MergeExtensionMethods<
 // ---------------------------------------------------------------------------
 
 /**
- * Unique symbol used by {@link FixedMethods} to detect extension methods whose
- * first-argument literal should be accumulated in the return type.
+ * Unique string-literal brand key used by {@link FixedMethods} to detect
+ * extension methods whose first-argument literal should be accumulated in the
+ * return type.
  *
  * Declare the return type of any extension method as
  * `this & { readonly [METHOD_LITERAL_BRAND]?: N }` (where `N extends string`)

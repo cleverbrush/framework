@@ -27,8 +27,20 @@ export async function run(argv: string[]): Promise<void> {
         if (cmd === 'migrate') {
             switch (sub) {
                 case 'generate': {
-                    const name =
-                        rest.find(a => !a.startsWith('-')) ?? 'migration';
+                    // Collect positional args, skipping flag names and their
+                    // values so that e.g. `--dir ./migrations` is not mistaken
+                    // for the migration name.
+                    let name = 'migration';
+                    for (let i = 0; i < rest.length; i++) {
+                        if (rest[i].startsWith('-')) {
+                            const next = rest[i + 1];
+                            if (next !== undefined && !next.startsWith('-'))
+                                i++;
+                        } else {
+                            name = rest[i];
+                            break;
+                        }
+                    }
                     const config = await loadConfig(configPath);
                     const { generate } = await import('./commands/generate.js');
                     await generate(name, config, flags);

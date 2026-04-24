@@ -19,8 +19,7 @@ cb-orm db push                   # sync schema in-place (dev only)
 npm install --save-dev @cleverbrush/orm-cli
 ```
 
-`tsx` (for loading TypeScript config files) and `knex` are peer dependencies
-that are installed automatically as transitive dependencies.
+`knex` is a peer dependency and must be installed in your project. `tsx` is a regular dependency and is installed automatically.
 
 ---
 

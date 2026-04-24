@@ -232,6 +232,16 @@ export async function updateVariant(
         const { propToCol } = buildColumnMap(schema);
         const discCol = propToCol.get(discKey) ?? discKey;
         const pkInfo = getPrimaryKeyColumns(schema);
+        if (pkInfo.columnNames.length === 0) {
+            throw new Error(
+                `updateVariant: base schema has no primary key declared.`
+            );
+        }
+        if (pkInfo.columnNames.length > 1) {
+            throw new Error(
+                `updateVariant: composite primary keys are not supported for STI updates.`
+            );
+        }
         const pkColName = pkInfo.columnNames[0];
         const baseTable = schema.getExtension?.('tableName') as string;
 
@@ -293,6 +303,16 @@ export async function deleteVariant(
         const discKey = config.discriminatorKey;
         const baseTable = schema.getExtension?.('tableName') as string;
         const pkInfo = getPrimaryKeyColumns(schema);
+        if (pkInfo.columnNames.length === 0) {
+            throw new Error(
+                `deleteVariant: base schema has no primary key declared.`
+            );
+        }
+        if (pkInfo.columnNames.length > 1) {
+            throw new Error(
+                `deleteVariant: composite primary keys are not supported for variant deletes.`
+            );
+        }
         const pkColName = pkInfo.columnNames[0];
 
         if (spec.storage === 'sti') {

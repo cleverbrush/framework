@@ -19,7 +19,7 @@ EF-Core-like typed ORM layer on top of [`@cleverbrush/knex-schema`](../knex-sche
 npm install @cleverbrush/orm
 ```
 
-`knex` and `@cleverbrush/knex-schema` are peer dependencies.
+`knex` is a peer dependency (install it alongside `@cleverbrush/orm`). `@cleverbrush/knex-schema` is a direct dependency and is installed automatically.
 
 ---
 

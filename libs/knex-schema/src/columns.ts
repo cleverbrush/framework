@@ -67,11 +67,11 @@ export function buildColumnMap(
  */
 function jsonPathRaw(knex: Knex, col: string, jsonPath: string[]): Knex.Raw {
     if (jsonPath.length === 1) {
-        return knex.raw('??->?', [col, jsonPath[0]]);
+        return knex.raw('??->>?', [col, jsonPath[0]]);
     }
     // #>> expects a text array literal, e.g. '{address,city}'
     const pathLiteral = `{${jsonPath.join(',')}}`;
-    return knex.raw('??#>?', [col, pathLiteral]);
+    return knex.raw('??#>>?', [col, pathLiteral]);
 }
 
 /**
