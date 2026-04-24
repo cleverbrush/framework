@@ -68,9 +68,9 @@ export default function OrmPage() {
                         </li>
                         <li>
                             <strong>Relation graph saves</strong> — pass a
-                            nested object graph to <code>db.users.save()</code>;
-                            the ORM propagates PKs and FKs in the right order
-                            inside a transaction.
+                            nested object graph to <code>db.users.save()</code>
+                            {';'} the ORM propagates PKs and FKs in the right
+                            order inside a transaction.
                         </li>
                         <li>
                             <strong>Optimistic concurrency</strong> — mark any
@@ -271,17 +271,21 @@ const ActivityEntity = defineEntity(ActivityBase)
 
 const db = createDb(knex, { activities: ActivityEntity });
 
-// Insert a specific variant
-const activity = await db.activities.insertVariant('assigned', {
-    todoId: 42, assigneeId: 9,
-});
-// activity.type === 'assigned'
-// activity.assigneeId === 9
+// Get a typed view scoped to one variant (analogous to EF Core Set<T>())
+const assigned = db.activities.ofVariant('assigned');
 
-// Find / update / delete a specific variant
-const found  = await db.activities.findVariant('assigned', activityId);
-await db.activities.where(t => t.id, 3).updateVariant('assigned', { assigneeId: 99 });
-await db.activities.where(t => t.id, 3).deleteVariant('assigned');`)
+// Insert — discriminator is set automatically
+const activity = await assigned.insert({ todoId: 42, assigneeId: 9 });
+// activity.type === 'assigned', activity.assigneeId === 9
+
+// Find by PK, typed to the variant
+const found = await assigned.find(activity.id);
+
+// Update rows matching a WHERE clause
+await assigned.where(t => t.id, 3).update({ assigneeId: 99 });
+
+// Delete rows matching a WHERE clause
+await assigned.where(t => t.id, 3).delete();`)
                             }}
                         />
                     </pre>
@@ -403,13 +407,14 @@ npx cb-orm db push`
                                 <tr>
                                     <td>
                                         <code>
-                                            db.&lt;set&gt;.insertVariant(key,
-                                            payload)
+                                            db.&lt;set&gt;.ofVariant(key)
                                         </code>
                                     </td>
                                     <td>
-                                        Insert a polymorphic variant row (STI /
-                                        CTI)
+                                        Return a typed <code>VariantDbSet</code>{' '}
+                                        scoped to a polymorphic variant —
+                                        analogous to EF Core{"'s"}{' '}
+                                        <code>Set&lt;DerivedType&gt;()</code>
                                     </td>
                                 </tr>
                                 <tr>

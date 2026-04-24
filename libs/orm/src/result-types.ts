@@ -208,6 +208,15 @@ export type VariantUpdatePayload<
  */
 export type { ExtractBranch };
 
+/**
+ * `true` when `TEntity` is a polymorphic entity (has at least one variant
+ * declared via `.stiVariant()` / `.ctiVariant()`); `false` otherwise.
+ *
+ * @public
+ */
+export type HasVariants<TEntity extends Entity<any, any, any>> =
+    EntityResultByVariant<TEntity> extends never ? false : true;
+
 type EntityFromForeign<F> =
     F extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
         ? Entity<F, any>

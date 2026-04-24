@@ -11,6 +11,7 @@
 // same underlying builder.
 
 import type {
+    ColumnRef,
     Entity,
     EntityRelations,
     EntitySchema,
@@ -18,6 +19,7 @@ import type {
 } from '@cleverbrush/knex-schema';
 import {
     getPrimaryKeyColumns,
+    getVariants,
     type SchemaQueryBuilder,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
@@ -125,38 +127,6 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
     findMany(
         pks: ReadonlyArray<PrimaryKeyValueOf<EntitySchema<TEntity>>>
     ): Promise<TResult[]>;
-
-    /**
-     * Update variant-specific columns for all rows matching the current
-     * WHERE clause whose discriminator equals `variantKey`.
-     *
-     * For CTI variants only the variant table is updated. For STI variants
-     * the base table is updated with a discriminator filter applied.
-     *
-     * ```ts
-     * await db.activities
-     *     .where(t => t.id, activityId)
-     *     .updateVariant('assigned', { assigneeId: 10 });
-     * ```
-     */
-    updateVariant<K extends string>(
-        variantKey: K,
-        set: VariantUpdatePayload<TEntity, K>
-    ): Promise<void>;
-
-    /**
-     * Delete rows matching the current WHERE clause for the given variant.
-     *
-     * For CTI: deletes the variant row first (FK-constraint order), then
-     * deletes the base row. Both deletes are atomic.
-     *
-     * ```ts
-     * await db.activities
-     *     .where(t => t.id, activityId)
-     *     .deleteVariant('assigned');
-     * ```
-     */
-    deleteVariant(variantKey: string): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -213,44 +183,109 @@ export interface DbSet<TEntity extends Entity<any, any, any>>
     save(graph: SaveGraph<TEntity>): Promise<EntityResult<TEntity>>;
 
     /**
-     * Transactionally insert a polymorphic entity row for the given variant.
+     * Return a typed variant view pre-filtered to `variantKey`.
      *
-     * For CTI variants, inserts the base row first (with the discriminator
-     * set to `variantKey`), then inserts the variant row with the shared PK.
-     * For STI variants, inserts a single row.
-     *
-     * The discriminator field is set automatically from `variantKey` and
-     * must not be included in `payload`.
+     * Behaves like EF Core's `Set<DerivedType>()`: all reads automatically
+     * filter by the discriminator value, and `insert` / `update` / `delete`
+     * apply the correct single-table (STI) or two-table (CTI) logic.
      *
      * ```ts
-     * const activity = await db.activities.insertVariant('assigned', {
-     *     todoId: 42,
-     *     userId: 7,
-     *     assigneeId: 9,
-     * });
-     * // activity.type === 'assigned'
-     * // activity.assigneeId === 9
+     * const assigned = db.activities.ofVariant('assigned');
+     *
+     * // Insert a new variant row (discriminator set automatically):
+     * await assigned.insert({ todoId: 42, userId: 7, assigneeId: 9 });
+     *
+     * // Update variant-specific columns for matching rows:
+     * await assigned.where(t => t.id, activityId).update({ assigneeId: 10 });
+     *
+     * // Delete variant rows (CTI: variant table first, then base):
+     * await assigned.where(t => t.id, activityId).delete();
+     *
+     * // Find by PK (result is narrowed to the variant branch):
+     * const a = await assigned.find(activityId);
+     * // a.type === 'assigned' and a.assigneeId is available
      * ```
      */
-    insertVariant<K extends string>(
-        variantKey: K,
+    ofVariant<K extends string>(variantKey: K): VariantDbSet<TEntity, K>;
+}
+
+// ---------------------------------------------------------------------------
+// VariantDbSet — typed view scoped to a single polymorphic variant
+// ---------------------------------------------------------------------------
+
+/**
+ * A `DbSet`-like handle scoped to a single polymorphic variant (one branch
+ * of a discriminated union entity). All reads are automatically pre-filtered
+ * by the discriminator; all writes apply the correct STI / CTI logic.
+ *
+ * Obtain via `DbSet.ofVariant('key')` — analogous to EF Core's
+ * `Set<DerivedType>()`.
+ *
+ * @public
+ */
+export interface VariantDbSet<
+    TEntity extends Entity<any, any, any>,
+    K extends string
+> extends Omit<
+        SchemaQueryBuilder<EntitySchema<TEntity>, VariantResult<TEntity, K>>,
+        'include' | 'includeVariant' | 'insert' | 'update' | 'delete' | 'where'
+    > {
+    // Re-declared so that `this` resolves to `VariantDbSet<TEntity, K>`
+    // rather than the raw `SchemaQueryBuilder` (Omit doesn't preserve `this`).
+    where(
+        column: ColumnRef<EntitySchema<TEntity>>,
+        operator: string,
+        value: any
+    ): this;
+    where(column: ColumnRef<EntitySchema<TEntity>>, value: any): this;
+    where(raw: Knex.Raw, operator: string, value: any): this;
+    where(callback: (builder: Knex.QueryBuilder) => void): this;
+    where(record: Record<string, any>): this;
+    where(raw: Knex.Raw): this;
+    /**
+     * Eager-load a relation declared on `TEntity`. Identical to
+     * {@link EntityQuery.include}.
+     */
+    include<R extends keyof EntityRelations<TEntity> & string>(
+        sel: (t: RelKeyTree<TEntity>) => R,
+        customize?: (q: SchemaQueryBuilder<any, any>) => void
+    ): VariantDbSet<TEntity, K>;
+
+    /** Look up a single row by PK, typed to this variant. */
+    find(
+        pk: PrimaryKeyValueOf<EntitySchema<TEntity>>
+    ): Promise<VariantResult<TEntity, K> | undefined>;
+
+    /** Like {@link find} but throws {@link EntityNotFoundError} when absent. */
+    findOrFail(
+        pk: PrimaryKeyValueOf<EntitySchema<TEntity>>
+    ): Promise<VariantResult<TEntity, K>>;
+
+    /** Look up multiple rows by PK, typed to this variant. */
+    findMany(
+        pks: ReadonlyArray<PrimaryKeyValueOf<EntitySchema<TEntity>>>
+    ): Promise<VariantResult<TEntity, K>[]>;
+
+    /**
+     * Insert a new variant row. The discriminator is set automatically.
+     *
+     * For CTI: inserts the base row first, then the variant row (transactional).
+     */
+    insert(
         payload: VariantInsertPayload<TEntity, K>
     ): Promise<VariantResult<TEntity, K>>;
 
     /**
-     * Find a single entity by primary key, restricting to the given variant.
-     * Returns the merged base + variant row narrowed to the matching branch,
-     * or `undefined` when no row exists.
-     *
-     * ```ts
-     * const a = await db.activities.findVariant('assigned', activityId);
-     * // → { type: 'assigned'; assigneeId: number; … } | undefined
-     * ```
+     * Update variant-specific columns for rows matched by the current
+     * WHERE clause. For CTI, only the variant table is updated.
      */
-    findVariant<K extends string>(
-        variantKey: K,
-        pk: PrimaryKeyValueOf<EntitySchema<TEntity>>
-    ): Promise<VariantResult<TEntity, K> | undefined>;
+    update(patch: VariantUpdatePayload<TEntity, K>): Promise<void>;
+
+    /** Delete rows matched by the current WHERE clause (CTI: atomic). */
+    delete(): Promise<void>;
+
+    /** Return a new variant view bound to `trx`. */
+    withTransaction(trx: Knex.Transaction): VariantDbSet<TEntity, K>;
 }
 
 // ---------------------------------------------------------------------------
@@ -294,7 +329,7 @@ function getEntityKeyTree(
 function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
     sqb: SchemaQueryBuilder<EntitySchema<TEntity>, TResult>,
     entity: TEntity,
-    knexInst: Knex,
+    _knexInst: Knex,
     onResults?: (items: unknown[]) => unknown[] | undefined
 ): EntityQuery<TEntity, TResult> {
     const proxy: EntityQuery<TEntity, TResult> = new Proxy(
@@ -356,74 +391,21 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                     );
                 }
 
-                if (prop === 'updateVariant') {
-                    return async (
-                        variantKey: string,
-                        set: Record<string, unknown>
-                    ): Promise<void> => {
-                        const pkInfo = getPrimaryKeyColumns(
-                            entity.schema as Parameters<
-                                typeof getPrimaryKeyColumns
-                            >[0]
-                        );
-                        const rows = (await (
-                            proxy as unknown as {
-                                execute: () => Promise<
-                                    Array<Record<string, unknown>>
-                                >;
-                            }
-                        ).execute()) as Array<Record<string, unknown>>;
-                        const pkProp = pkInfo.propertyKeys[0];
-                        const pkValues = rows
-                            .map(r => r[pkProp])
-                            .filter(v => v !== undefined);
-                        const maybeTrx = (
-                            knexInst as unknown as { isTransaction?: boolean }
-                        ).isTransaction
-                            ? (knexInst as unknown as Knex.Transaction)
-                            : undefined;
-                        await _updateVariant(
-                            knexInst,
-                            entity.schema,
-                            variantKey,
-                            set,
-                            pkValues,
-                            maybeTrx
-                        );
-                    };
-                }
-
-                if (prop === 'deleteVariant') {
-                    return async (variantKey: string): Promise<void> => {
-                        const pkInfo = getPrimaryKeyColumns(
-                            entity.schema as Parameters<
-                                typeof getPrimaryKeyColumns
-                            >[0]
-                        );
-                        const rows = (await (
-                            proxy as unknown as {
-                                execute: () => Promise<
-                                    Array<Record<string, unknown>>
-                                >;
-                            }
-                        ).execute()) as Array<Record<string, unknown>>;
-                        const pkProp = pkInfo.propertyKeys[0];
-                        const pkValues = rows
-                            .map(r => r[pkProp])
-                            .filter(v => v !== undefined);
-                        const maybeTrx = (
-                            knexInst as unknown as { isTransaction?: boolean }
-                        ).isTransaction
-                            ? (knexInst as unknown as Knex.Transaction)
-                            : undefined;
-                        await _deleteVariant(
-                            knexInst,
-                            entity.schema,
-                            variantKey,
-                            pkValues,
-                            maybeTrx
-                        );
-                    };
+                // Guard: block direct update/delete/insert on polymorphic
+                // entities — callers must use db.set.ofVariant('key').op().
+                if (
+                    prop === 'update' ||
+                    prop === 'delete' ||
+                    prop === 'insert'
+                ) {
+                    if (getVariants((entity as any).schema)) {
+                        return () => {
+                            throw new Error(
+                                `${String(prop)}() cannot be called directly on a polymorphic entity set. ` +
+                                    `Use db.set.ofVariant('key').${String(prop)}() instead.`
+                            );
+                        };
+                    }
                 }
 
                 const value = Reflect.get(target, prop, receiver);
@@ -693,63 +675,19 @@ export function makeDbSet<TEntity extends Entity<any, any, any>>(
                     ) as Promise<unknown>;
                 };
             }
-            if (prop === 'insertVariant') {
-                return async (
-                    variantKey: string,
-                    payload: Record<string, unknown>
-                ) => {
-                    const maybeTrx = (
-                        knex as unknown as { isTransaction?: boolean }
-                    ).isTransaction
-                        ? (knex as unknown as Knex.Transaction)
-                        : undefined;
-                    const result = await _insertVariant(
-                        knex,
-                        entity.schema,
-                        variantKey,
-                        payload,
-                        maybeTrx
-                    );
-                    if (
-                        onResults &&
-                        result != null &&
-                        typeof result === 'object'
-                    ) {
-                        onResults([result]);
+            if (prop === 'ofVariant') {
+                return (variantKey: string) => {
+                    if (!getVariants((entity as any).schema)) {
+                        throw new Error(
+                            `ofVariant(): entity schema is not polymorphic (no variants declared).`
+                        );
                     }
-                    return result;
-                };
-            }
-            if (prop === 'findVariant') {
-                return async (
-                    variantKey: string,
-                    pk: unknown
-                ): Promise<unknown> => {
-                    // Build a fresh query, filter by PK, then execute
-                    const fresh = schemaQuery(
+                    return makeVariantDbSet(
                         knex,
-                        entity.schema as EntitySchema<TEntity>
-                    );
-                    const q = wrapQuery(
-                        fresh as SchemaQueryBuilder<
-                            EntitySchema<TEntity>,
-                            EntityResult<TEntity>
-                        >,
                         entity,
-                        knex,
+                        variantKey,
                         onResults
                     );
-                    // Apply variant filter (select only this variant)
-                    (
-                        q as unknown as {
-                            selectVariants: (keys: string[]) => void;
-                        }
-                    ).selectVariants?.([variantKey]);
-                    return (
-                        q as unknown as {
-                            find: (pk: unknown) => Promise<unknown>;
-                        }
-                    ).find(pk);
                 };
             }
             // Any other property/method: allocate a fresh query and
@@ -774,5 +712,315 @@ export function makeDbSet<TEntity extends Entity<any, any, any>>(
             return (value as Function).bind(query);
         }
     }) as DbSet<TEntity>;
+    return proxy;
+}
+
+// ---------------------------------------------------------------------------
+// VariantDbSet runtime
+// ---------------------------------------------------------------------------
+
+/**
+ * Wrap an SQB (which must already have `selectVariants([variantKey])` applied)
+ * in a proxy that routes `insert`, `update`, and `delete` through the
+ * variant-aware helpers, and re-wraps `this`-returning chain methods so that
+ * chains stay within the variant proxy rather than escaping to a plain
+ * `SchemaQueryBuilder`.
+ *
+ * @internal
+ */
+function wrapVariantQuery<
+    TEntity extends Entity<any, any, any>,
+    K extends string
+>(
+    sqb: SchemaQueryBuilder<EntitySchema<TEntity>, VariantResult<TEntity, K>>,
+    entity: TEntity,
+    variantKey: K,
+    knexInst: Knex,
+    onResults?: (items: unknown[]) => unknown[] | undefined
+): VariantDbSet<TEntity, K> {
+    const proxy: VariantDbSet<TEntity, K> = new Proxy(
+        sqb as unknown as object,
+        {
+            get(target, prop, receiver) {
+                // --- Typed include override (same as wrapQuery) ---
+                if (prop === 'include') {
+                    return (
+                        sel: (t: Record<string, string>) => string,
+                        customize?: (q: SchemaQueryBuilder<any, any>) => void
+                    ) => {
+                        const name = sel(getEntityKeyTree(entity));
+                        (
+                            sqb as unknown as {
+                                include: (
+                                    n: string,
+                                    c?: (
+                                        q: SchemaQueryBuilder<any, any>
+                                    ) => void
+                                ) => void;
+                            }
+                        ).include(name, customize);
+                        return proxy;
+                    };
+                }
+                if (prop === 'includeVariant') {
+                    return (
+                        vk: string,
+                        relationName: string,
+                        customize?: (q: SchemaQueryBuilder<any, any>) => void
+                    ) => {
+                        (
+                            sqb as unknown as {
+                                includeVariant: (
+                                    v: string,
+                                    r: string,
+                                    c?: (
+                                        q: SchemaQueryBuilder<any, any>
+                                    ) => void
+                                ) => void;
+                            }
+                        ).includeVariant(vk, relationName, customize);
+                        return proxy;
+                    };
+                }
+
+                if (prop === '_sqb') return sqb;
+                if (prop === '_entity') return entity;
+
+                // --- find* delegated to the shared helper ---
+                if (
+                    prop === 'find' ||
+                    prop === 'findOrFail' ||
+                    prop === 'findMany'
+                ) {
+                    return makeFindMethod(
+                        prop as 'find' | 'findOrFail' | 'findMany',
+                        sqb as unknown as SchemaQueryBuilder<any, any>,
+                        entity,
+                        proxy as unknown as EntityQuery<
+                            TEntity,
+                            VariantResult<TEntity, K>
+                        >
+                    );
+                }
+
+                // --- Variant-aware insert ---
+                if (prop === 'insert') {
+                    return async (
+                        payload: Record<string, unknown>
+                    ): Promise<unknown> => {
+                        const maybeTrx = (
+                            knexInst as unknown as { isTransaction?: boolean }
+                        ).isTransaction
+                            ? (knexInst as unknown as Knex.Transaction)
+                            : undefined;
+                        const result = await _insertVariant(
+                            knexInst,
+                            entity.schema,
+                            variantKey,
+                            payload,
+                            maybeTrx
+                        );
+                        if (
+                            onResults &&
+                            result != null &&
+                            typeof result === 'object'
+                        ) {
+                            onResults([result]);
+                        }
+                        return result;
+                    };
+                }
+
+                // --- Variant-aware update (collect PKs first, then UPDATE) ---
+                if (prop === 'update') {
+                    return async (
+                        set: Record<string, unknown>
+                    ): Promise<void> => {
+                        const pkInfo = getPrimaryKeyColumns(
+                            entity.schema as Parameters<
+                                typeof getPrimaryKeyColumns
+                            >[0]
+                        );
+                        const rows = (await (
+                            proxy as unknown as {
+                                execute: () => Promise<
+                                    Array<Record<string, unknown>>
+                                >;
+                            }
+                        ).execute()) as Array<Record<string, unknown>>;
+                        const pkProp = pkInfo.propertyKeys[0];
+                        const pkValues = rows
+                            .map(r => r[pkProp])
+                            .filter(v => v !== undefined);
+                        const maybeTrx = (
+                            knexInst as unknown as { isTransaction?: boolean }
+                        ).isTransaction
+                            ? (knexInst as unknown as Knex.Transaction)
+                            : undefined;
+                        await _updateVariant(
+                            knexInst,
+                            entity.schema,
+                            variantKey,
+                            set,
+                            pkValues,
+                            maybeTrx
+                        );
+                    };
+                }
+
+                // --- Variant-aware delete (collect PKs first, then DELETE) ---
+                if (prop === 'delete') {
+                    return async (): Promise<void> => {
+                        const pkInfo = getPrimaryKeyColumns(
+                            entity.schema as Parameters<
+                                typeof getPrimaryKeyColumns
+                            >[0]
+                        );
+                        const rows = (await (
+                            proxy as unknown as {
+                                execute: () => Promise<
+                                    Array<Record<string, unknown>>
+                                >;
+                            }
+                        ).execute()) as Array<Record<string, unknown>>;
+                        const pkProp = pkInfo.propertyKeys[0];
+                        const pkValues = rows
+                            .map(r => r[pkProp])
+                            .filter(v => v !== undefined);
+                        const maybeTrx = (
+                            knexInst as unknown as { isTransaction?: boolean }
+                        ).isTransaction
+                            ? (knexInst as unknown as Knex.Transaction)
+                            : undefined;
+                        await _deleteVariant(
+                            knexInst,
+                            entity.schema,
+                            variantKey,
+                            pkValues,
+                            maybeTrx
+                        );
+                    };
+                }
+
+                // --- Catch-all: forward to SQB; re-wrap this-returning calls ---
+                const value = Reflect.get(target, prop, receiver);
+                if (typeof value !== 'function') return value;
+                return function (this: unknown, ...args: unknown[]) {
+                    const result = (value as Function).apply(sqb, args);
+                    if (result === sqb) return proxy;
+                    if (
+                        onResults != null &&
+                        result != null &&
+                        typeof (result as any).then === 'function'
+                    ) {
+                        return (result as Promise<unknown>).then(
+                            (resolved: unknown) => {
+                                if (Array.isArray(resolved)) {
+                                    const entities = resolved.filter(
+                                        r =>
+                                            r !== null &&
+                                            r !== undefined &&
+                                            typeof r === 'object'
+                                    );
+                                    if (entities.length > 0) {
+                                        const mapped = onResults(entities);
+                                        if (mapped) {
+                                            const entityToMapped = new Map<
+                                                unknown,
+                                                unknown
+                                            >();
+                                            for (
+                                                let i = 0;
+                                                i < entities.length;
+                                                i++
+                                            ) {
+                                                entityToMapped.set(
+                                                    entities[i],
+                                                    mapped[i]
+                                                );
+                                            }
+                                            return resolved.map(
+                                                r => entityToMapped.get(r) ?? r
+                                            );
+                                        }
+                                    }
+                                } else if (
+                                    resolved !== null &&
+                                    resolved !== undefined &&
+                                    typeof resolved === 'object'
+                                ) {
+                                    const mapped = onResults([resolved]);
+                                    if (mapped && mapped.length > 0)
+                                        return mapped[0];
+                                }
+                                return resolved;
+                            }
+                        );
+                    }
+                    return result;
+                };
+            }
+        }
+    ) as unknown as VariantDbSet<TEntity, K>;
+    return proxy;
+}
+
+/**
+ * Construct a typed {@link VariantDbSet} scoped to `variantKey`.
+ *
+ * Every method invocation allocates a fresh `SchemaQueryBuilder` with
+ * `selectVariants([variantKey])` pre-applied so that reads are automatically
+ * filtered to the correct discriminator value.
+ *
+ * @internal — obtain via `DbSet.ofVariant('key')`.
+ */
+function makeVariantDbSet<
+    TEntity extends Entity<any, any, any>,
+    K extends string
+>(
+    knex: Knex,
+    entity: TEntity,
+    variantKey: K,
+    onResults?: (items: unknown[]) => unknown[] | undefined
+): VariantDbSet<TEntity, K> {
+    const proxy: VariantDbSet<TEntity, K> = new Proxy({} as object, {
+        get(_target, prop) {
+            if (prop === 'withTransaction') {
+                return (trx: Knex.Transaction) =>
+                    makeVariantDbSet(
+                        trx as unknown as Knex,
+                        entity,
+                        variantKey,
+                        onResults
+                    );
+            }
+            // Allocate a fresh SQB with the variant filter baked in, then
+            // wrap it in the variant-aware query proxy.
+            const fresh = schemaQuery(
+                knex,
+                entity.schema as EntitySchema<TEntity>
+            );
+            (
+                fresh as unknown as {
+                    selectVariants?: (keys: string[]) => void;
+                }
+            ).selectVariants?.([variantKey]);
+            const query = wrapVariantQuery(
+                fresh as SchemaQueryBuilder<
+                    EntitySchema<TEntity>,
+                    VariantResult<TEntity, K>
+                >,
+                entity,
+                variantKey,
+                knex,
+                onResults
+            );
+            const value = (
+                query as unknown as Record<string | symbol, unknown>
+            )[prop];
+            if (typeof value !== 'function') return value;
+            return (value as Function).bind(query);
+        }
+    }) as VariantDbSet<TEntity, K>;
     return proxy;
 }

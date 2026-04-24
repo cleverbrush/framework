@@ -843,10 +843,10 @@ const ActivityEntityCTI = defineEntity(CTIBaseSchema)
     );
 
 // ---------------------------------------------------------------------------
-// insertVariant
+// DbSet.ofVariant — insert
 // ---------------------------------------------------------------------------
 
-describe('DbSet.insertVariant', () => {
+describe('DbSet.ofVariant — insert', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
@@ -868,7 +868,7 @@ describe('DbSet.insertVariant', () => {
         ]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
-        const result = await db.activities.insertVariant('assigned', {
+        const result = await db.activities.ofVariant('assigned').insert({
             todoId: 42,
             userId: 7,
             assigneeId: 9
@@ -889,7 +889,7 @@ describe('DbSet.insertVariant', () => {
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntityCTI });
-        const result = await db.activities.insertVariant('assigned', {
+        const result = await db.activities.ofVariant('assigned').insert({
             todoId: 42,
             assigneeId: 9
         });
@@ -916,7 +916,7 @@ describe('DbSet.insertVariant', () => {
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntityCTI });
-        await db.activities.insertVariant('commented', {
+        await db.activities.ofVariant('commented').insert({
             todoId: 1,
             body: 'hi'
         });
@@ -931,25 +931,25 @@ describe('DbSet.insertVariant', () => {
 
     it('throws when the schema is not polymorphic', async () => {
         const db = createDb(mock.knex, { users: UserEntity });
-        await expect(
-            (db.users as any).insertVariant('foo', {})
-        ).rejects.toThrow(/not polymorphic/i);
+        expect(() => (db.users as any).ofVariant('foo')).toThrow(
+            /not polymorphic/i
+        );
     });
 
     it('throws when the variant key is unknown', async () => {
         stubTransaction();
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
         await expect(
-            db.activities.insertVariant('nonexistent' as any, {})
+            db.activities.ofVariant('nonexistent' as any).insert({})
         ).rejects.toThrow(/unknown/i);
     });
 });
 
 // ---------------------------------------------------------------------------
-// updateVariant (via EntityQuery chain)
+// VariantDbSet.update (via ofVariant chain)
 // ---------------------------------------------------------------------------
 
-describe('EntityQuery.updateVariant', () => {
+describe('VariantDbSet.update', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
@@ -974,8 +974,9 @@ describe('EntityQuery.updateVariant', () => {
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
         await db.activities
+            .ofVariant('assigned')
             .where(t => t.id, 3)
-            .updateVariant('assigned', { assigneeId: 99 });
+            .update({ assigneeId: 99 });
 
         const updates = mock.captured.filter(c => /^update /i.test(c.sql));
         expect(updates).toHaveLength(1);
@@ -992,8 +993,9 @@ describe('EntityQuery.updateVariant', () => {
 
         const db = createDb(mock.knex, { activities: ActivityEntityCTI });
         await db.activities
+            .ofVariant('assigned')
             .where(t => t.id, 5)
-            .updateVariant('assigned', { assigneeId: 10 });
+            .update({ assigneeId: 10 });
 
         const updates = mock.captured.filter(c => /^update /i.test(c.sql));
         expect(updates).toHaveLength(1);
@@ -1007,8 +1009,9 @@ describe('EntityQuery.updateVariant', () => {
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
         await db.activities
+            .ofVariant('assigned')
             .where(t => t.id, 999)
-            .updateVariant('assigned', { assigneeId: 1 });
+            .update({ assigneeId: 1 });
 
         const updates = mock.captured.filter(c => /^update /i.test(c.sql));
         expect(updates).toHaveLength(0);
@@ -1016,10 +1019,10 @@ describe('EntityQuery.updateVariant', () => {
 });
 
 // ---------------------------------------------------------------------------
-// deleteVariant (via EntityQuery chain)
+// VariantDbSet.delete (via ofVariant chain)
 // ---------------------------------------------------------------------------
 
-describe('EntityQuery.deleteVariant', () => {
+describe('VariantDbSet.delete', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
@@ -1042,7 +1045,10 @@ describe('EntityQuery.deleteVariant', () => {
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
-        await db.activities.where(t => t.id, 2).deleteVariant('commented');
+        await db.activities
+            .ofVariant('commented')
+            .where(t => t.id, 2)
+            .delete();
 
         const deletes = mock.captured.filter(c => /^delete /i.test(c.sql));
         expect(deletes).toHaveLength(1);
@@ -1059,7 +1065,10 @@ describe('EntityQuery.deleteVariant', () => {
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntityCTI });
-        await db.activities.where(t => t.id, 7).deleteVariant('assigned');
+        await db.activities
+            .ofVariant('assigned')
+            .where(t => t.id, 7)
+            .delete();
 
         const deletes = mock.captured.filter(c => /^delete /i.test(c.sql));
         expect(deletes).toHaveLength(2);
@@ -1073,7 +1082,10 @@ describe('EntityQuery.deleteVariant', () => {
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
-        await db.activities.where(t => t.id, 0).deleteVariant('assigned');
+        await db.activities
+            .ofVariant('assigned')
+            .where(t => t.id, 0)
+            .delete();
 
         const deletes = mock.captured.filter(c => /^delete /i.test(c.sql));
         expect(deletes).toHaveLength(0);
@@ -1081,10 +1093,10 @@ describe('EntityQuery.deleteVariant', () => {
 });
 
 // ---------------------------------------------------------------------------
-// findVariant
+// VariantDbSet.find
 // ---------------------------------------------------------------------------
 
-describe('DbSet.findVariant', () => {
+describe('VariantDbSet.find', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
@@ -1099,7 +1111,7 @@ describe('DbSet.findVariant', () => {
         ]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
-        const result = await db.activities.findVariant('assigned', 3);
+        const result = await db.activities.ofVariant('assigned').find(3);
         expect(result).toMatchObject({ id: 3, type: 'assigned' });
     });
 
@@ -1107,7 +1119,7 @@ describe('DbSet.findVariant', () => {
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
-        const result = await db.activities.findVariant('assigned', 999);
+        const result = await db.activities.ofVariant('assigned').find(999);
         expect(result).toBeUndefined();
     });
 
@@ -1115,7 +1127,7 @@ describe('DbSet.findVariant', () => {
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
-        await db.activities.findVariant('assigned', 42);
+        await db.activities.ofVariant('assigned').find(42);
 
         expect(mock.captured).toHaveLength(1);
         expect(mock.captured[0].sql).toContain('"id"');
@@ -1928,7 +1940,7 @@ describe('Tracked DbContext — insertVariant tracking', () => {
             { activities: ActivityEntitySTI },
             { tracking: true }
         );
-        const result = await db.activities.insertVariant('assigned', {
+        const result = await db.activities.ofVariant('assigned').insert({
             todoId: 42,
             userId: 1,
             assigneeId: 9

@@ -18,7 +18,7 @@ export type {
     TrackedDbContext
 } from './dbcontext.js';
 export { createDb } from './dbcontext.js';
-export type { DbSet, EntityQuery } from './dbset.js';
+export type { DbSet, EntityQuery, VariantDbSet } from './dbset.js';
 export {
     ConcurrencyError,
     EntityNotFoundError,
@@ -29,6 +29,7 @@ export type {
     EntityResult,
     EntityResultByVariant,
     ExtractBranch,
+    HasVariants,
     RelKeyTree,
     ResolvedRel,
     SaveGraph,

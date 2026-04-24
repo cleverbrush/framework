@@ -26,10 +26,17 @@ A typed ORM layer built on top of `@cleverbrush/knex-schema` that provides:
 - **`DbSet<TEntity>`** — typed query starter with:
   - `.find(pk)` / `.findOrFail(pk)` / `.findMany([pk…])` — PK-based lookups
   - `.save(graph)` — transactional graph persistence with FK propagation
-  - `.insertVariant(key, payload)` — insert STI/CTI polymorphic rows
-  - `.updateVariant(key, set)` / `.deleteVariant(key)` — polymorphic UPDATE/DELETE
-  - `.findVariant(key, pk)` — polymorphic single-row lookup
+  - `.ofVariant(key)` — return a typed `VariantDbSet` scoped to a polymorphic variant
+    (analogous to EF Core's `Set<DerivedType>()`)
   - All `SchemaQueryBuilder` methods (`.where()`, `.include()`, `.execute()`, etc.)
+
+- **`VariantDbSet<TEntity, K>`** — typed handle for a single polymorphic variant:
+  - `.insert(payload)` — insert with discriminator set automatically (STI/CTI aware)
+  - `.update(patch)` / `.delete()` — scoped writes for rows matched by `.where()`
+  - `.find(pk)` / `.findOrFail(pk)` / `.findMany([pk…])` — variant-typed lookups
+  - `.where()` / `.include()` / `.withTransaction()` — full chain support
+  - Calling `.insert()` / `.update()` / `.delete()` on the base polymorphic `DbSet`
+    throws a runtime error; use `.ofVariant(key)` instead
 
 - **`TrackedDbContext`** additions:
   - Identity map — same PK always returns the same object reference

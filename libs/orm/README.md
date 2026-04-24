@@ -81,8 +81,7 @@ const updated = await db.users.save({ id: 1, email: 'alice@example.com', name: '
 | `.where(col, value)` | Adds a `WHERE` predicate (chainable) |
 | `.include(t => t.rel)` | Eager-loads a relation (chainable) |
 | `.save(graph)` | Insert or update a row graph (transactional) |
-| `.insertVariant(key, payload)` | Insert a polymorphic variant row |
-| `.findVariant(key, pk)` | Find a single polymorphic variant row by PK |
+| `.ofVariant(key)` | Return a typed `VariantDbSet` scoped to a polymorphic variant |
 | `.query()` | Returns the underlying `EntityQuery` for advanced querying |
 | `.withTransaction(trx)` | Returns a new `DbSet` bound to an existing transaction |
 
@@ -257,8 +256,14 @@ const ActivityEntity = defineEntity(ActivityBase)
 
 ### Querying variants
 
+Call `db.set.ofVariant('key')` to obtain a **`VariantDbSet`** — a typed view
+scoped to that variant, analogous to EF Core's `Set<DerivedType>()`.  All
+reads are pre-filtered by the discriminator; writes use the correct STI / CTI
+logic automatically.
+
 ```ts
-const activity = await db.activities.insertVariant('assigned', {
+// Insert a new variant row (discriminator is set automatically)
+const activity = await db.activities.ofVariant('assigned').insert({
     todoId:     42,
     assigneeId: 9,
 });
@@ -266,14 +271,32 @@ const activity = await db.activities.insertVariant('assigned', {
 // activity.assigneeId === 9
 
 // Find a single variant by PK
-const found = await db.activities.findVariant('assigned', activityId);
+const found = await db.activities.ofVariant('assigned').find(activityId);
 
-// Update matching rows
-await db.activities.where(t => t.id, 3).updateVariant('assigned', { assigneeId: 99 });
+// Update matching rows  (chain .where() before .update())
+await db.activities.ofVariant('assigned').where(t => t.id, 3).update({ assigneeId: 99 });
 
 // Delete matching rows
-await db.activities.where(t => t.id, 3).deleteVariant('assigned');
+await db.activities.ofVariant('assigned').where(t => t.id, 3).delete();
 ```
+
+### `VariantDbSet<TEntity, K>` API
+
+| Method | Description |
+|--------|-------------|
+| `.insert(payload)` | Insert a new variant row; discriminator is set automatically |
+| `.update(patch)` | Update variant columns for rows matched by the current `WHERE` clause |
+| `.delete()` | Delete rows matched by the current `WHERE` clause (CTI: atomic) |
+| `.find(pk)` | Find a single variant row by PK; `undefined` if not found |
+| `.findOrFail(pk)` | Like `.find`, but throws `EntityNotFoundError` |
+| `.findMany([pk…])` | Fetch multiple variant rows by PK in one query |
+| `.where(col, value)` | Adds a `WHERE` predicate (chainable; returns `VariantDbSet`) |
+| `.include(t => t.rel)` | Eager-loads a relation (chainable; returns `VariantDbSet`) |
+| `.withTransaction(trx)` | Returns a new `VariantDbSet` bound to an existing transaction |
+
+Calling `.insert()` / `.update()` / `.delete()` directly on the polymorphic
+base `DbSet` (without `ofVariant`) throws a runtime error — use `ofVariant`
+for all writes on polymorphic entities.
 
 ---
 

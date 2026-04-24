@@ -220,7 +220,7 @@ export const sendTodoEventHandler: Handler<
         });
     }
 
-    // Use insertVariant — handles the two-table CTI transaction automatically
+    // Use ofVariant — handles the two-table CTI transaction automatically
     // (base row into todo_activity, variant row into the matching variant table).
     const basePayload = {
         todoId: params.id,
@@ -229,17 +229,17 @@ export const sendTodoEventHandler: Handler<
 
     let row: Record<string, unknown>;
     if (body.type === 'assigned') {
-        row = await db.todoActivity.insertVariant('assigned', {
+        row = await db.todoActivity.ofVariant('assigned').insert({
             ...basePayload,
             assignedToUserId: body.assignedTo
         });
     } else if (body.type === 'commented') {
-        row = await db.todoActivity.insertVariant('commented', {
+        row = await db.todoActivity.ofVariant('commented').insert({
             ...basePayload,
             comment: body.comment
         });
     } else {
-        row = await db.todoActivity.insertVariant('completed', {
+        row = await db.todoActivity.ofVariant('completed').insert({
             ...basePayload,
             ...(body.completedAt ? { completedAt: body.completedAt } : {})
         });
