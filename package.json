@@ -26,7 +26,13 @@
         "test": "vitest --run --typecheck",
         "test:coverage": "vitest --run --coverage && node scripts/update-coverage-badges.js",
         "bench": "vitest bench --run",
-        "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json"
+        "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json",
+        "dev:demo": "./scripts/dev-demo.sh",
+        "dev:demo:stop": "./scripts/dev-demo-stop.sh",
+        "test:e2e": "npm run test -w @cleverbrush/demo-e2e",
+        "test:e2e:api": "npm run test:api -w @cleverbrush/demo-e2e",
+        "test:e2e:ui": "npm run test:ui -w @cleverbrush/demo-e2e",
+        "test:e2e:reset": "RESET=1 npm run test -w @cleverbrush/demo-e2e"
     },
     "workspaces": [
         "./libs/*",
@@ -40,10 +46,12 @@
     "license": "BSD 3-Clause",
     "type": "module",
     "devDependencies": {
+        "@playwright/mcp": "^0.0.70",
         "@biomejs/biome": "^2.4.9",
         "@changesets/cli": "^2.30.0",
         "@testing-library/react": "^16.3.2",
         "@vitest/coverage-v8": "^4.1.2",
+        "concurrently": "^9.1.0",
         "jsdom": "^29.0.1",
         "tsup": "^8.5.1",
         "turbo": "^2.8.21",
