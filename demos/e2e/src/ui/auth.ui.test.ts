@@ -1,8 +1,7 @@
-import { afterAll, describe, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { closePool, getUserByEmail } from '../support/db.js';
 import { uniqueEmail } from '../support/ids.js';
 import { closeBrowser, withPage } from '../support/playwright.js';
-import { expect } from 'vitest';
 
 afterAll(async () => {
     await closeBrowser();

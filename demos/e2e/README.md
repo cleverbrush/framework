@@ -50,9 +50,9 @@ cd demos/e2e && npx playwright install chromium
 | `E2E_CLICKHOUSE_PASSWORD` | `api`                    | ClickHouse password.                                                                   |
 | `E2E_PG_HOST`             | `localhost`              | Postgres host.                                                                         |
 | `E2E_PG_PORT`             | `5445`                   | Postgres port (matches `demos/docker-compose.yml`).                                    |
-| `E2E_PG_DB`               | `todos`                  | Postgres database.                                                                     |
-| `E2E_PG_USER`             | `postgres`               | Postgres user.                                                                         |
-| `E2E_PG_PASSWORD`         | `postgres`               | Postgres password.                                                                     |
+| `E2E_PG_DATABASE`         | `todo_db`                | Postgres database.                                                                     |
+| `E2E_PG_USER`             | `todo_user`              | Postgres user.                                                                         |
+| `E2E_PG_PASSWORD`         | `todo_secret`            | Postgres password.                                                                     |
 
 ## Stack lifecycle
 
@@ -64,7 +64,7 @@ cd demos/e2e && npx playwright install chromium
    `npm run dev:demo` without conflicts.
 2. **Infrastructure** — always brings up `postgres` and `clickstack`
    (re-using existing containers).
-3. **Health waits** — polls each service for up to 60 s.
+3. **Health waits** — polls each service for up to 120 s.
 4. **Migrations** — `npm run db:run -w @cleverbrush/todo-backend`,
    wrapped in `timeout 60s` because the cb-orm CLI keeps the pg pool
    alive after `Already up to date.` (~30 s before it would exit).

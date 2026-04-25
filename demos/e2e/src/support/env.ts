@@ -26,11 +26,20 @@ export const config = {
     clickhousePassword: process.env.E2E_CLICKHOUSE_PASSWORD || 'api',
     /** Postgres connection (matches docker-compose host-mapped port). */
     postgres: {
-        host: process.env.DB_HOST || 'localhost',
-        port: num(process.env.E2E_DB_PORT, 5445),
-        database: process.env.POSTGRES_DB || 'todo_db',
-        user: process.env.POSTGRES_USER || 'todo_user',
-        password: process.env.POSTGRES_PASSWORD || 'todo_secret'
+        host: process.env.E2E_PG_HOST || process.env.DB_HOST || 'localhost',
+        port: num(process.env.E2E_PG_PORT || process.env.E2E_DB_PORT, 5445),
+        database:
+            process.env.E2E_PG_DATABASE ||
+            process.env.POSTGRES_DB ||
+            'todo_db',
+        user:
+            process.env.E2E_PG_USER ||
+            process.env.POSTGRES_USER ||
+            'todo_user',
+        password:
+            process.env.E2E_PG_PASSWORD ||
+            process.env.POSTGRES_PASSWORD ||
+            'todo_secret'
     },
     /**
      * If true, global setup tears down compose volumes before bringing
