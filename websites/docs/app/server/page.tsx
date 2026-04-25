@@ -502,6 +502,126 @@ await fs.writeFile('asyncapi.json', JSON.stringify(spec, null, 2));`)
                         <code>$ref</code> pointers.
                     </p>
                 </div>
+
+                {/* ── Contract Composition ─────────────────────────── */}
+                <div className="card">
+                    <h2>Contract Composition</h2>
+                    <p>
+                        When an application has distinct audiences — a public
+                        client and an admin panel, for example — you want each
+                        consumer to import only the endpoints it needs. This
+                        keeps admin schemas out of the client bundle and
+                        improves tree-shaking.
+                    </p>
+                    <p>
+                        Import the composition utilities from{' '}
+                        <code>@cleverbrush/server/contract</code>.
+                    </p>
+
+                    <h3>mergeContracts</h3>
+                    <p>
+                        Combine two contracts into one. Groups that share a key
+                        have their endpoint maps shallowly merged; unique groups
+                        are passed through unchanged.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { defineApi, mergeContracts } from '@cleverbrush/server/contract';
+
+// public-api.ts — safe to import in every consumer
+export const publicApi = defineApi({
+    todos: { list: ..., get: ..., create: ... },
+    auth:  { login: ..., register: ... },
+});
+
+// admin-api.ts — only imported by the admin application
+const adminApi = defineApi({
+    admin: { activityLog: ..., banUser: ... },
+});
+
+// admin-app/contract.ts
+export const fullAdminApi = mergeContracts(publicApi, adminApi);
+// TypeScript sees: { todos, auth, admin } — all fully typed
+
+// client-app uses publicApi directly
+// TypeScript sees: { todos, auth } — admin is absent from the bundle`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>pickGroups</h3>
+                    <p>
+                        Select a subset of groups. The TypeScript return type is{' '}
+                        <code>Pick&lt;T, K&gt;</code> — the compiler sees
+                        exactly the selected groups and no others.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { pickGroups } from '@cleverbrush/server/contract';
+
+const fullApi = defineApi({
+    todos: { ... },
+    auth:  { ... },
+    admin: { ... },
+    debug: { ... },
+});
+
+const clientApi = pickGroups(fullApi, 'todos', 'auth');
+// TypeScript: { todos: ..., auth: ... }
+// 'admin' and 'debug' do not exist on the type or at runtime`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>omitGroups</h3>
+                    <p>
+                        Inverse of <code>pickGroups</code> — remove the listed
+                        groups and keep everything else. Return type is{' '}
+                        <code>Omit&lt;T, K&gt;</code>.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { omitGroups } from '@cleverbrush/server/contract';
+
+const publicApi = omitGroups(fullApi, 'admin', 'debug');
+// TypeScript: { todos: ..., auth: ... }`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Bundle isolation pattern</h3>
+                    <p>
+                        The key is <strong>file-level separation</strong>:
+                        export different slices from different entry points so
+                        bundlers only pull in what each app imports.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// shared-contracts/src/public.ts
+export const publicApi = defineApi({ todos, auth, users });
+
+// shared-contracts/src/admin.ts
+export const adminApi = defineApi({ admin, internalTools });
+
+// shared-contracts/src/full.ts
+export const fullApi = mergeContracts(publicApi, adminApi);
+
+// client app
+import { publicApi } from 'shared-contracts/public';   // admin never bundled
+
+// admin panel
+import { fullApi } from 'shared-contracts/full';        // full set
+
+// backend
+import { fullApi } from 'shared-contracts/full';        // handles all routes`)
+                            }}
+                        />
+                    </pre>
+                </div>
             </div>
         </div>
     );
