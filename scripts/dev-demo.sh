@@ -2,15 +2,15 @@
 # scripts/dev-demo.sh
 #
 # Local dev orchestrator for the todo demo:
-#   1. Brings up the Postgres container from demos/docker-compose.yml (only that service).
+#   1. Brings up Postgres and Clickstack containers from demos/docker-compose.yml.
 #   2. Waits for the Postgres healthcheck.
 #   3. Runs pending migrations against the local DB.
 #   4. Starts the backend (tsx watch, hot reload) and frontend (vite) in parallel.
 #
 # Usage:
 #   npm run dev:demo
-# Press Ctrl-C once to stop both servers; postgres keeps running.
-# Stop postgres explicitly with:  npm run dev:demo:stop
+# Press Ctrl-C once to stop both servers; containers keep running.
+# Stop everything with:  npm run dev:demo:stop
 
 set -euo pipefail
 
@@ -20,8 +20,8 @@ BACKEND_ENV_FILE="$ROOT/demos/todo-backend/.env"
 
 cd "$ROOT"
 
-echo "▶ Starting Postgres (docker compose)…"
-docker compose -f "$COMPOSE_FILE" up -d postgres
+echo "▶ Starting Postgres + Clickstack (docker compose)…"
+docker compose -f "$COMPOSE_FILE" up -d postgres clickstack
 
 echo "▶ Waiting for Postgres to become healthy…"
 for _ in $(seq 1 30); do

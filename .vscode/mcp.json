@@ -23,6 +23,25 @@
             "env": {
                 "DATABASE_URI": "postgresql://readonly:qwerty123@host.docker.internal:5445/todo_db"
             }
+        },
+        "clickhouse": {
+            "command": "/home/andrew/.local/bin/uv",
+            "args": [
+                "run",
+                "--with",
+                "mcp-clickhouse",
+                "--python",
+                "3.12",
+                "mcp-clickhouse"
+            ],
+            "env": {
+                "CLICKHOUSE_HOST": "localhost",
+                "CLICKHOUSE_PORT": "8123",
+                "CLICKHOUSE_USER": "api",
+                "CLICKHOUSE_PASSWORD": "api",
+                "CLICKHOUSE_SECURE": "false",
+                "CLICKHOUSE_VERIFY": "false"
+            }
         }
     }
 }
