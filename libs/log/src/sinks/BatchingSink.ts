@@ -53,6 +53,11 @@ export class BatchingSink implements LogSink {
     #circuitOpen = false;
     #circuitResetTimer: ReturnType<typeof setTimeout> | undefined;
     #disposed = false;
+    /**
+     * Promise for any in-progress background flush.  Multiple callers
+     * join this promise rather than spawning concurrent writes.
+     */
+    #activeFlush: Promise<void> | undefined;
 
     constructor(options: BatchingSinkOptions) {
         this.#emitFn = options.emit;
@@ -64,6 +69,11 @@ export class BatchingSink implements LogSink {
         this.#circuitBreakerThreshold = options.circuitBreakerThreshold ?? 3;
     }
 
+    /**
+     * Buffers events and triggers a background flush when the batch
+     * size threshold is reached.  Returns immediately — callers are
+     * never blocked by network I/O.
+     */
     async emit(events: LogEvent[]): Promise<void> {
         if (this.#disposed) return;
 
@@ -75,15 +85,72 @@ export class BatchingSink implements LogSink {
         }
 
         if (this.#buffer.length >= this.#batchSize) {
-            await this.flush();
+            // Fire-and-forget: the actual write runs in the background.
+            // The caller's async chain is not held up by ClickHouse I/O.
+            this.flush().catch(err => {
+                SelfLog.write('BatchingSink background flush failed', err);
+            });
         } else {
             this.#resetTimer();
         }
     }
 
+    /**
+     * Flushes buffered events to the underlying sink.
+     *
+     * If a flush is already in progress, returns that same promise so
+     * that multiple concurrent callers share a single write rather than
+     * spawning concurrent network requests.
+     */
     async flush(): Promise<void> {
         this.#clearTimer();
 
+        // Join an already-running flush instead of starting another one.
+        if (this.#activeFlush) {
+            return this.#activeFlush;
+        }
+
+        if (this.#buffer.length === 0) return;
+
+        this.#activeFlush = this.#doFlush().finally(() => {
+            this.#activeFlush = undefined;
+            // If more events arrived while we were writing, kick off
+            // another background flush so nothing sits in the buffer.
+            if (this.#buffer.length > 0 && !this.#disposed) {
+                this.flush().catch(err => {
+                    SelfLog.write(
+                        'BatchingSink post-flush background flush failed',
+                        err
+                    );
+                });
+            }
+        });
+
+        return this.#activeFlush;
+    }
+
+    async [Symbol.asyncDispose](): Promise<void> {
+        this.#disposed = true;
+        this.#clearTimer();
+        if (this.#circuitResetTimer) {
+            clearTimeout(this.#circuitResetTimer);
+        }
+        // Wait for any in-progress background flush to finish before
+        // draining the remaining buffer.
+        if (this.#activeFlush) {
+            await this.#activeFlush.catch(() => {});
+        }
+        // Flush remaining events (best-effort)
+        if (this.#buffer.length > 0 && !this.#circuitOpen) {
+            try {
+                await this.#emitFn(this.#buffer.splice(0, this.#buffer.length));
+            } catch (err) {
+                SelfLog.write('BatchingSink dispose flush failed', err);
+            }
+        }
+    }
+
+    async #doFlush(): Promise<void> {
         while (this.#buffer.length > 0) {
             if (this.#circuitOpen) {
                 SelfLog.write(
@@ -143,22 +210,6 @@ export class BatchingSink implements LogSink {
                     }
                 }
                 return;
-            }
-        }
-    }
-
-    async [Symbol.asyncDispose](): Promise<void> {
-        this.#disposed = true;
-        this.#clearTimer();
-        if (this.#circuitResetTimer) {
-            clearTimeout(this.#circuitResetTimer);
-        }
-        // Flush remaining events (best-effort)
-        if (this.#buffer.length > 0 && !this.#circuitOpen) {
-            try {
-                await this.#emitFn(this.#buffer.splice(0, this.#buffer.length));
-            } catch (err) {
-                SelfLog.write('BatchingSink dispose flush failed', err);
             }
         }
     }

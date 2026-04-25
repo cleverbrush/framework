@@ -124,4 +124,52 @@ describe('BatchingSink', () => {
         // Only the dispose flush, not the post-dispose emit
         expect(emitFn).not.toHaveBeenCalled();
     });
+
+    it('emit() returns before the underlying write completes (non-blocking)', async () => {
+        let writeStarted = false;
+        let writeResolveFn!: () => void;
+        const writePromise = new Promise<void>(res => {
+            writeResolveFn = res;
+        });
+
+        const emitFn = vi.fn().mockImplementation(() => {
+            writeStarted = true;
+            return writePromise;
+        });
+
+        const sink = new BatchingSink({ batchSize: 1, emit: emitFn });
+
+        // emit() must resolve without waiting for the underlying write
+        await sink.emit([makeEvent()]);
+        expect(writeStarted).toBe(true); // write was kicked off...
+        expect(writePromise).not.toBe(undefined); // ...but its promise is still pending
+
+        // unblock the write and confirm flush reports completion
+        writeResolveFn();
+        await sink.flush();
+        expect(emitFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('concurrent flush() calls share a single write', async () => {
+        let inflight = 0;
+        let maxInflight = 0;
+        const emitFn = vi.fn().mockImplementation(async () => {
+            inflight++;
+            maxInflight = Math.max(maxInflight, inflight);
+            await new Promise(r => setTimeout(r, 5));
+            inflight--;
+        });
+
+        const sink = new BatchingSink({
+            batchSize: 2,
+            flushInterval: 60_000,
+            emit: emitFn
+        });
+        await sink.emit([makeEvent(), makeEvent()]);
+
+        // Two concurrent explicit flush calls should not spawn two writes
+        await Promise.all([sink.flush(), sink.flush()]);
+
+        expect(maxInflight).toBe(1);
+    });
 });
