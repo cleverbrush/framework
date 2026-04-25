@@ -17,15 +17,17 @@
                 "--add-host=host.docker.internal:host-gateway",
                 "-e",
                 "DATABASE_URI",
-                "crystaldba/postgres-mcp"
+                "crystaldba/postgres-mcp",
+                "--access-mode=unrestricted"
             ],
             "env": {
-                "DATABASE_URI": "postgresql://<USER>:<PASSWORD>@host.docker.internal:5445/todo_db"
+                "DATABASE_URI": "postgresql://readonly:qwerty123@host.docker.internal:5445/todo_db"
             }
         },
         "clickhouse": {
-            "command": "uvx",
+            "command": "/home/andrew/.local/bin/uv",
             "args": [
+                "run",
                 "--with",
                 "mcp-clickhouse",
                 "--python",
