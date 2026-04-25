@@ -1,0 +1,27 @@
+{
+    "name": "@cleverbrush/demo-e2e",
+    "private": true,
+    "version": "0.0.0",
+    "type": "module",
+    "description": "End-to-end test suite for the todo demo (backend + frontend + telemetry stack)",
+    "scripts": {
+        "test": "vitest --run",
+        "test:watch": "vitest",
+        "test:api": "vitest --run --project api",
+        "test:ui": "vitest --run --project ui",
+        "lint": "biome check ./src",
+        "playwright:install": "playwright install chromium"
+    },
+    "dependencies": {
+        "pg": "^8.13.3",
+        "playwright": "^1.49.1",
+        "ws": "^8.18.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.0.0",
+        "@types/pg": "^8.11.10",
+        "@types/ws": "^8.5.13",
+        "typescript": "^6.0.2",
+        "vitest": "^4.1.2"
+    }
+}

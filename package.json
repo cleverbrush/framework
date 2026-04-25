@@ -28,7 +28,11 @@
         "bench": "vitest bench --run",
         "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json",
         "dev:demo": "./scripts/dev-demo.sh",
-        "dev:demo:stop": "pkill -f 'tsx watch.*todo-backend' 2>/dev/null; pkill -f 'node.*vite' 2>/dev/null; docker compose -f demos/docker-compose.yml stop postgres clickstack; true"
+        "dev:demo:stop": "pkill -f 'tsx watch.*todo-backend' 2>/dev/null; pkill -f 'node.*vite' 2>/dev/null; docker compose -f demos/docker-compose.yml stop postgres clickstack; true",
+        "test:e2e": "npm run test -w @cleverbrush/demo-e2e",
+        "test:e2e:api": "npm run test:api -w @cleverbrush/demo-e2e",
+        "test:e2e:ui": "npm run test:ui -w @cleverbrush/demo-e2e",
+        "test:e2e:reset": "RESET=1 npm run test -w @cleverbrush/demo-e2e"
     },
     "workspaces": [
         "./libs/*",
