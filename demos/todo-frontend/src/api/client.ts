@@ -44,8 +44,11 @@ export const client = createClient(api, {
     baseUrl: BASE_URL,
     getToken: () => loadToken(),
     onUnauthorized: () => {
+        const wasAuthenticated = !!loadToken();
         setToken(null);
-        window.location.href = '/login';
+        if (wasAuthenticated) {
+            window.location.href = '/login';
+        }
     },
     middlewares: [
         retry({ limit: 2, retryOnTimeout: true }),

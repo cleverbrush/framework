@@ -69,19 +69,21 @@ export function RegisterPage() {
                     </Callout.Root>
                 )}
 
-                <Field forProperty={(t) => t.email} form={form} label="Email" variant="email" />
-                <Field forProperty={(t) => t.password} form={form} label="Password" variant="password" />
-                <Field forProperty={(t) => t.confirmPassword} form={form} label="Confirm Password" variant="password" />
+                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+                    <Field forProperty={(t) => t.email} form={form} label="Email" variant="email" />
+                    <Field forProperty={(t) => t.password} form={form} label="Password" variant="password" />
+                    <Field forProperty={(t) => t.confirmPassword} form={form} label="Confirm Password" variant="password" />
 
-                <Button
-                    size="3"
-                    style={{ width: '100%' }}
-                    onClick={handleSubmit}
-                    loading={loading}
-                    mt="1"
-                >
-                    Create Account
-                </Button>
+                    <Button
+                        type="submit"
+                        size="3"
+                        style={{ width: '100%' }}
+                        loading={loading}
+                        mt="1"
+                    >
+                        Create Account
+                    </Button>
+                </form>
 
                 <Box mt="5" style={{ textAlign: 'center' }}>
                     <Text size="2" color="gray">

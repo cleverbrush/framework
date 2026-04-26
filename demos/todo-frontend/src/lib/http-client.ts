@@ -63,8 +63,11 @@ async function request<T>(
     });
 
     if (response.status === 401) {
+        const wasAuthenticated = !!_token;
         setToken(null);
-        window.location.href = '/login';
+        if (wasAuthenticated) {
+            window.location.href = '/login';
+        }
         throw new ApiError(401, 'Unauthorized');
     }
 
