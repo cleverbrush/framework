@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/otel': minor
+'@cleverbrush/otel': major
 '@cleverbrush/log': patch
 '@cleverbrush/schema': patch
 ---

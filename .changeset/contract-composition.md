@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/server': minor
+'@cleverbrush/server': major
 ---
 
 Add contract composition utilities — `mergeContracts`, `pickGroups`, and `omitGroups`.

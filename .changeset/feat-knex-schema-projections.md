@@ -1,5 +1,5 @@
 ---
-'@cleverbrush/knex-schema': minor
+'@cleverbrush/knex-schema': major
 '@cleverbrush/schema': patch
 ---
 

@@ -1,7 +1,7 @@
 ---
-'@cleverbrush/orm': minor
-'@cleverbrush/orm-cli': minor
-'@cleverbrush/knex-schema': minor
+'@cleverbrush/orm': major
+'@cleverbrush/orm-cli': major
+'@cleverbrush/knex-schema': major
 ---
 
 Add `@cleverbrush/orm` — EF-Core-like typed ORM — and `@cleverbrush/orm-cli` migration tooling.
