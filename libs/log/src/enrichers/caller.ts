@@ -22,6 +22,7 @@ export function callerEnricher(): Enricher {
             const line = lines[i];
             if (
                 !line.includes('/log/src/') &&
+                !line.includes('\\log\\src\\') &&
                 !line.includes('@cleverbrush/log')
             ) {
                 const match = line.match(/\(?(.*?):(\d+):\d+\)?$/);

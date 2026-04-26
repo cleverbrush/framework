@@ -71,7 +71,11 @@ export function loadSnapshot(snapshotPath: string): SchemaSnapshot {
     try {
         const raw = readFileSync(resolve(snapshotPath), 'utf-8');
         const parsed = JSON.parse(raw) as SchemaSnapshot;
-        if (parsed.version !== 1 || typeof parsed.tables !== 'object') {
+        if (
+            parsed.version !== 1 ||
+            parsed.tables == null ||
+            typeof parsed.tables !== 'object'
+        ) {
             return { version: 1, tables: {} };
         }
         return parsed;

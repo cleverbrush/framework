@@ -130,8 +130,8 @@ describe('createLogger', () => {
 
     it('registers SIGTERM and beforeExit handlers when handleProcessExit is true', async () => {
         const sink = mockSink();
-        const onSpy = vi
-            .spyOn(process, 'on')
+        const onceSpy = vi
+            .spyOn(process, 'once')
             .mockImplementation((() => process) as any);
 
         try {
@@ -140,36 +140,36 @@ describe('createLogger', () => {
                 handleProcessExit: true
             });
 
-            const events = onSpy.mock.calls.map(c => c[0]);
+            const events = onceSpy.mock.calls.map(c => c[0]);
             expect(events).toContain('SIGTERM');
             expect(events).toContain('beforeExit');
 
             await logger.dispose();
         } finally {
-            onSpy.mockRestore();
+            onceSpy.mockRestore();
         }
     });
 
     it('does not register process listeners by default', () => {
         const sink = mockSink();
-        const onSpy = vi
-            .spyOn(process, 'on')
+        const onceSpy = vi
+            .spyOn(process, 'once')
             .mockImplementation((() => process) as any);
 
         try {
             createLogger({ sinks: [sink] });
-            const events = onSpy.mock.calls.map(c => c[0]);
+            const events = onceSpy.mock.calls.map(c => c[0]);
             expect(events).not.toContain('SIGTERM');
             expect(events).not.toContain('beforeExit');
         } finally {
-            onSpy.mockRestore();
+            onceSpy.mockRestore();
         }
     });
 
     it('onExit handler calls dispose; errors are swallowed', async () => {
         const sink = mockSink();
         const callbacks: Array<() => void> = [];
-        const onSpy = vi.spyOn(process, 'on').mockImplementation(((
+        const onceSpy = vi.spyOn(process, 'once').mockImplementation(((
             _event: string,
             cb: () => void
         ) => {
@@ -189,7 +189,7 @@ describe('createLogger', () => {
             // Let the microtask/promise resolve
             await new Promise(r => setTimeout(r, 10));
         } finally {
-            onSpy.mockRestore();
+            onceSpy.mockRestore();
         }
     });
 });

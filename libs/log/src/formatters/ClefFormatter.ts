@@ -61,10 +61,13 @@ export function formatClef(
         obj['@i'] = event.eventId;
     }
 
-    // Spread all properties as top-level CLEF fields
+    // Spread all properties as top-level CLEF fields.
+    // Keys starting with '@' are reserved for CLEF itself; user-supplied keys
+    // that collide are prefixed with '_' to avoid corrupting the event payload.
     if (event.properties) {
         for (const [key, value] of Object.entries(event.properties)) {
-            obj[key] = safeSerialize(value, options);
+            const safeKey = key.startsWith('@') ? `_${key}` : key;
+            obj[safeKey] = safeSerialize(value, options);
         }
     }
 

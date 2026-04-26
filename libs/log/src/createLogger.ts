@@ -74,13 +74,25 @@ export function createLogger(config: LoggerConfig): Logger {
     const logger = new Logger(pipeline);
 
     if (config.handleProcessExit) {
+        const originalDispose = logger.dispose.bind(logger);
+        const removeProcessExitListeners = () => {
+            process.off('SIGTERM', onExit);
+            process.off('beforeExit', onExit);
+        };
         const onExit = () => {
-            logger.dispose().catch(() => {
+            removeProcessExitListeners();
+            originalDispose().catch(() => {
                 // Best-effort flush on exit
             });
         };
-        process.on('SIGTERM', onExit);
-        process.on('beforeExit', onExit);
+
+        logger.dispose = () => {
+            removeProcessExitListeners();
+            return originalDispose();
+        };
+
+        process.once('SIGTERM', onExit);
+        process.once('beforeExit', onExit);
     }
 
     return logger;

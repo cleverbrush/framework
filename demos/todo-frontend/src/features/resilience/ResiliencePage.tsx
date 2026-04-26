@@ -8,7 +8,8 @@ import {
     Heading,
     Separator,
     Text,
-    Badge
+    Badge,
+    Tooltip
 } from '@radix-ui/themes';
 import {
     isApiError,
@@ -80,6 +81,44 @@ function StatusBadge({ status }: { status: DemoResult['status'] }) {
     return <Badge color={color}>{status}</Badge>;
 }
 
+function TraceIdCopy({ traceId }: { traceId: string }) {
+    const [copied, setCopied] = useState(false);
+
+    const handleCopy = useCallback(() => {
+        navigator.clipboard.writeText(traceId).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    }, [traceId]);
+
+    return (
+        <Flex align="center" gap="2">
+            <Text size="1" color="gray">
+                Trace ID:
+            </Text>
+            <Tooltip
+                content={
+                    copied ? 'Copied!' : 'Click to copy — paste into ClickStack Search'
+                }
+            >
+                <Code
+                    size="1"
+                    style={{ cursor: 'pointer', userSelect: 'all' }}
+                    onClick={handleCopy}
+                    aria-label="Copy trace ID to clipboard"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => {
+                        if (e.key === 'Enter' || e.key === ' ') handleCopy();
+                    }}
+                >
+                    {traceId}
+                </Code>
+            </Tooltip>
+        </Flex>
+    );
+}
+
 function DemoCard({
     title,
     description,
@@ -122,18 +161,7 @@ function DemoCard({
                     </Code>
                 )}
                 {result.traceId && (
-                    <Flex align="center" gap="2">
-                        <Text size="1" color="gray">
-                            Trace ID:
-                        </Text>
-                        <Code
-                            size="1"
-                            style={{ cursor: 'pointer', userSelect: 'all' }}
-                            title="Click to copy — paste into ClickStack Search"
-                        >
-                            {result.traceId}
-                        </Code>
-                    </Flex>
+                    <TraceIdCopy traceId={result.traceId} />
                 )}
             </Flex>
         </Card>

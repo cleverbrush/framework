@@ -94,6 +94,26 @@ describe('ClefFormatter', () => {
             expect(obj.Port).toBe(3000);
         });
 
+        it('should rename user properties that start with "@" to avoid overwriting reserved CLEF fields', () => {
+            const line = formatClef(
+                makeEvent({
+                    properties: {
+                        '@t': 'injected-timestamp',
+                        '@mt': 'injected-template',
+                        '@customField': 'value'
+                    }
+                })
+            );
+            const obj = JSON.parse(line);
+            // Reserved fields must remain intact
+            expect(obj['@t']).toBe('2026-04-20T14:30:00.123Z');
+            expect(obj['@mt']).toBe('User {UserId} signed in');
+            // User-supplied @-keys should be prefixed with '_'
+            expect(obj['_@t']).toBe('injected-timestamp');
+            expect(obj['_@mt']).toBe('injected-template');
+            expect(obj['_@customField']).toBe('value');
+        });
+
         it('should safely serialize complex properties', () => {
             const circular: any = { name: 'test' };
             circular.self = circular;
