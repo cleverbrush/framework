@@ -28,6 +28,66 @@ test('introspect returns correct metadata', () => {
 });
 
 // ---------------------------------------------------------------------------
+// .template getter — exposes raw `{Property}` pattern for log grouping
+// ---------------------------------------------------------------------------
+
+test('template getter: returns the raw {Property} pattern', () => {
+    const TodoCreated = parseString(
+        object({ TodoId: number(), Title: string(), UserId: string() }),
+        $t =>
+            $t`Todo #${t => t.TodoId} "${t => t.Title}" created by ${t => t.UserId}`
+    );
+
+    expect(TodoCreated.template).toBe(
+        'Todo #{TodoId} "{Title}" created by {UserId}'
+    );
+});
+
+test('template getter: handles single-segment templates', () => {
+    const schema = parseString(
+        object({ id: number() }),
+        $t => $t`/orders/${t => t.id}`
+    );
+
+    expect(schema.template).toBe('/orders/{id}');
+});
+
+test('template getter: handles trailing literal', () => {
+    const schema = parseString(
+        object({ id: number() }),
+        $t => $t`/orders/${t => t.id}/items`
+    );
+
+    expect(schema.template).toBe('/orders/{id}/items');
+});
+
+test('template getter: handles nested-property paths', () => {
+    const schema = parseString(
+        object({
+            order: object({ id: number() }),
+            user: object({ name: string() })
+        }),
+        $t => $t`/orders/${t => t.order.id}/by/${t => t.user.name}`
+    );
+
+    // Nested property paths preserved as dot-notation in the {hole} marker.
+    expect(schema.template).toBe('/orders/{order.id}/by/{user.name}');
+});
+
+test('template getter: matches the human pattern in introspect()', () => {
+    const schema = parseString(
+        object({ a: number(), b: string() }),
+        $t => $t`${t => t.a}-${t => t.b}`
+    );
+
+    // Self-consistency: the getter is a stable view of the same data
+    // surfaced via introspect().
+    const info = schema.introspect();
+    expect(info.templateDefinition.literals).toEqual(['', '-', '']);
+    expect(schema.template).toBe('{a}-{b}');
+});
+
+// ---------------------------------------------------------------------------
 // Basic validation — single param
 // ---------------------------------------------------------------------------
 

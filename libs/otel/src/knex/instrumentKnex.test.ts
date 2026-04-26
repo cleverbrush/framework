@@ -83,6 +83,78 @@ describe('instrumentKnex', () => {
         expect(span.events.some(e => e.name === 'exception')).toBe(true);
     });
 
+    it('handles non-Error thrown values on query-error (string)', () => {
+        const k = makeMockKnex();
+        instrumentKnex(k);
+        k.emit('query', { sql: 'select 1', __knexQueryUid: 'qe-str' });
+        k.emit('query-error', 'connection lost', {
+            __knexQueryUid: 'qe-str'
+        });
+        const span = exporter.getFinishedSpans()[0]!;
+        expect(span.status.code).toBe(2); // ERROR
+        expect(span.status.message).toBe('connection lost');
+        // No `exception` event when the value isn't an Error.
+        expect(span.events.some(e => e.name === 'exception')).toBe(false);
+    });
+
+    it('handles non-Error thrown values on query-error (object)', () => {
+        const k = makeMockKnex();
+        instrumentKnex(k);
+        k.emit('query', { sql: 'select 1', __knexQueryUid: 'qe-obj' });
+        k.emit('query-error', { code: 42 }, { __knexQueryUid: 'qe-obj' });
+        const span = exporter.getFinishedSpans()[0]!;
+        expect(span.status.code).toBe(2); // ERROR
+        // String() of a plain object yields '[object Object]' — verify the
+        // instrumentation still ends the span with a string status message.
+        expect(typeof span.status.message).toBe('string');
+        expect(span.status.message).toBe('[object Object]');
+    });
+
+    it('ignores orphan query-error events with no matching query', () => {
+        const k = makeMockKnex();
+        instrumentKnex(k);
+        // No prior `query` event with this uid.
+        k.emit('query-error', new Error('whatever'), {
+            __knexQueryUid: 'orphan'
+        });
+        // Also no uid at all.
+        k.emit('query-error', new Error('whatever'), {});
+        expect(exporter.getFinishedSpans()).toHaveLength(0);
+    });
+
+    it('preserves db.query.text and db.operation.name when query fails', () => {
+        const k = makeMockKnex();
+        instrumentKnex(k);
+        k.emit('query', {
+            sql: 'select * from todos where id = ?',
+            method: 'select',
+            __knexQueryUid: 'qe-attrs'
+        });
+        k.emit('query-error', new Error('boom'), {
+            __knexQueryUid: 'qe-attrs'
+        });
+        const span = exporter.getFinishedSpans()[0]!;
+        expect(span.attributes['db.operation.name']).toBe('SELECT');
+        expect(span.attributes['db.query.text']).toBe(
+            'select * from todos where id = ?'
+        );
+        expect(span.status.code).toBe(2); // ERROR
+    });
+
+    it('records the exception with name and stack on query-error', () => {
+        const k = makeMockKnex();
+        instrumentKnex(k);
+        k.emit('query', { sql: 'select 1', __knexQueryUid: 'qe-rec' });
+        const err = new Error('pool exhausted');
+        err.name = 'PoolError';
+        k.emit('query-error', err, { __knexQueryUid: 'qe-rec' });
+        const span = exporter.getFinishedSpans()[0]!;
+        const ex = span.events.find(e => e.name === 'exception');
+        expect(ex).toBeDefined();
+        expect(ex!.attributes?.['exception.message']).toBe('pool exhausted');
+        expect(ex!.attributes?.['exception.type']).toBe('PoolError');
+    });
+
     it('parents queries under the ambient context', () => {
         const k = makeMockKnex();
         instrumentKnex(k);

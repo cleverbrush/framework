@@ -75,6 +75,22 @@ const [correlationId, requestLogging] = useLogging(logger, {
 
 `correlationResponseHeader: false` suppresses the `X-Correlation-Id` response header entirely — useful when `@cleverbrush/otel`'s tracing middleware already sets a `traceparent` / `traceresponse` header and a second ID would be redundant.
 
+## OpenTelemetry Integration
+
+Trace correlation, OTLP log export, and the `traceEnricher` (which copies the active span's `traceId` / `spanId` onto every log event) live in [`@cleverbrush/otel`](https://www.npmjs.com/package/@cleverbrush/otel). Wire them up like this:
+
+```ts
+import { createLogger, consoleSink } from '@cleverbrush/log';
+import { otelLogSink, traceEnricher } from '@cleverbrush/otel';
+
+const logger = createLogger({
+    sinks: [consoleSink(), otelLogSink()],
+    enrichers: [traceEnricher()],
+});
+```
+
+`@cleverbrush/log` itself stays free of any OpenTelemetry runtime dependency.
+
 ## License
 
 BSD-3-Clause

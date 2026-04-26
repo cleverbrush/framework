@@ -2,6 +2,7 @@
 
 import { createRequire } from 'node:module';
 import { loadConfig } from './config.js';
+import type { OrmCliConfig } from './types.js';
 
 // Read the CLI's own version at startup
 const _require = createRequire(import.meta.url);
@@ -23,6 +24,11 @@ export async function run(argv: string[]): Promise<void> {
     const flags = parseFlags(rest);
     const configPath = flags['--config'] as string | undefined;
 
+    // Track the loaded config so we can always destroy the knex pool — even
+    // on error — to avoid the CLI hanging open until the pool's idle timeout
+    // (Knex pools keep ~30s of TCP keep-alive connections by default).
+    let loadedConfig: OrmCliConfig | undefined;
+
     try {
         if (cmd === 'migrate') {
             switch (sub) {
@@ -41,29 +47,29 @@ export async function run(argv: string[]): Promise<void> {
                             break;
                         }
                     }
-                    const config = await loadConfig(configPath);
+                    loadedConfig = await loadConfig(configPath);
                     const { generate } = await import('./commands/generate.js');
-                    await generate(name, config, flags);
+                    await generate(name, loadedConfig, flags);
                     break;
                 }
                 case 'run': {
-                    const config = await loadConfig(configPath);
+                    loadedConfig = await loadConfig(configPath);
                     const { run: runMigrations } = await import(
                         './commands/run.js'
                     );
-                    await runMigrations(config, flags);
+                    await runMigrations(loadedConfig, flags);
                     break;
                 }
                 case 'rollback': {
-                    const config = await loadConfig(configPath);
+                    loadedConfig = await loadConfig(configPath);
                     const { rollback } = await import('./commands/rollback.js');
-                    await rollback(config, flags);
+                    await rollback(loadedConfig, flags);
                     break;
                 }
                 case 'status': {
-                    const config = await loadConfig(configPath);
+                    loadedConfig = await loadConfig(configPath);
                     const { status } = await import('./commands/status.js');
-                    await status(config, flags);
+                    await status(loadedConfig, flags);
                     break;
                 }
                 default:
@@ -75,9 +81,9 @@ export async function run(argv: string[]): Promise<void> {
         } else if (cmd === 'db') {
             switch (sub) {
                 case 'push': {
-                    const config = await loadConfig(configPath);
+                    loadedConfig = await loadConfig(configPath);
                     const { push } = await import('./commands/push.js');
-                    await push(config, flags);
+                    await push(loadedConfig, flags);
                     break;
                 }
                 default:
@@ -90,10 +96,27 @@ export async function run(argv: string[]): Promise<void> {
             fatal(`Unknown command: ${cmd}. Run \`cb-orm --help\` for usage.`);
         }
     } catch (err: unknown) {
+        await destroyKnex(loadedConfig);
         console.error(
             `\nError: ${err instanceof Error ? err.message : String(err)}\n`
         );
         process.exit(1);
+    }
+
+    await destroyKnex(loadedConfig);
+}
+
+/**
+ * Best-effort cleanup of the knex connection pool so the Node process can
+ * exit promptly.  Swallows errors so that a destroy failure never masks a
+ * real command-level error.
+ */
+async function destroyKnex(config: OrmCliConfig | undefined): Promise<void> {
+    if (!config?.knex) return;
+    try {
+        await config.knex.destroy();
+    } catch {
+        /* ignore — exit-time cleanup */
     }
 }
 

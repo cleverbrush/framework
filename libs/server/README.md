@@ -369,10 +369,6 @@ createServer()
     .listen(3000);
 ```
 
-## License
-
-BSD-3-Clause — see [LICENSE](../../LICENSE).
-
 ## Contract Composition
 
 When building applications with distinct audiences — a **public client** and an **admin panel**, for example — you want each consumer to import only the endpoints it needs.  This eliminates leaking admin schemas into the client bundle and improves tree-shaking.
@@ -449,3 +445,7 @@ apps/
   admin-panel/         // imports fullApi    — full set of endpoints
   backend/             // imports fullApi    — handles all routes
 ```
+
+## License
+
+BSD-3-Clause — see [LICENSE](../../LICENSE).

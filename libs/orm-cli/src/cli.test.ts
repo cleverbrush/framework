@@ -197,3 +197,91 @@ describe('push command — production guard', () => {
         process.env.NODE_ENV = originalEnv;
     });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Regression: the CLI must close the knex pool after running a command so
+// the host process can exit promptly (knex pools otherwise keep idle TCP
+// sockets for ~30 s).
+describe('cli.run — knex pool cleanup', () => {
+    it('calls knex.destroy() after a successful command', async () => {
+        const destroy = vi.fn().mockResolvedValue(undefined);
+        const fakeKnex = {
+            schema: {},
+            destroy,
+            migrate: {
+                list: vi.fn().mockResolvedValue([[], []])
+            }
+        };
+
+        const tmp = path.join(os.tmpdir(), `orm-cli-destroy-${Date.now()}`);
+        mkdirSync(tmp, { recursive: true });
+        const cfgPath = path.join(tmp, 'db.config.mjs');
+        const stash = (globalThis as any).__cbOrmFakeKnex;
+        (globalThis as any).__cbOrmFakeKnex = fakeKnex;
+        try {
+            const cfgSrc = `
+                export default {
+                    knex: globalThis.__cbOrmFakeKnex,
+                    entities: {},
+                    migrations: { directory: ${JSON.stringify(tmp)} }
+                };
+            `;
+            const fs = await import('node:fs');
+            fs.writeFileSync(cfgPath, cfgSrc, 'utf-8');
+
+            const { run } = await import('./cli.js');
+            await run(['migrate', 'status', '--config', cfgPath]);
+
+            expect(destroy).toHaveBeenCalledTimes(1);
+        } finally {
+            (globalThis as any).__cbOrmFakeKnex = stash;
+            rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+
+    it('calls knex.destroy() even when the command throws', async () => {
+        const destroy = vi.fn().mockResolvedValue(undefined);
+        const fakeKnex = {
+            schema: {},
+            destroy,
+            migrate: {
+                list: vi.fn().mockRejectedValue(new Error('boom'))
+            }
+        };
+
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+            throw new Error('process.exit called');
+        }) as any);
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const tmp = path.join(os.tmpdir(), `orm-cli-destroy-err-${Date.now()}`);
+        mkdirSync(tmp, { recursive: true });
+        const cfgPath = path.join(tmp, 'db.config.mjs');
+        const stash = (globalThis as any).__cbOrmFakeKnex;
+        (globalThis as any).__cbOrmFakeKnex = fakeKnex;
+        try {
+            const cfgSrc = `
+                export default {
+                    knex: globalThis.__cbOrmFakeKnex,
+                    entities: {},
+                    migrations: { directory: ${JSON.stringify(tmp)} }
+                };
+            `;
+            const fs = await import('node:fs');
+            fs.writeFileSync(cfgPath, cfgSrc, 'utf-8');
+
+            const { run } = await import('./cli.js');
+            await expect(
+                run(['migrate', 'status', '--config', cfgPath])
+            ).rejects.toThrow('process.exit called');
+
+            expect(destroy).toHaveBeenCalledTimes(1);
+            expect(exitSpy).toHaveBeenCalledWith(1);
+        } finally {
+            (globalThis as any).__cbOrmFakeKnex = stash;
+            exitSpy.mockRestore();
+            errSpy.mockRestore();
+            rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+});

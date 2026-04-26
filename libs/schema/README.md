@@ -541,6 +541,18 @@ const result = RouteSchema.validate('/orders/abc/bad-uuid');
 // result.errors[0].message → "id: expected an integer number"
 ```
 
+**Raw template access** — the original `{Property}` pattern is exposed via the `.template` getter. This enables consumers to use a parse-string schema as a Serilog-style message template (used by `@cleverbrush/log` for typed log events):
+
+```typescript
+const TodoCreated = parseString(
+    object({ TodoId: number(), Title: string(), UserId: string() }),
+    $t => $t`Todo #${t => t.TodoId} "${t => t.Title}" created by ${t => t.UserId}`
+);
+
+TodoCreated.template;
+// → 'Todo #{TodoId} "{Title}" created by {UserId}'
+```
+
 ## Coercion
 
 The `number()`, `boolean()`, and `date()` builders each have a `.coerce()` method that adds a preprocessor to convert string values to the target type. This is especially useful with parse-string schemas where captured segments are always strings, but also works standalone for URL parameters, form inputs, or any other string source.
