@@ -57,9 +57,10 @@ export default function LogPage() {
                 {/* ── Quick Start ──────────────────────────────────── */}
                 <h2>🚀 Quick Start</h2>
 
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { createLogger, consoleSink } from '@cleverbrush/log';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { createLogger, consoleSink } from '@cleverbrush/log';
 
 const logger = createLogger({
     minimumLevel: 'information',
@@ -72,8 +73,9 @@ logger.error(new Error('oops'), 'Request failed for {UserId}', { UserId: 42 });
 
 // Graceful shutdown
 await logger.dispose();`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 {/* ── Message Templates ────────────────────────────── */}
                 <h2>📝 Message Templates</h2>
@@ -83,15 +85,17 @@ await logger.dispose();`)
                     <code>{'@'}</code> to destructure objects.
                 </p>
 
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`// Named properties — queryable in Seq/ClickHouse
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`// Named properties — queryable in Seq/ClickHouse
 logger.info('Order {OrderId} placed by {UserId}', { OrderId: 123, UserId: 'u-42' });
 
 // Destructure with @
 logger.info('Config loaded: {@Config}', { Config: { port: 3000, env: 'prod' } });`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 {/* ── Sinks ────────────────────────────────────────── */}
                 <h2>🔌 Sinks</h2>
@@ -118,9 +122,10 @@ logger.info('Config loaded: {@Config}', { Config: { port: 3000, env: 'prod' } })
                     </li>
                 </ul>
 
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { createLogger, consoleSink, SeqSink, FileSink } from '@cleverbrush/log';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { createLogger, consoleSink, SeqSink, FileSink } from '@cleverbrush/log';
 
 const logger = createLogger({
     minimumLevel: 'debug',
@@ -130,8 +135,9 @@ const logger = createLogger({
         new FileSink({ path: './logs/app.clef', rotationPolicy: 'size', maxFileSize: 10_000_000 }),
     ],
 });`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 {/* ── Typed Templates ─────────────────────────────── */}
                 <h2>🔷 Typed Templates</h2>
@@ -145,9 +151,10 @@ const logger = createLogger({
                     are <strong>grouped</strong> in Seq, ClickStack, ClickHouse,
                     etc.
                 </p>
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { s } from '@cleverbrush/schema';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { s } from '@cleverbrush/schema';
 import { createLogger, consoleSink } from '@cleverbrush/log';
 
 // Define once — compile-time checked parameter types
@@ -159,15 +166,17 @@ const logger = createLogger({ sinks: [consoleSink()] });
 logger.info(TodoCreated, { TodoId: 1, Title: 'Buy milk', UserId: 'u-42' });
 // messageTemplate → 'Todo #{TodoId} "{Title}" created by {UserId}'
 // renderedMessage → 'Todo #1 "Buy milk" created by u-42'`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 {/* ── Correlation & Middleware ─────────────────────── */}
                 <h2>🔗 Correlation & Middleware</h2>
 
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { useLogging, createLogger, consoleSink } from '@cleverbrush/log';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { useLogging, createLogger, consoleSink } from '@cleverbrush/log';
 
 const logger = createLogger({
     minimumLevel: 'information',
@@ -185,15 +194,17 @@ const [correlationId, requestLogging] = useLogging(logger, {
 
 // Add to your @cleverbrush/server pipeline
 // Every request gets a unique correlation ID, logged on completion`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 {/* ── DI Integration ──────────────────────────────── */}
                 <h2>🧩 DI Integration</h2>
 
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { ServiceCollection } from '@cleverbrush/di';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { ServiceCollection } from '@cleverbrush/di';
 import { configureLogging, ILogger, consoleSink } from '@cleverbrush/log';
 
 const services = new ServiceCollection();
@@ -202,8 +213,9 @@ configureLogging(services, logger);
 const provider = services.buildServiceProvider();
 const logger = provider.getService(ILogger);
 logger.info('Resolved from DI');`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
             </div>
         </div>
     );

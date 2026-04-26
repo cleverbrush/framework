@@ -72,9 +72,10 @@ export default function OtelPage() {
                     anything else, then start Node with{' '}
                     <code>--import ./dist/telemetry.js</code>.
                 </p>
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`// telemetry.ts
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`// telemetry.ts
 import { setupOtel } from '@cleverbrush/otel';
 import {
     outboundHttpInstrumentations,
@@ -91,20 +92,23 @@ export const otel = setupOtel({
         ...runtimeMetrics()
     ]
 });`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 <h3>2. Trace HTTP requests</h3>
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { tracingMiddleware } from '@cleverbrush/otel';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { tracingMiddleware } from '@cleverbrush/otel';
 import { createServer } from '@cleverbrush/server';
 
 const server = createServer()
     .use(tracingMiddleware({ excludePaths: ['/health'] })) // first!
     .use(corsMiddleware);`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
                 <p>
                     A <code>SpanKind.SERVER</code> span is opened per request,
                     named from the endpoint metadata (<code>operationId</code>{' '}
@@ -115,16 +119,18 @@ const server = createServer()
                 </p>
 
                 <h3>3. Trace SQL queries</h3>
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { instrumentKnex } from '@cleverbrush/otel';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { instrumentKnex } from '@cleverbrush/otel';
 import knex from 'knex';
 
 const db = instrumentKnex(
     knex({ client: 'pg', connection: '...' })
 );`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
                 <p>
                     Every query becomes a <code>SpanKind.CLIENT</code> span with{' '}
                     <code>db.system.name</code>, <code>db.namespace</code>,{' '}
@@ -134,9 +140,10 @@ const db = instrumentKnex(
                 </p>
 
                 <h3>4. Send logs as OTLP records</h3>
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { createLogger, consoleSink } from '@cleverbrush/log';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { createLogger, consoleSink } from '@cleverbrush/log';
 import { otelLogSink, traceEnricher } from '@cleverbrush/otel';
 
 const logger = createLogger({
@@ -144,8 +151,9 @@ const logger = createLogger({
     sinks: [consoleSink({ theme: 'dark' }), otelLogSink()],
     enrichers: [traceEnricher()] // attaches TraceId/SpanId
 });`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 {/* ── API ──────────────────────────────────────────── */}
                 <h2>📚 API</h2>
@@ -241,17 +249,19 @@ const logger = createLogger({
                     attributes or events directly from endpoint handlers without
                     calling <code>trace.getActiveSpan()</code>.
                 </p>
-                <div
-                    dangerouslySetInnerHTML={{
-                        __html: highlightTS(`import { OTEL_SPAN_ITEM_KEY } from '@cleverbrush/otel';
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { OTEL_SPAN_ITEM_KEY } from '@cleverbrush/otel';
 import type { Span } from '@opentelemetry/api';
 
 // Inside a @cleverbrush/server endpoint handler
 const span = ctx.items.get(OTEL_SPAN_ITEM_KEY) as Span | undefined;
 span?.setAttribute('app.user_id', userId);
 span?.addEvent('cache.miss', { key: cacheKey });`)
-                    }}
-                />
+                        }}
+                    />
+                </pre>
 
                 {/* ── Privacy ──────────────────────────────────────── */}
                 <h2>🔒 Privacy &amp; Redaction</h2>
