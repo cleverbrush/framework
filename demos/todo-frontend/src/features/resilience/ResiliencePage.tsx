@@ -88,6 +88,8 @@ function TraceIdCopy({ traceId }: { traceId: string }) {
         navigator.clipboard.writeText(traceId).then(() => {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
+        }).catch(() => {
+            // Clipboard API unavailable or permission denied; silently ignore
         });
     }, [traceId]);
 
@@ -109,7 +111,10 @@ function TraceIdCopy({ traceId }: { traceId: string }) {
                     role="button"
                     tabIndex={0}
                     onKeyDown={e => {
-                        if (e.key === 'Enter' || e.key === ' ') handleCopy();
+                        if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleCopy();
+                        }
                     }}
                 >
                     {traceId}
