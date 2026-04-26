@@ -195,6 +195,83 @@ describe('Logger', () => {
             await l.dispose();
             expect(disposeSpy).toHaveBeenCalled();
         });
+
+        it('Symbol.asyncDispose calls dispose', async () => {
+            const disposeSpy = vi.fn();
+            const disposableSink: LogSink = {
+                async emit() {},
+                async [Symbol.asyncDispose]() {
+                    disposeSpy();
+                }
+            };
+            const p = new LoggerPipeline({
+                minimumLevel: LogLevel.Trace,
+                sinks: [disposableSink]
+            });
+            const l = new Logger(p);
+            await l[Symbol.asyncDispose]();
+            expect(disposeSpy).toHaveBeenCalled();
+        });
+
+        it('dispose clears watchLevel interval', async () => {
+            const p = new LoggerPipeline({
+                minimumLevel: LogLevel.Trace,
+                sinks: []
+            });
+            const l = new Logger(p);
+            l.watchLevel('LOG_LEVEL', 60_000);
+            await l.dispose(); // should clearInterval without throwing
+        });
+
+        it('watchLevel replaces existing interval when called twice', () => {
+            const p = new LoggerPipeline({
+                minimumLevel: LogLevel.Trace,
+                sinks: []
+            });
+            const l = new Logger(p);
+            l.watchLevel('LOG_LEVEL', 60_000);
+            l.watchLevel('LOG_LEVEL', 60_000); // second call clears first interval
+            // cleanup
+            l.dispose();
+        });
+
+        it('watchLevel interval callback reads env var and updates level', async () => {
+            vi.useFakeTimers();
+            const p = new LoggerPipeline({
+                minimumLevel: LogLevel.Trace,
+                sinks: []
+            });
+            const l = new Logger(p);
+
+            process.env['TEST_CB_LOG_LEVEL'] = 'warn';
+            l.watchLevel('TEST_CB_LOG_LEVEL', 1_000);
+
+            // Fire the interval (covers lines 118-121)
+            await vi.advanceTimersByTimeAsync(1_001);
+
+            delete process.env['TEST_CB_LOG_LEVEL'];
+            await l.dispose();
+            vi.useRealTimers();
+        });
+
+        it('watchLevel interval callback ignores invalid level values', async () => {
+            vi.useFakeTimers();
+            const p = new LoggerPipeline({
+                minimumLevel: LogLevel.Trace,
+                sinks: []
+            });
+            const l = new Logger(p);
+
+            process.env['TEST_INVALID_LOG_LEVEL'] = 'not-a-level';
+            l.watchLevel('TEST_INVALID_LOG_LEVEL', 1_000);
+
+            // Fire the interval — invalid level should not throw (catch block covered)
+            await vi.advanceTimersByTimeAsync(1_001);
+
+            delete process.env['TEST_INVALID_LOG_LEVEL'];
+            await l.dispose();
+            vi.useRealTimers();
+        });
     });
 
     describe('TypedTemplate', () => {

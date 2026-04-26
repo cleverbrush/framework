@@ -3,8 +3,10 @@ import {
     lazy,
     number,
     object,
+    record,
     type SchemaBuilder,
     string,
+    tuple,
     union
 } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
@@ -174,5 +176,39 @@ describe('walkSchemas', () => {
         }).schemaName('TreeNode');
         expect(() => walkSchemas(treeNode, registry)).not.toThrow();
         expect(registry.getName(treeNode)).toBe('TreeNode');
+    });
+
+    it('recurses into tuple elements', () => {
+        const registry = new SchemaRegistry();
+        const A = object({ a: number() }).schemaName('TupleA');
+        const B = object({ b: string() }).schemaName('TupleB');
+        walkSchemas(tuple([A, B]) as any, registry);
+        expect(registry.getName(A)).toBe('TupleA');
+        expect(registry.getName(B)).toBe('TupleB');
+    });
+
+    it('recurses into tuple restSchema', () => {
+        const registry = new SchemaRegistry();
+        const restEl = object({ x: number() }).schemaName('RestElement');
+        const tup = tuple([string()]).rest(restEl);
+        walkSchemas(tup as any, registry);
+        expect(registry.getName(restEl)).toBe('RestElement');
+    });
+
+    it('recurses into record valueSchema', () => {
+        const registry = new SchemaRegistry();
+        const val = object({ count: number() }).schemaName('RecordValue');
+        const r = record(string(), val);
+        walkSchemas(r as any, registry);
+        expect(registry.getName(val)).toBe('RecordValue');
+    });
+
+    it('handles unrecognized schema type without throwing (default branch)', () => {
+        const registry = new SchemaRegistry();
+        const fakeSchema = {
+            introspect: () => ({ type: 'custom_unknown_xyz' }),
+            validate: () => ({ valid: true, object: null })
+        } as any;
+        expect(() => walkSchemas(fakeSchema, registry)).not.toThrow();
     });
 });

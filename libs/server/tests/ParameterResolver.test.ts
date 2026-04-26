@@ -288,5 +288,77 @@ describe('ParameterResolver', () => {
                 expect(pointers).toContain('/body');
             }
         });
+
+        it('throws when querySchema is not an object schema', async () => {
+            const meta = makeMeta({ querySchema: string() as any });
+            const ctx = createMockContext();
+            await expect(
+                resolveArgs(meta, null, ctx, undefined)
+            ).rejects.toThrow('query schema must be an object schema');
+        });
+
+        it('throws when headerSchema is not an object schema', async () => {
+            const meta = makeMeta({ headerSchema: string() as any });
+            const ctx = createMockContext();
+            await expect(
+                resolveArgs(meta, null, ctx, undefined)
+            ).rejects.toThrow('headers schema must be an object schema');
+        });
+
+        it('throws when serviceSchemas declared but no services available', async () => {
+            const meta = makeMeta({
+                serviceSchemas: { myService: string() }
+            });
+            const ctx = createMockContext();
+            await expect(
+                resolveArgs(meta, null, ctx, undefined)
+            ).rejects.toThrow('no service provider is available');
+        });
+
+        it('resolves service dependencies when services available', async () => {
+            const serviceInstance = { greet: () => 'hello' };
+            const meta = makeMeta({
+                serviceSchemas: { myService: string() }
+            });
+            const ctx = createMockContext();
+            ctx.services = { get: () => serviceInstance } as any;
+
+            const result = await resolveArgs(meta, null, ctx, undefined);
+            expect(result.valid).toBe(true);
+            if (result.valid) {
+                expect(result.args).toHaveLength(2);
+                expect((result.args[1] as any).myService).toBe(serviceInstance);
+            }
+        });
+
+        it('includes principal in action context when authRoles is set and principal exists', async () => {
+            const meta = makeMeta({ authRoles: ['admin'] } as any);
+            const ctx = createMockContext();
+            ctx.principal = { id: 1, name: 'Alice' };
+
+            const result = await resolveArgs(meta, null, ctx, null);
+            expect(result.valid).toBe(true);
+            if (result.valid) {
+                expect((result.args[0] as any).principal).toEqual({
+                    id: 1,
+                    name: 'Alice'
+                });
+            }
+        });
+
+        it('returns /body pointer when body schema has no getInvalidProperties (fallback)', async () => {
+            // string() schema does not produce getInvalidProperties on its result
+            const meta = makeMeta({ bodySchema: string() as any });
+            const ctx = createMockContext();
+
+            const result = await resolveArgs(meta, 123 as any, ctx, null);
+            expect(result.valid).toBe(false);
+            if (!result.valid) {
+                const pointers = (result.problemDetails as any).errors.map(
+                    (e: any) => e.pointer
+                );
+                expect(pointers).toContain('/body');
+            }
+        });
     });
 });

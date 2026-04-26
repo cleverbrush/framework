@@ -151,4 +151,36 @@ describe('otelLogSink', () => {
         const sink = otelLogSink();
         await expect(sink[Symbol.asyncDispose]()).resolves.toBeUndefined();
     });
+
+    it('maps array property values', async () => {
+        const sink = otelLogSink();
+        await sink.emit([
+            {
+                timestamp: new Date(),
+                level: LogLevel.Information,
+                messageTemplate: 't',
+                renderedMessage: 't',
+                properties: { Tags: ['a', 'b', 'c'] }
+            }
+        ]);
+        const r = logExporter.getFinishedLogRecords().at(-1)!;
+        expect(r.attributes?.Tags).toEqual(['a', 'b', 'c']);
+    });
+
+    it('serializes non-JSON-safe objects with String() fallback', async () => {
+        const circular: Record<string, unknown> = {};
+        circular['self'] = circular;
+        const sink = otelLogSink();
+        await sink.emit([
+            {
+                timestamp: new Date(),
+                level: LogLevel.Information,
+                messageTemplate: 't',
+                renderedMessage: 't',
+                properties: { Circ: circular }
+            }
+        ]);
+        const r = logExporter.getFinishedLogRecords().at(-1)!;
+        expect(typeof r.attributes?.Circ).toBe('string');
+    });
 });

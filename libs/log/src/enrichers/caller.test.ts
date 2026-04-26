@@ -43,4 +43,18 @@ describe('callerEnricher', () => {
             Error.captureStackTrace = original;
         }
     });
+
+    it('returns event unchanged when non-library frame has no file:line pattern', () => {
+        const original = Error.captureStackTrace;
+        // Produce a stack where the first non-library frame has no regex match
+        Error.captureStackTrace = ((obj: { stack?: string }) => {
+            obj.stack = 'Error\n    at <anonymous>\n    at native code';
+        }) as typeof Error.captureStackTrace;
+        try {
+            const out = enricher(baseEvent);
+            expect(out).toBe(baseEvent);
+        } finally {
+            Error.captureStackTrace = original;
+        }
+    });
 });

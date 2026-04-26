@@ -2237,3 +2237,39 @@ describe('withVariants — per-variant relations', () => {
         expect(sql).toContain('free');
     });
 });
+
+describe('joinOne / joinMany validation errors', () => {
+    it('joinOne throws when as is missing', () => {
+        expect(() =>
+            query(knex, User).joinOne({
+                foreignSchema: Post,
+                localColumn: (t: any) => t.id,
+                foreignColumn: (t: any) => t.authorId,
+                as: '' as any
+            })
+        ).toThrow('as must be a non-empty string');
+    });
+
+    it('joinMany throws when as is missing', () => {
+        expect(() =>
+            query(knex, User).joinMany({
+                foreignSchema: Post,
+                localColumn: (t: any) => t.id,
+                foreignColumn: (t: any) => t.authorId,
+                as: '' as any
+            })
+        ).toThrow('as must be a non-empty string');
+    });
+
+    it('joinOne throws when mappers is not an object', () => {
+        expect(() =>
+            query(knex, User).joinOne({
+                foreignSchema: Post,
+                localColumn: (t: any) => t.id,
+                foreignColumn: (t: any) => t.authorId,
+                as: 'posts',
+                mappers: 'invalid' as any
+            })
+        ).toThrow('mappers must be an object');
+    });
+});

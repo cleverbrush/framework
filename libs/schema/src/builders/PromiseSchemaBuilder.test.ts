@@ -311,3 +311,45 @@ test('Immutability — each fluent call returns a new instance', () => {
     expect(s2 !== (s3 as any)).toEqual(true);
     expect(s3 !== (s4 as any)).toEqual(true);
 });
+
+// ---------------------------------------------------------------------------
+// validateAsync
+// ---------------------------------------------------------------------------
+
+test('validateAsync — valid Promise is accepted', async () => {
+    const schema = promise();
+    const { valid } = await schema.validateAsync(Promise.resolve(42) as any);
+    expect(valid).toBe(true);
+});
+
+test('validateAsync — non-Promise is rejected', async () => {
+    const schema = promise();
+    const { valid } = await schema.validateAsync('not a promise' as any);
+    expect(valid).toBe(false);
+});
+
+// ---------------------------------------------------------------------------
+// brand / readonly / nullable / notNullable
+// ---------------------------------------------------------------------------
+
+test('brand — returns new instance with branded type', () => {
+    const schema = promise();
+    const branded = schema.brand<'MyBrand'>();
+    expect(branded !== (schema as any)).toBe(true);
+});
+
+test('readonly — marks schema as readonly', () => {
+    const schema = promise();
+    const ro = schema.readonly();
+    expect(ro.introspect().isReadonly).toBe(true);
+});
+
+test('nullable — allows null value', () => {
+    const schema = promise().nullable();
+    expect(schema.validate(null as any).valid).toBe(true);
+});
+
+test('notNullable — removes nullable, rejects null', () => {
+    const schema = promise().nullable().notNullable();
+    expect(schema.validate(null as any).valid).toBe(false);
+});

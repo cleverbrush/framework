@@ -468,3 +468,124 @@ test('type — GenericSchemaBuilder is assignable to SchemaBuilder', () => {
     const ref: SchemaBuilder<any, any, any, any, any> = Wrap;
     expectTypeOf(ref).toMatchTypeOf<SchemaBuilder<any, any, any, any, any>>();
 });
+
+// ---------------------------------------------------------------------------
+// Fluent chaining — notNullable / default / clearDefault / brand / readonly
+// ---------------------------------------------------------------------------
+
+test('generic.notNullable — removes nullable flag', () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    );
+    const nul = Wrap.nullable();
+    const notNul = nul.notNullable();
+    expectTypeOf(notNul).toMatchTypeOf<
+        GenericSchemaBuilder<any, any, false, any, any, any>
+    >();
+    expect(notNul.validate(null as any).valid).toBe(false);
+});
+
+test('generic.default — provides a fallback value for optional', () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    );
+    const withDefault = Wrap.optional().default({ data: 'fallback' });
+    expectTypeOf(withDefault).toMatchTypeOf<
+        GenericSchemaBuilder<any, true, any, any, true, any>
+    >();
+    const info = withDefault.introspect();
+    expect(info.hasDefault).toBe(true);
+});
+
+test('generic.clearDefault — removes default value', () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    );
+    const withDefault = Wrap.optional().default({ data: 'fallback' });
+    const cleared = withDefault.clearDefault();
+    expectTypeOf(cleared).toMatchTypeOf<
+        GenericSchemaBuilder<any, any, any, any, false, any>
+    >();
+    expect(cleared.introspect().hasDefault).toBe(false);
+});
+
+test('generic.brand — brands the type', () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    );
+    const branded = Wrap.brand<'MyBrand'>();
+    expectTypeOf(branded).toMatchTypeOf<
+        GenericSchemaBuilder<any, any, any, any, any, any>
+    >();
+    // brand() returns a new instance
+    expect(branded !== (Wrap as any)).toBe(true);
+});
+
+test('generic.readonly — marks schema as readonly', () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    );
+    const ro = Wrap.readonly();
+    expectTypeOf(ro).toMatchTypeOf<
+        GenericSchemaBuilder<any, any, any, any, any, any>
+    >();
+    expect(ro.introspect().isReadonly).toBe(true);
+});
+
+test('generic.clearHasType — removes explicit type override', () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    );
+    const typed = Wrap.hasType<{ custom: boolean }>();
+    const cleared = typed.clearHasType();
+    expectTypeOf(cleared).toMatchTypeOf<
+        GenericSchemaBuilder<any, any, any, undefined, any, any>
+    >();
+    expect(cleared.introspect().type).toBe('generic');
+});
+
+// ---------------------------------------------------------------------------
+// async validation — edge cases (null/undefined early returns, no-defaults error)
+// ---------------------------------------------------------------------------
+
+test('generic — validateAsync(undefined) on optional schema returns valid', async () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    ).optional();
+    const { valid } = await Wrap.validateAsync(undefined as any);
+    expect(valid).toBe(true);
+});
+
+test('generic — validateAsync(null) on nullable schema returns valid', async () => {
+    const Wrap = generic(
+        [string()],
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    ).nullable();
+    const { valid } = await Wrap.validateAsync(null as any);
+    expect(valid).toBe(true);
+});
+
+test('generic — validateAsync without defaults fails with clear error', async () => {
+    const Wrap = generic(
+        <T extends SchemaBuilder<any, any, any, any, any>>(s: T) =>
+            object({ data: s })
+    );
+    const { valid, errors } = await Wrap.validateAsync({ data: 'x' } as any);
+    expect(valid).toBe(false);
+    expect(errors?.[0]?.message).toContain('.apply()');
+});

@@ -49,4 +49,19 @@ describe('traceEnricher', () => {
         expect(out.properties.TraceId).toBeUndefined();
         expect(out.properties.SpanId).toBeUndefined();
     });
+
+    it('returns the event unchanged when active span has no traceId', () => {
+        const enricher = traceEnricher();
+        const tracer = trace.getTracer('t');
+        const span = tracer.startSpan('work');
+        // Override spanContext to return no traceId
+        const originalCtx = span.spanContext.bind(span);
+        span.spanContext = () => ({ ...originalCtx(), traceId: '' });
+        let out: ReturnType<typeof enricher>;
+        context.with(trace.setSpan(context.active(), span), () => {
+            out = enricher({ ...baseEvent });
+        });
+        span.end();
+        expect(out!.properties.TraceId).toBeUndefined();
+    });
 });

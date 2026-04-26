@@ -72,4 +72,23 @@ describe('ConsoleSink', () => {
         expect(writeSpy).not.toHaveBeenCalled();
         writeSpy.mockRestore();
     });
+
+    it('should append exception stack to output (line 106)', async () => {
+        const writeSpy = vi
+            .spyOn(process.stderr, 'write')
+            .mockImplementation(() => true);
+
+        const err = new Error('something went wrong');
+        const sink = consoleSink({ theme: 'none' });
+        await sink.emit([
+            makeEvent({
+                level: LogLevel.Error,
+                exception: err
+            })
+        ]);
+
+        const output = writeSpy.mock.calls[0][0] as string;
+        expect(output).toContain('something went wrong');
+        writeSpy.mockRestore();
+    });
 });

@@ -7,7 +7,7 @@
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-96.8%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).

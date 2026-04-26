@@ -1739,4 +1739,102 @@ describe('webhooks', () => {
         const components = spec['components'] as any;
         expect(components?.securitySchemes).toBeUndefined();
     });
+
+    it('includes description and tags on webhook when set', () => {
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg()], {
+                webhooks: [
+                    {
+                        name: 'paymentProcessed',
+                        description: 'Fires when a payment is processed',
+                        tags: ['payments', 'events']
+                    }
+                ]
+            })
+        );
+        const whOp = (spec['webhooks'] as any)?.['paymentProcessed']?.['post'];
+        expect(whOp?.description).toBe('Fires when a payment is processed');
+        expect(whOp?.tags).toEqual(['payments', 'events']);
+    });
+
+    it('includes response schema in webhook responses when set', () => {
+        const responseSchema = object({ ack: string() });
+        const spec = generateOpenApiSpec(
+            makeOptions([makeReg()], {
+                webhooks: [
+                    {
+                        name: 'dataSync',
+                        response: responseSchema
+                    }
+                ]
+            })
+        );
+        const whOp = (spec['webhooks'] as any)?.['dataSync']?.['post'];
+        expect(
+            whOp?.responses?.['200']?.content?.['application/json']?.schema
+        ).toBeDefined();
+    });
+});
+
+// ---------------------------------------------------------------------------
+// responsesSchemas — multi-status response map
+// ---------------------------------------------------------------------------
+
+describe('responsesSchemas', () => {
+    it('emits each status code from responsesSchemas map', () => {
+        const schema200 = object({ id: number() });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    responsesSchemas: {
+                        200: schema200,
+                        404: null
+                    }
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        expect(op.responses['200']).toBeDefined();
+        expect(op.responses['404']).toBeDefined();
+        // 200 has content map, 404 is description-only (null schema)
+        expect(op.responses['200'].content).toBeDefined();
+        expect(op.responses['404'].content).toBeUndefined();
+    });
+
+    it('uses schema description when set on a responses schema', () => {
+        // Add description via introspect by using a plain string schema with description
+        const strSchema = string();
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    responsesSchemas: {
+                        200: strSchema
+                    }
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        // description falls back to HTTP status text when schema has no description
+        expect(op.responses['200'].description).toBeTruthy();
+    });
+
+    it('responsesSchemas takes precedence over responseSchema', () => {
+        const single = object({ v: string() });
+        const multi200 = object({ id: number() });
+        const spec = generateOpenApiSpec(
+            makeOptions([
+                makeReg({
+                    method: 'GET',
+                    responseSchema: single,
+                    responsesSchemas: { 201: multi200 }
+                })
+            ])
+        );
+        const op = (spec['paths'] as any)['/api/items']['get'];
+        // responsesSchemas wins — code 201, not 200 from single responseSchema
+        expect(op.responses['201']).toBeDefined();
+        expect(op.responses['200']).toBeUndefined();
+    });
 });

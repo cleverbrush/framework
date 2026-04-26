@@ -343,4 +343,138 @@ describe('ServiceScope', () => {
             /Circular dependency detected/
         );
     });
+
+    // ── getOptional ──────────────────────────────────
+
+    test('getOptional returns service when registered', () => {
+        const services = new ServiceCollection();
+        services.addScoped(IConfig, () => ({ port: 8080, host: 'localhost' }));
+
+        const provider = services.buildServiceProvider();
+        const scope = provider.createScope();
+        const result = scope.serviceProvider.getOptional(IConfig);
+        expect(result).toEqual({ port: 8080, host: 'localhost' });
+    });
+
+    test('getOptional returns undefined when not registered', () => {
+        const IUnknown = object({ x: number() });
+        const services = new ServiceCollection();
+        const provider = services.buildServiceProvider();
+        const scope = provider.createScope();
+        const result = scope.serviceProvider.getOptional(IUnknown);
+        expect(result).toBeUndefined();
+    });
+
+    // ── Unregistered service throws ──────────────────
+
+    test('get throws when service is not registered', () => {
+        const IUnregistered = object({ x: number() });
+        const services = new ServiceCollection();
+        const provider = services.buildServiceProvider();
+        const scope = provider.createScope();
+        expect(() => scope.serviceProvider.get(IUnregistered)).toThrow(
+            /Service not registered/
+        );
+    });
+
+    // ── Singleton accessed via scope ─────────────────
+
+    test('singleton service is accessible via scoped provider', () => {
+        const ISingleton = object({ value: string() });
+        const services = new ServiceCollection();
+        services.addSingleton(ISingleton, { value: 'shared' });
+
+        const provider = services.buildServiceProvider();
+        const scope1 = provider.createScope();
+        const scope2 = provider.createScope();
+
+        const a = scope1.serviceProvider.get(ISingleton);
+        const b = scope2.serviceProvider.get(ISingleton);
+        expect(a).toBe(b); // same singleton instance across scopes
+        expect(a.value).toBe('shared');
+    });
+
+    // ── Validation ───────────────────────────────────
+
+    test('service validation throws when factory produces invalid value', () => {
+        const IStrict = object({ name: string() });
+
+        const services = new ServiceCollection();
+        services.addScoped(IStrict, () => ({ name: 123 as any }), {
+            validate: true
+        });
+
+        const provider = services.buildServiceProvider();
+        const scope = provider.createScope();
+        expect(() => scope.serviceProvider.get(IStrict)).toThrow(
+            /validation failed/i
+        );
+    });
+
+    // ── asyncDispose re-throws ────────────────────────
+
+    test('asyncDispose re-throws first error but disposes all', async () => {
+        const order: number[] = [];
+        const IFirst = object({ id: number() });
+        const ISecond = object({ id: number() });
+
+        const services = new ServiceCollection();
+        services.addScoped(IFirst, () => ({
+            id: 1,
+            [Symbol.asyncDispose]: async () => {
+                order.push(1);
+            }
+        }));
+        services.addScoped(ISecond, () => ({
+            id: 2,
+            [Symbol.asyncDispose]: async () => {
+                order.push(2);
+                throw new Error('async disposal error');
+            }
+        }));
+
+        const provider = services.buildServiceProvider();
+        const scope = provider.createScope();
+        scope.serviceProvider.get(IFirst);
+        scope.serviceProvider.get(ISecond);
+
+        await expect(scope.asyncDispose()).rejects.toThrow(
+            'async disposal error'
+        );
+        expect(order).toEqual([2, 1]);
+    });
+
+    // ── Transient via scope ───────────────────────────
+
+    test('transient service via scope returns new instance each time', () => {
+        const IService = object({ value: number() });
+
+        let count = 0;
+        const services = new ServiceCollection();
+        services.addTransient(IService, () => ({ value: ++count }));
+
+        const provider = services.buildServiceProvider();
+        const scope = provider.createScope();
+
+        const a = scope.serviceProvider.get(IService);
+        const b = scope.serviceProvider.get(IService);
+        expect(a).not.toBe(b);
+        expect(a.value).toBe(1);
+        expect(b.value).toBe(2);
+    });
+
+    // ── getOptional via scope ─────────────────────────
+
+    test('scope.serviceProvider.getOptional delegates to provider', () => {
+        const IService = object({ value: number() });
+
+        const services = new ServiceCollection();
+        services.addScoped(IService, () => ({ value: 42 }));
+
+        const provider = services.buildServiceProvider();
+        const scope = provider.createScope();
+
+        const result = scope.serviceProvider.getOptional(IService);
+        expect(result).toEqual({ value: 42 });
+    });
 });

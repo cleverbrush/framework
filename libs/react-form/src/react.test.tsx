@@ -1375,3 +1375,65 @@ describe('nested form validation', () => {
         expect(result.current.zip.error).toBeTruthy();
     });
 });
+
+// ─── isErrorPathMatch tests ───────────────────────────────────────────────────
+
+import { isErrorPathMatch } from './helpers.js';
+
+describe('isErrorPathMatch', () => {
+    test('returns true for exact match', () => {
+        expect(isErrorPathMatch('$.user.name', '$.user.name')).toBe(true);
+    });
+
+    test('returns true when errPath starts with fieldPath + dot', () => {
+        expect(isErrorPathMatch('$.user.name.first', '$.user.name')).toBe(true);
+    });
+
+    test('returns true when errPath starts with fieldPath + paren', () => {
+        // e.g. validator annotation
+        expect(
+            isErrorPathMatch('$.user.name($validators[0])', '$.user.name')
+        ).toBe(true);
+    });
+
+    test('returns false for non-matching paths', () => {
+        expect(isErrorPathMatch('$.user.email', '$.user.name')).toBe(false);
+    });
+});
+
+// ─── FormStore.subscribeGlobal tests ─────────────────────────────────────────
+
+import { createFormStore } from './FormStore.js';
+
+describe('FormStore.subscribeGlobal', () => {
+    test('subscribeGlobal listener is called on notifyAll', () => {
+        const store = createFormStore({});
+        const listener = vi.fn();
+        const unsubscribe = store.subscribeGlobal(listener);
+
+        store.notifyAll();
+        expect(listener).toHaveBeenCalledTimes(1);
+
+        unsubscribe();
+        store.notifyAll();
+        expect(listener).toHaveBeenCalledTimes(1); // not called again after unsub
+    });
+});
+
+// ─── buildDescriptorPathMap tests ────────────────────────────────────────────
+
+import { buildDescriptorPathMap } from './helpers.js';
+
+describe('buildDescriptorPathMap', () => {
+    test('skips tree properties without SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR', () => {
+        // Pass a tree with an extra property that has no descriptor symbol
+        const schema = object({ name: string() });
+        const tree = {
+            name: Object.create(null), // no SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+            extra: 'not a descriptor'
+        };
+        const map = buildDescriptorPathMap(tree as any, schema as any);
+        // Neither entry has the symbol, so map should be empty
+        expect(map.size).toBe(0);
+    });
+});

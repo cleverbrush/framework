@@ -122,4 +122,17 @@ describe('serveAsyncApi', () => {
         const parsed = JSON.parse(body);
         expect(parsed.asyncapi).toBe('3.0.0');
     });
+
+    it('uses empty subscriptions when neither server nor getSubscriptionRegistrations is provided', async () => {
+        const mw = serveAsyncApi({
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        const ctx = makeContext('GET', '/asyncapi.json');
+        await mw(ctx as any, vi.fn());
+
+        const body = (ctx.response.end as any).mock.calls[0][0];
+        const parsed = JSON.parse(body);
+        expect(parsed.asyncapi).toBe('3.0.0');
+        expect(Object.keys(parsed.channels as any)).toHaveLength(0);
+    });
 });

@@ -79,4 +79,16 @@ describe('ContentNegotiator', () => {
         expect(handler).not.toBeNull();
         expect(handler!.mimeType).toBe('text/plain');
     });
+
+    it('treats invalid q value as 1 (line 32)', () => {
+        const cn = new ContentNegotiator();
+        cn.register({
+            mimeType: 'text/xml',
+            serialize: () => '<xml/>',
+            deserialize: () => ({})
+        });
+        // q=invalid is NaN, so quality defaults to 1 — text/xml wins
+        const handler = cn.selectResponseHandler('text/xml;q=invalid');
+        expect(handler!.mimeType).toBe('text/xml');
+    });
 });

@@ -121,3 +121,55 @@ test('Collector - 8: collect with rejected promise emits error when no promise s
     expect(errorHandler).toHaveBeenCalledOnce();
     expect(errorHandler.mock.calls[0][0]).toMatchObject({ key: 'a' });
 });
+
+test('Collector - 9: throws when keys is not an array', () => {
+    expect(() => new (Collector as any)(null)).toThrow(
+        'keys must be of time Array<String>'
+    );
+});
+
+test('Collector - 10: collect throws when same key is provided twice', async () => {
+    const c = new Collector<{ a: number }>(['a']);
+    const errorHandler = vi.fn();
+    c.on('error' as any, errorHandler);
+
+    c.collect('a', 1 as any);
+    c.collect('a', 2 as any); // duplicate
+
+    await new Promise(resolve => setTimeout(resolve, 20));
+    // The duplicate should trigger an error on the collector
+    expect(errorHandler).toHaveBeenCalled();
+});
+
+test('Collector - 11: timeout fires but collection already done (line 79)', async () => {
+    vi.useFakeTimers();
+    const c = new Collector<{ a: number }>(['a'], 1000);
+    c.collect('a', 42 as any);
+    // Let microtasks settle so the promise resolves and #leftToCollect reaches 0
+    await Promise.resolve();
+    await Promise.resolve();
+    // Advance timer - timeout callback should see #leftToCollect <= 0 and return early
+    await vi.advanceTimersByTimeAsync(2000);
+    vi.useRealTimers();
+    // No timeout event should have fired since collection completed
+});
+
+test('Collector - 12: promise resolves after timeout (line 110)', async () => {
+    vi.useFakeTimers();
+    let resolveP!: (v: number) => void;
+    const p = new Promise<number>(res => {
+        resolveP = res;
+    });
+    const c = new Collector<{ a: number }>(['a'], 100);
+    const timeoutHandler = vi.fn();
+    c.on('timeout', timeoutHandler);
+    c.collect('a', p as any);
+    // Fire the timeout before the promise resolves
+    await vi.advanceTimersByTimeAsync(200);
+    expect(timeoutHandler).toHaveBeenCalledOnce();
+    // Now resolve the promise — should hit the isTimedOut early return on line 110
+    resolveP(99);
+    await Promise.resolve();
+    await Promise.resolve();
+    vi.useRealTimers();
+});

@@ -529,3 +529,51 @@ test('throws for unknown schedule type', () => {
             })
     ).toThrow('unknown schedule type');
 });
+
+test('hasNext(span) returns false when schedule is exhausted (line 364)', () => {
+    const past = new Date(Date.now() - 10_000);
+    const calc = new ScheduleCalculator({
+        every: 'minute',
+        interval: 1,
+        startsOn: past,
+        maxOccurences: 1
+    });
+    // Exhaust the one occurrence
+    calc.next();
+    // Now #next is null — hasNext with span should return false
+    expect(calc.hasNext(10_000)).toBe(false);
+});
+
+test('next() throws when schedule is over (line 379)', () => {
+    const past = new Date(Date.now() - 10_000);
+    const calc = new ScheduleCalculator({
+        every: 'minute',
+        interval: 1,
+        startsOn: past,
+        maxOccurences: 1
+    });
+    calc.next();
+    expect(() => calc.next()).toThrow('schedule is over');
+});
+
+test('year - day:last covers lines 292-298', () => {
+    const calculator = new ScheduleCalculator({
+        every: 'year',
+        day: 'last',
+        month: 1,
+        interval: 1,
+        startsOn: new Date(Date.UTC(2022, 0, 1, 0, 0, 0, 0)),
+        maxOccurences: 2
+    });
+
+    expect(calculator.hasNext()).toEqual(true);
+    const first = calculator.next().date;
+    // Last day of January 2022 = Jan 31
+    expect(first.getUTCDate()).toBe(31);
+    expect(first.getUTCMonth()).toBe(0); // January
+
+    expect(calculator.hasNext()).toEqual(true);
+    const second = calculator.next().date;
+    expect(second.getUTCDate()).toBe(31);
+    expect(second.getUTCFullYear()).toBe(2023);
+});

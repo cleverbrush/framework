@@ -211,7 +211,9 @@ describe('instrumentKnex', () => {
             ['mysql', 'mysql'],
             ['mysql2', 'mysql'],
             ['better-sqlite3', 'sqlite'],
-            ['mssql', 'mssql']
+            ['mssql', 'mssql'],
+            ['oracledb', 'oracle'],
+            ['unknowndialect', 'unknowndialect']
         ];
         for (const [dialect, expected] of cases) {
             exporter.reset();

@@ -1,4 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
+import { LogContext } from '../LogContext.js';
+import { Logger } from '../Logger.js';
+import { LoggerPipeline } from '../LoggerPipeline.js';
+import { LogLevel } from '../LogLevel.js';
 import { correlationIdMiddleware } from './correlationId.js';
 
 // ---------------------------------------------------------------------------
@@ -95,5 +99,30 @@ describe('correlationIdMiddleware — responseHeader', () => {
         await mw(ctx, next);
 
         expect(responseSetHeader).not.toHaveBeenCalled();
+    });
+});
+
+describe('correlationIdMiddleware — LogContext integration', () => {
+    it('runs next within runWithCorrelationId when a LogContext store exists (line 62)', async () => {
+        const pipeline = new LoggerPipeline({
+            minimumLevel: LogLevel.Trace,
+            sinks: []
+        });
+        const logger = new Logger(pipeline);
+        const mw = correlationIdMiddleware();
+        const ctx = makeContext();
+
+        let nextCalled = false;
+        const trackingNext = async () => {
+            nextCalled = true;
+        };
+
+        await LogContext.run(logger, async () => {
+            await mw(ctx, trackingNext);
+        });
+
+        expect(nextCalled).toBe(true);
+        expect(ctx.items.get('correlationId')).toBeDefined();
+        await logger.dispose();
     });
 });

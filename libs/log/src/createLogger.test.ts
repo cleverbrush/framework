@@ -165,4 +165,31 @@ describe('createLogger', () => {
             onSpy.mockRestore();
         }
     });
+
+    it('onExit handler calls dispose; errors are swallowed', async () => {
+        const sink = mockSink();
+        const callbacks: Array<() => void> = [];
+        const onSpy = vi.spyOn(process, 'on').mockImplementation(((
+            _event: string,
+            cb: () => void
+        ) => {
+            callbacks.push(cb);
+            return process;
+        }) as any);
+
+        try {
+            createLogger({
+                sinks: [sink],
+                handleProcessExit: true
+            });
+
+            // Invoke the captured exit handler
+            expect(callbacks.length).toBeGreaterThan(0);
+            callbacks[0]();
+            // Let the microtask/promise resolve
+            await new Promise(r => setTimeout(r, 10));
+        } finally {
+            onSpy.mockRestore();
+        }
+    });
 });

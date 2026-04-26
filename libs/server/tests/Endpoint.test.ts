@@ -1,4 +1,4 @@
-import { number, object, string } from '@cleverbrush/schema';
+import { number, object, parseString, string } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
 import { endpoint, mapHandlers } from '../src/Endpoint.js';
 
@@ -394,5 +394,221 @@ describe('mapHandlers()', () => {
                 e.endpoint.introspect().method === 'GET'
         );
         expect(listEntry!.endpoint).toBe(endpoints.items.list);
+    });
+});
+
+describe('EndpointBuilder .headers() / .inject()', () => {
+    it('headers(schema) stores headerSchema in introspect', () => {
+        const headerSchema = object({ 'x-api-key': string() });
+        const ep = endpoint.get('/api/items').headers(headerSchema);
+        expect(ep.introspect().headerSchema).toBe(headerSchema);
+    });
+
+    it('headers() returns a new builder without mutating original', () => {
+        const headerSchema = object({ authorization: string() });
+        const a = endpoint.get('/api/items');
+        const b = a.headers(headerSchema);
+        expect(a).not.toBe(b);
+        expect(a.introspect().headerSchema).toBeNull();
+        expect(b.introspect().headerSchema).toBe(headerSchema);
+    });
+
+    it('inject({ name: schema }) stores serviceSchemas in introspect', () => {
+        const userServiceSchema = object({ id: number() });
+        const ep = endpoint
+            .get('/api/items')
+            .inject({ userService: userServiceSchema });
+        expect(ep.introspect().serviceSchemas).toEqual({
+            userService: userServiceSchema
+        });
+    });
+
+    it('inject() returns a new builder without mutating original', () => {
+        const schema = object({ id: number() });
+        const a = endpoint.get('/api/items');
+        const b = a.inject({ db: schema });
+        expect(a).not.toBe(b);
+        expect(a.introspect().serviceSchemas).toBeNull();
+        expect(b.introspect().serviceSchemas).toEqual({ db: schema });
+    });
+
+    it('headerSchema and serviceSchemas default to null', () => {
+        const meta = endpoint.get('/api/items').introspect();
+        expect(meta.headerSchema).toBeNull();
+        expect(meta.serviceSchemas).toBeNull();
+    });
+});
+
+describe('EndpointBuilder .authorize()', () => {
+    it('authorize(schema, role) stores authRoles and principal schema overload', () => {
+        const principalSchema = object({ id: number(), role: string() });
+        const ep = endpoint
+            .get('/api/admin')
+            .authorize(principalSchema, 'admin');
+        expect(ep.introspect().authRoles).toEqual(['admin']);
+    });
+
+    it('authorize(schema) with no roles sets empty authRoles array', () => {
+        const principalSchema = object({ id: number() });
+        const ep = endpoint.get('/api/secure').authorize(principalSchema);
+        expect(ep.introspect().authRoles).toEqual([]);
+    });
+
+    it('authorize(...roles) without schema sets authRoles', () => {
+        const ep = endpoint.get('/api/items').authorize('admin', 'moderator');
+        expect(ep.introspect().authRoles).toEqual(['admin', 'moderator']);
+    });
+
+    it('authorize() with no args sets empty authRoles', () => {
+        const ep = endpoint.get('/api/me').authorize();
+        expect(ep.introspect().authRoles).toEqual([]);
+    });
+
+    it('chaining authorize() merges roles', () => {
+        const ep = endpoint
+            .get('/api/items')
+            .authorize('admin')
+            .authorize('moderator');
+        expect(ep.introspect().authRoles).toEqual(['admin', 'moderator']);
+    });
+
+    it('authRoles defaults to null when not set', () => {
+        expect(endpoint.get('/api/items').introspect().authRoles).toBeNull();
+    });
+});
+
+describe('EndpointBuilder .responses()', () => {
+    it('responses(map) stores responsesSchemas in introspect', () => {
+        const okSchema = object({ id: number() });
+        const errSchema = object({ message: string() });
+        const ep = endpoint
+            .get('/api/items/:id')
+            .responses({ 200: okSchema, 404: errSchema });
+        const meta = ep.introspect();
+        expect(meta.responsesSchemas).toEqual({
+            200: okSchema,
+            404: errSchema
+        });
+    });
+
+    it('responses() with null schema for 204 is stored correctly', () => {
+        const ep = endpoint
+            .delete('/api/items/:id')
+            .responses({ 204: null, 404: object({ message: string() }) });
+        const meta = ep.introspect();
+        expect(meta.responsesSchemas![204]).toBeNull();
+        expect(meta.responsesSchemas![404]).toBeDefined();
+    });
+
+    it('responses() returns a new builder without mutating original', () => {
+        const a = endpoint.get('/api/items/:id');
+        const b = a.responses({ 200: object({ id: number() }) });
+        expect(a).not.toBe(b);
+        expect(a.introspect().responsesSchemas).toBeNull();
+        expect(b.introspect().responsesSchemas).not.toBeNull();
+    });
+
+    it('responsesSchemas defaults to null', () => {
+        expect(
+            endpoint.get('/api/items').introspect().responsesSchemas
+        ).toBeNull();
+    });
+});
+
+describe('EndpointBuilder .path getter', () => {
+    it('path returns basePath for default "/" pathTemplate', () => {
+        const ep = endpoint.get('/api/items');
+        expect(ep.path).toBe('/api/items');
+    });
+
+    it('path concatenates basePath and static pathTemplate', () => {
+        // When a string pathTemplate is provided it is appended to basePath
+        const ep = endpoint.get('/api', '/items');
+        expect(ep.path).toBe('/api/items');
+    });
+
+    it('path with ParseStringSchemaBuilder expands :params from segments', () => {
+        const paramsSchema = object({ id: number() });
+        const tpl = parseString(paramsSchema, $t => $t`/${t => t.id}`);
+        const ep = endpoint.get('/api/items', tpl as any);
+        expect(ep.path).toBe('/api/items/:id');
+    });
+
+    it('path with multi-segment ParseStringSchemaBuilder builds full path', () => {
+        const paramsSchema = object({ org: string(), repo: string() });
+        const tpl = parseString(
+            paramsSchema,
+            $t => $t`/${t => t.org}/${t => t.repo}`
+        );
+        const ep = endpoint.get('/api', tpl as any);
+        expect(ep.path).toBe('/api/:org/:repo');
+    });
+});
+
+describe('mapHandlers() with subscription endpoints', () => {
+    it('routes subscription endpoints to _subscriptions not _entries', () => {
+        const subEndpoint = endpoint.subscription('/ws/events');
+        const regularEndpoint = endpoint.get('/api/items');
+
+        const mapping = mapHandlers(
+            { ws: { events: subEndpoint }, api: { list: regularEndpoint } },
+            {
+                ws: { events: async function* () {} },
+                api: { list: () => [] }
+            }
+        );
+
+        expect(mapping._subscriptions).toHaveLength(1);
+        expect(mapping._entries).toHaveLength(1);
+        expect(mapping._subscriptions[0]!.endpoint).toBe(subEndpoint);
+        expect(mapping._entries[0]!.endpoint).toBe(regularEndpoint);
+    });
+});
+
+describe('SubscriptionBuilder .authorize()', () => {
+    it('authorize(schema, role) stores typed principal schema overload (line 591)', () => {
+        const principalSchema = object({ id: number() });
+        const sub = endpoint
+            .subscription('/ws/events')
+            .authorize(principalSchema, 'admin');
+
+        const meta = sub.introspect();
+        expect(meta.authRoles).toEqual(['admin']);
+    });
+
+    it('authorize(schema) with no roles sets empty authRoles (Subscription)', () => {
+        const principalSchema = object({ id: number() });
+        const sub = endpoint
+            .subscription('/ws/events')
+            .authorize(principalSchema);
+
+        const meta = sub.introspect();
+        expect(meta.authRoles).toEqual([]);
+    });
+
+    it('authorize(...roles) without schema sets authRoles (Subscription)', () => {
+        const sub = endpoint
+            .subscription('/ws/events')
+            .authorize('admin', 'moderator');
+
+        const meta = sub.introspect();
+        expect(meta.authRoles).toEqual(['admin', 'moderator']);
+    });
+});
+
+describe('endpoint HTTP method factories', () => {
+    it('patch() creates a PATCH endpoint', () => {
+        const ep = endpoint.patch('/api/items');
+        expect(ep.introspect().method).toBe('PATCH');
+    });
+
+    it('head() creates a HEAD endpoint', () => {
+        const ep = endpoint.head('/api/items');
+        expect(ep.introspect().method).toBe('HEAD');
+    });
+
+    it('options() creates an OPTIONS endpoint', () => {
+        const ep = endpoint.options('/api/items');
+        expect(ep.introspect().method).toBe('OPTIONS');
     });
 });

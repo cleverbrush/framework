@@ -152,4 +152,30 @@ describe('serveOpenApi', () => {
             bearerFormat: 'JWT'
         });
     });
+
+    it('uses explicit authConfig when provided (covers authConfig !== undefined branch)', async () => {
+        const mw = serveOpenApi({
+            getRegistrations: () => [] as EndpointRegistration[],
+            authConfig: null,
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        const ctx = makeContext('GET', '/openapi.json');
+        await mw(ctx as any, vi.fn());
+
+        const body = (ctx.response.end as any).mock.calls[0][0];
+        const parsed = JSON.parse(body);
+        expect(parsed.components?.securitySchemes).toBeUndefined();
+    });
+
+    it('uses empty registrations when neither server nor getRegistrations is provided', async () => {
+        const mw = serveOpenApi({
+            info: { title: 'Test', version: '1.0.0' }
+        });
+        const ctx = makeContext('GET', '/openapi.json');
+        await mw(ctx as any, vi.fn());
+
+        const body = (ctx.response.end as any).mock.calls[0][0];
+        const parsed = JSON.parse(body);
+        expect(parsed.paths).toEqual({});
+    });
 });

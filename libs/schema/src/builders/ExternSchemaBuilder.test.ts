@@ -1049,3 +1049,45 @@ test('e2e: getErrorsFor(t => t) on root shows isValid false when extern child fa
     const orderErrors = result.getErrorsFor(t => t.order);
     expect(orderErrors.isValid).toBe(false);
 });
+
+// ---------------------------------------------------------------------------
+// clearDefault / readonly / notNullable
+// ---------------------------------------------------------------------------
+
+test('clearDefault — removes default value', () => {
+    const baseSchema = {
+        '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            validate: (v: unknown) => ({ value: v as string })
+        }
+    };
+    const schema = extern(baseSchema).optional().default('fallback');
+    expect(schema.introspect().hasDefault).toBe(true);
+    const cleared = schema.clearDefault();
+    expect(cleared.introspect().hasDefault).toBe(false);
+});
+
+test('readonly — marks schema as readonly', () => {
+    const baseSchema = {
+        '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            validate: (v: unknown) => ({ value: v as string })
+        }
+    };
+    const schema = extern(baseSchema).readonly();
+    expect(schema.introspect().isReadonly).toBe(true);
+});
+
+test('notNullable — removes nullable flag, rejects null', () => {
+    const baseSchema = {
+        '~standard': {
+            version: 1 as const,
+            vendor: 'test',
+            validate: (v: unknown) => ({ value: v as string })
+        }
+    };
+    const schema = extern(baseSchema).nullable().notNullable();
+    expect(schema.validate(null as any).valid).toBe(false);
+});

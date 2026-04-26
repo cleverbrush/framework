@@ -1247,6 +1247,20 @@ describe('Tracked DbContext', () => {
         expect(returned).toBe(u1); // identity-map: existing wins
     });
 
+    it('entry().originalValues returns the snapshot', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b.com', name: 'Alice' };
+        db.attach('users', user);
+
+        const original = db.entry(user).originalValues;
+        expect(original.name).toBe('Alice');
+        expect(original.email).toBe('a@b.com');
+    });
+
     it('entry().isModified() returns false on unmodified entity', () => {
         const db = createDb(
             mock.knex,
@@ -1306,6 +1320,31 @@ describe('Tracked DbContext', () => {
         db.attach('users', user);
         db.detach(user);
         expect(() => db.entry(user)).toThrow(/not tracked/i);
+    });
+
+    it('detach removes added-without-PK entity from tracker (lines 382-385)', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        // Attach with no PK — goes to #addedWithoutPk
+        const user = { id: undefined as any, email: 'x@y', name: 'X' };
+        db.attach('users', user);
+        // Detach should remove from the #addedWithoutPk set
+        db.detach(user);
+        expect(() => db.entry(user)).toThrow(/not tracked/i);
+    });
+
+    it('attach() throws when entity set is unknown (line 290)', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        expect(() => db.attach('nonexistent' as any, { id: 1 })).toThrow(
+            /unknown entity set/i
+        );
     });
 
     // -------------------------------------------------------------------------
@@ -1548,6 +1587,23 @@ describe('Tracked DbContext', () => {
         // After reload the snapshot is fresh, so entry is Unchanged.
         expect(db.entry(user).state).toBe('Unchanged');
         expect(db.entry(user).isModified()).toBe(false);
+    });
+
+    it('reload() refreshes rowVersion snapshotValue', async () => {
+        mock.responses.push([{ id: 1, name: 'Original', version: 7 }]);
+
+        const db = createDb(
+            mock.knex,
+            { versioned: VersionedEntity },
+            { tracking: true }
+        );
+        const entity = { id: 1, name: 'Original', version: 5 };
+        db.attach('versioned', entity);
+
+        await db.reload(entity);
+
+        expect(entity.version).toBe(7);
+        expect(db.entry(entity).state).toBe('Unchanged');
     });
 
     // -------------------------------------------------------------------------
@@ -1983,5 +2039,443 @@ describe('Tracked DbContext — first() single result onResults (line 481)', () 
         // Mutating it marks it as modified.
         (user as any).name = 'BobChanged';
         expect(entry.isModified('name' as any)).toBe(true);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — reload() early returns (change-tracker.ts ~491-499)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — reload() early returns', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('reload() is a no-op for an untracked entity', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const untracked = { id: 99, email: 'x@y.com', name: 'X' };
+        // Should not throw and should not emit any SQL.
+        await db.reload(untracked);
+        expect(mock.captured).toHaveLength(0);
+    });
+
+    it('reload() is a no-op for an entity with no PK columns on its schema', async () => {
+        const db = createDb(
+            mock.knex,
+            { auditLogs: AuditLogEntity },
+            { tracking: true }
+        );
+        const entry = { message: 'test', at: new Date() } as any;
+        // AuditLogSchema has no PK columns → pkInfo.propertyKeys.length === 0 → early return
+        db.attach('auditLogs', entry);
+        await db.reload(entry);
+        expect(mock.captured).toHaveLength(0);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — attach() same-object snapshot refresh (change-tracker.ts ~335)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — attach() same-object snapshot refresh', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('re-attaching the same object reference refreshes its snapshot', () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b.com', name: 'Alice' };
+        db.attach('users', user);
+
+        // Dirty the entity.
+        user.name = 'Dirty';
+        expect(db.entry(user).isModified('name' as any)).toBe(true);
+
+        // Re-attach the same JS reference — should refresh snapshot to current values.
+        db.attach('users', user);
+        expect(db.entry(user).isModified('name' as any)).toBe(false);
+        expect(db.entry(user).state).toBe('Unchanged');
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — rowVersion 'manual' strategy (change-tracker.ts ~758)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const ManualVersionSchema = object({
+    id: number().primaryKey(),
+    name: string(),
+    etag: string().rowVersion()
+}).hasTableName('manual_versioned');
+const ManualVersionEntity = defineEntity(ManualVersionSchema);
+
+describe('Tracked DbContext — rowVersion manual strategy', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('saveChanges() uses the caller-supplied new etag value in the UPDATE (manual strategy)', async () => {
+        stubTransaction();
+        // UPDATE response (1 row updated).
+        mock.responses.push([{ id: 1, name: 'Updated', etag: 'v2' }]);
+
+        const db = createDb(
+            mock.knex,
+            { items: ManualVersionEntity },
+            { tracking: true }
+        );
+        const item = { id: 1, name: 'Original', etag: 'v1' };
+        db.attach('items', item);
+
+        // Caller sets the new version and mutates the name.
+        item.name = 'Updated';
+        item.etag = 'v2';
+
+        const result = await db.saveChanges();
+        expect(result.updated).toBe(1);
+
+        // The UPDATE SQL should include WHERE etag = 'v1' (snapshot) and SET etag = 'v2'.
+        const updateQuery = mock.captured.find(q => q.method === 'update');
+        expect(updateQuery).toBeDefined();
+        expect(updateQuery!.bindings).toContain('v1'); // WHERE old etag value
+        expect(updateQuery!.bindings).toContain('v2'); // SET new etag value
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — ConcurrencyError on 0 rows updated (change-tracker.ts ~793)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — ConcurrencyError on stale rowVersion', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransactionWithZeroUpdate(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+        // Make all UPDATE queries return 0 (simulate rowVersion conflict).
+        const client = mock.knex.client as any;
+        const origProcess = client.processResponse.bind(client);
+        client.processResponse = (resp: any, runner: any) => {
+            if (runner?.builder?._method === 'update') return 0;
+            return origProcess(resp, runner);
+        };
+    }
+
+    it('saveChanges() throws ConcurrencyError when UPDATE affects 0 rows', async () => {
+        stubTransactionWithZeroUpdate();
+        mock.responses.push([]); // UPDATE response (0 rows via processResponse override)
+
+        const db = createDb(
+            mock.knex,
+            { versioned: VersionedEntity },
+            { tracking: true }
+        );
+        const entity = { id: 1, name: 'Original', version: 5 };
+        db.attach('versioned', entity);
+
+        entity.name = 'Modified';
+
+        await expect(db.saveChanges()).rejects.toBeInstanceOf(ConcurrencyError);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — pendingSummary() Modified/Deleted counts (change-tracker.ts ~907)
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — pendingSummary() branch coverage', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    it('PendingChangesError message reflects silently-mutated Modified entries', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 1, email: 'a@b.com', name: 'Alice' };
+        db.attach('users', user);
+
+        // Silently mutate (no explicit state change — isDirty triggers Modified count).
+        user.name = 'Changed';
+
+        const err = await db[Symbol.asyncDispose]().catch(e => e);
+        expect(err).toBeInstanceOf(PendingChangesError);
+        expect(err.message).toMatch(/Modified/i);
+    });
+
+    it('PendingChangesError message reflects Deleted entries', async () => {
+        const db = createDb(
+            mock.knex,
+            { users: UserEntity },
+            { tracking: true }
+        );
+        const user = { id: 2, email: 'b@c.com', name: 'Bob' };
+        db.attach('users', user);
+
+        db.remove(user);
+
+        const err = await db[Symbol.asyncDispose]().catch(e => e);
+        expect(err).toBeInstanceOf(PendingChangesError);
+        expect(err.message).toMatch(/Deleted/i);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Tracked DbContext — timestamp rowVersion and DELETE with rowVersion
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TimestampVersionSchema = object({
+    id: number().primaryKey(),
+    name: string(),
+    updatedAt: date().rowVersion()
+}).hasTableName('ts_versioned');
+const TimestampVersionEntity = defineEntity(TimestampVersionSchema);
+
+describe('Tracked DbContext — timestamp rowVersion strategy', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('saveChanges() sets updatedAt to a new Date on UPDATE (timestamp strategy)', async () => {
+        stubTransaction();
+        mock.responses.push([
+            { id: 1, name: 'Updated', updated_at: new Date() }
+        ]);
+
+        const db = createDb(
+            mock.knex,
+            { items: TimestampVersionEntity },
+            { tracking: true }
+        );
+        const entity = {
+            id: 1,
+            name: 'Original',
+            updatedAt: new Date('2020-01-01')
+        };
+        db.attach('items', entity);
+
+        entity.name = 'Updated';
+
+        const result = await db.saveChanges();
+        expect(result.updated).toBe(1);
+
+        // The updatedAt should be a new Date (auto-set by timestamp strategy)
+        expect(entity.updatedAt).toBeInstanceOf(Date);
+        expect(entity.updatedAt.getTime()).toBeGreaterThan(
+            new Date('2020-01-01').getTime()
+        );
+    });
+});
+
+describe('Tracked DbContext — DELETE with rowVersion WHERE clause', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('saveChanges() includes rowVersion in DELETE WHERE clause', async () => {
+        stubTransaction();
+        // Response with rowCount=1 (1 row deleted)
+        mock.responses.push([{ id: 1 }]);
+
+        const db = createDb(
+            mock.knex,
+            { versioned: VersionedEntity },
+            { tracking: true }
+        );
+        const entity = { id: 1, name: 'ToDelete', version: 3 };
+        db.attach('versioned', entity);
+        db.remove(entity);
+
+        const result = await db.saveChanges();
+        expect(result.deleted).toBe(1);
+
+        // The DELETE query should include the rowVersion column in WHERE
+        const deleteQuery = mock.captured.find(q => q.method === 'del');
+        expect(deleteQuery).toBeDefined();
+        // bindings should include the version snapshot value (3)
+        expect(deleteQuery!.bindings).toContain(3);
+    });
+
+    it('saveChanges() throws ConcurrencyError when DELETE affects 0 rows due to stale rowVersion', async () => {
+        stubTransaction();
+        // Empty response → rowCount=0 → ConcurrencyError
+        mock.responses.push([]);
+
+        const db = createDb(
+            mock.knex,
+            { versioned: VersionedEntity },
+            { tracking: true }
+        );
+        const entity = { id: 1, name: 'ToDelete', version: 5 };
+        db.attach('versioned', entity);
+        db.remove(entity);
+
+        await expect(db.saveChanges()).rejects.toBeInstanceOf(ConcurrencyError);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// change-tracker.ts line 584-585: already-Modified entry path
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — explicit Modified state re-save', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('second saveChanges() after ConcurrencyError takes the already-Modified path', async () => {
+        // First save: UPDATE returns 0 → ConcurrencyError, entity stays Modified
+        // Second save: returns 1 → succeeds, taking the already-Modified branch (lines 584-585)
+        const client = mock.knex.client as any;
+        let callCount = 0;
+        const origProcess = client.processResponse.bind(client);
+        client.processResponse = (resp: any, runner: any) => {
+            if (runner?.builder?._method === 'update') {
+                callCount++;
+                return callCount === 1 ? 0 : 1;
+            }
+            return origProcess(resp, runner);
+        };
+
+        stubTransaction();
+        mock.responses.push([]);
+
+        const db = createDb(
+            mock.knex,
+            { versioned: VersionedEntity },
+            { tracking: true }
+        );
+        const entity = { id: 1, name: 'Original', version: 5 };
+        db.attach('versioned', entity);
+        entity.name = 'Changed';
+
+        // First save fails → entity retains Modified state
+        await expect(db.saveChanges()).rejects.toBeInstanceOf(ConcurrencyError);
+
+        stubTransaction();
+        mock.responses.push([{ id: 1, name: 'Changed', version: 6 }]);
+
+        // Second save: entity is already Modified → hits lines 584-585
+        const result = await db.saveChanges();
+        expect(result.updated).toBe(1);
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// change-tracker.ts line 740: new property added to entity after attach
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Tracked DbContext — new property added after attach', () => {
+    let mock: MockKnex;
+    beforeEach(() => {
+        mock = makeMockKnex();
+    });
+    afterEach(async () => {
+        await mock.knex.destroy();
+    });
+
+    function stubTransaction(): void {
+        vi.spyOn(mock.knex, 'transaction').mockImplementation((async (
+            cb: any
+        ) => cb(mock.knex)) as any);
+    }
+
+    it('saveChanges() includes new properties not in original snapshot in UPDATE', async () => {
+        stubTransaction();
+        mock.responses.push([{ id: 1 }]);
+
+        const db = createDb(
+            mock.knex,
+            { users: defineEntity(UserSchema) },
+            { tracking: true }
+        );
+        const entity: Record<string, unknown> = {
+            id: 1,
+            email: 'a@b.com',
+            name: 'Alice'
+        };
+        db.attach('users', entity as any);
+
+        // Mutate existing field so entity is dirty
+        entity.name = 'Bob';
+        // Add new property not present in original snapshot (covers line 740)
+        entity.extra = 'value';
+
+        const result = await db.saveChanges();
+        expect(result.updated).toBe(1);
+
+        const updateQuery = mock.captured.find(q => q.method === 'update');
+        expect(updateQuery).toBeDefined();
+        // The 'extra' field should be included in UPDATE bindings
+        expect(updateQuery!.bindings).toContain('value');
     });
 });

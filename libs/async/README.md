@@ -3,7 +3,7 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-93.6%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-96.8%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A set of simple utilities for working with asynchronous operations.

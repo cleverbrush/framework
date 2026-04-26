@@ -1088,3 +1088,8 @@ test('clearDefault - removes default value from string schema', () => {
     const { valid } = schema.validate(undefined as any);
     expect(valid).toEqual(false);
 });
+
+test('example() sets the example value on the schema (lines 1646, 2124)', () => {
+    const schema = string().example('hello');
+    expect(schema.introspect().example).toBe('hello');
+});

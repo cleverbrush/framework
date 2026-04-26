@@ -127,6 +127,12 @@ describe('serializeCookie', () => {
         const result = serializeCookie('my cookie', 'hello world');
         expect(result).toBe('my%20cookie=hello%20world');
     });
+
+    it('serializes with expires option', () => {
+        const expires = new Date('2030-01-01T00:00:00.000Z');
+        const result = serializeCookie('sid', 'abc', { expires });
+        expect(result).toContain(`Expires=${expires.toUTCString()}`);
+    });
 });
 
 // -----------------------------------------------------------------------

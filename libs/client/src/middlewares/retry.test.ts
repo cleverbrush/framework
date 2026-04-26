@@ -279,4 +279,38 @@ describe('retry middleware', () => {
         expect(res.status).toBe(200);
         expect(fetch).toHaveBeenCalledTimes(4); // 1 initial + 3 retries
     });
+
+    test('respects Retry-After header as HTTP-date', async () => {
+        // Provide a date 3 seconds in the future
+        const futureDate = new Date(Date.now() + 3_000).toUTCString();
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValueOnce(
+                jsonResponse(429, {}, { 'retry-after': futureDate })
+            )
+            .mockResolvedValueOnce(jsonResponse(200));
+
+        const mw = retry({ limit: 1, delay: () => 0 })(fetch);
+        const promise = mw('/api/test', { method: 'GET' });
+        await vi.advanceTimersByTimeAsync(10_000);
+        const res = await promise;
+
+        expect(res.status).toBe(200);
+    });
+
+    test('ignores invalid Retry-After header', async () => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValueOnce(
+                jsonResponse(429, {}, { 'retry-after': 'not-a-date' })
+            )
+            .mockResolvedValueOnce(jsonResponse(200));
+
+        const mw = retry({ limit: 1, delay: () => 0 })(fetch);
+        const promise = mw('/api/test', { method: 'GET' });
+        await vi.advanceTimersByTimeAsync(10_000);
+        const res = await promise;
+
+        expect(res.status).toBe(200);
+    });
 });
