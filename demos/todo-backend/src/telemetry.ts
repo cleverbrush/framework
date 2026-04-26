@@ -11,10 +11,9 @@
  * at `http://clickstack:4318` in `docker-compose.yml`).
  */
 import { setupOtel } from '@cleverbrush/otel';
-import {
-    outboundHttpInstrumentations,
-    runtimeMetrics
-} from '@cleverbrush/otel/instrumentations';
+import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
+import { UndiciInstrumentation } from '@opentelemetry/instrumentation-undici';
+import { RuntimeNodeInstrumentation } from '@opentelemetry/instrumentation-runtime-node';
 
 const endpoint =
     process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? 'http://clickstack:4318';
@@ -25,7 +24,8 @@ export const otel = setupOtel({
     environment: process.env.NODE_ENV,
     otlpEndpoint: endpoint,
     instrumentations: [
-        ...outboundHttpInstrumentations(),
-        ...runtimeMetrics()
+        new HttpInstrumentation(),
+        new UndiciInstrumentation(),
+        new RuntimeNodeInstrumentation()
     ]
 });

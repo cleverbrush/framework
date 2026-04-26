@@ -46,7 +46,7 @@
     "name": "@cleverbrush/todo-backend",
     "scripts": {
         "start": "node dist/index.js",
-        "dev": "tsx watch --env-file=.env src/index.ts",
+        "dev": "tsx watch --env-file=.env --import @opentelemetry/instrumentation/hook.mjs src/index.ts",
         "watch": "tsc --build tsconfig.build.json --watch",
         "build": "tsup && tsc --noEmit --project tsconfig.build.json",
         "clean": "rm -rf dist tsconfig.build.tsbuildinfo",

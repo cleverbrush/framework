@@ -236,7 +236,7 @@ export function setupOtel(config: OtelConfig): OtelHandle {
         resource,
         ...(spanProcessors ? { spanProcessors } : {}),
         ...(logRecordProcessors ? { logRecordProcessors } : {}),
-        ...(metricReader ? { metricReader } : {}),
+        ...(metricReader ? { metricReaders: [metricReader] } : {}),
         instrumentations: (config.instrumentations ?? []) as any
     });
 

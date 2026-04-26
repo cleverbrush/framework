@@ -88,22 +88,31 @@ services:
       - pgadmin_data:/var/lib/pgadmin
       - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
 
-  # ClickStack — all-in-one OTel collector + ClickHouse + UI.
+  # ClickStack — all-in-one OTel collector + ClickHouse + HyperDX UI + MongoDB.
   # UI:        http://localhost:${CLICKSTACK_PORT:-8091}
   # OTLP HTTP: http://clickstack:4318 (in-network) | http://localhost:4318 (host)
+  #
+  # Uses the `clickstack-local` image which runs in no-auth local mode out of
+  # the box — no user account needed. DEFAULT_CONNECTIONS and DEFAULT_SOURCES
+  # seed the ClickHouse connection and all four OTel sources (Logs, Traces,
+  # Metrics, Sessions) automatically on first boot, so `docker compose up`
+  # gives a fully configured UI with zero manual steps.
   #
   # NOTE: the host port MUST match the container port — the UI generates
   # self-referential URLs using its internal port. We override the internal
   # port via HYPERDX_APP_PORT so they always agree, freeing host port 8080.
-  #
-  # clickstack-entry.sh mounts over /etc/local/entry.sh to enable no-auth
-  # mode (IS_LOCAL_APP_MODE=DANGEROUSLY_is_local_app_mode💀) so the OTLP
-  # endpoint accepts data without an API key — suitable for local dev only.
   clickstack:
-    image: clickhouse/clickstack-all-in-one:latest
+    image: clickhouse/clickstack-local:latest
     restart: unless-stopped
     environment:
       HYPERDX_APP_PORT: ${CLICKSTACK_PORT:-8091}
+      # Pre-seed the local ClickHouse connection (host is localhost because
+      # ClickHouse runs inside the same container as HyperDX).
+      DEFAULT_CONNECTIONS: '[{"name":"Local ClickHouse","host":"http://localhost:8123","username":"default","password":""}]'
+      # Pre-seed all four OTel sources so Logs/Traces/Metrics/Sessions appear
+      # in the UI immediately without any manual configuration.
+      # Column names match the standard OTel ClickHouse exporter schema.
+      DEFAULT_SOURCES: '[{"from":{"databaseName":"default","tableName":"otel_logs"},"kind":"log","timestampValueExpression":"TimestampTime","name":"Logs","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"Body","serviceNameExpression":"ServiceName","bodyExpression":"Body","eventAttributesExpression":"LogAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,SeverityText,Body","severityTextExpression":"SeverityText","traceIdExpression":"TraceId","spanIdExpression":"SpanId","connection":"Local ClickHouse","traceSourceId":"Traces","metricSourceId":"Metrics"},{"from":{"databaseName":"default","tableName":"otel_traces"},"kind":"trace","timestampValueExpression":"Timestamp","name":"Traces","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"SpanName","serviceNameExpression":"ServiceName","eventAttributesExpression":"SpanAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,StatusCode,round(Duration/1e6),SpanName","traceIdExpression":"TraceId","spanIdExpression":"SpanId","durationExpression":"Duration","durationPrecision":9,"parentSpanIdExpression":"ParentSpanId","spanNameExpression":"SpanName","spanKindExpression":"SpanKind","statusCodeExpression":"StatusCode","statusMessageExpression":"StatusMessage","connection":"Local ClickHouse","logSourceId":"Logs","metricSourceId":"Metrics"},{"from":{"databaseName":"default","tableName":""},"kind":"metric","timestampValueExpression":"TimeUnix","name":"Metrics","resourceAttributesExpression":"ResourceAttributes","metricTables":{"gauge":"otel_metrics_gauge","histogram":"otel_metrics_histogram","sum":"otel_metrics_sum"},"connection":"Local ClickHouse","logSourceId":"Logs","traceSourceId":"Traces"},{"from":{"databaseName":"default","tableName":"hyperdx_sessions"},"kind":"session","timestampValueExpression":"TimestampTime","name":"Sessions","displayedTimestampValueExpression":"Timestamp","implicitColumnExpression":"Body","serviceNameExpression":"ServiceName","bodyExpression":"Body","eventAttributesExpression":"LogAttributes","resourceAttributesExpression":"ResourceAttributes","defaultTableSelectExpression":"Timestamp,ServiceName,SeverityText,Body","severityTextExpression":"SeverityText","traceIdExpression":"TraceId","spanIdExpression":"SpanId","connection":"Local ClickHouse","logSourceId":"Logs","traceSourceId":"Traces"}]'
     ports:
       - "${CLICKSTACK_PORT:-8091}:${CLICKSTACK_PORT:-8091}"
       - "4317:4317"   # OTLP/gRPC
@@ -113,7 +122,6 @@ services:
       - clickstack_data:/data/db
       - clickstack_ch_data:/var/lib/clickhouse
       - clickstack_ch_logs:/var/log/clickhouse-server
-      - ./clickstack-entry.sh:/etc/local/entry.sh:ro
     # Wait until the UI is accepting TCP connections before declaring the
     # service healthy. Uses bash's built-in /dev/tcp (no `nc` / `wget`
     # required). The OTel collector (4318) is launched by opampsupervisor

@@ -74,4 +74,4 @@ ENV NODE_ENV=production
 
 EXPOSE 3000
 
-CMD ["node", "--import", "./dist/telemetry.js", "dist/index.js"]
+CMD ["node", "--import", "@opentelemetry/instrumentation/hook.mjs", "--import", "./dist/telemetry.js", "dist/index.js"]
