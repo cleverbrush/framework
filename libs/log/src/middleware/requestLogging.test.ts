@@ -127,3 +127,125 @@ describe('requestLoggingMiddleware – excludePaths', () => {
         expect(sink.events.length).toBeGreaterThan(0);
     });
 });
+
+describe('requestLoggingMiddleware – level and body branches', () => {
+    let sink: ReturnType<typeof createMockSink>;
+    let logger: Logger;
+
+    beforeEach(() => {
+        sink = createMockSink();
+        const pipeline = new LoggerPipeline({
+            minimumLevel: LogLevel.Trace,
+            sinks: [sink]
+        });
+        logger = new Logger(pipeline);
+    });
+
+    it('logs at warning level for a 4xx status', async () => {
+        const mw = requestLoggingMiddleware(logger);
+        const ctx = {
+            method: 'GET',
+            url: { pathname: '/missing' },
+            headers: {},
+            response: { statusCode: 404 }
+        };
+        await mw(ctx, async () => {
+            ctx.response.statusCode = 404;
+        });
+        const event = sink.events[sink.events.length - 1];
+        expect(event.level).toBe(LogLevel.Warning);
+    });
+
+    it('logs at error level for a 5xx status', async () => {
+        const mw = requestLoggingMiddleware(logger);
+        const ctx = {
+            method: 'POST',
+            url: { pathname: '/crash' },
+            headers: {},
+            statusCode: 500
+        };
+        await mw(ctx, async () => {});
+        const event = sink.events[sink.events.length - 1];
+        expect(event.level).toBe(LogLevel.Error);
+    });
+
+    it('uses context.path when context.url is absent', async () => {
+        const mw = requestLoggingMiddleware(logger);
+        const ctx: any = {
+            method: 'GET',
+            path: '/fallback',
+            headers: {},
+            statusCode: 200
+        };
+        await mw(ctx, async () => {});
+        expect(sink.events.length).toBeGreaterThan(0);
+    });
+
+    it('respects custom getLevel function', async () => {
+        const mw = requestLoggingMiddleware(logger, {
+            getLevel: () => 'error'
+        });
+        const ctx = createContext('/api');
+        await mw(ctx, async () => {});
+        const event = sink.events[sink.events.length - 1];
+        expect(event.level).toBe(LogLevel.Error);
+    });
+
+    it('logs request start when logRequestStart is true', async () => {
+        const mw = requestLoggingMiddleware(logger, { logRequestStart: true });
+        const ctx = createContext('/api');
+        await mw(ctx, async () => {});
+        expect(sink.events.length).toBeGreaterThanOrEqual(1);
+        expect(
+            sink.events.some(e => e.messageTemplate?.includes('started'))
+        ).toBe(true);
+    });
+
+    it('includes user-agent in properties when present', async () => {
+        const mw = requestLoggingMiddleware(logger);
+        const ctx = {
+            method: 'GET',
+            url: { pathname: '/api' },
+            headers: { 'user-agent': 'TestAgent/1.0' },
+            statusCode: 200
+        };
+        await mw(ctx, async () => {});
+        expect(sink.events[0].properties?.UserAgent).toBe('TestAgent/1.0');
+    });
+
+    it('applies enrichRequest extra properties', async () => {
+        const mw = requestLoggingMiddleware(logger, {
+            enrichRequest: () => ({ RequestId: 'xyz' })
+        });
+        const ctx = createContext('/api');
+        await mw(ctx, async () => {});
+        expect(sink.events[0].properties?.RequestId).toBe('xyz');
+    });
+
+    it('swallows enrichRequest errors silently', async () => {
+        const mw = requestLoggingMiddleware(logger, {
+            enrichRequest: () => {
+                throw new Error('enricher boom');
+            }
+        });
+        const ctx = createContext('/api');
+        await mw(ctx, async () => {});
+        expect(sink.events.length).toBe(1);
+    });
+
+    it('logs and re-throws when downstream throws', async () => {
+        const mw = requestLoggingMiddleware(logger);
+        const ctx: any = {
+            method: 'GET',
+            url: { pathname: '/api' },
+            headers: {}
+        };
+        await expect(
+            mw(ctx, async () => {
+                throw new Error('downstream failure');
+            })
+        ).rejects.toThrow('downstream failure');
+        // At least one log event should have been emitted (the finally block logs)
+        expect(sink.events.length).toBeGreaterThan(0);
+    });
+});
