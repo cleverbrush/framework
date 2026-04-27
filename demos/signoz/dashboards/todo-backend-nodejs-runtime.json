@@ -1,0 +1,605 @@
+{
+  "description": "Node.js runtime health for the todo-backend process: heap memory, event loop, GC, and CPU — sourced from @opentelemetry/instrumentation-runtime-node (RuntimeNodeInstrumentation).",
+  "layout": [
+    {
+      "h": 1,
+      "i": "row-memory",
+      "maxH": 1,
+      "minH": 1,
+      "minW": 12,
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "h": 6,
+      "i": "w-heap-used",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "h": 6,
+      "i": "w-heap-rss",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 12,
+      "y": 1
+    },
+    {
+      "h": 1,
+      "i": "row-eventloop",
+      "maxH": 1,
+      "minH": 1,
+      "minW": 12,
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 7
+    },
+    {
+      "h": 6,
+      "i": "w-eventloop-util",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 0,
+      "y": 8
+    },
+    {
+      "h": 6,
+      "i": "w-gc-duration",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 12,
+      "y": 8
+    },
+    {
+      "h": 1,
+      "i": "row-cpu",
+      "maxH": 1,
+      "minH": 1,
+      "minW": 12,
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 14
+    },
+    {
+      "h": 6,
+      "i": "w-cpu",
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 15
+    }
+  ],
+  "panelMap": {
+    "row-memory": {
+      "collapsed": false,
+      "widgets": [
+        { "h": 6, "i": "w-heap-used", "moved": false, "static": false, "w": 12, "x": 0,  "y": 1 },
+        { "h": 6, "i": "w-heap-rss",  "moved": false, "static": false, "w": 12, "x": 12, "y": 1 }
+      ]
+    },
+    "row-eventloop": {
+      "collapsed": false,
+      "widgets": [
+        { "h": 6, "i": "w-eventloop-util", "moved": false, "static": false, "w": 12, "x": 0,  "y": 8 },
+        { "h": 6, "i": "w-gc-duration",    "moved": false, "static": false, "w": 12, "x": 12, "y": 8 }
+      ]
+    },
+    "row-cpu": {
+      "collapsed": false,
+      "widgets": [
+        { "h": 6, "i": "w-cpu", "moved": false, "static": false, "w": 24, "x": 0, "y": 15 }
+      ]
+    }
+  },
+  "tags": ["todo-backend", "nodejs", "runtime", "metrics"],
+  "title": "todo-backend — Node.js Runtime",
+  "uploadedGrafana": false,
+  "variables": {},
+  "version": "v4",
+  "widgets": [
+    {
+      "description": "",
+      "id": "row-memory",
+      "panelTypes": "row",
+      "title": "Memory"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "V8 heap used vs heap total. Emitted by RuntimeNodeInstrumentation as nodejs.heap.used and nodejs.heap.total (unit: bytes).",
+      "fillSpans": false,
+      "id": "w-heap-used",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.heap.used--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.heap.used",
+                "type": "Sum"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt1a2b3c",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "heap used",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.heap.total--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.heap.total",
+                "type": "Sum"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "B",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt2b3c4d",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "heap total",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-heap-used",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Heap Used vs Heap Total",
+      "yAxisUnit": "bytes"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "RSS (Resident Set Size) — total memory allocated to the Node.js process, including heap and native buffers. Emitted as nodejs.heap.rss (unit: bytes).",
+      "fillSpans": false,
+      "id": "w-heap-rss",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.heap.rss--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.heap.rss",
+                "type": "Sum"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt3c4d5e",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "RSS",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-heap-rss",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Process RSS Memory",
+      "yAxisUnit": "bytes"
+    },
+    {
+      "description": "",
+      "id": "row-eventloop",
+      "panelTypes": "row",
+      "title": "Event Loop & GC"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Event loop utilization ratio [0, 1] — the fraction of time the event loop is active. Values close to 1 indicate a saturated loop. Emitted as nodejs.event_loop.utilization (unit: 1).",
+      "fillSpans": false,
+      "id": "w-eventloop-util",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.event_loop.utilization--float64--Gauge--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.event_loop.utilization",
+                "type": "Gauge"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt4d5e6f",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "utilization",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-eventloop-util",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [
+        {
+          "index": 0,
+          "type": "absolute",
+          "value": 0.8
+        }
+      ],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Event Loop Utilization",
+      "yAxisUnit": "percentunit"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "GC pause duration broken down by GC type (major, minor, incremental, weakcb). High or frequent GC pauses indicate memory pressure. Emitted as nodejs.gc.duration histogram (unit: s), grouped by gc.type attribute.",
+      "fillSpans": false,
+      "id": "w-gc-duration",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.gc.duration--float64--Histogram--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.gc.duration",
+                "type": "Histogram"
+              },
+              "aggregateOperator": "count",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt5e6f7a",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "gc.type--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "gc.type",
+                  "type": "tag"
+                }
+              ],
+              "having": [],
+              "legend": "{{gc.type}} p99",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "p99",
+              "stepInterval": 60,
+              "timeAggregation": ""
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-gc-duration",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "GC Duration p99 (by GC type)",
+      "yAxisUnit": "s"
+    },
+    {
+      "description": "",
+      "id": "row-cpu",
+      "panelTypes": "row",
+      "title": "CPU"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "CPU utilization ratio [0, 1] split by state (user, system). Emitted as process.cpu.utilization gauge (unit: 1), grouped by cpu.mode attribute.",
+      "fillSpans": false,
+      "id": "w-cpu",
+      "isStacked": true,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "process.cpu.utilization--float64--Gauge--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "process.cpu.utilization",
+                "type": "Gauge"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt6f7a8b",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "cpu.mode--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "cpu.mode",
+                  "type": "tag"
+                }
+              ],
+              "having": [],
+              "legend": "{{cpu.mode}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-cpu",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": true,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "CPU Utilization (user + system)",
+      "yAxisUnit": "percentunit"
+    }
+  ]
+}
