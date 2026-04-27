@@ -7,7 +7,7 @@ import { createLogEvent } from './MessageTemplate.js';
  *
  * When passed to a `Logger` log method, the logger uses `template` as the
  * `messageTemplate` (so events with the same shape are grouped in Seq /
- * ClickStack / ClickHouse) and derives the rendered message by interpolating
+ * SigNoz / ClickHouse) and derives the rendered message by interpolating
  * `template` with the supplied parameters.
  *
  * @example
@@ -38,7 +38,7 @@ export interface TypedTemplate<T extends Record<string, unknown>> {
  * objects (produced by `ParseStringSchemaBuilder` from `@cleverbrush/schema`).
  * Typed templates carry a `template` property with the raw `{Property}` pattern,
  * which the logger uses as `messageTemplate` so all events of the same shape
- * are grouped correctly in Seq, ClickStack, ClickHouse, etc.
+ * are grouped correctly in Seq, SigNoz, ClickHouse, etc.
  *
  * @example
  * ```ts

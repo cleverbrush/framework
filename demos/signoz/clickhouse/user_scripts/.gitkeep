@@ -1,0 +1,3 @@
+# Placeholder to ensure git tracks this directory.
+# The histogramQuantile binary is downloaded here by the init-clickhouse
+# container on first boot and is gitignored.

@@ -148,7 +148,7 @@ const logger = createLogger({
                     site, and the logger uses the raw{' '}
                     <code>{'{Property}'}</code> pattern as{' '}
                     <code>messageTemplate</code> so all events of the same shape
-                    are <strong>grouped</strong> in Seq, ClickStack, ClickHouse,
+                    are <strong>grouped</strong> in Seq, SigNoz, ClickHouse,
                     etc.
                 </p>
                 <pre>

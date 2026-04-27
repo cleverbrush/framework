@@ -49,7 +49,7 @@ export const config = {
     reset: process.env.RESET === '1' || process.env.RESET === 'true',
     /**
      * If true, the suite leaves containers running after teardown so a
-     * developer can poke at the DB / ClickStack UI.  Implied by
+     * developer can poke at the DB / SigNoz UI.  Implied by
      * non-CI runs unless `CI=true` or `KEEP_STACK=0` is set.
      */
     keepStack:

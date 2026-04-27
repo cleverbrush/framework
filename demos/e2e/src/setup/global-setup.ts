@@ -12,7 +12,7 @@ const COMPOSE_FILE = path.join(REPO_ROOT, 'demos/docker-compose.yml');
 const TODO_BACKEND_DIR = path.join(REPO_ROOT, 'demos/todo-backend');
 
 /** Infrastructure services we always need from docker-compose. */
-const INFRA_SERVICES = ['postgres', 'clickstack'] as const;
+const INFRA_SERVICES = ['postgres', 'otel-collector'] as const;
 /** Application services that may also be supplied externally (e.g. `npm run dev:demo`). */
 const APP_SERVICES = ['backend', 'frontend'] as const;
 

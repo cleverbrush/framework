@@ -8,7 +8,7 @@ import { defineConfig } from 'vitest/config';
  *           browser well-behaved and avoid concurrent login collisions
  *
  * Both projects share the same global setup which orchestrates the
- * docker-compose stack (postgres + clickstack + backend + frontend) and
+ * docker-compose stack (postgres + signoz + backend + frontend) and
  * runs migrations once before any tests execute.
  */
 export default defineConfig({

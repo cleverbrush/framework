@@ -45,7 +45,7 @@ await logger.dispose();
 
 ## Typed Templates
 
-Pass a `ParseStringSchemaBuilder` (from `@cleverbrush/schema`) directly to any log method. The logger uses the raw `{Property}` pattern as `messageTemplate` so all events of the same shape are grouped in Seq, ClickStack, ClickHouse, etc., while the rendered message is interpolated as usual.
+Pass a `ParseStringSchemaBuilder` (from `@cleverbrush/schema`) directly to any log method. The logger uses the raw `{Property}` pattern as `messageTemplate` so all events of the same shape are grouped in Seq, SigNoz, ClickHouse, etc., while the rendered message is interpolated as usual.
 
 ```ts
 import { s } from '@cleverbrush/schema';

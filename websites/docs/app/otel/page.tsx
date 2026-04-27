@@ -286,11 +286,10 @@ span?.addEvent('cache.miss', { key: cacheKey });`)
                 <h2>🎯 See it in action</h2>
                 <p>
                     The <code>todo-backend</code> demo is fully wired and ships
-                    traces, logs, and metrics to a ClickStack container included
-                    in <code>demos/docker-compose.yml</code>. Run{' '}
+                    traces, logs, and metrics to a SigNoz container included in{' '}
+                    <code>demos/docker-compose.yml</code>. Run{' '}
                     <code>docker compose up</code> from <code>demos/</code> and
-                    open <code>http://localhost:8091</code> for the ClickStack
-                    UI.
+                    open <code>http://localhost:8082</code> for the SigNoz UI.
                 </p>
             </div>
         </div>

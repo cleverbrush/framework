@@ -74,7 +74,7 @@ export interface TracingMiddlewareOptions {
      * current request span.
      *
      * Expose this so API consumers can include it in bug reports and you
-     * can look up the exact trace in ClickStack / Jaeger / etc.
+     * can look up the exact trace in SigNoz / Jaeger / etc.
      *
      * Set to `false` to disable the header entirely.
      *
@@ -216,7 +216,7 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
                 ctx.items?.set?.(OTEL_SPAN_ITEM_KEY, span);
 
                 // Write the trace ID to the response so consumers can look
-                // up the exact trace in ClickStack / Jaeger / any backend.
+                // up the exact trace in SigNoz / Jaeger / any backend.
                 if (responseTraceHeader) {
                     const { traceId } = span.spanContext();
                     if (traceId) {

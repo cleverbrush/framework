@@ -1,7 +1,7 @@
 # `@cleverbrush/demo-e2e`
 
 End-to-end test suite for the todo demo. Brings up the full stack
-(Postgres + ClickStack + backend + frontend) with Docker Compose, runs
+(Postgres + SigNoz + backend + frontend) with Docker Compose, runs
 fresh migrations, and exercises the system through both REST/WebSocket
 APIs (Vitest) and the React UI (Playwright + Chromium).
 
@@ -62,7 +62,7 @@ cd demos/e2e && npx playwright install chromium
    already serving on their expected ports, skips starting those Compose
    services. This means you can run the suite on top of a long-running
    `npm run dev:demo` without conflicts.
-2. **Infrastructure** — always brings up `postgres` and `clickstack`
+2. **Infrastructure** — always brings up `postgres` and `otel-collector`
    (re-using existing containers).
 3. **Health waits** — polls each service for up to 120 s.
 4. **Migrations** — `npm run db:run -w @cleverbrush/todo-backend`,
