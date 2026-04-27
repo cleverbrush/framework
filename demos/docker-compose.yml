@@ -235,6 +235,22 @@ services:
       retries: 3
       start_period: 30s
 
+  # ── Dashboard Provisioner (one-shot, idempotent) ──────────────────────────
+  signoz-provisioner:
+    image: curlimages/curl:latest
+    restart: on-failure
+    depends_on:
+      signoz:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/provision-dashboards.sh"]
+    environment:
+      - SIGNOZ_URL=http://signoz:8080
+      - SIGNOZ_ADMIN_EMAIL=${SIGNOZ_ADMIN_EMAIL:-admin@todo.local.com}
+      - SIGNOZ_ADMIN_PASSWORD=${SIGNOZ_ADMIN_PASSWORD:-Admin1234!}
+    volumes:
+      - ./signoz/dashboards:/dashboards:ro
+      - ./signoz/provision-dashboards.sh:/provision-dashboards.sh:ro
+
 volumes:
   postgres_data:
   pgadmin_data:
