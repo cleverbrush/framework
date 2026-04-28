@@ -62,9 +62,23 @@ const FIRST_KEYWORD_RE = /^\s*([A-Za-z]+)/;
 // Recognised SQL operation keywords — anything outside this set is ignored
 // to prevent arbitrary SQL words becoming low-cardinality span names.
 const KNOWN_SQL_OPS = new Set([
-    'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'REPLACE',
-    'CALL', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE',
-    'EXPLAIN', 'ANALYZE', 'SHOW', 'WITH', 'EXECUTE', 'UPSERT'
+    'SELECT',
+    'INSERT',
+    'UPDATE',
+    'DELETE',
+    'MERGE',
+    'REPLACE',
+    'CALL',
+    'CREATE',
+    'ALTER',
+    'DROP',
+    'TRUNCATE',
+    'EXPLAIN',
+    'ANALYZE',
+    'SHOW',
+    'WITH',
+    'EXECUTE',
+    'UPSERT'
 ]);
 
 function inferOperation(sql: string, method?: string): string | undefined {
