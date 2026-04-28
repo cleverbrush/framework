@@ -40,7 +40,9 @@ describe('Telemetry smoke — ClickHouse logs & traces correlation', () => {
             Body: string;
             TraceId: string;
         }>(
-            `SELECT Body, TraceId FROM default.otel_logs WHERE TraceId = '${traceId}' FORMAT JSON`,
+            `SELECT body AS Body, trace_id AS TraceId FROM signoz_logs.distributed_logs_v2 WHERE trace_id = '${traceId}' FORMAT JSON`,
+ace_id = '${traceId}' FORMAT JSON`,
+
             45_000,
             1_000
         );
@@ -53,8 +55,10 @@ describe('Telemetry smoke — ClickHouse logs & traces correlation', () => {
         const spans = await waitForRows<{
             SpanName: string;
             ServiceName: string;
-        }>(
-            `SELECT SpanName, ServiceName FROM default.otel_traces WHERE TraceId = '${traceId}' FORMAT JSON`,
+        }>(name AS SpanName, resources_string['service.name'] AS ServiceName FROM signoz_traces.distributed_signoz_index_v3 WHERE trace_id = '${traceId}' FORMAT JSON`,
+
+            `SELECT name AS SpanName, resources_string['service.name'] AS ServiceName FROM signoz_traces.distributed_signoz_index_v3 WHERE trace_id = '${traceId}' FORMAT JSON`,
+
             45_000,
             1_000
         );
@@ -63,9 +67,9 @@ describe('Telemetry smoke — ClickHouse logs & traces correlation', () => {
         expect(services.has('todo-backend')).toBe(true);
     });
 
-    it('ClickHouse is reachable and reports recent log volume', async () => {
+    it('ClickHouse is reachable and reports recent losignoz_logs.distributed_logs_v2 WHERE toDateTime(intDiv(timestamp, 1000000000))
         const { rows } = await clickhouseQuery<{ recent: string }>(
-            `SELECT toString(count()) AS recent FROM default.otel_logs WHERE Timestamp >= now() - INTERVAL 1 HOUR FORMAT JSON`
+            `SELECT toString(count()) AS recent FROM signoz_logs.distributed_logs_v2 WHERE toDateTime(intDiv(timestamp, 1000000000)) >= now() - INTERVAL 1 HOUR FORMAT JSON`
         );
         expect(rows.length).toBe(1);
         // Smoke: not asserting an exact count, just that the pipeline isn't empty.

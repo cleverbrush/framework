@@ -22,8 +22,8 @@ export const config = {
     /** ClickHouse HTTP endpoint */
     clickhouseUrl:
         process.env.E2E_CLICKHOUSE_URL || 'http://localhost:8123',
-    clickhouseUser: process.env.E2E_CLICKHOUSE_USER || 'api',
-    clickhousePassword: process.env.E2E_CLICKHOUSE_PASSWORD || 'api',
+    clickhouseUser: process.env.E2E_CLICKHOUSE_USER || 'default',
+    clickhousePassword: process.env.E2E_CLICKHOUSE_PASSWORD || '',
     /** Postgres connection (matches docker-compose host-mapped port). */
     postgres: {
         host: process.env.E2E_PG_HOST || process.env.DB_HOST || 'localhost',

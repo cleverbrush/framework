@@ -21,7 +21,8 @@ async function compose(args: string[]): Promise<void> {
     await new Promise<void>((resolve, reject) => {
         const child = spawn('docker', ['compose', '-f', COMPOSE_FILE, ...args], {
             stdio: 'inherit',
-            cwd: REPO_ROOT
+            cwd: REPO_ROOT,
+            env: { ...process.env, DOCKER_CLIENT_TIMEOUT: '300' }
         });
         child.on('error', reject);
         child.on('exit', code => {
