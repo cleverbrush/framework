@@ -176,6 +176,10 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
         const meta = getEndpointMeta(ctx);
         const route = getRouteTemplate(meta);
         const method: string = (ctx.method ?? 'GET').toUpperCase();
+        // Span name follows OTel HTTP semconv (low-cardinality, descending priority):
+        //   1. operationId       — e.g. "getTodoById"
+        //   2. METHOD ROUTE      — e.g. "GET /todos/{id}"
+        //   3. METHOD pathname   — fallback when no route template is available
         const spanName: string =
             meta?.operationId ||
             (route ? `${method} ${route}` : `${method} ${pathname}`);

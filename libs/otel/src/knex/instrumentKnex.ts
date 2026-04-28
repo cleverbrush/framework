@@ -58,10 +58,20 @@ interface KnexQueryEvent {
 }
 
 const FIRST_KEYWORD_RE = /^\s*([A-Za-z]+)/;
+
+// Recognised SQL operation keywords — anything outside this set is ignored
+// to prevent arbitrary SQL words becoming low-cardinality span names.
+const KNOWN_SQL_OPS = new Set([
+    'SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'REPLACE',
+    'CALL', 'CREATE', 'ALTER', 'DROP', 'TRUNCATE',
+    'EXPLAIN', 'ANALYZE', 'SHOW', 'WITH', 'EXECUTE', 'UPSERT'
+]);
+
 function inferOperation(sql: string, method?: string): string | undefined {
     if (method) return method.toUpperCase();
     const m = FIRST_KEYWORD_RE.exec(sql);
-    return m?.[1]?.toUpperCase();
+    const word = m?.[1]?.toUpperCase();
+    return word && KNOWN_SQL_OPS.has(word) ? word : undefined;
 }
 
 function inferDbSystem(client: any): string | undefined {
@@ -151,7 +161,11 @@ export function instrumentKnex<T extends Knex>(
         const uid = q.__knexQueryUid;
         if (!uid) return;
         const operation = inferOperation(q.sql, q.method);
-        const spanName = operation ?? 'db.query';
+        const spanName = operation
+            ? dbName
+                ? `${operation} ${dbName}`
+                : operation
+            : 'db.query';
 
         const attrs: Record<string, string | number> = { ...baseAttrs };
         if (operation) attrs[ATTR_DB_OPERATION_NAME] = operation;

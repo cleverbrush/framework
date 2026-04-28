@@ -58,7 +58,7 @@ describe('instrumentKnex', () => {
         expect(spans).toHaveLength(1);
         const span = spans[0]!;
         expect(span.kind).toBe(2); // CLIENT
-        expect(span.name).toBe('SELECT');
+        expect(span.name).toBe('SELECT todo_db');
         expect(span.attributes['db.system.name']).toBe('postgresql');
         expect(span.attributes['db.namespace']).toBe('todo_db');
         expect(span.attributes['db.operation.name']).toBe('SELECT');
@@ -226,5 +226,47 @@ describe('instrumentKnex', () => {
                 exporter.getFinishedSpans()[0]!.attributes['db.system.name']
             ).toBe(expected);
         }
+    });
+
+    it('uses db.query span name and omits db.operation.name for unrecognised SQL keywords', () => {
+        const k = makeMockKnex();
+        instrumentKnex(k);
+        // "BROKEN" is not a recognised SQL operation — span name must not expose it.
+        k.emit('query', { sql: 'broken sql', __knexQueryUid: 'q-unknown' });
+        k.emit('query-response', [], { __knexQueryUid: 'q-unknown' });
+        const span = exporter.getFinishedSpans()[0]!;
+        expect(span.name).toBe('db.query');
+        expect(span.attributes['db.operation.name']).toBeUndefined();
+    });
+
+    it('uses bare operation name when operation is known but db namespace is absent', () => {
+        const k = makeMockKnex(); // no connection.database set
+        instrumentKnex(k);
+        k.emit('query', {
+            sql: 'select 1',
+            method: 'select',
+            __knexQueryUid: 'q-no-db'
+        });
+        k.emit('query-response', [], { __knexQueryUid: 'q-no-db' });
+        const span = exporter.getFinishedSpans()[0]!;
+        expect(span.name).toBe('SELECT');
+        expect(span.attributes['db.operation.name']).toBe('SELECT');
+    });
+
+    it('includes db namespace in span name when operation and db.namespace are both known', () => {
+        const k = makeMockKnex({
+            connection: { database: 'mydb', host: 'db', port: 5432 }
+        });
+        instrumentKnex(k);
+        k.emit('query', {
+            sql: 'delete from sessions where expires < ?',
+            method: 'delete',
+            __knexQueryUid: 'q-db-ns'
+        });
+        k.emit('query-response', [], { __knexQueryUid: 'q-db-ns' });
+        const span = exporter.getFinishedSpans()[0]!;
+        expect(span.name).toBe('DELETE mydb');
+        expect(span.attributes['db.operation.name']).toBe('DELETE');
+        expect(span.attributes['db.namespace']).toBe('mydb');
     });
 });
