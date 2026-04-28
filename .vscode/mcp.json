@@ -1,9 +1,5 @@
 {
     "servers": {
-        "context7": {
-            "type": "http",
-            "url": "https://mcp.context7.com/mcp"
-        },
         "playwright": {
             "command": "npx",
             "args": ["@playwright/mcp", "--headless"]
@@ -25,7 +21,7 @@
             }
         },
         "clickhouse": {
-            "command": "/home/andrew/.local/bin/uv",
+            "command": "~/.local/bin/uv",
             "args": [
                 "run",
                 "--with",
@@ -37,8 +33,8 @@
             "env": {
                 "CLICKHOUSE_HOST": "localhost",
                 "CLICKHOUSE_PORT": "8123",
-                "CLICKHOUSE_USER": "api",
-                "CLICKHOUSE_PASSWORD": "api",
+                "CLICKHOUSE_USER": "default",
+                "CLICKHOUSE_PASSWORD": "",
                 "CLICKHOUSE_SECURE": "false",
                 "CLICKHOUSE_VERIFY": "false"
             }

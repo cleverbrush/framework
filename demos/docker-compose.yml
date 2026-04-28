@@ -147,6 +147,8 @@ services:
       nofile:
         soft: 262144
         hard: 262144
+    ports:
+      - "0.0.0.0:8123:8123"   # Clickhouse
     environment:
       - CLICKHOUSE_SKIP_USER_SETUP=1
     volumes:

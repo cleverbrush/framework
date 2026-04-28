@@ -41,7 +41,7 @@ function createAuditLogMiddleware(logger: Logger): Middleware {
         auditLog.info(AuditEnd, {
             Method: ctx.method,
             Path: ctx.url.pathname,
-            ElapsedMs: Date.now() - start
+            Elapsed: Date.now() - start
         });
     };
 }

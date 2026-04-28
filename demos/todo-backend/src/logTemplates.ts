@@ -61,9 +61,9 @@ export const AuditStart = parseString(
 );
 
 export const AuditEnd = parseString(
-    object({ Method: string(), Path: string(), ElapsedMs: number() }),
+    object({ Method: string(), Path: string(), Elapsed: number() }),
     $t =>
-        $t`Audit end: ${t => t.Method} ${t => t.Path} completed in ${t => t.ElapsedMs}ms`
+        $t`Audit end: ${t => t.Method} ${t => t.Path} completed in ${t => t.Elapsed}ms`
 );
 
 // ── Todos ────────────────────────────────────────────────────────────────────

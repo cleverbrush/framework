@@ -121,7 +121,7 @@
       "bucketCount": 30,
       "bucketWidth": 0,
       "columnUnits": {},
-      "description": "V8 heap used vs heap total. Emitted by RuntimeNodeInstrumentation as nodejs.heap.used and nodejs.heap.total (unit: bytes).",
+      "description": "V8 heap used vs heap limit. Emitted by RuntimeNodeInstrumentation as v8js.memory.heap.used and v8js.memory.heap.limit (summed across all heap spaces, unit: bytes).",
       "fillSpans": false,
       "id": "w-heap-used",
       "isStacked": false,
@@ -135,11 +135,11 @@
             {
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "nodejs.heap.used--float64--Sum--true",
+                "id": "v8js.memory.heap.used--float64--Gauge--true",
                 "isColumn": true,
                 "isJSON": false,
-                "key": "nodejs.heap.used",
-                "type": "Sum"
+                "key": "v8js.memory.heap.used",
+                "type": "Gauge"
               },
               "aggregateOperator": "avg",
               "dataSource": "metrics",
@@ -171,18 +171,18 @@
               "orderBy": [],
               "queryName": "A",
               "reduceTo": "avg",
-              "spaceAggregation": "avg",
+              "spaceAggregation": "sum",
               "stepInterval": 60,
               "timeAggregation": "avg"
             },
             {
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "nodejs.heap.total--float64--Sum--true",
+                "id": "v8js.memory.heap.limit--float64--Gauge--true",
                 "isColumn": true,
                 "isJSON": false,
-                "key": "nodejs.heap.total",
-                "type": "Sum"
+                "key": "v8js.memory.heap.limit",
+                "type": "Gauge"
               },
               "aggregateOperator": "avg",
               "dataSource": "metrics",
@@ -209,12 +209,12 @@
               "functions": [],
               "groupBy": [],
               "having": [],
-              "legend": "heap total",
+              "legend": "heap limit",
               "limit": null,
               "orderBy": [],
               "queryName": "B",
               "reduceTo": "avg",
-              "spaceAggregation": "avg",
+              "spaceAggregation": "sum",
               "stepInterval": 60,
               "timeAggregation": "avg"
             }
@@ -238,14 +238,14 @@
       "stackedBarChart": false,
       "thresholds": [],
       "timePreferance": "GLOBAL_TIME",
-      "title": "Heap Used vs Heap Total",
+      "title": "Heap Used vs Heap Limit",
       "yAxisUnit": "bytes"
     },
     {
       "bucketCount": 30,
       "bucketWidth": 0,
       "columnUnits": {},
-      "description": "RSS (Resident Set Size) — total memory allocated to the Node.js process, including heap and native buffers. Emitted as nodejs.heap.rss (unit: bytes).",
+      "description": "Physical heap space size summed across all V8 heap spaces. Emitted as v8js.memory.heap.space.physical_size gauge (unit: bytes).",
       "fillSpans": false,
       "id": "w-heap-rss",
       "isStacked": false,
@@ -259,11 +259,11 @@
             {
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "nodejs.heap.rss--float64--Sum--true",
+                "id": "v8js.memory.heap.space.physical_size--float64--Gauge--true",
                 "isColumn": true,
                 "isJSON": false,
-                "key": "nodejs.heap.rss",
-                "type": "Sum"
+                "key": "v8js.memory.heap.space.physical_size",
+                "type": "Gauge"
               },
               "aggregateOperator": "avg",
               "dataSource": "metrics",
@@ -290,12 +290,12 @@
               "functions": [],
               "groupBy": [],
               "having": [],
-              "legend": "RSS",
+              "legend": "physical size",
               "limit": null,
               "orderBy": [],
               "queryName": "A",
               "reduceTo": "avg",
-              "spaceAggregation": "avg",
+              "spaceAggregation": "sum",
               "stepInterval": 60,
               "timeAggregation": "avg"
             }
@@ -319,7 +319,7 @@
       "stackedBarChart": false,
       "thresholds": [],
       "timePreferance": "GLOBAL_TIME",
-      "title": "Process RSS Memory",
+      "title": "Heap Physical Size (all spaces)",
       "yAxisUnit": "bytes"
     },
     {
@@ -332,7 +332,7 @@
       "bucketCount": 30,
       "bucketWidth": 0,
       "columnUnits": {},
-      "description": "Event loop utilization ratio [0, 1] — the fraction of time the event loop is active. Values close to 1 indicate a saturated loop. Emitted as nodejs.event_loop.utilization (unit: 1).",
+      "description": "Event loop utilization ratio [0, 1] — the fraction of time the event loop is active. Values close to 1 indicate a saturated loop. Emitted as nodejs.eventloop.utilization (unit: 1).",
       "fillSpans": false,
       "id": "w-eventloop-util",
       "isStacked": false,
@@ -346,10 +346,10 @@
             {
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "nodejs.event_loop.utilization--float64--Gauge--true",
+                "id": "nodejs.eventloop.utilization--float64--Gauge--true",
                 "isColumn": true,
                 "isJSON": false,
-                "key": "nodejs.event_loop.utilization",
+                "key": "nodejs.eventloop.utilization",
                 "type": "Gauge"
               },
               "aggregateOperator": "avg",
@@ -419,7 +419,7 @@
       "bucketCount": 30,
       "bucketWidth": 0,
       "columnUnits": {},
-      "description": "GC pause duration broken down by GC type (major, minor, incremental, weakcb). High or frequent GC pauses indicate memory pressure. Emitted as nodejs.gc.duration histogram (unit: s), grouped by gc.type attribute.",
+      "description": "GC pause duration broken down by GC type (major, minor, incremental). High or frequent GC pauses indicate memory pressure. Emitted as v8js.gc.duration histogram (unit: s), grouped by v8js.gc.type attribute.",
       "fillSpans": false,
       "id": "w-gc-duration",
       "isStacked": false,
@@ -433,13 +433,13 @@
             {
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "nodejs.gc.duration--float64--Histogram--true",
+                "id": "v8js.gc.duration.sum--float64--Sum--true",
                 "isColumn": true,
                 "isJSON": false,
-                "key": "nodejs.gc.duration",
-                "type": "Histogram"
+                "key": "v8js.gc.duration.sum",
+                "type": "Sum"
               },
-              "aggregateOperator": "count",
+              "aggregateOperator": "rate",
               "dataSource": "metrics",
               "disabled": false,
               "expression": "A",
@@ -465,22 +465,22 @@
               "groupBy": [
                 {
                   "dataType": "string",
-                  "id": "gc.type--string--tag--false",
+                  "id": "v8js.gc.type--string--tag--false",
                   "isColumn": false,
                   "isJSON": false,
-                  "key": "gc.type",
+                  "key": "v8js.gc.type",
                   "type": "tag"
                 }
               ],
               "having": [],
-              "legend": "{{gc.type}} p99",
+              "legend": "{{v8js.gc.type}}",
               "limit": null,
               "orderBy": [],
               "queryName": "A",
               "reduceTo": "avg",
-              "spaceAggregation": "p99",
+              "spaceAggregation": "sum",
               "stepInterval": 60,
-              "timeAggregation": ""
+              "timeAggregation": "rate"
             }
           ],
           "queryFormulas": []
@@ -502,23 +502,23 @@
       "stackedBarChart": false,
       "thresholds": [],
       "timePreferance": "GLOBAL_TIME",
-      "title": "GC Duration p99 (by GC type)",
+      "title": "GC Duration Rate (by GC type)",
       "yAxisUnit": "s"
     },
     {
       "description": "",
       "id": "row-cpu",
       "panelTypes": "row",
-      "title": "CPU"
+      "title": "Event Loop Delay"
     },
     {
       "bucketCount": 30,
       "bucketWidth": 0,
       "columnUnits": {},
-      "description": "CPU utilization ratio [0, 1] split by state (user, system). Emitted as process.cpu.utilization gauge (unit: 1), grouped by cpu.mode attribute.",
+      "description": "Event loop delay percentiles (ms) — how long callbacks are delayed after being scheduled. Higher values indicate a busy event loop. Emitted as nodejs.eventloop.delay.p99/p90/p50 gauges.",
       "fillSpans": false,
       "id": "w-cpu",
-      "isStacked": true,
+      "isStacked": false,
       "mergeAllActiveQueries": false,
       "nullZeroValues": "zero",
       "opacity": "1",
@@ -529,10 +529,10 @@
             {
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "process.cpu.utilization--float64--Gauge--true",
+                "id": "nodejs.eventloop.delay.p99--float64--Gauge--true",
                 "isColumn": true,
                 "isJSON": false,
-                "key": "process.cpu.utilization",
+                "key": "nodejs.eventloop.delay.p99",
                 "type": "Gauge"
               },
               "aggregateOperator": "avg",
@@ -558,21 +558,98 @@
                 "op": "AND"
               },
               "functions": [],
-              "groupBy": [
-                {
-                  "dataType": "string",
-                  "id": "cpu.mode--string--tag--false",
-                  "isColumn": false,
-                  "isJSON": false,
-                  "key": "cpu.mode",
-                  "type": "tag"
-                }
-              ],
+              "groupBy": [],
               "having": [],
-              "legend": "{{cpu.mode}}",
+              "legend": "p99",
               "limit": null,
               "orderBy": [],
               "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.eventloop.delay.p90--float64--Gauge--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.eventloop.delay.p90",
+                "type": "Gauge"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "B",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt6f7a8c",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "p90",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.eventloop.delay.p50--float64--Gauge--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.eventloop.delay.p50",
+                "type": "Gauge"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "C",
+              "filters": {
+                "items": [
+                  {
+                    "id": "rt6f7a8d",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "p50",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "C",
               "reduceTo": "avg",
               "spaceAggregation": "avg",
               "stepInterval": 60,
@@ -595,11 +672,11 @@
       ],
       "softMax": 0,
       "softMin": 0,
-      "stackedBarChart": true,
+      "stackedBarChart": false,
       "thresholds": [],
       "timePreferance": "GLOBAL_TIME",
-      "title": "CPU Utilization (user + system)",
-      "yAxisUnit": "percentunit"
+      "title": "Event Loop Delay (p99 / p90 / p50)",
+      "yAxisUnit": "ms"
     }
   ]
 }

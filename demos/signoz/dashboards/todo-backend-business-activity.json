@@ -104,7 +104,7 @@
       "bucketCount": 30,
       "bucketWidth": 0,
       "columnUnits": {},
-      "description": "Count of each todo CRUD event per minute, derived from structured log messages (logTemplates.ts).\nA = Todo created, B = Todo updated, C = Todo completed, D = Todo deleted, E = Todos imported, F = Todos exported",
+      "description": "Count of each todo CRUD event per minute, derived from structured log messages (logTemplates.ts).\nA = Todo created, B = Todo updated, C = Todo completed, D = Todo deleted, E = Todos imported, F = Todo event (sendTodoEvent)",
       "fillSpans": false,
       "id": "w-todo-event-rates",
       "isStacked": false,
@@ -434,7 +434,7 @@
                       "type": ""
                     },
                     "op": "contains",
-                    "value": "Todos exported:"
+                    "value": "Todo event:"
                   }
                 ],
                 "op": "AND"
@@ -442,7 +442,7 @@
               "functions": [],
               "groupBy": [],
               "having": [],
-              "legend": "Exported",
+              "legend": "Events",
               "limit": null,
               "orderBy": [],
               "queryName": "F",
@@ -472,7 +472,7 @@
       "stackedBarChart": false,
       "thresholds": [],
       "timePreferance": "GLOBAL_TIME",
-      "title": "Todo Event Rates (Created / Updated / Completed / Deleted / Imported / Exported)",
+      "title": "Todo Event Rates (Created / Updated / Completed / Deleted / Imported / Events)",
       "yAxisUnit": "none"
     },
     {
@@ -763,7 +763,7 @@
       "bucketCount": 30,
       "bucketWidth": 0,
       "columnUnits": {},
-      "description": "Average request duration as measured by the audit middleware (ElapsedMs extracted from the 'Audit end:' log message).\nUses a sum_rate approach: sums ElapsedMs values divided by count gives avg duration per interval.",
+      "description": "Average request duration as measured by the audit middleware (Elapsed extracted from the 'Audit end:' log message).\nUses a sum_rate approach: sums Elapsed values divided by count gives avg duration per interval.",
       "fillSpans": false,
       "id": "w-audit-duration",
       "isStacked": false,
@@ -777,10 +777,10 @@
             {
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "ElapsedMs--float64--tag--false",
+                "id": "Elapsed--float64--tag--false",
                 "isColumn": false,
                 "isJSON": false,
-                "key": "ElapsedMs",
+                "key": "Elapsed",
                 "type": "tag"
               },
               "aggregateOperator": "avg",

@@ -91,14 +91,14 @@
                     "id": "fe57da52-ec62-4ae6-a693-6c07be3cfbd7",
                     "key": {
                       "dataType": "string",
-                      "id": "dbSystem--string--tag--false",
+                      "id": "dbName--string--tag--false",
                       "isColumn": false,
                       "isJSON": false,
-                      "key": "dbSystem",
+                      "key": "dbName",
                       "type": "tag"
                     },
-                    "op": "exists",
-                    "value": ""
+                    "op": "=",
+                    "value": "todo_db"
                   },
                   {
                     "id": "82d8b9e4-80ae-4bb7-80c3-36ea901fc1ea",
@@ -197,14 +197,14 @@
                     "id": "64c335d4-0efa-4112-8ffc-298679def5ef",
                     "key": {
                       "dataType": "string",
-                      "id": "dbSystem--string--tag--false",
+                      "id": "dbName--string--tag--false",
                       "isColumn": false,
                       "isJSON": false,
-                      "key": "dbSystem",
+                      "key": "dbName",
                       "type": "tag"
                     },
-                    "op": "exists",
-                    "value": ""
+                    "op": "=",
+                    "value": "todo_db"
                   },
                   {
                     "id": "c6af5d5a-bea3-423d-8df2-2acbf17510f3",
@@ -227,7 +227,20 @@
               "queryName": "A",
               "reduceTo": "avg",
               "stepInterval": 60,
-              "functions": [],
+              "functions": [
+                {
+                  "name": "cutOffMin",
+                  "args": [
+                    { "name": "thresholdValue", "value": 0 }
+                  ]
+                },
+                {
+                  "name": "divideBy",
+                  "args": [
+                    { "name": "divideBy", "value": 1000000 }
+                  ]
+                }
+              ],
               "having": [],
               "orderBy": [],
               "limit": null,
@@ -254,7 +267,7 @@
           }
         ]
       },
-      "yAxisUnit": "ns",
+      "yAxisUnit": "ms",
       "nullZeroValues": "zero",
       "fillSpans": false,
       "isStacked": false,
@@ -294,14 +307,14 @@
                     "id": "be3c92ea-9067-4fed-be46-a16b7c95e99b",
                     "key": {
                       "dataType": "string",
-                      "id": "dbSystem--string--tag--false",
+                      "id": "dbName--string--tag--false",
                       "isColumn": false,
                       "isJSON": false,
-                      "key": "dbSystem",
+                      "key": "dbName",
                       "type": "tag"
                     },
-                    "op": "exists",
-                    "value": ""
+                    "op": "=",
+                    "value": "todo_db"
                   },
                   {
                     "id": "f61aed57-d355-490b-8753-46ff96ab39fe",
@@ -404,14 +417,14 @@
                     "id": "beba3d7c-1d50-49d4-991d-7d7c56a5ae6f",
                     "key": {
                       "dataType": "string",
-                      "id": "dbSystem--string--tag--false",
+                      "id": "dbName--string--tag--false",
                       "isColumn": false,
                       "isJSON": false,
-                      "key": "dbSystem",
+                      "key": "dbName",
                       "type": "tag"
                     },
-                    "op": "exists",
-                    "value": ""
+                    "op": "=",
+                    "value": "todo_db"
                   },
                   {
                     "id": "9a0657ce-eae8-4a49-9ccc-e3a1c56a57e9",
@@ -432,10 +445,10 @@
               "groupBy": [
                 {
                   "dataType": "string",
-                  "id": "dbStatement--string--tag--false",
+                  "id": "db.query.text--string--tag--false",
                   "isColumn": false,
                   "isJSON": false,
-                  "key": "dbStatement",
+                  "key": "db.query.text",
                   "type": "tag"
                 }
               ],

@@ -70,7 +70,21 @@
               "timeAggregation": "avg",
               "spaceAggregation": "sum",
               "filters": {
-                "items": [],
+                "items": [
+                  {
+                    "id": "svc-3c5b0cad",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
                 "op": "AND"
               },
               "groupBy": [],
@@ -140,7 +154,21 @@
               "timeAggregation": "avg",
               "spaceAggregation": "sum",
               "filters": {
-                "items": [],
+                "items": [
+                  {
+                    "id": "svc-e6ea2290",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
                 "op": "AND"
               },
               "groupBy": [],
@@ -200,17 +228,31 @@
               "dataSource": "metrics",
               "aggregateAttribute": {
                 "dataType": "float64",
-                "id": "v8js.gc.duration--float64--Histogram--true",
+                "id": "v8js.gc.duration.sum--float64--Sum--true",
                 "isColumn": true,
                 "isJSON": false,
-                "key": "v8js.gc.duration",
-                "type": "Histogram"
+                "key": "v8js.gc.duration.sum",
+                "type": "Sum"
               },
               "aggregateOperator": "rate",
               "timeAggregation": "rate",
               "spaceAggregation": "sum",
               "filters": {
-                "items": [],
+                "items": [
+                  {
+                    "id": "svc-0607d505",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
                 "op": "AND"
               },
               "groupBy": [
@@ -289,7 +331,21 @@
               "timeAggregation": "avg",
               "spaceAggregation": "sum",
               "filters": {
-                "items": [],
+                "items": [
+                  {
+                    "id": "svc-f35efdde",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
                 "op": "AND"
               },
               "groupBy": [],
