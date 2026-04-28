@@ -34,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
     },
     { href: '/comparisons', label: 'Comparisons' },
     { href: '/examples', label: 'Examples' },
+    { href: '/demo', label: 'Demo App' },
     { href: '/api-docs', label: 'API Docs' },
     {
         href: 'https://schema.cleverbrush.com',

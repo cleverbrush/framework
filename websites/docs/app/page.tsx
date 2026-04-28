@@ -423,6 +423,42 @@ const alice = await client.users.create({
                     </div>
                 </div>
             </section>
+            {/* ── Demo App CTA ─────────────────────────────────────── */}
+            <section className="section">
+                <div className="container">
+                    <div className="contribute-banner">
+                        <div className="contribute-content">
+                            <h2>See the framework in action</h2>
+                            <p>
+                                The monorepo includes a production-style
+                                full-stack Todo app built with every major
+                                Cleverbrush package — backend REST API, typed
+                                client, JWT auth, DI, schema-driven forms, ORM,
+                                auto-generated OpenAPI, real-time WebSockets,
+                                and OpenTelemetry tracing. Run it locally in one
+                                command.
+                            </p>
+                            <div className="contribute-actions">
+                                <Link
+                                    href="/demo"
+                                    className="hero-btn hero-btn-primary"
+                                >
+                                    Run the Demo →
+                                </Link>
+                                <a
+                                    href="https://github.com/cleverbrush/framework/tree/master/demos"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hero-btn hero-btn-secondary"
+                                >
+                                    View Source →
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             {/* ── Schema CTA ──────────────────────────────────────── */}
             <section className="section">
                 <div className="container">
