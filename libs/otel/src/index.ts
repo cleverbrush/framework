@@ -40,3 +40,11 @@ export {
     type OtelLogSinkOptions,
     otelLogSink
 } from './sinks/OtelLogSink.js';
+// ---------------------------------------------------------------------------
+// Custom span helpers
+// ---------------------------------------------------------------------------
+export {
+    type SpanHandle,
+    type WithSpanOptions,
+    withSpan
+} from './span.js';

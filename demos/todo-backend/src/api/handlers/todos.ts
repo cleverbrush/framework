@@ -1,4 +1,5 @@
 import { ActionResult, type Handler } from '@cleverbrush/server';
+import { withSpan } from '@cleverbrush/otel';
 import {
     TodoCompleted,
     TodoCreated,
@@ -82,20 +83,30 @@ export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
     { body, principal },
     { db, logger }
 ) => {
-    const todo = await db.todos.insert({
-        title: body.title,
-        description: body.description,
-        completed: false,
-        userId: principal.userId
-    });
+    await using handle = withSpan('todo.create');
+    handle.span.setAttribute('todo.user_id', principal.userId);
 
-    logger.info(TodoCreated, {
-        TodoId: todo.id,
-        Title: body.title,
-        UserId: principal.userId
-    });
+    try {
+        const todo = await db.todos.insert({
+            title: body.title,
+            description: body.description,
+            completed: false,
+            userId: principal.userId
+        });
 
-    return ActionResult.created(await mapTodo(todo), `/api/todos/${todo.id}`);
+        handle.span.setAttribute('todo.id', todo.id);
+
+        logger.info(TodoCreated, {
+            TodoId: todo.id,
+            Title: body.title,
+            UserId: principal.userId
+        });
+
+        return ActionResult.created(await mapTodo(todo), `/api/todos/${todo.id}`);
+    } catch (err) {
+        handle.fail(err);
+        throw err;
+    }
 };
 
 // ── Update todo ───────────────────────────────────────────────────────────────
@@ -407,42 +418,71 @@ export const importTodosHandler: Handler<typeof ImportTodosEndpoint> = async (
         });
     }
 
-    const results: Array<{
-        title: string;
-        success: boolean;
-        error?: string;
-    }> = [];
-    let imported = 0;
+    // Outer span wraps the entire import batch. Child per-item spans + their
+    // SQL INSERT spans will nest under it, producing a clean trace hierarchy:
+    //
+    //   INTERNAL: todos.import
+    //     ├─ INTERNAL: todos.import.item  (title=…, success=true/false)
+    //     │    └─ CLIENT: INSERT todo_db
+    //     └─ …
+    return withSpan(
+        'todos.import',
+        async span => {
+            span.setAttribute('todos.import.total', items.length);
 
-    for (const item of items) {
-        try {
-            await db.todos.insert({
-                title: item.title,
-                description: item.description,
-                completed: false,
-                userId: principal.userId
+            const results: Array<{
+                title: string;
+                success: boolean;
+                error?: string;
+            }> = [];
+            let imported = 0;
+
+            for (const item of items) {
+                // Per-item span — INSERT nests inside because withSpan callback
+                // uses startActiveSpan (activates the span in context).
+                const ok = await withSpan(
+                    'todos.import.item',
+                    async itemSpan => {
+                        itemSpan.setAttribute('todo.title', item.title);
+                        await db.todos.insert({
+                            title: item.title,
+                            description: item.description,
+                            completed: false,
+                            userId: principal.userId
+                        });
+                        itemSpan.setAttribute('todo.import.success', true);
+                    }
+                ).then(
+                    () => true,
+                    () => false // error already recorded on the item span
+                );
+
+                if (ok) {
+                    results.push({ title: item.title, success: true });
+                    imported++;
+                } else {
+                    results.push({
+                        title: item.title,
+                        success: false,
+                        error: 'Failed to insert todo.'
+                    });
+                }
+            }
+
+            span.setAttribute('todos.import.imported', imported);
+
+            // 207 Multi-Status with per-item results
+            logger.info(TodosImported, {
+                Imported: imported,
+                Total: items.length,
+                UserId: principal.userId
             });
-            results.push({ title: item.title, success: true });
-            imported++;
-        } catch {
-            results.push({
-                title: item.title,
-                success: false,
-                error: 'Failed to insert todo.'
-            });
+
+            return ActionResult.json(
+                { imported, total: items.length, items: results },
+                207
+            );
         }
-    }
-
-    // 207 Multi-Status with per-item results (demo of ActionResult.json with custom status)
-    logger.info(TodosImported, {
-        Imported: imported,
-        Total: items.length,
-        UserId: principal.userId
-    });
-
-    return ActionResult.json(
-        { imported, total: items.length, items: results },
-        207
     );
 };
 
