@@ -6,3 +6,6 @@ dist
 .next
 /websites/docs/public/api-docs/latest
 /websites/schema/public/playground/schema-bundle.js
+.playwright-mcp
+demos/todo-backend/logs
+demos/signoz/clickhouse/user_scripts/histogramQuantile

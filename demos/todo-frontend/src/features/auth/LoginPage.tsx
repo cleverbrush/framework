@@ -69,7 +69,11 @@ export function LoginPage() {
             await login(result.object.email, result.object.password);
             navigate('/todos');
         } catch (e) {
-            setError(e instanceof ApiError ? e.message : 'Login failed. Please try again.');
+            if (e instanceof ApiError && e.status === 401) {
+                setError('Invalid email or password.');
+            } else {
+                setError('Login failed. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
@@ -91,18 +95,20 @@ export function LoginPage() {
                     </Callout.Root>
                 )}
 
-                <Field forProperty={(t) => t.email} form={form} label="Email" variant="email" />
-                <Field forProperty={(t) => t.password} form={form} label="Password" variant="password" />
+                <form onSubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+                    <Field forProperty={(t) => t.email} form={form} label="Email" variant="email" />
+                    <Field forProperty={(t) => t.password} form={form} label="Password" variant="password" />
 
-                <Button
-                    size="3"
-                    style={{ width: '100%' }}
-                    onClick={handleSubmit}
-                    loading={loading}
-                    mt="1"
-                >
-                    Sign in
-                </Button>
+                    <Button
+                        type="submit"
+                        size="3"
+                        style={{ width: '100%' }}
+                        loading={loading}
+                        mt="1"
+                    >
+                        Sign in
+                    </Button>
+                </form>
 
                 {googleEnabled && (
                     <>

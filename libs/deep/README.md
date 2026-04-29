@@ -3,7 +3,7 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-95.6%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-97.8%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A library for deep operations on JavaScript objects — deep equality, deep merge, and flattening.

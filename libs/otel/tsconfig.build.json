@@ -1,0 +1,20 @@
+{
+    "compilerOptions": {
+        "rootDir": "./src",
+        "outDir": "./dist",
+        "declaration": true,
+        "target": "ES2022",
+        "lib": ["ES2022", "ESNext.Disposable"],
+        "module": "ES2022",
+        "esModuleInterop": true,
+        "moduleResolution": "bundler",
+        "allowSyntheticDefaultImports": true,
+        "sourceMap": false,
+        "declarationMap": false,
+        "types": ["node"],
+        "strict": true,
+        "skipLibCheck": true
+    },
+    "include": ["src/**/*.ts"],
+    "exclude": ["src/**/*.test.ts"]
+}

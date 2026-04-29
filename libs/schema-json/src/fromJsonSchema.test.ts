@@ -969,3 +969,24 @@ test('fromJsonSchema - 64: empty description string is ignored', () => {
     const schema = fromJsonSchema({ type: 'string', description: '' } as const);
     expect((schema.introspect() as any).description).toBeUndefined();
 });
+
+test('fromJsonSchema - 65: unknown type falls back to any()', () => {
+    // default branch in type switch (line 65)
+    const schema = fromJsonSchema({ type: 'unknown-type' as any });
+    expect(schema).toBeDefined();
+    const result = schema.validate('anything');
+    expect(result.valid).toBe(true);
+});
+
+test('fromJsonSchema - 66: const boolean true → boolean schema with equals', () => {
+    // buildConst with boolean value (line 78)
+    const schema = fromJsonSchema({ const: true } as const);
+    expect(schema.validate(true).valid).toBe(true);
+    expect(schema.validate(false).valid).toBe(false);
+});
+
+test('fromJsonSchema - 67: const null/object falls back to any()', () => {
+    // buildConst default branch (line 79) — null is not string/number/boolean
+    const schema = fromJsonSchema({ const: null as any });
+    expect(schema).toBeDefined();
+});

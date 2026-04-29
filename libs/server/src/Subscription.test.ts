@@ -194,3 +194,11 @@ describe('endpoint.subscription()', () => {
         expect(sub.introspect().protocol).toBe('subscription');
     });
 });
+
+describe('SubscriptionBuilder.inject()', () => {
+    test('sets serviceSchemas on the builder (line 537)', () => {
+        const IMyService = object({ value: string() });
+        const sub = new SubscriptionBuilder('/ws/test').inject({ IMyService });
+        expect(sub.introspect().serviceSchemas).toEqual({ IMyService });
+    });
+});

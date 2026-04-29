@@ -19,6 +19,7 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 - **AsyncAPI-ready** — `getSubscriptionRegistrations()` exposes subscription metadata for `generateAsyncApiSpec()` in `@cleverbrush/server-openapi`.
 - **Health check** — optional `/health` endpoint via `server.withHealthcheck()`.
 - **WebSocket subscriptions** — `endpoint.subscription('/ws/path')` with typed incoming/outgoing schemas, `tracked()` events, and async generator handlers.
+- **Contract composition** — `mergeContracts`, `pickGroups`, and `omitGroups` enable audience-scoped bundles: ship only the endpoints each consumer needs.
 
 ## Installation
 
@@ -366,6 +367,83 @@ createServer()
     .useBatching({ path: '/_batch', maxSize: 50, parallel: false })
     .handleAll(mapping)
     .listen(3000);
+```
+
+## Contract Composition
+
+When building applications with distinct audiences — a **public client** and an **admin panel**, for example — you want each consumer to import only the endpoints it needs.  This eliminates leaking admin schemas into the client bundle and improves tree-shaking.
+
+The `@cleverbrush/server/contract` entry point ships three utilities for this.
+
+### `mergeContracts`
+
+Combine two `ApiContract` objects into one.  Groups that only exist in one contract are kept as-is; groups that share a key have their endpoint maps shallowly merged.
+
+```ts
+import { defineApi, mergeContracts } from '@cleverbrush/server/contract';
+
+// public-api.ts — safe to import in every consumer
+export const publicApi = defineApi({
+    todos: { list: ..., get: ..., create: ... },
+    auth:  { login: ..., register: ... },
+});
+
+// admin-api.ts — only imported by the admin application
+const adminApi = defineApi({
+    admin: { activityLog: ..., banUser: ... },
+});
+
+// admin-app/contract.ts
+export const fullAdminApi = mergeContracts(publicApi, adminApi);
+// TypeScript sees: { todos, auth, admin } — all fully typed
+
+// client-app/contract.ts
+import { publicApi } from '../shared/public-api';
+// TypeScript sees: { todos, auth } — admin is absent from the bundle
+```
+
+### `pickGroups`
+
+Returns a new contract containing only the listed groups.  The TypeScript return type is `Pick<T, K>` — the compiler sees exactly the selected groups.
+
+```ts
+import { pickGroups } from '@cleverbrush/server/contract';
+
+const fullApi = defineApi({ todos: {...}, auth: {...}, admin: {...}, debug: {...} });
+
+// Only expose what the frontend needs
+const clientApi = pickGroups(fullApi, 'todos', 'auth');
+// TypeScript: { todos: ..., auth: ... }
+// 'admin' and 'debug' do not exist on the type or at runtime
+```
+
+### `omitGroups`
+
+Inverse of `pickGroups` — strips the listed groups and keeps everything else.  Return type is `Omit<T, K>`.
+
+```ts
+import { omitGroups } from '@cleverbrush/server/contract';
+
+const publicApi = omitGroups(fullApi, 'admin', 'debug');
+// TypeScript: { todos: ..., auth: ... }
+```
+
+### Bundle isolation pattern
+
+The key to keeping admin endpoints out of the client bundle is **file-level separation**.  Export different slices from different entry points:
+
+```
+packages/
+  shared-contracts/
+    src/
+      public.ts        // export const publicApi = defineApi({ ... })
+      admin.ts         // export const adminApi  = defineApi({ ... })
+      full.ts          // export const fullApi   = mergeContracts(publicApi, adminApi)
+
+apps/
+  client/              // imports publicApi  — admin endpoints never bundled
+  admin-panel/         // imports fullApi    — full set of endpoints
+  backend/             // imports fullApi    — handles all routes
 ```
 
 ## License

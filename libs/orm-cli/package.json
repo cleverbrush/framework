@@ -1,0 +1,52 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "bin": {
+        "cb-orm": "./dist/bin.js"
+    },
+    "dependencies": {
+        "@cleverbrush/knex-schema": "*",
+        "tsx": "^4.19.0"
+    },
+    "peerDependencies": {
+        "knex": ">=3.1.0"
+    },
+    "description": "CLI for @cleverbrush/orm — migrate generate/run/rollback/status and db push",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://github.com/cleverbrush/framework/tree/master/libs/orm-cli#readme",
+    "keywords": [
+        "orm",
+        "knex",
+        "typescript",
+        "migrations",
+        "cli",
+        "cleverbrush"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/orm-cli",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/orm-cli#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "0.1.0"
+}

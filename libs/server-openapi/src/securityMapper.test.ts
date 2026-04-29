@@ -182,3 +182,43 @@ describe('mapOperationSecurity', () => {
         expect(result).toEqual([{ jwt: ['admin'] }, { cookie: ['admin'] }]);
     });
 });
+
+describe('mapSecuritySchemes — generic challenge and fallback branches', () => {
+    it('maps a custom scheme with a non-bearer challenge header (else-if-challenge branch)', () => {
+        const config: AuthenticationConfig = {
+            defaultScheme: 'basic',
+            schemes: [
+                {
+                    name: 'basic',
+                    authenticate: async () => ({
+                        succeeded: false as const,
+                        failure: 'test'
+                    }),
+                    challenge: () => ({
+                        headerName: 'WWW-Authenticate',
+                        headerValue: 'Basic realm="My App"'
+                    })
+                }
+            ]
+        };
+        const result = mapSecuritySchemes(config);
+        expect(result['basic']).toEqual({ type: 'http', scheme: 'basic' });
+    });
+
+    it('maps a scheme with no challenge and no known type to fallback http scheme', () => {
+        const config: AuthenticationConfig = {
+            defaultScheme: 'apikey',
+            schemes: [
+                {
+                    name: 'apikey',
+                    authenticate: async () => ({
+                        succeeded: false as const,
+                        failure: 'test'
+                    })
+                } as any
+            ]
+        };
+        const result = mapSecuritySchemes(config);
+        expect(result['apikey']).toEqual({ type: 'http', scheme: 'apikey' });
+    });
+});

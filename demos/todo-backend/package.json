@@ -10,11 +10,18 @@
         "@cleverbrush/di": "*",
         "@cleverbrush/env": "*",
         "@cleverbrush/knex-schema": "*",
+        "@cleverbrush/log": "*",
+        "@cleverbrush/orm": "*",
+        "@cleverbrush/orm-cli": "*",
+        "@cleverbrush/otel": "*",
         "@cleverbrush/mapper": "*",
         "@cleverbrush/schema": "*",
         "@cleverbrush/schema-json": "*",
         "@cleverbrush/server": "*",
         "@cleverbrush/server-openapi": "*",
+        "@opentelemetry/instrumentation-http": "^0.215.0",
+        "@opentelemetry/instrumentation-runtime-node": "^0.28.0",
+        "@opentelemetry/instrumentation-undici": "^0.25.0",
         "google-auth-library": "^9.15.0",
         "knex": "^3.1.0",
         "pg": "^8.13.3"
@@ -39,13 +46,22 @@
     "name": "@cleverbrush/todo-backend",
     "scripts": {
         "start": "node dist/index.js",
+        "dev": "tsx watch --env-file=.env --import @opentelemetry/instrumentation/hook.mjs src/index.ts",
         "watch": "tsc --build tsconfig.build.json --watch",
-        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
-        "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
+        "build": "tsup && tsc --noEmit --project tsconfig.build.json",
+        "clean": "rm -rf dist tsconfig.build.tsbuildinfo",
+        "typecheck": "tsc --noEmit -p tsconfig.build.json",
+        "lint": "biome check ./src",
+        "db:generate": "cb-orm migrate generate",
+        "db:run": "cb-orm migrate run",
+        "db:rollback": "cb-orm migrate rollback",
+        "db:status": "cb-orm migrate status",
+        "db:push": "cb-orm db push"
     },
     "devDependencies": {
         "@types/node": "^22.0.0",
         "tsup": "^8.5.1",
+        "tsx": "^4.19.0",
         "typescript": "^6.0.2"
     },
     "type": "module",

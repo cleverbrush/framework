@@ -317,4 +317,238 @@ describe('generateAsyncApiSpec', () => {
         });
         expect(Object.keys(spec['channels'] as any)).toHaveLength(1);
     });
+
+    // --- pathToChannelId edge cases ---
+
+    it('collapses consecutive slashes into a single underscore in channel ID', () => {
+        // basePath='/ws', pathTemplate='//events' → address '/ws/events'
+        // After normalizeSlashes, pathToChannelId gets '/ws/events' → 'ws_events'
+        // Test with {param} to trigger the _+ collapsing rule
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({ basePath: '/ws', pathTemplate: '/rooms/:id' })
+            ])
+        );
+        const channels = spec['channels'] as Record<string, any>;
+        // '/ws/rooms/:id' → address '/ws/rooms/{id}' → pathToChannelId → 'ws_rooms_id'
+        // The {id} produces '__id_' which gets collapsed to '_id_' then trailing _ removed
+        expect(channels['ws_rooms_id']).toBeDefined();
+    });
+
+    it('removes trailing underscore from channel ID for paths ending with param', () => {
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({ basePath: '/ws', pathTemplate: '/users/:userId' })
+            ])
+        );
+        const channels = spec['channels'] as Record<string, any>;
+        expect(channels['ws_users_userId']).toBeDefined();
+    });
+
+    // --- resolveSubscriptionAddress with ParseStringSchemaBuilder ---
+
+    it('derives channel address from ParseStringSchemaBuilder pathTemplate', () => {
+        const mockTemplate = {
+            introspect: () => ({
+                templateDefinition: {
+                    literals: ['/rooms/', ''],
+                    segments: [{ path: 'id' }]
+                }
+            })
+        };
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({
+                    basePath: '/ws',
+                    pathTemplate: mockTemplate as any
+                })
+            ])
+        );
+        const channels = spec['channels'] as Record<string, any>;
+        const channel = Object.values(channels)[0] as any;
+        expect(channel.address).toBe('/ws/rooms/{id}');
+    });
+
+    it('handles ParseStringSchemaBuilder with multiple segments', () => {
+        const mockTemplate = {
+            introspect: () => ({
+                templateDefinition: {
+                    literals: ['/orgs/', '/repos/', ''],
+                    segments: [{ path: 'org' }, { path: 'repo' }]
+                }
+            })
+        };
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({
+                    basePath: '/ws',
+                    pathTemplate: mockTemplate as any
+                })
+            ])
+        );
+        const channels = spec['channels'] as Record<string, any>;
+        const channel = Object.values(channels)[0] as any;
+        expect(channel.address).toBe('/ws/orgs/{org}/repos/{repo}');
+    });
+
+    it('handles ParseStringSchemaBuilder without templateDefinition gracefully', () => {
+        const mockTemplate = {
+            introspect: () => ({})
+        };
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({
+                    basePath: '/ws/events',
+                    pathTemplate: mockTemplate as any
+                })
+            ])
+        );
+        const channels = spec['channels'] as Record<string, any>;
+        const channel = Object.values(channels)[0] as any;
+        // Falls back to just basePath
+        expect(channel.address).toBe('/ws/events');
+    });
+
+    // --- normalizeSlashes: path without leading slash ---
+
+    it('normalizes path that does not start with a slash', () => {
+        // ParseStringSchemaBuilder with literals not starting with '/', basePath=''
+        const mockTemplate = {
+            introspect: () => ({
+                templateDefinition: {
+                    literals: ['rooms/', ''],
+                    segments: [{ path: 'id' }]
+                }
+            })
+        };
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({
+                    basePath: '',
+                    pathTemplate: mockTemplate as any
+                })
+            ])
+        );
+        const channels = spec['channels'] as Record<string, any>;
+        const channel = Object.values(channels)[0] as any;
+        // normalizeSlashes adds leading '/'
+        expect(channel.address).toBe('/rooms/{id}');
+    });
+
+    // --- externalDocs on channel ---
+
+    it('includes externalDocs on channel when set', () => {
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({
+                    externalDocs: {
+                        url: 'https://docs.example.com',
+                        description: 'Docs'
+                    } as any
+                })
+            ])
+        );
+        const channel = Object.values(spec['channels'] as any)[0] as any;
+        expect(channel.externalDocs).toEqual({
+            url: 'https://docs.example.com',
+            description: 'Docs'
+        });
+    });
+
+    // --- operationId prefix for send/receive operation names ---
+
+    it('prefixes send operation ID with operationId when outgoingSchema is set', () => {
+        const EventSchema = object({ id: number() });
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({
+                    operationId: 'liveEvents',
+                    outgoingSchema: EventSchema as any
+                })
+            ])
+        );
+        const operations = spec['operations'] as Record<string, any>;
+        expect(operations['liveEventsEvents']).toBeDefined();
+        expect(operations['liveEventsEvents'].action).toBe('send');
+    });
+
+    it('prefixes receive operation ID with operationId when incomingSchema is set', () => {
+        const MsgSchema = object({ text: string() });
+        const spec = generateAsyncApiSpec(
+            makeOptions([
+                makeReg({
+                    operationId: 'chatRoom',
+                    incomingSchema: MsgSchema as any
+                })
+            ])
+        );
+        const operations = spec['operations'] as Record<string, any>;
+        expect(operations['chatRoomMessages']).toBeDefined();
+        expect(operations['chatRoomMessages'].action).toBe('receive');
+    });
+
+    // --- info description, termsOfService, contact, license ---
+
+    it('includes description in info when provided', () => {
+        const spec = generateAsyncApiSpec(
+            makeOptions([], {
+                info: {
+                    title: 'T',
+                    version: '1.0.0',
+                    description: 'My API description'
+                }
+            })
+        );
+        expect((spec['info'] as any).description).toBe('My API description');
+    });
+
+    it('includes termsOfService in info when provided', () => {
+        const spec = generateAsyncApiSpec(
+            makeOptions([], {
+                info: {
+                    title: 'T',
+                    version: '1.0.0',
+                    termsOfService: 'https://example.com/tos'
+                }
+            })
+        );
+        expect((spec['info'] as any).termsOfService).toBe(
+            'https://example.com/tos'
+        );
+    });
+
+    it('includes contact in info when provided', () => {
+        const spec = generateAsyncApiSpec(
+            makeOptions([], {
+                info: {
+                    title: 'T',
+                    version: '1.0.0',
+                    contact: { name: 'Support', email: 'help@example.com' }
+                }
+            })
+        );
+        expect((spec['info'] as any).contact).toEqual({
+            name: 'Support',
+            email: 'help@example.com'
+        });
+    });
+
+    it('includes license in info when provided', () => {
+        const spec = generateAsyncApiSpec(
+            makeOptions([], {
+                info: {
+                    title: 'T',
+                    version: '1.0.0',
+                    license: {
+                        name: 'MIT',
+                        url: 'https://opensource.org/licenses/MIT'
+                    }
+                }
+            })
+        );
+        expect((spec['info'] as any).license).toEqual({
+            name: 'MIT',
+            url: 'https://opensource.org/licenses/MIT'
+        });
+    });
 });

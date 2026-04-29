@@ -1,0 +1,107 @@
+{
+    "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
+    "bugs": {
+        "url": "https://github.com/cleverbrush/framework/issues",
+        "email": "andrew_zol@cleverbrush.com"
+    },
+    "description": "OpenTelemetry instrumentation for the Cleverbrush framework — traces for HTTP, Knex/SQL, outbound HTTP; structured logs and metrics over OTLP",
+    "files": [
+        "dist"
+    ],
+    "homepage": "https://docs.cleverbrush.com/",
+    "keywords": [
+        "opentelemetry",
+        "otel",
+        "tracing",
+        "observability",
+        "cleverbrush",
+        "knex",
+        "http",
+        "logs",
+        "metrics"
+    ],
+    "license": "BSD 3-Clause",
+    "main": "./dist/index.js",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js"
+        },
+        "./instrumentations": {
+            "types": "./dist/instrumentations.d.ts",
+            "import": "./dist/instrumentations.js"
+        }
+    },
+    "sideEffects": false,
+    "name": "@cleverbrush/otel",
+    "readme": "https://github.com/cleverbrush/framework/tree/master/libs/otel#readme",
+    "repository": {
+        "type": "git",
+        "url": "github:cleverbrush/framework"
+    },
+    "scripts": {
+        "watch": "tsc --build --watch",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "clean": "rm -rf dist tsconfig.tsbuildinfo"
+    },
+    "dependencies": {
+        "@opentelemetry/api": "^1.9.0",
+        "@opentelemetry/api-logs": "^0.215.0",
+        "@opentelemetry/context-async-hooks": "^2.7.0",
+        "@opentelemetry/core": "^2.7.0",
+        "@opentelemetry/exporter-logs-otlp-http": "^0.215.0",
+        "@opentelemetry/exporter-metrics-otlp-http": "^0.215.0",
+        "@opentelemetry/exporter-trace-otlp-http": "^0.215.0",
+        "@opentelemetry/resources": "^2.7.0",
+        "@opentelemetry/sdk-logs": "^0.215.0",
+        "@opentelemetry/sdk-metrics": "^2.7.0",
+        "@opentelemetry/sdk-node": "^0.215.0",
+        "@opentelemetry/sdk-trace-node": "^2.7.0",
+        "@opentelemetry/semantic-conventions": "^1.40.0"
+    },
+    "peerDependencies": {
+        "@cleverbrush/di": "^3.1.0",
+        "@cleverbrush/log": "^3.1.0",
+        "@cleverbrush/server": "^3.1.0",
+        "@opentelemetry/instrumentation-http": "^0.215.0",
+        "@opentelemetry/instrumentation-runtime-node": "^0.28.0",
+        "@opentelemetry/instrumentation-undici": "^0.25.0",
+        "knex": "^3.0.0"
+    },
+    "peerDependenciesMeta": {
+        "@cleverbrush/di": {
+            "optional": true
+        },
+        "@cleverbrush/log": {
+            "optional": true
+        },
+        "@cleverbrush/server": {
+            "optional": true
+        },
+        "@opentelemetry/instrumentation-http": {
+            "optional": true
+        },
+        "@opentelemetry/instrumentation-runtime-node": {
+            "optional": true
+        },
+        "@opentelemetry/instrumentation-undici": {
+            "optional": true
+        },
+        "knex": {
+            "optional": true
+        }
+    },
+    "devDependencies": {
+        "@cleverbrush/di": "*",
+        "@cleverbrush/log": "*",
+        "@cleverbrush/server": "*",
+        "@opentelemetry/instrumentation-http": "^0.215.0",
+        "@opentelemetry/instrumentation-runtime-node": "^0.28.0",
+        "@opentelemetry/instrumentation-undici": "^0.25.0",
+        "@types/node": "^25.4.0",
+        "knex": "^3.1.0"
+    },
+    "type": "module",
+    "types": "./dist/index.d.ts",
+    "version": "3.1.0"
+}

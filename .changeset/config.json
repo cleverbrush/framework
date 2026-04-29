@@ -17,6 +17,8 @@
             "@cleverbrush/client",
             "@cleverbrush/di",
             "@cleverbrush/knex-schema",
+            "@cleverbrush/log",
+            "@cleverbrush/otel",
             "@cleverbrush/server",
             "@cleverbrush/server-openapi"
         ]

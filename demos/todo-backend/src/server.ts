@@ -1,39 +1,50 @@
 import { jwtScheme } from '@cleverbrush/auth';
+import type { Logger } from '@cleverbrush/log';
+import { useLogging } from '@cleverbrush/log';
 import {
     createServer,
     endpoint,
-    mapHandlers,
-    type Middleware
+    type Middleware,
+    mapHandlers
 } from '@cleverbrush/server';
+import { tracingMiddleware } from '@cleverbrush/otel';
 import {
     generateOpenApiSpec,
-    serveAsyncApi,
-    type OpenApiDocument
+    type OpenApiDocument,
+    serveAsyncApi
 } from '@cleverbrush/server-openapi';
 import {
     endpoints,
     todoCompletedWebhook,
     todoCreatedWebhook
 } from './api/endpoints.js';
+import { activityLogHandler } from './api/handlers/admin.js';
 import { handlers } from './api/handlers/index.js';
 import { exportTodosHandler } from './api/handlers/todos.js';
-import { activityLogHandler } from './api/handlers/admin.js';
 import type { Config } from './config.js';
 import { configureDI } from './di/setup.js';
+import { AuditEnd, AuditStart } from './logTemplates.js';
 
 // ── Per-endpoint middlewares ──────────────────────────────────────────────────
 
-/** Audit logging middleware — logs export requests to stdout. */
-const auditLogMiddleware: Middleware = async (ctx, next) => {
-    const start = Date.now();
-    console.log(
-        `[audit] ${ctx.method} ${ctx.url.pathname} by principal=${JSON.stringify(ctx.principal ?? 'anonymous')}`
-    );
-    await next();
-    console.log(
-        `[audit] ${ctx.method} ${ctx.url.pathname} completed in ${Date.now() - start}ms`
-    );
-};
+/** Audit logging middleware — logs export requests via structured logger. */
+function createAuditLogMiddleware(logger: Logger): Middleware {
+    const auditLog = logger.forContext('SourceContext', 'AuditLog');
+    return async (ctx, next) => {
+        const start = Date.now();
+        auditLog.info(AuditStart, {
+            Method: ctx.method,
+            Path: ctx.url.pathname,
+            Principal: String(ctx.principal ?? 'anonymous')
+        });
+        await next();
+        auditLog.info(AuditEnd, {
+            Method: ctx.method,
+            Path: ctx.url.pathname,
+            Elapsed: Date.now() - start
+        });
+    };
+}
 
 /** Request timing middleware — adds X-Response-Time header. */
 const timingMiddleware: Middleware = async (ctx, next) => {
@@ -42,7 +53,9 @@ const timingMiddleware: Middleware = async (ctx, next) => {
     ctx.response.setHeader('x-response-time', `${Date.now() - start}ms`);
 };
 
-export function buildServer(config: Config) {
+export function buildServer(config: Config, logger: Logger) {
+    const auditLogMiddleware = createAuditLogMiddleware(logger);
+
     const corsMiddleware: Middleware = async (ctx, next) => {
         ctx.response.setHeader('Access-Control-Allow-Origin', '*');
         ctx.response.setHeader(
@@ -53,6 +66,10 @@ export function buildServer(config: Config) {
             'Access-Control-Allow-Headers',
             'Content-Type, Authorization, X-Idempotency-Key, If-Match'
         );
+        ctx.response.setHeader(
+            'Access-Control-Expose-Headers',
+            'X-Trace-Id, X-Response-Time'
+        );
         if (ctx.method === 'OPTIONS') {
             ctx.response.writeHead(204);
             ctx.response.end();
@@ -61,9 +78,17 @@ export function buildServer(config: Config) {
         await next();
     };
 
+    const [correlationMiddleware, requestLogMiddleware] = useLogging(logger, {
+        excludePaths: ['/health'],
+        correlationResponseHeader: false
+    });
+
     const server = createServer()
+        .use(tracingMiddleware({ excludePaths: ['/health'] }))
         .use(corsMiddleware)
-        .services(svc => configureDI(svc, config))
+        .use(correlationMiddleware)
+        .use(requestLogMiddleware)
+        .services(svc => configureDI(svc, config, logger))
         .useAuthentication({
             defaultScheme: 'jwt',
             schemes: [
@@ -151,44 +176,44 @@ export function buildServer(config: Config) {
     };
 
     // ── AsyncAPI spec middleware (registered after server is assigned)
-    server.use(serveAsyncApi({
-        server,
-        info: {
-            title: 'ToDo Management API – WebSocket',
-            version: '1.0.0'
-        },
-        servers: {
-            local: {
-                host: `${config.server.host === '0.0.0.0' ? 'localhost' : config.server.host}:${config.server.port}`,
-                protocol: 'ws'
+    server.use(
+        serveAsyncApi({
+            server,
+            info: {
+                title: 'ToDo Management API – WebSocket',
+                version: '1.0.0'
+            },
+            servers: {
+                local: {
+                    host: `${config.server.host === '0.0.0.0' ? 'localhost' : config.server.host}:${config.server.port}`,
+                    protocol: 'ws'
+                }
             }
-        }
-    }));
+        })
+    );
 
     // ── Register webhooks on the server (for getWebhooks() introspection)
     server.webhook(todoCreatedWebhook).webhook(todoCompletedWebhook);
 
     // ── Register all contract endpoints via compile-time checked mapping
-    server
-        .handle(openApiEndpoint, openApiHandler)
-        .handleAll(
-            mapHandlers(endpoints, {
-                ...handlers,
-                todos: {
-                    ...handlers.todos,
-                    exportCsv: {
-                        handler: exportTodosHandler,
-                        middlewares: [auditLogMiddleware]
-                    }
-                },
-                admin: {
-                    activityLog: {
-                        handler: activityLogHandler,
-                        middlewares: [timingMiddleware]
-                    }
+    server.handle(openApiEndpoint, openApiHandler).handleAll(
+        mapHandlers(endpoints, {
+            ...handlers,
+            todos: {
+                ...handlers.todos,
+                exportCsv: {
+                    handler: exportTodosHandler,
+                    middlewares: [auditLogMiddleware]
                 }
-            })
-        );
+            },
+            admin: {
+                activityLog: {
+                    handler: activityLogHandler,
+                    middlewares: [timingMiddleware]
+                }
+            }
+        })
+    );
 
     return server;
 }

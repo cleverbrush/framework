@@ -1,0 +1,870 @@
+{
+  "description": "Structured log events emitted by the todo-backend: todo CRUD operations, audit log, imports/exports, and startup lifecycle.",
+  "layout": [
+    {
+      "h": 1,
+      "i": "row-todo-events",
+      "maxH": 1,
+      "minH": 1,
+      "minW": 12,
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "h": 6,
+      "i": "w-todo-event-rates",
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "h": 6,
+      "i": "w-log-volume",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 0,
+      "y": 7
+    },
+    {
+      "h": 6,
+      "i": "w-log-by-severity",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 12,
+      "y": 7
+    },
+    {
+      "h": 1,
+      "i": "row-audit",
+      "maxH": 1,
+      "minH": 1,
+      "minW": 12,
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 13
+    },
+    {
+      "h": 6,
+      "i": "w-audit-volume",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 0,
+      "y": 14
+    },
+    {
+      "h": 6,
+      "i": "w-audit-duration",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 12,
+      "y": 14
+    }
+  ],
+  "panelMap": {
+    "row-todo-events": {
+      "collapsed": false,
+      "widgets": [
+        { "h": 6, "i": "w-todo-event-rates", "moved": false, "static": false, "w": 24, "x": 0,  "y": 1  },
+        { "h": 6, "i": "w-log-volume",        "moved": false, "static": false, "w": 12, "x": 0,  "y": 7  },
+        { "h": 6, "i": "w-log-by-severity",   "moved": false, "static": false, "w": 12, "x": 12, "y": 7  }
+      ]
+    },
+    "row-audit": {
+      "collapsed": false,
+      "widgets": [
+        { "h": 6, "i": "w-audit-volume",   "moved": false, "static": false, "w": 12, "x": 0,  "y": 14 },
+        { "h": 6, "i": "w-audit-duration", "moved": false, "static": false, "w": 12, "x": 12, "y": 14 }
+      ]
+    }
+  },
+  "tags": ["todo-backend", "logs", "business"],
+  "title": "todo-backend — Business Activity",
+  "uploadedGrafana": false,
+  "variables": {},
+  "version": "v4",
+  "widgets": [
+    {
+      "description": "",
+      "id": "row-todo-events",
+      "panelTypes": "row",
+      "title": "Todo Events"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Count of each todo CRUD event per minute, derived from structured log messages (logTemplates.ts).\nA = Todo created, B = Todo updated, C = Todo completed, D = Todo deleted, E = Todos imported, F = Todo event (sendTodoEvent)",
+      "fillSpans": false,
+      "id": "w-todo-event-rates",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "l1a2b3c4",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "l2b3c4d5",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Todo created:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "Created",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "B",
+              "filters": {
+                "items": [
+                  {
+                    "id": "l3c4d5e6",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "l4d5e6f7",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Todo updated:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "Updated",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "C",
+              "filters": {
+                "items": [
+                  {
+                    "id": "l5e6f7a8",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "l6f7a8b9",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Todo completed:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "Completed",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "C",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "D",
+              "filters": {
+                "items": [
+                  {
+                    "id": "l7a8b9c0",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "l8b9c0d1",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Todo deleted:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "Deleted",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "D",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "E",
+              "filters": {
+                "items": [
+                  {
+                    "id": "l9c0d1e2",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "l0d1e2f3",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Todos imported:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "Imported",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "E",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "F",
+              "filters": {
+                "items": [
+                  {
+                    "id": "l1e2f3a4",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "l2f3a4b5",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Todo event:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "Events",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "F",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-todo-event-rates",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string",  "id": "serviceName--string--tag--true",  "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" },
+        { "dataType": "string",  "id": "name--string--tag--true",         "isColumn": true, "isJSON": false, "key": "name",        "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Todo Event Rates (Created / Updated / Completed / Deleted / Imported / Events)",
+      "yAxisUnit": "none"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Total log entries from the todo-backend per interval",
+      "fillSpans": false,
+      "id": "w-log-volume",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "lv1a2b3c",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "log count",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-log-volume",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Log Volume",
+      "yAxisUnit": "none"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Log entries grouped by severity level (INFO, WARN, ERROR)",
+      "fillSpans": false,
+      "id": "w-log-by-severity",
+      "isStacked": true,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "ls1a2b3c",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "severity_text--string----true",
+                  "isColumn": true,
+                  "isJSON": false,
+                  "key": "severity_text",
+                  "type": ""
+                }
+              ],
+              "having": [],
+              "legend": "{{severity_text}}",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-log-by-severity",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": true,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Log Volume by Severity",
+      "yAxisUnit": "none"
+    },
+    {
+      "description": "",
+      "id": "row-audit",
+      "panelTypes": "row",
+      "title": "Audit Log (Export Endpoint)"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Count of audit log entries (AuditStart / AuditEnd) emitted by the audit middleware on the export endpoint",
+      "fillSpans": false,
+      "id": "w-audit-volume",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "",
+                "id": "",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "",
+                "type": ""
+              },
+              "aggregateOperator": "count",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "la1a2b3c",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "la2b3c4d",
+                    "key": {
+                      "dataType": "string",
+                      "id": "SourceContext--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "SourceContext",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "AuditLog"
+                  },
+                  {
+                    "id": "la3c4d5e",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Audit start:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "audit requests",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-audit-volume",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Audit Log: Request Count",
+      "yAxisUnit": "none"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Average request duration as measured by the audit middleware (Elapsed extracted from the 'Audit end:' log message).\nUses a sum_rate approach: sums Elapsed values divided by count gives avg duration per interval.",
+      "fillSpans": false,
+      "id": "w-audit-duration",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "Elapsed--float64--tag--false",
+                "isColumn": false,
+                "isJSON": false,
+                "key": "Elapsed",
+                "type": "tag"
+              },
+              "aggregateOperator": "avg",
+              "dataSource": "logs",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "ld1a2b3c",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--resource--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "resource"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "ld2b3c4d",
+                    "key": {
+                      "dataType": "string",
+                      "id": "SourceContext--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "SourceContext",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "AuditLog"
+                  },
+                  {
+                    "id": "ld3c4d5e",
+                    "key": {
+                      "dataType": "string",
+                      "id": "body--string----true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "body",
+                      "type": ""
+                    },
+                    "op": "contains",
+                    "value": "Audit end:"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "avg duration (ms)",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "avg",
+              "stepInterval": 60,
+              "timeAggregation": "avg"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-audit-duration",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string", "id": "serviceName--string--tag--true", "isColumn": true, "isJSON": false, "key": "serviceName", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Audit Log: Avg Request Duration",
+      "yAxisUnit": "ms"
+    }
+  ]
+}

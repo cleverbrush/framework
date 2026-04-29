@@ -1,0 +1,397 @@
+{
+  "description": "Event loop delay, heap memory, garbage collection, and event loop utilization",
+  "dotMigrated": true,
+  "image": "",
+  "layout": [
+    {
+      "i": "3c5b0cad-cc6b-45a2-881f-bf4b8998d887",
+      "x": 0,
+      "y": 0,
+      "w": 12,
+      "h": 8,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "e6ea2290-48dd-436c-bca1-a366bcd4e83c",
+      "x": 12,
+      "y": 0,
+      "w": 12,
+      "h": 8,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "0607d505-d098-4e67-9859-b14611c13eca",
+      "x": 0,
+      "y": 8,
+      "w": 12,
+      "h": 8,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "f35efdde-ed5b-4f9a-92c8-97dfa844571f",
+      "x": 12,
+      "y": 8,
+      "w": 12,
+      "h": 8,
+      "moved": false,
+      "static": false
+    }
+  ],
+  "panelMap": {},
+  "tags": [],
+  "title": "Todo Backend \u2014 Node.js Runtime",
+  "uploadedGrafana": false,
+  "variables": {},
+  "version": "v4",
+  "widgets": [
+    {
+      "id": "3c5b0cad-cc6b-45a2-881f-bf4b8998d887",
+      "title": "Event Loop Delay P99",
+      "description": "",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.eventloop.delay.p99--float64--Gauge--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.eventloop.delay.p99",
+                "type": "Gauge"
+              },
+              "aggregateOperator": "avg",
+              "timeAggregation": "avg",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "svc-3c5b0cad",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [],
+              "having": [],
+              "orderBy": [],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "s",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    },
+    {
+      "id": "e6ea2290-48dd-436c-bca1-a366bcd4e83c",
+      "title": "Heap Used vs Limit",
+      "description": "",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "v8js.memory.heap.used--float64--Gauge--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "v8js.memory.heap.used",
+                "type": "Gauge"
+              },
+              "aggregateOperator": "avg",
+              "timeAggregation": "avg",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "svc-e6ea2290",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [],
+              "having": [],
+              "orderBy": [],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "bytes",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    },
+    {
+      "id": "0607d505-d098-4e67-9859-b14611c13eca",
+      "title": "GC Duration (rate)",
+      "description": "",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "v8js.gc.duration.sum--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "v8js.gc.duration.sum",
+                "type": "Sum"
+              },
+              "aggregateOperator": "rate",
+              "timeAggregation": "rate",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "svc-0607d505",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "v8js.gc.type--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "v8js.gc.type",
+                  "type": "tag"
+                }
+              ],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [],
+              "having": [],
+              "orderBy": [],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "s",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    },
+    {
+      "id": "f35efdde-ed5b-4f9a-92c8-97dfa844571f",
+      "title": "Event Loop Utilization",
+      "description": "Value between 0 and 1",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "metrics",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "nodejs.eventloop.utilization--float64--Gauge--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "nodejs.eventloop.utilization",
+                "type": "Gauge"
+              },
+              "aggregateOperator": "avg",
+              "timeAggregation": "avg",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "svc-f35efdde",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [],
+              "having": [],
+              "orderBy": [],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "short",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    }
+  ],
+  "uuid": "9075aaa6-2bcf-4853-9343-ef2db07f8637"
+}

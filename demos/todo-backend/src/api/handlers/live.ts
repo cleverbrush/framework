@@ -3,10 +3,13 @@
  */
 
 import type { SubscriptionHandler } from '@cleverbrush/server';
+import type { TodoActivityResponse } from '../schemas.js';
 import type {
-    TodoUpdatesSubscription,
-    ChatSubscription
+    ActivityFeedSubscription,
+    ChatSubscription,
+    TodoUpdatesSubscription
 } from '../endpoints.js';
+import { subscribeActivity } from './activityBus.js';
 
 // ── Todo updates — broadcasts simulated todo changes ──────────────────────────
 
@@ -24,7 +27,7 @@ export const todoUpdatesHandler: SubscriptionHandler<
     ];
 
     while (true) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
         id++;
         yield {
             action: actions[id % actions.length],
@@ -36,7 +39,9 @@ export const todoUpdatesHandler: SubscriptionHandler<
 
 // ── Chat — echoes back incoming messages with metadata ────────────────────────
 
-const chatClients = new Set<(msg: { user: string; text: string; ts: number }) => void>();
+const chatClients = new Set<
+    (msg: { user: string; text: string; ts: number }) => void
+>();
 
 export const chatHandler: SubscriptionHandler<typeof ChatSubscription> =
     async function* ({ incoming }) {
@@ -82,7 +87,7 @@ export const chatHandler: SubscriptionHandler<typeof ChatSubscription> =
             // Yield pending messages as they arrive
             while (true) {
                 if (pending.length === 0) {
-                    await new Promise<void>((r) => {
+                    await new Promise<void>(r => {
                         resolve = r;
                     });
                 }
@@ -95,3 +100,32 @@ export const chatHandler: SubscriptionHandler<typeof ChatSubscription> =
             await incomingDone.catch(() => {});
         }
     };
+
+// ── Activity feed — server-push subscription backed by activityBus ────────────
+
+export const activityFeedHandler: SubscriptionHandler<
+    typeof ActivityFeedSubscription
+> = async function* () {
+    const pending: TodoActivityResponse[] = [];
+    let resolve: (() => void) | null = null;
+
+    const unsubscribe = subscribeActivity(event => {
+        pending.push(event);
+        resolve?.();
+    });
+
+    try {
+        while (true) {
+            if (pending.length === 0) {
+                await new Promise<void>(r => {
+                    resolve = r;
+                });
+            }
+            while (pending.length > 0) {
+                yield pending.shift()!;
+            }
+        }
+    } finally {
+        unsubscribe();
+    }
+};

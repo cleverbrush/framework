@@ -681,3 +681,38 @@ test('59. object schema with .example() emits examples array', () => {
     expect(result.type).toBe('object');
     expect(result.examples).toEqual([{ name: 'Alice', age: 30 }]);
 });
+
+// ---------------------------------------------------------------------------
+// nullable enum and nullable const
+// ---------------------------------------------------------------------------
+
+test('60. enum union nullable — adds null to enum values', () => {
+    // union of all-const strings → produces { enum: [...] }; nullable adds null
+    const schema = union(string('a')).or(string('b')).nullable();
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result['enum']).toEqual(['a', 'b', null]);
+});
+
+test('61. const string nullable — converts const to oneOf with null', () => {
+    // single-value string → produces { const: 'x' }; nullable wraps in oneOf
+    const schema = string('x').nullable();
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result['anyOf']).toEqual([{ const: 'x' }, { type: 'null' }]);
+    expect(result['const']).toBeUndefined();
+});
+
+// ---------------------------------------------------------------------------
+// description emission (line 244)
+// ---------------------------------------------------------------------------
+
+test('62. schema with .describe() emits description field', () => {
+    const schema = string().describe('A user email address');
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result['description']).toBe('A user email address');
+});
+
+test('63. schema without description does not emit description field', () => {
+    const schema = string();
+    const result = toJsonSchema(schema, { $schema: false });
+    expect(result['description']).toBeUndefined();
+});

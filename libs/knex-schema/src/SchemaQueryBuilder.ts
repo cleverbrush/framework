@@ -2,19 +2,39 @@
 
 import type { InferType } from '@cleverbrush/schema';
 import {
+    EXTRA_TYPE_BRAND,
+    METHOD_LITERAL_BRAND,
     ObjectSchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import { buildColumnMap, resolveColumnRef } from './columns.js';
-import { getTableName } from './extension.js';
+import {
+    buildColumnMap,
+    getPrimaryKeyColumns,
+    resolveColumnRef,
+    resolvePropertyKey
+} from './columns.js';
+import {
+    getProjections,
+    getTableName,
+    getVariants,
+    POLYMORPHIC_TYPE_BRAND
+} from './extension.js';
 import { clearRow } from './mappers.js';
 import type {
     ColumnRef,
+    CursorPaginationResult,
     InsertType,
     JoinManySpec,
     JoinOneSpec,
+    PaginationResult,
+    RelationSpec,
+    ResolvedVariantConfig,
+    ResolvedVariantRelationSpec,
+    SelectProjection,
+    SelectSelector,
     ValidatedSpec,
+    VariantWhereFilter,
     WithJoinedMany,
     WithJoinedOne
 } from './types.js';
@@ -23,6 +43,190 @@ import {
     validateJoinOne,
     validateUniqueFieldNames
 } from './validate.js';
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Extracts the scope names registered on a schema via `.scope(name, fn)`.
+ * Returns `never` when no scopes are defined (making `.scoped()` uncallable).
+ * Falls back to `string` for `any`-typed schemas to preserve loose behaviour.
+ *
+ * @internal
+ */
+type ScopesOf<S> = S extends {
+    readonly [METHOD_LITERAL_BRAND]?: infer N;
+}
+    ? Extract<N, string>
+    : never;
+
+/**
+ * Extracts the named projection map from a schema type.
+ * Returns a `Record<name, readonly keys[]>` type where each key is a
+ * registered projection name and the value is the tuple of property keys.
+ * Returns `Record<never, never>` (no projections) when the schema has none,
+ * making `.projected()` uncallable on undecorated schemas.
+ *
+ * @internal
+ */
+type ProjectionsOf<S> = S extends {
+    readonly [EXTRA_TYPE_BRAND]?: infer P;
+}
+    ? P extends Record<string, readonly string[]>
+        ? P
+        : Record<never, never>
+    : Record<never, never>;
+
+/**
+ * Extracts the string-key union for a specific projection name from a schema
+ * type. This indirection is needed because TypeScript cannot directly index
+ * `ProjectionsOf<S>[K]` with `number` inside a generic function signature.
+ *
+ * @internal
+ */
+type ProjectionKeysOf<
+    S,
+    K extends keyof ProjectionsOf<S> & string
+> = ProjectionsOf<S>[K] extends readonly (infer T extends string)[]
+    ? T
+    : string;
+
+// ---------------------------------------------------------------------------
+// Polymorphic result type — driven by POLYMORPHIC_TYPE_BRAND phantom type
+// ---------------------------------------------------------------------------
+
+/**
+ * When a schema carries the `POLYMORPHIC_TYPE_BRAND` phantom type (set by
+ * `.withVariants()`), extract the discriminated-union result type from it.
+ * Otherwise fall back to `InferType<TLocalSchema>`.
+ *
+ * @internal
+ */
+type QueryResultType<TLocalSchema> = TLocalSchema extends {
+    readonly [POLYMORPHIC_TYPE_BRAND]?: infer U;
+}
+    ? NonNullable<U>
+    : InferType<TLocalSchema>;
+
+// ---------------------------------------------------------------------------
+// OnConflictBuilder
+// ---------------------------------------------------------------------------
+
+/**
+ * Intermediate builder returned by {@link SchemaQueryBuilder.onConflict}.
+ * Call `.merge()` or `.ignore()` to complete the upsert/insert-ignore operation.
+ *
+ * @internal
+ */
+export class OnConflictBuilder<
+    TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    TResult
+> {
+    readonly #knex: Knex;
+    readonly #localSchema: TLocalSchema;
+    readonly #conflictColumns: string[];
+
+    /** @internal */
+    constructor(
+        knex: Knex,
+        localSchema: TLocalSchema,
+        _parent: SchemaQueryBuilder<TLocalSchema, TResult>,
+        conflictColumns: string[]
+    ) {
+        this.#knex = knex;
+        this.#localSchema = localSchema;
+        this.#conflictColumns = conflictColumns;
+    }
+
+    /**
+     * Insert and merge (update) conflicting rows.
+     *
+     * @param data - Row to insert.
+     * @param updateData - Optional partial object of columns to update on
+     *   conflict. If omitted, all inserted columns are updated.
+     * @returns The resulting row.
+     */
+    async merge(
+        data: InsertType<TLocalSchema>,
+        updateData?: Partial<InferType<TLocalSchema>>
+    ): Promise<TResult> {
+        return this.#execute(data, 'merge', updateData) as Promise<TResult>;
+    }
+
+    /**
+     * Insert and silently ignore conflicts.
+     *
+     * @param data - Row to insert.
+     * @returns The row if inserted, or `undefined` if the conflict was ignored.
+     */
+    async ignore(data: InsertType<TLocalSchema>): Promise<TResult | undefined> {
+        return this.#execute(data, 'ignore');
+    }
+
+    async #execute(
+        data: InsertType<TLocalSchema>,
+        mode: 'merge' | 'ignore',
+        updateData?: Partial<InferType<TLocalSchema>>
+    ): Promise<TResult | undefined> {
+        const tableName = getTableName(this.#localSchema);
+        const timestamps: { createdAt: string; updatedAt: string } | null =
+            (this.#localSchema as any).getExtension?.('timestamps') ?? null;
+
+        const beforeHooks: Function[] =
+            (this.#localSchema as any).getExtension?.('beforeInsert') ?? [];
+
+        let processed = { ...(data as Record<string, any>) };
+        for (const hook of beforeHooks) {
+            processed = (await hook(processed)) ?? processed;
+        }
+
+        const { propToCol } = buildColumnMap(this.#localSchema as any);
+        const mapped: Record<string, any> = {};
+        for (const [key, val] of Object.entries(processed)) {
+            mapped[propToCol.get(key) ?? key] = val;
+        }
+        if (timestamps) {
+            mapped[timestamps.createdAt] = this.#knex.fn.now();
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
+        let qb = this.#knex(tableName)
+            .insert(mapped)
+            .onConflict(this.#conflictColumns);
+
+        if (mode === 'ignore') {
+            qb = (qb as any).ignore();
+        } else {
+            let mergeObj: Record<string, any>;
+            if (updateData) {
+                mergeObj = {};
+                for (const [key, val] of Object.entries(
+                    updateData as Record<string, any>
+                )) {
+                    mergeObj[propToCol.get(key) ?? key] = val;
+                }
+            } else {
+                mergeObj = { ...mapped };
+                if (timestamps) {
+                    delete mergeObj[timestamps.createdAt];
+                    mergeObj[timestamps.updatedAt] = this.#knex.fn.now();
+                }
+            }
+            qb = (qb as any).merge(mergeObj);
+        }
+
+        const rows = await (qb as any).returning('*');
+        if (!rows || rows.length === 0) return undefined;
+
+        const { colToProp } = buildColumnMap(this.#localSchema as any);
+        const result: Record<string, any> = {};
+        for (const [col, val] of Object.entries(rows[0])) {
+            result[colToProp.get(col) ?? col] = val;
+        }
+        return result as TResult;
+    }
+}
 
 // ---------------------------------------------------------------------------
 // SchemaQueryBuilder
@@ -85,6 +289,76 @@ export class SchemaQueryBuilder<
     #explicitSelects: string[] | null = null;
 
     /**
+     * Tracks which column-selection mode is active on this builder.
+     * - `null`          — no explicit SELECT issued yet (SELECT *).
+     * - `'select'`      — `.select()` / `.distinct()` was called.
+     * - `'aggregate'`   — `.count()` / `.countDistinct()` / `.min()` / etc.
+     * - `'projection'`  — `.projected()` was called.
+     *
+     * Only one mode is allowed per query. Calling a method that would switch
+     * to a different mode throws an error.
+     */
+    #selectionMode: 'select' | 'aggregate' | 'projection' | null = null;
+    /** Name of the projection currently applied, for use in error messages. */
+    #appliedProjection: string | null = null;
+
+    /** When true, soft-delete filter is not applied to SELECT queries. */
+    #includeDeleted = false;
+    /** When true, only soft-deleted rows are returned. */
+    #onlyDeleted = false;
+    /** When true, default scope is not applied. */
+    #skipDefaultScope = false;
+
+    // -----------------------------------------------------------------------
+    // Polymorphic variant state
+    // -----------------------------------------------------------------------
+
+    /**
+     * Resolved variant config, lazily populated from the schema's `'variants'`
+     * extension. `undefined` = not yet read; `null` = schema is not polymorphic.
+     */
+    #variantConfig: ResolvedVariantConfig | null | undefined = undefined;
+
+    /**
+     * When set, only these discriminator values are returned (added to WHERE).
+     * `null` means all variants are included.
+     */
+    #enabledVariants: Set<string> | null = null;
+
+    /** Pending per-variant WHERE filters registered via `.whereVariant()`. */
+    #variantWhereFilters: VariantWhereFilter[] = [];
+
+    /**
+     * Variant-relation eager-load requests registered via `.includeVariant()`.
+     * Each entry names the variant key and the relation name to load.
+     * Processed inside `#applyVariantJoins()`.
+     */
+    #variantRelationIncludes: Array<{
+        variantKey: string;
+        relationName: string;
+        customize?: (q: SchemaQueryBuilder<any, any>) => void;
+    }> = [];
+
+    /**
+     * Memoized result of `#buildQuery()`. Invalidated by any mutating method
+     * (where, orderBy, limit, etc.) and re-built lazily on the next read.
+     */
+    #cachedBuiltQuery: Knex.QueryBuilder | null = null;
+
+    /** Invalidate the compiled-query cache. Called by every mutating method. */
+    #invalidateCache(): void {
+        this.#cachedBuiltQuery = null;
+    }
+
+    /** Return the built query, building it once and caching the result. */
+    #getQuery(): Knex.QueryBuilder {
+        if (!this.#cachedBuiltQuery) {
+            this.#cachedBuiltQuery = this.#buildQuery();
+        }
+        return this.#cachedBuiltQuery;
+    }
+
+    /**
      * @param knex - A configured Knex instance.
      * @param localSchema - The `ObjectSchemaBuilder` for the primary table.
      *   Must have a table name set via `.hasTableName()`.
@@ -107,12 +381,516 @@ export class SchemaQueryBuilder<
     // Private helpers
     // =======================================================================
 
-    #resolveColumn(ref: any, label = 'column'): string {
+    #resolveColumn(
+        ref: any,
+        label = 'column'
+    ): string | import('knex').Knex.Raw {
         return resolveColumnRef(
             ref as ColumnRef<any>,
             this.#localSchema,
-            label
+            label,
+            this.#knex
         );
+    }
+
+    /** @internal Read soft-delete extension from schema. */
+    #getSoftDelete(): { column: string } | null {
+        const ext = (this.#localSchema as any).getExtension?.('softDelete');
+        return ext ?? null;
+    }
+
+    /** @internal Read default scope function from schema. */
+    #getDefaultScope(): Function | null {
+        const fn = (this.#localSchema as any).getExtension?.('defaultScope');
+        return typeof fn === 'function' ? fn : null;
+    }
+
+    /** @internal Read timestamps config from schema. */
+    #getTimestamps(): { createdAt: string; updatedAt: string } | null {
+        const ts = (this.#localSchema as any).getExtension?.('timestamps');
+        return ts ?? null;
+    }
+
+    // -----------------------------------------------------------------------
+    // Polymorphic helpers
+    // -----------------------------------------------------------------------
+
+    /**
+     * Read and cache the variant config from the schema. Returns `null` when
+     * the schema is not polymorphic.
+     * @internal
+     */
+    #getVariantConfig(): ResolvedVariantConfig | null {
+        if (this.#variantConfig !== undefined) return this.#variantConfig;
+
+        const raw = getVariants(this.#localSchema);
+        if (!raw) {
+            this.#variantConfig = null;
+            return null;
+        }
+
+        // Resolve discriminator property key → SQL column name
+        const { propToCol } = buildColumnMap(this.#localSchema);
+        const discCol =
+            propToCol.get(raw.discriminatorKey) ?? raw.discriminatorKey;
+
+        this.#variantConfig = {
+            ...raw,
+            discriminatorColumn: discCol
+        };
+        return this.#variantConfig;
+    }
+
+    /**
+     * Validate allowed SQL operators for `whereVariant`.
+     * Guards against SQL injection via the `op` parameter.
+     * @internal
+     */
+    static #ALLOWED_OPS = new Set([
+        '=',
+        '!=',
+        '<>',
+        '<',
+        '>',
+        '<=',
+        '>=',
+        'like',
+        'not like',
+        'ilike',
+        'not ilike',
+        'in',
+        'not in',
+        'is',
+        'is not'
+    ]);
+
+    /**
+     * Apply variant LEFT JOINs and aliased column selects to a base query,
+     * then add any `whereVariant` / `selectVariants` filters.
+     *
+     * For CTI variants:
+     *   - `LEFT JOIN variantTable AS __v_<key> ON __v_<key>.<fk> = base.<pk> AND base.<disc> = '<key>'`
+     *   - `SELECT __v_<key>.<col> AS __v_<key>__<col>` for every column (incl. FK for orphan detection)
+     *
+     * For STI variants:
+     *   - No extra JOIN needed; columns are already in the base row.
+     *
+     * @internal
+     */
+    #applyVariantJoins(
+        base: Knex.QueryBuilder,
+        variantConfig: ResolvedVariantConfig
+    ): Knex.QueryBuilder {
+        const knex = this.#knex;
+        const baseTable = this.#tableName;
+        const basePkCol = this.#findPrimaryKeyColumn(this.#localSchema);
+        const discCol = variantConfig.discriminatorColumn;
+
+        // Clone base and ensure we SELECT base.* so variant aliases don't
+        // collide with the base column list when the caller used SELECT *.
+        const qb = base.clone().select(`${baseTable}.*`);
+
+        for (const [key, spec] of Object.entries(variantConfig.variants)) {
+            // Skip disabled variants when selectVariants() was called
+            if (
+                this.#enabledVariants !== null &&
+                !this.#enabledVariants.has(key)
+            )
+                continue;
+
+            if (spec.storage === 'cti') {
+                const variantAlias = `__v_${key}`;
+                const variantTable = spec.tableName!;
+                const fkCol = spec.foreignKey!;
+
+                // LEFT JOIN with discriminator gate so we only pick up rows
+                // for the matching variant.
+                qb.leftJoin(
+                    `${variantTable} as ${variantAlias}`,
+                    knex.raw(`?? = ?? AND ?? = ?`, [
+                        `${variantAlias}.${fkCol}`,
+                        `${baseTable}.${basePkCol}`,
+                        `${baseTable}.${discCol}`,
+                        key
+                    ])
+                );
+
+                // SELECT each variant column with a namespaced alias
+                const { propToCol } = buildColumnMap(spec.schema);
+                const variantIntrospect = spec.schema.introspect() as any;
+                const variantProps: Record<string, unknown> =
+                    variantIntrospect.properties ?? {};
+
+                for (const propKey of Object.keys(variantProps)) {
+                    const colName = propToCol.get(propKey) ?? propKey;
+                    // Alias: __v_image.width AS __v_image__width
+                    qb.select(
+                        knex.raw('?? as ??', [
+                            `${variantAlias}.${colName}`,
+                            `${variantAlias}__${colName}`
+                        ])
+                    );
+                }
+            }
+            // STI: no extra JOIN — variant columns are already in the base row
+        }
+
+        // Apply variant-relation eager-load JOINs (registered via .includeVariant())
+        for (const vrInc of this.#variantRelationIncludes) {
+            const variantSpec = variantConfig.variants[vrInc.variantKey];
+            if (!variantSpec) continue;
+
+            const relSpec = variantSpec.relations.find(
+                (r: ResolvedVariantRelationSpec) =>
+                    r.name === vrInc.relationName
+            );
+            if (!relSpec) continue;
+
+            const foreignSchema = this.#resolveSchema(relSpec.schema);
+            const foreignTableName = getTableName(foreignSchema);
+            const relAlias = `__v_${vrInc.variantKey}__rel_${vrInc.relationName}`;
+
+            if (relSpec.type === 'belongsTo' || relSpec.type === 'hasOne') {
+                // Determine join condition columns
+                let localCol: string;
+                let foreignCol: string;
+
+                if (relSpec.type === 'belongsTo') {
+                    // FK is on the variant table (or base table for STI)
+                    localCol =
+                        relSpec.foreignKey ??
+                        ((): string => {
+                            throw new Error(
+                                `includeVariant: relation "${vrInc.relationName}" on variant "${vrInc.variantKey}" requires foreignKey`
+                            );
+                        })();
+                    foreignCol = this.#findPrimaryKeyColumn(foreignSchema);
+                } else {
+                    // hasOne: FK is on the foreign table
+                    localCol = this.#findPrimaryKeyColumn(this.#localSchema);
+                    foreignCol =
+                        relSpec.foreignKey ??
+                        ((): string => {
+                            throw new Error(
+                                `includeVariant: relation "${vrInc.relationName}" on variant "${vrInc.variantKey}" requires foreignKey`
+                            );
+                        })();
+                }
+
+                // Build the join ON condition, gated by the discriminator
+                let onExpr: string;
+                const variantAlias = `__v_${vrInc.variantKey}`;
+
+                if (variantSpec.storage === 'cti') {
+                    if (relSpec.type === 'belongsTo') {
+                        // FK lives on the CTI variant alias table
+                        onExpr = `${relAlias}.${foreignCol} = ${variantAlias}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    } else {
+                        // hasOne: FK on foreign table, local col is base PK
+                        onExpr = `${relAlias}.${foreignCol} = ${baseTable}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    }
+                } else {
+                    // STI: all columns are in the base table
+                    if (relSpec.type === 'belongsTo') {
+                        onExpr = `${relAlias}.${foreignCol} = ${baseTable}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    } else {
+                        onExpr = `${relAlias}.${foreignCol} = ${baseTable}.${localCol} AND ${baseTable}.${discCol} = '${vrInc.variantKey}'`;
+                    }
+                }
+
+                // Build the foreign query (applying customize if provided)
+                const foreignKnex: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+
+                // Determine which columns to select from the foreign table.
+                // Run customize on a probe proxy to capture projection/explicit-select state.
+                const selectionSql = this.#buildVariantRelationSelect(
+                    foreignSchema,
+                    relAlias,
+                    foreignTableName,
+                    vrInc.customize
+                );
+
+                qb.leftJoin(
+                    knex.raw(`?? as ??`, [foreignTableName, relAlias]),
+                    knex.raw(onExpr)
+                );
+                void foreignKnex; // probe was used only for column determination
+
+                for (const sel of selectionSql) {
+                    qb.select(sel);
+                }
+            }
+            // NOTE: hasMany / belongsToMany on variants are not yet supported
+            // via inline JOINs (they would multiply rows). Future: secondary query.
+        }
+
+        // Apply per-variant WHERE filters (added via .whereVariant())
+        for (const filter of this.#variantWhereFilters) {
+            const discColFull = `${baseTable}.${discCol}`;
+            // (base.disc = 'key' AND variant_col op value) OR base.disc != 'key'
+            // → restricts matching rows, passes through non-matching variants
+            qb.where(function (this: Knex.QueryBuilder) {
+                this.where(discColFull, filter.key)
+                    .andWhere(filter.qualifiedColumn, filter.op, filter.value)
+                    .orWhere(discColFull, '!=', filter.key);
+            });
+        }
+
+        // Apply selectVariants restriction
+        if (this.#enabledVariants !== null) {
+            qb.whereIn(`${baseTable}.${discCol}`, [...this.#enabledVariants]);
+        }
+
+        return qb;
+    }
+
+    /**
+     * Build the list of `knex.raw("?? as ??", ...)` select expressions that
+     * project a variant-relation alias table's columns into the namespaced
+     * prefix `__v_<key>__rel_<name>__<col>`.
+     *
+     * When `customize` applies a projection, only the projected columns are
+     * selected.  Otherwise every column in the foreign schema is selected.
+     *
+     * @internal
+     */
+    #buildVariantRelationSelect(
+        foreignSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+        relAlias: string,
+        foreignTableName: string,
+        customize?: (q: SchemaQueryBuilder<any, any>) => void
+    ): Knex.Raw[] {
+        const knex = this.#knex;
+        const { propToCol } = buildColumnMap(foreignSchema);
+        const foreignIntrospect = foreignSchema.introspect() as any;
+        const foreignProps: Record<string, unknown> =
+            foreignIntrospect.properties ?? {};
+
+        // Determine which property keys to include.
+        // Run customize on a probe proxy to capture #explicitSelects state.
+        let columnsToSelect: string[];
+
+        if (customize) {
+            const probe = new SchemaQueryBuilder(
+                this.#knex,
+                foreignSchema,
+                this.#knex(foreignTableName)
+            );
+            customize(probe);
+            const explicit = probe.#explicitSelects;
+            if (explicit && explicit.length > 0) {
+                columnsToSelect = explicit;
+            } else {
+                columnsToSelect = Object.keys(foreignProps).map(
+                    p => propToCol.get(p) ?? p
+                );
+            }
+        } else {
+            columnsToSelect = Object.keys(foreignProps).map(
+                p => propToCol.get(p) ?? p
+            );
+        }
+
+        return columnsToSelect.map(colName =>
+            knex.raw('?? as ??', [
+                `${relAlias}.${colName}`,
+                `${relAlias}__${colName}`
+            ])
+        );
+    }
+
+    /**
+     * Map a raw SQL row from a polymorphic query to a schema-property-named
+     * object for the active variant.
+     *
+     * - Base columns are mapped via the base schema's `colToProp` map.
+     * - CTI variant columns (aliased as `__v_<key>__<col>`) are mapped via
+     *   the variant schema's `colToProp` map for the matching discriminator value.
+     * - STI variant columns are already in the base row; they are mapped via
+     *   the variant schema's `colToProp` map.
+     * - The CTI FK column alias (`__v_<key>__<fkCol>`) is used only for orphan
+     *   detection and is NOT included in the result.
+     *
+     * @internal
+     */
+    #mapPolymorphicRow(
+        row: Record<string, any>,
+        variantConfig: ResolvedVariantConfig
+    ): Record<string, any> {
+        const { colToProp: baseColToProp } = buildColumnMap(this.#localSchema);
+        const result: Record<string, any> = {};
+
+        // Pass 1: map base columns (skip __v_* aliases)
+        for (const [colName, value] of Object.entries(row)) {
+            if (colName.startsWith('__v_')) continue;
+            const propName = baseColToProp.get(colName);
+            if (propName) {
+                result[propName] = value;
+            } else {
+                // Unknown column (raw expression, joined field) — pass through
+                result[colName] = value;
+            }
+        }
+
+        // Pass 2: map variant columns for the active discriminator value
+        const discPropKey = variantConfig.discriminatorKey;
+        const discValue: string | undefined = result[discPropKey];
+
+        if (discValue != null) {
+            const variantSpec = variantConfig.variants[discValue];
+            if (variantSpec) {
+                if (variantSpec.storage === 'cti') {
+                    const { colToProp: varColToProp } = buildColumnMap(
+                        variantSpec.schema
+                    );
+                    const variantAlias = `__v_${discValue}`;
+                    const prefix = `${variantAlias}__`;
+                    const fkCol = variantSpec.foreignKey;
+
+                    // Check for orphaned discriminator (FK alias is NULL)
+                    if (fkCol) {
+                        const fkAlias = `${prefix}${fkCol}`;
+                        if (!variantSpec.allowOrphan && row[fkAlias] == null) {
+                            throw new Error(
+                                `Polymorphic orphan: "${discPropKey}" = "${discValue}" ` +
+                                    `but no matching row found in variant table ` +
+                                    `"${variantSpec.tableName}". ` +
+                                    `Set allowOrphan: true on this variant to suppress.`
+                            );
+                        }
+                    }
+
+                    for (const [colName, value] of Object.entries(row)) {
+                        if (!colName.startsWith(prefix)) continue;
+                        const origCol = colName.slice(prefix.length);
+                        // Skip FK column — it duplicates the base PK
+                        if (origCol === fkCol) continue;
+                        const propName = varColToProp.get(origCol) ?? origCol;
+                        result[propName] = value;
+                    }
+                } else {
+                    // STI: variant columns are in the base row (no prefix)
+                    const { colToProp: varColToProp } = buildColumnMap(
+                        variantSpec.schema
+                    );
+                    for (const [colName, value] of Object.entries(row)) {
+                        if (colName.startsWith('__v_')) continue;
+                        if (baseColToProp.has(colName)) continue; // already mapped
+                        const propName = varColToProp.get(colName);
+                        if (propName) {
+                            result[propName] = value;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 3: extract variant-relation nested objects
+        if (this.#variantRelationIncludes.length > 0 && discValue != null) {
+            const variantSpec3 = variantConfig.variants[discValue];
+            if (variantSpec3) {
+                for (const vrInc of this.#variantRelationIncludes) {
+                    if (vrInc.variantKey !== discValue) continue;
+
+                    const relSpec = variantSpec3.relations.find(
+                        (r: ResolvedVariantRelationSpec) =>
+                            r.name === vrInc.relationName
+                    );
+                    if (!relSpec) continue;
+
+                    if (
+                        relSpec.type === 'belongsTo' ||
+                        relSpec.type === 'hasOne'
+                    ) {
+                        const relAlias = `__v_${discValue}__rel_${vrInc.relationName}`;
+                        const prefix = `${relAlias}__`;
+                        const foreignSchema = this.#resolveSchema(
+                            relSpec.schema
+                        );
+                        const { colToProp: relColToProp } =
+                            buildColumnMap(foreignSchema);
+                        const nested: Record<string, unknown> = {};
+                        let anyNonNull = false;
+
+                        for (const [colName, value] of Object.entries(row)) {
+                            if (!colName.startsWith(prefix)) continue;
+                            const origCol = colName.slice(prefix.length);
+                            const propName =
+                                relColToProp.get(origCol) ?? origCol;
+                            nested[propName] = value;
+                            if (value !== null && value !== undefined) {
+                                anyNonNull = true;
+                            }
+                        }
+                        result[vrInc.relationName] = anyNonNull ? nested : null;
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    /**
+     * Build the effective base query with soft-delete and default-scope
+     * filters applied lazily. Does NOT include CTE wrapping.
+     */
+    #getEffectiveBaseQuery(): Knex.QueryBuilder {
+        let effectiveBase = this.#baseQuery;
+        let cloned = false;
+
+        // Apply soft delete filter
+        const softDelete = this.#getSoftDelete();
+        if (softDelete && this.#onlyDeleted) {
+            if (!cloned) {
+                effectiveBase = effectiveBase.clone();
+                cloned = true;
+            }
+            effectiveBase.whereNotNull(softDelete.column);
+        } else if (softDelete && !this.#includeDeleted) {
+            if (!cloned) {
+                effectiveBase = effectiveBase.clone();
+                cloned = true;
+            }
+            effectiveBase.whereNull(softDelete.column);
+        }
+
+        // Apply default scope
+        if (!this.#skipDefaultScope) {
+            const defaultScopeFn = this.#getDefaultScope();
+            if (defaultScopeFn) {
+                if (!cloned) {
+                    effectiveBase = effectiveBase.clone();
+                    cloned = true;
+                }
+                const proxy = new SchemaQueryBuilder(
+                    this.#knex,
+                    this.#localSchema,
+                    effectiveBase
+                );
+                proxy.#skipDefaultScope = true;
+                defaultScopeFn(proxy);
+            }
+        }
+
+        return effectiveBase;
+    }
+
+    /** @internal Resolve a lazy schema reference `schema | () => schema`. */
+    #resolveSchema(
+        schema: any
+    ): ObjectSchemaBuilder<any, any, any, any, any, any, any> {
+        return typeof schema === 'function' ? schema() : schema;
+    }
+
+    /** @internal Find the primary key column name from schema extensions. */
+    #findPrimaryKeyColumn(
+        schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>
+    ): string {
+        const pk = getPrimaryKeyColumns(schema);
+        if (pk.columnNames.length > 0) return pk.columnNames[0];
+        return 'id';
     }
 
     // =======================================================================
@@ -184,6 +962,7 @@ export class SchemaQueryBuilder<
         const validated = validateJoinOne(spec, this.#localSchema, this.#knex);
         this.#specs.push({ type: 'one' as const, ...validated });
         validateUniqueFieldNames(this.#specs);
+        this.#invalidateCache();
         return this as any;
     }
 
@@ -253,6 +1032,7 @@ export class SchemaQueryBuilder<
         const validated = validateJoinMany(spec, this.#localSchema, this.#knex);
         this.#specs.push({ type: 'many' as const, ...validated });
         validateUniqueFieldNames(this.#specs);
+        this.#invalidateCache();
         return this as any;
     }
 
@@ -290,6 +1070,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -334,6 +1115,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -376,6 +1158,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -418,6 +1201,7 @@ export class SchemaQueryBuilder<
             | ((builder: Knex.QueryBuilder) => void),
         ...args: any[]
     ): this {
+        this.#invalidateCache();
         if (
             typeof columnOrRaw === 'function' &&
             !this.#isColumnAccessor(columnOrRaw)
@@ -449,8 +1233,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereIn(
-            this.#resolveColumn(column, 'whereIn'),
+            this.#resolveColumn(column, 'whereIn') as any,
             values as any
         );
         return this;
@@ -466,8 +1251,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereNotIn(
-            this.#resolveColumn(column, 'whereNotIn'),
+            this.#resolveColumn(column, 'whereNotIn') as any,
             values as any
         );
         return this;
@@ -481,6 +1267,7 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereIn(
             this.#resolveColumn(column, 'orWhereIn'),
             values as any
@@ -496,6 +1283,7 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         values: readonly any[] | Knex.QueryBuilder
     ): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereNotIn(
             this.#resolveColumn(column, 'orWhereNotIn'),
             values as any
@@ -508,7 +1296,10 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereNull(column: ColumnRef<TLocalSchema>): this {
-        this.#baseQuery.whereNull(this.#resolveColumn(column, 'whereNull'));
+        this.#invalidateCache();
+        this.#baseQuery.whereNull(
+            this.#resolveColumn(column, 'whereNull') as any
+        );
         return this;
     }
 
@@ -517,8 +1308,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereNotNull(column: ColumnRef<TLocalSchema>): this {
+        this.#invalidateCache();
         this.#baseQuery.whereNotNull(
-            this.#resolveColumn(column, 'whereNotNull')
+            this.#resolveColumn(column, 'whereNotNull') as any
         );
         return this;
     }
@@ -528,6 +1320,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     orWhereNull(column: ColumnRef<TLocalSchema>): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereNull(
             this.#resolveColumn(column, 'orWhereNull')
         );
@@ -539,6 +1332,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     orWhereNotNull(column: ColumnRef<TLocalSchema>): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).orWhereNotNull(
             this.#resolveColumn(column, 'orWhereNotNull')
         );
@@ -554,8 +1348,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         range: readonly [any, any]
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereBetween(
-            this.#resolveColumn(column, 'whereBetween'),
+            this.#resolveColumn(column, 'whereBetween') as any,
             range as [any, any]
         );
         return this;
@@ -570,8 +1365,9 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema>,
         range: readonly [any, any]
     ): this {
+        this.#invalidateCache();
         this.#baseQuery.whereNotBetween(
-            this.#resolveColumn(column, 'whereNotBetween'),
+            this.#resolveColumn(column, 'whereNotBetween') as any,
             range as [any, any]
         );
         return this;
@@ -583,6 +1379,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereLike(column: ColumnRef<TLocalSchema>, value: string): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).whereLike(
             this.#resolveColumn(column, 'whereLike'),
             value
@@ -596,6 +1393,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereILike(column: ColumnRef<TLocalSchema>, value: string): this {
+        this.#invalidateCache();
         (this.#baseQuery as any).whereILike(
             this.#resolveColumn(column, 'whereILike'),
             value
@@ -610,6 +1408,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.whereRaw(sql, ...bindings);
         return this;
     }
@@ -620,7 +1419,84 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     whereExists(callback: Knex.QueryCallback | Knex.QueryBuilder): this {
+        this.#invalidateCache();
         this.#baseQuery.whereExists(callback as any);
+        return this;
+    }
+
+    /**
+     * Add a `WHERE NOT EXISTS (subquery)` clause.
+     * @param callback - A Knex query callback or sub-query builder.
+     * @returns `this` for chaining.
+     */
+    whereNotExists(callback: Knex.QueryCallback | Knex.QueryBuilder): this {
+        this.#invalidateCache();
+        (this.#baseQuery as any).whereNotExists(callback as any);
+        return this;
+    }
+
+    /**
+     * Add a PostgreSQL JSON path filter using `@?` / `@@` operators or
+     * a path-based equality test via `jsonb_path_query_first`.
+     *
+     * Only supported on `pg` clients — throws at runtime on others.
+     *
+     * @param column - Column reference for the `jsonb` column.
+     * @param path   - Dot-separated property path (e.g. `'a.b.c'`) or a
+     *   JSONPath expression string (e.g. `'$.a.b ? (@ == 1)'`).
+     * @param operator - Comparison operator (`=`, `!=`, `<`, `<=`, `>`, `>=`,
+     *   `@?`, `@@`). Use `@?` / `@@` for JSONPath existence / predicate tests.
+     * @param value  - The right-hand side value. Ignored for `@?` and `@@`.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * // Filter rows where data->>'status' = 'active'
+     * query(db, Schema).whereJsonPath(t => t.data, 'status', '=', 'active');
+     *
+     * // JSONPath existence
+     * query(db, Schema).whereJsonPath(t => t.data, '$.tags[*] ? (@ == "sale")', '@?');
+     * ```
+     */
+    whereJsonPath(
+        column: ColumnRef<TLocalSchema>,
+        path: string,
+        operator?: string,
+        value?: any
+    ): this {
+        this.#invalidateCache();
+        const client = (this.#knex as any).client?.config?.client as
+            | string
+            | undefined;
+        if (
+            client !== 'pg' &&
+            client !== 'postgresql' &&
+            client !== 'postgres'
+        ) {
+            throw new Error(
+                `whereJsonPath() is only supported on PostgreSQL (got client: "${client ?? 'unknown'}")`
+            );
+        }
+
+        const col = this.#resolveColumn(column, 'whereJsonPath');
+        const op = operator ?? '=';
+
+        if (op === '@?' || op === '@@') {
+            // JSONPath existence / predicate.
+            // Note: `@?` contains a `?` which Knex would treat as a binding
+            // placeholder inside whereRaw. Escape it with `\?` → `\\?` in JS.
+            const escapedOp = op === '@?' ? '@\\?' : '@@';
+            this.#baseQuery.whereRaw(`?? ${escapedOp} ?`, [col, path]);
+        } else {
+            // Path-based value test: jsonb_path_query_first(col, path) op value
+            const jsonPath = path.startsWith('$')
+                ? path
+                : `$.${path.replace(/\./g, '.')}`;
+            this.#baseQuery.whereRaw(
+                `jsonb_path_query_first(??, ?) ${op} ?::jsonb`,
+                [col, jsonPath, JSON.stringify(value)]
+            );
+        }
         return this;
     }
 
@@ -643,6 +1519,7 @@ export class SchemaQueryBuilder<
         column: ColumnRef<TLocalSchema> | Knex.Raw,
         direction?: 'asc' | 'desc'
     ): this {
+        this.#invalidateCache();
         const col = this.#resolveColumnArg(column);
         this.#baseQuery.orderBy(col as string, direction);
         return this;
@@ -654,6 +1531,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     orderByRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.orderByRaw(sql, ...bindings);
         return this;
     }
@@ -668,6 +1546,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     groupBy(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
+        this.#invalidateCache();
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.groupBy(...(resolved as string[]));
         return this;
@@ -678,6 +1557,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     groupByRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.groupByRaw(sql, ...bindings);
         return this;
     }
@@ -691,6 +1571,7 @@ export class SchemaQueryBuilder<
         operator: string,
         value: any
     ): this {
+        this.#invalidateCache();
         const col = this.#resolveColumnArg(column);
         this.#baseQuery.having(col as string, operator, value);
         return this;
@@ -701,6 +1582,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     havingRaw(sql: string, ...bindings: any[]): this {
+        this.#invalidateCache();
         this.#baseQuery.havingRaw(sql, ...bindings);
         return this;
     }
@@ -715,6 +1597,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     limit(n: number): this {
+        this.#invalidateCache();
         this.#baseQuery.limit(n);
         return this;
     }
@@ -725,6 +1608,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     offset(n: number): this {
+        this.#invalidateCache();
         this.#baseQuery.offset(n);
         return this;
     }
@@ -739,8 +1623,82 @@ export class SchemaQueryBuilder<
      * @param columns - One or more column references or raw expressions.
      * @returns `this` for chaining.
      */
-    select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
-        const resolved = columns.map(c => this.#resolveColumnArg(c));
+    select(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this;
+    /**
+     * DTO projection: select multiple aliased columns at once via a
+     * descriptor record. Returns a query whose result rows match the
+     * shape of the selector's return value (each value typed as the
+     * inferred schema-property type).
+     *
+     * @example
+     * ```ts
+     * const dtos = await query(db, UserSchema)
+     *     .where(t => t.id, '>', 0)
+     *     .select(t => ({ id: t.id, n: t.name }))
+     *     .execute();
+     * // dtos: { id: number; n: string }[]
+     * ```
+     */
+    select<TSel extends SelectSelector<TLocalSchema>>(
+        selector: TSel
+    ): SchemaQueryBuilder<TLocalSchema, SelectProjection<ReturnType<TSel>>>;
+    select(...args: unknown[]): SchemaQueryBuilder<TLocalSchema, any> {
+        // DTO projection overload: a single function whose return value
+        // is a Record<alias, descriptor> (NOT a single descriptor — those
+        // are handled by the column-list path via #resolveColumnArg).
+        if (args.length === 1 && typeof args[0] === 'function') {
+            const fn = args[0] as (t: any) => unknown;
+            const tree = ObjectSchemaBuilder.getPropertiesFor(
+                this.#localSchema as any
+            );
+            const result = fn(tree);
+            if (
+                result &&
+                typeof result === 'object' &&
+                !(SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in (result as object))
+            ) {
+                this.#invalidateCache();
+                this.#assertNotProjection('select');
+                this.#selectionMode = 'projection';
+                this.#appliedProjection = '<inline>';
+
+                const aliasMap: Record<string, string> = {};
+                this.#explicitSelects ??= [];
+                for (const [alias, descriptor] of Object.entries(
+                    result as Record<string, unknown>
+                )) {
+                    if (
+                        !descriptor ||
+                        typeof descriptor !== 'object' ||
+                        !(
+                            SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR in
+                            (descriptor as object)
+                        )
+                    ) {
+                        throw new Error(
+                            `select(selector): value for alias "${alias}" must be a property descriptor (e.g. \`t.someProp\`).`
+                        );
+                    }
+                    const col = this.#resolveColumn(
+                        (() => descriptor) as ColumnRef<TLocalSchema>,
+                        `select(selector).${alias}`
+                    );
+                    aliasMap[alias] = col as string;
+                    this.#explicitSelects.push(col as string);
+                }
+                this.#baseQuery.select(aliasMap);
+                return this as unknown as SchemaQueryBuilder<TLocalSchema, any>;
+            }
+            // Fall through: single descriptor → column-list path.
+        }
+
+        // Column-list path (existing behaviour).
+        this.#invalidateCache();
+        this.#assertNotProjection('select');
+        this.#selectionMode = 'select';
+        const resolved = (args as (ColumnRef<TLocalSchema> | Knex.Raw)[]).map(
+            c => this.#resolveColumnArg(c)
+        );
         this.#baseQuery.select(...(resolved as string[]));
         // Track the string-resolved columns (not Knex.Raw) for CTE column management
         this.#explicitSelects ??= [];
@@ -749,7 +1707,39 @@ export class SchemaQueryBuilder<
                 this.#explicitSelects.push(r);
             }
         }
-        return this;
+        return this as unknown as SchemaQueryBuilder<TLocalSchema, any>;
+    }
+
+    /** @internal Throw if a projection has already been applied. */
+    #assertNotProjection(method: string): void {
+        if (this.#selectionMode === 'projection') {
+            throw new Error(
+                `Cannot call .${method}() after .projected('${
+                    this.#appliedProjection
+                }'). Choose one column-selection mode per query.`
+            );
+        }
+    }
+
+    /** @internal Throw if .select() or .projected() has already been applied. */
+    #assertNotExplicitSelect(method: string): void {
+        if (this.#selectionMode === 'select') {
+            throw new Error(
+                `Cannot call .${method}() after .select(). Choose one column-selection mode per query.`
+            );
+        }
+        if (this.#selectionMode === 'aggregate') {
+            throw new Error(
+                `Cannot call .${method}() after an aggregate method. Choose one column-selection mode per query.`
+            );
+        }
+        if (this.#selectionMode === 'projection') {
+            throw new Error(
+                `Cannot call .${method}() after .projected('${
+                    this.#appliedProjection
+                }'). Choose one column-selection mode per query.`
+            );
+        }
     }
 
     /**
@@ -758,6 +1748,7 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     distinct(...columns: (ColumnRef<TLocalSchema> | Knex.Raw)[]): this {
+        this.#invalidateCache();
         const resolved = columns.map(c => this.#resolveColumnArg(c));
         this.#baseQuery.distinct(...(resolved as string[]));
         return this;
@@ -773,6 +1764,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     count(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
+        this.#assertNotProjection('count');
+        this.#selectionMode = 'aggregate';
         if (column) {
             this.#baseQuery.count(this.#resolveColumnArg(column) as string);
         } else {
@@ -787,6 +1781,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     countDistinct(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
+        this.#assertNotProjection('countDistinct');
+        this.#selectionMode = 'aggregate';
         if (column) {
             this.#baseQuery.countDistinct(
                 this.#resolveColumnArg(column) as string
@@ -802,6 +1799,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     min(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
+        this.#assertNotProjection('min');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.min(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -811,6 +1811,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     max(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
+        this.#assertNotProjection('max');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.max(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -820,6 +1823,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     sum(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
+        this.#assertNotProjection('sum');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.sum(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -829,6 +1835,9 @@ export class SchemaQueryBuilder<
      * @returns `this` for chaining.
      */
     avg(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
+        this.#invalidateCache();
+        this.#assertNotProjection('avg');
+        this.#selectionMode = 'aggregate';
         this.#baseQuery.avg(this.#resolveColumnArg(column) as string);
         return this;
     }
@@ -854,11 +1863,41 @@ export class SchemaQueryBuilder<
      * ```
      */
     async insert(data: InsertType<TLocalSchema>): Promise<TResult> {
-        const mapped = this.#mapObjectToColumns(data as Record<string, any>);
+        let processedData = { ...(data as Record<string, any>) };
+
+        // Run beforeInsert hooks
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of beforeHooks) {
+            processedData = (await hook(processedData)) ?? processedData;
+        }
+
+        const mapped = this.#mapObjectToColumns(processedData);
+
+        // Apply timestamps
+        const timestamps = this.#getTimestamps();
+        if (timestamps) {
+            mapped[timestamps.createdAt] = this.#knex.fn.now();
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
         const [row] = await this.#knex(this.#tableName)
             .insert(mapped)
             .returning('*');
-        return this.#mapRow(row) as TResult;
+        const result = this.#mapRow(row) as TResult;
+
+        // Run afterInsert hooks
+        const afterHooks =
+            ((this.#localSchema as any).getExtension?.('afterInsert') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of afterHooks) {
+            await hook(result);
+        }
+
+        return result;
     }
 
     /**
@@ -869,13 +1908,154 @@ export class SchemaQueryBuilder<
      * @returns The full inserted rows in insertion order.
      */
     async insertMany(data: InsertType<TLocalSchema>[]): Promise<TResult[]> {
-        const mapped = data.map(d =>
-            this.#mapObjectToColumns(d as Record<string, any>)
-        );
+        const timestamps = this.#getTimestamps();
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+
+        const mapped = [];
+        for (const d of data) {
+            let processedData = { ...(d as Record<string, any>) };
+            for (const hook of beforeHooks) {
+                processedData = (await hook(processedData)) ?? processedData;
+            }
+            const m = this.#mapObjectToColumns(processedData);
+            if (timestamps) {
+                m[timestamps.createdAt] = this.#knex.fn.now();
+                m[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+            mapped.push(m);
+        }
+
         const rows = await this.#knex(this.#tableName)
             .insert(mapped)
             .returning('*');
-        return rows.map((row: any) => this.#mapRow(row) as TResult);
+        const results = rows.map((row: any) => this.#mapRow(row) as TResult);
+
+        // Run afterInsert hooks
+        const afterHooks =
+            ((this.#localSchema as any).getExtension?.('afterInsert') as
+                | Function[]
+                | undefined) ?? [];
+        for (const result of results) {
+            for (const hook of afterHooks) {
+                await hook(result);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Insert a row (or rows) with an `ON CONFLICT` clause.
+     *
+     * Returns a chainable object with `.merge()` and `.ignore()` methods.
+     *
+     * - `.merge(updateData?)` — updates the conflicting row with the provided
+     *   fields (or all insert fields if omitted).
+     * - `.ignore()` — skips the insert when a conflict occurs (INSERT IGNORE).
+     *
+     * @param conflictColumns - Column references that define the conflict target.
+     * @returns A chainable conflict builder.
+     *
+     * @example
+     * ```ts
+     * // Upsert: insert or update on conflict
+     * await query(db, UserSchema)
+     *     .onConflict(t => t.email)
+     *     .merge({ name: 'Bob' });
+     *
+     * // Insert and ignore on conflict
+     * await query(db, UserSchema)
+     *     .onConflict(t => t.email)
+     *     .ignore();
+     * ```
+     */
+    onConflict(
+        ...conflictColumns: ColumnRef<TLocalSchema>[]
+    ): OnConflictBuilder<TLocalSchema, TResult> {
+        const cols = conflictColumns.map(
+            c => this.#resolveColumn(c, 'onConflict') as string
+        );
+        return new OnConflictBuilder(this.#knex, this.#localSchema, this, cols);
+    }
+
+    /**
+     * Insert or update a row based on a conflict target (upsert shorthand).
+     *
+     * Equivalent to calling `.onConflict(conflictColumns).merge(updateData)`.
+     *
+     * @param data - The row data to insert.
+     * @param opts - `{ conflictColumns, updateColumns? }`.
+     * @returns The resulting row (inserted or updated).
+     *
+     * @example
+     * ```ts
+     * const user = await query(db, UserSchema).upsert(
+     *     { email: 'alice@example.com', name: 'Alice' },
+     *     { conflictColumns: [t => t.email], updateColumns: [t => t.name] }
+     * );
+     * ```
+     */
+    async upsert(
+        data: InsertType<TLocalSchema>,
+        opts: {
+            conflictColumns: ColumnRef<TLocalSchema>[];
+            updateColumns?: ColumnRef<TLocalSchema>[];
+        }
+    ): Promise<TResult> {
+        const timestamps = this.#getTimestamps();
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+
+        let processedData = { ...(data as Record<string, any>) };
+        for (const hook of beforeHooks) {
+            processedData = (await hook(processedData)) ?? processedData;
+        }
+
+        const mapped = this.#mapObjectToColumns(processedData);
+        if (timestamps) {
+            mapped[timestamps.createdAt] = this.#knex.fn.now();
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
+        const conflictCols = opts.conflictColumns.map(
+            c => this.#resolveColumn(c, 'upsert conflict') as string
+        );
+
+        let qb = this.#knex(this.#tableName)
+            .insert(mapped)
+            .onConflict(conflictCols);
+
+        if (opts.updateColumns && opts.updateColumns.length > 0) {
+            const updateCols = opts.updateColumns.map(
+                c => this.#resolveColumn(c, 'upsert update') as string
+            );
+            const updateData: Record<string, any> = {};
+            for (const col of updateCols) {
+                if (col in mapped) {
+                    updateData[col] = mapped[col];
+                }
+            }
+            if (timestamps) {
+                updateData[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+            qb = (qb as any).merge(updateData);
+        } else {
+            const updateData = { ...mapped };
+            // Don't overwrite createdAt on upsert
+            if (timestamps) {
+                delete updateData[timestamps.createdAt];
+                updateData[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+            qb = (qb as any).merge(updateData);
+        }
+
+        const [row] = await (qb as any).returning('*');
+        return this.#mapRow(row) as TResult;
     }
 
     /**
@@ -896,14 +2076,37 @@ export class SchemaQueryBuilder<
      * ```
      */
     async update(data: Partial<InferType<TLocalSchema>>): Promise<TResult[]> {
-        const mapped = this.#mapObjectToColumns(data as Record<string, any>);
+        let processedData = { ...(data as Record<string, any>) };
+
+        // Run beforeUpdate hooks
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeUpdate') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of beforeHooks) {
+            processedData = (await hook(processedData)) ?? processedData;
+        }
+
+        const mapped = this.#mapObjectToColumns(processedData);
+
+        // Apply timestamps
+        const timestamps = this.#getTimestamps();
+        if (timestamps) {
+            mapped[timestamps.updatedAt] = this.#knex.fn.now();
+        }
+
         const rows = await this.#baseQuery.update(mapped).returning('*');
         return rows.map((row: any) => this.#mapRow(row) as TResult);
     }
 
     /**
      * Delete all rows that match the current `WHERE` clause.
-     * @returns The number of rows deleted.
+     *
+     * If the schema has soft-delete enabled via `.softDelete()`, this performs
+     * an `UPDATE SET deleted_at = NOW()` instead of a real `DELETE`.
+     * Use {@link hardDelete} for permanent deletion.
+     *
+     * @returns The number of rows deleted (or soft-deleted).
      *
      * @example
      * ```ts
@@ -911,7 +2114,302 @@ export class SchemaQueryBuilder<
      * ```
      */
     async delete(): Promise<number> {
+        // Run beforeDelete hooks
+        const hooks =
+            ((this.#localSchema as any).getExtension?.('beforeDelete') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of hooks) {
+            await hook(this);
+        }
+
+        const softDelete = this.#getSoftDelete();
+        if (softDelete) {
+            return this.#baseQuery.update({
+                [softDelete.column]: this.#knex.fn.now()
+            });
+        }
         return this.#baseQuery.delete();
+    }
+
+    // =======================================================================
+    // BULK WRITE OPERATIONS
+    // =======================================================================
+
+    /**
+     * Bulk-insert many rows in chunks. The default chunk size of `500` keeps
+     * comfortably below Postgres' parameter-count limit of 65535. The chunk
+     * size also auto-shrinks when the number of bindings per row would
+     * exceed that ceiling.
+     *
+     * When `opts.onConflict` is supplied each chunk is wrapped in an
+     * `INSERT ... ON CONFLICT` clause:
+     *
+     * - `'ignore'` — `ON CONFLICT (...) DO NOTHING`
+     * - `'merge'`  — `ON CONFLICT (...) DO UPDATE SET ...` (uses `conflictColumns` as
+     *   the conflict target and updates every inserted column).
+     *
+     * `beforeInsert` / `afterInsert` hooks fire per row, identically to
+     * {@link insertMany}.
+     *
+     * @returns The inserted rows (excluding rows skipped by `'ignore'`).
+     */
+    async bulkInsert(
+        rows: InsertType<TLocalSchema>[],
+        opts?: {
+            chunkSize?: number;
+            onConflict?: 'ignore' | 'merge';
+            conflictColumns?: ColumnRef<TLocalSchema>[];
+        }
+    ): Promise<TResult[]> {
+        if (rows.length === 0) return [];
+
+        const requestedChunkSize = opts?.chunkSize ?? 500;
+        const bindingsPerRow = Object.keys(rows[0] as object).length || 1;
+        const safeChunkCap = Math.max(
+            1,
+            Math.floor(60000 / Math.max(1, bindingsPerRow))
+        );
+        const chunkSize = Math.max(
+            1,
+            Math.min(requestedChunkSize, safeChunkCap)
+        );
+
+        const timestamps = this.#getTimestamps();
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeInsert') as
+                | Function[]
+                | undefined) ?? [];
+        const afterHooks =
+            ((this.#localSchema as any).getExtension?.('afterInsert') as
+                | Function[]
+                | undefined) ?? [];
+
+        const conflictCols =
+            opts?.onConflict && opts.conflictColumns
+                ? opts.conflictColumns.map(
+                      c =>
+                          this.#resolveColumn(
+                              c,
+                              'bulkInsert.onConflict'
+                          ) as string
+                  )
+                : null;
+        if (opts?.onConflict && (!conflictCols || conflictCols.length === 0)) {
+            throw new Error(
+                'bulkInsert: `conflictColumns` is required when `onConflict` is set.'
+            );
+        }
+
+        const results: TResult[] = [];
+
+        for (let i = 0; i < rows.length; i += chunkSize) {
+            const chunk = rows.slice(i, i + chunkSize);
+            const mapped: Record<string, any>[] = [];
+            for (const row of chunk) {
+                let processed = { ...(row as Record<string, any>) };
+                for (const hook of beforeHooks) {
+                    processed = (await hook(processed)) ?? processed;
+                }
+                const m = this.#mapObjectToColumns(processed);
+                if (timestamps) {
+                    m[timestamps.createdAt] = this.#knex.fn.now();
+                    m[timestamps.updatedAt] = this.#knex.fn.now();
+                }
+                mapped.push(m);
+            }
+
+            let qb: any = this.#knex(this.#tableName).insert(mapped);
+
+            if (conflictCols) {
+                qb = qb.onConflict(conflictCols);
+                if (opts!.onConflict === 'ignore') {
+                    qb = qb.ignore();
+                } else {
+                    // Merge — update every non-conflict-target column.
+                    const updateCols = new Set<string>();
+                    for (const m of mapped) {
+                        for (const k of Object.keys(m)) updateCols.add(k);
+                    }
+                    for (const c of conflictCols) updateCols.delete(c);
+                    if (timestamps) {
+                        updateCols.delete(timestamps.createdAt);
+                        updateCols.add(timestamps.updatedAt);
+                    }
+                    qb = qb.merge(Array.from(updateCols));
+                }
+            }
+
+            const inserted: any[] = await qb.returning('*');
+            for (const row of inserted) {
+                const mappedRow = this.#mapRow(row) as TResult;
+                for (const hook of afterHooks) {
+                    await hook(mappedRow);
+                }
+                results.push(mappedRow);
+            }
+        }
+
+        return results;
+    }
+
+    /**
+     * Bulk-upsert many rows in chunks. Equivalent to
+     * `.bulkInsert(rows, { onConflict: 'merge', conflictColumns })`.
+     */
+    async bulkUpsert(
+        rows: InsertType<TLocalSchema>[],
+        opts: {
+            conflictColumns: ColumnRef<TLocalSchema>[];
+            chunkSize?: number;
+        }
+    ): Promise<TResult[]> {
+        return this.bulkInsert(rows, {
+            chunkSize: opts.chunkSize,
+            onConflict: 'merge',
+            conflictColumns: opts.conflictColumns
+        });
+    }
+
+    /**
+     * Bulk-update many rows in a single SQL statement using a CASE
+     * expression keyed on the entity's primary key.
+     *
+     * Each entry's `where` clause must fully match the entity's primary key
+     * columns (single or composite). Updates that touch different columns
+     * are coalesced into one statement; rows whose PK appears in `updates`
+     * but whose `set` does not contain a given column retain their existing
+     * value.
+     *
+     * @returns The number of rows affected.
+     */
+    async bulkUpdate(
+        updates: ReadonlyArray<{
+            where: Partial<InferType<TLocalSchema>>;
+            set: Partial<InferType<TLocalSchema>>;
+        }>
+    ): Promise<number> {
+        if (updates.length === 0) return 0;
+
+        const pk = this.#resolvePkColumns();
+        const { propToCol } = buildColumnMap(this.#localSchema as any);
+        const beforeHooks =
+            ((this.#localSchema as any).getExtension?.('beforeUpdate') as
+                | Function[]
+                | undefined) ?? [];
+        const timestamps = this.#getTimestamps();
+
+        // Pre-process: run hooks, map keys, validate PK presence in `where`.
+        const processed: Array<{
+            pkValues: unknown[];
+            set: Record<string, any>;
+        }> = [];
+        for (const entry of updates) {
+            let setData = { ...(entry.set as Record<string, any>) };
+            for (const hook of beforeHooks) {
+                setData = (await hook(setData)) ?? setData;
+            }
+            const setMapped = this.#mapObjectToColumns(setData);
+            if (timestamps) {
+                setMapped[timestamps.updatedAt] = this.#knex.fn.now();
+            }
+
+            const whereRec = entry.where as Record<string, unknown>;
+            const pkValues: unknown[] = [];
+            for (const propKey of pk.propertyKeys) {
+                const value =
+                    propKey in whereRec
+                        ? whereRec[propKey]
+                        : (whereRec[propToCol.get(propKey) ?? propKey] as
+                              | unknown
+                              | undefined);
+                if (value === undefined) {
+                    throw new Error(
+                        `bulkUpdate: each \`where\` clause must include the entity's primary key (missing "${propKey}").`
+                    );
+                }
+                pkValues.push(value);
+            }
+            processed.push({ pkValues, set: setMapped });
+        }
+
+        // Collect every column referenced in any `set`.
+        const allSetCols = new Set<string>();
+        for (const p of processed) {
+            for (const k of Object.keys(p.set)) allSetCols.add(k);
+        }
+        if (allSetCols.size === 0) return 0;
+
+        // Build the SET clause: one CASE per column, keyed by PK.
+        const knex = this.#knex;
+        const updateExpr: Record<string, any> = {};
+        for (const col of allSetCols) {
+            const fragments: string[] = [];
+            const bindings: unknown[] = [];
+            for (const p of processed) {
+                if (!(col in p.set)) continue;
+                if (pk.columnNames.length === 1) {
+                    fragments.push('WHEN ?? = ? THEN ?');
+                    bindings.push(pk.columnNames[0], p.pkValues[0], p.set[col]);
+                } else {
+                    const conditions = pk.columnNames
+                        .map(() => '?? = ?')
+                        .join(' AND ');
+                    fragments.push(`WHEN ${conditions} THEN ?`);
+                    for (let i = 0; i < pk.columnNames.length; i++) {
+                        bindings.push(pk.columnNames[i], p.pkValues[i]);
+                    }
+                    bindings.push(p.set[col]);
+                }
+            }
+            if (fragments.length === 0) continue;
+            // ELSE keeps the existing column value untouched.
+            updateExpr[col] = knex.raw(
+                `CASE ${fragments.join(' ')} ELSE ?? END`,
+                [...bindings, col] as any
+            );
+        }
+
+        // WHERE: restrict to the PK tuples covered by the batch.
+        let qb: any = knex(this.#tableName).update(updateExpr);
+        if (pk.columnNames.length === 1) {
+            qb = qb.whereIn(
+                pk.columnNames[0],
+                processed.map(p => p.pkValues[0])
+            );
+        } else {
+            qb = qb.where(function (this: Knex.QueryBuilder) {
+                for (const p of processed) {
+                    this.orWhere(function (this: Knex.QueryBuilder) {
+                        for (let i = 0; i < pk.columnNames.length; i++) {
+                            this.andWhere(
+                                pk.columnNames[i],
+                                p.pkValues[i] as any
+                            );
+                        }
+                    });
+                }
+            });
+        }
+
+        return await qb;
+    }
+
+    /**
+     * @internal Resolve the entity's primary-key columns, throwing a clear
+     * error when none is declared. Used by bulk-update / find helpers.
+     */
+    #resolvePkColumns(): {
+        propertyKeys: readonly string[];
+        columnNames: readonly string[];
+    } {
+        const pk = getPrimaryKeyColumns(this.#localSchema as any);
+        if (pk.columnNames.length === 0) {
+            throw new Error(
+                'No primary key declared on this schema. Use `.primaryKey()` on a column or `.hasPrimaryKey([...])` on the schema.'
+            );
+        }
+        return pk;
     }
 
     // =======================================================================
@@ -934,6 +2432,7 @@ export class SchemaQueryBuilder<
      * ```
      */
     apply(fn: (builder: Knex.QueryBuilder) => void): this {
+        this.#invalidateCache();
         fn(this.#baseQuery);
         return this;
     }
@@ -988,7 +2487,691 @@ export class SchemaQueryBuilder<
         builder.#explicitSelects = this.#explicitSelects
             ? [...this.#explicitSelects]
             : null;
+        builder.#selectionMode = this.#selectionMode;
+        builder.#appliedProjection = this.#appliedProjection;
+        builder.#includeDeleted = this.#includeDeleted;
+        builder.#onlyDeleted = this.#onlyDeleted;
+        builder.#skipDefaultScope = this.#skipDefaultScope;
+        // Copy polymorphic variant state
+        builder.#variantConfig = this.#variantConfig;
+        builder.#enabledVariants =
+            this.#enabledVariants !== null
+                ? new Set(this.#enabledVariants)
+                : null;
+        builder.#variantWhereFilters = [...this.#variantWhereFilters];
+        builder.#variantRelationIncludes = [...this.#variantRelationIncludes];
         return builder;
+    }
+
+    // =======================================================================
+    // Include (relation-based eager loading)
+    // =======================================================================
+
+    /**
+     * Eager-load a named relation defined via `.hasMany()`, `.belongsTo()`,
+     * `.hasOne()`, or `.belongsToMany()` on the schema.
+     *
+     * @param relationName - The relation name passed to the schema's relation method.
+     * @param customize - Optional callback to customise the foreign query
+     *   (e.g. add ordering, limits).
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * const posts = await query(db, PostWithRelations)
+     *     .include('author')
+     *     .include('tags');
+     * ```
+     */
+    include(
+        relationName: string,
+        customize?: (q: SchemaQueryBuilder<any, any>) => void
+    ): this {
+        this.#invalidateCache();
+        const relations: RelationSpec[] =
+            (this.#localSchema as any).getExtension?.('relations') ?? [];
+        const relation = relations.find(
+            (r: RelationSpec) => r.name === relationName
+        );
+        if (!relation) {
+            // Try variant relations as fallback (auto-routing)
+            const variantConfig = this.#getVariantConfig();
+            if (variantConfig) {
+                const matches: Array<{ variantKey: string }> = [];
+                for (const [vKey, vSpec] of Object.entries(
+                    variantConfig.variants
+                )) {
+                    if (
+                        vSpec.relations.some(
+                            (r: ResolvedVariantRelationSpec) =>
+                                r.name === relationName
+                        )
+                    ) {
+                        matches.push({ variantKey: vKey });
+                    }
+                }
+                if (matches.length === 1) {
+                    return this.includeVariant(
+                        matches[0].variantKey,
+                        relationName,
+                        customize
+                    );
+                }
+                if (matches.length > 1) {
+                    throw new Error(
+                        `Ambiguous relation "${relationName}" — found on variants: ${matches.map(m => m.variantKey).join(', ')}. Use .includeVariant(key, name) to be explicit.`
+                    );
+                }
+            }
+            throw new Error(
+                `Unknown relation "${relationName}" on schema for table "${this.#tableName}"`
+            );
+        }
+
+        const foreignSchema = this.#resolveSchema(relation.schema);
+        const foreignTableName = getTableName(foreignSchema);
+
+        switch (relation.type) {
+            case 'belongsTo': {
+                const localColumn = resolveColumnRef(
+                    relation.foreignKey,
+                    this.#localSchema,
+                    'foreignKey'
+                );
+                const foreignColumn = this.#findPrimaryKeyColumn(foreignSchema);
+
+                const foreignQuery1: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery1
+                    );
+                    customize(proxy);
+                }
+
+                this.joinOne({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn,
+                    as: relationName,
+                    foreignQuery: foreignQuery1
+                } as any);
+                break;
+            }
+            case 'hasOne': {
+                const localColumn = this.#findPrimaryKeyColumn(
+                    this.#localSchema
+                );
+                const foreignColumn = resolveColumnRef(
+                    relation.foreignKey,
+                    foreignSchema,
+                    'foreignKey'
+                );
+
+                const foreignQuery2: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery2
+                    );
+                    customize(proxy);
+                }
+
+                this.joinOne({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn,
+                    as: relationName,
+                    required: false,
+                    foreignQuery: foreignQuery2
+                } as any);
+                break;
+            }
+            case 'hasMany': {
+                const localColumn = this.#findPrimaryKeyColumn(
+                    this.#localSchema
+                );
+                const foreignColumn = resolveColumnRef(
+                    relation.foreignKey,
+                    foreignSchema,
+                    'foreignKey'
+                );
+
+                const foreignQuery3: Knex.QueryBuilder =
+                    this.#knex(foreignTableName);
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery3
+                    );
+                    customize(proxy);
+                }
+
+                this.joinMany({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn,
+                    as: relationName,
+                    foreignQuery: foreignQuery3
+                } as any);
+                break;
+            }
+            case 'belongsToMany': {
+                const through = relation.through!;
+                const localColumn = this.#findPrimaryKeyColumn(
+                    this.#localSchema
+                );
+
+                const foreignQuery = this.#knex(foreignTableName)
+                    .join(
+                        through.table,
+                        `${through.table}.${through.foreignKey}`,
+                        `${foreignTableName}.${this.#findPrimaryKeyColumn(foreignSchema)}`
+                    )
+                    .select(
+                        `${foreignTableName}.*`,
+                        `${through.table}.${through.localKey}`
+                    );
+
+                if (customize) {
+                    const proxy = new SchemaQueryBuilder(
+                        this.#knex,
+                        foreignSchema,
+                        foreignQuery
+                    );
+                    customize(proxy);
+                }
+
+                this.joinMany({
+                    foreignSchema,
+                    localColumn,
+                    foreignColumn: through.localKey,
+                    as: relationName,
+                    foreignQuery
+                } as any);
+                break;
+            }
+        }
+
+        return this;
+    }
+
+    /**
+     * Eager-load a named relation declared inside a `withVariants` variant spec.
+     *
+     * The relation is loaded via a LEFT JOIN on the variant's alias table and
+     * only populated on rows whose discriminator matches `variantKey`.
+     *
+     * @param variantKey - The variant key (e.g. `'assigned'`).
+     * @param relationName - The relation name declared in `variants[key].relations`.
+     * @param customize - Optional callback to restrict which columns are
+     *   selected from the foreign table (scope / projection).
+     *
+     * @example
+     * ```ts
+     * await query(db, TodoActivity)
+     *   .includeVariant('assigned', 'assignee', q => q.projected('summary'));
+     * ```
+     */
+    includeVariant(
+        variantKey: string,
+        relationName: string,
+        customize?: (q: SchemaQueryBuilder<any, any>) => void
+    ): this {
+        this.#invalidateCache();
+        const variantConfig = this.#getVariantConfig();
+        if (!variantConfig) {
+            throw new Error(
+                `includeVariant: schema for table "${this.#tableName}" is not polymorphic (no .withVariants() config found)`
+            );
+        }
+        const variantSpec = variantConfig.variants[variantKey];
+        if (!variantSpec) {
+            throw new Error(
+                `includeVariant: unknown variant key "${variantKey}" on schema for table "${this.#tableName}"`
+            );
+        }
+        const relSpec = variantSpec.relations.find(
+            (r: ResolvedVariantRelationSpec) => r.name === relationName
+        );
+        if (!relSpec) {
+            throw new Error(
+                `includeVariant: unknown relation "${relationName}" on variant "${variantKey}" of table "${this.#tableName}"`
+            );
+        }
+        this.#variantRelationIncludes.push({
+            variantKey,
+            relationName,
+            customize
+        });
+        return this;
+    }
+
+    // =======================================================================
+    // Scopes
+    // =======================================================================
+
+    /**
+     * Apply a named scope defined on the schema via `.scope(name, fn)`.
+     *
+     * The `name` parameter is constrained to the literal scope names registered
+     * on the schema, so IDEs show only valid completions and typos are caught
+     * at compile time.
+     *
+     * @param name - The scope name.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * await query(db, Post).scoped('published').scoped('recent');
+     * ```
+     */
+    /**
+     * Apply a **named projection** defined on the schema via
+     * `.projection(name, columns)`.
+     *
+     * Calling `.projected()` on the query builder does two things:
+     * 1. Restricts the SQL `SELECT` clause to the columns registered under
+     *    `name` (SQL column names are resolved via `.hasColumnName()`).
+     * 2. Narrows the TypeScript result row type to `Pick<Row, Keys>` so
+     *    accessing columns outside the projection is a compile-time error.
+     *
+     * The `name` parameter is constrained to the literal projection names
+     * registered on the schema — TypeScript will report an error for any
+     * unregistered name.
+     *
+     * Calling `.projected()` after `.select()`, any aggregate method
+     * (`.count()`, `.min()`, etc.), or a second `.projected()` call throws
+     * at runtime with a clear error message.
+     *
+     * @param name - The projection name.
+     * @returns A new builder whose result type is `Pick<Row, ProjectionKeys>`.
+     *
+     * @example
+     * ```ts
+     * const PostSchema = object({ id: number(), title: string(), body: string() })
+     *   .hasTableName('posts')
+     *   .projection('summary', 'id', 'title');
+     *
+     * const rows = await query(db, PostSchema)
+     *   .scoped('published')
+     *   .projected('summary');
+     * // rows: Array<Pick<Post, 'id' | 'title'>>
+     * // rows[0].body  // ← TS error: not in projection
+     * ```
+     *
+     * @see {@link ddlExtension} `.projection()` for schema-side definition.
+     */
+    projected<K extends keyof ProjectionsOf<TLocalSchema> & string>(
+        name: K
+    ): SchemaQueryBuilder<
+        TLocalSchema,
+        Pick<TResult, ProjectionKeysOf<TLocalSchema, K> & keyof TResult>
+    > {
+        this.#assertNotExplicitSelect('projected');
+        if (this.#selectionMode === 'projection') {
+            throw new Error(
+                `Cannot call .projected('${name}') — .projected('${
+                    this.#appliedProjection
+                }') was already applied. Only one projection per query.`
+            );
+        }
+        const projections = getProjections(this.#localSchema as any);
+        const projection = projections[name];
+        if (!projection) {
+            throw new Error(
+                `Unknown projection "${name}" on schema for table "${
+                    this.#tableName
+                }"`
+            );
+        }
+        // Translate property keys → SQL column names
+        const { propToCol } = buildColumnMap(this.#localSchema as any);
+        const sqlCols = projection.keys.map(key => propToCol.get(key) ?? key);
+        this.#baseQuery.select(...sqlCols);
+        this.#explicitSelects ??= [];
+        for (const col of sqlCols) {
+            this.#explicitSelects.push(col);
+        }
+        this.#selectionMode = 'projection';
+        this.#appliedProjection = name;
+        this.#invalidateCache();
+        return this as any;
+    }
+
+    scoped<K extends ScopesOf<TLocalSchema>>(name: K): this {
+        this.#invalidateCache();
+        const scopes = (this.#localSchema as any).getExtension?.('scopes') as
+            | Record<string, Function>
+            | undefined;
+        const scopeFn = scopes?.[name];
+        if (!scopeFn) {
+            throw new Error(
+                `Unknown scope "${name}" on schema for table "${this.#tableName}"`
+            );
+        }
+        scopeFn(this);
+        return this;
+    }
+
+    /**
+     * Bypass the default scope (and soft-delete scope) for this query.
+     *
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * await query(db, Post).unscoped().where(t => t.id, 1);
+     * ```
+     */
+    unscoped(): this {
+        this.#invalidateCache();
+        this.#skipDefaultScope = true;
+        this.#includeDeleted = true;
+        return this;
+    }
+
+    // =======================================================================
+    // Polymorphic variant methods
+    // =======================================================================
+
+    /**
+     * Add a WHERE condition that applies **only to rows matching a specific
+     * variant** of a polymorphic schema. Rows for other variants pass through
+     * unaffected (the condition is ORed away for non-matching discriminator values).
+     *
+     * The column name is resolved against the **variant's** schema properties.
+     *
+     * Only valid on a polymorphic schema (created via `.withVariants()`).
+     *
+     * @param key - The discriminator value identifying the variant (e.g. `'image'`).
+     * @param column - Property key on the variant's schema (e.g. `'width'`).
+     * @param operator - SQL comparison operator (`'='`, `'>'`, `'<'`, `'like'`, etc.).
+     * @param value - The value to compare against.
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * // Return all documents and only images wider than 1024 px
+     * const files = await query(db, FileSchema)
+     *     .whereVariant('image', 'width', '>', 1024);
+     * ```
+     */
+    whereVariant(
+        key: string,
+        column: string,
+        operator: string,
+        value: any
+    ): this {
+        const variantConfig = this.#getVariantConfig();
+        if (!variantConfig) {
+            throw new Error(
+                'whereVariant() can only be used on a polymorphic schema (created with .withVariants())'
+            );
+        }
+
+        const spec = variantConfig.variants[key];
+        if (!spec) {
+            throw new Error(
+                `whereVariant: unknown variant key "${key}". ` +
+                    `Valid keys: ${Object.keys(variantConfig.variants).join(', ')}`
+            );
+        }
+
+        const op = operator.toLowerCase();
+        if (!SchemaQueryBuilder.#ALLOWED_OPS.has(op)) {
+            throw new Error(
+                `whereVariant: operator "${operator}" is not allowed. ` +
+                    `Allowed operators: ${[...SchemaQueryBuilder.#ALLOWED_OPS].join(', ')}`
+            );
+        }
+
+        // Resolve property key → SQL column name via variant schema column map
+        const { propToCol } = buildColumnMap(spec.schema);
+        const colName = propToCol.get(column) ?? column;
+
+        let qualifiedColumn: string;
+        if (spec.storage === 'cti') {
+            qualifiedColumn = `__v_${key}.${colName}`;
+        } else {
+            // STI: column is on the base table
+            qualifiedColumn = `${this.#tableName}.${colName}`;
+        }
+
+        this.#variantWhereFilters.push({ key, qualifiedColumn, op, value });
+        this.#invalidateCache();
+        return this;
+    }
+
+    /**
+     * Restrict the query to only return rows for the specified variant keys.
+     *
+     * Adds `WHERE <discriminator> IN (...)` to the query and skips the LEFT
+     * JOINs for excluded variants. This is more efficient than filtering after
+     * loading all variants.
+     *
+     * Only valid on a polymorphic schema (created via `.withVariants()`).
+     *
+     * @param keys - Discriminator values to include (e.g. `['image', 'document']`).
+     * @returns `this` for chaining.
+     *
+     * @example
+     * ```ts
+     * const images = await query(db, FileSchema).selectVariants(['image']);
+     * // images: Array<{ id; name; type: 'image'; width; height; format }>
+     * ```
+     */
+    selectVariants(keys: string[]): this {
+        if (!this.#getVariantConfig()) {
+            throw new Error(
+                'selectVariants() can only be used on a polymorphic schema (created with .withVariants())'
+            );
+        }
+        this.#enabledVariants = new Set(keys);
+        this.#invalidateCache();
+        return this;
+    }
+
+    // =======================================================================
+    // Soft delete methods
+    // =======================================================================
+
+    /**
+     * Include soft-deleted rows in the results.
+     *
+     * By default, schemas with `.softDelete()` automatically filter out
+     * rows where `deleted_at IS NOT NULL`. Call `.withDeleted()` to
+     * include them.
+     *
+     * @returns `this` for chaining.
+     */
+    withDeleted(): this {
+        this.#invalidateCache();
+        this.#includeDeleted = true;
+        return this;
+    }
+
+    /**
+     * Return only soft-deleted rows (`WHERE deleted_at IS NOT NULL`).
+     *
+     * @returns `this` for chaining.
+     */
+    onlyDeleted(): this {
+        this.#invalidateCache();
+        this.#onlyDeleted = true;
+        this.#includeDeleted = true;
+        return this;
+    }
+
+    /**
+     * Permanently delete rows matching the current WHERE clause, bypassing
+     * the soft-delete mechanism.
+     *
+     * @returns The number of rows deleted.
+     */
+    async hardDelete(): Promise<number> {
+        // Run beforeDelete hooks
+        const hooks =
+            ((this.#localSchema as any).getExtension?.('beforeDelete') as
+                | Function[]
+                | undefined) ?? [];
+        for (const hook of hooks) {
+            await hook(this);
+        }
+        return this.#baseQuery.delete();
+    }
+
+    /**
+     * Restore soft-deleted rows by setting `deleted_at = NULL`.
+     *
+     * @returns The restored rows.
+     */
+    async restore(): Promise<TResult[]> {
+        const softDelete = this.#getSoftDelete();
+        if (!softDelete) {
+            throw new Error(
+                'Schema does not have soft delete enabled. Use .softDelete() on the schema.'
+            );
+        }
+        const rows = await this.#baseQuery
+            .update({ [softDelete.column]: null })
+            .returning('*');
+        return rows.map((row: any) => this.#mapRow(row) as TResult);
+    }
+
+    // =======================================================================
+    // Pagination
+    // =======================================================================
+
+    /**
+     * Execute an offset-based paginated query.
+     *
+     * Runs a count query and a data query in parallel. Returns the page data
+     * along with pagination metadata.
+     *
+     * @param opts - `{ page, pageSize }` — 1-based page number and page size.
+     * @returns A {@link PaginationResult} with data, total count, and page info.
+     *
+     * @example
+     * ```ts
+     * const page = await query(db, Post)
+     *     .where(t => t.status, 'published')
+     *     .paginate({ page: 2, pageSize: 20 });
+     * // page.data, page.total, page.totalPages, page.hasNextPage, ...
+     * ```
+     */
+    async paginate(opts: {
+        page: number;
+        pageSize: number;
+    }): Promise<PaginationResult<TResult>> {
+        const { page, pageSize } = opts;
+
+        const effectiveBase = this.#getEffectiveBaseQuery();
+
+        // Count query (no CTE, no ordering, no eager loading)
+        const countResult = await effectiveBase
+            .clone()
+            .clearSelect()
+            .clearOrder()
+            .count('* as count')
+            .first();
+        const total = Number((countResult as any)?.count ?? 0);
+
+        // Data query (with CTE for eager loading)
+        this.limit(pageSize).offset((page - 1) * pageSize);
+        const data = await this.execute();
+
+        const totalPages = Math.ceil(total / pageSize);
+
+        return {
+            data,
+            total,
+            page,
+            pageSize,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1
+        };
+    }
+
+    /**
+     * Execute a cursor-based (keyset) paginated query.
+     *
+     * More efficient than offset pagination for large datasets. Fetches one
+     * extra row to determine whether more data exists.
+     *
+     * @param opts - `{ cursor, limit, column?, direction? }`.
+     * @returns A {@link CursorPaginationResult} with data, next cursor, and
+     *   `hasMore` flag.
+     *
+     * @example
+     * ```ts
+     * const page = await query(db, Post)
+     *     .orderBy(t => t.createdAt, 'desc')
+     *     .paginateAfter({ cursor: lastCreatedAt, limit: 20 });
+     * ```
+     */
+    async paginateAfter(opts: {
+        cursor?: any;
+        limit: number;
+        column?: ColumnRef<TLocalSchema>;
+        direction?: 'asc' | 'desc';
+    }): Promise<CursorPaginationResult<TResult>> {
+        const direction = opts.direction ?? 'desc';
+        const column = opts.column ?? ('id' as any);
+
+        if (opts.cursor != null) {
+            const op = direction === 'desc' ? '<' : '>';
+            this.where(column, op, opts.cursor);
+        }
+
+        this.orderBy(column, direction).limit(opts.limit + 1);
+        const rows = await this.execute();
+
+        const hasMore = rows.length > opts.limit;
+        const data = hasMore ? rows.slice(0, opts.limit) : rows;
+
+        const propKey =
+            typeof column === 'string'
+                ? column
+                : resolvePropertyKey(
+                      column as any,
+                      this.#localSchema,
+                      'cursor'
+                  );
+
+        const nextCursor =
+            hasMore && data.length > 0
+                ? String((data[data.length - 1] as any)[propKey])
+                : null;
+
+        return { data, nextCursor, hasMore };
+    }
+
+    // =======================================================================
+    // Select Raw
+    // =======================================================================
+
+    /**
+     * Add a raw SQL expression to the SELECT clause.
+     *
+     * @param sql - Raw SQL (e.g. `'*, ts_rank(vector, query) AS rank'`).
+     * @param bindings - Optional parameter bindings.
+     * @returns `this` for chaining.
+     */
+    selectRaw(sql: string, bindings?: any[]): this {
+        this.#invalidateCache();
+        if (bindings) {
+            this.#baseQuery.select(this.#knex.raw(sql, bindings));
+        } else {
+            this.#baseQuery.select(this.#knex.raw(sql));
+        }
+        return this;
     }
 
     // =======================================================================
@@ -996,8 +3179,18 @@ export class SchemaQueryBuilder<
     // =======================================================================
 
     #buildQuery(): Knex.QueryBuilder {
+        const effectiveBase = this.#getEffectiveBaseQuery();
+
+        // Apply polymorphic variant joins (CTI LEFT JOINs + selectVariants /
+        // whereVariant filters) before any CTE wrapping so the CTE also
+        // contains variant columns.
+        const variantConfig = this.#getVariantConfig();
+        const queryBase = variantConfig
+            ? this.#applyVariantJoins(effectiveBase, variantConfig)
+            : effectiveBase;
+
         if (this.#specs.length === 0) {
-            return this.#baseQuery;
+            return queryBase;
         }
 
         const knex = this.#knex;
@@ -1013,7 +3206,7 @@ export class SchemaQueryBuilder<
         // included in the CTE so the join conditions work at runtime.
         // Track which columns we added so they can be excluded from the
         // final SELECT (preserving the original column set the caller asked for).
-        let cteQuery = this.#baseQuery;
+        let cteQuery = queryBase;
         let extraColumns: string[] = [];
 
         if (this.#explicitSelects !== null) {
@@ -1022,7 +3215,7 @@ export class SchemaQueryBuilder<
                 col => !selectedSet.has(col)
             );
             if (extraColumns.length > 0) {
-                cteQuery = this.#baseQuery.clone();
+                cteQuery = queryBase.clone();
                 for (const col of extraColumns) {
                     cteQuery.column(col);
                 }
@@ -1279,9 +3472,15 @@ export class SchemaQueryBuilder<
     /**
      * Map a SQL result row (column names) back to schema property names.
      * Also handles joined fields (which are already named by `as`).
+     * Delegates to `#mapPolymorphicRow` for polymorphic schemas.
      */
     #mapRow(row: Record<string, any>): Record<string, any> {
         if (!row) return row;
+
+        const variantConfig = this.#getVariantConfig();
+        if (variantConfig) {
+            return this.#mapPolymorphicRow(row, variantConfig);
+        }
 
         const { colToProp } = buildColumnMap(this.#localSchema);
         const result: Record<string, any> = {};
@@ -1408,7 +3607,7 @@ export class SchemaQueryBuilder<
      * Does not execute the query against the database.
      */
     toQuery(): string {
-        return this.#buildQuery().toQuery();
+        return this.#getQuery().toQuery();
     }
 
     /**
@@ -1417,14 +3616,14 @@ export class SchemaQueryBuilder<
      * that expects a raw `Knex.QueryBuilder`.
      */
     toKnexQuery(): Knex.QueryBuilder {
-        return this.#buildQuery();
+        return this.#getQuery();
     }
 
     /**
      * Alias for {@link toQuery} — returns the raw SQL string.
      */
     toString(): string {
-        return this.#buildQuery().toString();
+        return this.#getQuery().toString();
     }
 
     /**
@@ -1440,7 +3639,7 @@ export class SchemaQueryBuilder<
      * ```
      */
     async execute(): Promise<TResult[]> {
-        const query = this.#buildQuery();
+        const query = this.#getQuery();
         const rows = await query;
 
         if (!rows) return [];
@@ -1461,11 +3660,34 @@ export class SchemaQueryBuilder<
      * ```
      */
     async first(): Promise<TResult | undefined> {
-        const query = this.#buildQuery().first();
+        const query = this.#getQuery().first();
         const row = await query;
 
         if (!row) return undefined;
         return this.#cleanAndMapRow(row) as TResult;
+    }
+
+    /**
+     * Execute the query and return an array of values for a single column.
+     *
+     * @param column - Column reference (property accessor or string key) for
+     *   the column whose values should be returned.
+     * @returns A promise resolving to an array of values for that column.
+     *
+     * @example
+     * ```ts
+     * const names = await query(db, UserSchema).pluck(t => t.name);
+     * // names: string[]
+     * ```
+     */
+    async pluck<K extends keyof TResult & string>(
+        column: ColumnRef<TLocalSchema>
+    ): Promise<TResult[K][]> {
+        const col = this.#resolveColumn(column, 'pluck') as string;
+        const rows = await this.#buildQuery().select(col);
+        return rows.map(
+            (row: any) => row[col] ?? row[column as string]
+        ) as TResult[K][];
     }
 
     /**
@@ -1521,7 +3743,7 @@ export function query<
 >(
     knex: Knex,
     schema: TLocalSchema
-): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
 
 /**
  * Create a typed {@link SchemaQueryBuilder} from an existing Knex query builder.
@@ -1547,7 +3769,7 @@ export function query<
     knex: Knex,
     schema: TLocalSchema,
     baseQuery: Knex.QueryBuilder
-): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
 
 export function query<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
@@ -1555,8 +3777,8 @@ export function query<
     knex: Knex,
     schema: TLocalSchema,
     baseQuery?: Knex.QueryBuilder
-): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>> {
-    return new SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>(
+): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>> {
+    return new SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>(
         knex,
         schema,
         baseQuery
@@ -1581,7 +3803,7 @@ export interface BoundQuery {
         >
     >(
         schema: TLocalSchema
-    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+    ): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
     <
         TLocalSchema extends ObjectSchemaBuilder<
             any,
@@ -1595,7 +3817,7 @@ export interface BoundQuery {
     >(
         schema: TLocalSchema,
         baseQuery: Knex.QueryBuilder
-    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>>;
+    ): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
     /**
      * Return a version of this bound factory whose queries all run within the
      * given Knex transaction. Equivalent to calling `.transacting(trx)` on
@@ -1678,7 +3900,7 @@ export function createQuery(knexInstance: Knex): BoundQuery {
     >(
         schema: TLocalSchema,
         baseQuery?: Knex.QueryBuilder
-    ): SchemaQueryBuilder<TLocalSchema, InferType<TLocalSchema>> {
+    ): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>> {
         return baseQuery
             ? query(knexInstance, schema, baseQuery)
             : query(knexInstance, schema);

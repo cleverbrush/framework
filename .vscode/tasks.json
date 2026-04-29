@@ -1,0 +1,105 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Demo: Start Postgres",
+            "type": "shell",
+            "command": "docker compose -f demos/docker-compose.yml up -d postgres",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Demo: Run Migrations",
+            "type": "shell",
+            "command": "npm run db:run",
+            "options": {
+                "cwd": "${workspaceFolder}/demos/todo-backend"
+            },
+            "dependsOn": ["Demo: Start Postgres"],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
+            "label": "Demo: Backend (dev)",
+            "type": "shell",
+            "command": "npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/demos/todo-backend"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "tsx",
+                "pattern": [
+                    {
+                        "regexp": "^(.*)$",
+                        "file": 1,
+                        "location": 1,
+                        "message": 1
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": ".*",
+                    "endsPattern": "Listening on"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "demo"
+            }
+        },
+        {
+            "label": "Demo: Frontend (dev)",
+            "type": "shell",
+            "command": "npm run dev",
+            "options": {
+                "cwd": "${workspaceFolder}/demos/todo-frontend"
+            },
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "vite",
+                "pattern": [
+                    {
+                        "regexp": "^(.*)$",
+                        "file": 1,
+                        "location": 1,
+                        "message": 1
+                    }
+                ],
+                "background": {
+                    "activeOnStart": true,
+                    "beginsPattern": "VITE",
+                    "endsPattern": "ready in"
+                }
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "demo"
+            }
+        },
+        {
+            "label": "Demo: All",
+            "dependsOn": [
+                "Demo: Run Migrations",
+                "Demo: Backend (dev)",
+                "Demo: Frontend (dev)"
+            ],
+            "dependsOrder": "sequence",
+            "problemMatcher": []
+        },
+        {
+            "label": "Demo: Stop Postgres",
+            "type": "shell",
+            "command": "docker compose -f demos/docker-compose.yml stop postgres",
+            "problemMatcher": []
+        }
+    ]
+}

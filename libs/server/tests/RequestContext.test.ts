@@ -126,4 +126,26 @@ describe('RequestContext', () => {
         const introspect = IRequestContext.introspect();
         expect(introspect.type).toBe('object');
     });
+
+    it('joins array-valued headers with ", "', () => {
+        const { req, res } = createReqRes();
+        // IncomingMessage allows string | string[] | undefined for header values
+        req.headers['accept'] = ['text/html', 'application/json'];
+        const ctx = new RequestContext(req, res);
+        expect(ctx.headers['accept']).toBe('text/html, application/json');
+    });
+
+    it('services getter returns undefined when not set', () => {
+        const { req, res } = createReqRes();
+        const ctx = new RequestContext(req, res);
+        expect(ctx.services).toBeUndefined();
+    });
+
+    it('services setter/getter round-trips value', () => {
+        const { req, res } = createReqRes();
+        const ctx = new RequestContext(req, res);
+        const mockServices = { get: (_s: any) => null } as any;
+        ctx.services = mockServices;
+        expect(ctx.services).toBe(mockServices);
+    });
 });

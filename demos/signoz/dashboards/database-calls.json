@@ -1,0 +1,505 @@
+{
+  "description": "Database call count, P99 latency, errors and top statements",
+  "dotMigrated": true,
+  "image": "",
+  "layout": [
+    {
+      "i": "1eee793e-1c34-43b0-9370-d918cee3cb81",
+      "x": 0,
+      "y": 0,
+      "w": 8,
+      "h": 8,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "d6de8c4e-cba5-4aa4-8d5f-a33b41f40dc3",
+      "x": 8,
+      "y": 0,
+      "w": 8,
+      "h": 8,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "cffcf873-9776-444e-90b8-33e165c2f7c7",
+      "x": 16,
+      "y": 0,
+      "w": 8,
+      "h": 8,
+      "moved": false,
+      "static": false
+    },
+    {
+      "i": "997f974b-4dd7-4916-9263-ac9c0499e64d",
+      "x": 0,
+      "y": 8,
+      "w": 24,
+      "h": 9,
+      "moved": false,
+      "static": false
+    }
+  ],
+  "panelMap": {},
+  "tags": [],
+  "title": "Todo Backend \u2014 Database Calls",
+  "uploadedGrafana": false,
+  "variables": {
+    "7dc8080e-bb0a-4a7c-86cf-033277e4466d": {
+      "id": "7dc8080e-bb0a-4a7c-86cf-033277e4466d",
+      "name": "service.name",
+      "type": "QUERY",
+      "queryValue": "SELECT JSONExtractString(labels, 'service.name') AS `service.name` FROM signoz_metrics.time_series_v4_1day WHERE (metric_name = 'signoz_calls_total') AND (unix_milli >= (toUnixTimestamp(now() - toIntervalDay(1)) * 1000)) GROUP BY `service.name`",
+      "multiSelect": false,
+      "allSelected": false,
+      "showALLOption": false,
+      "sort": "DISABLED",
+      "order": 0,
+      "modificationUUID": "aa228e67-f023-454b-8952-812acc6a21fe",
+      "customValue": "",
+      "description": "",
+      "textboxValue": ""
+    }
+  },
+  "version": "v4",
+  "widgets": [
+    {
+      "id": "1eee793e-1c34-43b0-9370-d918cee3cb81",
+      "title": "DB Call Count",
+      "description": "",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "traces",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "durationNano--float64--tag--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "durationNano",
+                "type": "tag"
+              },
+              "aggregateOperator": "count",
+              "timeAggregation": "count",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "fe57da52-ec62-4ae6-a693-6c07be3cfbd7",
+                    "key": {
+                      "dataType": "string",
+                      "id": "dbName--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "dbName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo_db"
+                  },
+                  {
+                    "id": "82d8b9e4-80ae-4bb7-80c3-36ea901fc1ea",
+                    "key": {
+                      "dataType": "string",
+                      "id": "serviceName--string--tag--true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "serviceName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "{{.service.name}}"
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "dbName--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "dbName",
+                  "type": "tag"
+                }
+              ],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [],
+              "having": [],
+              "orderBy": [],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "short",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    },
+    {
+      "id": "d6de8c4e-cba5-4aa4-8d5f-a33b41f40dc3",
+      "title": "DB P99 Latency",
+      "description": "",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "traces",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "durationNano--float64--tag--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "durationNano",
+                "type": "tag"
+              },
+              "aggregateOperator": "p99",
+              "timeAggregation": "p99",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "64c335d4-0efa-4112-8ffc-298679def5ef",
+                    "key": {
+                      "dataType": "string",
+                      "id": "dbName--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "dbName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo_db"
+                  },
+                  {
+                    "id": "c6af5d5a-bea3-423d-8df2-2acbf17510f3",
+                    "key": {
+                      "dataType": "string",
+                      "id": "serviceName--string--tag--true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "serviceName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "{{.service.name}}"
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [
+                {
+                  "name": "cutOffMin",
+                  "args": [
+                    { "name": "thresholdValue", "value": 0 }
+                  ]
+                },
+                {
+                  "name": "divideBy",
+                  "args": [
+                    { "name": "divideBy", "value": 1000000 }
+                  ]
+                }
+              ],
+              "having": [],
+              "orderBy": [],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "ms",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    },
+    {
+      "id": "cffcf873-9776-444e-90b8-33e165c2f7c7",
+      "title": "DB Error Count",
+      "description": "",
+      "panelTypes": "graph",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "traces",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "durationNano--float64--tag--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "durationNano",
+                "type": "tag"
+              },
+              "aggregateOperator": "count",
+              "timeAggregation": "count",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "be3c92ea-9067-4fed-be46-a16b7c95e99b",
+                    "key": {
+                      "dataType": "string",
+                      "id": "dbName--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "dbName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo_db"
+                  },
+                  {
+                    "id": "f61aed57-d355-490b-8753-46ff96ab39fe",
+                    "key": {
+                      "dataType": "string",
+                      "id": "serviceName--string--tag--true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "serviceName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "{{.service.name}}"
+                  },
+                  {
+                    "id": "7c2a6dfd-14a8-4408-a5a1-19831375520a",
+                    "key": {
+                      "dataType": "bool",
+                      "id": "hasError--bool--tag--true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "hasError",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": true
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [],
+              "having": [],
+              "orderBy": [],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "short",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    },
+    {
+      "id": "997f974b-4dd7-4916-9263-ac9c0499e64d",
+      "title": "Top DB Statements",
+      "description": "",
+      "panelTypes": "table",
+      "query": {
+        "queryType": "builder",
+        "builder": {
+          "queryData": [
+            {
+              "dataSource": "traces",
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "durationNano--float64--tag--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "durationNano",
+                "type": "tag"
+              },
+              "aggregateOperator": "count",
+              "timeAggregation": "count",
+              "spaceAggregation": "sum",
+              "filters": {
+                "items": [
+                  {
+                    "id": "beba3d7c-1d50-49d4-991d-7d7c56a5ae6f",
+                    "key": {
+                      "dataType": "string",
+                      "id": "dbName--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "dbName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo_db"
+                  },
+                  {
+                    "id": "9a0657ce-eae8-4a49-9ccc-e3a1c56a57e9",
+                    "key": {
+                      "dataType": "string",
+                      "id": "serviceName--string--tag--true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "serviceName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "{{.service.name}}"
+                  }
+                ],
+                "op": "AND"
+              },
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "db.query.text--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "db.query.text",
+                  "type": "tag"
+                }
+              ],
+              "expression": "A",
+              "queryName": "A",
+              "reduceTo": "avg",
+              "stepInterval": 60,
+              "functions": [],
+              "having": [],
+              "orderBy": [
+                {
+                  "columnName": "timestamp",
+                  "order": "desc"
+                }
+              ],
+              "limit": null,
+              "legend": "",
+              "disabled": false
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ],
+        "promql": [
+          {
+            "disabled": false,
+            "legend": "",
+            "name": "A",
+            "query": ""
+          }
+        ]
+      },
+      "yAxisUnit": "short",
+      "nullZeroValues": "zero",
+      "fillSpans": false,
+      "isStacked": false,
+      "opacity": "1",
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "mergeAllActiveQueries": false,
+      "timePreferance": "GLOBAL_TIME",
+      "selectedLogFields": [],
+      "selectedTracesFields": []
+    }
+  ],
+  "uuid": "84ef83b5-3177-410d-97e3-f446facd99ff"
+}

@@ -4,11 +4,10 @@ import {
     type ScryptOptions,
     timingSafeEqual
 } from 'node:crypto';
-import { OAuth2Client } from 'google-auth-library';
 import { signJwt } from '@cleverbrush/auth';
 import { ActionResult, type Handler } from '@cleverbrush/server';
+import { OAuth2Client } from 'google-auth-library';
 import { config } from '../../config.js';
-import { UserDbSchema } from '../../db/schemas.js';
 import type {
     GoogleLoginEndpoint,
     LoginEndpoint,
@@ -35,7 +34,12 @@ function scryptAsync(
 
 export async function hashPassword(password: string): Promise<string> {
     const salt = randomBytes(16).toString('hex');
-    const hash = await scryptAsync(password, salt, SCRYPT_KEYLEN, SCRYPT_PARAMS);
+    const hash = await scryptAsync(
+        password,
+        salt,
+        SCRYPT_KEYLEN,
+        SCRYPT_PARAMS
+    );
     return `${salt}:${hash.toString('hex')}`;
 }
 
@@ -46,17 +50,19 @@ export async function verifyPassword(
     const [salt, hashHex] = stored.split(':');
     if (!salt || !hashHex) return false;
     const stored_buf = Buffer.from(hashHex, 'hex');
-    const derived = await scryptAsync(password, salt, SCRYPT_KEYLEN, SCRYPT_PARAMS);
+    const derived = await scryptAsync(
+        password,
+        salt,
+        SCRYPT_KEYLEN,
+        SCRYPT_PARAMS
+    );
     if (derived.length !== stored_buf.length) return false;
     return timingSafeEqual(derived, stored_buf);
 }
 
 function issueToken(userId: number, role: string): string {
     const exp = Math.floor(Date.now() / 1000) + config.jwt.expiresInSeconds;
-    return signJwt(
-        { sub: String(userId), role, exp },
-        config.jwt.secret
-    );
+    return signJwt({ sub: String(userId), role, exp }, config.jwt.secret);
 }
 
 // ── Register ─────────────────────────────────────────────────────────────────
@@ -65,18 +71,22 @@ export const registerHandler: Handler<typeof RegisterEndpoint> = async (
     { body },
     { db }
 ) => {
-    const existing = await db(UserDbSchema).where(t => t.email, body.email).first();
+    const existing = await db.users
+        .projected('public')
+        .where(t => t.email, body.email)
+        .first();
     if (existing) {
-        return ActionResult.badRequest({ message: 'Email is already registered.' });
+        return ActionResult.badRequest({
+            message: 'Email is already registered.'
+        });
     }
 
     const passwordHash = await hashPassword(body.password);
-    const user = await db(UserDbSchema).insert({
+    const user = await db.users.insert({
         email: body.email,
         passwordHash,
         role: 'user',
-        authProvider: 'local',
-        createdAt: new Date()
+        authProvider: 'local'
     });
 
     return ActionResult.created(await mapUser(user), `/api/users/${user.id}`);
@@ -88,15 +98,22 @@ export const loginHandler: Handler<typeof LoginEndpoint> = async (
     { body },
     { db }
 ) => {
-    const user = await db(UserDbSchema).where(t => t.email, body.email).first();
+    const user = await db.users
+        .projected('auth')
+        .where(t => t.email, body.email)
+        .first();
 
-    if (!user || !user.passwordHash) {
-        return ActionResult.unauthorized({ message: 'Invalid email or password.' });
+    if (!user?.passwordHash) {
+        return ActionResult.unauthorized({
+            message: 'Invalid email or password.'
+        });
     }
 
     const valid = await verifyPassword(body.password, user.passwordHash);
     if (!valid) {
-        return ActionResult.unauthorized({ message: 'Invalid email or password.' });
+        return ActionResult.unauthorized({
+            message: 'Invalid email or password.'
+        });
     }
 
     return { token: issueToken(user.id, user.role) };
@@ -133,12 +150,16 @@ export const googleLoginHandler: Handler<typeof GoogleLoginEndpoint> = async (
                 { headers: { Authorization: `Bearer ${body.idToken}` } }
             );
             if (!res.ok) {
-                return ActionResult.unauthorized({ message: 'Invalid Google token.' });
+                return ActionResult.unauthorized({
+                    message: 'Invalid Google token.'
+                });
             }
             const info = (await res.json()) as { email?: string };
             email = info.email;
         } catch {
-            return ActionResult.unauthorized({ message: 'Invalid Google token.' });
+            return ActionResult.unauthorized({
+                message: 'Invalid Google token.'
+            });
         }
     }
 
@@ -149,16 +170,18 @@ export const googleLoginHandler: Handler<typeof GoogleLoginEndpoint> = async (
     }
 
     // Find or auto-provision user
-    let user = await db(UserDbSchema).where(t => t.email, email).first();
-    if (!user) {
-        user = await db(UserDbSchema).insert({
+    const foundUser = await db.users
+        .projected('public')
+        .where(t => t.email, email)
+        .first();
+    const user =
+        foundUser ??
+        (await db.users.insert({
             email,
             passwordHash: undefined,
             role: 'user',
-            authProvider: 'google',
-            createdAt: new Date()
-        });
-    }
+            authProvider: 'google'
+        }));
 
     return { token: issueToken(user.id, user.role) };
 };

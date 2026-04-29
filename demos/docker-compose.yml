@@ -7,11 +7,14 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-todo_secret}
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init-readonly-user.sql:/docker-entrypoint-initdb.d/init-readonly-user.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-todo_user} -d ${POSTGRES_DB:-todo_db}"]
       interval: 5s
       timeout: 5s
       retries: 10
+    ports:
+      - "5445:5432"
 
   backend:
     build:
@@ -19,6 +22,8 @@ services:
       dockerfile: demos/todo-backend/Dockerfile
     depends_on:
       postgres:
+        condition: service_healthy
+      otel-collector:
         condition: service_healthy
     environment:
       DB_HOST: postgres
@@ -31,10 +36,13 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       PORT: 3000
       NODE_ENV: production
+      OTEL_SERVICE_NAME: todo-backend
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_LOG_LEVEL: warn
     ports:
       - "${APP_PORT:-3000}:3000"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:3000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -63,5 +71,193 @@ services:
     depends_on:
       - backend
 
+  pgadmin:
+    image: dpage/pgadmin4:8
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@todo.local.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "8110:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+
+  # ── Zookeeper (required by ClickHouse replication) ──────────────────────
+  zookeeper-1:
+    image: signoz/zookeeper:3.7.1
+    restart: unless-stopped
+    user: root
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -m 2 http://localhost:8080/commands/ruok | grep error | grep null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - signoz-zookeeper-1:/bitnami/zookeeper
+    environment:
+      - ZOO_SERVER_ID=1
+      - ALLOW_ANONYMOUS_LOGIN=yes
+      - ZOO_AUTOPURGE_INTERVAL=1
+      - ZOO_ENABLE_PROMETHEUS_METRICS=yes
+      - ZOO_PROMETHEUS_METRICS_PORT_NUMBER=9141
+
+  # ── ClickHouse init (downloads histogramQuantile binary on first boot) ───
+  init-clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    restart: on-failure
+    user: root
+    command:
+      - bash
+      - -c
+      - |
+        version="v0.0.1"
+        node_os=$$(uname -s | tr '[:upper:]' '[:lower:]')
+        node_arch=$$(uname -m | sed s/aarch64/arm64/ | sed s/x86_64/amd64/)
+        echo "Fetching histogram-binary for $${node_os}/$${node_arch}"
+        cd /tmp
+        wget -O histogram-quantile.tar.gz "https://github.com/SigNoz/signoz/releases/download/histogram-quantile%2F$${version}/histogram-quantile_$${node_os}_$${node_arch}.tar.gz"
+        tar -xvzf histogram-quantile.tar.gz
+        mv histogram-quantile /var/lib/clickhouse/user_scripts/histogramQuantile
+    volumes:
+      - ./signoz/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
+
+  # ── ClickHouse ───────────────────────────────────────────────────────────
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.5.6
+    restart: unless-stopped
+    tty: true
+    depends_on:
+      init-clickhouse:
+        condition: service_completed_successfully
+      zookeeper-1:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "0.0.0.0:8123/ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+    ports:
+      - "0.0.0.0:8123:8123"   # Clickhouse
+    environment:
+      - CLICKHOUSE_SKIP_USER_SETUP=1
+    volumes:
+      - ./signoz/clickhouse/cluster.xml:/etc/clickhouse-server/config.d/cluster.xml
+      - ./signoz/clickhouse/custom-function.xml:/etc/clickhouse-server/custom-function.xml
+      - ./signoz/clickhouse/user_scripts:/var/lib/clickhouse/user_scripts/
+      - signoz-clickhouse:/var/lib/clickhouse/
+
+  # ── SigNoz telemetry store migrator (one-shot, runs schema migrations) ───
+  signoz-telemetrystore-migrator:
+    image: signoz/signoz-otel-collector:v0.144.3
+    restart: on-failure
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - |
+        /signoz-otel-collector migrate bootstrap &&
+        /signoz-otel-collector migrate sync up &&
+        /signoz-otel-collector migrate async up
+    environment:
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+
+  # ── SigNoz OTel collector ─────────────────────────────────────────────────
+  # OTLP HTTP: http://otel-collector:4318 (in-network) | http://localhost:4318 (host)
+  otel-collector:
+    image: signoz/signoz-otel-collector:v0.144.3
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      signoz-telemetrystore-migrator:
+        condition: service_completed_successfully
+    entrypoint: ["/bin/sh"]
+    command:
+      - -c
+      - |
+        /signoz-otel-collector migrate sync check &&
+        /signoz-otel-collector --config=/etc/otel-collector-config.yaml
+    environment:
+      - OTEL_RESOURCE_ATTRIBUTES=host.name=signoz-host,os.type=linux
+      - LOW_CARDINAL_EXCEPTION_GROUPING=false
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_CLUSTER=cluster
+      - SIGNOZ_OTEL_COLLECTOR_CLICKHOUSE_REPLICATION=true
+      - SIGNOZ_OTEL_COLLECTOR_TIMEOUT=10m
+    volumes:
+      - ./signoz/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      - ./signoz/otel-collector-opamp-config.yaml:/etc/manager-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    healthcheck:
+      test: ["CMD", "bash", "-c", "echo > /dev/tcp/localhost/13133"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ── SigNoz UI ─────────────────────────────────────────────────────────────
+  # UI: http://localhost:${SIGNOZ_PORT:-8080}
+  signoz:
+    image: signoz/signoz:v0.120.0
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      signoz-telemetrystore-migrator:
+        condition: service_completed_successfully
+    environment:
+      - SIGNOZ_ALERTMANAGER_PROVIDER=signoz
+      - SIGNOZ_TELEMETRYSTORE_CLICKHOUSE_DSN=tcp://clickhouse:9000
+      - SIGNOZ_SQLSTORE_SQLITE_PATH=/var/lib/signoz/signoz.db
+      - SIGNOZ_TOKENIZER_JWT_SECRET=secret
+    volumes:
+      - signoz-sqlite:/var/lib/signoz/
+    ports:
+      - "${SIGNOZ_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  # ── Dashboard Provisioner (one-shot, idempotent) ──────────────────────────
+  signoz-provisioner:
+    image: curlimages/curl:latest
+    restart: on-failure
+    depends_on:
+      signoz:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/provision-dashboards.sh"]
+    environment:
+      - SIGNOZ_URL=http://signoz:8080
+      - SIGNOZ_ADMIN_EMAIL=${SIGNOZ_ADMIN_EMAIL:-admin@todo.local.com}
+      - SIGNOZ_ADMIN_PASSWORD=${SIGNOZ_ADMIN_PASSWORD:-Admin1234!}
+    volumes:
+      - ./signoz/dashboards:/dashboards:ro
+      - ./signoz/provision-dashboards.sh:/provision-dashboards.sh:ro
+
 volumes:
   postgres_data:
+  pgadmin_data:
+  signoz-clickhouse:
+  signoz-sqlite:
+  signoz-zookeeper-1:

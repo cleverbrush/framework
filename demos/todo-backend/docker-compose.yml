@@ -38,6 +38,8 @@ services:
       HOST: 0.0.0.0
     ports:
       - "${APP_PORT:-3000}:3000"
+    volumes:
+      - app_logs:/app/logs
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://localhost:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 15s
@@ -59,4 +61,6 @@ services:
 
 volumes:
   postgres_data:
+    driver: local
+  app_logs:
     driver: local

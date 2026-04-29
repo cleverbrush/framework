@@ -103,3 +103,25 @@ test('deepEqual - undefined props', () => {
         )
     ).toEqual(false);
 });
+
+test('deepEqual - array vs non-array returns false', () => {
+    expect(deepEqual([1, 2], { 0: 1, 1: 2 })).toEqual(false);
+    expect(deepEqual({ 0: 1 }, [1])).toEqual(false);
+});
+
+test('deepEqual - circular reference returns false', () => {
+    const a: Record<string, unknown> = {};
+    a['self'] = a;
+    const b: Record<string, unknown> = {};
+    b['self'] = b;
+    // cyclic comparison should not infinitely recurse and return false
+    expect(deepEqual(a, b)).toEqual(false);
+});
+
+test('deepEqual - objects with different key order but same keys are equal', () => {
+    expect(deepEqual({ b: 2, a: 1 }, { a: 1, b: 2 })).toEqual(true);
+});
+
+test('deepEqual - objects with different key names return false', () => {
+    expect(deepEqual({ a: 1 }, { b: 1 })).toEqual(false);
+});

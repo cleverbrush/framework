@@ -291,4 +291,75 @@ describe('ServiceProvider', () => {
         const fromScope = scope.serviceProvider.get(IConfig);
         expect(fromScope).toBe(fromRoot);
     });
+
+    // ── Singleton factory resolves scoped service (lines 283-298) ────────
+
+    test('singleton factory can resolve scoped service via proxy', () => {
+        const IScoped = object({ value: string() });
+        const ISingleton = object({ length: number() });
+
+        const services = new ServiceCollection();
+        services.addScoped(IScoped, () => ({ value: 'hello' }));
+        services.addSingleton(ISingleton, provider => ({
+            length: provider.get(IScoped).value.length
+        }));
+
+        const provider = services.buildServiceProvider();
+        const result = provider.get(ISingleton);
+        expect(result.length).toBe(5);
+    });
+
+    test('scoped service cached within chained factory proxy scope', () => {
+        const IScoped = object({ n: number() });
+        const IInner = object({ same: string() });
+        const IOuter = object({ result: number() });
+        let count = 0;
+
+        const services = new ServiceCollection();
+        services.addScoped(IScoped, () => ({ n: ++count }));
+        // IInner's factory uses the propagated scopedCache from the outer proxy
+        services.addSingleton(IInner, provider => {
+            const a = provider.get(IScoped); // cache miss → line 286-298
+            const b = provider.get(IScoped); // cache hit  → line 284
+            return { same: a === b ? 'yes' : 'no' };
+        });
+        services.addSingleton(IOuter, provider => ({
+            result: provider.get(IInner).same === 'yes' ? 1 : 0
+        }));
+
+        const p = services.buildServiceProvider();
+        const result = p.get(IOuter);
+        expect(result.result).toBe(1);
+    });
+
+    // ── ScopedResolverProxy.getOptional (lines 405-408) ──────────────────
+
+    test('factory can call getOptional for registered service via proxy', () => {
+        const IScoped = object({ value: number() });
+        const ISingleton = object({ found: string() });
+
+        const services = new ServiceCollection();
+        services.addScoped(IScoped, () => ({ value: 42 }));
+        services.addSingleton(ISingleton, provider => ({
+            found: provider.getOptional(IScoped)?.value.toString() ?? 'missing'
+        }));
+
+        const provider = services.buildServiceProvider();
+        const result = provider.get(ISingleton);
+        expect(result.found).toBe('42');
+    });
+
+    test('factory getOptional returns undefined for unregistered service via proxy', () => {
+        const IScoped = object({ value: number() });
+        const ISingleton = object({ found: string() });
+
+        const services = new ServiceCollection();
+        services.addSingleton(ISingleton, provider => ({
+            found: provider.getOptional(IScoped)?.value.toString() ?? 'missing'
+        }));
+
+        const provider = services.buildServiceProvider();
+        const result = provider.get(ISingleton);
+        expect(result.found).toBe('missing');
+    });
 });

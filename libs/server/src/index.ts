@@ -9,6 +9,15 @@ export {
     StreamResult
 } from './ActionResult.js';
 export {
+    type ApiContract,
+    type ApiGroup,
+    defineApi,
+    type MergedContracts,
+    mergeContracts,
+    omitGroups,
+    pickGroups
+} from './contract.js';
+export {
     type ActionContext,
     type AllowedResponseReturn,
     type CallbackDefinition,

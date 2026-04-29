@@ -391,4 +391,40 @@ describe('ActionResult factories', () => {
                 ActionResult
         ).toBe(true);
     });
+
+    it('accepted() returns 202 JsonResult', () => {
+        const r = ActionResult.accepted({ queued: true });
+        expect(r).toBeInstanceOf(JsonResult);
+        expect(r.status).toBe(202);
+    });
+
+    it('badRequest() returns 400 JsonResult', () => {
+        const r = ActionResult.badRequest({ error: 'bad input' });
+        expect(r).toBeInstanceOf(JsonResult);
+        expect(r.status).toBe(400);
+    });
+
+    it('unauthorized() returns 401 JsonResult', () => {
+        const r = ActionResult.unauthorized({ error: 'not authenticated' });
+        expect(r).toBeInstanceOf(JsonResult);
+        expect(r.status).toBe(401);
+    });
+
+    it('forbidden() returns 403 JsonResult', () => {
+        const r = ActionResult.forbidden({ error: 'access denied' });
+        expect(r).toBeInstanceOf(JsonResult);
+        expect(r.status).toBe(403);
+    });
+
+    it('notFound() returns 404 JsonResult', () => {
+        const r = ActionResult.notFound({ error: 'not found' });
+        expect(r).toBeInstanceOf(JsonResult);
+        expect(r.status).toBe(404);
+    });
+
+    it('conflict() returns 409 JsonResult', () => {
+        const r = ActionResult.conflict({ error: 'already exists' });
+        expect(r).toBeInstanceOf(JsonResult);
+        expect(r.status).toBe(409);
+    });
 });

@@ -3,11 +3,11 @@
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- bundle-badge-start -->
-[![Bundle size](https://img.shields.io/badge/bundle-19.9%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
+[![Bundle size](https://img.shields.io/badge/bundle-20.2%20KB%20gzip-green)](https://github.com/cleverbrush/framework/blob/master/libs/schema)
 <!-- bundle-badge-end -->
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-96.8%25-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 <!-- coverage-badge-end -->
 
 A schema definition and validation library for TypeScript — faster than Zod in 14/15 benchmarks (up to 204× faster on invalid input), 3× smaller than Zod v4, and compatible with 50+ ecosystem tools via [Standard Schema v1](https://standardschema.dev/).
@@ -539,6 +539,18 @@ Error messages include the property path for easy debugging:
 ```typescript
 const result = RouteSchema.validate('/orders/abc/bad-uuid');
 // result.errors[0].message → "id: expected an integer number"
+```
+
+**Raw template access** — the original `{Property}` pattern is exposed via the `.template` getter. This enables consumers to use a parse-string schema as a Serilog-style message template (used by `@cleverbrush/log` for typed log events):
+
+```typescript
+const TodoCreated = parseString(
+    object({ TodoId: number(), Title: string(), UserId: string() }),
+    $t => $t`Todo #${t => t.TodoId} "${t => t.Title}" created by ${t => t.UserId}`
+);
+
+TodoCreated.template;
+// → 'Todo #{TodoId} "{Title}" created by {UserId}'
 ```
 
 ## Coercion

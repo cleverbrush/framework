@@ -1,0 +1,1199 @@
+{
+  "description": "HTTP request rate, latency percentiles, error rate, and database call metrics for the todo-backend service.",
+  "layout": [
+    {
+      "h": 1,
+      "i": "row-http",
+      "maxH": 1,
+      "minH": 1,
+      "minW": 12,
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 0
+    },
+    {
+      "h": 6,
+      "i": "w-latency",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 0,
+      "y": 1
+    },
+    {
+      "h": 6,
+      "i": "w-rps",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 12,
+      "y": 1
+    },
+    {
+      "h": 6,
+      "i": "w-error-pct",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 0,
+      "y": 7
+    },
+    {
+      "h": 6,
+      "i": "w-top-ops",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 12,
+      "y": 7
+    },
+    {
+      "h": 1,
+      "i": "row-db",
+      "maxH": 1,
+      "minH": 1,
+      "minW": 12,
+      "moved": false,
+      "static": false,
+      "w": 24,
+      "x": 0,
+      "y": 13
+    },
+    {
+      "h": 6,
+      "i": "w-db-rps",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 0,
+      "y": 14
+    },
+    {
+      "h": 6,
+      "i": "w-db-latency",
+      "moved": false,
+      "static": false,
+      "w": 12,
+      "x": 12,
+      "y": 14
+    }
+  ],
+  "panelMap": {
+    "row-http": {
+      "collapsed": false,
+      "widgets": [
+        { "h": 6, "i": "w-latency",   "moved": false, "static": false, "w": 12, "x": 0,  "y": 1 },
+        { "h": 6, "i": "w-rps",       "moved": false, "static": false, "w": 12, "x": 12, "y": 1 },
+        { "h": 6, "i": "w-error-pct", "moved": false, "static": false, "w": 12, "x": 0,  "y": 7 },
+        { "h": 6, "i": "w-top-ops",   "moved": false, "static": false, "w": 12, "x": 12, "y": 7 }
+      ]
+    },
+    "row-db": {
+      "collapsed": false,
+      "widgets": [
+        { "h": 6, "i": "w-db-rps",     "moved": false, "static": false, "w": 12, "x": 0,  "y": 14 },
+        { "h": 6, "i": "w-db-latency", "moved": false, "static": false, "w": 12, "x": 12, "y": 14 }
+      ]
+    }
+  },
+  "tags": ["todo-backend", "http", "apm"],
+  "title": "todo-backend — HTTP Traffic",
+  "uploadedGrafana": false,
+  "variables": {},
+  "version": "v4",
+  "widgets": [
+    {
+      "description": "",
+      "id": "row-http",
+      "panelTypes": "row",
+      "title": "HTTP Traffic"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "p99, p90, p50 latency for all routes",
+      "fillSpans": false,
+      "id": "w-latency",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_latency.bucket--float64--Histogram--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_latency.bucket",
+                "type": "Histogram"
+              },
+              "aggregateOperator": "p99",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "a1b2c3d4",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-a1b2c3d4",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "p99",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "p99",
+              "stepInterval": 60,
+              "timeAggregation": "p99"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_latency.bucket--float64--Histogram--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_latency.bucket",
+                "type": "Histogram"
+              },
+              "aggregateOperator": "p90",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "B",
+              "filters": {
+                "items": [
+                  {
+                    "id": "b2c3d4e5",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-b2c3d4e5",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "p90",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "reduceTo": "avg",
+              "spaceAggregation": "p90",
+              "stepInterval": 60,
+              "timeAggregation": "p90"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_latency.bucket--float64--Histogram--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_latency.bucket",
+                "type": "Histogram"
+              },
+              "aggregateOperator": "p50",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "C",
+              "filters": {
+                "items": [
+                  {
+                    "id": "c3d4e5f6",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-c3d4e5f6",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "p50",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "C",
+              "reduceTo": "avg",
+              "spaceAggregation": "p50",
+              "stepInterval": 60,
+              "timeAggregation": "p50"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-latency",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string",  "id": "serviceName--string--tag--true",  "isColumn": true, "isJSON": false, "key": "serviceName",          "type": "tag" },
+        { "dataType": "string",  "id": "name--string--tag--true",         "isColumn": true, "isJSON": false, "key": "name",                 "type": "tag" },
+        { "dataType": "float64", "id": "durationNano--float64--tag--true","isColumn": true, "isJSON": false, "key": "durationNano",          "type": "tag" },
+        { "dataType": "string",  "id": "httpMethod--string--tag--true",   "isColumn": true, "isJSON": false, "key": "httpMethod",            "type": "tag" },
+        { "dataType": "string",  "id": "responseStatusCode--string--tag--true", "isColumn": true, "isJSON": false, "key": "responseStatusCode", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Latency (p99 / p90 / p50)",
+      "yAxisUnit": "ms"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Requests per second for the todo-backend service",
+      "fillSpans": false,
+      "id": "w-rps",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_latency.count--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_latency.count",
+                "type": "Sum"
+              },
+              "aggregateOperator": "rate",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "d4e5f6a7",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-d4e5f6a7",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "rps",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "rate"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-rps",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string",  "id": "serviceName--string--tag--true",  "isColumn": true, "isJSON": false, "key": "serviceName",          "type": "tag" },
+        { "dataType": "string",  "id": "name--string--tag--true",         "isColumn": true, "isJSON": false, "key": "name",                 "type": "tag" },
+        { "dataType": "float64", "id": "durationNano--float64--tag--true","isColumn": true, "isJSON": false, "key": "durationNano",          "type": "tag" },
+        { "dataType": "string",  "id": "httpMethod--string--tag--true",   "isColumn": true, "isJSON": false, "key": "httpMethod",            "type": "tag" },
+        { "dataType": "string",  "id": "responseStatusCode--string--tag--true", "isColumn": true, "isJSON": false, "key": "responseStatusCode", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Request Rate",
+      "yAxisUnit": "reqps"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Percentage of requests that resulted in an error (status.code = STATUS_CODE_ERROR)",
+      "fillSpans": false,
+      "id": "w-error-pct",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_calls_total--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_calls_total",
+                "type": "Sum"
+              },
+              "aggregateOperator": "rate",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "e5f6a7b8",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "f6a7b8c9",
+                    "key": {
+                      "dataType": "string",
+                      "id": "status.code--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "status.code",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "STATUS_CODE_ERROR"
+                  },
+                  {
+                    "id": "sk-f6a7b8c9",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "rate"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_calls_total--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_calls_total",
+                "type": "Sum"
+              },
+              "aggregateOperator": "rate",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "B",
+              "filters": {
+                "items": [
+                  {
+                    "id": "a7b8c9d0",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-a7b8c9d0",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "rate"
+            }
+          ],
+          "queryFormulas": [
+            {
+              "disabled": false,
+              "expression": "A/B",
+              "legend": "error %",
+              "queryName": "F1"
+            }
+          ]
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-error-pct",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string",  "id": "serviceName--string--tag--true",  "isColumn": true, "isJSON": false, "key": "serviceName",          "type": "tag" },
+        { "dataType": "string",  "id": "name--string--tag--true",         "isColumn": true, "isJSON": false, "key": "name",                 "type": "tag" },
+        { "dataType": "float64", "id": "durationNano--float64--tag--true","isColumn": true, "isJSON": false, "key": "durationNano",          "type": "tag" },
+        { "dataType": "string",  "id": "httpMethod--string--tag--true",   "isColumn": true, "isJSON": false, "key": "httpMethod",            "type": "tag" },
+        { "dataType": "string",  "id": "responseStatusCode--string--tag--true", "isColumn": true, "isJSON": false, "key": "responseStatusCode", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Error Percentage",
+      "yAxisUnit": "percentunit"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {
+        "A": "ms",
+        "B": "ms",
+        "C": "ms",
+        "D": "reqps",
+        "F1": "percent"
+      },
+      "columnWidths": {
+        "A": 145,
+        "B": 145,
+        "C": 145,
+        "D": 145,
+        "F1": 145,
+        "operation": 200
+      },
+      "description": "p99 / p90 / p50 latency and request rate per operation (route)",
+      "fillSpans": false,
+      "id": "w-top-ops",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "table",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_latency.bucket--float64--Histogram--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_latency.bucket",
+                "type": "Histogram"
+              },
+              "aggregateOperator": "p99",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "b8c9d0e1",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-b8c9d0e1",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "operation--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "operation",
+                  "type": "tag"
+                }
+              ],
+              "having": [],
+              "legend": "p99",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "p99",
+              "stepInterval": 60,
+              "timeAggregation": "p99"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_latency.bucket--float64--Histogram--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_latency.bucket",
+                "type": "Histogram"
+              },
+              "aggregateOperator": "p90",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "B",
+              "filters": {
+                "items": [
+                  {
+                    "id": "c9d0e1f2",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-c9d0e1f2",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "operation--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "operation",
+                  "type": "tag"
+                }
+              ],
+              "having": [],
+              "legend": "p90",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "B",
+              "reduceTo": "avg",
+              "spaceAggregation": "p90",
+              "stepInterval": 60,
+              "timeAggregation": "p90"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_latency.bucket--float64--Histogram--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_latency.bucket",
+                "type": "Histogram"
+              },
+              "aggregateOperator": "p50",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "C",
+              "filters": {
+                "items": [
+                  {
+                    "id": "d0e1f2a3",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-d0e1f2a3",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "operation--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "operation",
+                  "type": "tag"
+                }
+              ],
+              "having": [],
+              "legend": "p50",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "C",
+              "reduceTo": "avg",
+              "spaceAggregation": "p50",
+              "stepInterval": 60,
+              "timeAggregation": "p50"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_calls_total--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_calls_total",
+                "type": "Sum"
+              },
+              "aggregateOperator": "rate",
+              "dataSource": "metrics",
+              "disabled": false,
+              "expression": "D",
+              "filters": {
+                "items": [
+                  {
+                    "id": "e1f2a3b4",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "sk-e1f2a3b4",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "operation--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "operation",
+                  "type": "tag"
+                }
+              ],
+              "having": [],
+              "legend": "req/s",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "D",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "rate"
+            },
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "signoz_calls_total--float64--Sum--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "signoz_calls_total",
+                "type": "Sum"
+              },
+              "aggregateOperator": "rate",
+              "dataSource": "metrics",
+              "disabled": true,
+              "expression": "E",
+              "filters": {
+                "items": [
+                  {
+                    "id": "f2a3b4c5",
+                    "key": {
+                      "dataType": "string",
+                      "id": "service.name--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "service.name",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "a3b4c5d6",
+                    "key": {
+                      "dataType": "string",
+                      "id": "status.code--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "status.code",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "STATUS_CODE_ERROR"
+                  },
+                  {
+                    "id": "sk-a3b4c5d6",
+                    "key": {
+                      "dataType": "string",
+                      "id": "span.kind--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "span.kind",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "SPAN_KIND_SERVER"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [
+                {
+                  "dataType": "string",
+                  "id": "operation--string--tag--false",
+                  "isColumn": false,
+                  "isJSON": false,
+                  "key": "operation",
+                  "type": "tag"
+                }
+              ],
+              "having": [],
+              "legend": "err/s",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "E",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "rate"
+            }
+          ],
+          "queryFormulas": [
+            {
+              "disabled": false,
+              "expression": "E/D",
+              "legend": "error %",
+              "queryName": "F1"
+            }
+          ]
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-top-ops",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string",  "id": "serviceName--string--tag--true",  "isColumn": true, "isJSON": false, "key": "serviceName",          "type": "tag" },
+        { "dataType": "string",  "id": "name--string--tag--true",         "isColumn": true, "isJSON": false, "key": "name",                 "type": "tag" },
+        { "dataType": "float64", "id": "durationNano--float64--tag--true","isColumn": true, "isJSON": false, "key": "durationNano",          "type": "tag" },
+        { "dataType": "string",  "id": "httpMethod--string--tag--true",   "isColumn": true, "isJSON": false, "key": "httpMethod",            "type": "tag" },
+        { "dataType": "string",  "id": "responseStatusCode--string--tag--true", "isColumn": true, "isJSON": false, "key": "responseStatusCode", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Top Operations",
+      "yAxisUnit": "none"
+    },
+    {
+      "description": "",
+      "id": "row-db",
+      "panelTypes": "row",
+      "title": "Database"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "Rate of database calls per second",
+      "fillSpans": false,
+      "id": "w-db-rps",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "durationNano--float64--tag--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "durationNano",
+                "type": "tag"
+              },
+              "aggregateOperator": "count",
+              "dataSource": "traces",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "b4c5d6e7",
+                    "key": {
+                      "dataType": "string",
+                      "id": "serviceName--string--tag--true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "serviceName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "b4c5d6e8",
+                    "key": {
+                      "dataType": "string",
+                      "id": "dbName--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "dbName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo_db"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "db calls/s",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "count"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-db-rps",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string",  "id": "serviceName--string--tag--true",  "isColumn": true, "isJSON": false, "key": "serviceName",          "type": "tag" },
+        { "dataType": "string",  "id": "name--string--tag--true",         "isColumn": true, "isJSON": false, "key": "name",                 "type": "tag" },
+        { "dataType": "float64", "id": "durationNano--float64--tag--true","isColumn": true, "isJSON": false, "key": "durationNano",          "type": "tag" },
+        { "dataType": "string",  "id": "httpMethod--string--tag--true",   "isColumn": true, "isJSON": false, "key": "httpMethod",            "type": "tag" },
+        { "dataType": "string",  "id": "responseStatusCode--string--tag--true", "isColumn": true, "isJSON": false, "key": "responseStatusCode", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Database Calls Rate",
+      "yAxisUnit": "reqps"
+    },
+    {
+      "bucketCount": 30,
+      "bucketWidth": 0,
+      "columnUnits": {},
+      "description": "DB span p99 latency from traces (filtered by dbName=todo_db). Unit: nanoseconds.",
+      "fillSpans": false,
+      "id": "w-db-latency",
+      "isStacked": false,
+      "mergeAllActiveQueries": false,
+      "nullZeroValues": "zero",
+      "opacity": "1",
+      "panelTypes": "graph",
+      "query": {
+        "builder": {
+          "queryData": [
+            {
+              "aggregateAttribute": {
+                "dataType": "float64",
+                "id": "durationNano--float64--tag--true",
+                "isColumn": true,
+                "isJSON": false,
+                "key": "durationNano",
+                "type": "tag"
+              },
+              "aggregateOperator": "p99",
+              "dataSource": "traces",
+              "disabled": false,
+              "expression": "A",
+              "filters": {
+                "items": [
+                  {
+                    "id": "c5d6e7f8",
+                    "key": {
+                      "dataType": "string",
+                      "id": "serviceName--string--tag--true",
+                      "isColumn": true,
+                      "isJSON": false,
+                      "key": "serviceName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo-backend"
+                  },
+                  {
+                    "id": "c5d6e7f9",
+                    "key": {
+                      "dataType": "string",
+                      "id": "dbName--string--tag--false",
+                      "isColumn": false,
+                      "isJSON": false,
+                      "key": "dbName",
+                      "type": "tag"
+                    },
+                    "op": "=",
+                    "value": "todo_db"
+                  }
+                ],
+                "op": "AND"
+              },
+              "functions": [],
+              "groupBy": [],
+              "having": [],
+              "legend": "p99",
+              "limit": null,
+              "orderBy": [],
+              "queryName": "A",
+              "reduceTo": "avg",
+              "spaceAggregation": "sum",
+              "stepInterval": 60,
+              "timeAggregation": "p99"
+            }
+          ],
+          "queryFormulas": []
+        },
+        "clickhouse_sql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "id": "q-db-latency",
+        "promql": [{ "disabled": false, "legend": "", "name": "A", "query": "" }],
+        "queryType": "builder"
+      },
+      "selectedLogFields": [
+        { "dataType": "string", "name": "body", "type": "" },
+        { "dataType": "string", "name": "timestamp", "type": "" }
+      ],
+      "selectedTracesFields": [
+        { "dataType": "string",  "id": "serviceName--string--tag--true",  "isColumn": true, "isJSON": false, "key": "serviceName",          "type": "tag" },
+        { "dataType": "string",  "id": "name--string--tag--true",         "isColumn": true, "isJSON": false, "key": "name",                 "type": "tag" },
+        { "dataType": "float64", "id": "durationNano--float64--tag--true","isColumn": true, "isJSON": false, "key": "durationNano",          "type": "tag" },
+        { "dataType": "string",  "id": "httpMethod--string--tag--true",   "isColumn": true, "isJSON": false, "key": "httpMethod",            "type": "tag" },
+        { "dataType": "string",  "id": "responseStatusCode--string--tag--true", "isColumn": true, "isJSON": false, "key": "responseStatusCode", "type": "tag" }
+      ],
+      "softMax": 0,
+      "softMin": 0,
+      "stackedBarChart": false,
+      "thresholds": [],
+      "timePreferance": "GLOBAL_TIME",
+      "title": "Database Calls P99 Latency",
+      "yAxisUnit": "ns"
+    }
+  ]
+}
