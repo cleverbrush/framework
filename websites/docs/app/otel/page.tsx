@@ -291,6 +291,14 @@ span?.addEvent('cache.miss', { key: cacheKey });`)
                     <code>docker compose up</code> from <code>demos/</code> and
                     open <code>http://localhost:8082</code> for the SigNoz UI.
                 </p>
+                <p>
+                    Ready-made dashboard JSON files (HTTP traffic, DB calls,
+                    Node.js runtime, and business activity) live in{' '}
+                    <code>demos/signoz/dashboards/</code>. If they were not
+                    auto-provisioned on first boot, import them manually via{' '}
+                    <em>Dashboards → Import</em> in the SigNoz UI to visualise
+                    what the OTel instrumentation emits.
+                </p>
             </div>
         </div>
     );

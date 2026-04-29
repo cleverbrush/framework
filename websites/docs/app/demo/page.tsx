@@ -73,9 +73,13 @@ docker compose -f demos/docker-compose.yml up`}</code>
                             trace correlation
                         </li>
                         <li>
-                            <strong>Dashboards</strong> — pre-provisioned HTTP
-                            traffic, DB calls, and Node.js runtime metrics
-                            dashboards
+                            <strong>Dashboards</strong> — HTTP traffic, DB
+                            calls, and Node.js runtime metrics. Dashboard JSON
+                            files are included in{' '}
+                            <code>demos/signoz/dashboards/</code> and can be
+                            imported manually via the SigNoz UI under{' '}
+                            <em>Dashboards → Import</em> if auto-provisioning
+                            does not run.
                         </li>
                     </ul>
                     <p>
