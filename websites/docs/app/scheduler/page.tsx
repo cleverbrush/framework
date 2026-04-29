@@ -248,7 +248,7 @@ scheduler.on('job:message', ({ jobId, value }) => {
                                     <td>
                                         <code>
                                             {
-                                                '{ every: "month", interval: 1, dayOfMonth: 1, hour: 0, minute: 0 }'
+                                                '{ every: "month", interval: 1, day: 1, hour: 0, minute: 0 }'
                                             }
                                         </code>
                                     </td>
@@ -261,7 +261,7 @@ scheduler.on('job:message', ({ jobId, value }) => {
                                     <td>
                                         <code>
                                             {
-                                                '{ every: "year", interval: 1, month: 1, dayOfMonth: 1, hour: 0, minute: 0 }'
+                                                '{ every: "year", interval: 1, month: 1, day: 1, hour: 0, minute: 0 }'
                                             }
                                         </code>
                                     </td>

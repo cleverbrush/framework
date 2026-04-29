@@ -173,7 +173,7 @@ const scheme = cookieScheme<SessionData>({
 const principal: Principal<{ sub: string; role: string }> = result.principal;
 
 principal.isAuthenticated;         // true
-principal.claims.sub;              // 'user-1'
+principal.value?.sub;              // 'user-1'
 principal.hasRole('admin');        // true
 principal.hasClaim('role', 'admin'); // true
 
@@ -272,7 +272,7 @@ server
     .useAuthorization()
     .handle(
         endpoint.get('/api/admin').authorize(UserPrincipal, 'admin'),
-        ({ principal }) => ({ greeting: \`Hello \${principal.claims.sub}\` })
+        ({ principal }) => ({ greeting: \`Hello \${principal.value?.sub}\` })
     );
 
 await server.listen(3000);`)
