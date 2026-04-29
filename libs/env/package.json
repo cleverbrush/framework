@@ -42,7 +42,7 @@
     },
     "scripts": {
         "watch": "tsc --build tsconfig.build.json --watch",
-        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "build": "tsup && rm -f tsconfig.build.tsbuildinfo && tsgo --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
     },
     "type": "module",

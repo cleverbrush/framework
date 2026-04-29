@@ -8,6 +8,8 @@
         "moduleResolution": "bundler",
         "checkJs": true,
         "strictNullChecks": true,
+        "jsx": "react-jsx",
+        "skipLibCheck": true,
         "types": ["vitest/globals"]
     },
     "watchOptions": {
@@ -22,6 +24,9 @@
         "**/node_modules",
         "coverage",
         "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
         "**/*.bench.ts",
         "libs/benchmarks",
         "libs/server-integration-tests"

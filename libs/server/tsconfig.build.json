@@ -8,10 +8,8 @@
         "module": "ES2022",
         "esModuleInterop": true,
         "moduleResolution": "bundler",
-        "allowSyntheticDefaultImports": true,
         "sourceMap": false,
         "declarationMap": false,
-        "ignoreDeprecations": "6.0",
         "types": ["node"]
     },
     "include": ["src/**/*.ts"],

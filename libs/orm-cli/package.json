@@ -43,7 +43,7 @@
         "url": "github:cleverbrush/framework"
     },
     "scripts": {
-        "build": "tsup && tsc --project tsconfig.build.json --emitDeclarationOnly",
+        "build": "tsup && tsgo --project tsconfig.build.json --emitDeclarationOnly",
         "clean": "rm -rf dist tsconfig.build.tsbuildinfo"
     },
     "type": "module",
