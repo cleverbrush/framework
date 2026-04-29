@@ -1,5 +1,94 @@
 # @cleverbrush/schema
 
+## 4.0.0
+
+### Patch Changes
+
+- 3bfc1e1: Add named projections to `@cleverbrush/knex-schema`.
+
+  **`@cleverbrush/knex-schema`** — new feature
+
+  - `ObjectSchemaBuilder.projection(name, columns)` — define a named column subset on the schema.
+    Two forms are supported:
+    - **String-tuple form**: `.projection('summary', ['id', 'title'] as const)` — the column list
+      is a `readonly string[]` const that TypeScript uses to narrow the query result type.
+    - **Accessor form**: `.projection('detail', t => [t.id, t.title])` — refactor-safe accessor that
+      resolves property names at runtime via the schema's property-descriptor tree.
+  - `SchemaQueryBuilder.projected(name)` — apply a named projection at query time.
+    - Restricts the `SELECT` clause to the registered columns (respecting `hasColumnName()` mappings).
+    - Narrows the TypeScript result type to `Pick<Row, Keys>` for tuple-form projections.
+    - Registered projection names are constrained at the type level — unregistered names are a
+      compile-time error.
+    - Throws at runtime if combined with `.select()`, `.distinct()`, or any aggregate method
+      (`.count()`, `.min()`, etc.) on the same query.
+  - Calling `.projection()` with a name that is already registered on the schema throws immediately.
+
+  **`@cleverbrush/schema`** — internal extension
+
+  - `PROJECTION_BRAND` unique symbol exported from the core extension system.
+  - `FixedMethods` updated with a 4th `TProjections` type parameter that accumulates the
+    name → keys map as `.projection()` calls are chained, enabling `SchemaQueryBuilder` to
+    extract the column list at the type level.
+  - `PropertyDescriptor` / `PropertyDescriptorInner` now accept an optional 4th type parameter
+    `TPropertyKey extends string = string` that carries the property key literal so accessor-form
+    descriptors can propagate their key name through the type system.
+
+- cbdfa69: Add `@cleverbrush/otel` — OpenTelemetry instrumentation for the framework.
+
+  ## `@cleverbrush/otel` (new library)
+
+  End-to-end OpenTelemetry support for `@cleverbrush/server`, `@cleverbrush/orm`,
+  and `@cleverbrush/log`. Ships traces, logs, and runtime metrics over OTLP/HTTP
+  to any compatible backend (ClickStack, Grafana Tempo, Jaeger, …).
+
+  - **`setupOtel(config)`** — bootstraps the Node SDK (traces + logs + metrics)
+    with sensible defaults and a single `shutdown()` hook for graceful exit.
+  - **`tracingMiddleware()`** — `@cleverbrush/server` middleware that opens a
+    `SpanKind.SERVER` span per request, names it from the endpoint metadata
+    (`operationId` or `METHOD route`), tags it with HTTP semantic-convention
+    attributes, and extracts inbound W3C `traceparent` headers.
+  - **`instrumentKnex(knex)`** — wires Knex `query` / `query-response` /
+    `query-error` events into `SpanKind.CLIENT` spans with `db.system.name`,
+    `db.namespace`, `db.operation.name`, and `db.query.text`. Spans are
+    automatically parented under the active request span.
+  - **`otelLogSink()`** — `@cleverbrush/log` sink that emits OTLP log records
+    with severity, body, structured attributes, and exception info.
+  - **`traceEnricher()`** — log enricher that attaches `TraceId` / `SpanId` /
+    `TraceFlags` to every event when a span is active.
+  - **`configureOtel(services)`** — registers `ITracer` and `IMeter` in
+    `@cleverbrush/di`.
+  - **`outboundHttpInstrumentations()` / `runtimeMetrics()`** — opt-in
+    lazy loaders for HTTP / undici / Node runtime metrics auto-instrumentation
+    (declared as optional peer dependencies).
+
+  The `todo-backend` demo is fully wired and ships traces / logs / metrics to
+  a ClickStack container included in `demos/docker-compose.yml`.
+
+  ## `@cleverbrush/log`
+
+  - **`TypedTemplate.template`** — new optional property on the `TypedTemplate<T>`
+    interface. When present, the `Logger` uses it as the raw `{Property}` pattern
+    string for `messageTemplate`, so log events with the same shape are grouped
+    correctly in Seq, ClickStack, and other structured-log UIs. `ParseStringSchemaBuilder`
+    now implements this property automatically.
+  - **`correlationIdMiddleware` / `useLogging`** — `responseHeader` (and the new
+    `UseLoggingOptions.correlationResponseHeader`) now accept `false` to suppress
+    the `X-Correlation-Id` response header entirely. Useful when OTel's
+    `traceparent` / `traceresponse` header already provides traceability and a
+    second correlation header would be redundant.
+  - **`traceEnricher` removed** — the `globalThis.opentelemetry`-based enricher
+    that was included in earlier builds has been removed. Use `traceEnricher`
+    from `@cleverbrush/otel` instead — it reads the active span via
+    `@opentelemetry/api` directly and also captures `TraceFlags`.
+
+  ## `@cleverbrush/schema`
+
+  - **`ParseStringSchemaBuilder.template`** — new read-only getter that returns
+    the human-readable `{Property}` pattern string (e.g.
+    `"Todo created: #{TodoId} \"{Title}\" by user {UserId}"`). This satisfies the
+    `TypedTemplate.template` contract, so schema-parsed log templates are
+    automatically grouped by shape in structured-log UIs.
+
 ## 3.1.0
 
 ## 3.0.1
