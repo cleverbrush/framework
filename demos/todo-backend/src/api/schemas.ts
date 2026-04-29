@@ -21,6 +21,7 @@ export const RegisterBodySchema = object({
 });
 
 export const LoginBodySchema = object({
+    /** The user's email address. */
     email: string().required("email is required").nonempty("email cannot be empty").email("must be a valid email address").describe("The user's email address."),
     password: string().required("password is required").nonempty("password cannot be empty").describe("The user's password.")
 });

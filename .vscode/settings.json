@@ -8,5 +8,6 @@
     "editor.defaultFormatter": "biomejs.biome",
     "[jsonc]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
-    }
+    },
+    "typescript.native-preview.tsdk": "~/projects/framework/node_modules/@typescript/native-preview"
 }
