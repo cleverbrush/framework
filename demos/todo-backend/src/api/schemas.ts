@@ -12,15 +12,17 @@ import {
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export const RegisterBodySchema = object({
-    email: string().describe("The user's email address."),
+    email: string().required("email is required").nonempty("email cannot be empty").email("must be a valid email address").describe("The user's email address."),
     password: string()
-        .minLength(8)
+        .nonempty("password cannot be empty")
+        .required("password is required")
+        .minLength(8, "password must be at least 8 characters")
         .describe("The user's password. Must be at least 8 characters.")
 });
 
 export const LoginBodySchema = object({
-    email: string().describe("The user's email address."),
-    password: string().describe("The user's password.")
+    email: string().required("email is required").nonempty("email cannot be empty").email("must be a valid email address").describe("The user's email address."),
+    password: string().required("password is required").nonempty("password cannot be empty").describe("The user's password.")
 });
 
 export const GoogleAuthBodySchema = object({
@@ -65,9 +67,10 @@ export type UserResponse = InferType<typeof UserResponseSchema>;
 // ── Todo requests ─────────────────────────────────────────────────────────────
 
 export const CreateTodoBodySchema = object({
-    title: string()
-        .minLength(1)
-        .describe('The todo title. Must be at least 1 character.'),
+    title: string().nonempty("title cannot be empty")
+    .required("title is required")
+    .minLength(1, "title must be at least 1 character")
+    .describe('The todo title. Must be at least 1 character.'),
     description: string()
         .optional()
         .describe('Optional longer description of the todo.')
@@ -75,7 +78,7 @@ export const CreateTodoBodySchema = object({
 
 export const UpdateTodoBodySchema = object({
     /** New title for the todo. */
-    title: string().minLength(1).optional().describe('New title for the todo.'),
+    title: string().minLength(1, "title must be at least 1 character").optional().describe('New title for the todo.'),
     /** New description for the todo. */
     description: string().optional().describe('New description for the todo.'),
     /** Whether the todo is completed. */

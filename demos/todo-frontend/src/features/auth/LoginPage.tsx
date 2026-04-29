@@ -69,7 +69,11 @@ export function LoginPage() {
             await login(result.object.email, result.object.password);
             navigate('/todos');
         } catch (e) {
-            setError(e instanceof ApiError ? e.message : 'Login failed. Please try again.');
+            if (e instanceof ApiError && e.status === 401) {
+                setError('Invalid email or password.');
+            } else {
+                setError('Login failed. Please try again.');
+            }
         } finally {
             setLoading(false);
         }
