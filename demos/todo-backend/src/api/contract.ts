@@ -164,9 +164,19 @@ export const api = defineApi({
             route({ id: number().coerce() })`/${t => t.id}/attachment`
         ),
 
-        uploadAttachment: todosResource.post(
-            route({ id: number().coerce() })`/${t => t.id}/attachment`
-        ),
+        uploadAttachment: todosResource
+            .post(
+                route({ id: number().coerce() })`/${t => t.id}/attachment`
+            )
+            .upload({
+                maxFileSize: 10 * 1024 * 1024,
+                allowedMimeTypes: [
+                    'image/*',
+                    'application/pdf',
+                    'text/plain'
+                ]
+            })
+            .body(object({ description: string().optional() })),
 
         listActivity: todosResource
             .get(

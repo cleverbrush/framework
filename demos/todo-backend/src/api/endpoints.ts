@@ -1,5 +1,4 @@
 import { defineWebhook } from '@cleverbrush/server';
-import { number, object, string } from '@cleverbrush/schema';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
 import { DbToken, KnexToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
@@ -194,8 +193,6 @@ export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
 // Features: .upload(), multipart/form-data, FilePart, file persistence in DB
 
 export const UploadAttachmentEndpoint = api.todos.uploadAttachment
-    .upload({ maxFileSize: 10 * 1024 * 1024, allowedMimeTypes: ['image/*', 'application/pdf', 'text/plain'] })
-    .body(object({ description: string().optional() }))
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, knex: KnexToken })
     .responses({ 201: TodoResponseSchema })

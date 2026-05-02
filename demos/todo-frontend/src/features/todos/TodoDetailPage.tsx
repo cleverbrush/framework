@@ -20,7 +20,6 @@ import { ApiError, isTimeoutError, isNetworkError } from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 type TodoEvent = Parameters<typeof client.todos.sendEvent>[0]['body'];
-import { loadToken } from '../../lib/http-client';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 type TodoWithAuthor = Awaited<ReturnType<typeof client.todos.getWithAuthor>>;
@@ -132,23 +131,16 @@ export function TodoDetailPage() {
         setUploadLoading(true);
         setError(null);
         try {
-            const token = loadToken();
-            const fd = new FormData();
-            fd.append('attachment', selectedFile);
-            const resp = await fetch(`/api/todos/${id}/attachment`, {
-                method: 'POST',
-                headers: token ? { Authorization: `Bearer ${token}` } : {},
-                body: fd
+            await client.todos.uploadAttachment({
+                params: { id: Number(id) },
+                body: {},
+                files: { attachment: selectedFile }
             });
-            if (!resp.ok) {
-                const body = await resp.text();
-                throw new Error(body || 'Upload failed');
-            }
             setSelectedFile(null);
             if (fileInputRef.current) fileInputRef.current.value = '';
             await load();
         } catch (e) {
-            setError(e instanceof Error ? e.message : 'Upload failed.');
+            setError(e instanceof ApiError ? e.message : 'Upload failed.');
         } finally {
             setUploadLoading(false);
         }
@@ -156,21 +148,15 @@ export function TodoDetailPage() {
 
     const handleDownload = async () => {
         try {
-            const token = loadToken();
-            const resp = await fetch(`/api/todos/${id}/attachment`, {
-                headers: token ? { Authorization: `Bearer ${token}` } : {}
+            const blob = await client.todos.downloadAttachment.file({
+                params: { id: Number(id) }
             });
-            if (!resp.ok) throw new Error('Download failed');
 
-            // Use Content-Disposition filename if available, else fallback
-            const disposition = resp.headers.get('content-disposition');
-            let filename = `todo-${id}`;
-            if (disposition) {
-                const match = disposition.match(/filename="?(.+?)"?$/);
-                if (match) filename = match[1];
-            }
+            // Extract filename from Content-Disposition header
+            // (not directly available from Blob, use todo attachment name)
+            const filename =
+                data?.todo.attachmentName ?? `todo-${id}-download`;
 
-            const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;

@@ -218,16 +218,21 @@ export function createClient<T extends ApiContract>(
                 }
                 // Append file fields from args.files
                 if (args.files) {
-                    for (const [key, filePart] of Object.entries(
-                        args.files as Record<string, FilePart>
+                    for (const [key, value] of Object.entries(
+                        args.files as Record<string, FilePart | Blob>
                     )) {
-                        fd.append(
-                            key,
-                            new Blob([filePart.buffer], {
-                                type: filePart.mimeType
-                            }),
-                            filePart.filename
-                        );
+                        if (value instanceof Blob) {
+                            fd.append(key, value);
+                        } else {
+                            const fp = value as FilePart;
+                            fd.append(
+                                key,
+                                new Blob([fp.buffer], {
+                                    type: fp.mimeType
+                                }),
+                                fp.filename
+                            );
+                        }
                     }
                 }
                 body = fd;
@@ -413,9 +418,32 @@ export function createClient<T extends ApiContract>(
                             );
                     }
 
-                    // Regular HTTP endpoints return a callable with .stream()
+                    // Regular HTTP endpoints return a callable with .stream() and .file()
                     const call = (args?: any) => execute(ep, args);
                     call.stream = (args?: any) => streamLines(ep, args);
+                    call.file = async (args?: any): Promise<Blob> => {
+                        const {
+                            url,
+                            method,
+                            headers: reqHeaders,
+                            body
+                        } = buildRequest(ep, args);
+                        const init: RequestInit = {
+                            method,
+                            headers: reqHeaders,
+                            body
+                        };
+                        await runBeforeRequest(hooks, url, init);
+                        const response = await composedFetch(url, init);
+                        if (!response.ok) {
+                            if (response.status === 401) onUnauthorized?.();
+                            throw new ApiError(
+                                response.status,
+                                response.statusText || `HTTP ${response.status}`
+                            );
+                        }
+                        return response.blob();
+                    };
                     return call;
                 }
             });

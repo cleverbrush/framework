@@ -66,7 +66,7 @@ type CallArgsParts<
     (TBody extends undefined ? {} : { body: InferSchema<TBody> }) &
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
-    (TUpload extends true ? { files: Record<string, FilePart> } : {});
+    (TUpload extends true ? { files: Record<string, FilePart | Blob> } : {});
 
 /**
  * Extracts the typed request argument shape from an `EndpointBuilder`.
@@ -218,20 +218,20 @@ export interface PerCallOverrides {
  * `AsyncIterable<string>` yielding newline-delimited chunks (e.g. NDJSON).
  * An optional `AbortSignal` can be passed to cancel an in-flight stream.
  */
-export type EndpointCall<E> =
-    EndpointCallArgs<E> extends undefined
-        ? ((args?: PerCallOverrides) => Promise<EndpointResponse<E>>) & {
-              stream: (options?: {
-                  signal?: AbortSignal;
-              }) => AsyncIterable<string>;
-          }
-        : ((
-              args: EndpointCallArgs<E> & PerCallOverrides
-          ) => Promise<EndpointResponse<E>>) & {
-              stream: (
-                  args: EndpointCallArgs<E> & { signal?: AbortSignal }
-              ) => AsyncIterable<string>;
-          };
+export type EndpointCall<E> = (EndpointCallArgs<E> extends undefined
+    ? (args?: PerCallOverrides) => Promise<EndpointResponse<E>>
+    : (
+          args: EndpointCallArgs<E> & PerCallOverrides
+      ) => Promise<EndpointResponse<E>>) & {
+    stream: EndpointCallArgs<E> extends undefined
+        ? (options?: { signal?: AbortSignal }) => AsyncIterable<string>
+        : (
+              args: EndpointCallArgs<E> & { signal?: AbortSignal }
+          ) => AsyncIterable<string>;
+    file: EndpointCallArgs<E> extends undefined
+        ? (args?: PerCallOverrides) => Promise<Blob>
+        : (args: EndpointCallArgs<E> & PerCallOverrides) => Promise<Blob>;
+};
 
 // ---------------------------------------------------------------------------
 // Subscription types
