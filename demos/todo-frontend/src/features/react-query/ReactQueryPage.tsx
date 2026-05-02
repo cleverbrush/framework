@@ -14,7 +14,8 @@ import {
 } from '@radix-ui/themes';
 import { useQueryClient } from '@tanstack/react-query';
 import { isApiError, isWebError } from '@cleverbrush/client';
-import { client } from '../../api/client';
+import { useOptimisticMutation } from '@cleverbrush/client/react';
+import { client, offlineQueueStore } from '../../api/client';
 
 // ── Shared Helpers ──────────────────────────────────────────────────────
 
@@ -210,36 +211,20 @@ function MutationDemo() {
     );
 }
 
-// ── Demo 4: Optimistic Toggle ─────────────────────────────────────────
+// ── Demo 4: Optimistic Toggle (useOptimisticMutation) ─────────────────
 
 function OptimisticToggleDemo() {
-    const queryClient = useQueryClient();
     const { data } = client.todos.list.useQuery();
+    const queryClient = useQueryClient();
 
-    const toggleMutation = client.todos.update.useMutation({
-        onMutate: async (variables: any) => {
-            await queryClient.cancelQueries({
-                queryKey: client.todos.queryKey()
-            });
-            const key = client.todos.list.queryKey();
-            const previous = queryClient.getQueryData(key);
-            queryClient.setQueryData(key, (old: any[]) =>
-                old?.map((t: any) =>
-                    t.id === variables.params.id
-                        ? { ...t, completed: variables.body.completed }
-                        : t
-                )
-            );
-            return { previous };
-        },
-        onError: (_err: unknown, _vars: unknown, context: any) => {
-            if (context?.previous) {
-                queryClient.setQueryData(
-                    client.todos.list.queryKey(),
-                    context.previous
-                );
-            }
-        },
+    const toggleMutation = useOptimisticMutation(client.todos.update, {
+        queryKey: client.todos.list.queryKey(),
+        optimisticUpdate: (oldTodos: any, variables: any) =>
+            (oldTodos ?? []).map((t: any) =>
+                t.id === variables.params.id
+                    ? { ...t, completed: variables.body.completed }
+                    : t
+            ),
         onSettled: () => {
             queryClient.invalidateQueries({
                 queryKey: client.todos.queryKey()
@@ -251,8 +236,8 @@ function OptimisticToggleDemo() {
 
     return (
         <DemoCard
-            title="4. Optimistic Update"
-            description="Toggles a todo's completed status optimistically — the UI updates immediately while the mutation fires in the background."
+            title="4. Optimistic Update (useOptimisticMutation)"
+            description="Toggles a todo's completed status optimistically using the useOptimisticMutation hook — automatic cache snapshot, apply, and rollback."
         >
             {todos.length === 0 ? (
                 <Text size="2" color="gray">
@@ -289,7 +274,7 @@ function OptimisticToggleDemo() {
                 </Flex>
             )}
             <Code size="1" color="gray">
-                onMutate → cancel + setQueryData → onError → rollback
+                {'useOptimisticMutation(client.todos.update, { queryKey, optimisticUpdate })'}
             </Code>
         </DemoCard>
     );
@@ -517,6 +502,112 @@ function ErrorHandlingDemo() {
     );
 }
 
+// ── Demo 10: Offline Queue ─────────────────────────────────────────────
+
+function OfflineQueueDemo() {
+    const [title, setTitle] = useState('');
+    const [isDemoOffline, setIsDemoOffline] = useState(false);
+    const queryClient = useQueryClient();
+
+    const queueCount = offlineQueueStore.queue.length;
+    const isReplaying = offlineQueueStore.isReplaying;
+
+    const toggleOffline = () => {
+        if (isDemoOffline) {
+            setIsDemoOffline(false);
+            offlineQueueStore.isOnline = true;
+            window.dispatchEvent(new Event('online'));
+        } else {
+            setIsDemoOffline(true);
+            offlineQueueStore.isOnline = false;
+            window.dispatchEvent(new Event('offline'));
+        }
+    };
+
+    const createMutation = client.todos.create.useMutation({
+        onSuccess: () => {
+            queryClient.invalidateQueries({
+                queryKey: client.todos.queryKey()
+            });
+            setTitle('');
+        }
+    });
+
+    return (
+        <DemoCard
+            title="10. Offline Queue"
+            description="Simulates offline mode. Mutations made while offline are queued and automatically replayed when connectivity is restored."
+        >
+            <Flex gap="2" align="center">
+                <Button
+                    size="1"
+                    color={isDemoOffline ? 'green' : 'red'}
+                    onClick={toggleOffline}
+                >
+                    {isDemoOffline ? 'Go Online' : 'Go Offline'}
+                </Button>
+                {queueCount > 0 && (
+                    <Badge color="amber">
+                        {queueCount} queued
+                    </Badge>
+                )}
+                {isReplaying && (
+                    <Badge color="blue">
+                        Replaying…
+                    </Badge>
+                )}
+                {isDemoOffline && (
+                    <Badge color="red">Offline</Badge>
+                )}
+            </Flex>
+
+            <Flex gap="2" align="center">
+                <TextField.Root
+                    size="1"
+                    placeholder="New todo title…"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    style={{ flex: 1 }}
+                />
+                <Button
+                    size="1"
+                    disabled={!title.trim() || createMutation.isPending}
+                    onClick={() =>
+                        createMutation.mutate({
+                            body: { title: title.trim() }
+                        })
+                    }
+                >
+                    {createMutation.isPending ? 'Creating…' : 'Create'}
+                </Button>
+            </Flex>
+
+            {isDemoOffline && (
+                <Text size="1" color="amber">
+                    Offline mode — mutations are queued and will replay when
+                    you go back online.
+                </Text>
+            )}
+            {queueCount > 0 && (
+                <Box
+                    p="2"
+                    style={{
+                        background: 'var(--amber-2)',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        fontFamily: 'monospace'
+                    }}
+                >
+                    Queued: {queueCount} mutation(s)
+                </Box>
+            )}
+            <Code size="1" color="gray">
+                offlineQueue() middleware — automatic queue and replay
+            </Code>
+        </DemoCard>
+    );
+}
+
 // ── Page ────────────────────────────────────────────────────────────────
 
 export default function ReactQueryPage() {
@@ -538,6 +629,7 @@ export default function ReactQueryPage() {
                 <PrefetchDemo />
                 <QueryKeyDemo />
                 <ErrorHandlingDemo />
+                <OfflineQueueDemo />
             </Flex>
         </Box>
     );

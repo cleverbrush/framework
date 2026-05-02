@@ -27,6 +27,8 @@
  */
 
 export { createClient } from './createClient.js';
+export type { OptimisticMutationConfig } from './optimisticMutation.js';
+export { useOptimisticMutation } from './optimisticMutation.js';
 export {
     buildGroupQueryKey,
     buildQueryKey,

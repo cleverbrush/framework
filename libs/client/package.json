@@ -71,6 +71,14 @@
             "types": "./dist/batching.d.ts",
             "import": "./dist/batching.js"
         },
+        "./optimistic-update": {
+            "types": "./dist/optimisticUpdate.d.ts",
+            "import": "./dist/optimisticUpdate.js"
+        },
+        "./offline-queue": {
+            "types": "./dist/offlineQueue.d.ts",
+            "import": "./dist/offlineQueue.js"
+        },
         "./react": {
             "types": "./dist/react.d.ts",
             "import": "./dist/react.js"

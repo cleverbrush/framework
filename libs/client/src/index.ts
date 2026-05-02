@@ -24,9 +24,11 @@ export {
     ApiError,
     isApiError,
     isNetworkError,
+    isOfflineError,
     isTimeoutError,
     isWebError,
     NetworkError,
+    OfflineError,
     TimeoutError,
     WebError
 } from './errors.js';

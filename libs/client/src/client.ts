@@ -230,6 +230,10 @@ export function createClient<T extends ApiContract>(
         const perCallOptions: Record<string, unknown> = {};
         if (args?.retry !== undefined) perCallOptions.retry = args.retry;
         if (args?.timeout !== undefined) perCallOptions.timeout = args.timeout;
+        if (args?.optimisticUpdate !== undefined)
+            perCallOptions.optimisticUpdate = args.optimisticUpdate;
+        if (args?.offlineQueue !== undefined)
+            perCallOptions.offlineQueue = args.offlineQueue;
         if (Object.keys(perCallOptions).length > 0) {
             (init as any)[PER_CALL_OPTIONS] = perCallOptions;
         }
