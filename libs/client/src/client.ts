@@ -13,7 +13,7 @@
  * @module
  */
 
-import type { ApiContract } from '@cleverbrush/server/contract';
+import type { ApiContract, FilePart } from '@cleverbrush/server/contract';
 import { ApiError, NetworkError, WebError } from './errors.js';
 import { composeMiddleware, PER_CALL_OPTIONS } from './middleware.js';
 import { buildPath } from './path.js';
@@ -179,7 +179,7 @@ export function createClient<T extends ApiContract>(
         url: string;
         method: string;
         headers: Record<string, string>;
-        body: string | undefined;
+        body: string | FormData | undefined;
     } {
         const meta = getMeta(ep);
         const method = meta.method.toUpperCase();
@@ -202,10 +202,41 @@ export function createClient<T extends ApiContract>(
         }
 
         // -- Body --
-        let body: string | undefined;
+        let body: string | FormData | undefined;
         if (args?.body !== undefined && hasBody(method)) {
-            reqHeaders['Content-Type'] = JSON_CONTENT_TYPE;
-            body = JSON.stringify(args.body);
+            if (meta.fileUpload) {
+                // Build FormData for multipart uploads
+                const fd = new FormData();
+                if (
+                    args.body &&
+                    typeof args.body === 'object' &&
+                    !(args.body instanceof Blob)
+                ) {
+                    for (const [key, val] of Object.entries(args.body)) {
+                        fd.append(key, String(val));
+                    }
+                }
+                // Append file fields from args.files
+                if (args.files) {
+                    for (const [key, filePart] of Object.entries(
+                        args.files as Record<string, FilePart>
+                    )) {
+                        fd.append(
+                            key,
+                            new Blob([filePart.buffer], {
+                                type: filePart.mimeType
+                            }),
+                            filePart.filename
+                        );
+                    }
+                }
+                body = fd;
+                // Let the browser set Content-Type with boundary
+                delete reqHeaders['Content-Type'];
+            } else {
+                reqHeaders['Content-Type'] = JSON_CONTENT_TYPE;
+                body = JSON.stringify(args.body);
+            }
         }
 
         return { url, method, headers: reqHeaders, body };

@@ -1,4 +1,5 @@
 import { ActionResult, BadRequestError, ForbiddenError, type Handler, NotFoundError } from '@cleverbrush/server';
+import type { Knex } from 'knex';
 import { withSpan } from '@cleverbrush/otel';
 import {
     TodoCompleted,
@@ -368,37 +369,42 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
 
 export const downloadAttachmentHandler: Handler<
     typeof DownloadAttachmentEndpoint
-> = async ({ params, principal }, { db }) => {
-    const todo = await db.todos.find(params.id);
+> = async ({ params, principal }, { knex }) => {
+    const row = await (knex as Knex)('todos')
+        .select(
+            'attachment_data',
+            'attachment_name',
+            'attachment_mime_type',
+            'user_id'
+        )
+        .where('id', params.id)
+        .first();
 
-    if (!todo) {
-        return ActionResult.notFound({
-            message: `Todo ${params.id} not found.`
-        });
+    if (!row) {
+        throw new NotFoundError(`Todo ${params.id} not found.`);
     }
 
-    if (principal.role !== 'admin' && todo.userId !== principal.userId) {
-        return ActionResult.forbidden({
-            message: 'You do not have access to this todo.'
-        });
+    if (
+        principal.role !== 'admin' &&
+        (row as Record<string, unknown>).user_id !== principal.userId
+    ) {
+        throw new ForbiddenError('You do not have access to this todo.');
     }
 
-    const mapped = await mapTodo(todo);
-    const text = [
-        `Todo #${mapped.id}`,
-        `Title: ${mapped.title}`,
-        mapped.description ? `Description: ${mapped.description}` : null,
-        `Completed: ${mapped.completed ? 'Yes' : 'No'}`,
-        `Created: ${mapped.createdAt.toISOString()}`,
-        `Updated: ${mapped.updatedAt.toISOString()}`
-    ]
-        .filter(Boolean)
-        .join('\n');
+    if (!(row as Record<string, unknown>).attachment_data) {
+        throw new NotFoundError('No attachment for this todo.');
+    }
+
+    const r = row as {
+        attachment_data: Buffer;
+        attachment_name: string;
+        attachment_mime_type: string;
+    };
 
     return ActionResult.file(
-        Buffer.from(text, 'utf-8'),
-        `todo-${params.id}.txt`,
-        'text/plain'
+        r.attachment_data,
+        r.attachment_name,
+        r.attachment_mime_type
     );
 };
 
@@ -406,7 +412,7 @@ export const downloadAttachmentHandler: Handler<
 
 export const uploadAttachmentHandler: Handler<
     typeof UploadAttachmentEndpoint
-> = async ({ params, principal, files }, { db }) => {
+> = async ({ params, principal, files }, { db, knex }) => {
     const todo = await db.todos.find(params.id);
 
     if (!todo) {
@@ -424,11 +430,31 @@ export const uploadAttachmentHandler: Handler<
         );
     }
 
+    // Persist file in DB — raw knex for bytea column
+    await (knex as Knex)('todos')
+        .where('id', params.id)
+        .update({
+            attachment_data: file.buffer,
+            attachment_name: file.filename,
+            attachment_mime_type: file.mimeType,
+            updated_at: new Date()
+        });
+
+    // Re-fetch the updated todo for the response
+    const updated = await db.todos.find(params.id);
+    if (!updated) throw new NotFoundError(`Todo ${params.id} not found.`);
+
     return ActionResult.created({
-        id: params.id,
-        fileName: file.filename,
-        fileSize: file.size,
-        mimeType: file.mimeType
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        completed: updated.completed,
+        userId: updated.userId,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        attachmentName: updated.attachmentName,
+        attachmentMimeType: updated.attachmentMimeType,
+        attachmentSize: file.size
     });
 };
 

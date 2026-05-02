@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
     Badge,
@@ -45,6 +45,11 @@ export function TodoDetailPage() {
     const [eventCompletedAt, setEventCompletedAt] = useState('');
     const [eventLoading, setEventLoading] = useState(false);
     const [eventResult, setEventResult] = useState<string | null>(null);
+
+    // Attachment upload
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [uploadLoading, setUploadLoading] = useState(false);
 
     // User list for the "assigned" picker
     const [users, setUsers] = useState<Array<{ id: number; email: string }>>([]);
@@ -117,6 +122,38 @@ export function TodoDetailPage() {
         }
     };
 
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        setSelectedFile(file);
+    };
+
+    const handleUpload = async () => {
+        if (!selectedFile || !id) return;
+        setUploadLoading(true);
+        setError(null);
+        try {
+            const token = loadToken();
+            const fd = new FormData();
+            fd.append('attachment', selectedFile);
+            const resp = await fetch(`/api/todos/${id}/attachment`, {
+                method: 'POST',
+                headers: token ? { Authorization: `Bearer ${token}` } : {},
+                body: fd
+            });
+            if (!resp.ok) {
+                const body = await resp.text();
+                throw new Error(body || 'Upload failed');
+            }
+            setSelectedFile(null);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            await load();
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Upload failed.');
+        } finally {
+            setUploadLoading(false);
+        }
+    };
+
     const handleDownload = async () => {
         try {
             const token = loadToken();
@@ -124,11 +161,20 @@ export function TodoDetailPage() {
                 headers: token ? { Authorization: `Bearer ${token}` } : {}
             });
             if (!resp.ok) throw new Error('Download failed');
+
+            // Use Content-Disposition filename if available, else fallback
+            const disposition = resp.headers.get('content-disposition');
+            let filename = `todo-${id}`;
+            if (disposition) {
+                const match = disposition.match(/filename="?(.+?)"?$/);
+                if (match) filename = match[1];
+            }
+
             const blob = await resp.blob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = `todo-${id}.txt`;
+            a.download = filename;
             a.click();
             URL.revokeObjectURL(url);
         } catch {
@@ -250,8 +296,64 @@ export function TodoDetailPage() {
                         </Text>
                     </Card>
 
+                    {/* Attachment upload */}
+                    <Card mb="4">
+                        <Heading size="3" mb="3">Attachment</Heading>
+                        {todo?.attachmentName ? (
+                            <Box mb="3">
+                                <Text size="2" style={{ display: 'block' }}>
+                                    <strong>{todo.attachmentName}</strong>
+                                </Text>
+                                <Text size="1" color="gray" style={{ display: 'block' }}>
+                                    {todo.attachmentMimeType}
+                                    {todo.attachmentSize
+                                        ? ` — ${(todo.attachmentSize / 1024).toFixed(1)} KB`
+                                        : ''}
+                                </Text>
+                            </Box>
+                        ) : (
+                            <Text size="2" color="gray" mb="3" style={{ display: 'block' }}>
+                                No attachment uploaded.
+                            </Text>
+                        )}
+
+                        <input
+                            type="file"
+                            ref={fileInputRef}
+                            style={{ display: 'none' }}
+                            onChange={handleFileSelect}
+                        />
+                        <Flex gap="2" direction="column">
+                            <Button
+                                variant="soft"
+                                onClick={() => fileInputRef.current?.click()}
+                                size="1"
+                            >
+                                📁 Choose File
+                            </Button>
+                            {selectedFile && (
+                                <Text size="1" color="gray" style={{ display: 'block' }}>
+                                    {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
+                                </Text>
+                            )}
+                            {selectedFile && (
+                                <Button
+                                    onClick={handleUpload}
+                                    loading={uploadLoading}
+                                    size="1"
+                                >
+                                    Upload
+                                </Button>
+                            )}
+                            {todo?.attachmentName && (
+                                <Button variant="soft" onClick={handleDownload} size="1">
+                                    📎 Download
+                                </Button>
+                            )}
+                        </Flex>
+                    </Card>
+
                     <Flex direction="column" gap="2">
-                        <Button variant="soft" onClick={handleDownload}>📎 Download .txt</Button>
                         <Button variant="soft" color="red" onClick={() => setDeleteOpen(true)}>
                             🗑 Delete Todo
                         </Button>

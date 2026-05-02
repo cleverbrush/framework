@@ -3,13 +3,13 @@ import { number, object, string } from '@cleverbrush/schema';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
 import { DbToken, KnexToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
+import { TodoResponseSchema } from './schemas.js';
 import { api } from './contract.js';
 import {
     type ImportTodosBody,
     ImportTodosBodySchema,
     PrincipalSchema,
     TodoNotificationPayloadSchema,
-    UploadAttachmentResponseSchema,
     WebhookAckSchema
 } from './schemas.js';
 
@@ -181,30 +181,30 @@ export const ExportTodosEndpoint = api.todos.exportCsv
 
 export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
     .authorize(PrincipalSchema)
-    .inject({ db: DbToken })
-    .producesFile('text/plain', 'A plain-text summary of the todo.')
+    .inject({ knex: KnexToken })
     .summary('Download todo attachment')
     .description(
-        'Downloads a plain-text summary of the todo as a file attachment. ' +
-            'Demonstrates `.producesFile()` and `ActionResult.file()`.'
+        'Downloads the uploaded file attachment for a todo. ' +
+            'Returns the original file with its original content type.'
     )
     .tags('todos')
     .operationId('downloadTodoAttachment');
 
 // ── Upload attachment ─────────────────────────────────────────────────────────
-// Features: .upload(), multipart/form-data, FilePart
+// Features: .upload(), multipart/form-data, FilePart, file persistence in DB
 
 export const UploadAttachmentEndpoint = api.todos.uploadAttachment
     .upload({ maxFileSize: 10 * 1024 * 1024, allowedMimeTypes: ['image/*', 'application/pdf', 'text/plain'] })
     .body(object({ description: string().optional() }))
     .authorize(PrincipalSchema)
-    .inject({ db: DbToken })
-    .responses({ 201: UploadAttachmentResponseSchema })
+    .inject({ db: DbToken, knex: KnexToken })
+    .responses({ 201: TodoResponseSchema })
     .summary('Upload todo attachment')
     .description(
         'Uploads a file attachment for a todo. ' +
             'Supports images, PDFs, and plain text files up to 10 MB. ' +
-            'Demonstrates `.upload()` and multipart/form-data handling.'
+            'The file is stored in the database and can be downloaded via ' +
+            'the download attachment endpoint.'
     )
     .tags('todos')
     .operationId('uploadTodoAttachment');

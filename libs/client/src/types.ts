@@ -10,9 +10,15 @@
 import type { InferType, SchemaBuilder } from '@cleverbrush/schema';
 import type {
     EndpointBuilder,
+    FilePart,
     ApiContract as ServerApiContract,
     SubscriptionBuilder
 } from '@cleverbrush/server/contract';
+
+// Re-export types shared between server and client
+/** @see {@link FilePart} from `@cleverbrush/server` */
+export type { FilePart };
+
 import type { WebError } from './errors.js';
 import type { Middleware } from './middleware.js';
 
@@ -50,11 +56,17 @@ type InferSchema<T> =
  * Assembles the parts of the request argument object conditionally.
  * Only keys that carry data are included.
  */
-type CallArgsParts<TParams, TBody, TQuery, THeaders> =
-    (HasKeys<TParams> extends true ? { params: TParams } : {}) &
-        (TBody extends undefined ? {} : { body: InferSchema<TBody> }) &
-        (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
-        (HasKeys<THeaders> extends true ? { headers: THeaders } : {});
+type CallArgsParts<
+    TParams,
+    TBody,
+    TQuery,
+    THeaders,
+    TUpload extends boolean
+> = (HasKeys<TParams> extends true ? { params: TParams } : {}) &
+    (TBody extends undefined ? {} : { body: InferSchema<TBody> }) &
+    (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
+    (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
+    (TUpload extends true ? { files: Record<string, FilePart> } : {});
 
 /**
  * Extracts the typed request argument shape from an `EndpointBuilder`.
@@ -95,12 +107,13 @@ export type EndpointCallArgs<E> =
         any, // TPrincipal
         any, // TRoles
         any, // TResponse
-        any // TResponses
+        any, // TResponses
+        infer TUpload // TUpload
     >
         ? HasKeys<
-              Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders>>
+              Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders, TUpload>>
           > extends true
-            ? Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders>>
+            ? Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders, TUpload>>
             : undefined
         : never;
 
