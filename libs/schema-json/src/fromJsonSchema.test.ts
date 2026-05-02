@@ -319,15 +319,16 @@ test('fromJsonSchema - 28: anyOf accepts either type', () => {
     expect(valid(schema, true)).toBe(false);
 });
 
-test('fromJsonSchema - 28b: allOf falls back to any() (not supported)', () => {
+test('fromJsonSchema - 28b: allOf maps to intersection', () => {
     const schema = fromJsonSchema({
-        allOf: [{ type: 'string' }, { minLength: 1 }]
+        allOf: [
+            { type: 'string', minLength: 1 },
+            { type: 'string', maxLength: 10 }
+        ]
     } as const);
-    // allOf is not supported; falls back to any() which accepts anything
-    expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<unknown>();
     expect(valid(schema, 'hello')).toBe(true);
-    expect(valid(schema, 42)).toBe(true);
-    expect(valid(schema, null)).toBe(false);
+    expect(valid(schema, '')).toBe(false);
+    expect(valid(schema, 'a'.repeat(11))).toBe(false);
 });
 
 // ---------------------------------------------------------------------------
