@@ -1,4 +1,4 @@
-import { ActionResult, type Handler } from '@cleverbrush/server';
+import { ActionResult, BadRequestError, ForbiddenError, type Handler, NotFoundError } from '@cleverbrush/server';
 import { withSpan } from '@cleverbrush/otel';
 import {
     TodoCompleted,
@@ -23,6 +23,7 @@ import type {
     ListAllActivityEndpoint,
     ListTodoActivityEndpoint,
     ListTodosEndpoint,
+    UploadAttachmentEndpoint,
     SendTodoEventEndpoint,
     UpdateTodoEndpoint
 } from '../endpoints.js';
@@ -399,6 +400,36 @@ export const downloadAttachmentHandler: Handler<
         `todo-${params.id}.txt`,
         'text/plain'
     );
+};
+
+// ── Upload todo attachment ────────────────────────────────────────────────────
+
+export const uploadAttachmentHandler: Handler<
+    typeof UploadAttachmentEndpoint
+> = async ({ params, principal, files }, { db }) => {
+    const todo = await db.todos.find(params.id);
+
+    if (!todo) {
+        throw new NotFoundError(`Todo ${params.id} not found.`);
+    }
+
+    if (principal.role !== 'admin' && todo.userId !== principal.userId) {
+        throw new ForbiddenError('You do not have access to this todo.');
+    }
+
+    const file = files['attachment'];
+    if (!file) {
+        throw new BadRequestError(
+            'No file uploaded. Use field name "attachment".'
+        );
+    }
+
+    return ActionResult.created({
+        id: params.id,
+        fileName: file.filename,
+        fileSize: file.size,
+        mimeType: file.mimeType
+    });
 };
 
 // ── Bulk import todos ─────────────────────────────────────────────────────────

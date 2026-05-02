@@ -318,4 +318,13 @@ export const TodoActivityResponseSchema = union(TodoActivityAssignedResponseSche
     .or(TodoActivityCompletedResponseSchema)
     .schemaName('TodoActivityResponse');
 
+// ── Attachment upload response ─────────────────────────────────────────────────
+
+export const UploadAttachmentResponseSchema = object({
+    id: number().describe('Unique identifier of the todo.'),
+    fileName: string().describe('Name of the uploaded file.'),
+    fileSize: number().describe('Size of the uploaded file in bytes.'),
+    mimeType: string().describe('MIME type of the uploaded file.')
+}).schemaName('UploadAttachmentResponse');
+
 export type TodoActivityResponse = InferType<typeof TodoActivityResponseSchema>;

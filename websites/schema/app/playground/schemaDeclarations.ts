@@ -1545,6 +1545,131 @@ export declare function generic<TFn extends (...args: any[]) => SchemaBuilder<an
 export declare function generic<TFn extends (...args: any[]) => SchemaBuilder<any, any, any, any, any>>(defaults: readonly any[], templateFn: TFn): GenericSchemaBuilder<TFn, true, false, undefined, false, {}>;
 export {};
 `,
+    "file:///node_modules/@cleverbrush/schema/builders/IntersectionSchemaBuilder.d.ts": `import { type BRAND, type InferType, SchemaBuilder, type ValidationContext, type ValidationResult } from './SchemaBuilder.js';
+type IntersectionSchemaBuilderCreateProps<TLeft extends SchemaBuilder<any, any, any, any, any>, TRight extends SchemaBuilder<any, any, any, any, any>, R extends boolean = true> = Partial<ReturnType<IntersectionSchemaBuilder<TLeft, TRight, R>['introspect']>>;
+type SchemaIntersection<TLeft extends SchemaBuilder<any, any, any, any, any>, TRight extends SchemaBuilder<any, any, any, any, any>> = InferType<TLeft> & InferType<TRight>;
+export type IntersectionSchemaValidationResult<T> = ValidationResult<T>;
+export declare class IntersectionSchemaBuilder<TLeft extends SchemaBuilder<any, any, any, any, any>, TRight extends SchemaBuilder<any, any, any, any, any>, TRequired extends boolean = true, TNullable extends boolean = false, TExplicitType = undefined, THasDefault extends boolean = false, TExtensions = {}> extends SchemaBuilder<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType, TRequired, TNullable, THasDefault, TExtensions> {
+    #private;
+    /**
+     * @hidden
+     */
+    static create(props: IntersectionSchemaBuilderCreateProps<any, any>): IntersectionSchemaBuilder<any, any, true, false, undefined, false, {}>;
+    protected constructor(props: IntersectionSchemaBuilderCreateProps<TLeft, TRight, TRequired>);
+    introspect(): {
+        left: TLeft;
+        right: TRight;
+        type: string;
+        isRequired: boolean;
+        isNullable: boolean;
+        isReadonly: boolean;
+        preprocessors: readonly import("./SchemaBuilder.js").PreprocessorEntry<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType>[];
+        validators: readonly import("./SchemaBuilder.js").ValidatorEntry<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType>[];
+        requiredValidationErrorMessageProvider: import("./SchemaBuilder.js").ValidationErrorMessageProvider<SchemaBuilder<any, any, any, any, any>>;
+        extensions: {
+            [x: string]: unknown;
+        };
+        hasDefault: boolean;
+        defaultValue: (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
+        description: string | undefined;
+        schemaName: string | undefined;
+        hasCatch: boolean;
+        catchValue: (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | undefined;
+        example: unknown;
+    };
+    /**
+     * @override
+     */
+    protected get isNullRequiredViolation(): boolean;
+    /**
+     * @inheritdoc
+     */
+    hasType<T>(_notUsed?: T): IntersectionSchemaBuilder<TLeft, TRight, true, TNullable, T, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    clearHasType(): IntersectionSchemaBuilder<TLeft, TRight, TRequired, TNullable, undefined, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @inheritdoc
+     */
+    validate(object: TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType, context?: ValidationContext): IntersectionSchemaValidationResult<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType>;
+    /**
+     * @inheritdoc
+     */
+    validateAsync(object: TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType, context?: ValidationContext): Promise<IntersectionSchemaValidationResult<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType>>;
+    /**
+     * Performs synchronous validation.
+     * Validates left schema first, then right schema.
+     * Both must pass for the intersection to be valid.
+     */
+    protected _validate(object: TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType, context?: ValidationContext): IntersectionSchemaValidationResult<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType>;
+    /**
+     * Performs async validation.
+     */
+    protected _validateAsync(object: TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType, context?: ValidationContext): Promise<IntersectionSchemaValidationResult<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType>>;
+    protected createFromProps<TL extends SchemaBuilder<any, any, any, any, any>, TR extends SchemaBuilder<any, any, any, any, any>, TReq extends boolean>(props: IntersectionSchemaBuilderCreateProps<TL, TR, TReq>): this;
+    /**
+     * @hidden
+     */
+    required(errorMessage?: any): IntersectionSchemaBuilder<TLeft, TRight, true, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    optional(): IntersectionSchemaBuilder<TLeft, TRight, false, TNullable, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    default(value: (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) | (() => TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType)): IntersectionSchemaBuilder<TLeft, TRight, true, TNullable, TExplicitType, true, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    clearDefault(): IntersectionSchemaBuilder<TLeft, TRight, TRequired, TNullable, TExplicitType, false, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    brand<TBrand extends string | symbol>(_name?: TBrand): IntersectionSchemaBuilder<TLeft, TRight, TRequired, TNullable, (TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType) & {
+        readonly [K in BRAND]: TBrand;
+    }, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    readonly(): IntersectionSchemaBuilder<TLeft, TRight, TRequired, TNullable, Readonly<TExplicitType extends undefined ? SchemaIntersection<TLeft, TRight> : TExplicitType>, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    nullable(): IntersectionSchemaBuilder<TLeft, TRight, TRequired, true, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * @hidden
+     */
+    notNullable(): IntersectionSchemaBuilder<TLeft, TRight, TRequired, false, TExplicitType, THasDefault, TExtensions> & TExtensions;
+    /**
+     * Gets the left side of this intersection.
+     */
+    get leftSchema(): TLeft;
+    /**
+     * Gets the right side of this intersection.
+     */
+    get rightSchema(): TRight;
+}
+/**
+ * Creates an intersection schema.
+ * The resulting schema validates that the input satisfies both \`left\` and \`right\` schemas.
+ *
+ * @example
+ * \`\`\`ts
+ * const schema = intersection(
+ *     object({ name: string() }),
+ *     object({ age: number() })
+ * );
+ * // InferType<typeof schema> === { name: string } & { age: number }
+ * \`\`\`
+ *
+ * @param left - first schema
+ * @param right - second schema
+ */
+export declare const intersection: <TLeft extends SchemaBuilder<any, any, any, any, any>, TRight extends SchemaBuilder<any, any, any, any, any>>(left: TLeft, right: TRight) => IntersectionSchemaBuilder<TLeft, TRight>;
+export {};
+`,
     "file:///node_modules/@cleverbrush/schema/builders/LazySchemaBuilder.d.ts": `import { type BRAND, SchemaBuilder, type ValidationContext, type ValidationErrorMessageProvider, type ValidationResult } from './SchemaBuilder.js';
 type LazySchemaBuilderCreateProps<R extends boolean = true> = Partial<ReturnType<LazySchemaBuilder<any, R>['introspect']>>;
 /**
@@ -2960,6 +3085,15 @@ export declare class ParseStringSchemaBuilder<TResult = any, TRequired extends b
      */
     static create(props: ParseStringSchemaBuilderCreateProps): ParseStringSchemaBuilder<any, true, false, false, {}>;
     protected constructor(props: ParseStringSchemaBuilderCreateProps);
+    /**
+     * The human-readable message template pattern with \`{property}\` holes,
+     * e.g. \`"Todo created: #{TodoId} \\"{Title}\\" by user {UserId}"\`.
+     *
+     * Useful for structured logging — pass this as the log \`messageTemplate\`
+     * so events with the same shape can be grouped, and pass
+     * \`serialize(params)\` as the rendered message.
+     */
+    get template(): string;
     /**
      * Return a snapshot of this builder's configuration.
      *
@@ -5770,8 +5904,9 @@ type MergeExtensionMethods<TExts extends readonly ExtensionDescriptor<any>[], TT
     ...infer TRest extends readonly ExtensionDescriptor<any>[]
 ] ? ExtractMethods<TFirst, TType> & MergeExtensionMethods<TRest, TType> : {};
 /**
- * Unique symbol used by {@link FixedMethods} to detect extension methods whose
- * first-argument literal should be accumulated in the return type.
+ * Unique string-literal brand key used by {@link FixedMethods} to detect
+ * extension methods whose first-argument literal should be accumulated in the
+ * return type.
  *
  * Declare the return type of any extension method as
  * \`this & { readonly [METHOD_LITERAL_BRAND]?: N }\` (where \`N extends string\`)

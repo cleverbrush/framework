@@ -7,6 +7,7 @@ import type {
     AuthenticationConfig,
     EndpointMetadata,
     EndpointRegistration,
+    UploadOptions,
     WebhookDefinition
 } from '@cleverbrush/server';
 import { resolvePath } from './pathUtils.js';
@@ -167,22 +168,34 @@ function buildRequestBody(
     examples?: Record<
         string,
         { summary?: string; description?: string; value: unknown }
-    > | null
+    > | null,
+    fileUpload?: UploadOptions | null
 ): Record<string, unknown> {
-    const jsonSchema = convertSchema(bodySchema, registry);
     const bodyInfo = bodySchema.introspect() as any;
-    const mediaType: Record<string, unknown> = { schema: jsonSchema };
-    if (example != null) {
-        mediaType['example'] = example;
-    } else if (examples != null) {
-        mediaType['examples'] = examples;
-    }
     const body: Record<string, unknown> = {
-        required: bodyInfo.isRequired !== false,
-        content: {
-            'application/json': mediaType
-        }
+        required: bodyInfo.isRequired !== false
     };
+
+    // When file uploads are enabled, emit multipart/form-data
+    if (fileUpload) {
+        const jsonSchema = convertSchema(bodySchema, registry);
+        const mediaType: Record<string, unknown> = { schema: jsonSchema };
+        body['content'] = {
+            'multipart/form-data': mediaType
+        };
+    } else {
+        const jsonSchema = convertSchema(bodySchema, registry);
+        const mediaType: Record<string, unknown> = { schema: jsonSchema };
+        if (example != null) {
+            mediaType['example'] = example;
+        } else if (examples != null) {
+            mediaType['examples'] = examples;
+        }
+        body['content'] = {
+            'application/json': mediaType
+        };
+    }
+
     if (typeof bodyInfo.description === 'string' && bodyInfo.description !== '')
         body['description'] = bodyInfo.description;
     return body;
@@ -521,7 +534,8 @@ function buildOperation(
             meta.bodySchema,
             registry,
             meta.example,
-            meta.examples
+            meta.examples,
+            meta.fileUpload
         );
     }
 

@@ -1,4 +1,5 @@
 import { defineWebhook } from '@cleverbrush/server';
+import { number, object, string } from '@cleverbrush/schema';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
 import { DbToken, KnexToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
@@ -8,6 +9,7 @@ import {
     ImportTodosBodySchema,
     PrincipalSchema,
     TodoNotificationPayloadSchema,
+    UploadAttachmentResponseSchema,
     WebhookAckSchema
 } from './schemas.js';
 
@@ -188,6 +190,24 @@ export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
     )
     .tags('todos')
     .operationId('downloadTodoAttachment');
+
+// ── Upload attachment ─────────────────────────────────────────────────────────
+// Features: .upload(), multipart/form-data, FilePart
+
+export const UploadAttachmentEndpoint = api.todos.uploadAttachment
+    .upload({ maxFileSize: 10 * 1024 * 1024, allowedMimeTypes: ['image/*', 'application/pdf', 'text/plain'] })
+    .body(object({ description: string().optional() }))
+    .authorize(PrincipalSchema)
+    .inject({ db: DbToken })
+    .responses({ 201: UploadAttachmentResponseSchema })
+    .summary('Upload todo attachment')
+    .description(
+        'Uploads a file attachment for a todo. ' +
+            'Supports images, PDFs, and plain text files up to 10 MB. ' +
+            'Demonstrates `.upload()` and multipart/form-data handling.'
+    )
+    .tags('todos')
+    .operationId('uploadTodoAttachment');
 
 // ── Import todos ──────────────────────────────────────────────────────────────
 // Features: .example(), .examples(), .headers(), ActionResult.json(), ActionResult.accepted()
@@ -391,6 +411,7 @@ export const endpoints = {
         sendEvent: SendTodoEventEndpoint,
         exportCsv: ExportTodosEndpoint,
         downloadAttachment: DownloadAttachmentEndpoint,
+        uploadAttachment: UploadAttachmentEndpoint,
         importBulk: ImportTodosEndpoint,
         legacyReplace: LegacyReplaceTodoEndpoint,
         complete: CompleteTodoEndpoint,

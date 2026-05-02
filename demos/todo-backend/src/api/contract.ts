@@ -164,6 +164,10 @@ export const api = defineApi({
             route({ id: number().coerce() })`/${t => t.id}/attachment`
         ),
 
+        uploadAttachment: todosResource.post(
+            route({ id: number().coerce() })`/${t => t.id}/attachment`
+        ),
+
         listActivity: todosResource
             .get(
                 route({ id: number().coerce() })`/${t => t.id}/activity`

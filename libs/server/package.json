@@ -11,6 +11,7 @@
         "ws": "^8.20.0"
     },
     "devDependencies": {
+        "@types/busboy": "1.5.4",
         "@types/ws": "^8.18.1"
     },
     "description": "Schema-first HTTP server framework — schema-driven controllers, DI, auto-validation, RFC 9457 errors",
