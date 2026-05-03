@@ -62,7 +62,25 @@ export const client = createClient(api, {
         retry({ limit: 2, retryOnTimeout: true }),
         timeout({ timeout: 10_000 }),
         dedupe(),
-        throttlingCache({ throttle: 2000 }),
+        throttlingCache({
+            throttle: 2000,
+            invalidate: (url, init) => {
+                if (
+                    (init.method ?? 'GET').toUpperCase() !==
+                    'GET'
+                ) {
+                    // Strip trailing resource ID(s) to derive
+                    // the collection URL, e.g. PATCH /api/todos/1
+                    // invalidates GET@/api/todos
+                    const collectionUrl = url.replace(
+                        /\/\d+(\/.*)?$/,
+                        ''
+                    );
+                    return `GET@${collectionUrl}`;
+                }
+                return null;
+            }
+        }),
         batching({ maxSize: 10, windowMs: 10 }),
         optimisticUpdate()
     ]

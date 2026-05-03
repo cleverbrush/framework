@@ -2961,6 +2961,15 @@ export declare class ParseStringSchemaBuilder<TResult = any, TRequired extends b
     static create(props: ParseStringSchemaBuilderCreateProps): ParseStringSchemaBuilder<any, true, false, false, {}>;
     protected constructor(props: ParseStringSchemaBuilderCreateProps);
     /**
+     * The human-readable message template pattern with \`{property}\` holes,
+     * e.g. \`"Todo created: #{TodoId} \\"{Title}\\" by user {UserId}"\`.
+     *
+     * Useful for structured logging — pass this as the log \`messageTemplate\`
+     * so events with the same shape can be grouped, and pass
+     * \`serialize(params)\` as the rendered message.
+     */
+    get template(): string;
+    /**
      * Return a snapshot of this builder's configuration.
      *
      * Includes all base-class fields plus:
@@ -5770,8 +5779,9 @@ type MergeExtensionMethods<TExts extends readonly ExtensionDescriptor<any>[], TT
     ...infer TRest extends readonly ExtensionDescriptor<any>[]
 ] ? ExtractMethods<TFirst, TType> & MergeExtensionMethods<TRest, TType> : {};
 /**
- * Unique symbol used by {@link FixedMethods} to detect extension methods whose
- * first-argument literal should be accumulated in the return type.
+ * Unique string-literal brand key used by {@link FixedMethods} to detect
+ * extension methods whose first-argument literal should be accumulated in the
+ * return type.
  *
  * Declare the return type of any extension method as
  * \`this & { readonly [METHOD_LITERAL_BRAND]?: N }\` (where \`N extends string\`)
