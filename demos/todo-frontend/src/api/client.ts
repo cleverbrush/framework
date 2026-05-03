@@ -64,19 +64,9 @@ export const client = createClient(api, {
         dedupe(),
         throttlingCache({
             throttle: 2000,
-            invalidate: (url, init) => {
-                if (
-                    (init.method ?? 'GET').toUpperCase() !==
-                    'GET'
-                ) {
-                    // Strip trailing resource ID(s) to derive
-                    // the collection URL, e.g. PATCH /api/todos/1
-                    // invalidates GET@/api/todos
-                    const collectionUrl = url.replace(
-                        /\/\d+(\/.*)?$/,
-                        ''
-                    );
-                    return `GET@${collectionUrl}`;
+            invalidate: (_url, _init, meta) => {
+                if (meta && meta.method !== 'GET') {
+                    return `GET@${meta.collectionPath}`;
                 }
                 return null;
             }

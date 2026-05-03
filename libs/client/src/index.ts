@@ -32,7 +32,7 @@ export {
     TimeoutError,
     WebError
 } from './errors.js';
-export type { FetchLike, Middleware } from './middleware.js';
+export type { EndpointMeta, FetchLike, Middleware } from './middleware.js';
 export {
     composeMiddleware,
     getPerCallOptions,

@@ -212,7 +212,12 @@ export function createClient<T extends ApiContract>(
     }
 
     // The actual fetch logic, shared by every endpoint proxy method.
-    async function execute(ep: any, args: any): Promise<any> {
+    async function execute(
+        ep: any,
+        args: any,
+        groupName?: string,
+        endpointName?: string
+    ): Promise<any> {
         const {
             url,
             method,
@@ -236,6 +241,54 @@ export function createClient<T extends ApiContract>(
             perCallOptions.offlineQueue = args.offlineQueue;
         if (Object.keys(perCallOptions).length > 0) {
             (init as any)[PER_CALL_OPTIONS] = perCallOptions;
+        }
+
+        // Attach endpoint metadata for middleware introspection
+        // (e.g. throttlingCache cache invalidation callbacks).
+        if (groupName && endpointName) {
+            const meta = getMeta(ep);
+            const tpl = meta.pathTemplate;
+
+            let suffix = '';
+            if (typeof tpl === 'string') {
+                suffix = tpl;
+            } else if (tpl && typeof (tpl as any).introspect === 'function') {
+                suffix =
+                    (tpl as any).introspect().templateDefinition.literals[0] ??
+                    '';
+            }
+            const collectionPath =
+                (meta.basePath + suffix).replace(/\/$/, '') || '/';
+
+            let pathParamNames: string[] = [];
+            if (
+                tpl &&
+                typeof tpl !== 'string' &&
+                typeof (tpl as any).introspect === 'function'
+            ) {
+                pathParamNames = (tpl as any)
+                    .introspect()
+                    .templateDefinition.segments.map((s: any) => s.path);
+            }
+
+            const epMeta: Record<string, unknown> = {
+                group: groupName,
+                endpoint: endpointName,
+                method: meta.method,
+                path: ep.path as string,
+                basePath: meta.basePath,
+                collectionPath,
+                pathParamNames,
+                params: args?.params ?? ({} as Record<string, unknown>),
+                body: args?.body,
+                query: args?.query ?? ({} as Record<string, unknown>),
+                operationId: meta.operationId ?? null,
+                tags: meta.tags ?? []
+            };
+
+            if (!(init as any).__endpointMeta) {
+                (init as any).__endpointMeta = epMeta;
+            }
         }
 
         // -- beforeRequest hooks --
@@ -387,7 +440,8 @@ export function createClient<T extends ApiContract>(
                     }
 
                     // Regular HTTP endpoints return a callable with .stream()
-                    const call = (args?: any) => execute(ep, args);
+                    const call = (args?: any) =>
+                        execute(ep, args, groupName, endpointName);
                     call.stream = (args?: any) => streamLines(ep, args);
                     return call;
                 }

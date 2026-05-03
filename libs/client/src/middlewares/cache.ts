@@ -18,7 +18,7 @@
  * @module
  */
 
-import type { Middleware } from '../middleware.js';
+import type { EndpointMeta, Middleware } from '../middleware.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -61,8 +61,15 @@ export interface CacheOptions {
      * Return `null` to skip invalidation.
      *
      * By default, mutating requests do not invalidate the cache.
+     *
+     * The `meta` parameter carries endpoint metadata (group, endpoint,
+     * method, path, params, body, query, etc.) provided by the client proxy.
      */
-    invalidate?: (url: string, init: RequestInit) => string | null;
+    invalidate?: (
+        url: string,
+        init: RequestInit,
+        meta?: EndpointMeta
+    ) => string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,8 +113,9 @@ const DEFAULT_CONDITION = (response: Response) => response.ok;
  * const client = createClient(api, {
  *     middlewares: [throttlingCache({
  *         throttle: 2000,
- *         invalidate: (url, init) => {
- *             if (init.method !== 'GET') return `GET@${url}`;
+ *         invalidate: (_url, _init, meta) => {
+ *             if (meta && meta.method !== 'GET')
+ *                 return `GET@${meta.collectionPath}`;
  *             return null;
  *         },
  *     })],
@@ -128,7 +136,10 @@ export function throttlingCache(options: CacheOptions = {}): Middleware {
     return next => (url, init) => {
         // Handle cache invalidation for mutating requests.
         if (invalidate) {
-            const invalidateKey = invalidate(url, init);
+            const meta = (init as any).__endpointMeta as
+                | EndpointMeta
+                | undefined;
+            const invalidateKey = invalidate(url, init, meta);
             if (invalidateKey !== null && invalidateKey !== undefined) {
                 cache.delete(invalidateKey);
             }
