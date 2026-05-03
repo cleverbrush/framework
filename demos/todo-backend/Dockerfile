@@ -5,7 +5,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Copy root workspace manifest for npm workspaces resolution
-COPY package.json package-lock.json* turbo.json tsconfig.build.json ./
+COPY package.json package-lock.json* turbo.json tsconfig.json tsconfig.build.json ./
 
 # Copy all workspace package.json files for dependency resolution
 COPY libs/async/package.json ./libs/async/
