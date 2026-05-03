@@ -215,7 +215,6 @@ function MutationDemo() {
 
 function OptimisticToggleDemo() {
     const { data } = client.todos.list.useQuery();
-    const queryClient = useQueryClient();
 
     const toggleMutation = useOptimisticMutation(client.todos.update, {
         queryKey: client.todos.list.queryKey(),
@@ -224,12 +223,7 @@ function OptimisticToggleDemo() {
                 t.id === variables.params.id
                     ? { ...t, completed: variables.body.completed }
                     : t
-            ),
-        onSettled: () => {
-            queryClient.invalidateQueries({
-                queryKey: client.todos.queryKey()
-            });
-        }
+            )
     });
 
     const todos = (data ?? []).slice(0, 5);

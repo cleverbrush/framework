@@ -3,6 +3,7 @@ import {
     useMutation,
     useQueryClient
 } from '@tanstack/react-query';
+import { useRef } from 'react';
 import type { WebError } from '../errors.js';
 
 export interface OptimisticMutationConfig<TData, TArgs> {
@@ -24,10 +25,12 @@ export function useOptimisticMutation<TData, TArgs>(
     const queryClient = useQueryClient();
     const { queryKey, optimisticUpdate, onSuccess, onError, onSettled } =
         config;
+    const pendingCount = useRef(0);
 
     return useMutation<TData, WebError, TArgs>({
         mutationFn,
         onMutate: async (args: TArgs) => {
+            pendingCount.current++;
             await queryClient.cancelQueries({ queryKey });
             const previous = queryClient.getQueryData<TData>(queryKey);
             queryClient.setQueryData<TData>(queryKey, (old: unknown) =>
@@ -50,7 +53,10 @@ export function useOptimisticMutation<TData, TArgs>(
             error: WebError | null,
             args: TArgs
         ) => {
-            queryClient.invalidateQueries({ queryKey });
+            pendingCount.current--;
+            if (pendingCount.current === 0) {
+                queryClient.invalidateQueries({ queryKey });
+            }
             onSettled?.(data, error, args);
         }
     });
