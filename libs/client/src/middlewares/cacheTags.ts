@@ -150,6 +150,7 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
 
         // -- Invalidation on mutating requests --
         if (isMutating(method) && tags && tags.length > 0) {
+            console.log('[cacheTags] INVALIDATING for', method, url, 'tags:', tags.map(t => t.name), 'cache size:', cache.size);
             const root: TagRoot = {
                 params: (meta?.params as Record<string, unknown>) ?? {},
                 body: meta?.body,
