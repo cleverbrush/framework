@@ -82,7 +82,10 @@ export const api = defineApi({
         list: todosResource
             .get()
             .query(TodoListQuerySchema)
-            .cacheTag('todo-list')
+            .cacheTag('todo-list', p => ({
+                page: p.query.page,
+                limit: p.query.limit
+            }))
             .responses({ 200: array(TodoResponseSchema) }),
 
         get: todosResource.get(ById).cacheTag('todo', p => ({ id: p.params.id })).responses({
@@ -189,7 +192,10 @@ export const api = defineApi({
         list: usersResource
             .get()
             .query(PaginationQuerySchema)
-            .cacheTag('user-list')
+            .cacheTag('user-list', p => ({
+                page: p.query.page,
+                limit: p.query.limit
+            }))
             .responses({ 200: array(UserResponseSchema) }),
 
         delete: usersResource.delete(ById)
@@ -220,7 +226,9 @@ export const api = defineApi({
         listAll: activityResource
             .get()
             .query(object({ limit: number().coerce().optional() }))
-            .cacheTag('activity-list')
+            .cacheTag('activity-list', p => ({
+                limit: p.query.limit
+            }))
             .responses({ 200: array(TodoActivityResponseSchema) }),
 
         delete: activityResource.delete(ById)

@@ -61,7 +61,10 @@ export const GoogleLoginEndpoint = api.auth.googleLogin
 export const ListTodosEndpoint = api.todos.list
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
-    .cacheTag('todo-list')
+    .cacheTag('todo-list', p => ({
+        page: p.query.page,
+        limit: p.query.limit
+    }))
     .summary('List todos')
     .description(
         'Returns a paginated list of todos. Users see only their own todos; admins can see all todos or filter by userId.'
@@ -152,7 +155,10 @@ export const ListTodoActivityEndpoint = api.todos.listActivity
 export const ListUsersEndpoint = api.users.list
     .authorize(PrincipalSchema, 'admin')
     .inject({ db: DbToken })
-    .cacheTag('user-list')
+    .cacheTag('user-list', p => ({
+        page: p.query.page,
+        limit: p.query.limit
+    }))
     .summary('List all users')
     .description(
         'Returns a paginated list of all registered users. Admin only.'
@@ -377,7 +383,9 @@ export const ActivityFeedSubscription = api.live.activityFeed;
 export const ListAllActivityEndpoint = api.activity.listAll
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
-    .cacheTag('activity-list')
+    .cacheTag('activity-list', p => ({
+        limit: p.query.limit
+    }))
     .summary('List recent activity')
     .description(
         'Returns the most recent activity events across all todos (default: 10, max: 100). ' +
