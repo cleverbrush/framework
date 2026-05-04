@@ -243,6 +243,43 @@ throttlingCache({
 
 Caches successful GET responses for a configurable TTL. Subsequent requests within the TTL receive a cloned cached response without hitting the network.
 
+### Cache Tags — `@cleverbrush/client/cache`
+
+Tag-based HTTP caching with automatic invalidation driven by server-side endpoint
+annotations (`.cacheTag()`). Replaces manual invalidation callbacks — mutations
+automatically clear cache entries matching the endpoint's declared tag names.
+
+```ts
+import { cacheTags } from '@cleverbrush/client/cache';
+
+const client = createClient(api, {
+    middlewares: [cacheTags({ defaultTtl: 5000 })],
+});
+
+// Populates cache entries for 'todo-list' and 'todo:id=1' tags.
+await client.todos.list({ query: { page: 1 } });
+await client.todos.get({ params: { id: 1 } });
+
+// Mutation — automatically invalidates both tags.
+await client.todos.update({ params: { id: 1 }, body: { title: 'Updated' } });
+
+// Triggers network fetch — cache was cleared.
+await client.todos.list({ query: { page: 1 } });
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `defaultTtl` | `number` | `0` | TTL in ms for tags without explicit TTL. `0` = invalidation-only. |
+| `ttlByTag` | `Record<string, number>` | `{}` | Per-tag TTL overrides. |
+| `condition` | `(Response) => boolean` | `response.ok` | Predicate controlling which responses are cached. |
+
+When used with `@cleverbrush/client/react`, TanStack Query's `useMutation` hooks
+automatically invalidate the query cache for the affected group — no manual
+`queryClient.invalidateQueries()` needed.
+
+See the [server-side cache tags](/server#cache-tags) section for how to declare
+tags on your endpoints.
+
 ## Per-Call Overrides
 
 Override middleware options for individual calls:
@@ -772,7 +809,7 @@ if (isApiError(error)) {
 | `@cleverbrush/client/retry` | Retry middleware with exponential backoff |
 | `@cleverbrush/client/timeout` | AbortController-based timeout middleware |
 | `@cleverbrush/client/dedupe` | Request deduplication middleware |
-| `@cleverbrush/client/cache` | Throttling cache middleware |
+| `@cleverbrush/client/cache` | Throttling cache + tag-based cache invalidation middleware |
 | `@cleverbrush/client/batching` | Request batching middleware |
 | `@cleverbrush/client/optimistic-update` | Optimistic update middleware (mutation tracking) |
 | `@cleverbrush/client/offline-queue` | Offline queue middleware (queue + replay) |

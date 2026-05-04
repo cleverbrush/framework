@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/useAdjacentOverloadSignatures: each method in ScopedEndpointFactoryMethods and EndpointFactory has a single signature; they are separate methods, not overloads
 import type {
     InferType,
     ObjectSchemaBuilder,
@@ -586,9 +587,10 @@ type InferResponsesMap<
  */
 interface CacheTagPropertyLeaf {
     readonly [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
-        readonly getValue: (
-            obj: Record<string, unknown>
-        ) => { readonly value?: unknown; readonly success: boolean };
+        readonly getValue: (obj: Record<string, unknown>) => {
+            readonly value?: unknown;
+            readonly success: boolean;
+        };
     };
 }
 
@@ -2074,17 +2076,7 @@ function createEndpoint<TParams>(
     pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>,
     authRoles?: readonly string[] | null,
     meta?: EndpointMetadataDescriptors
-): EndpointBuilder<
-    TParams,
-    undefined,
-    {},
-    {},
-    {},
-    any,
-    string,
-    any,
-    {}
->;
+): EndpointBuilder<TParams, undefined, {}, {}, {}, any, string, any, {}>;
 
 function createEndpoint(
     method: string,
@@ -2384,101 +2376,31 @@ type EndpointFactory<TRoles extends string = string> = {
     get<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        any,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     post<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        any,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     put<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        any,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     patch<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        any,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     delete<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        any,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     head<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        any,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     options<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        any,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     resource(basePath: string): ScopedEndpointFactory<TRoles>;
     subscription<TParams = {}>(
         basePath: string,

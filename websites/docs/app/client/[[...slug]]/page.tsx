@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import BatchingSection from '../sections/batching';
 import CacheSection from '../sections/cache';
+import CacheTagsSection from '../sections/cacheTags';
 import DedupeSection from '../sections/dedupe';
 import ErrorHandlingSection from '../sections/error-handling';
 import GettingStartedSection from '../sections/getting-started';
@@ -26,6 +27,7 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     timeout: TimeoutSection,
     dedupe: DedupeSection,
     cache: CacheSection,
+    'cache-tags': CacheTagsSection,
     batching: BatchingSection,
     'error-handling': ErrorHandlingSection,
     'per-call-overrides': PerCallOverridesSection,

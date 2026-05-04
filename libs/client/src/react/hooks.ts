@@ -154,6 +154,16 @@ export function createUseInfiniteQuery(
 /**
  * Creates a `useMutation` hook for the given endpoint.
  *
+ * When `cacheTagNames` is provided, the hook automatically invalidates
+ * TanStack Query entries for the endpoint's group on mutation success
+ * — no manual `queryClient.invalidateQueries()` needed.
+ *
+ * @param webClient - The underlying typed web client.
+ * @param group - API contract group name (e.g. `"todos"`).
+ * @param endpoint - Endpoint name within the group (e.g. `"create"`).
+ * @param cacheTagNames - Optional cache tag names declared on the
+ *   endpoint via `.cacheTag()`. When non-empty, triggers automatic
+ *   `queryClient.invalidateQueries()` on mutation success.
  * @internal
  */
 export function createUseMutation(

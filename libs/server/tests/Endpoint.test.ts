@@ -612,3 +612,142 @@ describe('endpoint HTTP method factories', () => {
         expect(ep.introspect().method).toBe('OPTIONS');
     });
 });
+
+// ---------------------------------------------------------------------------
+// .cacheTag()
+// ---------------------------------------------------------------------------
+
+describe('EndpointBuilder cacheTag', () => {
+    it('simple tag stores name with empty properties in introspect', () => {
+        const ep = endpoint.get('/api/items').cacheTag('tag-a');
+
+        const tags = ep.introspect().cacheTags;
+        expect(tags).toHaveLength(1);
+        expect(tags[0].name).toBe('tag-a');
+        expect(tags[0].properties).toEqual({});
+    });
+
+    it('property tag stores name and property accessors', () => {
+        const querySchema = object({ filter: string(), page: number() });
+        const ep = endpoint
+            .get('/api/items')
+            .query(querySchema)
+            .cacheTag('tag-b', p => ({
+                filter: p.query.filter,
+                page: p.query.page
+            }));
+
+        const tags = ep.introspect().cacheTags;
+        expect(tags).toHaveLength(1);
+        expect(tags[0].name).toBe('tag-b');
+        expect(Object.keys(tags[0].properties).sort()).toEqual([
+            'filter',
+            'page'
+        ]);
+    });
+
+    it('multiple tags accumulate in order', () => {
+        const ep = endpoint
+            .get('/api/items')
+            .cacheTag('first')
+            .cacheTag('second');
+
+        const tags = ep.introspect().cacheTags;
+        expect(tags).toHaveLength(2);
+        expect(tags[0].name).toBe('first');
+        expect(tags[1].name).toBe('second');
+    });
+
+    it('cacheTag returns a new builder (immutable)', () => {
+        const a = endpoint.get('/api/items');
+        const b = a.cacheTag('test');
+
+        expect(a).not.toBe(b);
+        expect(a.introspect().cacheTags).toEqual([]);
+        expect(b.introspect().cacheTags).toHaveLength(1);
+        expect(b.introspect().cacheTags[0].name).toBe('test');
+    });
+
+    it('selector with invalid value throws', () => {
+        const ep = endpoint.get('/api/items');
+
+        expect(() =>
+            ep.cacheTag('bad', () => ({
+                notADescriptor: 'hello' as any
+            }))
+        ).toThrow(/not a valid.*PropertyDescriptor/);
+    });
+
+    it('selector returning null throws', () => {
+        const ep = endpoint.get('/api/items');
+
+        expect(() =>
+            ep.cacheTag('bad', () => ({
+                missing: null as any
+            }))
+        ).toThrow(/not a valid.*PropertyDescriptor/);
+    });
+
+    it('combines simple and property tags', () => {
+        const querySchema = object({ search: string() });
+        const ep = endpoint
+            .get('/api/items')
+            .query(querySchema)
+            .cacheTag('list')
+            .cacheTag('item', p => ({ search: p.query.search }));
+
+        const tags = ep.introspect().cacheTags;
+        expect(tags).toHaveLength(2);
+        expect(tags[0].name).toBe('list');
+        expect(tags[0].properties).toEqual({});
+        expect(tags[1].name).toBe('item');
+        expect(Object.keys(tags[1].properties)).toEqual(['search']);
+    });
+
+    it('property tag with body schema', () => {
+        const bodySchema = object({ title: string() });
+        const ep = endpoint
+            .post('/api/items')
+            .body(bodySchema)
+            .cacheTag('item', p => ({ title: p.body.title }));
+
+        const tags = ep.introspect().cacheTags;
+        expect(tags).toHaveLength(1);
+        expect(tags[0].name).toBe('item');
+        expect(Object.keys(tags[0].properties)).toEqual(['title']);
+    });
+
+    it('property tag with params from ParseStringSchemaBuilder', () => {
+        const ps = parseString(
+            object({ id: number() }),
+            $t => $t`/items/${t => t.id}`
+        );
+        const ep = endpoint
+            .get('/api/items', ps as any)
+            .cacheTag('item', p => ({ id: p.params.id }));
+
+        const tags = ep.introspect().cacheTags;
+        expect(tags).toHaveLength(1);
+        expect(tags[0].name).toBe('item');
+        expect(Object.keys(tags[0].properties)).toEqual(['id']);
+    });
+
+    it('property accessors actually resolve values', () => {
+        const querySchema = object({ filter: string() });
+        const ep = endpoint
+            .get('/api/items')
+            .query(querySchema)
+            .cacheTag('item', p => ({ filter: p.query.filter }));
+
+        const tags = ep.introspect().cacheTags;
+        const accessor = tags[0].properties['filter'];
+        const result = accessor.getValue({
+            params: {},
+            body: undefined,
+            query: { filter: 'active' },
+            headers: {}
+        });
+        expect(result.success).toBe(true);
+        expect(result.value).toBe('active');
+    });
+});

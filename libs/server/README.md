@@ -124,6 +124,35 @@ const CreateUser = endpoint
     .operationId('createUser');
 ```
 
+### Cache Tags
+
+Tag-based cache invalidation. Tags declared on endpoints flow to the
+[`cacheTags` middleware](/client/cache-tags) for automatic HTTP caching and
+invalidation on mutating requests.
+
+```ts
+const ListTodos = endpoint
+    .get('/api/todos')
+    .query(TodoListQuerySchema)
+    .cacheTag('todo-list', p => ({ page: p.query.page, limit: p.query.limit }))
+    .returns(array(TodoSchema));
+
+const UpdateTodo = endpoint
+    .patch('/api/todos/:id')
+    .body(UpdateTodoBody)
+    .cacheTag('todo-list')               // invalidates the collection
+    .cacheTag('todo', p => ({ id: p.params.id }))  // invalidates specific entity
+    .returns(TodoSchema);
+```
+
+- **Simple tags** — `cacheTag('name')` — cache key is the name itself.
+  Mutations invalidate all entries prefixed with the name.
+- **Property tags** — `cacheTag('name', p => ({ ... }))` — each selected
+  property becomes part of the cache key, so different query params, body
+  values, or headers produce distinct cache entries.
+- **Immutability** — `.cacheTag()` returns a new builder; the original is
+  unchanged.
+
 ## Registering and Handling Endpoints
 
 ```ts
