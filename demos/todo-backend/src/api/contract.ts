@@ -82,9 +82,10 @@ export const api = defineApi({
         list: todosResource
             .get()
             .query(TodoListQuerySchema)
+            .cacheTag('todo-list')
             .responses({ 200: array(TodoResponseSchema) }),
 
-        get: todosResource.get(ById).responses({
+        get: todosResource.get(ById).cacheTag('todo', p => ({ id: p.params.id })).responses({
             200: TodoResponseSchema,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema
@@ -96,6 +97,7 @@ export const api = defineApi({
                     id: number().coerce()
                 })`/${t => t.id}/with-author`
             )
+            .cacheTag('todo-author', p => ({ id: p.params.id }))
             .responses({
                 200: TodoWithAuthorResponseSchema,
                 403: ErrorResponseSchema,
@@ -105,15 +107,20 @@ export const api = defineApi({
         create: todosResource
             .post()
             .body(CreateTodoBodySchema)
+            .cacheTag('todo-list')
             .responses({ 201: TodoResponseSchema }),
 
-        update: todosResource.patch(ById).body(UpdateTodoBodySchema).responses({
+        update: todosResource.patch(ById).body(UpdateTodoBodySchema)
+            .cacheTag('todo-list')
+            .cacheTag('todo', p => ({ id: p.params.id })).responses({
             200: TodoResponseSchema,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema
         }),
 
-        delete: todosResource.delete(ById).responses({
+        delete: todosResource.delete(ById)
+            .cacheTag('todo-list')
+            .cacheTag('todo', p => ({ id: p.params.id })).responses({
             204: null,
             403: ErrorResponseSchema,
             404: ErrorResponseSchema
@@ -153,6 +160,8 @@ export const api = defineApi({
         complete: todosResource
             .post(route({ id: number().coerce() })`/${t => t.id}/complete`)
             .headers(CompletionRequestHeadersSchema)
+            .cacheTag('todo-list')
+            .cacheTag('todo', p => ({ id: p.params.id }))
             .responses({
                 200: TodoResponseSchema,
                 409: ErrorResponseSchema,
@@ -168,6 +177,7 @@ export const api = defineApi({
             .get(
                 route({ id: number().coerce() })`/${t => t.id}/activity`
             )
+            .cacheTag('todo-activity', p => ({ id: p.params.id }))
             .responses({
                 200: array(TodoActivityResponseSchema),
                 403: ErrorResponseSchema,
@@ -179,15 +189,21 @@ export const api = defineApi({
         list: usersResource
             .get()
             .query(PaginationQuerySchema)
+            .cacheTag('user-list')
             .responses({ 200: array(UserResponseSchema) }),
 
-        delete: usersResource.delete(ById).responses({
+        delete: usersResource.delete(ById)
+            .cacheTag('user-list')
+            .cacheTag('user-profile')
+            .responses({
             204: null,
             400: ErrorResponseSchema,
             404: ErrorResponseSchema
         }),
 
-        me: usersResource.get(route({})`/me`).returns(UserResponseSchema)
+        me: usersResource.get(route({})`/me`)
+            .cacheTag('user-profile')
+            .returns(UserResponseSchema)
     },
 
     webhooks: {
@@ -204,9 +220,12 @@ export const api = defineApi({
         listAll: activityResource
             .get()
             .query(object({ limit: number().coerce().optional() }))
+            .cacheTag('activity-list')
             .responses({ 200: array(TodoActivityResponseSchema) }),
 
-        delete: activityResource.delete(ById).responses({
+        delete: activityResource.delete(ById)
+            .cacheTag('activity-list')
+            .responses({
             204: null,
             404: ErrorResponseSchema
         })
