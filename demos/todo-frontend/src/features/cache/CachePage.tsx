@@ -9,418 +9,181 @@ import {
     Flex,
     Heading,
     Separator,
-    Spinner,
     Text,
     TextField
 } from '@radix-ui/themes';
 import { client } from '../../api/client';
 
-// ── Config ───────────────────────────────────────────────────────────────
-
-const CONFIG = {
-    middleware: 'cacheTags',
-    defaultTtl: 5000,
-    tags: {
-        'todo-list': { ttl: 5000, description: 'GET /api/todos — list cache' },
-        'todo': {
-            ttl: 5000,
-            description: 'GET /api/todos/:id — entity cache (property: id)'
-        },
-        'activity-list': {
-            ttl: 3000,
-            description: 'GET /api/activity — activity list cache'
-        },
-        'todo-author': {
-            ttl: 5000,
-            description: 'GET /api/todos/:id/with-author (property: id)'
-        },
-        'todo-activity': {
-            ttl: 5000,
-            description: 'GET /api/todos/:id/activity (property: id)'
-        },
-        'user-list': { ttl: 5000, description: 'GET /api/users — user list' },
-        'user-profile': {
-            ttl: 5000,
-            description: 'GET /api/users/me — profile'
-        }
-    }
-};
-
-// ── Helpers ──────────────────────────────────────────────────────────────
+// ── Types ────────────────────────────────────────────────────────────────
 
 type LogEntry = {
-    id: number;
-    type: 'fetch' | 'cache-hit' | 'mutate' | 'error';
+    step: number;
     label: string;
-    time: string;
-    ms: number;
+    expected: string;
+    result: string;
+    resultColor: 'blue' | 'green' | 'amber' | 'red';
 };
-
-let logCounter = 0;
-
-function formatMs(ms: number): string {
-    return ms < 10 ? `${ms}ms ⚡ (cache hit)` : `${ms}ms (network)`;
-}
-
-// ── Demo: GET Cache ─────────────────────────────────────────────────────
-
-function GetCacheDemo({
-    addLog
-}: {
-    addLog: (e: LogEntry) => void;
-}) {
-    const [todoId, setTodoId] = useState(1);
-
-    const fetchList = useCallback(async () => {
-        const start = performance.now();
-        try {
-            await client.todos.list({ query: {} });
-
-            const ms = Math.round(performance.now() - start);
-            addLog({
-                id: ++logCounter,
-                type: ms < 100 ? 'cache-hit' : 'fetch',
-                label: 'GET /api/todos (list)',
-                time: formatMs(ms),
-                ms
-            });
-        } catch (err: any) {
-            addLog({
-                id: ++logCounter,
-                type: 'error',
-                label: 'GET /api/todos — failed',
-                time: err.message,
-                ms: 0
-            });
-        }
-    }, [addLog]);
-
-    const fetchTodo = useCallback(async () => {
-        const start = performance.now();
-        try {
-            await client.todos.get({ params: { id: todoId } });
-            const ms = Math.round(performance.now() - start);
-            addLog({
-                id: ++logCounter,
-                type: ms < 100 ? 'cache-hit' : 'fetch',
-                label: `GET /api/todos/${todoId} (entity)`,
-                time: formatMs(ms),
-                ms
-            });
-        } catch (err: any) {
-            addLog({
-                id: ++logCounter,
-                type: 'error',
-                label: `GET /api/todos/${todoId} — failed`,
-                time: err.message,
-                ms: 0
-            });
-        }
-    }, [addLog, todoId]);
-
-    return (
-        <Card size="3">
-            <Heading size="3">GET Cache</Heading>
-            <Text size="2" color="gray" mb="3" as="p">
-                Each endpoint has a <Code>defaultTtl: 5000ms</Code>. The first
-                fetch hits the network; a second fetch within 5s returns from
-                the cacheTags middleware cache.
-            </Text>
-            <Separator size="4" mb="3" />
-
-            <Flex direction="column" gap="3">
-                <Flex gap="2" align="center">
-                    <Button size="1" onClick={fetchList}>
-                        Fetch Todo List
-                    </Button>
-                    <Button size="1" onClick={fetchList}>
-                        Fetch Again
-                    </Button>
-                </Flex>
-                <Flex gap="2" align="center">
-                    <Text size="2">Todo ID:</Text>
-                    <TextField.Root
-                        size="1"
-                        type="number"
-                        value={String(todoId)}
-                        onChange={(e) =>
-                            setTodoId(Number(e.target.value) || 1)
-                        }
-                        style={{ width: '80px' }}
-                    />
-                    <Button size="1" onClick={fetchTodo}>
-                        Fetch Todo
-                    </Button>
-                    <Button size="1" onClick={fetchTodo}>
-                        Fetch Again
-                    </Button>
-                </Flex>
-            </Flex>
-        </Card>
-    );
-}
-
-// ── Demo: Mutation Invalidation ─────────────────────────────────────────
-
-function InvalidationDemo({
-    addLog
-}: {
-    addLog: (e: LogEntry) => void;
-}) {
-    const [todoId, setTodoId] = useState(1);
-    const [mutating, setMutating] = useState(false);
-
-    const mutate = useCallback(async () => {
-        setMutating(true);
-        const start = performance.now();
-        try {
-            await client.todos.update({
-                params: { id: todoId },
-                body: { title: `Cache-test ${Date.now()}` }
-            });
-            const ms = Math.round(performance.now() - start);
-            addLog({
-                id: ++logCounter,
-                type: 'mutate',
-                label: `PATCH /api/todos/${todoId} → invalidates "todo-list" + "todo"`,
-                time: `${ms}ms`,
-                ms
-            });
-        } catch (err: any) {
-            addLog({
-                id: ++logCounter,
-                type: 'error',
-                label: `PATCH /api/todos/${todoId} — failed`,
-                time: err.message,
-                ms: 0
-            });
-        }
-        setMutating(false);
-    }, [addLog, todoId]);
-
-    const fetchAfterMutate = useCallback(async () => {
-        const start = performance.now();
-        try {
-            await client.todos.get({ params: { id: todoId } });
-            const ms = Math.round(performance.now() - start);
-            addLog({
-                id: ++logCounter,
-                type: 'fetch',
-                label: `GET /api/todos/${todoId} — should be network (cache was invalidated)`,
-                time: `${ms}ms`,
-                ms
-            });
-        } catch (err: any) {
-            addLog({
-                id: ++logCounter,
-                type: 'error',
-                label: `GET /api/todos/${todoId} — failed`,
-                time: err.message,
-                ms: 0
-            });
-        }
-    }, [addLog, todoId]);
-
-    return (
-        <Card size="3">
-            <Heading size="3">Mutation Invalidation</Heading>
-            <Text size="2" color="gray" mb="3" as="p">
-                Mutations on endpoints with <Code>.cacheTag()</Code>{' '}
-                automatically invalidate matching cache entries. After a
-                mutation, the next GET should hit the network again.
-            </Text>
-            <Separator size="4" mb="3" />
-
-            <Flex direction="column" gap="3">
-                <Flex gap="2" align="center">
-                    <Text size="2">Todo ID:</Text>
-                    <TextField.Root
-                        size="1"
-                        type="number"
-                        value={String(todoId)}
-                        onChange={(e) =>
-                            setTodoId(Number(e.target.value) || 1)
-                        }
-                        style={{ width: '80px' }}
-                    />
-                    <Button
-                        size="1"
-                        color="amber"
-                        onClick={mutate}
-                        disabled={mutating}
-                    >
-                        {mutating ? 'Mutating…' : 'Mutate (Update)'}
-                    </Button>
-                    <Button size="1" onClick={fetchAfterMutate}>
-                        Fetch After Mutate
-                    </Button>
-                </Flex>
-            </Flex>
-        </Card>
-    );
-}
-
-// ── Demo: TS Query Integration ──────────────────────────────────────────
-
-function TsQueryDemo() {
-    const { data: todos, isLoading } = client.todos.list.useQuery();
-    const [title, setTitle] = useState('');
-    const createMutation = client.todos.create.useMutation({
-        onSuccess: () => setTitle('')
-    });
-
-    return (
-        <Card size="3">
-            <Heading size="3">TanStack Query Integration</Heading>
-            <Text size="2" color="gray" mb="3" as="p">
-                The <Code>useMutation</Code> hook automatically invalidates
-                TanStack Query cache for the endpoint&apos;s group when cache
-                tags are declared. No manual{' '}
-                <Code>queryClient.invalidateQueries()</Code> needed.
-            </Text>
-            <Separator size="4" mb="3" />
-
-            <Flex direction="column" gap="3">
-                <Flex gap="2" align="center">
-                    <TextField.Root
-                        size="1"
-                        placeholder="New todo title…"
-                        value={title}
-                        onChange={(e) => setTitle(e.target.value)}
-                        style={{ flex: 1 }}
-                    />
-                    <Button
-                        size="1"
-                        disabled={!title.trim() || createMutation.isPending}
-                        onClick={() =>
-                            createMutation.mutate({
-                                body: { title: title.trim() }
-                            })
-                        }
-                    >
-                        {createMutation.isPending ? 'Creating…' : 'Create'}
-                    </Button>
-                    {createMutation.isSuccess && (
-                        <Badge color="green">Created — list auto-refetches</Badge>
-                    )}
-                </Flex>
-
-                {isLoading ? (
-                    <Spinner size="1" />
-                ) : (
-                    <Text size="2">
-                        <Badge size="1" color="blue" mr="2">
-                            {todos?.length ?? 0} todos
-                        </Badge>
-                        Watch the Network tab — the list refetches
-                        automatically after creating a todo.
-                    </Text>
-                )}
-            </Flex>
-        </Card>
-    );
-}
-
-// ── Log ──────────────────────────────────────────────────────────────────
-
-function LogView({ entries }: { entries: LogEntry[] }) {
-    if (entries.length === 0) return null;
-
-    return (
-        <Card size="3">
-            <Heading size="3">Event Log</Heading>
-            <Separator size="4" mb="3" />
-            <Flex direction="column" gap="1">
-                {entries.map((e) => (
-                    <Flex
-                        key={e.id}
-                        gap="2"
-                        align="center"
-                        style={{
-                            padding: '4px 8px',
-                            borderRadius: '4px',
-                            fontFamily: 'monospace',
-                            fontSize: '12px',
-                            background: 'var(--gray-2)'
-                        }}
-                    >
-                        <Badge
-                            size="1"
-                            color={
-                                e.type === 'cache-hit'
-                                    ? 'green'
-                                    : e.type === 'mutate'
-                                      ? 'amber'
-                                      : e.type === 'error'
-                                        ? 'red'
-                                        : 'blue'
-                            }
-                        >
-                            {e.type}
-                        </Badge>
-                        <Text size="1">{e.label}</Text>
-                        <Text size="1" style={{ marginLeft: 'auto' }}>
-                            {e.time}
-                        </Text>
-                    </Flex>
-                ))}
-            </Flex>
-        </Card>
-    );
-}
-
-// ── Config Card ──────────────────────────────────────────────────────────
-
-function ConfigCard() {
-    return (
-        <Card size="3">
-            <Heading size="3">Middleware Configuration</Heading>
-            <Separator size="4" mb="3" />
-            <Flex direction="column" gap="2">
-                <Flex gap="2">
-                    <Badge size="1" color="indigo">
-                        middleware
-                    </Badge>
-                    <Code size="1">{CONFIG.middleware}</Code>
-                </Flex>
-                <Flex gap="2">
-                    <Badge size="1" color="indigo">
-                        defaultTtl
-                    </Badge>
-                    <Code size="1">{CONFIG.defaultTtl}ms</Code>
-                </Flex>
-                <Flex gap="2" align="center">
-                    <Badge size="1" color="indigo">
-                        active tags
-                    </Badge>
-                    <Flex gap="1" wrap="wrap">
-                        {Object.entries(CONFIG.tags).map(([name, info]) => (
-                            <Flex key={name} gap="1" align="center">
-                                <Badge size="1" color="green">
-                                    {name}
-                                </Badge>
-                                <Text size="1" color="gray">
-                                    {info.ttl}ms
-                                </Text>
-                            </Flex>
-                        ))}
-                    </Flex>
-                </Flex>
-            </Flex>
-        </Card>
-    );
-}
 
 // ── Page ─────────────────────────────────────────────────────────────────
 
 export default function CachePage() {
+    const [todoId, setTodoId] = useState(1);
+    const [running, setRunning] = useState(false);
     const [log, setLog] = useState<LogEntry[]>([]);
 
-    const addLog = useCallback((entry: LogEntry) => {
-        setLog((prev) => [entry, ...prev.slice(0, 19)]);
-    }, []);
+    const run = useCallback(async () => {
+        setRunning(true);
+        setLog([]);
+        const entries: LogEntry[] = [];
 
-    const clearLog = useCallback(() => setLog([]), []);
+        function add(
+            step: number,
+            label: string,
+            expected: string,
+            result: string,
+            resultColor: LogEntry['resultColor'] = 'blue'
+        ) {
+            entries.push({ step, label, expected, result, resultColor });
+            setLog([...entries]);
+        }
+
+        const id = todoId;
+        let start: number;
+
+        // Step 1 — warm the cache
+        start = performance.now();
+        try {
+            await client.todos.get({ params: { id } });
+            const ms = Math.round(performance.now() - start);
+            add(
+                1,
+                `Fetch GET /api/todos/${id}`,
+                'Network request in DevTools',
+                `Completed in ${ms}ms — network fetch`,
+                'blue'
+            );
+        } catch (err: any) {
+            add(
+                1,
+                `Fetch GET /api/todos/${id}`,
+                'Network request',
+                `Error: ${err.message}`,
+                'red'
+            );
+            setRunning(false);
+            return;
+        }
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Step 2 — cache hit
+        start = performance.now();
+        await client.todos.get({ params: { id } });
+        const ms2 = Math.round(performance.now() - start);
+        const isCacheHit = ms2 < 50;
+        add(
+            2,
+            `Fetch GET /api/todos/${id} again`,
+            'NO request in DevTools — served from cacheTags middleware cache',
+            `Completed in ${ms2}ms${isCacheHit ? ' ⚡ cache hit' : ' (network)'}`,
+            isCacheHit ? 'green' : 'amber'
+        );
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Step 3 — list cache hit (after being warmed by previous fetch?)
+        start = performance.now();
+        await client.todos.list({ query: {} });
+        const ms3 = Math.round(performance.now() - start);
+        add(
+            3,
+            'Fetch GET /api/todos (list)',
+            'Network request in DevTools (first list fetch)',
+            `Completed in ${ms3}ms`,
+            'blue'
+        );
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Step 4 — list cache hit (warmed)
+        start = performance.now();
+        await client.todos.list({ query: {} });
+        const ms4 = Math.round(performance.now() - start);
+        const listCacheHit = ms4 < 50;
+        add(
+            4,
+            'Fetch GET /api/todos (list) again',
+            'NO request — cache hit for "todo-list" tag',
+            `Completed in ${ms4}ms${listCacheHit ? ' ⚡ cache hit' : ' (network)'}`,
+            listCacheHit ? 'green' : 'amber'
+        );
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Step 5 — mutate
+        start = performance.now();
+        try {
+            await client.todos.update({
+                params: { id },
+                body: { title: `Cache-test ${Date.now()}` }
+            });
+            const ms5 = Math.round(performance.now() - start);
+            add(
+                5,
+                `Mutate PATCH /api/todos/${id}`,
+                'Network request in DevTools. Invalidates "todo" and "todo-list" cache entries.',
+                `Completed in ${ms5}ms`,
+                'amber'
+            );
+        } catch (err: any) {
+            add(
+                5,
+                `Mutate PATCH /api/todos/${id}`,
+                'Network request, invalidates cache',
+                `Error: ${err.message}`,
+                'red'
+            );
+        }
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Step 6 — fetch after invalidate (should be network)
+        start = performance.now();
+        await client.todos.get({ params: { id } });
+        const ms6 = Math.round(performance.now() - start);
+        const postInvalidateHit = ms6 < 50;
+        add(
+            6,
+            `Fetch GET /api/todos/${id} after mutation`,
+            'Network request in DevTools — "todo" cache was invalidated by step 5',
+            `Completed in ${ms6}ms${postInvalidateHit ? ' ⚡ cache hit' : ' (network — expected)'}`,
+            postInvalidateHit ? 'amber' : 'green'
+        );
+
+        await new Promise((r) => setTimeout(r, 100));
+
+        // Step 7 — list after mutation (should also be invalidated)
+        start = performance.now();
+        await client.todos.list({ query: {} });
+        const ms7 = Math.round(performance.now() - start);
+        const listPostInvalidateHit = ms7 < 50;
+        add(
+            7,
+            'Fetch GET /api/todos (list) after mutation',
+            'Network request in DevTools — "todo-list" cache was invalidated by step 5',
+            `Completed in ${ms7}ms${listPostInvalidateHit ? ' ⚡ cache hit' : ' (network — expected)'}`,
+            listPostInvalidateHit ? 'amber' : 'green'
+        );
+
+        setRunning(false);
+    }, [todoId]);
+
+    const colorMap: Record<string, string> = {
+        blue: 'var(--blue-9)',
+        green: 'var(--green-9)',
+        amber: 'var(--amber-9)',
+        red: 'var(--red-9)'
+    };
 
     return (
         <Box>
@@ -428,36 +191,165 @@ export default function CachePage() {
                 🗄️ Cache Tags
             </Heading>
             <Text size="2" color="gray" mb="4" as="p">
-                Interactive demos of the tag-based cache and auto-invalidation
-                system. Use your browser&apos;s DevTools Network tab to observe
-                which requests hit the server and which are served from cache.
+                Demonstrates tag-based HTTP caching with the{' '}
+                <Code>cacheTags</Code> middleware. The demo runs a sequence of
+                fetch + mutate operations and shows what to expect in your
+                browser&apos;s DevTools Network tab.
             </Text>
 
             <Callout.Root color="blue" mb="4" size="1">
                 <Callout.Text>
-                    Open DevTools → Network tab to see request flows. Cache
-                    hits show no HTTP request at all (served by the middleware
-                    in-memory).
+                    Open DevTools → Network tab before running. Cache hits
+                    show <strong>no HTTP request at all</strong> — the response
+                    comes from the middleware&apos;s in-memory cache.
                 </Callout.Text>
             </Callout.Root>
 
             <Flex direction="column" gap="4">
-                <ConfigCard />
-                <GetCacheDemo addLog={addLog} />
-                <InvalidationDemo addLog={addLog} />
-                <TsQueryDemo />
+                <Card size="3">
+                    <Flex gap="3" align="end">
+                        <Box style={{ flex: 1 }}>
+                            <Text size="2" weight="medium" mb="1" as="p">
+                                Todo ID
+                            </Text>
+                            <TextField.Root
+                                size="2"
+                                type="number"
+                                value={String(todoId)}
+                                onChange={(e) =>
+                                    setTodoId(Number(e.target.value) || 1)
+                                }
+                            />
+                        </Box>
+                        <Button
+                            size="2"
+                            onClick={run}
+                            disabled={running}
+                            style={{ minWidth: '140px' }}
+                        >
+                            {running ? 'Running…' : 'Run Test'}
+                        </Button>
+                    </Flex>
+                </Card>
 
-                <Flex justify="end">
-                    <Button
-                        size="1"
-                        variant="ghost"
-                        color="gray"
-                        onClick={clearLog}
-                    >
-                        Clear Log
-                    </Button>
-                </Flex>
-                <LogView entries={log} />
+                {log.length > 0 && (
+                    <Card size="3">
+                        <Heading size="3" mb="3">
+                            Run Log
+                        </Heading>
+                        <Separator size="4" mb="3" />
+                        <Flex direction="column" gap="3">
+                            {log.map((entry) => (
+                                <Box
+                                    key={entry.step}
+                                    style={{
+                                        padding: '10px 12px',
+                                        borderRadius: '6px',
+                                        border: '1px solid var(--gray-4)',
+                                        borderLeft: `3px solid ${colorMap[entry.resultColor]}`
+                                    }}
+                                >
+                                    <Flex gap="2" align="center" mb="1">
+                                        <Badge
+                                            size="1"
+                                            color={
+                                                entry.resultColor === 'green'
+                                                    ? 'green'
+                                                    : entry.resultColor ===
+                                                        'amber'
+                                                      ? 'amber'
+                                                      : entry.resultColor ===
+                                                          'red'
+                                                        ? 'red'
+                                                        : 'blue'
+                                            }
+                                        >
+                                            Step {entry.step}
+                                        </Badge>
+                                        <Text
+                                            size="1"
+                                            weight="medium"
+                                            style={{
+                                                fontFamily: 'monospace'
+                                            }}
+                                        >
+                                            {entry.label}
+                                        </Text>
+                                    </Flex>
+
+                                    <Flex
+                                        direction="column"
+                                        gap="1"
+                                        style={{ paddingLeft: '28px' }}
+                                    >
+                                        <Flex gap="1" align="center">
+                                            <Badge size="1" color="gray">
+                                                Expected
+                                            </Badge>
+                                            <Text size="1" color="gray">
+                                                {entry.expected}
+                                            </Text>
+                                        </Flex>
+                                        <Flex gap="1" align="center">
+                                            <Badge
+                                                size="1"
+                                                color={entry.resultColor}
+                                            >
+                                                Result
+                                            </Badge>
+                                            <Text
+                                                size="1"
+                                                style={{
+                                                    color:
+                                                        colorMap[
+                                                            entry.resultColor
+                                                        ]
+                                                }}
+                                            >
+                                                {entry.result}
+                                            </Text>
+                                        </Flex>
+                                    </Flex>
+                                </Box>
+                            ))}
+                        </Flex>
+                    </Card>
+                )}
+
+                <Card size="3">
+                    <Heading size="3" mb="3">
+                        What&apos;s Happening
+                    </Heading>
+                    <Separator size="4" mb="3" />
+                    <Flex direction="column" gap="2">
+                        <Text size="2">
+                            <strong>Steps 1–2:</strong> The first{' '}
+                            <Code>GET /api/todos/:id</Code> fetches from the
+                            network and populates the{' '}
+                            <Code>todo</Code> cache entry. The second call
+                            within the 5s TTL hits the in-memory cache — no
+                            network request is made.
+                        </Text>
+                        <Text size="2">
+                            <strong>Steps 3–4:</strong> Same pattern for{' '}
+                            <Code>GET /api/todos</Code> with the{' '}
+                            <Code>todo-list</Code> tag.
+                        </Text>
+                        <Text size="2">
+                            <strong>Step 5:</strong> A{' '}
+                            <Code>PATCH /api/todos/:id</Code> mutation triggers
+                            cache invalidation for both the{' '}
+                            <Code>todo</Code> tag (matching the entity) and the{' '}
+                            <Code>todo-list</Code> tag (the collection). The
+                            middleware deletes the matching cache entries.
+                        </Text>
+                        <Text size="2">
+                            <strong>Steps 6–7:</strong> After invalidation, the
+                            next fetch for both entity and list hits the
+                            network again — the cache was cleared.
+                        </Text>
+                    </Flex>
+                </Card>
             </Flex>
         </Box>
     );
