@@ -150,7 +150,6 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
 
         // -- Invalidation on mutating requests --
         if (isMutating(method) && tags && tags.length > 0) {
-            console.log('[cacheTags] INVALIDATING for', method, url, 'tags:', tags.map(t => t.name), 'cache size:', cache.size);
             const root: TagRoot = {
                 params: (meta?.params as Record<string, unknown>) ?? {},
                 body: meta?.body,
@@ -160,18 +159,18 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
 
             for (const tag of tags) {
                 const tagKey = computeKey(tag, root);
-                console.log('[cacheTags] tag:', tag.name, 'computed key:', tagKey);
+                // Invalidate the exact key and any prefixed variants
+                // (tag name prefix match handles dynamic property variants
+                // when the mutation didn't provide the same properties).
                 for (const [cachedKey] of cache) {
-                    const match =
+                    if (
                         cachedKey === tagKey ||
-                        cachedKey.startsWith(tag.name);
-                    if (match) {
-                        console.log('[cacheTags] DELETE', cachedKey, '(match)', 'exact:', cachedKey === tagKey, 'prefix:', cachedKey.startsWith(tag.name));
+                        cachedKey.startsWith(tag.name)
+                    ) {
                         cache.delete(cachedKey);
                     }
                 }
             }
-            console.log('[cacheTags] cache size after invalidation:', cache.size);
         }
 
         // -- Cache lookup for GET requests --
@@ -187,7 +186,6 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
 
             for (const tag of tags) {
                 const cacheKey = computeKey(tag, root);
-                console.log('[cacheTags] GET lookup tag:', tag.name, 'computed key:', cacheKey, 'in cache:', cache.has(cacheKey));
                 const entry = cache.get(cacheKey);
                 if (entry && entry.expiresAt > Date.now()) {
                     foundEntry = entry;

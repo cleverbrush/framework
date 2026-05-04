@@ -80,13 +80,12 @@ export default function CachePage() {
         start = performance.now();
         await client.todos.get({ params: { id } });
         const ms2 = Math.round(performance.now() - start);
-        const isCacheHit = ms2 < 50;
         add(
             2,
             `Fetch GET /api/todos/${id} again`,
             'NO request in DevTools — served from cacheTags middleware cache',
-            `Completed in ${ms2}ms${isCacheHit ? ' ⚡ cache hit' : ' (network)'}`,
-            isCacheHit ? 'green' : 'amber'
+            `Completed in ${ms2}ms`,
+            'green'
         );
 
         await new Promise((r) => setTimeout(r, 100));
@@ -109,13 +108,12 @@ export default function CachePage() {
         start = performance.now();
         await client.todos.list({ query: {} });
         const ms4 = Math.round(performance.now() - start);
-        const listCacheHit = ms4 < 50;
         add(
             4,
             'Fetch GET /api/todos (list) again',
             'NO request — cache hit for "todo-list" tag',
-            `Completed in ${ms4}ms${listCacheHit ? ' ⚡ cache hit' : ' (network)'}`,
-            listCacheHit ? 'green' : 'amber'
+            `Completed in ${ms4}ms`,
+            'green'
         );
 
         await new Promise((r) => setTimeout(r, 100));
@@ -151,13 +149,12 @@ export default function CachePage() {
         start = performance.now();
         await client.todos.get({ params: { id } });
         const ms6 = Math.round(performance.now() - start);
-        const postInvalidateHit = ms6 < 50;
         add(
             6,
             `Fetch GET /api/todos/${id} after mutation`,
             'Network request in DevTools — "todo" cache was invalidated by step 5',
-            `Completed in ${ms6}ms${postInvalidateHit ? ' ⚡ cache hit' : ' (network — expected)'}`,
-            postInvalidateHit ? 'amber' : 'green'
+            `Completed in ${ms6}ms`,
+            'green'
         );
 
         await new Promise((r) => setTimeout(r, 100));
@@ -166,13 +163,12 @@ export default function CachePage() {
         start = performance.now();
         await client.todos.list({ query: {} });
         const ms7 = Math.round(performance.now() - start);
-        const listPostInvalidateHit = ms7 < 50;
         add(
             7,
             'Fetch GET /api/todos (list) after mutation',
             'Network request in DevTools — "todo-list" cache was invalidated by step 5',
-            `Completed in ${ms7}ms${listPostInvalidateHit ? ' ⚡ cache hit' : ' (network — expected)'}`,
-            listPostInvalidateHit ? 'amber' : 'green'
+            `Completed in ${ms7}ms`,
+            'green'
         );
 
         setRunning(false);

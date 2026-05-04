@@ -21,7 +21,7 @@ import { createClient } from '@cleverbrush/client/react';
 import { retry } from '@cleverbrush/client/retry';
 import { timeout } from '@cleverbrush/client/timeout';
 import { dedupe } from '@cleverbrush/client/dedupe';
-import { throttlingCache, cacheTags } from '@cleverbrush/client/cache';
+import { cacheTags } from '@cleverbrush/client/cache';
 import { batching } from '@cleverbrush/client/batching';
 import { optimisticUpdate } from '@cleverbrush/client/optimistic-update';
 import { offlineQueue } from '@cleverbrush/client/offline-queue';
@@ -40,10 +40,9 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? '';
  * 2. **retry** — retries failed requests up to 2 times with exponential backoff
  * 3. **timeout** — aborts requests exceeding 10 seconds
  * 4. **dedupe** — coalesces identical in-flight GET requests
- * 5. **cacheTags** — tag-based caching and auto-invalidation (TanStack Query invalidation is implicit)
- * 6. **throttlingCache** — serves cached GET responses within a 2-second TTL
- * 7. **batching** — coalesces concurrent requests into a single `POST /__batch`
- * 8. **optimisticUpdate** — tags mutations and tracks network failures (innermost)
+ * 5. **cacheTags** — tag-based caching and auto-invalidation (replaces throttlingCache)
+ * 6. **batching** — coalesces concurrent requests into a single `POST /__batch`
+ * 7. **optimisticUpdate** — tags mutations and tracks network failures (innermost)
  */
 
 export const offlineQueueStore = { queue: [], isOnline: true, isReplaying: false };
@@ -65,9 +64,6 @@ export const client = createClient(api, {
         dedupe(),
         cacheTags({
             defaultTtl: 5000
-        }),
-        throttlingCache({
-            throttle: 2000
         }),
         batching({ maxSize: 10, windowMs: 10 }),
         optimisticUpdate()
