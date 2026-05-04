@@ -160,18 +160,18 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
 
             for (const tag of tags) {
                 const tagKey = computeKey(tag, root);
-                // Invalidate the exact key and any prefixed variants
-                // (tag name prefix match handles dynamic property variants
-                // when the mutation didn't provide the same properties).
+                console.log('[cacheTags] tag:', tag.name, 'computed key:', tagKey);
                 for (const [cachedKey] of cache) {
-                    if (
+                    const match =
                         cachedKey === tagKey ||
-                        cachedKey.startsWith(tag.name)
-                    ) {
+                        cachedKey.startsWith(tag.name);
+                    if (match) {
+                        console.log('[cacheTags] DELETE', cachedKey, '(match)', 'exact:', cachedKey === tagKey, 'prefix:', cachedKey.startsWith(tag.name));
                         cache.delete(cachedKey);
                     }
                 }
             }
+            console.log('[cacheTags] cache size after invalidation:', cache.size);
         }
 
         // -- Cache lookup for GET requests --
