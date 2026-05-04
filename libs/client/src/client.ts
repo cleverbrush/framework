@@ -257,8 +257,7 @@ export function createClient<T extends ApiContract>(
                     (tpl as any).introspect().templateDefinition.literals[0] ??
                     '';
             }
-            const collectionPath =
-                (meta.basePath + suffix).replace(/\/$/, '') || '/';
+            const collectionPath = meta.basePath + suffix || '/';
 
             let pathParamNames: string[] = [];
             if (
@@ -277,13 +276,17 @@ export function createClient<T extends ApiContract>(
                 method: meta.method,
                 path: ep.path as string,
                 basePath: meta.basePath,
+                baseUrl,
                 collectionPath,
+                fullCollectionUrl: baseUrl.replace(/\/$/, '') + collectionPath,
                 pathParamNames,
                 params: args?.params ?? ({} as Record<string, unknown>),
                 body: args?.body,
                 query: args?.query ?? ({} as Record<string, unknown>),
+                headers: args?.headers ?? ({} as Record<string, string>),
                 operationId: meta.operationId ?? null,
-                tags: meta.tags ?? []
+                tags: meta.tags ?? [],
+                cacheTags: meta.cacheTags ?? []
             };
 
             if (!(init as any).__endpointMeta) {

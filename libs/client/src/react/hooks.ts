@@ -13,6 +13,7 @@ import {
     useInfiniteQuery,
     useMutation,
     useQuery,
+    useQueryClient,
     useSuspenseQuery
 } from '@tanstack/react-query';
 import type { WebError } from '../index.js';
@@ -158,13 +159,27 @@ export function createUseInfiniteQuery(
 export function createUseMutation(
     webClient: AnyClient,
     group: string,
-    endpoint: string
+    endpoint: string,
+    cacheTagNames?: readonly string[]
 ) {
     return function hookUseMutation(options?: any): any {
+        const queryClient = useQueryClient();
+
         return useMutation<any, WebError, any>({
             ...options,
             mutationFn: (args: any) =>
-                callEndpoint(webClient, group, endpoint, args)
+                callEndpoint(webClient, group, endpoint, args),
+            onSuccess: (...args: any[]) => {
+                options?.onSuccess?.(...args);
+
+                // Auto-invalidate TanStack Query cache when endpoint
+                // declares cache tags and cacheTags middleware is active.
+                if (cacheTagNames && cacheTagNames.length > 0) {
+                    queryClient.invalidateQueries({
+                        queryKey: ['@cleverbrush', group]
+                    });
+                }
+            }
         });
     };
 }

@@ -1,11 +1,16 @@
-import { defineWebhook } from '@cleverbrush/server';
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
-import { DbToken, KnexToken, LoggerToken, TrackedDbToken } from '../di/tokens.js';
+import { defineWebhook } from '@cleverbrush/server';
+import {
+    DbToken,
+    KnexToken,
+    LoggerToken,
+    TrackedDbToken
+} from '../di/tokens.js';
 import { api } from './contract.js';
 import {
     type ImportTodosBody,
-    ImportTodosBodySchema,
+    type ImportTodosBodySchema,
     PrincipalSchema,
     TodoNotificationPayloadSchema,
     WebhookAckSchema
@@ -56,6 +61,7 @@ export const GoogleLoginEndpoint = api.auth.googleLogin
 export const ListTodosEndpoint = api.todos.list
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
+    .cacheTag('todo-list')
     .summary('List todos')
     .description(
         'Returns a paginated list of todos. Users see only their own todos; admins can see all todos or filter by userId.'
@@ -66,6 +72,7 @@ export const ListTodosEndpoint = api.todos.list
 export const GetTodoEndpoint = api.todos.get
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
+    .cacheTag('todo', p => ({ id: p.params.id }))
     .summary('Get a todo by ID')
     .description(
         'Returns a todo by its ID. Users can only fetch their own todos.'
@@ -76,6 +83,7 @@ export const GetTodoEndpoint = api.todos.get
 export const GetTodoWithAuthorEndpoint = api.todos.getWithAuthor
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
+    .cacheTag('todo-author', p => ({ id: p.params.id }))
     .summary('Get a todo with its author')
     .description(
         'Returns a todo together with its author. Demonstrates nested $ref deduplication in the OpenAPI spec.'
@@ -86,6 +94,7 @@ export const GetTodoWithAuthorEndpoint = api.todos.getWithAuthor
 export const CreateTodoEndpoint = api.todos.create
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, logger: LoggerToken })
+    .cacheTag('todo-list')
     .summary('Create a todo')
     .description('Creates a new todo owned by the authenticated user.')
     .tags('todos')
@@ -94,6 +103,8 @@ export const CreateTodoEndpoint = api.todos.create
 export const UpdateTodoEndpoint = api.todos.update
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
+    .cacheTag('todo-list')
+    .cacheTag('todo', p => ({ id: p.params.id }))
     .summary('Update a todo')
     .description(
         'Partially updates a todo. Users can only update their own todos; admins can update any todo.'
@@ -104,6 +115,8 @@ export const UpdateTodoEndpoint = api.todos.update
 export const DeleteTodoEndpoint = api.todos.delete
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
+    .cacheTag('todo-list')
+    .cacheTag('todo', p => ({ id: p.params.id }))
     .summary('Delete a todo')
     .description(
         'Deletes a todo. Users can only delete their own todos; admins can delete any todo.'
@@ -125,6 +138,7 @@ export const SendTodoEventEndpoint = api.todos.sendEvent
 export const ListTodoActivityEndpoint = api.todos.listActivity
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
+    .cacheTag('todo-activity', p => ({ id: p.params.id }))
     .summary('List todo activity')
     .description(
         'Returns all activity events for a todo in reverse-chronological order. ' +
@@ -138,6 +152,7 @@ export const ListTodoActivityEndpoint = api.todos.listActivity
 export const ListUsersEndpoint = api.users.list
     .authorize(PrincipalSchema, 'admin')
     .inject({ db: DbToken })
+    .cacheTag('user-list')
     .summary('List all users')
     .description(
         'Returns a paginated list of all registered users. Admin only.'
@@ -148,6 +163,8 @@ export const ListUsersEndpoint = api.users.list
 export const DeleteUserEndpoint = api.users.delete
     .authorize(PrincipalSchema, 'admin')
     .inject({ db: DbToken })
+    .cacheTag('user-list')
+    .cacheTag('user-profile')
     .summary('Delete a user')
     .description(
         'Permanently deletes a user account and all their todos. Admin only.'
@@ -238,6 +255,8 @@ export const LegacyReplaceTodoEndpoint = api.todos.legacyReplace
 export const CompleteTodoEndpoint = api.todos.complete
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
+    .cacheTag('todo-list')
+    .cacheTag('todo', p => ({ id: p.params.id }))
     .summary('Complete a todo with conflict detection')
     .description(
         'Marks a todo as completed. Supports optimistic concurrency via the `If-Match` header — ' +
@@ -253,6 +272,7 @@ export const CompleteTodoEndpoint = api.todos.complete
 export const GetMyProfileEndpoint = api.users.me
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
+    .cacheTag('user-profile')
     .links({
         GetMyTodos: {
             operationId: 'listTodos',
@@ -357,6 +377,7 @@ export const ActivityFeedSubscription = api.live.activityFeed;
 export const ListAllActivityEndpoint = api.activity.listAll
     .authorize(PrincipalSchema)
     .inject({ db: DbToken })
+    .cacheTag('activity-list')
     .summary('List recent activity')
     .description(
         'Returns the most recent activity events across all todos (default: 10, max: 100). ' +
@@ -368,6 +389,7 @@ export const ListAllActivityEndpoint = api.activity.listAll
 export const DeleteActivityEndpoint = api.activity.delete
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken })
+    .cacheTag('activity-list')
     .summary('Delete an activity event')
     .description('Permanently deletes a single activity event by ID.')
     .tags('activity')

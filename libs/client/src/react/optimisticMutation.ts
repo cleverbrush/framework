@@ -55,9 +55,14 @@ export function useOptimisticMutation<TData, TArgs>(
         ) => {
             pendingCount.current--;
             if (pendingCount.current === 0) {
-                queryClient.invalidateQueries({ queryKey });
+                // Cancel any background GET that may have snuck in (e.g. from a
+                // window-focus refetch) and potentially cached an intermediate
+                // server state, then trigger the definitive invalidation.
+                queryClient
+                    .cancelQueries({ queryKey })
+                    .then(() => queryClient.invalidateQueries({ queryKey }));
+                onSettled?.(data, error, args);
             }
-            onSettled?.(data, error, args);
         }
     });
 }

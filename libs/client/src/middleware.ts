@@ -142,6 +142,13 @@ export interface EndpointMeta {
     basePath: string;
     /** Resource collection path (basePath without param placeholders). */
     collectionPath: string;
+    /** Client base URL (e.g. `"http://localhost:3000"` or `""`). */
+    baseUrl: string;
+    /**
+     * Full collection URL matching the HTTP cache key format.
+     * Computed as `baseUrl (stripped of trailing slash) + collectionPath`.
+     */
+    fullCollectionUrl: string;
     /** Names of path parameters, e.g. `["id"]`. */
     pathParamNames: string[];
     /** Actual route parameter values from the call, e.g. `{ id: 42 }`. */
@@ -154,4 +161,27 @@ export interface EndpointMeta {
     operationId: string | null;
     /** OpenAPI tags, or `[]`. */
     tags: readonly string[];
+    /**
+     * Cache tag definitions from the endpoint's `.cacheTag()` calls.
+     * Each tag has a `name` and a map of `properties` (key → accessor).
+     * Used by the `cacheTags` middleware.
+     */
+    cacheTags: ReadonlyArray<{
+        name: string;
+        properties: Readonly<
+            Record<
+                string,
+                {
+                    getValue(root: {
+                        params: Record<string, unknown>;
+                        body: unknown;
+                        query: Record<string, unknown>;
+                        headers: Record<string, string>;
+                    }): { value?: unknown; success: boolean };
+                }
+            >
+        >;
+    }>;
+    /** Request headers from the call, e.g. `{ 'x-request-id': 'abc' }`. */
+    headers: Readonly<Record<string, string>>;
 }

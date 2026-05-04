@@ -9,6 +9,13 @@ export {
     StreamResult
 } from './ActionResult.js';
 export {
+    type CacheTagDefinition,
+    type CacheTagPropertyAccessor,
+    computeCacheKey,
+    createCacheTagTree,
+    serializeTag
+} from './CacheTag.js';
+export {
     type ApiContract,
     type ApiGroup,
     defineApi,
