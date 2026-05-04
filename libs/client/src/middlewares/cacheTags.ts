@@ -187,6 +187,7 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
 
             for (const tag of tags) {
                 const cacheKey = computeKey(tag, root);
+                console.log('[cacheTags] GET lookup tag:', tag.name, 'computed key:', cacheKey, 'in cache:', cache.has(cacheKey));
                 const entry = cache.get(cacheKey);
                 if (entry && entry.expiresAt > Date.now()) {
                     foundEntry = entry;
