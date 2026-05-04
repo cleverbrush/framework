@@ -5,6 +5,7 @@ import type {
     PropertyDescriptorTree,
     SchemaBuilder
 } from '@cleverbrush/schema';
+import { SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR } from '@cleverbrush/schema';
 import type {
     ActionResult,
     ContentResult,
@@ -571,6 +572,60 @@ type InferResponsesMap<
     [K in keyof T]: T[K] extends SchemaBuilder<any, any, any, any, any>
         ? InferType<T[K]>
         : null;
+};
+
+// ---------------------------------------------------------------------------
+// Cache-tag selector type — gives the consumer IDE hints when selecting
+// properties from the tree passed to the `.cacheTag()` callback.
+// ---------------------------------------------------------------------------
+
+/**
+ * A leaf node in a cache-tag property tree — mirrors the shape of the
+ * actual runtime {@link PropertyDescriptor} so the compiler accepts
+ * values selected by the consumer.
+ */
+interface CacheTagPropertyLeaf {
+    readonly [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+        readonly getValue: (
+            obj: Record<string, unknown>
+        ) => { readonly value?: unknown; readonly success: boolean };
+    };
+}
+
+/** Recursively builds a typed property tree from an inferred object shape. */
+type CacheTagPropertyTree<T> = CacheTagPropertyLeaf &
+    (T extends Record<string, unknown>
+        ? { readonly [K in keyof T]-?: CacheTagPropertyTree<T[K]> }
+        : unknown);
+
+/**
+ * The typed tree passed to the `.cacheTag(name, selector)` callback.
+ *
+ * `p.params`, `p.query`, and `p.headers` provide IDE completion for
+ * each schema's property names, while `p.body` resolves through the
+ * body schema's `InferType`.
+ */
+type CacheTagSelector<TParams, TBody, TQuery, THeaders> = {
+    readonly params: [keyof TParams] extends [never]
+        ? Record<string, never>
+        : TParams extends Record<string, unknown>
+          ? CacheTagPropertyTree<TParams>
+          : Record<string, never>;
+    readonly body: TBody extends undefined
+        ? undefined
+        : TBody extends SchemaBuilder<any, any, any, any, any>
+          ? CacheTagPropertyTree<InferType<TBody>>
+          : Record<string, never>;
+    readonly query: [keyof TQuery] extends [never]
+        ? Record<string, never>
+        : TQuery extends Record<string, unknown>
+          ? CacheTagPropertyTree<TQuery>
+          : Record<string, never>;
+    readonly headers: [keyof THeaders] extends [never]
+        ? Record<string, never>
+        : THeaders extends Record<string, unknown>
+          ? CacheTagPropertyTree<THeaders>
+          : Record<string, never>;
 };
 
 export class EndpointBuilder<
@@ -1892,7 +1947,9 @@ export class EndpointBuilder<
     >;
     cacheTag(
         name: string,
-        selector: (tree: any) => Record<string, unknown>
+        selector: (
+            tree: CacheTagSelector<TParams, TBody, TQuery, THeaders>
+        ) => Record<string, unknown>
     ): EndpointBuilder<
         TParams,
         TBody,
@@ -2017,7 +2074,17 @@ function createEndpoint<TParams>(
     pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>,
     authRoles?: readonly string[] | null,
     meta?: EndpointMetadataDescriptors
-): EndpointBuilder<TParams extends undefined ? {} : TParams>;
+): EndpointBuilder<
+    TParams,
+    undefined,
+    {},
+    {},
+    {},
+    any,
+    string,
+    any,
+    {}
+>;
 
 function createEndpoint(
     method: string,
@@ -2149,6 +2216,84 @@ type ScopedEndpointFactoryMethods<
         any,
         {}
     >;
+    post<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    put<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    patch<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    delete<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    head<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    options<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
 };
 
 export type ScopedEndpointFactory<TRoles extends string = string> =
@@ -2245,7 +2390,7 @@ type EndpointFactory<TRoles extends string = string> = {
         {},
         {},
         {},
-        undefined,
+        any,
         TRoles,
         any,
         {}
@@ -2259,7 +2404,7 @@ type EndpointFactory<TRoles extends string = string> = {
         {},
         {},
         {},
-        undefined,
+        any,
         TRoles,
         any,
         {}
@@ -2273,7 +2418,7 @@ type EndpointFactory<TRoles extends string = string> = {
         {},
         {},
         {},
-        undefined,
+        any,
         TRoles,
         any,
         {}
@@ -2287,7 +2432,7 @@ type EndpointFactory<TRoles extends string = string> = {
         {},
         {},
         {},
-        undefined,
+        any,
         TRoles,
         any,
         {}
@@ -2301,7 +2446,7 @@ type EndpointFactory<TRoles extends string = string> = {
         {},
         {},
         {},
-        undefined,
+        any,
         TRoles,
         any,
         {}
@@ -2315,7 +2460,7 @@ type EndpointFactory<TRoles extends string = string> = {
         {},
         {},
         {},
-        undefined,
+        any,
         TRoles,
         any,
         {}
@@ -2329,7 +2474,7 @@ type EndpointFactory<TRoles extends string = string> = {
         {},
         {},
         {},
-        undefined,
+        any,
         TRoles,
         any,
         {}
