@@ -305,6 +305,7 @@ export function TodoDetailPage() {
 
                         <input
                             type="file"
+                            accept="image/*,application/pdf,text/plain"
                             ref={fileInputRef}
                             style={{ display: 'none' }}
                             onChange={handleFileSelect}

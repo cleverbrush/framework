@@ -412,7 +412,7 @@ export const downloadAttachmentHandler: Handler<
 
 export const uploadAttachmentHandler: Handler<
     typeof UploadAttachmentEndpoint
-> = async ({ params, principal, files }, { db, knex }) => {
+> = async ({ params, principal, files, rejectedFiles }, { db, knex }) => {
     const todo = await db.todos.find(params.id);
 
     if (!todo) {
@@ -425,9 +425,14 @@ export const uploadAttachmentHandler: Handler<
 
     const file = files['attachment'];
     if (!file) {
-        throw new BadRequestError(
-            'No file uploaded. Use field name "attachment".'
-        );
+        let detail = 'No file uploaded. Use field name "attachment".';
+        if (rejectedFiles && rejectedFiles.length > 0) {
+            const reasons = rejectedFiles
+                .map(r => `${r.filename}: ${r.reason}`)
+                .join('; ');
+            detail += ` Rejected: ${reasons}`;
+        }
+        throw new BadRequestError(detail);
     }
 
     // Persist file in DB — raw knex for bytea column

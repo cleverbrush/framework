@@ -22,7 +22,12 @@ import {
     type SubscriptionBuilder,
     type SubscriptionHandlerEntry
 } from './Subscription.js';
-import type { FilePart, Middleware, UploadOptions } from './types.js';
+import type {
+    FilePart,
+    Middleware,
+    RejectedFile,
+    UploadOptions
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // Simplify — flattens intersection types for clean IDE tooltips
@@ -56,7 +61,9 @@ type ActionContextParts<
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
     (TPrincipal extends undefined ? {} : { principal: TPrincipal }) &
-    (TUpload extends true ? { files: Record<string, FilePart> } : {});
+    (TUpload extends true
+        ? { files: Record<string, FilePart>; rejectedFiles?: RejectedFile[] }
+        : {});
 
 /**
  * The fully-typed argument object passed to endpoint handlers.

@@ -37,6 +37,7 @@ import type {
     EndpointRegistration,
     FilePart,
     Middleware,
+    RejectedFile,
     ServerBatchingOptions,
     ServerOptions,
     SubscriptionRegistration,
@@ -94,6 +95,7 @@ async function parseMultipart(
 ): Promise<{
     fields: Record<string, string>;
     files: Record<string, FilePart>;
+    rejectedFiles: RejectedFile[];
 }> {
     const maxFileCount = options.maxFileCount ?? 10;
     const maxFileSize = options.maxFileSize ?? 10 * 1024 * 1024;
@@ -102,6 +104,7 @@ async function parseMultipart(
     return new Promise((resolve, reject) => {
         const fields: Record<string, string> = {};
         const files: Record<string, FilePart> = {};
+        const rejectedFiles: RejectedFile[] = [];
         let fileCount = 0;
 
         const busboy = Busboy({
@@ -128,6 +131,11 @@ async function parseMultipart(
                 mimeType: string
             ) => {
                 if (fileCount >= maxFileCount) {
+                    rejectedFiles.push({
+                        filename,
+                        mimeType,
+                        reason: `Exceeded max file count (${maxFileCount})`
+                    });
                     stream.resume();
                     return;
                 }
@@ -140,6 +148,11 @@ async function parseMultipart(
                         return mimeType === pattern;
                     });
                     if (!allowed) {
+                        rejectedFiles.push({
+                            filename,
+                            mimeType,
+                            reason: `MIME type "${mimeType}" not allowed (allowed: ${allowedMimeTypes.join(', ')})`
+                        });
                         stream.resume();
                         return;
                     }
@@ -167,7 +180,7 @@ async function parseMultipart(
         );
 
         busboy.on('error', reject);
-        busboy.on('finish', () => resolve({ fields, files }));
+        busboy.on('finish', () => resolve({ fields, files, rejectedFiles }));
 
         req.pipe(busboy);
     });
@@ -693,6 +706,7 @@ export class Server {
                 // Parse body if needed
                 let parsedBody: unknown;
                 let uploadedFiles: Record<string, FilePart> | undefined;
+                let rejectedFiles: RejectedFile[] | undefined;
                 if (needsBody(meta)) {
                     const contentType = req.headers['content-type'] ?? '';
 
@@ -708,6 +722,7 @@ export class Server {
                             );
                             parsedBody = result.fields;
                             uploadedFiles = result.files;
+                            rejectedFiles = result.rejectedFiles;
                         } catch {
                             const pd = createProblemDetails(
                                 400,
@@ -778,8 +793,14 @@ export class Server {
 
                 // Inject uploaded files into the action context
                 if (uploadedFiles && resolveResult.args.length > 0) {
-                    (resolveResult.args[0] as Record<string, unknown>).files =
-                        uploadedFiles;
+                    const ctx = resolveResult.args[0] as Record<
+                        string,
+                        unknown
+                    >;
+                    ctx.files = uploadedFiles;
+                    if (rejectedFiles && rejectedFiles.length > 0) {
+                        ctx.rejectedFiles = rejectedFiles;
+                    }
                 }
 
                 // Call handler

@@ -137,6 +137,18 @@ export interface FilePart {
 }
 
 /**
+ * Describes a file that was rejected during multipart parsing.
+ */
+export interface RejectedFile {
+    /** Original filename as provided by the client. */
+    readonly filename: string;
+    /** MIME type of the file (e.g. `'application/xlsx'`). */
+    readonly mimeType: string;
+    /** Human-readable reason the file was rejected. */
+    readonly reason: string;
+}
+
+/**
  * Configuration for file upload endpoints declared via
  * `EndpointBuilder.upload()`.
  */

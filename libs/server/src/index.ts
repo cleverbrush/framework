@@ -77,6 +77,7 @@ export type {
     EndpointRegistration,
     FilePart,
     Middleware,
+    RejectedFile,
     ServerBatchingOptions,
     ServerOptions,
     SubscriptionRegistration,
