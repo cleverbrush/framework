@@ -1,4 +1,4 @@
-import type { InferType } from '@cleverbrush/schema';
+import type { InferType, IntersectionSchemaBuilder } from '@cleverbrush/schema';
 import { expect, expectTypeOf, test } from 'vitest';
 import { fromJsonSchema } from './fromJsonSchema.js';
 
@@ -326,9 +326,91 @@ test('fromJsonSchema - 28b: allOf maps to intersection', () => {
             { type: 'string', maxLength: 10 }
         ]
     } as const);
+
+    // Type-level: InferType<typeof schema> should be string (intersection of string & string)
+    expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<string>();
+
+    // Type-level: should NOT be unknown
+    expectTypeOf<InferType<typeof schema>>().not.toMatchTypeOf<unknown>();
+
+    // Type-level: schema should be an IntersectionSchemaBuilder
+    expectTypeOf<typeof schema>().toMatchTypeOf<
+        IntersectionSchemaBuilder<any, any>
+    >();
+
     expect(valid(schema, 'hello')).toBe(true);
     expect(valid(schema, '')).toBe(false);
     expect(valid(schema, 'a'.repeat(11))).toBe(false);
+});
+
+test('fromJsonSchema - 28c: allOf type is not unknown', () => {
+    const schema = fromJsonSchema({
+        allOf: [
+            {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name']
+            },
+            {
+                type: 'object',
+                properties: { age: { type: 'number' } },
+                required: ['age']
+            }
+        ]
+    } as const);
+
+    // InferType should be { name: string } & { age: number }, not unknown
+    expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<{
+        name: string;
+        age: number;
+    }>();
+    expectTypeOf<InferType<typeof schema>>().not.toMatchTypeOf<unknown>();
+});
+
+test('fromJsonSchema - 28d: allOf three elements produces intersection type', () => {
+    const schema = fromJsonSchema({
+        allOf: [
+            {
+                type: 'object',
+                properties: { name: { type: 'string' } },
+                required: ['name']
+            },
+            {
+                type: 'object',
+                properties: { age: { type: 'number' } },
+                required: ['age']
+            },
+            {
+                type: 'object',
+                properties: { email: { type: 'string' } },
+                required: ['email']
+            }
+        ]
+    } as const);
+
+    expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<{
+        name: string;
+        age: number;
+        email: string;
+    }>();
+    expectTypeOf<InferType<typeof schema>>().not.toMatchTypeOf<unknown>();
+});
+
+test('fromJsonSchema - 28e: allOf single element returns direct builder type', () => {
+    const schema = fromJsonSchema({
+        allOf: [{ type: 'string', minLength: 1 }]
+    } as const);
+
+    expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<string>();
+    expectTypeOf<InferType<typeof schema>>().not.toMatchTypeOf<unknown>();
+});
+
+test('fromJsonSchema - 28f: allOf empty returns unknown builder', () => {
+    const schema = fromJsonSchema({
+        allOf: []
+    } as const);
+
+    expectTypeOf<InferType<typeof schema>>().toMatchTypeOf<unknown>();
 });
 
 // ---------------------------------------------------------------------------
