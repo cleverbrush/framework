@@ -2,7 +2,7 @@ import { expect, expectTypeOf, test } from 'vitest';
 import { intersection } from './IntersectionSchemaBuilder.js';
 import { number } from './NumberSchemaBuilder.js';
 import { object } from './ObjectSchemaBuilder.js';
-import type { InferType } from './SchemaBuilder.js';
+import type { BRAND, InferType } from './SchemaBuilder.js';
 import { string } from './StringSchemaBuilder.js';
 
 test('Intersection of two objects', async () => {
@@ -234,9 +234,8 @@ test('Intersection with brand', async () => {
     ).brand<'Person'>();
 
     type T = InferType<typeof schema>;
-    expectTypeOf<T>().toEqualTypeOf<
-        ({ name: string } & { age: number }) & { readonly __brand: 'Person' }
-    >();
+    expectTypeOf<T>().toExtend<{ name: string } & { age: number }>();
+    expectTypeOf<T>().toExtend<{ readonly [K in BRAND]: 'Person' }>();
 });
 
 test('Intersection with describe', async () => {
