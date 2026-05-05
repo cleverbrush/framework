@@ -62,9 +62,9 @@ function validateRaw(key: EnvKey, raw: string): string | null {
             : key === 'NEXT_PUBLIC_ENABLE_ANALYTICS'
               ? raw === 'true'
               : raw;
-    const result = schema.validate(coerced as any);
+    const result = schema.validate(coerced as never);
     if (!result.valid) {
-        return result.errors[0]?.message ?? 'Invalid value';
+        return (result.errors as any)[0]?.message ?? 'Invalid value';
     }
     return null;
 }
