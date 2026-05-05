@@ -328,7 +328,7 @@ export type JsonSchemaNodeToBuilder<S, TRequired extends boolean = true> =
                   readonly anyOf: infer Opts extends readonly unknown[];
               }
             ? UnionSchemaBuilder<SchemaNodesTupleToBuilders<Opts>, TRequired>
-            : // allOf (not supported; falls back to any() at runtime)
+            : // allOf — runtime maps to intersection(); type-level inference is a future enhancement
               S extends {
                     readonly allOf: infer _Opts extends readonly unknown[];
                 }
