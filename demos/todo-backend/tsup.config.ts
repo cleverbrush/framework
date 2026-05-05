@@ -12,5 +12,7 @@ export default defineConfig({
     // @opentelemetry/* packages are CJS and use require('async_hooks') + other
     // Node built-ins internally. Bundling them into ESM via tsup's shimmed
     // require breaks at runtime. Keep them external so Node loads them natively.
-    external: ['ws', /^@opentelemetry\//],
+    // @fastify/busboy is CJS and uses require('node:stream') internally.
+    // Bundling it into ESM via tsup's shimmed require breaks at runtime.
+    external: ['ws', /^@opentelemetry\//, '@fastify/busboy'],
 });
