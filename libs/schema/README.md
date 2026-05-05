@@ -1777,6 +1777,16 @@ const UserSchema = object({
 const standardSchema = UserSchema['~standard'];
 ```
 
+The `['~standard'].validate()` method returns a `Promise`, supporting both sync
+and async preprocessors, validators, and error message providers:
+
+```ts
+const result = await UserSchema['~standard'].validate(input);
+if ('issues' in result) {
+  console.error(result.issues[0].message);
+}
+```
+
 Confirmed integrations: **tRPC**, **TanStack Form**, **React Hook Form**, **T3 Env**, **Hono**, **Elysia**, **next-safe-action**, and 50+ others listed on [standardschema.dev](https://standardschema.dev/).
 
 ## Code Quality

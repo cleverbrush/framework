@@ -858,16 +858,18 @@ export abstract class SchemaBuilder<
         this.#standardProps = {
             version: 1 as const,
             vendor: '@cleverbrush/schema',
-            validate(
+            async validate(
                 value: unknown
-            ): StandardSchemaV1.Result<
-                ResolvedSchemaType<TResult, TRequired, TNullable>
+            ): Promise<
+                StandardSchemaV1.Result<
+                    ResolvedSchemaType<TResult, TRequired, TNullable>
+                >
             > {
                 // Standard Schema validate accepts `unknown`, while the
-                // schema's own validate() has a typed parameter. The cast
-                // is safe because validate() performs full runtime
+                // schema's own validateAsync() has a typed parameter. The cast
+                // is safe because validateAsync() performs full runtime
                 // validation regardless of the compile-time input type.
-                const result = self.validate(value as any);
+                const result = await self.validateAsync(value as any);
                 if (result.valid) {
                     return {
                         value: result.object as ResolvedSchemaType<

@@ -95,10 +95,10 @@ const std = UserSchema['~standard'];
 console.log(std.version); // 1
 console.log(std.vendor);  // '@cleverbrush/schema'
 
-const ok   = std.validate({ name: 'Alice', email: 'alice@example.com' });
+const ok   = await std.validate({ name: 'Alice', email: 'alice@example.com' });
 // { value: { name: 'Alice', email: 'alice@example.com', age: undefined } }
 
-const fail = std.validate({ name: 'A', email: 'not-an-email' });
+const fail = await std.validate({ name: 'A', email: 'not-an-email' });
 // { issues: [{ message: 'minLength' }, { message: 'email' }] }`)
                     }}
                 />

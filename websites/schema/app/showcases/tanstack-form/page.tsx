@@ -489,7 +489,7 @@ const bioSchema = string()
 // Standard Schema interface:
 // nameSchema['~standard'].version  // => 1
 // nameSchema['~standard'].vendor   // => '@cleverbrush/schema'
-// nameSchema['~standard'].validate('Hi')
+// await nameSchema['~standard'].validate('Hi')
 // => { issues: [{ message: 'Name must be at least 2 characters' }] }`)
                             }}
                         />
