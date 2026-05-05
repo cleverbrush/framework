@@ -115,3 +115,73 @@ export function getPerCallOptions<T>(
 ): T | undefined {
     return (init as any)[PER_CALL_OPTIONS]?.[key] as T | undefined;
 }
+
+// ---------------------------------------------------------------------------
+// Endpoint metadata
+// ---------------------------------------------------------------------------
+
+/**
+ * Endpoint metadata carried through {@link PER_CALL_OPTIONS} on every request.
+ *
+ * Computed by the Proxy-based client at call time, this gives middleware
+ * access to the endpoint's structural info plus the actual call arguments
+ * without any URL parsing or regex.
+ *
+ * Used by {@link throttlingCache} for cache-invalidation callbacks.
+ */
+export interface EndpointMeta {
+    /** Contract group name, e.g. `"todos"`. */
+    group: string;
+    /** Endpoint name within the group, e.g. `"update"`. */
+    endpoint: string;
+    /** HTTP method in uppercase, e.g. `"PATCH"`. */
+    method: string;
+    /** Path template with colon placeholders, e.g. `/api/todos/:id`. */
+    path: string;
+    /** Resource base path, e.g. `/api/todos`. */
+    basePath: string;
+    /** Resource collection path (basePath without param placeholders). */
+    collectionPath: string;
+    /** Client base URL (e.g. `"http://localhost:3000"` or `""`). */
+    baseUrl: string;
+    /**
+     * Full collection URL matching the HTTP cache key format.
+     * Computed as `baseUrl (stripped of trailing slash) + collectionPath`.
+     */
+    fullCollectionUrl: string;
+    /** Names of path parameters, e.g. `["id"]`. */
+    pathParamNames: string[];
+    /** Actual route parameter values from the call, e.g. `{ id: 42 }`. */
+    params: Readonly<Record<string, unknown>>;
+    /** Request body. */
+    body: unknown;
+    /** Query parameters, e.g. `{ page: 1 }`. */
+    query: Readonly<Record<string, unknown>>;
+    /** OpenAPI operationId, or `null`. */
+    operationId: string | null;
+    /** OpenAPI tags, or `[]`. */
+    tags: readonly string[];
+    /**
+     * Cache tag definitions from the endpoint's `.cacheTag()` calls.
+     * Each tag has a `name` and a map of `properties` (key → accessor).
+     * Used by the `cacheTags` middleware.
+     */
+    cacheTags: ReadonlyArray<{
+        name: string;
+        properties: Readonly<
+            Record<
+                string,
+                {
+                    getValue(root: {
+                        params: Record<string, unknown>;
+                        body: unknown;
+                        query: Record<string, unknown>;
+                        headers: Record<string, string>;
+                    }): { value?: unknown; success: boolean };
+                }
+            >
+        >;
+    }>;
+    /** Request headers from the call, e.g. `{ 'x-request-id': 'abc' }`. */
+    headers: Readonly<Record<string, string>>;
+}
