@@ -205,6 +205,16 @@ export interface PerCallOverrides {
      * Override the timeout (in milliseconds) for this call only.
      */
     timeout?: number;
+    /**
+     * Override optimistic update middleware options for this call.
+     * Pass `{ skip: true }` to skip tagging for this mutation.
+     */
+    optimisticUpdate?: { skip?: boolean };
+    /**
+     * Override offline queue middleware options for this call.
+     * Pass `{ skip: true }` to bypass the queue for this mutation.
+     */
+    offlineQueue?: { skip?: boolean };
 }
 
 /**

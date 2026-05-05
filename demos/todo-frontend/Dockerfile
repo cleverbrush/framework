@@ -24,6 +24,10 @@ COPY libs/server/package.json ./libs/server/
 COPY libs/server-openapi/package.json ./libs/server-openapi/
 COPY libs/client/package.json ./libs/client/
 COPY libs/benchmarks/package.json ./libs/benchmarks/
+COPY libs/log/package.json ./libs/log/
+COPY libs/otel/package.json ./libs/otel/
+COPY libs/orm/package.json ./libs/orm/
+COPY libs/orm-cli/package.json ./libs/orm-cli/
 COPY demos/todo-backend/package.json ./demos/todo-backend/
 COPY demos/todo-frontend/package.json ./demos/todo-frontend/
 

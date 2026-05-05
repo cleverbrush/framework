@@ -27,6 +27,10 @@
  * @module
  */
 
+export type {
+    CacheTagDefinition,
+    CacheTagPropertyAccessor
+} from './CacheTag.js';
 export {
     type ActionContext,
     type AllowedResponseReturn,

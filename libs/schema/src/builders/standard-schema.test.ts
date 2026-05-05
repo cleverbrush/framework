@@ -80,26 +80,29 @@ test('~standard is cached (same reference)', () => {
 // Successful validation
 // ---------------------------------------------------------------------------
 
-test('validate returns success result for valid string', () => {
-    const result = string()['~standard'].validate('hello');
+test('validate returns success result for valid string', async () => {
+    const result = await string()['~standard'].validate('hello');
     expect(result).toEqual({ value: 'hello' });
     expect(result).not.toHaveProperty('issues');
 });
 
-test('validate returns success result for valid number', () => {
-    const result = number()['~standard'].validate(42);
+test('validate returns success result for valid number', async () => {
+    const result = await number()['~standard'].validate(42);
     expect(result).toEqual({ value: 42 });
 });
 
-test('validate returns success result for valid object', () => {
+test('validate returns success result for valid object', async () => {
     const schema = object({ name: string(), age: number() });
-    const result = schema['~standard'].validate({ name: 'Alice', age: 30 });
+    const result = await schema['~standard'].validate({
+        name: 'Alice',
+        age: 30
+    });
     expect(result).toEqual({ value: { name: 'Alice', age: 30 } });
 });
 
-test('validate returns success for optional schema with undefined', () => {
+test('validate returns success for optional schema with undefined', async () => {
     const schema = string().optional();
-    const result = schema['~standard'].validate(undefined);
+    const result = await schema['~standard'].validate(undefined);
     expect(result).toEqual({ value: undefined });
 });
 
@@ -107,31 +110,31 @@ test('validate returns success for optional schema with undefined', () => {
 // Failed validation
 // ---------------------------------------------------------------------------
 
-test('validate returns failure result for invalid string', () => {
-    const result = string()['~standard'].validate(123);
+test('validate returns failure result for invalid string', async () => {
+    const result = await string()['~standard'].validate(123);
     expect(result).toHaveProperty('issues');
     const issues = (result as StandardSchemaV1.FailureResult).issues;
     expect(issues.length).toBeGreaterThan(0);
     expect(typeof issues[0].message).toBe('string');
 });
 
-test('validate returns failure result for required schema with null', () => {
-    const result = string()['~standard'].validate(null);
+test('validate returns failure result for required schema with null', async () => {
+    const result = await string()['~standard'].validate(null);
     expect(result).toHaveProperty('issues');
     const issues = (result as StandardSchemaV1.FailureResult).issues;
     expect(issues.length).toBeGreaterThan(0);
 });
 
-test('validate returns failure result for required schema with undefined', () => {
-    const result = string()['~standard'].validate(undefined);
+test('validate returns failure result for required schema with undefined', async () => {
+    const result = await string()['~standard'].validate(undefined);
     expect(result).toHaveProperty('issues');
     const issues = (result as StandardSchemaV1.FailureResult).issues;
     expect(issues.length).toBeGreaterThan(0);
 });
 
-test('validate returns failure with multiple issues for invalid object', () => {
+test('validate returns failure with multiple issues for invalid object', async () => {
     const schema = object({ name: string(), age: number() });
-    const result = schema['~standard'].validate({
+    const result = await schema['~standard'].validate({
         name: 123,
         age: 'not a number'
     });
@@ -144,12 +147,12 @@ test('validate returns failure with multiple issues for invalid object', () => {
 // Preprocessors work through ~standard.validate
 // ---------------------------------------------------------------------------
 
-test('preprocessors are applied through ~standard.validate', () => {
+test('preprocessors are applied through ~standard.validate', async () => {
     const schema = string().addPreprocessor((v: any) => {
         if (typeof v === 'number') return String(v);
         return v;
     });
-    const result = schema['~standard'].validate(42);
+    const result = await schema['~standard'].validate(42);
     expect(result).toEqual({ value: '42' });
 });
 
@@ -157,13 +160,48 @@ test('preprocessors are applied through ~standard.validate', () => {
 // Validators with constraints
 // ---------------------------------------------------------------------------
 
-test('string minLength constraint is enforced via ~standard.validate', () => {
+test('string minLength constraint is enforced via ~standard.validate', async () => {
     const schema = string().minLength(3);
-    const fail = schema['~standard'].validate('ab');
+    const fail = await schema['~standard'].validate('ab');
     expect(fail).toHaveProperty('issues');
 
-    const pass = schema['~standard'].validate('abc');
+    const pass = await schema['~standard'].validate('abc');
     expect(pass).toEqual({ value: 'abc' });
+});
+
+// ---------------------------------------------------------------------------
+// Async validation through ~standard.validate
+// ---------------------------------------------------------------------------
+
+test('async preprocessor works through ~standard.validate', async () => {
+    const schema = string().addPreprocessor(async (v: any) => {
+        if (typeof v === 'number') return String(v);
+        return v;
+    });
+    const result = await schema['~standard'].validate(42);
+    expect(result).toEqual({ value: '42' });
+});
+
+test('async validator works through ~standard.validate', async () => {
+    const schema = string().addValidator(async (v: any) => {
+        if (v === 'hello') {
+            return { valid: true, errors: [] };
+        }
+        return { valid: false, errors: [{ message: 'not hello' }] };
+    });
+    const pass = await schema['~standard'].validate('hello');
+    expect(pass).toEqual({ value: 'hello' });
+
+    const fail = await schema['~standard'].validate('world');
+    expect(fail).toHaveProperty('issues');
+    const issues = (fail as StandardSchemaV1.FailureResult).issues;
+    expect(issues[0].message).toMatch(/not hello/);
+});
+
+test('validate returns Promise from ~standard bridge', () => {
+    const schema = string();
+    const result = schema['~standard'].validate('hello');
+    expect(result).toBeInstanceOf(Promise);
 });
 
 // ---------------------------------------------------------------------------
@@ -219,64 +257,64 @@ test('StandardSchemaV1.InferOutput works with optional schema', () => {
 // Error shape — issue messages and mutual exclusivity of value / issues
 // ---------------------------------------------------------------------------
 
-test('failure result has no value property', () => {
-    const result = string()['~standard'].validate(123);
+test('failure result has no value property', async () => {
+    const result = await string()['~standard'].validate(123);
     expect(result).not.toHaveProperty('value');
     expect(result).toHaveProperty('issues');
 });
 
-test('success result has no issues property', () => {
-    const result = string()['~standard'].validate('hello');
+test('success result has no issues property', async () => {
+    const result = await string()['~standard'].validate('hello');
     expect(result).toHaveProperty('value');
     expect(result).not.toHaveProperty('issues');
 });
 
-test('wrong type produces a descriptive message', () => {
-    const result = string()['~standard'].validate(
+test('wrong type produces a descriptive message', async () => {
+    const result = (await string()['~standard'].validate(
         123
-    ) as StandardSchemaV1.FailureResult;
+    )) as StandardSchemaV1.FailureResult;
     expect(result.issues[0].message).toMatch(/string/i);
 });
 
-test('required field missing produces a descriptive message', () => {
-    const result = string()['~standard'].validate(
+test('required field missing produces a descriptive message', async () => {
+    const result = (await string()['~standard'].validate(
         undefined
-    ) as StandardSchemaV1.FailureResult;
+    )) as StandardSchemaV1.FailureResult;
     expect(result.issues[0].message).toMatch(/required/i);
 });
 
-test('null value produces a descriptive message', () => {
-    const result = string()['~standard'].validate(
+test('null value produces a descriptive message', async () => {
+    const result = (await string()['~standard'].validate(
         null
-    ) as StandardSchemaV1.FailureResult;
+    )) as StandardSchemaV1.FailureResult;
     expect(result.issues[0].message).toBeTruthy();
 });
 
-test('minLength violation produces a descriptive message', () => {
-    const result = string()
+test('minLength violation produces a descriptive message', async () => {
+    const result = (await string()
         .minLength(5)
-        ['~standard'].validate('ab') as StandardSchemaV1.FailureResult;
+        ['~standard'].validate('ab')) as StandardSchemaV1.FailureResult;
     expect(result.issues[0].message).toMatch(/5/);
 });
 
-test('number min violation produces a descriptive message', () => {
-    const result = number()
+test('number min violation produces a descriptive message', async () => {
+    const result = (await number()
         .min(10)
-        ['~standard'].validate(3) as StandardSchemaV1.FailureResult;
+        ['~standard'].validate(3)) as StandardSchemaV1.FailureResult;
     expect(result.issues[0].message).toMatch(/10/);
 });
 
-test('custom error message string is propagated through issues', () => {
-    const result = string()
+test('custom error message string is propagated through issues', async () => {
+    const result = (await string()
         .minLength(3, 'name too short')
-        ['~standard'].validate('a') as StandardSchemaV1.FailureResult;
+        ['~standard'].validate('a')) as StandardSchemaV1.FailureResult;
     expect(result.issues[0].message).toBe('name too short');
 });
 
-test('each issue has a non-empty string message', () => {
-    const result = string()['~standard'].validate(
+test('each issue has a non-empty string message', async () => {
+    const result = (await string()['~standard'].validate(
         false
-    ) as StandardSchemaV1.FailureResult;
+    )) as StandardSchemaV1.FailureResult;
     for (const issue of result.issues) {
         expect(typeof issue.message).toBe('string');
         expect(issue.message.length).toBeGreaterThan(0);

@@ -45,6 +45,9 @@ import type { UnifiedClient } from './types.js';
  * Each group also exposes a `queryKey()` method for group-level
  * cache invalidation.
  *
+ * When the `cacheTags` middleware is active, `useMutation` hooks
+ * automatically invalidate TanStack Query entries for the affected group.
+ *
  * @param contract - An API contract created with `defineApi()`.
  * @param options - Client options passed to `@cleverbrush/web`'s `createClient()`.
  * @returns A fully typed unified client proxy.
@@ -113,7 +116,12 @@ export function createClient<T extends ApiContract>(
                 group,
                 endpoint
             );
-            call.useMutation = createUseMutation(webClient, group, endpoint);
+            call.useMutation = createUseMutation(
+                webClient,
+                group,
+                endpoint,
+                extractCacheTagNames(contract, group, endpoint)
+            );
             call.queryKey = createQueryKey(group, endpoint);
             call.prefetch = createPrefetch(webClient, group, endpoint);
 
@@ -146,4 +154,21 @@ export function createClient<T extends ApiContract>(
             });
         }
     });
+}
+
+function extractCacheTagNames(
+    contract: any,
+    group: string,
+    endpoint: string
+): string[] | undefined {
+    try {
+        const ep = contract[group]?.[endpoint];
+        if (!ep || typeof ep.introspect !== 'function') return undefined;
+        const meta = ep.introspect();
+        const tags: Array<{ name: string }> = meta.cacheTags ?? [];
+        if (tags.length === 0) return undefined;
+        return tags.map(t => t.name);
+    } catch {
+        return undefined;
+    }
 }

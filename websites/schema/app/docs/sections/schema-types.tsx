@@ -236,6 +236,24 @@ export default function SchemaTypesSection() {
                             </tr>
                             <tr>
                                 <td>
+                                    <code>intersection(left, right)</code>
+                                </td>
+                                <td>
+                                    Value must match both schemas (logical AND).
+                                    Merges validated outputs.
+                                </td>
+                                <td>
+                                    <code>.validate(data)</code>,{' '}
+                                    <code>.validateAsync(data)</code>,{' '}
+                                    <code>.optional()</code>,{' '}
+                                    <code>.nullable()</code>,{' '}
+                                    <code>.default(value)</code>,{' '}
+                                    <code>.catch(value)</code>,{' '}
+                                    <code>.readonly()</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
                                     <code>lazy(getter)</code>
                                 </td>
                                 <td>
