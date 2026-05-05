@@ -581,6 +581,7 @@ export interface EndpointMetadata {
      * @see `EndpointBuilder.upload()`
      */
     readonly fileUpload: UploadOptions | null;
+    /**
      * Cache tags declared via `.clearsCacheTag()`, providing tag-based cache
      * key computation for the client middleware.
      */
@@ -812,7 +813,7 @@ export class EndpointBuilder<
         externalDocs: { url: string; description?: string } | null = null,
         links: Record<string, LinkDefinition> | null = null,
         callbacks: Record<string, CallbackDefinition> | null = null,
-        fileUpload: UploadOptions | null = null
+        fileUpload: UploadOptions | null = null,
         cacheTags: readonly CacheTagDefinition[] = []
     ) {
         this.#method = method;
@@ -1705,7 +1706,7 @@ export class EndpointBuilder<
                 maxFileSize: options?.maxFileSize ?? 10 * 1024 * 1024,
                 allowedMimeTypes: options?.allowedMimeTypes,
                 maxFileCount: options?.maxFileCount ?? 10
-            }
+            },
             this.#cacheTags
         );
     }
@@ -2072,6 +2073,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             defs as Record<string, CallbackDefinition>,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -2230,6 +2232,7 @@ export class EndpointBuilder<
                 this.#externalDocs,
                 this.#links,
                 this.#callbacks,
+                this.#fileUpload,
                 [...this.#cacheTags, { name, properties: {} }]
             );
         }
@@ -2278,6 +2281,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             [...this.#cacheTags, definition]
         );
     }

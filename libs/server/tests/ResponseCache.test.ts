@@ -1,4 +1,3 @@
-import { object, string } from '@cleverbrush/schema';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { cacheResponse } from '../src/middlewares/ResponseCache.js';
 
