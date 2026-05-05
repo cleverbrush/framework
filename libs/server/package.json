@@ -8,6 +8,7 @@
         "@cleverbrush/auth": "^4.0.0",
         "@cleverbrush/di": "^4.0.0",
         "@cleverbrush/schema": "^4.0.0",
+        "@fastify/busboy": "^3.2.0",
         "ws": "^8.20.0"
     },
     "devDependencies": {
