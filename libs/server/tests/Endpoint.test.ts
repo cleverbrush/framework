@@ -614,12 +614,12 @@ describe('endpoint HTTP method factories', () => {
 });
 
 // ---------------------------------------------------------------------------
-// .cacheTag()
+// .clearsCacheTag()
 // ---------------------------------------------------------------------------
 
-describe('EndpointBuilder cacheTag', () => {
+describe('EndpointBuilder clearsCacheTag / cacheTag', () => {
     it('simple tag stores name with empty properties in introspect', () => {
-        const ep = endpoint.get('/api/items').cacheTag('tag-a');
+        const ep = endpoint.get('/api/items').clearsCacheTag('tag-a');
 
         const tags = ep.introspect().cacheTags;
         expect(tags).toHaveLength(1);
@@ -632,7 +632,7 @@ describe('EndpointBuilder cacheTag', () => {
         const ep = endpoint
             .get('/api/items')
             .query(querySchema)
-            .cacheTag('tag-b', p => ({
+            .clearsCacheTag('tag-b', p => ({
                 filter: p.query.filter,
                 page: p.query.page
             }));
@@ -649,8 +649,8 @@ describe('EndpointBuilder cacheTag', () => {
     it('multiple tags accumulate in order', () => {
         const ep = endpoint
             .get('/api/items')
-            .cacheTag('first')
-            .cacheTag('second');
+            .clearsCacheTag('first')
+            .clearsCacheTag('second');
 
         const tags = ep.introspect().cacheTags;
         expect(tags).toHaveLength(2);
@@ -660,7 +660,7 @@ describe('EndpointBuilder cacheTag', () => {
 
     it('cacheTag returns a new builder (immutable)', () => {
         const a = endpoint.get('/api/items');
-        const b = a.cacheTag('test');
+        const b = a.clearsCacheTag('test');
 
         expect(a).not.toBe(b);
         expect(a.introspect().cacheTags).toEqual([]);
@@ -672,7 +672,7 @@ describe('EndpointBuilder cacheTag', () => {
         const ep = endpoint.get('/api/items');
 
         expect(() =>
-            ep.cacheTag('bad', () => ({
+            ep.clearsCacheTag('bad', () => ({
                 notADescriptor: 'hello' as any
             }))
         ).toThrow(/not a valid.*PropertyDescriptor/);
@@ -682,7 +682,7 @@ describe('EndpointBuilder cacheTag', () => {
         const ep = endpoint.get('/api/items');
 
         expect(() =>
-            ep.cacheTag('bad', () => ({
+            ep.clearsCacheTag('bad', () => ({
                 missing: null as any
             }))
         ).toThrow(/not a valid.*PropertyDescriptor/);
@@ -693,8 +693,8 @@ describe('EndpointBuilder cacheTag', () => {
         const ep = endpoint
             .get('/api/items')
             .query(querySchema)
-            .cacheTag('list')
-            .cacheTag('item', p => ({ search: p.query.search }));
+            .clearsCacheTag('list')
+            .clearsCacheTag('item', p => ({ search: p.query.search }));
 
         const tags = ep.introspect().cacheTags;
         expect(tags).toHaveLength(2);
@@ -709,7 +709,7 @@ describe('EndpointBuilder cacheTag', () => {
         const ep = endpoint
             .post('/api/items')
             .body(bodySchema)
-            .cacheTag('item', p => ({ title: p.body.title }));
+            .clearsCacheTag('item', p => ({ title: p.body.title }));
 
         const tags = ep.introspect().cacheTags;
         expect(tags).toHaveLength(1);
@@ -724,7 +724,7 @@ describe('EndpointBuilder cacheTag', () => {
         );
         const ep = endpoint
             .get('/api/items', ps as any)
-            .cacheTag('item', p => ({ id: p.params.id }));
+            .clearsCacheTag('item', p => ({ id: p.params.id }));
 
         const tags = ep.introspect().cacheTags;
         expect(tags).toHaveLength(1);
@@ -737,7 +737,7 @@ describe('EndpointBuilder cacheTag', () => {
         const ep = endpoint
             .get('/api/items')
             .query(querySchema)
-            .cacheTag('item', p => ({ filter: p.query.filter }));
+            .clearsCacheTag('item', p => ({ filter: p.query.filter }));
 
         const tags = ep.introspect().cacheTags;
         const accessor = tags[0].properties['filter'];
@@ -749,5 +749,28 @@ describe('EndpointBuilder cacheTag', () => {
         });
         expect(result.success).toBe(true);
         expect(result.value).toBe('active');
+    });
+
+    it('cacheTag and clearsCacheTag produce identical results', () => {
+        const querySchema = object({ x: string() });
+        const ep1 = endpoint
+            .get('/api/items')
+            .query(querySchema)
+            .cacheTag('group', p => ({ x: p.query.x }));
+
+        const ep2 = endpoint
+            .get('/api/items')
+            .query(querySchema)
+            .clearsCacheTag('group', p => ({ x: p.query.x }));
+
+        const tags1 = ep1.introspect().cacheTags;
+        const tags2 = ep2.introspect().cacheTags;
+
+        expect(tags1).toHaveLength(1);
+        expect(tags2).toHaveLength(1);
+        expect(tags1[0].name).toBe(tags2[0].name);
+        expect(Object.keys(tags1[0].properties)).toEqual(
+            Object.keys(tags2[0].properties)
+        );
     });
 });

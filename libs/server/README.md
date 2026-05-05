@@ -140,17 +140,18 @@ const ListTodos = endpoint
 const UpdateTodo = endpoint
     .patch('/api/todos/:id')
     .body(UpdateTodoBody)
-    .cacheTag('todo-list')               // invalidates the collection
-    .cacheTag('todo', p => ({ id: p.params.id }))  // invalidates specific entity
+    .clearsCacheTag('todo-list')               // clears the collection cache
+    .clearsCacheTag('todo', p => ({ id: p.params.id }))  // clears specific entity
     .returns(TodoSchema);
 ```
 
-- **Simple tags** — `cacheTag('name')` — cache key is the name itself.
-  Mutations invalidate all entries prefixed with the name.
-- **Property tags** — `cacheTag('name', p => ({ ... }))` — each selected
-  property becomes part of the cache key, so different query params, body
-  values, or headers produce distinct cache entries.
-- **Immutability** — `.cacheTag()` returns a new builder; the original is
+- **`.cacheTag(name)`** — declares the endpoint's data belongs to a cache
+  group. Use on GET endpoints.
+- **`.clearsCacheTag(name)`** — declares that this mutation clears matching
+  cache entries on success. Use on POST / PUT / PATCH / DELETE.
+- **`.cacheTag(name, p => ({ ... }))`** — property-based tag; each selected
+  property becomes part of the cache key (different pages → different entries).
+- **Immutability** — both methods return a new builder; the original is
   unchanged.
 
 ## Registering and Handling Endpoints

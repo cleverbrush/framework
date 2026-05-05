@@ -38,8 +38,8 @@ await client.todos.list({ query: { page: 1 } });
                 <h2>Server Integration</h2>
                 <p>
                     Cache tags are declared on the server-side endpoint
-                    definition via <code>.cacheTag()</code>. Tags flow through
-                    the contract metadata to the client automatically.
+                    definition via <code>.clearsCacheTag()</code>. Tags flow
+                    through the contract metadata to the client automatically.
                 </p>
                 <pre>
                     <code
@@ -48,7 +48,7 @@ await client.todos.list({ query: { page: 1 } });
 const ListTodos = todosResource
     .get()
     .query(TodoListQuerySchema)
-    .cacheTag('todo-list', p => ({
+    .clearsCacheTag('todo-list', p => ({
         page: p.query.page,
         limit: p.query.limit
     }))
@@ -57,8 +57,8 @@ const ListTodos = todosResource
 const UpdateTodo = todosResource
     .patch(ById)
     .body(UpdateTodoBodySchema)
-    .cacheTag('todo-list')            // invalidates list
-    .cacheTag('todo', p => ({        // invalidates entity
+    .clearsCacheTag('todo-list')            // invalidates list
+    .clearsCacheTag('todo', p => ({        // invalidates entity
         id: p.params.id
     }))
     .returns(TodoSchema);

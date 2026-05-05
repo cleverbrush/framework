@@ -246,7 +246,7 @@ Caches successful GET responses for a configurable TTL. Subsequent requests with
 ### Cache Tags — `@cleverbrush/client/cache`
 
 Tag-based HTTP caching with automatic invalidation driven by server-side endpoint
-annotations (`.cacheTag()`). Replaces manual invalidation callbacks — mutations
+annotations (`.cacheTag()` / `.clearsCacheTag()`). Replaces manual invalidation callbacks — mutations
 automatically clear cache entries matching the endpoint's declared tag names.
 
 ```ts

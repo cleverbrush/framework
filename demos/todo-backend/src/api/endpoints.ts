@@ -97,7 +97,7 @@ export const GetTodoWithAuthorEndpoint = api.todos.getWithAuthor
 export const CreateTodoEndpoint = api.todos.create
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, logger: LoggerToken })
-    .cacheTag('todo-list')
+    .clearsCacheTag('todo-list')
     .summary('Create a todo')
     .description('Creates a new todo owned by the authenticated user.')
     .tags('todos')
@@ -106,8 +106,8 @@ export const CreateTodoEndpoint = api.todos.create
 export const UpdateTodoEndpoint = api.todos.update
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
-    .cacheTag('todo-list')
-    .cacheTag('todo', p => ({ id: p.params.id }))
+    .clearsCacheTag('todo-list')
+    .clearsCacheTag('todo', p => ({ id: p.params.id }))
     .summary('Update a todo')
     .description(
         'Partially updates a todo. Users can only update their own todos; admins can update any todo.'
@@ -118,8 +118,8 @@ export const UpdateTodoEndpoint = api.todos.update
 export const DeleteTodoEndpoint = api.todos.delete
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
-    .cacheTag('todo-list')
-    .cacheTag('todo', p => ({ id: p.params.id }))
+    .clearsCacheTag('todo-list')
+    .clearsCacheTag('todo', p => ({ id: p.params.id }))
     .summary('Delete a todo')
     .description(
         'Deletes a todo. Users can only delete their own todos; admins can delete any todo.'
@@ -169,8 +169,8 @@ export const ListUsersEndpoint = api.users.list
 export const DeleteUserEndpoint = api.users.delete
     .authorize(PrincipalSchema, 'admin')
     .inject({ db: DbToken })
-    .cacheTag('user-list')
-    .cacheTag('user-profile')
+    .clearsCacheTag('user-list')
+    .clearsCacheTag('user-profile')
     .summary('Delete a user')
     .description(
         'Permanently deletes a user account and all their todos. Admin only.'
@@ -261,8 +261,8 @@ export const LegacyReplaceTodoEndpoint = api.todos.legacyReplace
 export const CompleteTodoEndpoint = api.todos.complete
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken, logger: LoggerToken })
-    .cacheTag('todo-list')
-    .cacheTag('todo', p => ({ id: p.params.id }))
+    .clearsCacheTag('todo-list')
+    .clearsCacheTag('todo', p => ({ id: p.params.id }))
     .summary('Complete a todo with conflict detection')
     .description(
         'Marks a todo as completed. Supports optimistic concurrency via the `If-Match` header — ' +
@@ -397,7 +397,7 @@ export const ListAllActivityEndpoint = api.activity.listAll
 export const DeleteActivityEndpoint = api.activity.delete
     .authorize(PrincipalSchema)
     .inject({ db: DbToken, trackedDb: TrackedDbToken })
-    .cacheTag('activity-list')
+    .clearsCacheTag('activity-list')
     .summary('Delete an activity event')
     .description('Permanently deletes a single activity event by ID.')
     .tags('activity')

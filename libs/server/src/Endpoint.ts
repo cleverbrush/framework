@@ -539,7 +539,7 @@ export interface EndpointMetadata {
      */
     readonly callbacks: Record<string, CallbackDefinition> | null;
     /**
-     * Cache tags declared via `.cacheTag()`, providing tag-based cache
+     * Cache tags declared via `.clearsCacheTag()`, providing tag-based cache
      * key computation for the client middleware.
      */
     readonly cacheTags: readonly CacheTagDefinition[];
@@ -577,7 +577,7 @@ type InferResponsesMap<
 
 // ---------------------------------------------------------------------------
 // Cache-tag selector type — gives the consumer IDE hints when selecting
-// properties from the tree passed to the `.cacheTag()` callback.
+// properties from the tree passed to the `.clearsCacheTag()` callback.
 // ---------------------------------------------------------------------------
 
 /**
@@ -601,7 +601,7 @@ type CacheTagPropertyTree<T> = CacheTagPropertyLeaf &
         : unknown);
 
 /**
- * The typed tree passed to the `.cacheTag(name, selector)` callback.
+ * The typed tree passed to the `.clearsCacheTag(name, selector)` callback.
  *
  * `p.params`, `p.query`, and `p.headers` provide IDE completion for
  * each schema's property names, while `p.body` resolves through the
@@ -1916,21 +1916,22 @@ export class EndpointBuilder<
     }
 
     /**
-     * Declare a cache tag for tag-based cache invalidation.
+     * Declare a cache group for this endpoint.
      *
-     * Cache tags are used by the `cacheTags` client middleware to compute
-     * cache keys from live request data and invalidate entries on
-     * mutating requests.
+     * Use on GET / query endpoints to group responses into a named cache.
+     * The client-side {@code cacheTags} middleware caches responses keyed
+     * by this tag and flushes matching entries when a mutation calls
+     * {@link clearsCacheTag}.
      *
-     * @overload Simple tag (no properties).
-     * @overload Tag with property descriptors extracted from the request schema.
+     * @overload Simple tag (no properties — single cache entry).
+     * @overload Tag with property descriptors for fine-grained keys.
      *
      * @example
      * ```ts
+     * // GET — responses cached under "todo" group, keyed by id
      * endpoint.get('/api/todos/:id')
      *     .cacheTag('todo', p => ({
-     *         id: p.query.id,
-     *         fromBodyId: p.body.id
+     *         id: p.params.id
      *     }))
      * ```
      */
@@ -1964,6 +1965,72 @@ export class EndpointBuilder<
         TResponses
     >;
     cacheTag(
+        name: string,
+        selector?: (tree: any) => Record<string, unknown>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return this.clearsCacheTag(name, selector!);
+    }
+
+    /**
+     * Declare which cache groups are cleared when this mutation succeeds.
+     *
+     * Use on POST / PUT / PATCH / DELETE endpoints. When the mutation
+     * completes, the {@code cacheTags} client middleware invalidates all
+     * cache entries matching the declared tag names (prefix match).
+     *
+     * @overload Simple tag (clears all entries prefixed with the name).
+     * @overload Tag with property descriptors for targeted invalidation.
+     *
+     * @example
+     * ```ts
+     * // PATCH — clears "todo-list" and "todo:id=42" on success
+     * endpoint.patch('/api/todos/:id')
+     *     .clearsCacheTag('todo-list')
+     *     .clearsCacheTag('todo', p => ({
+     *         id: p.params.id
+     *     }))
+     * ```
+     */
+    clearsCacheTag(
+        name: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    >;
+    clearsCacheTag(
+        name: string,
+        selector: (
+            tree: CacheTagSelector<TParams, TBody, TQuery, THeaders>
+        ) => Record<string, unknown>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    >;
+    clearsCacheTag(
         name: string,
         selector?: (tree: any) => Record<string, unknown>
     ): EndpointBuilder<

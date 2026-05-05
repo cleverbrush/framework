@@ -11,15 +11,15 @@ feat(client): optimistic update + offline support + tag-based cache invalidation
 - Add `OfflineError` class extending `NetworkError`
 - Extend `PerCallOverrides` with `optimisticUpdate` and `offlineQueue` keys
 
-feat(server, client): tag-based cache invalidation via `.cacheTag()` endpoint annotations
+feat(server, client): tag-based cache invalidation via `.clearsCacheTag()` endpoint annotations
 
-- Add `.cacheTag(name[, selector])` to `EndpointBuilder` — declare cache tags with optional property selectors
+- Add `.clearsCacheTag(name[, selector])` to `EndpointBuilder` — declare cache tags with optional property selectors
 - Add `CacheTagDefinition`, `CacheTagPropertyAccessor`, `createCacheTagTree`, `serializeTag`, `computeCacheKey` to `@cleverbrush/server`
 - Add `cacheTags()` middleware to `@cleverbrush/client/cache` — tag-keyed HTTP caching with automatic invalidation on mutations
 - Add `CacheTagMiddlewareOptions` with `ttlByTag`, `defaultTtl`, `condition`
 - Add `cacheTags` and `headers` fields to `EndpointMeta` for middleware introspection
 - Add implicit TanStack Query invalidation in `useMutation` when endpoint declares cache tags
-- Add `CacheTagSelector` type for IDE autocomplete in `.cacheTag()` selector callbacks
+- Add `CacheTagSelector` type for IDE autocomplete in `.clearsCacheTag()` selector callbacks
 
 feat(server, client): request idempotency middleware
 

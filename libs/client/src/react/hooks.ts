@@ -162,7 +162,7 @@ export function createUseInfiniteQuery(
  * @param group - API contract group name (e.g. `"todos"`).
  * @param endpoint - Endpoint name within the group (e.g. `"create"`).
  * @param cacheTagNames - Optional cache tag names declared on the
- *   endpoint via `.cacheTag()`. When non-empty, triggers automatic
+ *   endpoint via `.clearsCacheTag()`. When non-empty, triggers automatic
  *   `queryClient.invalidateQueries()` on mutation success.
  * @internal
  */
