@@ -62,10 +62,11 @@ function validateRaw(key: EnvKey, raw: string): string | null {
             : key === 'NEXT_PUBLIC_ENABLE_ANALYTICS'
               ? raw === 'true'
               : raw;
-    const result = schema['~standard'].validate(coerced);
-    if (result instanceof Promise) return null; // sync only in this demo
-    if (!result.issues) return null;
-    return result.issues[0]?.message ?? 'Invalid value';
+    const result = schema.validate(coerced as any);
+    if (!result.valid) {
+        return result.errors[0]?.message ?? 'Invalid value';
+    }
+    return null;
 }
 
 /* ── Per-key row ─────────────────────────────────────────────────────────── */
@@ -417,10 +418,10 @@ export function AnalyticsBanner() {
 const schema = string().required('required').minLength(8, 'too short');
 
 // T3 Env calls this internally:
-const result = schema['~standard'].validate('hi');
+const result = await schema['~standard'].validate('hi');
 // result => { issues: [{ message: 'too short' }] }
 
-const ok = schema['~standard'].validate('long enough value');
+const ok = await schema['~standard'].validate('long enough value');
 // ok => { value: 'long enough value' }
 
 console.log(schema['~standard'].version); // => 1
