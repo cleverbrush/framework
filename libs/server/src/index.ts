@@ -52,6 +52,10 @@ export {
     UnauthorizedError
 } from './HttpError.js';
 export {
+    cacheResponse,
+    type ServerCacheOptions
+} from './middlewares/ResponseCache.js';
+export {
     createProblemDetails,
     createValidationProblemDetails,
     type ProblemDetails,
