@@ -153,6 +153,46 @@ export function isTimeoutError(error: unknown): error is TimeoutError {
  * }
  * ```
  */
+/**
+ * Error thrown when a request is attempted while the client is offline.
+ *
+ * Extends {@link NetworkError} so offline errors are caught by
+ * `isNetworkError()` checks.
+ *
+ * @example
+ * ```ts
+ * try {
+ *     await client.todos.list();
+ * } catch (err) {
+ *     if (isOfflineError(err)) {
+ *         console.log('Cannot make requests while offline');
+ *     }
+ * }
+ * ```
+ */
+export class OfflineError extends NetworkError {
+    constructor() {
+        super('Client is offline');
+        this.name = 'OfflineError';
+    }
+}
+
+/**
+ * Type guard for {@link OfflineError}.
+ *
+ * @example
+ * ```ts
+ * catch (err) {
+ *     if (isOfflineError(err)) {
+ *         console.log('Device is offline');
+ *     }
+ * }
+ * ```
+ */
+export function isOfflineError(error: unknown): error is OfflineError {
+    return error instanceof OfflineError;
+}
+
 export function isNetworkError(error: unknown): error is NetworkError {
     return error instanceof NetworkError;
 }

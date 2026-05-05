@@ -1,3 +1,4 @@
+// biome-ignore-all lint/suspicious/useAdjacentOverloadSignatures: each method in ScopedEndpointFactoryMethods and EndpointFactory has a single signature; they are separate methods, not overloads
 import type {
     InferType,
     ObjectSchemaBuilder,
@@ -5,6 +6,7 @@ import type {
     PropertyDescriptorTree,
     SchemaBuilder
 } from '@cleverbrush/schema';
+import { SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR } from '@cleverbrush/schema';
 import type {
     ActionResult,
     ContentResult,
@@ -15,6 +17,8 @@ import type {
     StatusCodeResult,
     StreamResult
 } from './ActionResult.js';
+import type { CacheTagDefinition } from './CacheTag.js';
+import { createCacheTagTree, serializeTag } from './CacheTag.js';
 import type { RequestContext } from './RequestContext.js';
 import {
     createSubscription,
@@ -570,6 +574,10 @@ export interface EndpointMetadata {
      * @see `EndpointBuilder.upload()`
      */
     readonly fileUpload: UploadOptions | null;
+     * Cache tags declared via `.clearsCacheTag()`, providing tag-based cache
+     * key computation for the client middleware.
+     */
+    readonly cacheTags: readonly CacheTagDefinition[];
 }
 
 /**
@@ -600,6 +608,61 @@ type InferResponsesMap<
     [K in keyof T]: T[K] extends SchemaBuilder<any, any, any, any, any>
         ? InferType<T[K]>
         : null;
+};
+
+// ---------------------------------------------------------------------------
+// Cache-tag selector type — gives the consumer IDE hints when selecting
+// properties from the tree passed to the `.clearsCacheTag()` callback.
+// ---------------------------------------------------------------------------
+
+/**
+ * A leaf node in a cache-tag property tree — mirrors the shape of the
+ * actual runtime {@link PropertyDescriptor} so the compiler accepts
+ * values selected by the consumer.
+ */
+interface CacheTagPropertyLeaf {
+    readonly [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
+        readonly getValue: (obj: Record<string, unknown>) => {
+            readonly value?: unknown;
+            readonly success: boolean;
+        };
+    };
+}
+
+/** Recursively builds a typed property tree from an inferred object shape. */
+type CacheTagPropertyTree<T> = CacheTagPropertyLeaf &
+    (T extends Record<string, unknown>
+        ? { readonly [K in keyof T]-?: CacheTagPropertyTree<T[K]> }
+        : unknown);
+
+/**
+ * The typed tree passed to the `.clearsCacheTag(name, selector)` callback.
+ *
+ * `p.params`, `p.query`, and `p.headers` provide IDE completion for
+ * each schema's property names, while `p.body` resolves through the
+ * body schema's `InferType`.
+ */
+type CacheTagSelector<TParams, TBody, TQuery, THeaders> = {
+    readonly params: [keyof TParams] extends [never]
+        ? Record<string, never>
+        : TParams extends Record<string, unknown>
+          ? CacheTagPropertyTree<TParams>
+          : Record<string, never>;
+    readonly body: TBody extends undefined
+        ? undefined
+        : TBody extends SchemaBuilder<any, any, any, any, any>
+          ? CacheTagPropertyTree<InferType<TBody>>
+          : Record<string, never>;
+    readonly query: [keyof TQuery] extends [never]
+        ? Record<string, never>
+        : TQuery extends Record<string, unknown>
+          ? CacheTagPropertyTree<TQuery>
+          : Record<string, never>;
+    readonly headers: [keyof THeaders] extends [never]
+        ? Record<string, never>
+        : THeaders extends Record<string, unknown>
+          ? CacheTagPropertyTree<THeaders>
+          : Record<string, never>;
 };
 
 export class EndpointBuilder<
@@ -677,6 +740,7 @@ export class EndpointBuilder<
     readonly #links: Record<string, LinkDefinition> | null;
     readonly #callbacks: Record<string, CallbackDefinition> | null;
     readonly #fileUpload: UploadOptions | null;
+    readonly #cacheTags: readonly CacheTagDefinition[];
 
     constructor(
         method: string,
@@ -742,6 +806,7 @@ export class EndpointBuilder<
         links: Record<string, LinkDefinition> | null = null,
         callbacks: Record<string, CallbackDefinition> | null = null,
         fileUpload: UploadOptions | null = null
+        cacheTags: readonly CacheTagDefinition[] = []
     ) {
         this.#method = method;
         this.#basePath = basePath;
@@ -767,6 +832,7 @@ export class EndpointBuilder<
         this.#links = links;
         this.#callbacks = callbacks;
         this.#fileUpload = fileUpload;
+        this.#cacheTags = cacheTags;
     }
 
     /** Define the request body schema. Validation failures return 422 Problem Details. */
@@ -808,7 +874,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -853,7 +920,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -898,7 +966,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -943,7 +1012,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1039,7 +1109,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1109,7 +1180,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1178,7 +1250,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1221,7 +1294,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1264,7 +1338,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1307,7 +1382,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1350,7 +1426,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1391,7 +1468,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1441,7 +1519,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1494,7 +1573,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1546,7 +1626,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1618,6 +1699,7 @@ export class EndpointBuilder<
                 allowedMimeTypes: options?.allowedMimeTypes,
                 maxFileCount: options?.maxFileCount ?? 10
             }
+            this.#cacheTags
         );
     }
 
@@ -1673,7 +1755,8 @@ export class EndpointBuilder<
             externalDocs: this.#externalDocs,
             links: this.#links,
             callbacks: this.#callbacks,
-            fileUpload: this.#fileUpload
+            fileUpload: this.#fileUpload,
+            cacheTags: this.#cacheTags
         };
     }
 
@@ -1739,7 +1822,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1801,7 +1885,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1852,7 +1937,8 @@ export class EndpointBuilder<
             { url, description },
             this.#links,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1914,7 +2000,8 @@ export class EndpointBuilder<
             this.#externalDocs,
             defs as Record<string, LinkDefinition>,
             this.#callbacks,
-            this.#fileUpload
+            this.#fileUpload,
+            this.#cacheTags
         );
     }
 
@@ -1977,7 +2064,214 @@ export class EndpointBuilder<
             this.#responseHeaderSchema,
             this.#externalDocs,
             this.#links,
-            defs as Record<string, CallbackDefinition>
+            defs as Record<string, CallbackDefinition>,
+            this.#cacheTags
+        );
+    }
+
+    /**
+     * Declare a cache group for this endpoint.
+     *
+     * Use on GET / query endpoints to group responses into a named cache.
+     * The client-side {@code cacheTags} middleware caches responses keyed
+     * by this tag and flushes matching entries when a mutation calls
+     * {@link clearsCacheTag}.
+     *
+     * @overload Simple tag (no properties — single cache entry).
+     * @overload Tag with property descriptors for fine-grained keys.
+     *
+     * @example
+     * ```ts
+     * // GET — responses cached under "todo" group, keyed by id
+     * endpoint.get('/api/todos/:id')
+     *     .cacheTag('todo', p => ({
+     *         id: p.params.id
+     *     }))
+     * ```
+     */
+    cacheTag(
+        name: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    >;
+    cacheTag(
+        name: string,
+        selector: (
+            tree: CacheTagSelector<TParams, TBody, TQuery, THeaders>
+        ) => Record<string, unknown>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    >;
+    cacheTag(
+        name: string,
+        selector?: (tree: any) => Record<string, unknown>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        return this.clearsCacheTag(name, selector!);
+    }
+
+    /**
+     * Declare which cache groups are cleared when this mutation succeeds.
+     *
+     * Use on POST / PUT / PATCH / DELETE endpoints. When the mutation
+     * completes, the {@code cacheTags} client middleware invalidates all
+     * cache entries matching the declared tag names (prefix match).
+     *
+     * @overload Simple tag (clears all entries prefixed with the name).
+     * @overload Tag with property descriptors for targeted invalidation.
+     *
+     * @example
+     * ```ts
+     * // PATCH — clears "todo-list" and "todo:id=42" on success
+     * endpoint.patch('/api/todos/:id')
+     *     .clearsCacheTag('todo-list')
+     *     .clearsCacheTag('todo', p => ({
+     *         id: p.params.id
+     *     }))
+     * ```
+     */
+    clearsCacheTag(
+        name: string
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    >;
+    clearsCacheTag(
+        name: string,
+        selector: (
+            tree: CacheTagSelector<TParams, TBody, TQuery, THeaders>
+        ) => Record<string, unknown>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    >;
+    clearsCacheTag(
+        name: string,
+        selector?: (tree: any) => Record<string, unknown>
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses
+    > {
+        if (!selector) {
+            return new EndpointBuilder(
+                this.#method,
+                this.#basePath,
+                this.#pathTemplate,
+                this.#bodySchema,
+                this.#querySchema,
+                this.#headerSchema,
+                this.#serviceSchemas,
+                this.#authRoles,
+                this.#summary,
+                this.#description,
+                this.#tags,
+                this.#operationId,
+                this.#deprecated,
+                this.#responseSchema,
+                this.#responsesSchemas,
+                this.#example,
+                this.#examples,
+                this.#producesFile,
+                this.#produces,
+                this.#responseHeaderSchema,
+                this.#externalDocs,
+                this.#links,
+                this.#callbacks,
+                [...this.#cacheTags, { name, properties: {} }]
+            );
+        }
+
+        const paramsSchema = extractParamsObjectSchema(this.#pathTemplate);
+
+        const tree = createCacheTagTree({
+            paramsSchema,
+            bodySchema: this.#bodySchema,
+            querySchema: this.#querySchema,
+            headerSchema: this.#headerSchema
+        });
+
+        const descriptors = selector(tree);
+
+        if (typeof descriptors !== 'object' || descriptors === null) {
+            throw new Error(
+                `Cache tag "${name}": selector must return an object ` +
+                    `with property descriptors (e.g. { id: p.query.id }).`
+            );
+        }
+
+        const definition = serializeTag(name, descriptors);
+
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks,
+            [...this.#cacheTags, definition]
         );
     }
 }
@@ -2003,7 +2297,7 @@ function createEndpoint<TParams>(
     pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>,
     authRoles?: readonly string[] | null,
     meta?: EndpointMetadataDescriptors
-): EndpointBuilder<TParams extends undefined ? {} : TParams>;
+): EndpointBuilder<TParams, undefined, {}, {}, {}, any, string, any, {}>;
 
 function createEndpoint(
     method: string,
@@ -2135,6 +2429,84 @@ type ScopedEndpointFactoryMethods<
         any,
         {}
     >;
+    post<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    put<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    patch<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    delete<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    head<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
+    options<TParams = {}>(
+        pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
+    ): EndpointBuilder<
+        TParams extends undefined ? {} : TParams,
+        undefined,
+        {},
+        {},
+        {},
+        TPrincipal,
+        TRoles,
+        any,
+        {}
+    >;
 };
 
 export type ScopedEndpointFactory<TRoles extends string = string> =
@@ -2198,108 +2570,58 @@ function createScopedFactory(basePath: string): ScopedEndpointFactory {
 }
 
 // ---------------------------------------------------------------------------
-// EndpointFactory — top-level endpoint creation
+// endpoint factory — creates EndpointBuilder instances
 // ---------------------------------------------------------------------------
+
+/**
+ * Extracts an ObjectSchemaBuilder from a ParseStringSchemaBuilder path template.
+ * Used for constructing the synthetic cache tag tree.
+ */
+function extractParamsObjectSchema(
+    pathTemplate: RoutePath
+): ObjectSchemaBuilder<any, any, any, any, any, any, any> | null {
+    if (
+        pathTemplate &&
+        typeof pathTemplate !== 'string' &&
+        typeof (pathTemplate as any).introspect === 'function'
+    ) {
+        const info = (pathTemplate as any).introspect();
+        if (info.objectSchema) {
+            return info.objectSchema;
+        }
+    }
+    return null;
+}
 
 type EndpointFactory<TRoles extends string = string> = {
     get<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        undefined,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     post<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        undefined,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     put<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        undefined,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     patch<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        undefined,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     delete<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        undefined,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     head<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        undefined,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     options<TParams = {}>(
         basePath: string,
         pathTemplate?: ParseStringSchemaBuilder<TParams, any, any, any, any>
-    ): EndpointBuilder<
-        TParams,
-        undefined,
-        {},
-        {},
-        {},
-        undefined,
-        TRoles,
-        any,
-        {}
-    >;
+    ): EndpointBuilder<TParams, undefined, {}, {}, {}, any, TRoles, any, {}>;
     resource(basePath: string): ScopedEndpointFactory<TRoles>;
     subscription<TParams = {}>(
         basePath: string,

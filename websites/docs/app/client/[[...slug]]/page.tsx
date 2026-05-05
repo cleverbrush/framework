@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation';
 import BatchingSection from '../sections/batching';
 import CacheSection from '../sections/cache';
+import CacheTagsSection from '../sections/cacheTags';
 import DedupeSection from '../sections/dedupe';
 import ErrorHandlingSection from '../sections/error-handling';
 import GettingStartedSection from '../sections/getting-started';
 import HooksSection from '../sections/hooks';
+import IdempotencySection from '../sections/idempotency';
 import { CLIENT_SECTIONS } from '../sections/index';
 import MiddlewareSection from '../sections/middleware';
 import PerCallOverridesSection from '../sections/per-call-overrides';
@@ -25,7 +27,9 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     retry: RetrySection,
     timeout: TimeoutSection,
     dedupe: DedupeSection,
+    idempotency: IdempotencySection,
     cache: CacheSection,
+    'cache-tags': CacheTagsSection,
     batching: BatchingSection,
     'error-handling': ErrorHandlingSection,
     'per-call-overrides': PerCallOverridesSection,

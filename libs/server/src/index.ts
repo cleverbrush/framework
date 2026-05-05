@@ -9,6 +9,13 @@ export {
     StreamResult
 } from './ActionResult.js';
 export {
+    type CacheTagDefinition,
+    type CacheTagPropertyAccessor,
+    computeCacheKey,
+    createCacheTagTree,
+    serializeTag
+} from './CacheTag.js';
+export {
     type ApiContract,
     type ApiGroup,
     defineApi,
@@ -44,6 +51,14 @@ export {
     NotFoundError,
     UnauthorizedError
 } from './HttpError.js';
+export {
+    idempotency,
+    type ServerIdempotencyOptions
+} from './middlewares/Idempotency.js';
+export {
+    cacheResponse,
+    type ServerCacheOptions
+} from './middlewares/ResponseCache.js';
 export {
     createProblemDetails,
     createValidationProblemDetails,

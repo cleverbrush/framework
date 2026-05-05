@@ -469,15 +469,15 @@ test('safeParse() works like validate()', () => {
 // ~standard on extern builder itself
 // ---------------------------------------------------------------------------
 
-test('extern builder ~standard.validate works', () => {
+test('extern builder ~standard.validate works', async () => {
     const schema = extern(mockStringSchema);
-    const result = schema['~standard'].validate('hello');
+    const result = await schema['~standard'].validate('hello');
     expect(result).toEqual({ value: 'hello' });
 });
 
-test('extern builder ~standard.validate returns issues on failure', () => {
+test('extern builder ~standard.validate returns issues on failure', async () => {
     const schema = extern(mockStringSchema);
-    const result = schema['~standard'].validate(123);
+    const result = await schema['~standard'].validate(123);
     expect(result).toHaveProperty('issues');
     const issues = (result as StandardSchemaV1.FailureResult).issues;
     expect(issues.length).toBeGreaterThan(0);
