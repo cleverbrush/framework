@@ -85,7 +85,7 @@ test('Intersection with optional', async () => {
     >();
 
     {
-        const { valid, object: result } = await schema.validate(undefined);
+        const { valid, object: result } = schema.validate(undefined as any);
         expect(valid).toEqual(true);
         expect(result).toBeUndefined();
     }
@@ -111,7 +111,7 @@ test('Intersection with nullable', async () => {
     >();
 
     {
-        const { valid, object: result } = await schema.validate(null);
+        const { valid, object: result } = schema.validate(null as any);
         expect(valid).toEqual(true);
         expect(result).toBeNull();
     }
@@ -124,7 +124,7 @@ test('Intersection with default value', async () => {
     ).default({ name: 'Default', age: 0 } as any);
 
     {
-        const { valid, object: result } = await schema.validate(undefined);
+        const { valid, object: result } = schema.validate(undefined as any);
         expect(valid).toEqual(true);
         expect(result).toEqual({ name: 'Default', age: 0 });
     }
@@ -156,7 +156,7 @@ test('Intersection with nullable', async () => {
     >();
 
     {
-        const { valid, object: result } = await schema.validate(null);
+        const { valid, object: result } = schema.validate(null as any);
         expect(valid).toEqual(true);
         expect(result).toBeNull();
     }
@@ -169,7 +169,7 @@ test('Intersection with default value', async () => {
     ).default({ name: 'Default', age: 0 } as any);
 
     {
-        const { valid, object: result } = await schema.validate(undefined);
+        const { valid, object: result } = schema.validate(undefined as any);
         expect(valid).toEqual(true);
         expect(result).toEqual({ name: 'Default', age: 0 });
     }
