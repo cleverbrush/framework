@@ -144,6 +144,19 @@ export default function ApiReferenceSection() {
                             </tr>
                             <tr>
                                 <td>
+                                    <code>intersection(left, right)</code>
+                                </td>
+                                <td>Intersection of two schemas</td>
+                                <td>
+                                    <code>.validate(data)</code>,{' '}
+                                    <code>.validateAsync(data)</code>,{' '}
+                                    <code>.default(value)</code>,{' '}
+                                    <code>.nullable()</code>,{' '}
+                                    <code>.catch(value)</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
                                     <code>lazy(getter)</code>
                                 </td>
                                 <td>

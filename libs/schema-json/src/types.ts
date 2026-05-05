@@ -8,6 +8,7 @@ import type {
     ExtendedArray,
     ExtendedNumber,
     ExtendedString,
+    IntersectionSchemaBuilder,
     ObjectSchemaBuilder,
     SchemaBuilder,
     UnionSchemaBuilder
@@ -120,9 +121,18 @@ export type InferFromJsonSchema<S> = S extends { readonly const: infer V }
                         : S extends { readonly anyOf: readonly (infer U)[] }
                           ? InferFromJsonSchema<U>
                           : S extends {
-                                  readonly allOf: readonly JsonSchemaNode[];
+                                  readonly allOf: readonly [
+                                      infer First extends JsonSchemaNode,
+                                      ...infer Rest extends
+                                          readonly JsonSchemaNode[]
+                                  ];
                               }
-                            ? unknown
+                            ? Rest extends readonly []
+                                ? InferFromJsonSchema<First>
+                                : InferFromJsonSchema<First> &
+                                      InferFromJsonSchema<{
+                                          readonly allOf: Rest;
+                                      }>
                             : unknown;
 
 /** Options accepted by {@link toJsonSchema}. */
@@ -275,6 +285,53 @@ type ObjectPropertiesToBuilders<
 };
 
 /**
+ * When folding an allOf tuple, some accumulator elements may already be
+ * resolved builders from previous fold steps.  This helper returns the
+ * input unchanged when it is already a schema builder, and otherwise
+ * maps it through {@link JsonSchemaNodeToBuilder}.
+ * @internal
+ */
+type AsBuilderIfNeeded<X, R extends boolean = true> =
+    X extends SchemaBuilder<any, any, any, any, any>
+        ? X
+        : JsonSchemaNodeToBuilder<X, R>;
+
+/**
+ * Recursively folds an `allOf` tuple left-to-right into a nested
+ * {@link IntersectionSchemaBuilder} chain, matching the runtime behavior
+ * of {@link fromJsonSchema}.
+ *
+ * @internal
+ */
+type AllOfNodesToBuilder<
+    Acc extends readonly unknown[],
+    TRequired extends boolean = true
+> = Acc extends readonly [
+    infer First,
+    infer Second,
+    ...infer Rest extends readonly unknown[]
+]
+    ? Rest extends readonly []
+        ? IntersectionSchemaBuilder<
+              AsBuilderIfNeeded<First>,
+              AsBuilderIfNeeded<Second>,
+              TRequired
+          >
+        : AllOfNodesToBuilder<
+              [
+                  IntersectionSchemaBuilder<
+                      AsBuilderIfNeeded<First>,
+                      AsBuilderIfNeeded<Second>
+                  >,
+                  ...Rest
+              ],
+              TRequired
+          >
+    : Acc extends readonly [infer Only]
+      ? AsBuilderIfNeeded<Only, TRequired>
+      : SchemaBuilder<unknown, TRequired>;
+
+/**
  * Recursively maps a statically-known JSON Schema node (passed with
  * `as const`) to the exact `@cleverbrush/schema` builder type, including:
  *
@@ -328,11 +385,11 @@ export type JsonSchemaNodeToBuilder<S, TRequired extends boolean = true> =
                   readonly anyOf: infer Opts extends readonly unknown[];
               }
             ? UnionSchemaBuilder<SchemaNodesTupleToBuilders<Opts>, TRequired>
-            : // allOf (not supported; falls back to any() at runtime)
+            : // allOf — left-fold into IntersectionSchemaBuilder chain
               S extends {
-                    readonly allOf: infer _Opts extends readonly unknown[];
+                    readonly allOf: infer Opts extends readonly unknown[];
                 }
-              ? SchemaBuilder<unknown, TRequired>
+              ? AllOfNodesToBuilder<Opts, TRequired>
               : // string
                 S extends { readonly type: 'string' }
                 ? ExtendedStringBuilder<string, TRequired>

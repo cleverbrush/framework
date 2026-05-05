@@ -3,6 +3,7 @@ import {
     array,
     boolean,
     date,
+    intersection,
     lazy,
     nul,
     number,
@@ -304,6 +305,60 @@ test('toJsonSchema - 28d: discriminated union with nameResolver → mapping', ()
     const anyOf = result['anyOf'] as any[];
     expect(anyOf[0]).toEqual({ $ref: '#/components/schemas/Cat' });
     expect(anyOf[1]).toEqual({ $ref: '#/components/schemas/Dog' });
+});
+
+test('toJsonSchema - intersection of objects → allOf', () => {
+    const result = toJsonSchema(
+        intersection(object({ name: string() }), object({ age: number() })),
+        { $schema: false }
+    );
+    expect(result).toEqual({
+        allOf: [
+            {
+                type: 'object',
+                additionalProperties: false,
+                properties: { name: { type: 'string' } },
+                required: ['name']
+            },
+            {
+                type: 'object',
+                additionalProperties: false,
+                properties: { age: { type: 'integer' } },
+                required: ['age']
+            }
+        ]
+    });
+});
+
+test('toJsonSchema - intersection nullable → oneOf with null', () => {
+    const result = toJsonSchema(
+        intersection(
+            object({ name: string() }),
+            object({ age: number() })
+        ).nullable(),
+        { $schema: false }
+    );
+    expect(result).toEqual({
+        oneOf: [
+            {
+                allOf: [
+                    {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: { name: { type: 'string' } },
+                        required: ['name']
+                    },
+                    {
+                        type: 'object',
+                        additionalProperties: false,
+                        properties: { age: { type: 'integer' } },
+                        required: ['age']
+                    }
+                ]
+            },
+            { type: 'null' }
+        ]
+    });
 });
 
 // ---------------------------------------------------------------------------
