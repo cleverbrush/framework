@@ -63,6 +63,10 @@
             "types": "./dist/dedupe.d.ts",
             "import": "./dist/dedupe.js"
         },
+        "./idempotency": {
+            "types": "./dist/idempotency.d.ts",
+            "import": "./dist/idempotency.js"
+        },
         "./cache": {
             "types": "./dist/cache.d.ts",
             "import": "./dist/cache.js"

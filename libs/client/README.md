@@ -809,6 +809,7 @@ if (isApiError(error)) {
 | `@cleverbrush/client/retry` | Retry middleware with exponential backoff |
 | `@cleverbrush/client/timeout` | AbortController-based timeout middleware |
 | `@cleverbrush/client/dedupe` | Request deduplication middleware |
+| `@cleverbrush/client/idempotency` | Idempotency key middleware (deduplicates mutations) |
 | `@cleverbrush/client/cache` | Throttling cache + tag-based cache invalidation middleware |
 | `@cleverbrush/client/batching` | Request batching middleware |
 | `@cleverbrush/client/optimistic-update` | Optimistic update middleware (mutation tracking) |

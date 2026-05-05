@@ -18,6 +18,7 @@ export default defineConfig({
             '@cleverbrush/client/retry':             `${clientSrc}/retry.ts`,
             '@cleverbrush/client/timeout':           `${clientSrc}/timeout.ts`,
             '@cleverbrush/client/dedupe':            `${clientSrc}/dedupe.ts`,
+            '@cleverbrush/client/idempotency':       `${clientSrc}/idempotency.ts`,
             '@cleverbrush/client/cache':             `${clientSrc}/cache.ts`,
             '@cleverbrush/client/batching':          `${clientSrc}/batching.ts`,
             '@cleverbrush/client/optimistic-update': `${clientSrc}/optimisticUpdate.ts`,

@@ -15,7 +15,15 @@ export const SECTION_GROUPS = [
     },
     {
         label: 'Resilience',
-        slugs: ['retry', 'timeout', 'dedupe', 'cache', 'cache-tags', 'batching']
+        slugs: [
+            'retry',
+            'timeout',
+            'dedupe',
+            'idempotency',
+            'cache',
+            'cache-tags',
+            'batching'
+        ]
     },
     {
         label: 'Advanced',
@@ -34,6 +42,11 @@ export const CLIENT_SECTIONS: ClientSection[] = [
     { slug: 'retry', title: 'Retry', group: 'Resilience' },
     { slug: 'timeout', title: 'Timeout', group: 'Resilience' },
     { slug: 'dedupe', title: 'Deduplication', group: 'Resilience' },
+    {
+        slug: 'idempotency',
+        title: 'Idempotency',
+        group: 'Resilience'
+    },
     { slug: 'cache', title: 'Cache', group: 'Resilience' },
     {
         slug: 'cache-tags',

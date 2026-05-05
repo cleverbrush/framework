@@ -21,6 +21,7 @@ import { createClient } from '@cleverbrush/client/react';
 import { retry } from '@cleverbrush/client/retry';
 import { timeout } from '@cleverbrush/client/timeout';
 import { dedupe } from '@cleverbrush/client/dedupe';
+import { idempotency } from '@cleverbrush/client/idempotency';
 import { cacheTags } from '@cleverbrush/client/cache';
 import { batching } from '@cleverbrush/client/batching';
 import { optimisticUpdate } from '@cleverbrush/client/optimistic-update';
@@ -37,12 +38,13 @@ const BASE_URL = import.meta.env.VITE_API_URL ?? '';
  *
  * Resilience middlewares are applied in order:
  * 1. **offlineQueue** — queues mutations when offline, replays on reconnect (outermost)
- * 2. **retry** — retries failed requests up to 2 times with exponential backoff
- * 3. **timeout** — aborts requests exceeding 10 seconds
- * 4. **dedupe** — coalesces identical in-flight GET requests
- * 5. **cacheTags** — tag-based caching and auto-invalidation (replaces throttlingCache)
- * 6. **batching** — coalesces concurrent requests into a single `POST /__batch`
- * 7. **optimisticUpdate** — tags mutations and tracks network failures (innermost)
+ * 2. **idempotency** — adds X-Idempotency-Key to mutations for server deduplication
+ * 3. **retry** — retries failed requests (preserves idempotency key across retries)
+ * 4. **timeout** — aborts requests exceeding 10 seconds
+ * 5. **dedupe** — coalesces identical in-flight GET requests
+ * 6. **cacheTags** — tag-based caching and auto-invalidation
+ * 7. **batching** — coalesces concurrent requests into a single `POST /__batch`
+ * 8. **optimisticUpdate** — tags mutations and tracks network failures (innermost)
  */
 
 export const offlineQueueStore = { queue: [], isOnline: true, isReplaying: false };
@@ -59,6 +61,7 @@ export const client = createClient(api, {
     },
     middlewares: [
         offlineQueue({ store: offlineQueueStore }),
+        idempotency(),
         retry({ limit: 2, retryOnTimeout: true }),
         timeout({ timeout: 10_000 }),
         dedupe(),

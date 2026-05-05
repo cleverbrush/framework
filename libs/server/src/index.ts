@@ -52,6 +52,10 @@ export {
     UnauthorizedError
 } from './HttpError.js';
 export {
+    idempotency,
+    type ServerIdempotencyOptions
+} from './middlewares/Idempotency.js';
+export {
     cacheResponse,
     type ServerCacheOptions
 } from './middlewares/ResponseCache.js';
