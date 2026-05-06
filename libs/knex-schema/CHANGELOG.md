@@ -1,5 +1,14 @@
 # @cleverbrush/knex-schema
 
+## 4.1.0
+
+### Patch Changes
+
+- 9fb3eae: Extract query operations into modular files (helpers, select, where, insert, update, delete, join, pagination, state) from monolithic SchemaQueryBuilder. No public API changes.
+- Updated dependencies [9e9bb4c]
+- Updated dependencies [733b6f4]
+  - @cleverbrush/schema@4.1.0
+
 ## 4.0.0
 
 ### Major Changes

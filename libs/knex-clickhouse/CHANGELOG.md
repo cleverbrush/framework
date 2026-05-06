@@ -1,5 +1,12 @@
 # @cleverbrush/knex-clickhouse
 
+## 4.1.0
+
+### Patch Changes
+
+- @cleverbrush/deep@4.1.0
+- @cleverbrush/async@4.1.0
+
 ## 4.0.0
 
 ### Patch Changes
