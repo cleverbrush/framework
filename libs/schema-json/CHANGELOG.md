@@ -1,5 +1,16 @@
 # @cleverbrush/schema-json
 
+## 4.1.0
+
+### Minor Changes
+
+- 733b6f4: Add `intersection()` schema builder for combining two schemas (both must pass)
+
+  - New `IntersectionSchemaBuilder` class with `intersection(left, right)` factory
+  - Validates both schemas against the input and merges outputs
+  - Maps to `allOf` in JSON Schema (to/from bidirectional)
+  - Supports all standard modifiers: `.optional()`, `.nullable()`, `.default()`, `.catch()`, `.brand()`, `.readonly()`, `.addValidator()`, `.addPreprocessor()`, etc.
+
 ## 4.0.0
 
 ### Patch Changes

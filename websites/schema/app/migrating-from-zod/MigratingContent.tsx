@@ -1130,11 +1130,10 @@ const PostSlug = s().slug().minLength(3).maxLength(60);`
                                     <code>z.intersection(a, b)</code>
                                 </td>
                                 <td>
-                                    Object-level: <code>.intersect()</code>{' '}
-                                    covers it
+                                    <code>intersection(a, b)</code>
                                 </td>
                                 <td>
-                                    Use <code>object().intersect(other)</code>
+                                    <code>intersection(a, b)</code>
                                 </td>
                             </tr>
                             <tr>

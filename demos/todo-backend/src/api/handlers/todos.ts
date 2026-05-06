@@ -1,4 +1,5 @@
-import { ActionResult, type Handler } from '@cleverbrush/server';
+import { ActionResult, BadRequestError, ForbiddenError, type Handler, NotFoundError } from '@cleverbrush/server';
+import type { Knex } from 'knex';
 import { withSpan } from '@cleverbrush/otel';
 import {
     TodoCompleted,
@@ -23,6 +24,7 @@ import type {
     ListAllActivityEndpoint,
     ListTodoActivityEndpoint,
     ListTodosEndpoint,
+    UploadAttachmentEndpoint,
     SendTodoEventEndpoint,
     UpdateTodoEndpoint
 } from '../endpoints.js';
@@ -367,38 +369,98 @@ export const exportTodosHandler: Handler<typeof ExportTodosEndpoint> = async (
 
 export const downloadAttachmentHandler: Handler<
     typeof DownloadAttachmentEndpoint
-> = async ({ params, principal }, { db }) => {
+> = async ({ params, principal }, { knex }) => {
+    const row = await (knex as Knex)('todos')
+        .select(
+            'attachment_data',
+            'attachment_name',
+            'attachment_mime_type',
+            'user_id'
+        )
+        .where('id', params.id)
+        .first();
+
+    if (!row) {
+        throw new NotFoundError(`Todo ${params.id} not found.`);
+    }
+
+    if (
+        principal.role !== 'admin' &&
+        (row as Record<string, unknown>).user_id !== principal.userId
+    ) {
+        throw new ForbiddenError('You do not have access to this todo.');
+    }
+
+    if (!(row as Record<string, unknown>).attachment_data) {
+        throw new NotFoundError('No attachment for this todo.');
+    }
+
+    const r = row as {
+        attachment_data: Buffer;
+        attachment_name: string;
+        attachment_mime_type: string;
+    };
+
+    return ActionResult.file(
+        r.attachment_data,
+        r.attachment_name,
+        r.attachment_mime_type
+    );
+};
+
+// ── Upload todo attachment ────────────────────────────────────────────────────
+
+export const uploadAttachmentHandler: Handler<
+    typeof UploadAttachmentEndpoint
+> = async ({ params, principal, files, rejectedFiles }, { db, knex }) => {
     const todo = await db.todos.find(params.id);
 
     if (!todo) {
-        return ActionResult.notFound({
-            message: `Todo ${params.id} not found.`
-        });
+        throw new NotFoundError(`Todo ${params.id} not found.`);
     }
 
     if (principal.role !== 'admin' && todo.userId !== principal.userId) {
-        return ActionResult.forbidden({
-            message: 'You do not have access to this todo.'
-        });
+        throw new ForbiddenError('You do not have access to this todo.');
     }
 
-    const mapped = await mapTodo(todo);
-    const text = [
-        `Todo #${mapped.id}`,
-        `Title: ${mapped.title}`,
-        mapped.description ? `Description: ${mapped.description}` : null,
-        `Completed: ${mapped.completed ? 'Yes' : 'No'}`,
-        `Created: ${mapped.createdAt.toISOString()}`,
-        `Updated: ${mapped.updatedAt.toISOString()}`
-    ]
-        .filter(Boolean)
-        .join('\n');
+    const file = files['attachment'];
+    if (!file) {
+        let detail = 'No file uploaded. Use field name "attachment".';
+        if (rejectedFiles && rejectedFiles.length > 0) {
+            const reasons = rejectedFiles
+                .map(r => `${r.filename}: ${r.reason}`)
+                .join('; ');
+            detail += ` Rejected: ${reasons}`;
+        }
+        throw new BadRequestError(detail);
+    }
 
-    return ActionResult.file(
-        Buffer.from(text, 'utf-8'),
-        `todo-${params.id}.txt`,
-        'text/plain'
-    );
+    // Persist file in DB — raw knex for bytea column
+    await (knex as Knex)('todos')
+        .where('id', params.id)
+        .update({
+            attachment_data: file.buffer,
+            attachment_name: file.filename,
+            attachment_mime_type: file.mimeType,
+            updated_at: new Date()
+        });
+
+    // Re-fetch the updated todo for the response
+    const updated = await db.todos.find(params.id);
+    if (!updated) throw new NotFoundError(`Todo ${params.id} not found.`);
+
+    return ActionResult.created({
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        completed: updated.completed,
+        userId: updated.userId,
+        createdAt: updated.createdAt,
+        updatedAt: updated.updatedAt,
+        attachmentName: updated.attachmentName,
+        attachmentMimeType: updated.attachmentMimeType,
+        attachmentSize: file.size
+    });
 };
 
 // ── Bulk import todos ─────────────────────────────────────────────────────────

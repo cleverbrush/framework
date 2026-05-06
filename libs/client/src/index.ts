@@ -24,13 +24,15 @@ export {
     ApiError,
     isApiError,
     isNetworkError,
+    isOfflineError,
     isTimeoutError,
     isWebError,
     NetworkError,
+    OfflineError,
     TimeoutError,
     WebError
 } from './errors.js';
-export type { FetchLike, Middleware } from './middleware.js';
+export type { EndpointMeta, FetchLike, Middleware } from './middleware.js';
 export {
     composeMiddleware,
     getPerCallOptions,
@@ -43,6 +45,7 @@ export type {
     EndpointCall,
     EndpointCallArgs,
     EndpointResponse,
+    FilePart,
     PerCallOverrides,
     Subscription,
     SubscriptionCall,

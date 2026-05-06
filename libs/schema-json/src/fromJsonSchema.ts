@@ -3,6 +3,7 @@ import {
     any,
     array,
     boolean,
+    intersection,
     nul,
     number,
     object,
@@ -35,8 +36,8 @@ function buildNode(s: unknown): SchemaBuilder<any, any, any> {
     else if ('const' in node) b = buildConst(node['const']);
     else if ('anyOf' in node && Array.isArray(node['anyOf']))
         b = buildAnyOf(node['anyOf']);
-    // allOf is not supported (no intersection builder); fall back to any()
-    else if ('allOf' in node && Array.isArray(node['allOf'])) b = any();
+    else if ('allOf' in node && Array.isArray(node['allOf']))
+        b = buildAllOf(node['allOf']);
     else if (!('type' in node)) b = any();
     else {
         switch (node['type']) {
@@ -210,6 +211,15 @@ function buildAnyOf(options: unknown[]): SchemaBuilder<any, any, any> {
     return b;
 }
 
+function buildAllOf(options: unknown[]): SchemaBuilder<any, any, any> {
+    if (options.length === 0) return any();
+    let b: any = buildNode(options[0]);
+    for (let i = 1; i < options.length; i++) {
+        b = intersection(b, buildNode(options[i]));
+    }
+    return b;
+}
+
 /**
  * Converts a JSON Schema object into a `@cleverbrush/schema` builder.
  *
@@ -248,9 +258,8 @@ function buildAnyOf(options: unknown[]): SchemaBuilder<any, any, any> {
  * | `format: 'ipv6'`               | `.ip({ version: 'v6' })`        |
  * | `format: 'date-time'`          | `.matches(iso8601 regex)`       |
  *
- * Keywords **not** supported: `allOf` (falls back to `any()`), `$ref`,
- * `$defs`, `if/then/else`, `not`, `contains`, `unevaluatedProperties`,
- * `contentEncoding`.
+ * Keywords **not** supported: `$ref`, `$defs`, `if/then/else`, `not`,
+ * `contains`, `unevaluatedProperties`, `contentEncoding`.
  *
  * @param schema - A JSON Schema literal.  Pass with `as const` for precise
  *   TypeScript type inference on the returned builder.

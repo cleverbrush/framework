@@ -5,7 +5,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Copy root workspace manifest for npm workspaces resolution
-COPY package.json package-lock.json* turbo.json tsconfig.build.json ./
+COPY package.json package-lock.json* turbo.json tsconfig.json tsconfig.build.json ./
 
 # Copy all workspace package.json files for dependency resolution
 COPY libs/async/package.json ./libs/async/
@@ -26,6 +26,8 @@ COPY libs/server-openapi/package.json ./libs/server-openapi/
 COPY libs/otel/package.json ./libs/otel/
 COPY libs/client/package.json ./libs/client/
 COPY libs/benchmarks/package.json ./libs/benchmarks/
+COPY libs/orm/package.json ./libs/orm/
+COPY libs/orm-cli/package.json ./libs/orm-cli/
 COPY demos/todo-backend/package.json ./demos/todo-backend/
 
 # Install all workspace dependencies

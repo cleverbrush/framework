@@ -9,6 +9,13 @@ export {
     StreamResult
 } from './ActionResult.js';
 export {
+    type CacheTagDefinition,
+    type CacheTagPropertyAccessor,
+    computeCacheKey,
+    createCacheTagTree,
+    serializeTag
+} from './CacheTag.js';
+export {
     type ApiContract,
     type ApiGroup,
     defineApi,
@@ -45,6 +52,14 @@ export {
     UnauthorizedError
 } from './HttpError.js';
 export {
+    idempotency,
+    type ServerIdempotencyOptions
+} from './middlewares/Idempotency.js';
+export {
+    cacheResponse,
+    type ServerCacheOptions
+} from './middlewares/ResponseCache.js';
+export {
     createProblemDetails,
     createValidationProblemDetails,
     type ProblemDetails,
@@ -75,9 +90,12 @@ export {
 export type {
     ContentTypeHandler,
     EndpointRegistration,
+    FilePart,
     Middleware,
+    RejectedFile,
     ServerBatchingOptions,
     ServerOptions,
-    SubscriptionRegistration
+    SubscriptionRegistration,
+    UploadOptions
 } from './types.js';
 export { defineWebhook, type WebhookDefinition } from './Webhook.js';

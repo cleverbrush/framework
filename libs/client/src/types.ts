@@ -10,9 +10,15 @@
 import type { InferType, SchemaBuilder } from '@cleverbrush/schema';
 import type {
     EndpointBuilder,
+    FilePart,
     ApiContract as ServerApiContract,
     SubscriptionBuilder
 } from '@cleverbrush/server/contract';
+
+// Re-export types shared between server and client
+/** @see {@link FilePart} from `@cleverbrush/server` */
+export type { FilePart };
+
 import type { WebError } from './errors.js';
 import type { Middleware } from './middleware.js';
 
@@ -50,11 +56,17 @@ type InferSchema<T> =
  * Assembles the parts of the request argument object conditionally.
  * Only keys that carry data are included.
  */
-type CallArgsParts<TParams, TBody, TQuery, THeaders> =
-    (HasKeys<TParams> extends true ? { params: TParams } : {}) &
-        (TBody extends undefined ? {} : { body: InferSchema<TBody> }) &
-        (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
-        (HasKeys<THeaders> extends true ? { headers: THeaders } : {});
+type CallArgsParts<
+    TParams,
+    TBody,
+    TQuery,
+    THeaders,
+    TUpload extends boolean
+> = (HasKeys<TParams> extends true ? { params: TParams } : {}) &
+    (TBody extends undefined ? {} : { body: InferSchema<TBody> }) &
+    (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
+    (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
+    (TUpload extends true ? { files: Record<string, FilePart | Blob> } : {});
 
 /**
  * Extracts the typed request argument shape from an `EndpointBuilder`.
@@ -95,12 +107,13 @@ export type EndpointCallArgs<E> =
         any, // TPrincipal
         any, // TRoles
         any, // TResponse
-        any // TResponses
+        any, // TResponses
+        infer TUpload // TUpload
     >
         ? HasKeys<
-              Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders>>
+              Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders, TUpload>>
           > extends true
-            ? Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders>>
+            ? Simplify<CallArgsParts<TParams, TBody, TQuery, THeaders, TUpload>>
             : undefined
         : never;
 
@@ -192,6 +205,16 @@ export interface PerCallOverrides {
      * Override the timeout (in milliseconds) for this call only.
      */
     timeout?: number;
+    /**
+     * Override optimistic update middleware options for this call.
+     * Pass `{ skip: true }` to skip tagging for this mutation.
+     */
+    optimisticUpdate?: { skip?: boolean };
+    /**
+     * Override offline queue middleware options for this call.
+     * Pass `{ skip: true }` to bypass the queue for this mutation.
+     */
+    offlineQueue?: { skip?: boolean };
 }
 
 /**
@@ -205,20 +228,20 @@ export interface PerCallOverrides {
  * `AsyncIterable<string>` yielding newline-delimited chunks (e.g. NDJSON).
  * An optional `AbortSignal` can be passed to cancel an in-flight stream.
  */
-export type EndpointCall<E> =
-    EndpointCallArgs<E> extends undefined
-        ? ((args?: PerCallOverrides) => Promise<EndpointResponse<E>>) & {
-              stream: (options?: {
-                  signal?: AbortSignal;
-              }) => AsyncIterable<string>;
-          }
-        : ((
-              args: EndpointCallArgs<E> & PerCallOverrides
-          ) => Promise<EndpointResponse<E>>) & {
-              stream: (
-                  args: EndpointCallArgs<E> & { signal?: AbortSignal }
-              ) => AsyncIterable<string>;
-          };
+export type EndpointCall<E> = (EndpointCallArgs<E> extends undefined
+    ? (args?: PerCallOverrides) => Promise<EndpointResponse<E>>
+    : (
+          args: EndpointCallArgs<E> & PerCallOverrides
+      ) => Promise<EndpointResponse<E>>) & {
+    stream: EndpointCallArgs<E> extends undefined
+        ? (options?: { signal?: AbortSignal }) => AsyncIterable<string>
+        : (
+              args: EndpointCallArgs<E> & { signal?: AbortSignal }
+          ) => AsyncIterable<string>;
+    file: EndpointCallArgs<E> extends undefined
+        ? (args?: PerCallOverrides) => Promise<Blob>
+        : (args: EndpointCallArgs<E> & PerCallOverrides) => Promise<Blob>;
+};
 
 // ---------------------------------------------------------------------------
 // Subscription types

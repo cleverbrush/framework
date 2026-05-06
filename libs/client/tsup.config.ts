@@ -8,6 +8,8 @@ export default defineConfig({
         'src/dedupe.ts',
         'src/cache.ts',
         'src/batching.ts',
+        'src/optimisticUpdate.ts',
+        'src/offlineQueue.ts',
         'src/react.ts'
     ],
     format: ['esm'],

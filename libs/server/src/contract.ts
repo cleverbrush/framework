@@ -27,6 +27,10 @@
  * @module
  */
 
+export type {
+    CacheTagDefinition,
+    CacheTagPropertyAccessor
+} from './CacheTag.js';
 export {
     type ActionContext,
     type AllowedResponseReturn,
@@ -52,6 +56,7 @@ export {
     type TrackedEvent,
     tracked
 } from './Subscription.js';
+export type { FilePart, UploadOptions } from './types.js';
 
 import type { EndpointBuilder as _EB } from './Endpoint.js';
 import type { SubscriptionBuilder as _SB } from './Subscription.js';

@@ -104,7 +104,16 @@ export const TodoResponseSchema = object({
         .describe('ISO 8601 timestamp of when the todo was created.'),
     updatedAt: date()
         .coerce()
-        .describe('ISO 8601 timestamp of the last update.')
+        .describe('ISO 8601 timestamp of the last update.'),
+    attachmentName: string()
+        .optional()
+        .describe('Original filename of the uploaded attachment.'),
+    attachmentMimeType: string()
+        .optional()
+        .describe('MIME type of the uploaded attachment.'),
+    attachmentSize: number()
+        .optional()
+        .describe('Size of the uploaded attachment in bytes.')
 }).schemaName('TodoResponse');
 
 export type TodoResponse = InferType<typeof TodoResponseSchema>;
