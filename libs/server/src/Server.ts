@@ -209,11 +209,15 @@ export class ServerBuilder {
     readonly #webhooks: WebhookDefinition[] = [];
     readonly #globalMiddlewares: Middleware[] = [];
     readonly #contentNegotiator = new ContentNegotiator();
-    #options: ServerOptions = {};
+    #options: ServerOptions;
     #authConfig: AuthenticationConfig | null = null;
     #authzConfig: AuthorizationConfig | null = null;
     #healthcheck = false;
     #batchConfig: ServerBatchingOptions | null = null;
+
+    constructor(options: ServerOptions = {}) {
+        this.#options = options;
+    }
 
     /**
      * Configure the DI service collection.
@@ -735,6 +739,17 @@ export class Server {
                             ctx.responded = true;
                             return;
                         }
+                    } else if (meta.fileUpload) {
+                        const pd = createProblemDetails(
+                            400,
+                            'File upload endpoint requires multipart/form-data content type'
+                        );
+                        res.writeHead(400, {
+                            'content-type': PROBLEM_JSON_CONTENT_TYPE
+                        });
+                        res.end(serializeProblemDetails(pd));
+                        ctx.responded = true;
+                        return;
                     } else {
                         const ctHandler =
                             this.#contentNegotiator.selectRequestHandler(
@@ -1260,11 +1275,7 @@ export class Server {
 }
 
 export function createServer(options?: ServerOptions): ServerBuilder {
-    const builder = new ServerBuilder();
-    if (options) {
-        (builder as any).__options = options;
-    }
-    return builder;
+    return new ServerBuilder(options);
 }
 
 // ---------------------------------------------------------------------------

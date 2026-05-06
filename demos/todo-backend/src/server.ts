@@ -83,7 +83,9 @@ export function buildServer(config: Config, logger: Logger) {
         correlationResponseHeader: false
     });
 
-    const server = createServer()
+    const server = createServer({
+        maxBodySize: 15 * 1024 * 1024 // Matches nginx client_max_body_size
+    })
         .use(tracingMiddleware({ excludePaths: ['/health'] }))
         .use(corsMiddleware)
         .use(correlationMiddleware)
