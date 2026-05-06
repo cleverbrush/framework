@@ -137,6 +137,7 @@ The following builder functions are available:
 | `tuple([...schemas])` | Fixed-length array with per-position types. Each index validated against its own schema — mirrors TypeScript tuple types. | `.rest(schema)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `record(keySchema, valSchema)` | Object with dynamic string keys. Every key must satisfy `keySchema` (a string schema) and every value must satisfy `valSchema` — mirrors TypeScript's `Record<K, V>`. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`, `.addValidator(fn)` |
 | `union(schema)` | Union of schemas — e.g. `string \| number`.       | `.or(schema)`, `.validate(data)`, `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`                 |
+| `intersection(left, right)` | Intersection of two schemas — both must pass. Merges validated outputs. Use `.acceptUnknownProps()` on object schemas. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)`, `.addValidator(fn)` |
 | `enumOf(...values)` | String enum — sugar for `string().oneOf(...)`. | `.optional()`, `.nullable()`, `.notNullable()`, `.default(value)` |
 | `lazy(getter)`  | Recursive/self-referential schema. The getter is called once and its result is cached. Enables tree structures, linked lists, and other recursive types. | `.resolve()`, `.optional()`, `.addValidator(fn)`, `.default(value)` |
 | `generic(fn)`   | Parameterized schema template. Call `.apply(...schemas)` with concrete schemas to obtain a fully typed concrete schema builder. TypeScript infers the result type from the template function's own generic signature. Optionally pass a `defaults` array as the first argument to enable direct validation without calling `.apply()`. | `.apply(...schemas)`, `.optional()`, `.nullable()`, `.default(value)` |
@@ -199,6 +200,16 @@ const TeamSchema = object({
 const IdOrEmail = union(string().minLength(1)).or(
     string().matches(/^[^@]+@[^@]+$/)
 );
+
+// Intersection types — combine two schemas into one (both must pass)
+import { intersection } from '@cleverbrush/schema';
+
+const NameAndAge = intersection(
+    object({ name: string() }).acceptUnknownProps(),
+    object({ age: number() }).acceptUnknownProps()
+);
+const person = NameAndAge.parse({ name: 'Alice', age: 30 });
+// typeof person === { name: string } & { age: number }
 ```
 
 ## Generic Schemas
@@ -1764,6 +1775,16 @@ const UserSchema = object({
 
 // Works with tRPC, TanStack Form, React Hook Form, T3 Env, Hono, Elysia, …
 const standardSchema = UserSchema['~standard'];
+```
+
+The `['~standard'].validate()` method returns a `Promise`, supporting both sync
+and async preprocessors, validators, and error message providers:
+
+```ts
+const result = await UserSchema['~standard'].validate(input);
+if ('issues' in result) {
+  console.error(result.issues[0].message);
+}
 ```
 
 Confirmed integrations: **tRPC**, **TanStack Form**, **React Hook Form**, **T3 Env**, **Hono**, **Elysia**, **next-safe-action**, and 50+ others listed on [standardschema.dev](https://standardschema.dev/).

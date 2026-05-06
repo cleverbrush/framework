@@ -113,12 +113,12 @@ describe('withStandardJsonSchema', () => {
     // Preserves original schema behaviour
     // -----------------------------------------------------------------------
 
-    test('wrapped schema still validates via ~standard.validate', () => {
+    test('wrapped schema still validates via ~standard.validate', async () => {
         const wrapped = withStandardJsonSchema(string());
-        const pass = wrapped['~standard'].validate('hello');
+        const pass = await wrapped['~standard'].validate('hello');
         expect(pass).toEqual({ value: 'hello' });
 
-        const fail = wrapped['~standard'].validate(123);
+        const fail = await wrapped['~standard'].validate(123);
         expect(fail).toHaveProperty('issues');
     });
 

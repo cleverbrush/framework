@@ -248,9 +248,15 @@ export class FileResult extends ActionResult {
         res: http.ServerResponse,
         _contentNegotiator: ContentNegotiator
     ): Promise<void> {
+        const filename = this.fileName;
+        const sanitized = filename.replace(/[^\x20-\x7E]/g, '_');
+        const disposition =
+            sanitized === filename
+                ? `attachment; filename="${filename}"`
+                : `attachment; filename="${sanitized}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
         res.writeHead(200, {
             'content-type': this.contentType,
-            'content-disposition': `attachment; filename="${this.fileName}"`,
+            'content-disposition': disposition,
             'content-length': String(this.content.byteLength)
         });
         res.end(this.content);

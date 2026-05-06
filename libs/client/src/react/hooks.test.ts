@@ -14,12 +14,14 @@ function mockEndpoint(meta: {
     pathTemplate?:
         | string
         | { serialize: (p: Record<string, unknown>) => string };
+    cacheTags?: ReadonlyArray<{ name: string }>;
 }) {
     return {
         introspect: () => ({
             method: meta.method,
             basePath: meta.basePath,
-            pathTemplate: meta.pathTemplate ?? ''
+            pathTemplate: meta.pathTemplate ?? '',
+            cacheTags: meta.cacheTags ?? []
         })
     };
 }
@@ -35,7 +37,11 @@ function createMockContract() {
                     serialize: (p: Record<string, unknown>) => `/${p.id}`
                 }
             }),
-            create: mockEndpoint({ method: 'POST', basePath: '/api/todos' })
+            create: mockEndpoint({
+                method: 'POST',
+                basePath: '/api/todos',
+                cacheTags: [{ name: 'todo-list' }]
+            })
         },
         users: {
             me: mockEndpoint({ method: 'GET', basePath: '/api/users/me' })
@@ -209,6 +215,74 @@ describe('hooks integration', () => {
             });
 
             await waitFor(() => expect(onError).toHaveBeenCalledOnce());
+        });
+
+        test('invalidates query cache on success when endpoint has cacheTags', async () => {
+            const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+            mockFetch.mockResolvedValueOnce(jsonResponse({ id: 1 }, 201));
+
+            const { result } = renderHook(
+                () => queryApi.todos.create.useMutation(),
+                { wrapper: createWrapper(queryClient) }
+            );
+
+            await act(async () => {
+                result.current.mutate({ body: { title: 'Test' } } as any);
+            });
+
+            await waitFor(() =>
+                expect(invalidateSpy).toHaveBeenCalledWith({
+                    queryKey: ['@cleverbrush', 'todos']
+                })
+            );
+        });
+
+        test('does not invalidate when endpoint has no cacheTags', async () => {
+            const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+            mockFetch.mockResolvedValueOnce(jsonResponse({ id: 1 }, 201));
+
+            const { result } = renderHook(
+                () => queryApi.todos.list.useMutation(),
+                { wrapper: createWrapper(queryClient) }
+            );
+
+            await act(async () => {
+                result.current.mutate({} as any);
+            });
+
+            // Wait a tick to ensure no calls
+            await vi.waitFor(
+                () =>
+                    expect(invalidateSpy).not.toHaveBeenCalledWith({
+                        queryKey: ['@cleverbrush', 'todos']
+                    }),
+                { timeout: 1000 }
+            );
+        });
+
+        test('still calls onSuccess alongside auto-invalidation', async () => {
+            const onSuccess = vi.fn();
+            const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+            mockFetch.mockResolvedValueOnce(jsonResponse({ id: 1 }, 201));
+
+            const { result } = renderHook(
+                () =>
+                    queryApi.todos.create.useMutation({
+                        onSuccess
+                    }),
+                { wrapper: createWrapper(queryClient) }
+            );
+
+            await act(async () => {
+                result.current.mutate({ body: { title: 'Test' } } as any);
+            });
+
+            await waitFor(() => {
+                expect(onSuccess).toHaveBeenCalledOnce();
+                expect(invalidateSpy).toHaveBeenCalledWith({
+                    queryKey: ['@cleverbrush', 'todos']
+                });
+            });
         });
     });
 

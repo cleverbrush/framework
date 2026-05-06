@@ -9,5 +9,7 @@ export default defineConfig({
     sourcemap: true,
     clean: true,
     target: 'es2022',
-    external: ['ws']
+    // @fastify/busboy is CJS and uses require('node:stream') internally.
+    // Bundling it into ESM via tsup's shimmed require breaks at runtime.
+    external: ['ws', '@fastify/busboy']
 });

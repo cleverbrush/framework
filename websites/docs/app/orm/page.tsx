@@ -149,10 +149,10 @@ const updated = await db.users.save({ id: 1, email: 'alice@example.com', name: '
 }).hasTableName('todos');
 
 const TodoEntity = defineEntity(TodoSchema)
-    .belongsTo(t => t.author, 'userId');
+    .belongsTo(t => t.author, l => l.userId, r => r.id);
 
 const UserEntity = defineEntity(UserSchema)
-    .hasMany(t => t.todos, TodoEntity, 'userId');
+    .hasMany(t => t.todos, l => l.id, r => r.userId);
 
 const db = createDb(knex, { users: UserEntity, todos: TodoEntity });
 

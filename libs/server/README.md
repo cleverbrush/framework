@@ -124,6 +124,36 @@ const CreateUser = endpoint
     .operationId('createUser');
 ```
 
+### Cache Tags
+
+Tag-based cache invalidation. Tags declared on endpoints flow to the
+[`cacheTags` middleware](/client/cache-tags) for automatic HTTP caching and
+invalidation on mutating requests.
+
+```ts
+const ListTodos = endpoint
+    .get('/api/todos')
+    .query(TodoListQuerySchema)
+    .cacheTag('todo-list', p => ({ page: p.query.page, limit: p.query.limit }))
+    .returns(array(TodoSchema));
+
+const UpdateTodo = endpoint
+    .patch('/api/todos/:id')
+    .body(UpdateTodoBody)
+    .clearsCacheTag('todo-list')               // clears the collection cache
+    .clearsCacheTag('todo', p => ({ id: p.params.id }))  // clears specific entity
+    .returns(TodoSchema);
+```
+
+- **`.cacheTag(name)`** — declares the endpoint's data belongs to a cache
+  group. Use on GET endpoints.
+- **`.clearsCacheTag(name)`** — declares that this mutation clears matching
+  cache entries on success. Use on POST / PUT / PATCH / DELETE.
+- **`.cacheTag(name, p => ({ ... }))`** — property-based tag; each selected
+  property becomes part of the cache key (different pages → different entries).
+- **Immutability** — both methods return a new builder; the original is
+  unchanged.
+
 ## Registering and Handling Endpoints
 
 ```ts
@@ -154,6 +184,48 @@ await server.listen(3000);
 | `ActionResult.content(body, contentType)` | 200 | Arbitrary string body |
 | `ActionResult.stream(readable, contentType)` | 200 | Pipes a `Readable` |
 | `ActionResult.status(status)` | any | Bare status, no body |
+
+## File Upload
+
+Accept file uploads via `multipart/form-data` by chaining `.upload()` on an endpoint:
+
+```ts
+import { endpoint } from '@cleverbrush/server';
+import { object, string } from '@cleverbrush/schema';
+
+const UploadAvatar = endpoint
+    .post('/api/avatar')
+    .upload({ maxFileSize: 2 * 1024 * 1024, allowedMimeTypes: ['image/*'] })
+    .body(object({ description: string().optional() }))
+    .authorize(UserPrincipal);
+
+const handler: Handler<typeof UploadAvatar> = async ({ body, files }) => {
+    const avatar = files['avatar'];
+    // avatar: FilePart { filename, mimeType, buffer, size }
+    return ActionResult.created({ name: avatar.filename });
+};
+```
+
+The `files` object on the handler context contains one `FilePart` entry per uploaded file field. Non-file form fields are validated against the body schema and available via `body`.
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxFileSize` | `number` | 10 MB | Maximum file size per file in bytes |
+| `allowedMimeTypes` | `string[]` | all | MIME type allowlist (supports `image/*` glob) |
+| `maxFileCount` | `number` | 10 | Maximum number of files per request |
+
+### FilePart type
+
+```ts
+interface FilePart {
+    readonly filename: string;
+    readonly mimeType: string;
+    readonly buffer: Buffer;
+    readonly size: number;
+}
+```
 
 ## Middleware
 

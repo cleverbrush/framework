@@ -13,7 +13,7 @@
  * @module
  */
 
-import type { ApiContract } from '@cleverbrush/server/contract';
+import type { ApiContract, FilePart } from '@cleverbrush/server/contract';
 import { ApiError, NetworkError, WebError } from './errors.js';
 import { composeMiddleware, PER_CALL_OPTIONS } from './middleware.js';
 import { buildPath } from './path.js';
@@ -179,7 +179,7 @@ export function createClient<T extends ApiContract>(
         url: string;
         method: string;
         headers: Record<string, string>;
-        body: string | undefined;
+        body: string | FormData | undefined;
     } {
         const meta = getMeta(ep);
         const method = meta.method.toUpperCase();
@@ -202,17 +202,58 @@ export function createClient<T extends ApiContract>(
         }
 
         // -- Body --
-        let body: string | undefined;
+        let body: string | FormData | undefined;
         if (args?.body !== undefined && hasBody(method)) {
-            reqHeaders['Content-Type'] = JSON_CONTENT_TYPE;
-            body = JSON.stringify(args.body);
+            if (meta.fileUpload) {
+                // Build FormData for multipart uploads
+                const fd = new FormData();
+                if (
+                    args.body &&
+                    typeof args.body === 'object' &&
+                    !(args.body instanceof Blob)
+                ) {
+                    for (const [key, val] of Object.entries(args.body)) {
+                        fd.append(key, String(val));
+                    }
+                }
+                // Append file fields from args.files
+                if (args.files) {
+                    for (const [key, value] of Object.entries(
+                        args.files as Record<string, FilePart | Blob>
+                    )) {
+                        if (value instanceof Blob) {
+                            fd.append(key, value);
+                        } else {
+                            const fp = value as FilePart;
+                            fd.append(
+                                key,
+                                new Blob([fp.buffer], {
+                                    type: fp.mimeType
+                                }),
+                                fp.filename
+                            );
+                        }
+                    }
+                }
+                body = fd;
+                // Let the browser set Content-Type with boundary
+                delete reqHeaders['Content-Type'];
+            } else {
+                reqHeaders['Content-Type'] = JSON_CONTENT_TYPE;
+                body = JSON.stringify(args.body);
+            }
         }
 
         return { url, method, headers: reqHeaders, body };
     }
 
     // The actual fetch logic, shared by every endpoint proxy method.
-    async function execute(ep: any, args: any): Promise<any> {
+    async function execute(
+        ep: any,
+        args: any,
+        groupName?: string,
+        endpointName?: string
+    ): Promise<any> {
         const {
             url,
             method,
@@ -230,8 +271,63 @@ export function createClient<T extends ApiContract>(
         const perCallOptions: Record<string, unknown> = {};
         if (args?.retry !== undefined) perCallOptions.retry = args.retry;
         if (args?.timeout !== undefined) perCallOptions.timeout = args.timeout;
+        if (args?.optimisticUpdate !== undefined)
+            perCallOptions.optimisticUpdate = args.optimisticUpdate;
+        if (args?.offlineQueue !== undefined)
+            perCallOptions.offlineQueue = args.offlineQueue;
         if (Object.keys(perCallOptions).length > 0) {
             (init as any)[PER_CALL_OPTIONS] = perCallOptions;
+        }
+
+        // Attach endpoint metadata for middleware introspection
+        // (e.g. throttlingCache cache invalidation callbacks).
+        if (groupName && endpointName) {
+            const meta = getMeta(ep);
+            const tpl = meta.pathTemplate;
+
+            let suffix = '';
+            if (typeof tpl === 'string') {
+                suffix = tpl;
+            } else if (tpl && typeof (tpl as any).introspect === 'function') {
+                suffix =
+                    (tpl as any).introspect().templateDefinition.literals[0] ??
+                    '';
+            }
+            const collectionPath = meta.basePath + suffix || '/';
+
+            let pathParamNames: string[] = [];
+            if (
+                tpl &&
+                typeof tpl !== 'string' &&
+                typeof (tpl as any).introspect === 'function'
+            ) {
+                pathParamNames = (tpl as any)
+                    .introspect()
+                    .templateDefinition.segments.map((s: any) => s.path);
+            }
+
+            const epMeta: Record<string, unknown> = {
+                group: groupName,
+                endpoint: endpointName,
+                method: meta.method,
+                path: ep.path as string,
+                basePath: meta.basePath,
+                baseUrl,
+                collectionPath,
+                fullCollectionUrl: baseUrl.replace(/\/$/, '') + collectionPath,
+                pathParamNames,
+                params: args?.params ?? ({} as Record<string, unknown>),
+                body: args?.body,
+                query: args?.query ?? ({} as Record<string, unknown>),
+                headers: args?.headers ?? ({} as Record<string, string>),
+                operationId: meta.operationId ?? null,
+                tags: meta.tags ?? [],
+                cacheTags: meta.cacheTags ?? []
+            };
+
+            if (!(init as any).__endpointMeta) {
+                (init as any).__endpointMeta = epMeta;
+            }
         }
 
         // -- beforeRequest hooks --
@@ -382,9 +478,33 @@ export function createClient<T extends ApiContract>(
                             );
                     }
 
-                    // Regular HTTP endpoints return a callable with .stream()
-                    const call = (args?: any) => execute(ep, args);
+                    // Regular HTTP endpoints return a callable with .stream() and .file()
+                    const call = (args?: any) =>
+                        execute(ep, args, groupName, endpointName);
                     call.stream = (args?: any) => streamLines(ep, args);
+                    call.file = async (args?: any): Promise<Blob> => {
+                        const {
+                            url,
+                            method,
+                            headers: reqHeaders,
+                            body
+                        } = buildRequest(ep, args);
+                        const init: RequestInit = {
+                            method,
+                            headers: reqHeaders,
+                            body
+                        };
+                        await runBeforeRequest(hooks, url, init);
+                        const response = await composedFetch(url, init);
+                        if (!response.ok) {
+                            if (response.status === 401) onUnauthorized?.();
+                            throw new ApiError(
+                                response.status,
+                                response.statusText || `HTTP ${response.status}`
+                            );
+                        }
+                        return response.blob();
+                    };
                     return call;
                 }
             });

@@ -20,7 +20,9 @@ const TodoRowSchema = object({
     completed: boolean(),
     userId: number(),
     createdAt: date(),
-    updatedAt: date()
+    updatedAt: date(),
+    attachmentName: string().optional(),
+    attachmentMimeType: string().optional()
 });
 
 export const mappingRegistry = mapper()
@@ -28,7 +30,11 @@ export const mappingRegistry = mapper()
         m.for(t => t.authProvider).compute(f => f.authProvider)
     )
     .configure(TodoRowSchema, TodoResponseSchema, m =>
-        m.for(t => t.description).compute(f => f.description ?? undefined)
+        m
+            .for(t => t.description)
+            .compute(f => f.description ?? undefined)
+            .for(t => t.attachmentSize)
+            .ignore()
     );
 
 const _mapUserFn = mappingRegistry.getMapper(UserRowSchema, UserResponseSchema);

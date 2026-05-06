@@ -116,7 +116,7 @@ const schema = fromJsonSchema(S); // ObjectSchemaBuilder<{ x: NumberSchemaBuilde
 | `enum` | `union(…)` of const builders |
 | `anyOf` | `union(…)` of sub-builders |
 | `anyOf` + `discriminator` | auto-emitted for discriminated `union()` branches (see below) |
-| `allOf` | not supported — falls back to `any()` |
+| `allOf` | `intersection(...)` — chains sub-schemas via the `intersection()` builder |
 | `minLength` / `maxLength` | `.minLength()` / `.maxLength()` |
 | `pattern` | `.matches(regex)` (invalid patterns silently ignored) |
 | `minimum` / `maximum` | `.min()` / `.max()` |
@@ -288,7 +288,6 @@ type B = JsonSchemaNodeToBuilder<typeof S>;
 | `$ref` / `$defs` | Not supported in `fromJsonSchema` |
 | `if` / `then` / `else` | Not supported |
 | `not` | Not supported |
-| `allOf` in `fromJsonSchema` | Falls back to `SchemaBuilder<unknown>` (no deep merge) |
 | Dual IP format (`ip()` with both v4 + v6) | `format` is omitted in `toJsonSchema` output (no standard keyword covers both) |
 | JSDoc comments on properties | Not preserved in `toJsonSchema` output |
 | `nameResolver` + `$ref` / `$defs` round-trip | `nameResolver` emits `$ref` pointers based on external registry; `fromJsonSchema` does not resolve `$ref` references — they fall back to `any()` |

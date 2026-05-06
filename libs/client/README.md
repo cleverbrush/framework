@@ -243,6 +243,43 @@ throttlingCache({
 
 Caches successful GET responses for a configurable TTL. Subsequent requests within the TTL receive a cloned cached response without hitting the network.
 
+### Cache Tags — `@cleverbrush/client/cache`
+
+Tag-based HTTP caching with automatic invalidation driven by server-side endpoint
+annotations (`.cacheTag()` / `.clearsCacheTag()`). Replaces manual invalidation callbacks — mutations
+automatically clear cache entries matching the endpoint's declared tag names.
+
+```ts
+import { cacheTags } from '@cleverbrush/client/cache';
+
+const client = createClient(api, {
+    middlewares: [cacheTags({ defaultTtl: 5000 })],
+});
+
+// Populates cache entries for 'todo-list' and 'todo:id=1' tags.
+await client.todos.list({ query: { page: 1 } });
+await client.todos.get({ params: { id: 1 } });
+
+// Mutation — automatically invalidates both tags.
+await client.todos.update({ params: { id: 1 }, body: { title: 'Updated' } });
+
+// Triggers network fetch — cache was cleared.
+await client.todos.list({ query: { page: 1 } });
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `defaultTtl` | `number` | `0` | TTL in ms for tags without explicit TTL. `0` = invalidation-only. |
+| `ttlByTag` | `Record<string, number>` | `{}` | Per-tag TTL overrides. |
+| `condition` | `(Response) => boolean` | `response.ok` | Predicate controlling which responses are cached. |
+
+When used with `@cleverbrush/client/react`, TanStack Query's `useMutation` hooks
+automatically invalidate the query cache for the affected group — no manual
+`queryClient.invalidateQueries()` needed.
+
+See the [server-side cache tags](/server#cache-tags) section for how to declare
+tags on your endpoints.
+
 ## Per-Call Overrides
 
 Override middleware options for individual calls:
@@ -683,6 +720,47 @@ function InfiniteTodos() {
 }
 ```
 
+### Optimistic Mutations
+
+The `useOptimisticMutation` hook wraps TanStack Query's `useMutation` with automatic cache snapshot, optimistic update, and rollback on error. This replaces the manual `onMutate`/`onError`/`onSettled` pattern.
+
+```tsx
+import { useOptimisticMutation } from '@cleverbrush/client/react';
+
+function TodoItem({ todo }: { todo: Todo }) {
+    const toggleMutation = useOptimisticMutation(client.todos.update, {
+        queryKey: client.todos.list.queryKey(),
+        optimisticUpdate: (oldTodos, variables) =>
+            (oldTodos ?? []).map(t =>
+                t.id === variables.params.id
+                    ? { ...t, completed: variables.body.completed }
+                    : t
+            ),
+        onSettled: () => {
+            queryClient.invalidateQueries({
+                queryKey: client.todos.queryKey()
+            });
+        }
+    });
+
+    return (
+        <button onClick={() => toggleMutation.mutate({
+            params: { id: todo.id },
+            body: { completed: !todo.completed }
+        })}>
+            {todo.completed ? '✓' : '○'}
+        </button>
+    );
+}
+```
+
+The hook handles:
+1. **Cancel** — cancels in-flight queries for the given `queryKey`
+2. **Snapshot** — captures the current cache state
+3. **Optimistic update** — applies your `optimisticUpdate` function
+4. **Rollback** — restores the snapshot if the mutation fails
+5. **Invalidate** — invalidates the cache when the mutation settles
+
 ### Error Handling in Hooks
 
 ```tsx
@@ -693,7 +771,7 @@ const { error } = client.todos.list.useQuery();
 if (isApiError(error)) {
     console.log(error.status, error.body);
 } else if (isTimeoutError(error)) {
-    console.log('Timed out after', error.timeout, 'ms');
+    console.log('Timed out after', err.timeout, 'ms');
 }
 ```
 
@@ -731,9 +809,133 @@ if (isApiError(error)) {
 | `@cleverbrush/client/retry` | Retry middleware with exponential backoff |
 | `@cleverbrush/client/timeout` | AbortController-based timeout middleware |
 | `@cleverbrush/client/dedupe` | Request deduplication middleware |
-| `@cleverbrush/client/cache` | Throttling cache middleware |
+| `@cleverbrush/client/idempotency` | Idempotency key middleware (deduplicates mutations) |
+| `@cleverbrush/client/cache` | Throttling cache + tag-based cache invalidation middleware |
 | `@cleverbrush/client/batching` | Request batching middleware |
+| `@cleverbrush/client/optimistic-update` | Optimistic update middleware (mutation tracking) |
+| `@cleverbrush/client/offline-queue` | Offline queue middleware (queue + replay) |
 | `@cleverbrush/client/react` | TanStack Query hooks + unified client |
+
+## Optimistic Update Middleware
+
+```ts
+import { optimisticUpdate } from '@cleverbrush/client/optimistic-update';
+```
+
+Tags mutation requests (POST/PUT/PATCH/DELETE) with a unique ID and tracks network failures in an inspectable store. Designed to work with the `useOptimisticMutation` React hook.
+
+### Basic usage
+
+```ts
+import { createClient } from '@cleverbrush/client';
+import { optimisticUpdate } from '@cleverbrush/client/optimistic-update';
+
+const client = createClient(api, {
+    middlewares: [optimisticUpdate()]
+});
+```
+
+### Store inspection
+
+Pass a shared store to inspect failed mutations:
+
+```ts
+import { optimisticUpdate, type OptimisticUpdateStore } from '@cleverbrush/client/optimistic-update';
+
+const store: OptimisticUpdateStore = { failures: [] };
+
+const client = createClient(api, {
+    middlewares: [optimisticUpdate({ store })]
+});
+
+// After a network error:
+console.log(store.failures);
+// → [{ id, url, init, error, timestamp }]
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `store` | `OptimisticUpdateStore` | `{ failures: [] }` | Shared mutable store |
+| `skip` | `(url, init) => boolean` | — | Skip tagging for specific requests |
+
+### Per-call override
+
+```ts
+await client.todos.create({
+    body: { title: 'test' },
+    optimisticUpdate: { skip: true } // skip tagging for this call
+});
+```
+
+## Offline Queue Middleware
+
+```ts
+import { offlineQueue } from '@cleverbrush/client/offline-queue';
+```
+
+Queues mutation requests (POST/PUT/PATCH/DELETE) when the browser reports offline (`navigator.onLine`). Automatically replays queued mutations when connectivity is restored.
+
+### Important: middleware placement
+
+`offlineQueue()` must be the **outermost** middleware (first in the array) so that retry/timeout/etc. middlewares re-apply when queued mutations are replayed:
+
+```ts
+middlewares: [
+    offlineQueue(),          // outermost
+    retry({ limit: 3 }),     // re-applies on replay
+    timeout({ timeout: 10000 }),
+    batching(),
+]
+```
+
+### Basic usage
+
+```ts
+import { createClient } from '@cleverbrush/client';
+import { offlineQueue } from '@cleverbrush/client/offline-queue';
+
+const client = createClient(api, {
+    middlewares: [offlineQueue()]
+});
+```
+
+### Store inspection
+
+Pass a shared store to observe queue state:
+
+```ts
+import { offlineQueue, type OfflineQueueStore } from '@cleverbrush/client/offline-queue';
+
+const store: OfflineQueueStore = { queue: [], isOnline: true, isReplaying: false };
+
+const client = createClient(api, {
+    middlewares: [offlineQueue({ store })]
+});
+
+// Check queue status:
+console.log(store.isOnline);     // boolean
+console.log(store.queue.length); // queued mutations
+console.log(store.isReplaying);  // currently replaying
+```
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `store` | `OfflineQueueStore` | `{ queue: [], isOnline: true, isReplaying: false }` | Shared mutable store |
+| `skip` | `(url, init) => boolean` | — | Skip queue for specific requests |
+| `maxRetries` | `number` | `3` | Max flush retries per queued item |
+
+### Per-call override
+
+```ts
+await client.todos.create({
+    body: { title: 'test' },
+    offlineQueue: { skip: true } // bypass queue for this call
+});
+```
 
 ## License
 

@@ -211,6 +211,18 @@ function convertNodeInner(
             return out;
         }
 
+        case 'intersection': {
+            const left = info.left as SchemaBuilder<any, any, any>;
+            const right = info.right as SchemaBuilder<any, any, any>;
+            return {
+                ...readOnly,
+                allOf: [
+                    convertNode(left, resolver),
+                    convertNode(right, resolver)
+                ]
+            };
+        }
+
         case 'lazy': {
             // Resolve the lazy schema once and delegate conversion.
             // If the resolved schema has a name registered in the nameResolver,
@@ -264,6 +276,10 @@ function convertNode(
             const anyOf = out['anyOf'] as Out[];
             const hasNull = anyOf.some(o => o['type'] === 'null');
             if (!hasNull) anyOf.push({ type: 'null' });
+        } else if (out['allOf'] !== undefined && out['type'] === undefined) {
+            // Intersection type without a top-level type — wrap in oneOf with null
+            out['oneOf'] = [{ allOf: out['allOf'] as Out[] }, { type: 'null' }];
+            delete out['allOf'];
         } else if (out['enum'] !== undefined) {
             // Enum — add null to enum values if not already present
             const enumValues = out['enum'] as unknown[];

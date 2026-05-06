@@ -59,7 +59,7 @@ export default function GettingStartedPage() {
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { object, string, number, array } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { object, string, number, array, boolean } from '@cleverbrush/schema';
 
 const Todo = object({
   id:        number(),

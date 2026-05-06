@@ -119,7 +119,59 @@ export interface ServerOptions {
 }
 
 // ---------------------------------------------------------------------------
-// Batching Options
+// File Upload
+// ---------------------------------------------------------------------------
+
+/**
+ * Represents a single uploaded file from a `multipart/form-data` request.
+ */
+export interface FilePart {
+    /** Original filename as provided by the client. */
+    readonly filename: string;
+    /** MIME type of the file (e.g. `'image/jpeg'`). */
+    readonly mimeType: string;
+    /** Full file contents as a Buffer. */
+    readonly buffer: Buffer;
+    /** File size in bytes. */
+    readonly size: number;
+}
+
+/**
+ * Describes a file that was rejected during multipart parsing.
+ */
+export interface RejectedFile {
+    /** Original filename as provided by the client. */
+    readonly filename: string;
+    /** MIME type of the file (e.g. `'application/xlsx'`). */
+    readonly mimeType: string;
+    /** Human-readable reason the file was rejected. */
+    readonly reason: string;
+}
+
+/**
+ * Configuration for file upload endpoints declared via
+ * `EndpointBuilder.upload()`.
+ */
+export interface UploadOptions {
+    /**
+     * Maximum allowed file size per uploaded file in bytes.
+     * @default 10_485_760 (10 MB)
+     */
+    maxFileSize?: number;
+    /**
+     * Allowed MIME types or patterns (e.g. `'image/*'`, `'application/pdf'`).
+     * When not set, all MIME types are accepted.
+     */
+    allowedMimeTypes?: string[];
+    /**
+     * Maximum number of files allowed in a single request.
+     * @default 10
+     */
+    maxFileCount?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Server Batching Options
 // ---------------------------------------------------------------------------
 
 /**

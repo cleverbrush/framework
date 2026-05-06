@@ -216,7 +216,7 @@ await writeOpenApiSpec({
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(
                                     `import { object, string, number, array } from '@cleverbrush/schema';
-import { endpoint, route } from '@cleverbrush/server';
+import { createServer, endpoint, route } from '@cleverbrush/server';
 import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
 
 // Export as a constant — reuse the same reference everywhere
@@ -230,8 +230,12 @@ const GetUser   = endpoint
     .returns(UserSchema);
 const ListUsers = endpoint.get('/api/users').returns(array(UserSchema));
 
+const server = createServer()
+    .handle(GetUser, ({ params }) => ({ id: params.id, name: 'Alice' }))
+    .handle(ListUsers, () => []);
+
 const spec = generateOpenApiSpec({
-    registrations: [GetUser.registration, ListUsers.registration],
+    server,
     info: { title: 'My API', version: '1.0.0' },
 });
 

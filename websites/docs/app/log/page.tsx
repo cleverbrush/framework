@@ -60,12 +60,12 @@ export default function LogPage() {
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { createLogger, consoleSink } from '@cleverbrush/log';
+                            __html: highlightTS(`import { createLogger, consoleSink, hostnameEnricher, processIdEnricher } from '@cleverbrush/log';
 
 const logger = createLogger({
     minimumLevel: 'information',
     sinks: [consoleSink({ theme: 'dark' })],
-    enrichers: ['hostname', 'processId'],
+    enrichers: [hostnameEnricher(), processIdEnricher()],
 });
 
 logger.info('Server started on port {Port}', { Port: 3000 });
@@ -125,14 +125,14 @@ logger.info('Config loaded: {@Config}', { Config: { port: 3000, env: 'prod' } })
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { createLogger, consoleSink, SeqSink, FileSink } from '@cleverbrush/log';
+                            __html: highlightTS(`import { createLogger, consoleSink, seqSink, fileSink } from '@cleverbrush/log';
 
 const logger = createLogger({
     minimumLevel: 'debug',
     sinks: [
         consoleSink({ theme: 'dark', minimumLevel: 'information' }),
-        new SeqSink({ serverUrl: 'http://localhost:5341' }),
-        new FileSink({ path: './logs/app.clef', rotationPolicy: 'size', maxFileSize: 10_000_000 }),
+        seqSink({ serverUrl: 'http://localhost:5341' }),
+        fileSink({ path: './logs/app.clef', rotation: { strategy: 'size', maxBytes: 10_000_000 } }),
     ],
 });`)
                         }}
@@ -154,11 +154,14 @@ const logger = createLogger({
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { s } from '@cleverbrush/schema';
+                            __html: highlightTS(`import { parseString, object, string, number } from '@cleverbrush/schema';
 import { createLogger, consoleSink } from '@cleverbrush/log';
 
 // Define once — compile-time checked parameter types
-const TodoCreated = s.parseString('Todo #{TodoId} "{Title}" created by {UserId}');
+const TodoCreated = parseString(
+    object({ TodoId: number(), Title: string(), UserId: string() }),
+    $t => $t\`Todo #\${t => t.TodoId} "\${t => t.Title}" created by \${t => t.UserId}\`
+);
 
 const logger = createLogger({ sinks: [consoleSink()] });
 
@@ -176,12 +179,12 @@ logger.info(TodoCreated, { TodoId: 1, Title: 'Buy milk', UserId: 'u-42' });
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { useLogging, createLogger, consoleSink } from '@cleverbrush/log';
+                            __html: highlightTS(`import { useLogging, createLogger, consoleSink, correlationIdEnricher } from '@cleverbrush/log';
 
 const logger = createLogger({
     minimumLevel: 'information',
     sinks: [consoleSink()],
-    enrichers: ['correlationId'],
+    enrichers: [correlationIdEnricher()],
 });
 
 // Returns [correlationIdMiddleware, requestLoggingMiddleware]
@@ -205,14 +208,16 @@ const [correlationId, requestLogging] = useLogging(logger, {
                     <code
                         dangerouslySetInnerHTML={{
                             __html: highlightTS(`import { ServiceCollection } from '@cleverbrush/di';
-import { configureLogging, ILogger, consoleSink } from '@cleverbrush/log';
+import { createLogger, configureLogging, ILogger, consoleSink } from '@cleverbrush/log';
+
+const logger = createLogger({ sinks: [consoleSink()] });
 
 const services = new ServiceCollection();
 configureLogging(services, logger);
 
 const provider = services.buildServiceProvider();
-const logger = provider.getService(ILogger);
-logger.info('Resolved from DI');`)
+const resolvedLogger = provider.getService(ILogger);
+resolvedLogger.info('Resolved from DI');`)
                         }}
                     />
                 </pre>
