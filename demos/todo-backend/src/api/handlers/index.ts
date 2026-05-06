@@ -26,7 +26,8 @@ import {
     listTodoActivityHandler,
     listTodosHandler,
     sendTodoEventHandler,
-    updateTodoHandler
+    updateTodoHandler,
+    uploadAttachmentHandler
 } from './todos.js';
 import {
     deleteUserHandler,
@@ -51,6 +52,7 @@ export const handlers: HandlerMap<typeof endpoints> = {
         sendEvent: sendTodoEventHandler,
         exportCsv: exportTodosHandler,
         downloadAttachment: downloadAttachmentHandler,
+        uploadAttachment: uploadAttachmentHandler,
         importBulk: importTodosHandler,
         legacyReplace: legacyReplaceTodoHandler,
         complete: completeTodoHandler,

@@ -185,6 +185,48 @@ await server.listen(3000);
 | `ActionResult.stream(readable, contentType)` | 200 | Pipes a `Readable` |
 | `ActionResult.status(status)` | any | Bare status, no body |
 
+## File Upload
+
+Accept file uploads via `multipart/form-data` by chaining `.upload()` on an endpoint:
+
+```ts
+import { endpoint } from '@cleverbrush/server';
+import { object, string } from '@cleverbrush/schema';
+
+const UploadAvatar = endpoint
+    .post('/api/avatar')
+    .upload({ maxFileSize: 2 * 1024 * 1024, allowedMimeTypes: ['image/*'] })
+    .body(object({ description: string().optional() }))
+    .authorize(UserPrincipal);
+
+const handler: Handler<typeof UploadAvatar> = async ({ body, files }) => {
+    const avatar = files['avatar'];
+    // avatar: FilePart { filename, mimeType, buffer, size }
+    return ActionResult.created({ name: avatar.filename });
+};
+```
+
+The `files` object on the handler context contains one `FilePart` entry per uploaded file field. Non-file form fields are validated against the body schema and available via `body`.
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `maxFileSize` | `number` | 10 MB | Maximum file size per file in bytes |
+| `allowedMimeTypes` | `string[]` | all | MIME type allowlist (supports `image/*` glob) |
+| `maxFileCount` | `number` | 10 | Maximum number of files per request |
+
+### FilePart type
+
+```ts
+interface FilePart {
+    readonly filename: string;
+    readonly mimeType: string;
+    readonly buffer: Buffer;
+    readonly size: number;
+}
+```
+
 ## Middleware
 
 ```ts

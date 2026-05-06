@@ -26,7 +26,12 @@ import {
     type SubscriptionBuilder,
     type SubscriptionHandlerEntry
 } from './Subscription.js';
-import type { Middleware } from './types.js';
+import type {
+    FilePart,
+    Middleware,
+    RejectedFile,
+    UploadOptions
+} from './types.js';
 
 // ---------------------------------------------------------------------------
 // Simplify — flattens intersection types for clean IDE tooltips
@@ -40,7 +45,14 @@ type Simplify<T> = { [K in keyof T]: T[K] } & {};
 
 type HasKeys<T> = keyof T extends never ? false : true;
 
-type ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal> = {
+type ActionContextParts<
+    TParams,
+    TBody,
+    TQuery,
+    THeaders,
+    TPrincipal,
+    TUpload extends boolean
+> = {
     context: RequestContext;
 } & (HasKeys<TParams> extends true ? { params: TParams } : {}) &
     (TBody extends undefined
@@ -52,7 +64,10 @@ type ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal> = {
           }) &
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
-    (TPrincipal extends undefined ? {} : { principal: TPrincipal });
+    (TPrincipal extends undefined ? {} : { principal: TPrincipal }) &
+    (TUpload extends true
+        ? { files: Record<string, FilePart>; rejectedFiles?: RejectedFile[] }
+        : {});
 
 /**
  * The fully-typed argument object passed to endpoint handlers.
@@ -70,10 +85,18 @@ export type ActionContext<E> =
         infer TPrincipal,
         any,
         any,
-        any
+        any,
+        infer TUpload
     >
         ? Simplify<
-              ActionContextParts<TParams, TBody, TQuery, THeaders, TPrincipal>
+              ActionContextParts<
+                  TParams,
+                  TBody,
+                  TQuery,
+                  THeaders,
+                  TPrincipal,
+                  TUpload
+              >
           >
         : never;
 
@@ -101,6 +124,7 @@ export type ServiceSchemas<E> =
         any,
         any,
         any,
+        any,
         any
     >
         ? TServices
@@ -116,6 +140,7 @@ type ResponseType<E> =
         any,
         any,
         infer TResponse,
+        any,
         any
     >
         ? TResponse extends SchemaBuilder<any, any, any, any, any>
@@ -137,7 +162,8 @@ export type ResponsesOf<E> =
         any,
         any,
         any,
-        infer TResponses
+        infer TResponses,
+        any
     >
         ? TResponses
         : never;
@@ -202,7 +228,18 @@ export type Handler<E> =
 // Handler mapping — compile-time complete endpoint → handler binding
 // ---------------------------------------------------------------------------
 
-type AnyEndpoint = EndpointBuilder<any, any, any, any, any, any, any, any, any>;
+type AnyEndpoint = EndpointBuilder<
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any,
+    any
+>;
 type AnySubscriptionBuilder = SubscriptionBuilder<
     any,
     any,
@@ -539,6 +576,12 @@ export interface EndpointMetadata {
      */
     readonly callbacks: Record<string, CallbackDefinition> | null;
     /**
+     * When set, the endpoint accepts `multipart/form-data` uploads.
+     * The configuration controls max file size, allowed MIME types, etc.
+     * @see `EndpointBuilder.upload()`
+     */
+    readonly fileUpload: UploadOptions | null;
+    /**
      * Cache tags declared via `.clearsCacheTag()`, providing tag-based cache
      * key computation for the client middleware.
      */
@@ -639,7 +682,8 @@ export class EndpointBuilder<
     TPrincipal = undefined,
     TRoles extends string = string,
     TResponse = any,
-    TResponses extends Record<number, any> = {}
+    TResponses extends Record<number, any> = {},
+    TUpload extends boolean = false
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -703,6 +747,7 @@ export class EndpointBuilder<
     readonly #externalDocs: { url: string; description?: string } | null;
     readonly #links: Record<string, LinkDefinition> | null;
     readonly #callbacks: Record<string, CallbackDefinition> | null;
+    readonly #fileUpload: UploadOptions | null;
     readonly #cacheTags: readonly CacheTagDefinition[];
 
     constructor(
@@ -768,6 +813,7 @@ export class EndpointBuilder<
         externalDocs: { url: string; description?: string } | null = null,
         links: Record<string, LinkDefinition> | null = null,
         callbacks: Record<string, CallbackDefinition> | null = null,
+        fileUpload: UploadOptions | null = null,
         cacheTags: readonly CacheTagDefinition[] = []
     ) {
         this.#method = method;
@@ -793,6 +839,7 @@ export class EndpointBuilder<
         this.#externalDocs = externalDocs;
         this.#links = links;
         this.#callbacks = callbacks;
+        this.#fileUpload = fileUpload;
         this.#cacheTags = cacheTags;
     }
 
@@ -808,7 +855,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -834,6 +882,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -852,7 +901,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -878,6 +928,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -896,7 +947,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -922,6 +974,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -940,7 +993,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -966,6 +1020,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -991,7 +1046,8 @@ export class EndpointBuilder<
         InferType<TSchema>,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     >;
     authorize(
         ...roles: TRoles[]
@@ -1004,7 +1060,8 @@ export class EndpointBuilder<
         unknown,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     >;
     authorize(
         ...args: unknown[]
@@ -1017,7 +1074,8 @@ export class EndpointBuilder<
         any,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         let roles: string[];
         if (
@@ -1059,6 +1117,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1079,7 +1138,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         T,
-        TResponses
+        TResponses,
+        TUpload
     >;
     returns<TSchema extends SchemaBuilder<any, any, any, any, any>>(
         schema: TSchema
@@ -1092,11 +1152,12 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TSchema,
-        TResponses
+        TResponses,
+        TUpload
     >;
     returns(
         _schema?: unknown
-    ): EndpointBuilder<any, any, any, any, any, any, any, any, any> {
+    ): EndpointBuilder<any, any, any, any, any, any, any, any, any, any> {
         const schema =
             _schema != null &&
             typeof _schema === 'object' &&
@@ -1127,6 +1188,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1169,7 +1231,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        InferResponsesMap<T>
+        InferResponsesMap<T>,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1195,6 +1258,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1211,7 +1275,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1237,6 +1302,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1253,7 +1319,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1279,6 +1346,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1295,7 +1363,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1321,6 +1390,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1337,7 +1407,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1363,6 +1434,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1377,7 +1449,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1403,6 +1476,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1426,7 +1500,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1452,6 +1527,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1478,7 +1554,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1504,6 +1581,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1529,7 +1607,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1555,6 +1634,79 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
+            this.#cacheTags
+        );
+    }
+
+    /**
+     * Mark this endpoint as accepting `multipart/form-data` file uploads.
+     *
+     * When set, the server parses the request body with a streaming multipart
+     * parser instead of the default JSON deserializer. File fields are made
+     * available to the handler via `arg.files` (a `Record<string, FilePart>`),
+     * while non-file form fields are validated against the body schema and
+     * available via `arg.body`.
+     *
+     * @param options - Upload configuration (max file size, allowed MIME types, etc.).
+     *
+     * @example
+     * ```ts
+     * const UploadAvatar = endpoint
+     *     .post('/api/avatar')
+     *     .upload({ maxFileSize: 2 * 1024 * 1024, allowedMimeTypes: ['image/*'] })
+     *     .authorize(PrincipalSchema)
+     *     .responses({ 200: AvatarSchema });
+     *
+     * const handler: Handler<typeof UploadAvatar> = async ({ files }) => {
+     *     const avatar = files['avatar'];
+     *     // avatar: { filename, mimeType, buffer, size }
+     * };
+     * ```
+     */
+    upload(
+        options?: UploadOptions
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        true
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks,
+            {
+                maxFileSize: options?.maxFileSize ?? 10 * 1024 * 1024,
+                allowedMimeTypes: options?.allowedMimeTypes,
+                maxFileCount: options?.maxFileCount ?? 10
+            },
             this.#cacheTags
         );
     }
@@ -1611,6 +1763,7 @@ export class EndpointBuilder<
             externalDocs: this.#externalDocs,
             links: this.#links,
             callbacks: this.#callbacks,
+            fileUpload: this.#fileUpload,
             cacheTags: this.#cacheTags
         };
     }
@@ -1650,7 +1803,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1676,6 +1830,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1711,7 +1866,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1737,6 +1893,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1761,7 +1918,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1787,6 +1945,7 @@ export class EndpointBuilder<
             { url, description },
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1822,7 +1981,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1848,6 +2008,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             defs as Record<string, LinkDefinition>,
             this.#callbacks,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -1885,7 +2046,8 @@ export class EndpointBuilder<
         TPrincipal,
         TRoles,
         TResponse,
-        TResponses
+        TResponses,
+        TUpload
     > {
         return new EndpointBuilder(
             this.#method,
@@ -1911,6 +2073,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             defs as Record<string, CallbackDefinition>,
+            this.#fileUpload,
             this.#cacheTags
         );
     }
@@ -2069,6 +2232,7 @@ export class EndpointBuilder<
                 this.#externalDocs,
                 this.#links,
                 this.#callbacks,
+                this.#fileUpload,
                 [...this.#cacheTags, { name, properties: {} }]
             );
         }
@@ -2117,6 +2281,7 @@ export class EndpointBuilder<
             this.#externalDocs,
             this.#links,
             this.#callbacks,
+            this.#fileUpload,
             [...this.#cacheTags, definition]
         );
     }

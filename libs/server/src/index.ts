@@ -90,9 +90,12 @@ export {
 export type {
     ContentTypeHandler,
     EndpointRegistration,
+    FilePart,
     Middleware,
+    RejectedFile,
     ServerBatchingOptions,
     ServerOptions,
-    SubscriptionRegistration
+    SubscriptionRegistration,
+    UploadOptions
 } from './types.js';
 export { defineWebhook, type WebhookDefinition } from './Webhook.js';

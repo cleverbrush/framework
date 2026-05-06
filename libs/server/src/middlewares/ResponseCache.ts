@@ -9,7 +9,7 @@
  * @module
  */
 
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import type { ServerResponse } from 'node:http';
 import type { RequestContext } from '../RequestContext.js';
 import type { Middleware } from '../types.js';
 
@@ -150,7 +150,7 @@ export function cacheResponse(options: ServerCacheOptions = {}): Middleware {
                     for (const [cachedKey] of cache) {
                         if (
                             keys.includes(cachedKey) ||
-                            keys.some(k => cachedKey.startsWith(tag.name))
+                            keys.some(_k => cachedKey.startsWith(tag.name))
                         ) {
                             cache.delete(cachedKey);
                         }

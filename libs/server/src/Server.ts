@@ -14,6 +14,7 @@ import {
     requireRole
 } from '@cleverbrush/auth';
 import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
+import { Busboy } from '@fastify/busboy';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
@@ -34,10 +35,13 @@ import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 import type {
     ContentTypeHandler,
     EndpointRegistration,
+    FilePart,
     Middleware,
+    RejectedFile,
     ServerBatchingOptions,
     ServerOptions,
-    SubscriptionRegistration
+    SubscriptionRegistration,
+    UploadOptions
 } from './types.js';
 import {
     VirtualIncomingMessage,
@@ -79,6 +83,107 @@ export interface AuthenticationConfig {
 export interface AuthorizationConfig {
     /** Named policies (looked up by `authorize('policy-name')` — future use). */
     policies?: Record<string, (builder: PolicyBuilder) => void>;
+}
+
+// ---------------------------------------------------------------------------
+// Multipart / file-upload helpers
+// ---------------------------------------------------------------------------
+
+async function parseMultipart(
+    req: http.IncomingMessage,
+    options: UploadOptions
+): Promise<{
+    fields: Record<string, string>;
+    files: Record<string, FilePart>;
+    rejectedFiles: RejectedFile[];
+}> {
+    const maxFileCount = options.maxFileCount ?? 10;
+    const maxFileSize = options.maxFileSize ?? 10 * 1024 * 1024;
+    const allowedMimeTypes = options.allowedMimeTypes;
+
+    return new Promise((resolve, reject) => {
+        const fields: Record<string, string> = {};
+        const files: Record<string, FilePart> = {};
+        const rejectedFiles: RejectedFile[] = [];
+        let fileCount = 0;
+
+        const busboy = Busboy({
+            headers: req.headers as {
+                'content-type': string;
+            } & http.IncomingHttpHeaders,
+            limits: {
+                fileSize: maxFileSize,
+                files: maxFileCount
+            }
+        });
+
+        busboy.on('field', (fieldname: string, value: string) => {
+            fields[fieldname] = value;
+        });
+
+        busboy.on(
+            'file',
+            (
+                fieldname: string,
+                stream: import('@fastify/busboy').BusboyFileStream,
+                filename: string,
+                _transferEncoding: string,
+                mimeType: string
+            ) => {
+                if (fileCount >= maxFileCount) {
+                    rejectedFiles.push({
+                        filename,
+                        mimeType,
+                        reason: `Exceeded max file count (${maxFileCount})`
+                    });
+                    stream.resume();
+                    return;
+                }
+
+                if (allowedMimeTypes) {
+                    const allowed = allowedMimeTypes.some(pattern => {
+                        if (pattern.endsWith('/*')) {
+                            return mimeType.startsWith(pattern.slice(0, -1));
+                        }
+                        return mimeType === pattern;
+                    });
+                    if (!allowed) {
+                        rejectedFiles.push({
+                            filename,
+                            mimeType,
+                            reason: `MIME type "${mimeType}" not allowed (allowed: ${allowedMimeTypes.join(', ')})`
+                        });
+                        stream.resume();
+                        return;
+                    }
+                }
+
+                fileCount++;
+                const chunks: Buffer[] = [];
+
+                stream.on('data', (chunk: Buffer) => {
+                    chunks.push(chunk);
+                });
+
+                stream.on('end', () => {
+                    const buffer = Buffer.concat(chunks);
+                    files[fieldname] = {
+                        filename,
+                        mimeType,
+                        buffer,
+                        size: buffer.length
+                    };
+                });
+
+                stream.on('error', reject);
+            }
+        );
+
+        busboy.on('error', reject);
+        busboy.on('finish', () => resolve({ fields, files, rejectedFiles }));
+
+        req.pipe(busboy);
+    });
 }
 
 /**
@@ -600,39 +705,71 @@ export class Server {
 
                 // Parse body if needed
                 let parsedBody: unknown;
+                let uploadedFiles: Record<string, FilePart> | undefined;
+                let rejectedFiles: RejectedFile[] | undefined;
                 if (needsBody(meta)) {
-                    const contentType = req.headers['content-type'];
-                    const ctHandler =
-                        this.#contentNegotiator.selectRequestHandler(
-                            contentType
-                        );
-                    if (ctHandler) {
-                        const rawBody = await ctx.body();
-                        const bodyText = rawBody.toString('utf-8');
-                        if (bodyText.length > 0) {
-                            try {
-                                parsedBody = ctHandler.deserialize(bodyText);
-                            } catch {
-                                const pd = createProblemDetails(
-                                    400,
-                                    'Malformed request body'
-                                );
-                                res.writeHead(400, {
-                                    'content-type': PROBLEM_JSON_CONTENT_TYPE
-                                });
-                                res.end(serializeProblemDetails(pd));
-                                ctx.responded = true;
-                                return;
-                            }
+                    const contentType = req.headers['content-type'] ?? '';
+
+                    // Multipart / file-upload path
+                    if (
+                        meta.fileUpload &&
+                        contentType.startsWith('multipart/form-data')
+                    ) {
+                        try {
+                            const result = await parseMultipart(
+                                req,
+                                meta.fileUpload
+                            );
+                            parsedBody = result.fields;
+                            uploadedFiles = result.files;
+                            rejectedFiles = result.rejectedFiles;
+                        } catch {
+                            const pd = createProblemDetails(
+                                400,
+                                'Malformed multipart request'
+                            );
+                            res.writeHead(400, {
+                                'content-type': PROBLEM_JSON_CONTENT_TYPE
+                            });
+                            res.end(serializeProblemDetails(pd));
+                            ctx.responded = true;
+                            return;
                         }
-                    } else if (contentType) {
-                        const pd = createProblemDetails(415);
-                        res.writeHead(415, {
-                            'content-type': PROBLEM_JSON_CONTENT_TYPE
-                        });
-                        res.end(serializeProblemDetails(pd));
-                        ctx.responded = true;
-                        return;
+                    } else {
+                        const ctHandler =
+                            this.#contentNegotiator.selectRequestHandler(
+                                contentType
+                            );
+                        if (ctHandler) {
+                            const rawBody = await ctx.body();
+                            const bodyText = rawBody.toString('utf-8');
+                            if (bodyText.length > 0) {
+                                try {
+                                    parsedBody =
+                                        ctHandler.deserialize(bodyText);
+                                } catch {
+                                    const pd = createProblemDetails(
+                                        400,
+                                        'Malformed request body'
+                                    );
+                                    res.writeHead(400, {
+                                        'content-type':
+                                            PROBLEM_JSON_CONTENT_TYPE
+                                    });
+                                    res.end(serializeProblemDetails(pd));
+                                    ctx.responded = true;
+                                    return;
+                                }
+                            }
+                        } else if (contentType) {
+                            const pd = createProblemDetails(415);
+                            res.writeHead(415, {
+                                'content-type': PROBLEM_JSON_CONTENT_TYPE
+                            });
+                            res.end(serializeProblemDetails(pd));
+                            ctx.responded = true;
+                            return;
+                        }
                     }
                 }
 
@@ -652,6 +789,18 @@ export class Server {
                     );
                     ctx.responded = true;
                     return;
+                }
+
+                // Inject uploaded files into the action context
+                if (uploadedFiles && resolveResult.args.length > 0) {
+                    const ctx = resolveResult.args[0] as Record<
+                        string,
+                        unknown
+                    >;
+                    ctx.files = uploadedFiles;
+                    if (rejectedFiles && rejectedFiles.length > 0) {
+                        ctx.rejectedFiles = rejectedFiles;
+                    }
                 }
 
                 // Call handler

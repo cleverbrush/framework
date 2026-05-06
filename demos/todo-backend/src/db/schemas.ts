@@ -118,6 +118,12 @@ const TodoSchema = object({
         .index('idx_todos_user_id'),
     createdAt: date().hasColumnName('created_at'),
     updatedAt: date().hasColumnName('updated_at'),
+    attachmentName: string()
+        .hasColumnName('attachment_name')
+        .optional(),
+    attachmentMimeType: string()
+        .hasColumnName('attachment_mime_type')
+        .optional(),
     // navigation properties consumed by `defineEntity()`
     author: UserDbSchema.optional(),
     activity: array(TodoActivityDbSchema).optional()
@@ -133,7 +139,9 @@ const TodoSchema = object({
         'completed',
         'userId',
         'createdAt',
-        'updatedAt'
+        'updatedAt',
+        'attachmentName',
+        'attachmentMimeType'
     )
     .projection('ownership', 'id', 'userId')
     .scope(
@@ -205,4 +213,6 @@ export type TodoDb = {
     userId: number;
     createdAt: Date;
     updatedAt: Date;
+    attachmentName?: string;
+    attachmentMimeType?: string;
 };

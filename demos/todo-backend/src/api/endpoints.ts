@@ -1,5 +1,6 @@
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import { POLYMORPHIC_TYPE_BRAND } from '@cleverbrush/orm';
+import { TodoResponseSchema } from './schemas.js';
 import { defineWebhook } from '@cleverbrush/server';
 import {
     DbToken,
@@ -184,15 +185,31 @@ export const ExportTodosEndpoint = api.todos.exportCsv
 
 export const DownloadAttachmentEndpoint = api.todos.downloadAttachment
     .authorize(PrincipalSchema)
-    .inject({ db: DbToken })
-    .producesFile('text/plain', 'A plain-text summary of the todo.')
+    .inject({ knex: KnexToken })
     .summary('Download todo attachment')
     .description(
-        'Downloads a plain-text summary of the todo as a file attachment. ' +
-            'Demonstrates `.producesFile()` and `ActionResult.file()`.'
+        'Downloads the uploaded file attachment for a todo. ' +
+            'Returns the original file with its original content type.'
     )
     .tags('todos')
     .operationId('downloadTodoAttachment');
+
+// ── Upload attachment ─────────────────────────────────────────────────────────
+// Features: .upload(), multipart/form-data, FilePart, file persistence in DB
+
+export const UploadAttachmentEndpoint = api.todos.uploadAttachment
+    .authorize(PrincipalSchema)
+    .inject({ db: DbToken, knex: KnexToken })
+    .responses({ 201: TodoResponseSchema })
+    .summary('Upload todo attachment')
+    .description(
+        'Uploads a file attachment for a todo. ' +
+            'Supports images, PDFs, and plain text files up to 10 MB. ' +
+            'The file is stored in the database and can be downloaded via ' +
+            'the download attachment endpoint.'
+    )
+    .tags('todos')
+    .operationId('uploadTodoAttachment');
 
 // ── Import todos ──────────────────────────────────────────────────────────────
 // Features: .example(), .examples(), .headers(), ActionResult.json(), ActionResult.accepted()
@@ -396,6 +413,7 @@ export const endpoints = {
         sendEvent: SendTodoEventEndpoint,
         exportCsv: ExportTodosEndpoint,
         downloadAttachment: DownloadAttachmentEndpoint,
+        uploadAttachment: UploadAttachmentEndpoint,
         importBulk: ImportTodosEndpoint,
         legacyReplace: LegacyReplaceTodoEndpoint,
         complete: CompleteTodoEndpoint,

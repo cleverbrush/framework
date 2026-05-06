@@ -212,6 +212,107 @@ return ActionResult.status(202);`)
                     </pre>
                 </div>
 
+                {/* ── File Upload ────────────────────────────────── */}
+                <div className="card">
+                    <h2>File Upload</h2>
+                    <p>
+                        Accept file uploads via <code>multipart/form-data</code>{' '}
+                        by chaining <code>.upload()</code> on an endpoint. File
+                        fields are received as <code>FilePart</code> objects on
+                        the handler context's <code>files</code> property;
+                        non-file form fields are validated against the body
+                        schema and available via <code>body</code>.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { endpoint, type FilePart } from '@cleverbrush/server';
+import { object, string } from '@cleverbrush/schema';
+
+const UserPrincipal = object({ sub: string(), role: string() });
+
+const UploadAvatar = endpoint
+    .post('/api/avatar')
+    .upload({
+        maxFileSize: 2 * 1024 * 1024,
+        allowedMimeTypes: ['image/*']
+    })
+    .body(object({ description: string().optional() }))
+    .authorize(UserPrincipal);
+
+server.handle(UploadAvatar, ({ body, files }) => {
+    const avatar: FilePart = files['avatar'];
+    // avatar.filename, avatar.mimeType, avatar.buffer, avatar.size
+    return ActionResult.created({ name: avatar.filename });
+});`)
+                            }}
+                        />
+                    </pre>
+
+                    <h3>Options</h3>
+                    <div className="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Option</th>
+                                    <th>Type</th>
+                                    <th>Default</th>
+                                    <th>Description</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td>
+                                        <code>maxFileSize</code>
+                                    </td>
+                                    <td>
+                                        <code>number</code>
+                                    </td>
+                                    <td>10 MB</td>
+                                    <td>Maximum file size per file in bytes</td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>allowedMimeTypes</code>
+                                    </td>
+                                    <td>
+                                        <code>string[]</code>
+                                    </td>
+                                    <td>all</td>
+                                    <td>
+                                        MIME type allowlist (supports{' '}
+                                        <code>image/*</code> glob)
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>maxFileCount</code>
+                                    </td>
+                                    <td>
+                                        <code>number</code>
+                                    </td>
+                                    <td>10</td>
+                                    <td>Maximum number of files per request</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <h3>FilePart type</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`interface FilePart {
+    readonly filename: string;
+    readonly mimeType: string;
+    readonly buffer: Buffer;
+    readonly size: number;
+}`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
                 {/* ── HTTP Errors ──────────────────────────────────── */}
                 <div className="card">
                     <h2>HTTP Errors</h2>

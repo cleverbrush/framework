@@ -45,6 +45,7 @@ export type {
     EndpointCall,
     EndpointCallArgs,
     EndpointResponse,
+    FilePart,
     PerCallOverrides,
     Subscription,
     SubscriptionCall,

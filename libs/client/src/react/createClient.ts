@@ -102,6 +102,7 @@ export function createClient<T extends ApiContract>(
 
             // Attach streaming from the web client
             call.stream = (...args: any[]) => webEndpoint.stream(...args);
+            call.file = (...args: any[]) => webEndpoint.file(...args);
 
             // Attach TanStack Query hooks
             call.useQuery = createUseQuery(webClient, group, endpoint);
