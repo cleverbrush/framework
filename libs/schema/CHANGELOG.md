@@ -1,5 +1,17 @@
 # @cleverbrush/schema
 
+## 4.1.0
+
+### Minor Changes
+
+- 9e9bb4c: fix(schema): make ~standard.validate return Promise to support async validation per Standard Schema v1 spec
+- 733b6f4: Add `intersection()` schema builder for combining two schemas (both must pass)
+
+  - New `IntersectionSchemaBuilder` class with `intersection(left, right)` factory
+  - Validates both schemas against the input and merges outputs
+  - Maps to `allOf` in JSON Schema (to/from bidirectional)
+  - Supports all standard modifiers: `.optional()`, `.nullable()`, `.default()`, `.catch()`, `.brand()`, `.readonly()`, `.addValidator()`, `.addPreprocessor()`, etc.
+
 ## 4.0.0
 
 ### Patch Changes

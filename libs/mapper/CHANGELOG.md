@@ -1,5 +1,13 @@
 # @cleverbrush/mapper
 
+## 4.1.0
+
+### Patch Changes
+
+- Updated dependencies [9e9bb4c]
+- Updated dependencies [733b6f4]
+  - @cleverbrush/schema@4.1.0
+
 ## 4.0.0
 
 ### Patch Changes

@@ -5,9 +5,9 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/auth": "^4.0.0",
-        "@cleverbrush/di": "^4.0.0",
-        "@cleverbrush/schema": "^4.0.0",
+        "@cleverbrush/auth": "^4.1.0",
+        "@cleverbrush/di": "^4.1.0",
+        "@cleverbrush/schema": "^4.1.0",
         "@fastify/busboy": "^3.2.0",
         "ws": "^8.20.0"
     },
@@ -55,5 +55,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.0.0"
+    "version": "4.1.0"
 }
