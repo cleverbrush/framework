@@ -1,4 +1,4 @@
-# Type-safe HTTP API на TypeScript без кодогенерации: @cleverbrush/server и @cleverbrush/client
+# Типобезопасный HTTP API на TypeScript без кодогенерации: `@cleverbrush/server` и `@cleverbrush/client`
 
 
 Статья о том, как единый типизированный контракт позволяет получить проверяемые на этапе компиляции сервер, клиент и React-хуки — без кодогенерации и без дублирования типов.
@@ -6,19 +6,20 @@
 Дисклеймер: все описываемые библиотеки носят экспериментальный характер — они созданы в рамках эксперимента. Несмотря на это, покрытие тестами у них достаточно хорошее.
 
 
-Предыстория
+## Предыстория
 
-В предыдущей статье я рассказывал о @cleverbrush/schema — библиотеке валидации схем с fluent-API и runtime-интроспекцией. Схемы — это краеугольный камень всего фреймворка. Сегодня речь пойдёт о том, что на них строится: типизированный HTTP-сервер @cleverbrush/server и клиент @cleverbrush/client.
+В [предыдущей статье](https://habr.com/ru/articles/1023038/) я рассказывал о `@cleverbrush/schema` — библиотеке валидации схем с fluent-API и runtime-интроспекцией. Схемы — это краеугольный камень всего фреймворка. Сегодня речь пойдёт о том, что на них строится: типизированный HTTP-сервер `@cleverbrush/server` и клиент `@cleverbrush/client`.
 
 Классическая проблема выглядит так: у вас есть бэкенд на TypeScript и фронтенд на TypeScript, но типы между ними не разделены. Либо вы дублируете их в двух местах, либо запускаете кодогенерацию по OpenAPI-манифесту и работаете с «размороженными» типами, которые устаревают сразу после того, как меняется контракт.
 
 Здесь работает другой подход: единый контракт API в виде TypeScript-модуля, который импортируется и сервером, и клиентом напрямую.
 
 
-Контракт как единственный источник правды
+## Контракт как единственный источник правды
 
 Контракт — это объект, описывающий все эндпоинты приложения. Он создаётся в отдельном пакете (или файле), не содержит серверного кода и может безопасно импортироваться в браузер.
 
+```typescript
     import { array, number, object, string } from '@cleverbrush/schema';
     import { defineApi, endpoint, route } from '@cleverbrush/server/contract';
 
@@ -57,14 +58,18 @@
                 .responses({ 204: null })
         }
     });
+```
 
 Заметьте функцию route. Это tagged template, который задаёт путь с типизированными параметрами. В примере `/${t => t.id}` — TypeScript знает, что id имеет тип number (с coerce, то есть будет распарсен из строки URL). Если переименовать поле или написать t.userId там, где ключа нет, — получите ошибку компиляции.
 
 
-Сервер
+## Сервер
 
 Контракт сам по себе не содержит серверной логики. На бэкенде его расширяют: добавляют авторизацию, инъекцию зависимостей и метаданные для OpenAPI.
 
+Стоит отметить, что у `@cleverbrush/server` только одна внешняя зависимость — [`ws`](https://github.com/websockets/ws), и та нужна исключительно для WebSocket-подписок. Всё остальное — встроенный Node.js HTTP-сервер и собственные реализации роутинга, DI, валидации и батчинга.
+
+```typescript
     import { createServer, mapHandlers } from '@cleverbrush/server';
     import { api } from './contract.js';
     import { DbToken } from './di/tokens.js';
@@ -89,14 +94,16 @@
                 .inject({ db: DbToken })
         }
     };
+```
 
-Здесь .authorize(PrincipalSchema) указывает, что к этому эндпоинту нужна аутентификация. PrincipalSchema — это схема объекта principal (декодированный JWT), который будет доступен в хендлере. .inject({ db: DbToken }) — это инъекция зависимостей: хендлер получит db из DI-контейнера.
+Здесь .authorize(PrincipalSchema) указывает, что к этому эндпоинту нужна аутентификация. PrincipalSchema — это схема объекта principal (декодированный JWT), который будет доступен в хендлере. .inject({ db: DbToken }) — это инъекция зависимостей: хендлер получит db из DI-контейнера о котором речь пойдёт ниже.
 
 
-DI-контейнер: токены и регистрация сервисов
+## DI-контейнер: токены и регистрация сервисов
 
-В @cleverbrush/server зависимости разрешаются через @cleverbrush/di. Токен — это значение любой схемы из @cleverbrush/schema, которому через .hasType<T>() приписан фантомный тип. Сам токен ничего не делает в рантайме; он служит ключом для DI-контейнера, а TypeScript использует его тип, чтобы знать, что будет получено при резолвинге.
+В `@cleverbrush/server` зависимости разрешаются через `@cleverbrush/di`. Токен — это любая схема из `@cleverbrush/schema`, которой через .hasType<T>() можно сопоставить конкретный тип. Т.к. схемы в `@cleverbrush/schema` иммутабельные, то их можно безопасно использовать как ключи в DI-контейнере. Сам токен ничего не делает в рантайме; он служит ключом для DI-контейнера, а .hasType<T>() просто сопоставляет с ней конкретный тип. Это сделано для того чтобы было возможно использовать внешние типы, которые невозможно создать через схемы, например Knex или объекты из любых других сторонних библиотек.
 
+```typescript
     import { any } from '@cleverbrush/schema';
     import type { Knex } from 'knex';
     import type { DbContext } from '@cleverbrush/orm';
@@ -105,9 +112,11 @@ DI-контейнер: токены и регистрация сервисов
     export const KnexToken  = any().hasType<Knex>();
     export const DbToken    = any().hasType<DbContext<AppEntityMap>>();
     export const ConfigToken = any().hasType<AppConfig>();
+```
 
-Токены регистрируются в контейнере через ServiceCollection. Возможные стратегии: addSingleton — одна инстанция на всё приложение, addScoped — одна инстанция на HTTP-запрос, addTransient — новая инстанция при каждом резолвинге.
+Токены регистрируются в контейнере через ServiceCollection. Возможные стратегии: addSingleton — один инстанс на всё приложение, addScoped — один инстанс на HTTP-запрос, addTransient — новый инстанс при каждом резолвинге.
 
+```typescript
     import { ServiceCollection } from '@cleverbrush/di';
     import knex from 'knex';
 
@@ -123,27 +132,33 @@ DI-контейнер: токены и регистрация сервисов
             return createDb(knexInstance, entityMap);
         });
     }
+```
 
-Теперь — ключевой момент: когда хендлер объявлен как Handler<typeof MyEndpoint>, TypeScript уже знает тип db. Это происходит потому, что .inject({ db: DbToken }) сохраняет тип DbToken в сигнатуре эндпоинта, а Handler<E> разворачивает его во второй параметр хендлера. В итоге, если передать в DbToken строку вместо DbContext, или попытаться обратиться к несуществующему полю db.nonexistent — ошибка компиляции, не рантайм.
+Ключевой момент здесь — как тип `db` попадает в хендлер. Когда вы пишете `.inject({ db: DbToken })`, эндпоинт запоминает в своей TypeScript-сигнатуре, что ключу `db` соответствует тип из `DbToken` (то есть `DbContext<AppEntityMap>`). Дальше тип `Handler<typeof MyEndpoint>` читает эту информацию и автоматически выводит типы второго параметра хендлера. Именно поэтому `db` внутри хендлера уже типизирован — без явных аннотаций. Если обратиться к несуществующему полю `db.nonexistent` или зарегистрировать в контейнере значение неправильного типа — TypeScript выдаст ошибку на этапе компиляции, а не в рантайме.
 
+```typescript
     export const createTodoHandler: Handler<typeof CreateTodoEndpoint> = async (
         { body, principal },
         { db }
         // db: DbContext<AppEntityMap> — тип выведен из DbToken автоматически
     ) => { ... };
+```
 
 Контейнер подключается к серверу через .services():
 
+```typescript
     const server = createServer()
         .services(svc => configureDI(svc, config))
         // ...
         .listen(3000);
+```
 
 
-Исчерпывающая проверка хендлеров
+## Исчерпывающая проверка хендлеров
 
 Самое важное при регистрации хендлеров — функция mapHandlers. Она требует, чтобы для каждого эндпоинта в контракте был указан соответствующий хендлер. Если хоть один пропустить — TypeScript выдаст ошибку компиляции. Это гарантирует, что ни один эндпоинт не окажется без обработчика.
 
+```typescript
     const mapping = mapHandlers(endpoints, {
         todos: {
             list: listTodosHandler,
@@ -155,23 +170,31 @@ DI-контейнер: токены и регистрация сервисов
     });
 
     const server = createServer()
-        .use(corsMiddleware)
-        .use(requestLogMiddleware)
-        .services(svc => configureDI(svc, config))
-        .useAuthentication({ defaultScheme: 'jwt', schemes: [jwtScheme(...)] })
-        .useAuthorization()
-        .withHealthcheck()
-        .handleAll(mapping);
+        .use(corsMiddleware)           // middleware для CORS-заголовков
+        .use(requestLogMiddleware)     // middleware для логирования запросов
+        .services(svc => configureDI(svc, config))  // регистрируем DI-контейнер
+        .useAuthentication({           // подключаем JWT-аутентификацию
+            defaultScheme: 'jwt',
+            schemes: [jwtScheme(...)]
+        })
+        .useAuthorization()           // включаем проверку .authorize() на эндпоинтах
+        .withHealthcheck()            // добавляет GET /health
+        .handleAll(mapping);          // регистрирует все хендлеры из mapHandlers
 
     server.listen(3000);
+```
 
-Метод .withHealthcheck() автоматически добавляет GET /health эндпоинт. .useBatching() включает поддержку пакетных запросов через POST /__batch.
+Несколько встроенных возможностей сервера, которые подключаются одной строкой:
+
+- `.withHealthcheck()` — добавляет `GET /health`, который возвращает `200 OK` когда сервер готов принимать запросы. Удобно для Docker/Kubernetes readiness-проб.
+- `.useBatching()` — включает поддержку пакетных запросов через `POST /__batch`: клиент может отправить несколько запросов в одном HTTP-вызове, что снижает latency на медленных соединениях. Клиентский middleware `dedupe()` автоматически использует этот механизм при наличии нескольких параллельных запросов.
 
 
-Типизированные хендлеры
+## Типизированные хендлеры
 
 Тип Handler<E> выводит из эндпоинта всё необходимое: какие поля есть в body, query, params и principal. Писать касты не нужно.
 
+```typescript
     import { type Handler, ActionResult } from '@cleverbrush/server';
     import { type CreateTodoEndpoint } from './endpoints.js';
 
@@ -187,29 +210,35 @@ DI-контейнер: токены и регистрация сервисов
 
         return ActionResult.created(todo, `/api/todos/${todo.id}`);
     };
+```
 
 IDE подсказывает все поля body и principal с правильными типами. Если схема изменится — хендлеры, обращающиеся к удалённым полям, перестанут компилироваться.
+
+Важная деталь: в тело хендлера выполнение попадает только после успешной валидации. `body`, `query` и параметры пути автоматически проверяются по схемам из контракта ещё до вызова хендлера. Если данные не прошли валидацию — сервер вернёт `422 Unprocessable Entity` в формате Problem Details с описанием каждой ошибки, и хендлер вызван не будет. Это значит, что внутри хендлера `body.title` гарантированно является непустой строкой — именно такой, как описано в `CreateTodoBodySchema`.
 
 ActionResult предоставляет удобные фабричные методы: ActionResult.ok(data), ActionResult.created(data, location), ActionResult.notFound(body), ActionResult.forbidden(body), ActionResult.noContent() и т.д. Для нестандартных ответов можно использовать new StatusCodeResult(statusCode, body).
 
 
-Ошибки и Problem Details
+## Ошибки и Problem Details
 
 Когда в хендлере нужно прервать выполнение с HTTP-ошибкой, используются классы HttpError:
 
+```typescript
     import { NotFoundError, ForbiddenError, ConflictError } from '@cleverbrush/server';
 
     throw new NotFoundError({ message: 'Todo not found' });
     throw new ForbiddenError({ message: 'Access denied' });
     throw new ConflictError({ message: 'Already completed' });
+```
 
 Все ошибки автоматически сериализуются в формат RFC 9457 Problem Details с Content-Type: application/problem+json. Ошибки валидации (некорректный body или query) также возвращаются в этом формате с деталями по каждому полю.
 
 
-Автоматическая генерация OpenAPI
+## Автоматическая генерация OpenAPI
 
 Отдельный пакет @cleverbrush/server-openapi генерирует спецификацию OpenAPI 3.1 непосредственно из зарегистрированных эндпоинтов — никаких аннотаций или декораторов не требуется. Схемы из @cleverbrush/schema конвертируются в JSON Schema автоматически.
 
+```typescript
     import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
 
     const spec = generateOpenApiSpec({
@@ -226,18 +255,20 @@ ActionResult предоставляет удобные фабричные мет
         endpoint.get('/openapi.json'),
         () => spec
     );
+```
 
 Типы ответов, параметры пути, query-параметры, тела запросов и ответов — всё попадает в спецификацию из тех же схем, что используются для валидации. Один источник правды.
 
-Для WebSocket-подписок пакет @cleverbrush/server-openapi также умеет генерировать AsyncAPI 2.x-спецификацию через serveAsyncApi().
+Для WebSocket-подписок пакет `@cleverbrush/server-openapi` также умеет генерировать AsyncAPI 2.x-спецификацию через serveAsyncApi().
 
 
-Клиент без кодогенерации
+## Клиент без кодогенерации
 
 На стороне клиента тот же контракт превращается в типизированный HTTP-клиент через createClient(). Никакой кодогенерации — типы выводятся из контракта в момент компиляции через Proxy.
 
+```typescript
     import { createClient } from '@cleverbrush/client';
-    import { api } from './contract.js';
+    import { api } from '@some-shared-library/contract';
 
     const client = createClient(api, {
         baseUrl: 'https://api.example.com',
@@ -255,11 +286,13 @@ ActionResult предоставляет удобные фабричные мет
         body: { title: 'Купить молоко' }
     });
     //    ^? TodoResponse (201)
+```
 
 Если изменить схему запроса или ответа в контракте — IDE немедленно покажет все места, где код клиента перестал соответствовать.
 
 Клиент поддерживает middleware-цепочки для retry, timeout, дедупликации, кэширования и батчинга запросов:
 
+```typescript
     import { createClient } from '@cleverbrush/client';
     import { retry } from '@cleverbrush/client/retry';
     import { timeout } from '@cleverbrush/client/timeout';
@@ -274,12 +307,14 @@ ActionResult предоставляет удобные фабричные мет
             dedupe()
         ]
     });
+```
 
 
-React и TanStack Query
+## React и TanStack Query
 
-Для React-приложений есть отдельный вход @cleverbrush/client/react. Там createClient возвращает «унифицированный» клиент, у которого каждый метод одновременно является и вызываемой функцией, и источником TanStack Query хуков.
+Для React-приложений есть отдельный вход `@cleverbrush/client/react`. Там `createClient` возвращает «унифицированный» клиент, у которого каждый метод одновременно является и вызываемой функцией, и источником TanStack Query хуков.
 
+```typescript
     import { createClient } from '@cleverbrush/client/react';
     import { api } from './contract.js';
 
@@ -287,9 +322,11 @@ React и TanStack Query
         baseUrl: '/api',
         getToken: () => localStorage.getItem('token')
     });
+```
 
 В компоненте:
 
+```typescript
     function TodoList() {
         // useQuery — данные, загрузка, ошибки
         const { data: todos, isLoading } = client.todos.list.useQuery(
@@ -311,16 +348,18 @@ React и TanStack Query
             </ul>
         );
     }
+```
 
 Также доступны .useSuspenseQuery() и .useInfiniteQuery() с теми же принципами вывода типов. query key для TanStack Query формируется автоматически на основе имени группы, эндпоинта и аргументов.
 
 
-WebSocket подписки
+## WebSocket подписки
 
 Для real-time обновлений контракт поддерживает подписки через endpoint.subscription(). Сервер отправляет события клиентам, а при двунаправленной подписке клиент может отправлять сообщения обратно.
 
 Объявление в контракте:
 
+```typescript
     live: {
         todoUpdates: endpoint
             .subscription('/ws/todos')
@@ -335,9 +374,11 @@ WebSocket подписки
             .incoming(object({ text: string() }))
             .outgoing(object({ user: string(), text: string(), ts: number() }))
     }
+```
 
-На клиенте — React-хук useSubscription из @cleverbrush/client/react:
+На клиенте — React-хук useSubscription из `@cleverbrush/client/react`:
 
+```typescript
     import { useSubscription } from '@cleverbrush/client/react';
 
     function LiveFeed() {
@@ -355,9 +396,11 @@ WebSocket подписки
             </div>
         );
     }
+```
 
 Для двунаправленного канала (чат):
 
+```typescript
     function Chat() {
         const { events, state, send } = useSubscription(
             () => client.live.chat({ reconnect: { maxRetries: 5 } })
@@ -374,11 +417,12 @@ WebSocket подписки
             </div>
         );
     }
+```
 
 Хук управляет жизненным циклом соединения автоматически: подключается при монтировании, отключается при размонтировании, поддерживает переподключение.
 
 
-Итоги
+## Итоги
 
 Вся цепочка от схемы до браузера строится из одного источника правды:
 
@@ -392,14 +436,26 @@ WebSocket подписки
 Изменение схемы в контракте мгновенно расходится по всему коду: TypeScript покажет несоответствия на сервере, в клиенте и в компонентах — до запуска приложения.
 
 
-Ссылки
+## Что дальше
 
-GitHub: github.com/cleverbrush/framework
+В следующих статьях серии:
 
-Документация и playground: docs.cleverbrush.com
+- **@cleverbrush/orm** — лёгкая ORM на основе схем: типизированные запросы, миграции и связи без кодогенерации.
+- **@cleverbrush/log + @cleverbrush/otel** — структурированное логирование и трассировка через OpenTelemetry, где схемы задают структуру лог-записей и span-атрибутов.
+
+
+## Ссылки
+
+GitHub: https://github.com/cleverbrush/framework
+
+Документация и playground: https://docs.cleverbrush.com
+
+Демо-приложение (Todo, полный стек): https://docs.cleverbrush.com/demo
 
 npm:
-    npm install @cleverbrush/server @cleverbrush/server-openapi
-    npm install @cleverbrush/client
+```bash
+npm install @cleverbrush/server @cleverbrush/server-openapi
+npm install @cleverbrush/client
+```
 
 Буду рад любой обратной связи — по API, документации, пропущенным фичам. Issues и PR приветствуются.
