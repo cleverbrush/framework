@@ -197,7 +197,7 @@ export function createClient<T extends ApiContract>(
         };
 
         const token = getToken?.();
-        if (token) {
+        if (token && meta.authRoles !== null) {
             reqHeaders['Authorization'] = `Bearer ${token}`;
         }
 
@@ -606,7 +606,7 @@ function createSubscriptionHandle(
     function buildWsUrl(): string {
         let url = wsUrlBase;
         const token = getToken?.();
-        if (token) {
+        if (token && meta.authRoles !== null) {
             const sep = url.includes('?') ? '&' : '?';
             url += `${sep}token=${encodeURIComponent(token)}`;
         }

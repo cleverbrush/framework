@@ -20,7 +20,9 @@
             "@cleverbrush/log",
             "@cleverbrush/otel",
             "@cleverbrush/server",
-            "@cleverbrush/server-openapi"
+            "@cleverbrush/server-openapi",
+            "@cleverbrush/orm",
+            "@cleverbrush/orm-cli"
         ]
     ],
     "linked": [],

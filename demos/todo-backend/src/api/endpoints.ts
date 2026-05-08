@@ -374,6 +374,13 @@ export const TodoUpdatesSubscription = api.live.todoUpdates;
 export const ChatSubscription = api.live.chat;
 export const ActivityFeedSubscription = api.live.activityFeed;
 
+// ── Public endpoints (no authentication required) ──────────────────────────
+
+export const HealthEndpoint = api.public.health
+    .summary('Health check')
+    .description('Public health endpoint — no authentication required.')
+    .tags('health');
+
 // ── Activity endpoints ────────────────────────────────────────────────────────
 
 export const ListAllActivityEndpoint = api.activity.listAll
@@ -445,6 +452,9 @@ export const endpoints = {
         todoUpdates: TodoUpdatesSubscription,
         chat: ChatSubscription,
         activityFeed: ActivityFeedSubscription
+    },
+    public: {
+        health: HealthEndpoint
     }
 };
 
