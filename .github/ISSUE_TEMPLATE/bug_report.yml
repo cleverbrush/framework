@@ -52,13 +52,25 @@ body:
       label: Package
       description: Which package is affected?
       options:
-        - "@cleverbrush/schema"
-        - "@cleverbrush/deep"
         - "@cleverbrush/async"
+        - "@cleverbrush/auth"
+        - "@cleverbrush/client"
+        - "@cleverbrush/deep"
+        - "@cleverbrush/di"
+        - "@cleverbrush/env"
+        - "@cleverbrush/knex-clickhouse"
+        - "@cleverbrush/knex-schema"
+        - "@cleverbrush/log"
         - "@cleverbrush/mapper"
+        - "@cleverbrush/orm"
+        - "@cleverbrush/orm-cli"
+        - "@cleverbrush/otel"
         - "@cleverbrush/react-form"
         - "@cleverbrush/scheduler"
-        - "@cleverbrush/knex-clickhouse"
+        - "@cleverbrush/schema"
+        - "@cleverbrush/schema-json"
+        - "@cleverbrush/server"
+        - "@cleverbrush/server-openapi"
         - Other / Multiple
     validations:
       required: true
