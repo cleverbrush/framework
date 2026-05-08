@@ -1,5 +1,12 @@
 # @cleverbrush/orm-cli
 
+## 4.2.0
+
+### Patch Changes
+
+- 9c7359c: Fix wrong version numbers for `@cleverbrush/orm` and `@cleverbrush/orm-cli` — they were at 1.0.0 instead of matching the rest of the framework. Both packages are now added to the fixed release group so they stay in sync with all other `@cleverbrush/*` packages going forward.
+  - @cleverbrush/knex-schema@4.2.0
+
 ## 1.0.0
 
 ### Major Changes
