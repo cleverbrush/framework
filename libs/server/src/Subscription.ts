@@ -596,6 +596,25 @@ export class SubscriptionBuilder<
         return this.#clone({ authRoles: merged }) as any;
     }
 
+    /**
+     * Mark this subscription as public — no authentication required.
+     *
+     * Calling `.public()` sets `authRoles` to `null`, overriding any
+     * previously set authorization requirements.
+     */
+    public(): SubscriptionBuilder<
+        TParams,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TIncoming,
+        TOutgoing
+    > {
+        return this.#clone({ authRoles: null }) as any;
+    }
+
     /** Short, human-readable summary for documentation. */
     summary(
         text: string

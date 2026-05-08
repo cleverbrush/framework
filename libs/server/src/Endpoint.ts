@@ -1123,6 +1123,54 @@ export class EndpointBuilder<
     }
 
     /**
+     * Mark this endpoint as public — no authentication required.
+     *
+     * Calling `.public()` sets `authRoles` to `null`, overriding any
+     * previously set authorization requirements (from `.authorize()` or
+     * an inherited scoped factory).
+     */
+    public(): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        TUpload
+    > {
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            null,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks,
+            this.#fileUpload,
+            this.#cacheTags
+        );
+    }
+
+    /**
      * Declare the response type for OpenAPI spec generation.
      *
      * Overloads:
@@ -2518,6 +2566,8 @@ type ScopedEndpointFactoryMethods<
         any,
         {}
     >;
+    /** Returns factory methods where all endpoints are public (no auth). */
+    public(): ScopedEndpointFactoryMethods<TPrincipal, TRoles>;
 };
 
 export type ScopedEndpointFactory<TRoles extends string = string> =
@@ -2536,6 +2586,8 @@ export type ScopedEndpointFactory<TRoles extends string = string> =
         authorize(
             ...roles: TRoles[]
         ): ScopedEndpointFactoryMethods<unknown, TRoles>;
+        /** Returns factory methods where all endpoints are public (no auth). */
+        public(): ScopedEndpointFactoryMethods<TRoles>;
     };
 
 function createScopedFactoryMethods(
@@ -2556,7 +2608,8 @@ function createScopedFactoryMethods(
         head: (pathTemplate?) =>
             createEndpoint('HEAD', basePath, pathTemplate, authRoles),
         options: (pathTemplate?) =>
-            createEndpoint('OPTIONS', basePath, pathTemplate, authRoles)
+            createEndpoint('OPTIONS', basePath, pathTemplate, authRoles),
+        public: () => createScopedFactoryMethods(basePath, null)
     };
 }
 
@@ -2576,6 +2629,9 @@ function createScopedFactory(basePath: string): ScopedEndpointFactory {
                 roles = args as string[];
             }
             return createScopedFactoryMethods(basePath, roles);
+        },
+        public(): ScopedEndpointFactoryMethods<any> {
+            return createScopedFactoryMethods(basePath, null);
         }
     };
 }

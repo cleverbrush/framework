@@ -36,6 +36,12 @@ import {
 } from './users.js';
 import { subscribeWebhookHandler } from './webhooks.js';
 
+// Health handler — public endpoint, no auth required
+const healthHandler = () => ({
+    ok: 'ok',
+    uptime: process.uptime()
+});
+
 export const handlers: HandlerMap<typeof endpoints> = {
     auth: {
         register: registerHandler,
@@ -84,5 +90,8 @@ export const handlers: HandlerMap<typeof endpoints> = {
         todoUpdates: todoUpdatesHandler,
         chat: chatHandler,
         activityFeed: activityFeedHandler
+    },
+    public: {
+        health: healthHandler
     }
 };

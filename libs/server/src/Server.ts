@@ -1354,6 +1354,17 @@ function createAuthenticationMiddleware(
     }
 
     return async (ctx, next) => {
+        // Skip authentication for public endpoints (authRoles === null)
+        const epMeta = ctx.items.get('__endpoint_meta') as
+            | import('./Endpoint.js').EndpointMetadata
+            | import('./Subscription.js').SubscriptionMetadata
+            | undefined;
+        if (epMeta?.authRoles === null) {
+            ctx.principal = Principal.anonymous();
+            await next();
+            return;
+        }
+
         const scheme = schemeMap.get(config.defaultScheme);
         if (!scheme) {
             // No matching scheme — leave principal as anonymous
