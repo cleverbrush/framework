@@ -58,7 +58,23 @@ const server = createServer()
 
 A `SpanKind.SERVER` span is opened per request, named `operationId` or `METHOD route` and tagged with the standard HTTP semantic-convention attributes. W3C `traceparent` is extracted, so spans link to upstream callers.
 
-### 3. Trace SQL queries
+### 3. Trace typed client calls between services
+
+```ts
+import { createClient } from '@cleverbrush/client';
+import { clientTracingMiddleware } from '@cleverbrush/otel/client';
+
+const client = createClient(api, {
+    baseUrl: 'http://todo-backend:3000',
+    middlewares: [clientTracingMiddleware()]
+});
+```
+
+`clientTracingMiddleware()` opens a `SpanKind.CLIENT` span around each typed client call and injects W3C `traceparent` / `tracestate` / `baggage` headers. When the downstream Cleverbrush service uses `tracingMiddleware()`, SigNoz and other OTel backends show both services under one distributed trace.
+
+Put the tracing middleware first in the client middleware list so it wraps retries, timeouts, and batching. If you use `batching()`, keep batching last so each logical subrequest carries its own trace context.
+
+### 4. Trace SQL queries
 
 ```ts
 import { instrumentKnex } from '@cleverbrush/otel';
@@ -71,7 +87,7 @@ const db = instrumentKnex(
 
 Every Knex query becomes a `SpanKind.CLIENT` span with `db.system.name`, `db.namespace`, `db.operation.name`, `db.query.text`, and parented under the active server span automatically.
 
-### 4. Send logs as OTLP records (with trace correlation)
+### 5. Send logs as OTLP records (with trace correlation)
 
 ```ts
 import { createLogger, consoleSink } from '@cleverbrush/log';
@@ -90,6 +106,7 @@ const logger = createLogger({
 | --------------------------------- | --------------------------------------------------------- |
 | `setupOtel(config)`               | Boot the Node SDK; returns `{ shutdown(), sdk }`          |
 | `tracingMiddleware(opts?)`        | `@cleverbrush/server` middleware; opens SERVER span       |
+| `clientTracingMiddleware(opts?)`  | `@cleverbrush/client` middleware; opens CLIENT span       |
 | `instrumentKnex(knex, opts?)`     | Hook a Knex instance; emits CLIENT span per query         |
 | `otelLogSink(opts?)`              | `@cleverbrush/log` sink → OTLP log records                |
 | `traceEnricher()`                 | `@cleverbrush/log` enricher → adds `TraceId` / `SpanId`   |

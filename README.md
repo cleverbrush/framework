@@ -25,6 +25,7 @@ The flagship package is **`@cleverbrush/schema`** — a schema validation librar
 | [`@cleverbrush/deep`](./libs/deep) | Deep operations on objects: deep equality, deep merge, flattening, hashing |
 | [`@cleverbrush/scheduler`](./libs/scheduler) | Cron-like job scheduler for Node.js using worker threads |
 | [`@cleverbrush/client`](./libs/client) | Typed HTTP client for `@cleverbrush/server` API contracts — Proxy-based, zero codegen, full type inference. Optional React + TanStack Query integration via `/react` subpath |
+| [`@cleverbrush/otel`](./libs/otel) | OpenTelemetry instrumentation — traces for HTTP, SQL, and outbound client calls; OTLP log sink with trace correlation; DI integration |
 | [`@cleverbrush/knex-clickhouse`](./libs/knex-clickhouse) | Knex query builder dialect for ClickHouse |
 
 ---
