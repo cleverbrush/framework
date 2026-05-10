@@ -1,5 +1,11 @@
 # @cleverbrush/auth
 
+## 4.2.0
+
+### Patch Changes
+
+- @cleverbrush/schema@4.2.0
+
 ## 4.1.0
 
 ### Patch Changes
