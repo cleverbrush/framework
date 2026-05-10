@@ -10,8 +10,11 @@ export default function OtelPage() {
                     <h1>@cleverbrush/otel</h1>
                     <p className="subtitle">
                         End-to-end OpenTelemetry instrumentation for the
-                        framework — traces, logs, and metrics over OTLP for{' '}
+                        framework — traces for inbound/outbound HTTP, SQL, and
+                        typed client calls; OTLP log sink with trace
+                        correlation; metrics — for{' '}
                         <code>@cleverbrush/server</code>,{' '}
+                        <code>@cleverbrush/client</code>,{' '}
                         <code>@cleverbrush/orm</code>, and{' '}
                         <code>@cleverbrush/log</code>.
                     </p>
@@ -52,7 +55,8 @@ export default function OtelPage() {
                         <code>@cleverbrush/otel</code> provides one{' '}
                         <strong>SDK bootstrap</strong> ( <code>setupOtel</code>{' '}
                         ), <strong>middleware</strong> for{' '}
-                        <code>@cleverbrush/server</code>, a{' '}
+                        <code>@cleverbrush/server</code> and{' '}
+                        <code>@cleverbrush/client</code>, a{' '}
                         <strong>Knex hook</strong> for{' '}
                         <code>@cleverbrush/orm</code>, an{' '}
                         <strong>OTLP log sink</strong> + enricher for{' '}
@@ -118,7 +122,37 @@ const server = createServer()
                     automatically.
                 </p>
 
-                <h3>3. Trace SQL queries</h3>
+                <h3>3. Trace typed client calls</h3>
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { createClient } from '@cleverbrush/client';
+import { clientTracingMiddleware } from '@cleverbrush/otel/client';
+
+const client = createClient(api, {
+    baseUrl: 'http://todo-backend:3000',
+    middlewares: [clientTracingMiddleware()]
+});`)
+                        }}
+                    />
+                </pre>
+                <p>
+                    <code>clientTracingMiddleware()</code> opens a{' '}
+                    <code>SpanKind.CLIENT</code> span around each typed client
+                    call and injects W3C <code>traceparent</code> /{' '}
+                    <code>tracestate</code> / <code>baggage</code> headers. When
+                    the downstream Cleverbrush service uses{' '}
+                    <code>tracingMiddleware()</code>, OTel backends show both
+                    services under one distributed trace.
+                </p>
+                <p>
+                    Put tracing middleware first in the client middleware list so
+                    it wraps retries, timeouts, and batching. If you use{' '}
+                    <code>batching()</code>, keep batching last so each logical
+                    subrequest carries its own trace context.
+                </p>
+
+                <h3>4. Trace SQL queries</h3>
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
@@ -139,7 +173,7 @@ const db = instrumentKnex(
                     span.
                 </p>
 
-                <h3>4. Send logs as OTLP records</h3>
+                <h3>5. Send logs as OTLP records</h3>
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
@@ -182,6 +216,16 @@ const logger = createLogger({
                                 <code>@cleverbrush/server</code> middleware;
                                 opens <code>SpanKind.SERVER</code> span per
                                 request
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>
+                                <code>clientTracingMiddleware(opts?)</code>
+                            </td>
+                            <td>
+                                <code>@cleverbrush/client</code> middleware;
+                                opens <code>SpanKind.CLIENT</code> span per
+                                outbound call, injects W3C trace context
                             </td>
                         </tr>
                         <tr>
