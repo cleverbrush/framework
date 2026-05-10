@@ -1,5 +1,13 @@
 # @cleverbrush/server
 
+## 4.3.0
+
+### Patch Changes
+
+- @cleverbrush/schema@4.3.0
+- @cleverbrush/auth@4.3.0
+- @cleverbrush/di@4.3.0
+
 ## 4.2.0
 
 ### Minor Changes
