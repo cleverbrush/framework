@@ -1,7 +1,7 @@
 {
     "name": "cleverbrush-framework",
     "private": "true",
-    "version": "3.1.0",
+    "version": "4.2.0",
     "description": "Cleverbrush Framework - a set of libraries used by Cleverbrush, a web-based publishing application",
     "packageManager": "npm@24.13.0",
     "scripts": {
