@@ -146,8 +146,8 @@ const client = createClient(api, {
                     services under one distributed trace.
                 </p>
                 <p>
-                    Put tracing middleware first in the client middleware list so
-                    it wraps retries, timeouts, and batching. If you use{' '}
+                    Put tracing middleware first in the client middleware list
+                    so it wraps retries, timeouts, and batching. If you use{' '}
                     <code>batching()</code>, keep batching last so each logical
                     subrequest carries its own trace context.
                 </p>
