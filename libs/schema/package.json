@@ -106,9 +106,9 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.3.0",
+    "version": "4.3.1",
     "devDependencies": {
-        "@cleverbrush/deep": "^4.3.0"
+        "@cleverbrush/deep": "^4.3.1"
     },
     "peerDependencies": {
         "@standard-schema/spec": "^1.1.0"

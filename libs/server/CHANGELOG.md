@@ -1,5 +1,15 @@
 # @cleverbrush/server
 
+## 4.3.1
+
+### Patch Changes
+
+- 0bc2959: Trace batched requests as a parent batch span with child spans for each
+  sub-request.
+  - @cleverbrush/schema@4.3.1
+  - @cleverbrush/auth@4.3.1
+  - @cleverbrush/di@4.3.1
+
 ## 4.3.0
 
 ### Patch Changes
