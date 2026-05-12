@@ -1,5 +1,12 @@
 # @cleverbrush/otel
 
+## 4.3.1
+
+### Patch Changes
+
+- 0bc2959: Trace batched requests as a parent batch span with child spans for each
+  sub-request.
+
 ## 4.3.0
 
 ### Minor Changes
