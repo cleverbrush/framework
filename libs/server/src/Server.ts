@@ -627,6 +627,18 @@ export class Server {
             const ctx = new RequestContext(req, res, this.#maxBodySize);
             const urlPath = ctx.url.pathname;
             const method = ctx.method;
+            const batchSubrequest = (
+                req as http.IncomingMessage & {
+                    __cleverbrushBatchSubrequest?: {
+                        index: number;
+                        size: number;
+                        path: string;
+                    };
+                }
+            ).__cleverbrushBatchSubrequest;
+            if (batchSubrequest) {
+                ctx.items.set('__batch_subrequest', batchSubrequest);
+            }
 
             if (
                 this.#healthcheck &&
@@ -638,13 +650,26 @@ export class Server {
                 return;
             }
 
-            // Batch endpoint — handled before routing and auth.
+            // Batch endpoint — it has no endpoint metadata, but should still
+            // pass through global middleware so observability/logging can wrap
+            // the physical batch request.
             if (
                 this.#batchConfig !== null &&
                 method === 'POST' &&
                 urlPath === (this.#batchConfig.path ?? '/__batch')
             ) {
-                await this.#handleBatchRequest(req, res);
+                ctx.services = scope.serviceProvider;
+
+                const pipeline = new MiddlewarePipeline();
+                for (const mw of this.#globalMiddlewares) {
+                    pipeline.add(mw);
+                }
+
+                await pipeline.execute(ctx, async () => {
+                    if (ctx.responded) return;
+                    await this.#handleBatchRequest(req, res);
+                    ctx.responded = true;
+                });
                 return;
             }
 
@@ -904,7 +929,8 @@ export class Server {
         }
 
         const execute = async (
-            item: BatchSubRequest
+            item: BatchSubRequest,
+            index: number
         ): Promise<BatchSubResponse> => {
             const virtualReq = new VirtualIncomingMessage({
                 method: (item.method ?? 'GET').toUpperCase(),
@@ -912,6 +938,11 @@ export class Server {
                 headers: item.headers ?? {},
                 body: item.body
             });
+            virtualReq.__cleverbrushBatchSubrequest = {
+                index,
+                size: outerBody.requests.length,
+                path: config.path ?? '/__batch'
+            };
             const virtualRes = new VirtualServerResponse();
 
             await this.#handleRequest(
@@ -927,8 +958,8 @@ export class Server {
             results = await Promise.all(outerBody.requests.map(execute));
         } else {
             results = [];
-            for (const item of outerBody.requests) {
-                results.push(await execute(item));
+            for (let i = 0; i < outerBody.requests.length; i++) {
+                results.push(await execute(outerBody.requests[i]!, i));
             }
         }
 
