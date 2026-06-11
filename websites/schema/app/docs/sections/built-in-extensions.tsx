@@ -19,10 +19,13 @@ export default function BuiltInExtensionsSection() {
             <h3>String Extensions</h3>
             <div className="table-wrap">
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Method</th>
-                            <th>Description</th>
+                            <th scope="col">Method</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -90,10 +93,13 @@ export default function BuiltInExtensionsSection() {
             <h3>Number Extensions</h3>
             <div className="table-wrap">
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Method</th>
-                            <th>Description</th>
+                            <th scope="col">Method</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -131,10 +137,13 @@ export default function BuiltInExtensionsSection() {
             <h3>Array Extensions</h3>
             <div className="table-wrap">
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Method</th>
-                            <th>Description</th>
+                            <th scope="col">Method</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>

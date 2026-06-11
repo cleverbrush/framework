@@ -15,13 +15,13 @@ Important notes:
 
 ## Packages
 
-- [API Reference (TypeDoc)](/api-docs/latest/): Full generated API docs for all packages
+- [API Reference (TypeDoc)](https://docs.cleverbrush.com/api-docs/latest/index.html): Full generated API docs for all packages
 - [Playground](/playground): Interactive editor with 40+ runnable examples, live type inference, validation output
-- [Schema docs](/schema): @cleverbrush/schema — validation library
+- [Schema docs](/docs/why): @cleverbrush/schema — validation library
 - [Mapper docs](/mapper): @cleverbrush/mapper — schema-driven object mapping
-- [React Form docs](/react-form): @cleverbrush/react-form — headless schema-driven forms
+- [React Form docs](https://docs.cleverbrush.com/react-form): @cleverbrush/react-form — headless schema-driven forms
 - [Schema JSON docs](/schema-json): @cleverbrush/schema-json — bidirectional JSON Schema interop
-- [Migrating from Zod](/migrating-from-zod): Side-by-side migration guide
+- [Migrating from Zod](/docs/migrating-from-zod): Side-by-side migration guide
 
 ## @cleverbrush/schema — Core API
 
@@ -501,5 +501,5 @@ scheduler.start();
 
 - [Playground: Standard Schema with TanStack Form](/showcases/tanstack-form): Live showcase — 5-field registration form using `standardSchemaValidator`
 - [Playground: Standard Schema with T3 Env](/showcases/t3-env): Live showcase — `createEnv` with server + client env validation
-- [Migrating from Zod](/migrating-from-zod): Side-by-side API comparison and migration patterns
+- [Migrating from Zod](/docs/migrating-from-zod): Side-by-side API comparison and migration patterns
 - [Benchmark results](https://github.com/cleverbrush/framework): 14/15 benchmarks faster than Zod — 1.2–2.65x faster on valid input, 8–204x faster on invalid input

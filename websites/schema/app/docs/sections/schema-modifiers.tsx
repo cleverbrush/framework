@@ -139,10 +139,13 @@ console.log(schema.introspect().catchValue);  // 'unknown'`)
                 </p>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Builder</th>
-                                <th>
+                                <th scope="col">Builder</th>
+                                <th scope="col">
                                     Effect on <code>InferType&lt;T&gt;</code>
                                 </th>
                             </tr>

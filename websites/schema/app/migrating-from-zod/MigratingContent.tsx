@@ -90,11 +90,14 @@ export default function MigratingContent() {
                 </p>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Zod</th>
-                                <th>@cleverbrush/schema</th>
-                                <th>Notes</th>
+                                <th scope="col">Zod</th>
+                                <th scope="col">@cleverbrush/schema</th>
+                                <th scope="col">Notes</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1042,11 +1045,14 @@ const PostSlug = s().slug().minLength(3).maxLength(60);`
                 </p>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Zod Feature</th>
-                                <th>Status</th>
-                                <th>Workaround</th>
+                                <th scope="col">Zod Feature</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Workaround</th>
                             </tr>
                         </thead>
                         <tbody>

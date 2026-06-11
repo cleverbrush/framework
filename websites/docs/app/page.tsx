@@ -2,6 +2,9 @@
 
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import Link from 'next/link';
+import { docsMetadata } from './site';
+
+export const metadata = docsMetadata('/');
 
 export default function DocsHomePage() {
     return (
@@ -204,13 +207,16 @@ const alice = await client.users.create({
 
                     <div style={{ overflowX: 'auto' }}>
                         <table className="comparison-table">
+                            <caption className="visually-hidden">
+                                Comparison table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Feature</th>
-                                    <th>Cleverbrush</th>
-                                    <th>tRPC</th>
-                                    <th>ts-rest</th>
-                                    <th>Hono</th>
+                                    <th scope="col">Feature</th>
+                                    <th scope="col">Cleverbrush</th>
+                                    <th scope="col">tRPC</th>
+                                    <th scope="col">ts-rest</th>
+                                    <th scope="col">Hono</th>
                                 </tr>
                             </thead>
                             <tbody>

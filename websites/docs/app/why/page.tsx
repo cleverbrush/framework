@@ -2,12 +2,9 @@
 
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import Link from 'next/link';
+import { docsMetadata } from '../site';
 
-export const metadata = {
-    title: 'Why Cleverbrush? — Schema-First Full-Stack TypeScript',
-    description:
-        'The problem with full-stack TypeScript today and how Cleverbrush solves it with a single schema definition.'
-};
+export const metadata = docsMetadata('/why');
 
 export default function WhyPage() {
     return (

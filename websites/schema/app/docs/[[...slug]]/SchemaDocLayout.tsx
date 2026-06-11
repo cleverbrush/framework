@@ -18,9 +18,9 @@ export function SchemaDocLayout({ currentSlug, children }: Props) {
                 collapsed={navCollapsed}
                 onToggle={() => setNavCollapsed(c => !c)}
             />
-            <main className="doc-main">
+            <div className="doc-main">
                 <div className="container">{children}</div>
-            </main>
+            </div>
         </div>
     );
 }

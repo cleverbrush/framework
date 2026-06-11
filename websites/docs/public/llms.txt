@@ -9,7 +9,7 @@ The key differentiator is **contract-first architecture**: a shared API contract
 | Package | Description | Docs |
 |---------|-------------|------|
 | `@cleverbrush/server` | HTTP server with typed endpoints, middleware, batching, WebSocket | [/server](/server) |
-| `@cleverbrush/client` | Auto-typed REST client with retry, timeout, dedup, cache, batching | [/client](/client) |
+| `@cleverbrush/client` | Auto-typed REST client with retry, timeout, dedup, cache, batching | [/client/getting-started](/client/getting-started) |
 | `@cleverbrush/auth` | JWT, cookies, OAuth2, OIDC, policy-based authorization | [/auth](/auth) |
 | `@cleverbrush/di` | Dependency injection with schema-as-key tokens | [/di](/di) |
 | `@cleverbrush/server-openapi` | OpenAPI 3.1 generation (links, callbacks, webhooks, security) | [/server-openapi](/server-openapi) |

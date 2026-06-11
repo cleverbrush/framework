@@ -8,8 +8,11 @@
         "./components/Navbar": "./components/Navbar.tsx",
         "./components/Footer": "./components/Footer.tsx",
         "./components/InstallBanner": "./components/InstallBanner.tsx",
+        "./components/ConsentManager": "./components/ConsentManager.tsx",
+        "./components/PrivacyPage": "./components/PrivacyPage.tsx",
         "./components/ThemeProvider": "./components/ThemeProvider.tsx",
         "./lib/highlight": "./lib/highlight.ts",
+        "./lib/seo": "./lib/seo.tsx",
         "./lib/bundleSizes": "./lib/bundleSizes.ts"
     },
     "dependencies": {
