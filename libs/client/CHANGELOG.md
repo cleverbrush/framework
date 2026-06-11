@@ -1,5 +1,15 @@
 # @cleverbrush/client
 
+## 4.3.2
+
+### Patch Changes
+
+- 1556ad1: Prepare a patch release with website SEO, AI-readiness, accessibility, and
+  privacy compliance updates.
+- Updated dependencies [1556ad1]
+  - @cleverbrush/schema@4.3.2
+  - @cleverbrush/server@4.3.2
+
 ## 4.3.1
 
 ### Patch Changes
