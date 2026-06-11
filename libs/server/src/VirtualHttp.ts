@@ -56,6 +56,11 @@ export class VirtualIncomingMessage extends Readable {
     readonly method: string;
     readonly url: string;
     readonly headers: Record<string, string>;
+    __cleverbrushBatchSubrequest?: {
+        index: number;
+        size: number;
+        path: string;
+    };
     // Satisfy the `socket` property that IncomingMessage exposes.
     readonly socket: null = null;
 

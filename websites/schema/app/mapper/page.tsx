@@ -1,5 +1,8 @@
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { schemaMetadata } from '../site';
+
+export const metadata = schemaMetadata('/mapper');
 
 export default function MapperPage() {
     return (
@@ -344,11 +347,14 @@ const registry = mapper()
                     <h2>Mapping Strategies</h2>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Strategy</th>
-                                    <th>Usage</th>
-                                    <th>Description</th>
+                                    <th scope="col">Strategy</th>
+                                    <th scope="col">Usage</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -422,13 +428,16 @@ const registry = mapper()
                     <h2>Comparison with Alternatives</h2>
                     <div className="table-wrap">
                         <table className="comparison-table">
+                            <caption className="visually-hidden">
+                                Comparison table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Feature</th>
-                                    <th>@cleverbrush/mapper</th>
-                                    <th>AutoMapper-ts</th>
-                                    <th>class-transformer</th>
-                                    <th>morphism</th>
+                                    <th scope="col">Feature</th>
+                                    <th scope="col">@cleverbrush/mapper</th>
+                                    <th scope="col">AutoMapper-ts</th>
+                                    <th scope="col">class-transformer</th>
+                                    <th scope="col">morphism</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -512,11 +521,14 @@ const registry = mapper()
                     <h2>API Reference</h2>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Class / Method</th>
-                                    <th>Description</th>
-                                    <th>Signature</th>
+                                    <th scope="col">Class / Method</th>
+                                    <th scope="col">Description</th>
+                                    <th scope="col">Signature</th>
                                 </tr>
                             </thead>
                             <tbody>

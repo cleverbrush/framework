@@ -150,6 +150,7 @@ export function Navbar({
         <nav
             ref={navRef}
             className="navbar"
+            aria-label="Primary navigation"
             style={
                 scrolled
                     ? {

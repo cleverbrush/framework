@@ -1,6 +1,9 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it is intentional */
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
+
+export const metadata = docsMetadata('/server-openapi');
 
 export default function ServerOpenApiPage() {
     return (

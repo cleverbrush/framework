@@ -53,11 +53,14 @@ export default function HooksSection() {
                 <h2>Hook Reference</h2>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Hook</th>
-                                <th>When</th>
-                                <th>Can Modify</th>
+                                <th scope="col">Hook</th>
+                                <th scope="col">When</th>
+                                <th scope="col">Can Modify</th>
                             </tr>
                         </thead>
                         <tbody>

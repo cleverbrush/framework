@@ -1,4 +1,7 @@
-import { redirect } from 'next/navigation';
+import { breadcrumbJsonLd, JsonLd } from '@cleverbrush/website-shared/lib/seo';
+import type { Metadata } from 'next';
+import { notFound, permanentRedirect } from 'next/navigation';
+import { SCHEMA_SITE, schemaDocMetadata } from '../../site';
 import ApiReferenceSection from '../sections/api-reference';
 import BuiltInExtensionsSection from '../sections/built-in-extensions';
 import ComparisonSection from '../sections/comparison';
@@ -57,6 +60,36 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     'api-reference': ApiReferenceSection
 };
 
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ slug?: string[] }>;
+}): Promise<Metadata> {
+    const { slug } = await params;
+    const currentSlug = slug?.[0] ?? null;
+
+    if (!currentSlug) {
+        return schemaDocMetadata('why');
+    }
+
+    const redirectTarget = MODIFIER_REDIRECTS[currentSlug];
+    if (redirectTarget) {
+        return schemaDocMetadata(redirectTarget.split('#')[0] ?? 'why');
+    }
+
+    if (!SECTION_COMPONENTS[currentSlug]) {
+        return {
+            title: 'Not Found',
+            robots: {
+                index: false,
+                follow: false
+            }
+        };
+    }
+
+    return schemaDocMetadata(currentSlug);
+}
+
 export default async function SchemaDocPage({
     params
 }: {
@@ -66,23 +99,37 @@ export default async function SchemaDocPage({
     const currentSlug = slug?.[0] ?? null;
 
     if (!currentSlug) {
-        redirect('/docs/why');
+        permanentRedirect('/docs/why');
     }
 
     // Handle redirects from old individual modifier pages
     const redirectTarget = MODIFIER_REDIRECTS[currentSlug];
     if (redirectTarget) {
-        redirect(`/docs/${redirectTarget}`);
+        permanentRedirect(`/docs/${redirectTarget}`);
     }
 
     const SectionComponent = SECTION_COMPONENTS[currentSlug];
     if (!SectionComponent) {
-        redirect('/docs/why');
+        notFound();
     }
 
+    const section = SCHEMA_SECTIONS.find(entry => entry.slug === currentSlug);
+
     return (
-        <SchemaDocLayout currentSlug={currentSlug}>
-            <SectionComponent />
-        </SchemaDocLayout>
+        <>
+            <JsonLd
+                data={breadcrumbJsonLd(SCHEMA_SITE, [
+                    { name: 'Home', path: '/' },
+                    { name: '@cleverbrush/schema', path: '/docs/why' },
+                    {
+                        name: section?.title ?? 'Schema documentation',
+                        path: `/docs/${currentSlug}`
+                    }
+                ])}
+            />
+            <SchemaDocLayout currentSlug={currentSlug}>
+                <SectionComponent />
+            </SchemaDocLayout>
+        </>
     );
 }

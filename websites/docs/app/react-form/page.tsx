@@ -9,7 +9,7 @@ import {
 import { number, object, string } from '@cleverbrush/schema';
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
-import { type ReactNode, useState } from 'react';
+import { type InputHTMLAttributes, type ReactNode, useState } from 'react';
 
 /* ── Live Quick-Start form ──────────────────────────────────────── */
 
@@ -31,28 +31,48 @@ const ContactSchema = object({
 });
 
 function DemoStringRenderer(props: FieldRenderProps): ReactNode {
+    const inputProps = props.fieldProps as
+        | InputHTMLAttributes<HTMLInputElement>
+        | undefined;
+    const errorId = inputProps?.id ? `${inputProps.id}-error` : undefined;
+
     return (
         <div className="demo-field">
             <input
+                {...inputProps}
                 type="text"
+                name={props.name}
                 value={(props.value as string) ?? ''}
                 onChange={e => props.onChange(e.target.value)}
                 onBlur={props.onBlur}
                 className={props.touched && props.error ? 'has-error' : ''}
                 placeholder={props.touched ? '' : 'Type here…'}
+                aria-invalid={props.touched && props.error ? true : undefined}
+                aria-describedby={
+                    props.touched && props.error ? errorId : undefined
+                }
             />
             {props.touched && props.error && (
-                <span className="demo-error">{props.error}</span>
+                <span id={errorId} className="demo-error">
+                    {props.error}
+                </span>
             )}
         </div>
     );
 }
 
 function DemoNumberRenderer(props: FieldRenderProps): ReactNode {
+    const inputProps = props.fieldProps as
+        | InputHTMLAttributes<HTMLInputElement>
+        | undefined;
+    const errorId = inputProps?.id ? `${inputProps.id}-error` : undefined;
+
     return (
         <div className="demo-field">
             <input
+                {...inputProps}
                 type="number"
+                name={props.name}
                 value={props.value != null ? String(props.value) : ''}
                 onChange={e =>
                     props.onChange(
@@ -64,9 +84,15 @@ function DemoNumberRenderer(props: FieldRenderProps): ReactNode {
                 onBlur={props.onBlur}
                 className={props.touched && props.error ? 'has-error' : ''}
                 placeholder="Enter a number…"
+                aria-invalid={props.touched && props.error ? true : undefined}
+                aria-describedby={
+                    props.touched && props.error ? errorId : undefined
+                }
             />
             {props.touched && props.error && (
-                <span className="demo-error">{props.error}</span>
+                <span id={errorId} className="demo-error">
+                    {props.error}
+                </span>
             )}
         </div>
     );
@@ -419,11 +445,14 @@ const { register } = useForm<User>();
                     <h2>Core Concepts</h2>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Concept</th>
-                                    <th>What It Does</th>
-                                    <th>When to Use</th>
+                                    <th scope="col">Concept</th>
+                                    <th scope="col">What It Does</th>
+                                    <th scope="col">When to Use</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -711,10 +740,13 @@ function App() {
                     <h3>Returned API</h3>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Method / Property</th>
-                                    <th>Description</th>
+                                    <th scope="col">Method / Property</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -794,11 +826,14 @@ function App() {
                     <h3>Returned State</h3>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Property</th>
-                                    <th>Type</th>
-                                    <th>Description</th>
+                                    <th scope="col">Property</th>
+                                    <th scope="col">Type</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1018,11 +1053,14 @@ function App() {
                     <h3>Props</h3>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Prop</th>
-                                    <th>Type</th>
-                                    <th>Description</th>
+                                    <th scope="col">Prop</th>
+                                    <th scope="col">Type</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1267,13 +1305,16 @@ function UserForm() {
                     <h2>Comparison with Alternatives</h2>
                     <div className="table-wrap">
                         <table className="comparison-table">
+                            <caption className="visually-hidden">
+                                Comparison table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Feature</th>
-                                    <th>@cleverbrush/react-form</th>
-                                    <th>React Hook Form</th>
-                                    <th>Formik</th>
-                                    <th>React Final Form</th>
+                                    <th scope="col">Feature</th>
+                                    <th scope="col">@cleverbrush/react-form</th>
+                                    <th scope="col">React Hook Form</th>
+                                    <th scope="col">Formik</th>
+                                    <th scope="col">React Final Form</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1369,10 +1410,13 @@ function UserForm() {
                     <h3>Hooks</h3>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Hook</th>
-                                    <th>Description</th>
+                                    <th scope="col">Hook</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1414,10 +1458,13 @@ function UserForm() {
                     <h3>Components</h3>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Component</th>
-                                    <th>Description</th>
+                                    <th scope="col">Component</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1456,10 +1503,13 @@ function UserForm() {
                     <h3>Types</h3>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Type</th>
-                                    <th>Description</th>
+                                    <th scope="col">Type</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>

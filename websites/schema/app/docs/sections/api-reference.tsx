@@ -9,11 +9,14 @@ export default function ApiReferenceSection() {
                 <h3>Builder Functions</h3>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Function</th>
-                                <th>Description</th>
-                                <th>Key Methods</th>
+                                <th scope="col">Function</th>
+                                <th scope="col">Description</th>
+                                <th scope="col">Key Methods</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -194,10 +197,13 @@ export default function ApiReferenceSection() {
                 <h3>Extension Functions</h3>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Function</th>
-                                <th>Description</th>
+                                <th scope="col">Function</th>
+                                <th scope="col">Description</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -228,10 +234,13 @@ export default function ApiReferenceSection() {
                 <h3>Utility Types</h3>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Type</th>
-                                <th>Description</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Description</th>
                             </tr>
                         </thead>
                         <tbody>

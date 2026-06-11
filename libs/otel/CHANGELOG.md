@@ -1,5 +1,27 @@
 # @cleverbrush/otel
 
+## 4.3.2
+
+### Patch Changes
+
+- 1556ad1: Prepare a patch release with website SEO, AI-readiness, accessibility, and
+  privacy compliance updates.
+
+## 4.3.1
+
+### Patch Changes
+
+- 0bc2959: Trace batched requests as a parent batch span with child spans for each
+  sub-request.
+
+## 4.3.0
+
+### Minor Changes
+
+- 33630e2: Add `@cleverbrush/otel/client` with typed-client tracing middleware that creates outbound CLIENT spans and injects W3C trace context for distributed service-to-service traces.
+
+## 4.2.0
+
 ## 4.1.0
 
 ## 4.0.0

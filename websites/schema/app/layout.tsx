@@ -1,11 +1,19 @@
 import type { Metadata } from 'next';
-import Script from 'next/script';
 import '@cleverbrush/website-shared/styles/globals.css';
+import { ConsentManager } from '@cleverbrush/website-shared/components/ConsentManager';
 import type { FooterSection } from '@cleverbrush/website-shared/components/Footer';
 import { Footer } from '@cleverbrush/website-shared/components/Footer';
 import type { NavItem } from '@cleverbrush/website-shared/components/Navbar';
 import { Navbar } from '@cleverbrush/website-shared/components/Navbar';
 import { ThemeProvider } from '@cleverbrush/website-shared/components/ThemeProvider';
+import {
+    createBaseMetadata,
+    JsonLd,
+    organizationJsonLd,
+    softwareSourceCodeJsonLd,
+    websiteJsonLd
+} from '@cleverbrush/website-shared/lib/seo';
+import { SCHEMA_SITE } from './site';
 
 const GTM_ID = 'GTM-WRLXDMG';
 
@@ -62,6 +70,10 @@ const FOOTER_SECTIONS: FooterSection[] = [
                 href: 'https://github.com/cleverbrush/framework',
                 external: true
             },
+            {
+                label: 'Privacy Policy',
+                href: '/privacy'
+            },
             { label: 'Playground', href: '/playground' },
             {
                 label: 'API Reference',
@@ -107,14 +119,7 @@ const FOOTER_SECTIONS: FooterSection[] = [
     }
 ];
 
-export const metadata: Metadata = {
-    title: 'Cleverbrush Schema — Type-safe Validation for TypeScript',
-    description:
-        'Zero-dependency schema validation with full type inference, Standard Schema support, and Zod-compatible API. Open-source TypeScript library.',
-    icons: {
-        icon: '/favicon.ico'
-    }
-};
+export const metadata: Metadata = createBaseMetadata(SCHEMA_SITE);
 
 export default function RootLayout({
     children
@@ -130,35 +135,22 @@ export default function RootLayout({
                     href="https://fonts.gstatic.com"
                     crossOrigin="anonymous"
                 />
-                <Script
-                    id="gtm-script"
-                    strategy="afterInteractive"
-                    dangerouslySetInnerHTML={{
-                        __html: `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','${GTM_ID}');`
-                    }}
-                />
+                <JsonLd data={organizationJsonLd(SCHEMA_SITE)} />
+                <JsonLd data={websiteJsonLd(SCHEMA_SITE)} />
+                <JsonLd data={softwareSourceCodeJsonLd(SCHEMA_SITE)} />
             </head>
             <body>
-                <noscript>
-                    <iframe
-                        src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
-                        height="0"
-                        width="0"
-                        title="Google Tag Manager"
-                        style={{ display: 'none', visibility: 'hidden' }}
-                    />
-                </noscript>
                 <ThemeProvider>
+                    <a href="#main-content" className="skip-link">
+                        Skip to main content
+                    </a>
                     <Navbar
                         navItems={NAV_ITEMS}
                         brandLabel="Cleverbrush Schema"
                     />
-                    {children}
+                    <main id="main-content">{children}</main>
                     <Footer sections={FOOTER_SECTIONS} />
+                    <ConsentManager gtmId={GTM_ID} />
                 </ThemeProvider>
             </body>
         </html>

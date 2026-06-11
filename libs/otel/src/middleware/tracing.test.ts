@@ -5,7 +5,17 @@ import {
     SimpleSpanProcessor
 } from '@opentelemetry/sdk-trace-base';
 import { NodeTracerProvider } from '@opentelemetry/sdk-trace-node';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import {
+    afterAll,
+    afterEach,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it
+} from 'vitest';
+import { endpoint, mapHandlers } from '../../../server/src/Endpoint.js';
+import { createServer, type Server } from '../../../server/src/Server.js';
 import { OTEL_SPAN_ITEM_KEY, tracingMiddleware } from './tracing.js';
 
 const exporter = new InMemorySpanExporter();
@@ -24,6 +34,13 @@ afterAll(async () => {
 
 beforeEach(() => exporter.reset());
 
+let server: Server | undefined;
+
+afterEach(async () => {
+    await server?.close();
+    server = undefined;
+});
+
 function makeCtx(overrides: Partial<any> = {}): any {
     const items = new Map<string, unknown>();
     return {
@@ -34,6 +51,35 @@ function makeCtx(overrides: Partial<any> = {}): any {
         response: { statusCode: 200 },
         ...overrides
     };
+}
+
+const batchApi = {
+    items: {
+        a: endpoint.get('/api/a'),
+        b: endpoint.get('/api/b')
+    }
+};
+
+const batchHandlers = mapHandlers(batchApi, {
+    items: {
+        a: () => ({ ok: 'a' }),
+        b: () => ({ ok: 'b' })
+    }
+});
+
+async function postBatch(
+    port: number,
+    requests: Array<{
+        method: string;
+        url: string;
+        headers?: Record<string, string>;
+    }>
+): Promise<Response> {
+    return fetch(`http://127.0.0.1:${port}/__batch`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ requests })
+    });
 }
 
 describe('tracingMiddleware', () => {
@@ -208,5 +254,80 @@ describe('tracingMiddleware', () => {
         });
         const ctx = makeCtx();
         await expect(mw(ctx, async () => {})).resolves.toBeUndefined();
+    });
+
+    it('parents batch sub-request spans under the outer batch request', async () => {
+        server = await createServer()
+            .use(tracingMiddleware())
+            .useBatching()
+            .handleAll(batchHandlers)
+            .listen(0);
+
+        const response = await postBatch(server.address!.port, [
+            { method: 'GET', url: '/api/a', headers: {} },
+            { method: 'GET', url: '/api/b', headers: {} }
+        ]);
+        expect(response.status).toBe(200);
+
+        const spans = exporter.getFinishedSpans();
+        expect(spans).toHaveLength(3);
+
+        const batchSpan = spans.find(span => span.name === 'POST /__batch')!;
+        const childSpans = spans.filter(span => span.name !== 'POST /__batch');
+
+        expect(
+            childSpans.map(span => span.attributes['url.path']).sort()
+        ).toEqual(['/api/a', '/api/b']);
+
+        for (const child of childSpans) {
+            expect(child.spanContext().traceId).toBe(
+                batchSpan.spanContext().traceId
+            );
+            expect(child.parentSpanContext?.spanId).toBe(
+                batchSpan.spanContext().spanId
+            );
+            expect(child.attributes['cleverbrush.batch.size']).toBe(2);
+            expect(child.attributes['cleverbrush.batch.path']).toBe('/__batch');
+        }
+        expect(
+            childSpans.map(span => span.attributes['cleverbrush.batch.index'])
+        ).toEqual([0, 1]);
+    });
+
+    it('links sub-request traceparent while keeping the batch span as parent', async () => {
+        server = await createServer()
+            .use(tracingMiddleware())
+            .useBatching()
+            .handleAll(batchHandlers)
+            .listen(0);
+
+        await postBatch(server.address!.port, [
+            {
+                method: 'GET',
+                url: '/api/a',
+                headers: {
+                    traceparent:
+                        '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01'
+                }
+            }
+        ]);
+
+        const spans = exporter.getFinishedSpans();
+        const batchSpan = spans.find(span => span.name === 'POST /__batch')!;
+        const childSpan = spans.find(
+            span => span.attributes['url.path'] === '/api/a'
+        )!;
+
+        expect(childSpan.spanContext().traceId).toBe(
+            batchSpan.spanContext().traceId
+        );
+        expect(childSpan.parentSpanContext?.spanId).toBe(
+            batchSpan.spanContext().spanId
+        );
+        expect(childSpan.links).toHaveLength(1);
+        expect(childSpan.links[0]!.context.traceId).toBe(
+            '0af7651916cd43dd8448eb211c80319c'
+        );
+        expect(childSpan.links[0]!.context.spanId).toBe('b7ad6b7169203331');
     });
 });

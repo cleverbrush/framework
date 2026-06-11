@@ -1,11 +1,8 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
 
-export const metadata = {
-    title: 'Mapper — @cleverbrush/mapper',
-    description:
-        'Schema-to-schema object mapping with compile-time completeness checking and auto-mapping.'
-};
+export const metadata = docsMetadata('/mapper');
 
 export default function MapperPage() {
     return (
@@ -97,11 +94,14 @@ const result = await mapFn({
                     <h2>Mapping strategies</h2>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Strategy</th>
-                                    <th>Syntax</th>
-                                    <th>Purpose</th>
+                                    <th scope="col">Strategy</th>
+                                    <th scope="col">Syntax</th>
+                                    <th scope="col">Purpose</th>
                                 </tr>
                             </thead>
                             <tbody>

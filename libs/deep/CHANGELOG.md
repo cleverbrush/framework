@@ -1,5 +1,18 @@
 # @cleverbrush/deep
 
+## 4.3.2
+
+### Patch Changes
+
+- 1556ad1: Prepare a patch release with website SEO, AI-readiness, accessibility, and
+  privacy compliance updates.
+
+## 4.3.1
+
+## 4.3.0
+
+## 4.2.0
+
 ## 4.1.0
 
 ## 4.0.0

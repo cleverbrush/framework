@@ -1,6 +1,9 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed to show examples */
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
+
+export const metadata = docsMetadata('/env');
 
 export default function EnvPage() {
     return (
@@ -304,12 +307,15 @@ config.db.connectionString // "postgres://localhost:5432/mydb"`)
                 <div className="table-wrap">
                     <h2>Comparison</h2>
                     <table className="comparison-table">
+                        <caption className="visually-hidden">
+                            Comparison table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Feature</th>
-                                <th>@cleverbrush/env</th>
-                                <th>t3-env</th>
-                                <th>envalid</th>
+                                <th scope="col">Feature</th>
+                                <th scope="col">@cleverbrush/env</th>
+                                <th scope="col">t3-env</th>
+                                <th scope="col">envalid</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -363,11 +369,14 @@ config.db.connectionString // "postgres://localhost:5432/mydb"`)
                 <div className="table-wrap">
                     <h2>API Reference</h2>
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Export</th>
-                                <th>Type</th>
-                                <th>Description</th>
+                                <th scope="col">Export</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Description</th>
                             </tr>
                         </thead>
                         <tbody>

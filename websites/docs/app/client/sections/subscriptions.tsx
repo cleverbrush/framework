@@ -77,10 +77,13 @@ for await (const msg of chat) {
                     WebSocket connection status:
                 </p>
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>State</th>
-                            <th>Description</th>
+                            <th scope="col">State</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -186,11 +189,14 @@ function LiveFeed() {
 
                 <h3>Return Value</h3>
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Property</th>
-                            <th>Type</th>
-                            <th>Description</th>
+                            <th scope="col">Property</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -253,12 +259,15 @@ function LiveFeed() {
 
                 <h3>Options</h3>
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Option</th>
-                            <th>Type</th>
-                            <th>Default</th>
-                            <th>Description</th>
+                            <th scope="col">Option</th>
+                            <th scope="col">Type</th>
+                            <th scope="col">Default</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>

@@ -28,11 +28,14 @@ export default function GettingStartedSection() {
                     </p>
                     <div className="table-wrap">
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Import</th>
-                                    <th>Gzipped</th>
-                                    <th>Brotli</th>
+                                    <th scope="col">Import</th>
+                                    <th scope="col">Gzipped</th>
+                                    <th scope="col">Brotli</th>
                                 </tr>
                             </thead>
                             <tbody>

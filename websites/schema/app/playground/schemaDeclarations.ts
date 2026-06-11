@@ -5705,6 +5705,8 @@ export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export { ExternSchemaBuilder, extern } from './builders/ExternSchemaBuilder.js';
 export { FunctionSchemaBuilder, func } from './builders/FunctionSchemaBuilder.js';
 export { GenericSchemaBuilder, generic } from './builders/GenericSchemaBuilder.js';
+export type { IntersectionSchemaValidationResult } from './builders/IntersectionSchemaBuilder.js';
+export { IntersectionSchemaBuilder, intersection } from './builders/IntersectionSchemaBuilder.js';
 export { LazySchemaBuilder, lazy } from './builders/LazySchemaBuilder.js';
 export { NullSchemaBuilder, nul } from './builders/NullSchemaBuilder.js';
 export { NumberSchemaBuilder, number } from './builders/NumberSchemaBuilder.js';

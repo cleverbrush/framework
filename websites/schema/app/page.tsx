@@ -11,6 +11,9 @@ import { InstallSection } from './sections/InstallSection';
 import { QualitySection } from './sections/QualitySection';
 import { SchemaSpotlightSection } from './sections/SchemaSpotlightSection';
 import { SuperpowersSection } from './sections/SuperpowersSection';
+import { schemaMetadata } from './site';
+
+export const metadata = schemaMetadata('/');
 
 export default function HomePage() {
     const bundleSizes = loadBundleSizes();

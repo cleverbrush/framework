@@ -2,7 +2,9 @@ import {
     context,
     propagation,
     type Span,
+    type SpanContext,
     SpanKind,
+    type SpanOptions,
     SpanStatusCode,
     type Tracer,
     trace
@@ -88,6 +90,37 @@ function getEndpointMeta(ctx: any): any | undefined {
     return items?.get('__endpoint_meta');
 }
 
+interface BatchSubrequestMeta {
+    index: number;
+    size: number;
+    path: string;
+}
+
+function getBatchSubrequestMeta(ctx: any): BatchSubrequestMeta | undefined {
+    const items: Map<string, unknown> | undefined = ctx?.items;
+    const meta = items?.get('__batch_subrequest') as
+        | Partial<BatchSubrequestMeta>
+        | undefined;
+    if (
+        typeof meta?.index !== 'number' ||
+        typeof meta.size !== 'number' ||
+        typeof meta.path !== 'string'
+    ) {
+        return undefined;
+    }
+    return {
+        index: meta.index,
+        size: meta.size,
+        path: meta.path
+    };
+}
+
+function hasValidTraceparent(headers: Record<string, string>): boolean {
+    return /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/i.test(
+        headers.traceparent ?? ''
+    );
+}
+
 function getRouteTemplate(meta: any): string | undefined {
     if (!meta) return undefined;
     const base: string = meta.basePath ?? '';
@@ -171,7 +204,13 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
         const headers: Record<string, string> = ctx.headers ?? {};
 
         // Extract inbound trace context (W3C traceparent + baggage).
-        const parentCtx = propagation.extract(context.active(), headers);
+        const extractedCtx = propagation.extract(context.active(), headers);
+        const batchSubrequest = getBatchSubrequestMeta(ctx);
+        const parentCtx = batchSubrequest ? context.active() : extractedCtx;
+        const linkedSpanContext: SpanContext | undefined =
+            batchSubrequest && hasValidTraceparent(headers)
+                ? trace.getSpanContext(extractedCtx)
+                : undefined;
 
         const meta = getEndpointMeta(ctx);
         const route = getRouteTemplate(meta);
@@ -211,10 +250,23 @@ export function tracingMiddleware(options?: TracingMiddlewareOptions) {
         if (meta?.operationId) {
             attributes['cleverbrush.endpoint.operationId'] = meta.operationId;
         }
+        if (batchSubrequest) {
+            attributes['cleverbrush.batch.index'] = batchSubrequest.index;
+            attributes['cleverbrush.batch.size'] = batchSubrequest.size;
+            attributes['cleverbrush.batch.path'] = batchSubrequest.path;
+        }
+
+        const spanOptions: SpanOptions = {
+            kind: SpanKind.SERVER,
+            attributes,
+            ...(linkedSpanContext
+                ? { links: [{ context: linkedSpanContext }] }
+                : {})
+        };
 
         await tracer.startActiveSpan(
             spanName,
-            { kind: SpanKind.SERVER, attributes },
+            spanOptions,
             parentCtx,
             async (span: Span) => {
                 ctx.items?.set?.(OTEL_SPAN_ITEM_KEY, span);

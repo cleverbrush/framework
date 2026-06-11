@@ -1,6 +1,9 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it is intentional */
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
+
+export const metadata = docsMetadata('/server');
 
 export default function ServerPage() {
     return (
@@ -252,12 +255,15 @@ server.handle(UploadAvatar, ({ body, files }) => {
                     <h3>Options</h3>
                     <div className="table-wrapper">
                         <table>
+                            <caption className="visually-hidden">
+                                Reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Option</th>
-                                    <th>Type</th>
-                                    <th>Default</th>
-                                    <th>Description</th>
+                                    <th scope="col">Option</th>
+                                    <th scope="col">Type</th>
+                                    <th scope="col">Default</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>

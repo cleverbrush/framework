@@ -29,11 +29,14 @@ export default function StandardSchemaSection() {
             </p>
             <div className="table-wrap">
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Field</th>
-                            <th>Value</th>
-                            <th>Description</th>
+                            <th scope="col">Field</th>
+                            <th scope="col">Value</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -228,11 +231,14 @@ if (!result.valid) {
             </p>
             <div className="table-wrap">
                 <table className="api-table">
+                    <caption className="visually-hidden">
+                        API reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Library</th>
-                            <th>Category</th>
-                            <th>Integration</th>
+                            <th scope="col">Library</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Integration</th>
                         </tr>
                     </thead>
                     <tbody>

@@ -202,3 +202,23 @@ describe('SubscriptionBuilder.inject()', () => {
         expect(sub.introspect().serviceSchemas).toEqual({ IMyService });
     });
 });
+
+describe('SubscriptionBuilder.public()', () => {
+    test('sets authRoles to null', () => {
+        const sub = endpoint.subscription('/ws/test').public();
+        expect(sub.introspect().authRoles).toBeNull();
+    });
+
+    test('overrides authorize() when public() called after', () => {
+        const sub = endpoint
+            .subscription('/ws/test')
+            .authorize('admin')
+            .public();
+        expect(sub.introspect().authRoles).toBeNull();
+    });
+
+    test('is idempotent', () => {
+        const sub = endpoint.subscription('/ws/test').public().public();
+        expect(sub.introspect().authRoles).toBeNull();
+    });
+});

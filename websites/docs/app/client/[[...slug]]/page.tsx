@@ -1,4 +1,7 @@
-import { redirect } from 'next/navigation';
+import { breadcrumbJsonLd, JsonLd } from '@cleverbrush/website-shared/lib/seo';
+import type { Metadata } from 'next';
+import { notFound, permanentRedirect } from 'next/navigation';
+import { clientSectionMetadata, DOCS_SITE } from '../../site';
 import BatchingSection from '../sections/batching';
 import CacheSection from '../sections/cache';
 import CacheTagsSection from '../sections/cacheTags';
@@ -37,6 +40,31 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     subscriptions: SubscriptionsSection
 };
 
+export async function generateMetadata({
+    params
+}: {
+    params: Promise<{ slug?: string[] }>;
+}): Promise<Metadata> {
+    const { slug } = await params;
+    const currentSlug = slug?.[0] ?? null;
+
+    if (!currentSlug) {
+        return clientSectionMetadata('getting-started');
+    }
+
+    if (!SECTION_COMPONENTS[currentSlug]) {
+        return {
+            title: 'Not Found',
+            robots: {
+                index: false,
+                follow: false
+            }
+        };
+    }
+
+    return clientSectionMetadata(currentSlug);
+}
+
 export default async function ClientDocPage({
     params
 }: {
@@ -46,17 +74,34 @@ export default async function ClientDocPage({
     const currentSlug = slug?.[0] ?? null;
 
     if (!currentSlug) {
-        redirect('/client/getting-started');
+        permanentRedirect('/client/getting-started');
     }
 
     const SectionComponent = SECTION_COMPONENTS[currentSlug];
     if (!SectionComponent) {
-        redirect('/client/getting-started');
+        notFound();
     }
 
+    const section = CLIENT_SECTIONS.find(entry => entry.slug === currentSlug);
+
     return (
-        <ClientDocLayout currentSlug={currentSlug}>
-            <SectionComponent />
-        </ClientDocLayout>
+        <>
+            <JsonLd
+                data={breadcrumbJsonLd(DOCS_SITE, [
+                    { name: 'Home', path: '/' },
+                    {
+                        name: '@cleverbrush/client',
+                        path: '/client/getting-started'
+                    },
+                    {
+                        name: section?.title ?? 'Client documentation',
+                        path: `/client/${currentSlug}`
+                    }
+                ])}
+            />
+            <ClientDocLayout currentSlug={currentSlug}>
+                <SectionComponent />
+            </ClientDocLayout>
+        </>
     );
 }

@@ -1,5 +1,42 @@
 # @cleverbrush/client
 
+## 4.3.2
+
+### Patch Changes
+
+- 1556ad1: Prepare a patch release with website SEO, AI-readiness, accessibility, and
+  privacy compliance updates.
+- Updated dependencies [1556ad1]
+  - @cleverbrush/schema@4.3.2
+  - @cleverbrush/server@4.3.2
+
+## 4.3.1
+
+### Patch Changes
+
+- Updated dependencies [0bc2959]
+  - @cleverbrush/server@4.3.1
+  - @cleverbrush/schema@4.3.1
+
+## 4.3.0
+
+### Patch Changes
+
+- @cleverbrush/schema@4.3.0
+- @cleverbrush/server@4.3.0
+
+## 4.2.0
+
+### Minor Changes
+
+- c0bd823: Add `.public()` method to `EndpointBuilder`, `ScopedEndpointFactory`, and `SubscriptionBuilder` to explicitly mark endpoints as public (no authentication required). The server's authentication middleware now skips costly `authenticate()` calls for public endpoints, and the client skips sending `Authorization` headers and WS `?token=` query parameters for endpoints with `authRoles === null`.
+
+### Patch Changes
+
+- Updated dependencies [c0bd823]
+  - @cleverbrush/server@4.2.0
+  - @cleverbrush/schema@4.2.0
+
 ## 4.1.0
 
 ### Minor Changes

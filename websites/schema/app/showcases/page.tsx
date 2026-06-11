@@ -1,4 +1,7 @@
 import Link from 'next/link';
+import { schemaMetadata } from '../site';
+
+export const metadata = schemaMetadata('/showcases');
 
 const SHOWCASES = [
     {

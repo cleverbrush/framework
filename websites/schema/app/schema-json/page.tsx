@@ -1,5 +1,8 @@
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { schemaMetadata } from '../site';
+
+export const metadata = schemaMetadata('/schema-json');
 
 export default function SchemaJsonPage() {
     return (
@@ -137,10 +140,13 @@ const result = UserSchema.validate({
                     <h3>Supported JSON Schema keywords</h3>
                     <div className="table-wrapper">
                         <table>
+                            <caption className="visually-hidden">
+                                Reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Keyword</th>
-                                    <th>Builder equivalent</th>
+                                    <th scope="col">Keyword</th>
+                                    <th scope="col">Builder equivalent</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -501,10 +507,13 @@ type B = JsonSchemaNodeToBuilder<typeof S>;
                     <h2>Limitations</h2>
                     <div className="table-wrapper">
                         <table>
+                            <caption className="visually-hidden">
+                                Reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Limitation</th>
-                                    <th>Notes</th>
+                                    <th scope="col">Limitation</th>
+                                    <th scope="col">Notes</th>
                                 </tr>
                             </thead>
                             <tbody>

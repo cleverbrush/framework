@@ -322,5 +322,14 @@ export const api = defineApi({
             .outgoing(TodoActivityResponseSchema)
             .summary('Live activity feed')
             .tags('live')
+    },
+
+    public: {
+        health: endpoint
+            .get('/api/health')
+            .responses({ 200: object({ ok: string(), uptime: number() }) })
+            .summary('Health check')
+            .description('Public health endpoint — no authentication required.')
+            .tags('health')
     }
 });

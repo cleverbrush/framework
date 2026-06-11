@@ -116,6 +116,26 @@ describe('POST /__batch integration', () => {
         expect(JSON.parse(responses[1].body)).toMatchObject({ name: 'Alice' });
     });
 
+    it('runs global middleware for the outer batch request and sub-requests', async () => {
+        const paths: string[] = [];
+        server = await createServer()
+            .use(async (ctx, next) => {
+                paths.push(ctx.url.pathname);
+                await next();
+            })
+            .useBatching()
+            .handleAll(handlers)
+            .listen(0);
+        port = server.address!.port;
+
+        const { status } = await post(port, '/__batch', {
+            requests: [{ method: 'GET', url: '/api/todos', headers: {} }]
+        });
+
+        expect(status).toBe(200);
+        expect(paths).toEqual(['/__batch', '/api/todos']);
+    });
+
     it('returns 404 sub-response for unknown sub-request route', async () => {
         ({ server, port } = await makeServer());
 

@@ -25,12 +25,15 @@ export default function ComparisonSection() {
                 <h2>Key differences at a glance</h2>
                 <div className="table-wrap">
                     <table className="comparison-table">
+                        <caption className="visually-hidden">
+                            Comparison table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Capability</th>
-                                <th>@cleverbrush/schema</th>
-                                <th>Zod 3/4</th>
-                                <th>Notes</th>
+                                <th scope="col">Capability</th>
+                                <th scope="col">@cleverbrush/schema</th>
+                                <th scope="col">Zod 3/4</th>
+                                <th scope="col">Notes</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -258,15 +261,18 @@ export default function ComparisonSection() {
                 </p>
                 <div className="table-wrap">
                     <table className="comparison-table">
+                        <caption className="visually-hidden">
+                            Comparison table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Feature</th>
-                                <th>@cleverbrush/schema</th>
-                                <th>Zod</th>
-                                <th>Valibot</th>
-                                <th>ArkType</th>
-                                <th>Yup</th>
-                                <th>Joi</th>
+                                <th scope="col">Feature</th>
+                                <th scope="col">@cleverbrush/schema</th>
+                                <th scope="col">Zod</th>
+                                <th scope="col">Valibot</th>
+                                <th scope="col">ArkType</th>
+                                <th scope="col">Yup</th>
+                                <th scope="col">Joi</th>
                             </tr>
                         </thead>
                         <tbody>

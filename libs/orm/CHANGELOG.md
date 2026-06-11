@@ -1,5 +1,37 @@
 # @cleverbrush/orm
 
+## 4.3.2
+
+### Patch Changes
+
+- 1556ad1: Prepare a patch release with website SEO, AI-readiness, accessibility, and
+  privacy compliance updates.
+- Updated dependencies [1556ad1]
+  - @cleverbrush/schema@4.3.2
+  - @cleverbrush/knex-schema@4.3.2
+
+## 4.3.1
+
+### Patch Changes
+
+- @cleverbrush/schema@4.3.1
+- @cleverbrush/knex-schema@4.3.1
+
+## 4.3.0
+
+### Patch Changes
+
+- @cleverbrush/schema@4.3.0
+- @cleverbrush/knex-schema@4.3.0
+
+## 4.2.0
+
+### Patch Changes
+
+- 9c7359c: Fix wrong version numbers for `@cleverbrush/orm` and `@cleverbrush/orm-cli` — they were at 1.0.0 instead of matching the rest of the framework. Both packages are now added to the fixed release group so they stay in sync with all other `@cleverbrush/*` packages going forward.
+  - @cleverbrush/schema@4.2.0
+  - @cleverbrush/knex-schema@4.2.0
+
 ## 1.0.0
 
 ### Major Changes
