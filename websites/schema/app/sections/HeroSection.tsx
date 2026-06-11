@@ -1,4 +1,8 @@
-import Link from 'next/link';
+import {
+    PerformativeHero,
+    PerformativeProofRow,
+    PerformativeSlippyWords
+} from '@cleverbrush/website-shared/components/Performative';
 
 export function HeroSection({
     smallGzip,
@@ -8,93 +12,111 @@ export function HeroSection({
     fullGzip: string;
 }) {
     return (
-        <section className="hero">
-            <p className="hero-eyebrow">
-                The cornerstone of type-safe TypeScript
-            </p>
-            <h1>
-                One schema.
-                <br />
-                Types, validation, forms.
-            </h1>
-            <p className="tagline">
-                <code>@cleverbrush/schema</code> is an immutable, composable
-                schema library that infers your TypeScript types at compile time
-                and validates your data at runtime — with zero dependencies. It
-                lays the foundation for a rich ecosystem — much like{' '}
-                <a
-                    href="https://zod.dev"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Zod
-                </a>{' '}
-                has shown is possible.
-            </p>
-            <div className="hero-actions">
-                <Link href="/docs" className="hero-btn hero-btn-primary">
-                    Explore the Schema Library
-                    <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 16 16"
-                        fill="none"
-                        aria-hidden="true"
-                    >
-                        <path
-                            d="M3 8h10M9 4l4 4-4 4"
-                            stroke="currentColor"
-                            strokeWidth="1.5"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        />
-                    </svg>
-                </Link>
-                <Link
-                    href="/playground"
-                    className="hero-btn hero-btn-playground"
-                >
-                    <svg
-                        width="15"
-                        height="15"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        aria-hidden="true"
-                    >
-                        <path d="M8 5v14l11-7z" />
-                    </svg>
-                    Try in Playground
-                </Link>
-                <a
-                    href="https://github.com/cleverbrush/framework"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hero-btn hero-btn-secondary"
-                >
-                    <svg
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="currentColor"
-                        aria-hidden="true"
-                    >
-                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                    </svg>
-                    GitHub
-                </a>
-            </div>
-            <div className="hero-badges">
-                <span className="badge">Zero runtime dependencies</span>
-                <span className="badge">Compile-time type inference</span>
-                <span className="badge">Immutable &amp; composable</span>
-                <span className="badge">BSD-3 Licensed</span>
-                <span className="badge">
-                    {smallGzip} min (full {fullGzip}) gzipped
-                </span>
-                <span className="badge">Standard Schema compatible</span>
-                <span className="badge">98% test coverage</span>
-                <span className="badge">Faster than Zod in most tests</span>
-            </div>
-        </section>
+        <>
+            <PerformativeHero
+                eyebrow="The cornerstone of type-safe TypeScript"
+                headline="One schema for"
+                rotatingWords={['types', 'validation', 'forms', 'JSON Schema']}
+                body={
+                    <>
+                        <code>@cleverbrush/schema</code> infers TypeScript types
+                        at compile time, validates untrusted data at runtime,
+                        and exposes typed descriptors that power forms, mappers,
+                        OpenAPI, and your own tooling.
+                    </>
+                }
+                actions={[
+                    {
+                        href: '/docs',
+                        label: 'Explore the schema library',
+                        variant: 'glow'
+                    },
+                    {
+                        href: '/playground',
+                        label: 'Try the playground',
+                        variant: 'wave'
+                    },
+                    {
+                        href: 'https://github.com/cleverbrush/framework',
+                        label: 'GitHub',
+                        external: true,
+                        variant: 'ghost'
+                    }
+                ]}
+                metrics={[
+                    { value: smallGzip, label: 'minimal gzipped build' },
+                    { value: fullGzip, label: 'full gzipped build' },
+                    { value: '0', label: 'runtime dependencies' },
+                    { target: 98, suffix: '%', label: 'line coverage' }
+                ]}
+                badges={[
+                    'Immutable builders',
+                    'Standard Schema compatible',
+                    'Typed field selectors',
+                    'BSD-3 licensed'
+                ]}
+                code={{
+                    filename: 'schema.ts',
+                    code: `import { object, string, number } from '@cleverbrush/schema';
+
+const User = object({
+    name: string().minLength(2),
+    email: string().email(),
+    age: number().min(0).max(150)
+});
+
+const result = User.validate(input);
+
+if (!result.valid) {
+    result.getErrorsFor(u => u.email);
+}`
+                }}
+            />
+            <section className="section cb-pui-home-proof">
+                <div className="container">
+                    <PerformativeSlippyWords
+                        words={[
+                            'runtime validation',
+                            'compile-time inference',
+                            'property descriptors',
+                            'schema-driven forms',
+                            'JSON Schema interop',
+                            'typed mappers'
+                        ]}
+                    />
+                    <PerformativeProofRow
+                        marquee={[
+                            { label: '@cleverbrush/schema', tone: 'mono' },
+                            { label: '@cleverbrush/mapper', tone: 'mono' },
+                            { label: '@cleverbrush/react-form', tone: 'mono' },
+                            { label: '@cleverbrush/schema-json', tone: 'mono' },
+                            { label: 'Standard Schema', tone: 'strong' },
+                            { label: 'TypeScript', tone: 'serif' }
+                        ]}
+                        items={[
+                            {
+                                href: 'https://github.com/cleverbrush/framework',
+                                icon: 'GH',
+                                title: 'Open source on GitHub',
+                                subtitle: 'BSD-3-Clause framework monorepo'
+                            },
+                            {
+                                href: 'https://www.npmjs.com/package/@cleverbrush/schema',
+                                icon: 'npm',
+                                title: '@cleverbrush/schema',
+                                subtitle: `${smallGzip} minimal gzipped build`
+                            },
+                            {
+                                href: '/playground',
+                                icon: 'Run',
+                                title: 'Browser playground',
+                                subtitle:
+                                    'Try validation and type inference live'
+                            }
+                        ]}
+                    />
+                </div>
+            </section>
+        </>
     );
 }

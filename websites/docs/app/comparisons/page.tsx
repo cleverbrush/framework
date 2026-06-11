@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 
+import { PerformativeBeforeAfter } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { docsMetadata } from '../site';
 
@@ -17,6 +18,20 @@ export default function ComparisonsPage() {
                         ahead, we say so.
                     </p>
                 </div>
+
+                <PerformativeBeforeAfter
+                    brand="Cleverbrush"
+                    before={[
+                        'RPC-only clients or server-first routing',
+                        'OpenAPI and validation often live in separate tools',
+                        'Retry, timeout, cache, auth, and DI are assembled later'
+                    ]}
+                    after={[
+                        'Contract-first REST with an auto-typed client',
+                        'OpenAPI 3.1 comes from the same endpoint contract',
+                        'Resilience, auth, DI, and forms share schema metadata'
+                    ]}
+                />
 
                 {/* ── Overview Table ──────────────────────────────── */}
                 <div className="card">

@@ -1,6 +1,7 @@
 'use client';
 
 import { boolean, number, string } from '@cleverbrush/schema';
+import { PerformativeBeforeAfter } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { useState } from 'react';
 
@@ -240,6 +241,20 @@ export default function T3EnvPage() {
                         interface.
                     </p>
                 </div>
+
+                <PerformativeBeforeAfter
+                    brand="T3 Env"
+                    before={[
+                        'Environment variables arrive as untyped strings',
+                        'Runtime config errors surface after deployment',
+                        'Client-safe keys require separate validation rules'
+                    ]}
+                    after={[
+                        'Schema builders validate server and client values',
+                        'Startup fails fast with field-specific messages',
+                        'Standard Schema keeps T3 Env integration adapter-free'
+                    ]}
+                />
 
                 {/* ── How it works ─────────────────────────── */}
                 <div className="card">

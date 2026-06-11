@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 
+import { PerformativeBeforeAfter } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import Link from 'next/link';
 import { docsMetadata } from '../site';
@@ -17,6 +18,20 @@ export default function WhyPage() {
                         one schema definition replaces six.
                     </p>
                 </div>
+
+                <PerformativeBeforeAfter
+                    brand="Cleverbrush"
+                    before={[
+                        'TypeScript interfaces drift from validators',
+                        'Fetch clients and OpenAPI specs need separate upkeep',
+                        'Forms rely on duplicated string field names'
+                    ]}
+                    after={[
+                        'One schema drives runtime validation and types',
+                        'Server handlers, clients, and OpenAPI stay aligned',
+                        'Property selectors keep fields refactor-safe'
+                    ]}
+                />
 
                 {/* ── The Problem ─────────────────────────────────── */}
                 <div className="card">

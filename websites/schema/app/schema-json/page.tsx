@@ -1,4 +1,5 @@
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
+import { PerformativeBeforeAfter } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { schemaMetadata } from '../site';
 
@@ -16,6 +17,20 @@ export default function SchemaJsonPage() {
                         <code>@cleverbrush/schema</code> builders and back.
                     </p>
                 </div>
+
+                <PerformativeBeforeAfter
+                    brand="@cleverbrush/schema-json"
+                    before={[
+                        'JSON Schema files and TypeScript types drift apart',
+                        'OpenAPI schemas need hand-maintained validators',
+                        'Migration from external schemas becomes all-or-nothing'
+                    ]}
+                    after={[
+                        'JSON Schema literals infer exact TypeScript values',
+                        'Builders emit schemas for OpenAPI and form tooling',
+                        'Existing schema catalogues can move incrementally'
+                    ]}
+                />
 
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner

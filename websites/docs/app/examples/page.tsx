@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 
+import { PerformativeGlassGrid } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { docsMetadata } from '../site';
 
@@ -17,6 +18,32 @@ export default function ExamplesPage() {
                         mapper, schema-driven forms, and OpenAPI.
                     </p>
                 </div>
+
+                <PerformativeGlassGrid
+                    items={[
+                        {
+                            title: 'Backend contract',
+                            icon: 'API',
+                            body:
+                                'Shared schemas drive REST endpoints, handler ' +
+                                'types, mapper output, and OpenAPI documents.'
+                        },
+                        {
+                            title: 'Frontend client',
+                            icon: 'UI',
+                            body:
+                                'The React app calls a typed client with retry, ' +
+                                'timeout, cache, batching, and form validation.'
+                        },
+                        {
+                            title: 'Runtime visibility',
+                            icon: 'OTel',
+                            body:
+                                'The demo includes OpenTelemetry traces, ' +
+                                'structured logs, SigNoz, ClickHouse, and pgAdmin.'
+                        }
+                    ]}
+                />
 
                 {/* ── Overview ────────────────────────────────────── */}
                 <div className="card">

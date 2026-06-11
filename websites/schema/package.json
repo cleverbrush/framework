@@ -19,6 +19,7 @@
         "@t3-oss/env-nextjs": "^0.13.11",
         "@tanstack/react-form": "^1.28.6",
         "next": "^16.2.1",
+        "performative-ui": "^0.3.0",
         "react": "^19.2.4",
         "react-dom": "^19.2.4"
     },

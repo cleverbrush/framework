@@ -1,5 +1,9 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it is intentional */
 
+import {
+    PerformativeHero,
+    PerformativeProofRow
+} from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import Link from 'next/link';
 import { docsMetadata } from './site';
@@ -10,78 +14,113 @@ export default function DocsHomePage() {
     return (
         <>
             {/* ── Hero ─────────────────────────────────────────────── */}
-            <section className="hero">
-                <p className="hero-eyebrow">
-                    Schema-first full-stack TypeScript framework
-                </p>
-                <h1>
-                    One schema.
-                    <br />
-                    Full stack.
-                </h1>
-                <p className="tagline">
-                    Define your data shapes once with{' '}
-                    <a
-                        href="https://schema.cleverbrush.com"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        @cleverbrush/schema
-                    </a>
-                    . Get type-safe servers, auto-typed clients, OpenAPI docs,
-                    dependency injection, auth, and React forms — all from that
-                    single definition. Zero duplication. Zero drift.
-                </p>
-                <div className="hero-actions">
-                    <Link
-                        href="/getting-started"
-                        className="hero-btn hero-btn-primary"
-                    >
-                        Get Started
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            aria-hidden="true"
+            <PerformativeHero
+                eyebrow="Schema-first full-stack TypeScript framework"
+                headline="One contract for"
+                rotatingWords={[
+                    'servers',
+                    'clients',
+                    'OpenAPI',
+                    'forms',
+                    'auth'
+                ]}
+                body={
+                    <>
+                        Define data shapes once with{' '}
+                        <a
+                            href="https://schema.cleverbrush.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
                         >
-                            <path
-                                d="M3 8h10M9 4l4 4-4 4"
-                                stroke="currentColor"
-                                strokeWidth="1.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        </svg>
-                    </Link>
-                    <Link href="/why" className="hero-btn hero-btn-playground">
-                        Why Cleverbrush?
-                    </Link>
-                    <a
-                        href="https://github.com/cleverbrush/framework"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="hero-btn hero-btn-secondary"
-                    >
-                        <svg
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            aria-hidden="true"
-                        >
-                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-                        </svg>
-                        GitHub
-                    </a>
-                </div>
-                <div className="hero-badges">
-                    <span className="badge">Contract-first</span>
-                    <span className="badge">Zero codegen</span>
-                    <span className="badge">OpenAPI 3.1</span>
-                    <span className="badge">Built-in auth &amp; DI</span>
-                    <span className="badge">Client resilience</span>
-                    <span className="badge">React integration</span>
+                            @cleverbrush/schema
+                        </a>
+                        . Get type-safe servers, auto-typed clients, OpenAPI
+                        docs, dependency injection, auth, and React forms from
+                        that single definition.
+                    </>
+                }
+                actions={[
+                    {
+                        href: '/getting-started',
+                        label: 'Get started',
+                        variant: 'glow'
+                    },
+                    {
+                        href: '/why',
+                        label: 'Why Cleverbrush?',
+                        variant: 'wave'
+                    },
+                    {
+                        href: 'https://github.com/cleverbrush/framework',
+                        label: 'GitHub',
+                        external: true,
+                        variant: 'ghost'
+                    }
+                ]}
+                metrics={[
+                    { target: 18, label: 'workspace packages' },
+                    { value: '0', label: 'client codegen steps' },
+                    { value: '3.1', label: 'OpenAPI target' },
+                    { value: '1', label: 'shared schema contract' }
+                ]}
+                badges={[
+                    'Contract-first REST',
+                    'Built-in auth and DI',
+                    'Typed resilient client',
+                    'Schema-driven React forms'
+                ]}
+                code={{
+                    filename: 'contract.ts',
+                    code: `import { defineApi, endpoint } from '@cleverbrush/server/contract';
+import { object, string, array } from '@cleverbrush/schema';
+
+const User = object({
+    id: string().uuid(),
+    email: string().email()
+});
+
+export const api = defineApi({
+    users: {
+        list: endpoint.get('/api/users').returns(array(User)),
+        create: endpoint.post('/api/users').body(User).returns(User)
+    }
+});`
+                }}
+            />
+            <section className="section cb-pui-home-proof">
+                <div className="container">
+                    <PerformativeProofRow
+                        marquee={[
+                            { label: '@cleverbrush/server', tone: 'mono' },
+                            { label: '@cleverbrush/client', tone: 'mono' },
+                            { label: '@cleverbrush/auth', tone: 'mono' },
+                            { label: '@cleverbrush/di', tone: 'mono' },
+                            { label: '@cleverbrush/react-form', tone: 'mono' },
+                            { label: 'OpenAPI 3.1', tone: 'strong' },
+                            { label: 'Zero codegen', tone: 'serif' }
+                        ]}
+                        items={[
+                            {
+                                href: 'https://github.com/cleverbrush/framework',
+                                icon: 'GH',
+                                title: 'Open source on GitHub',
+                                subtitle: 'BSD-3-Clause framework monorepo'
+                            },
+                            {
+                                href: '/api-docs',
+                                icon: 'API',
+                                title: 'Generated API reference',
+                                subtitle: 'Typed package docs published here'
+                            },
+                            {
+                                href: 'https://schema.cleverbrush.com',
+                                icon: 'S',
+                                title: 'Schema foundation',
+                                subtitle:
+                                    'Validation, inference, and descriptors'
+                            }
+                        ]}
+                    />
                 </div>
             </section>
 

@@ -8,6 +8,7 @@
         "./components/Navbar": "./components/Navbar.tsx",
         "./components/Footer": "./components/Footer.tsx",
         "./components/InstallBanner": "./components/InstallBanner.tsx",
+        "./components/Performative": "./components/Performative.tsx",
         "./components/ConsentManager": "./components/ConsentManager.tsx",
         "./components/PrivacyPage": "./components/PrivacyPage.tsx",
         "./components/ThemeProvider": "./components/ThemeProvider.tsx",
@@ -17,6 +18,7 @@
     },
     "dependencies": {
         "next": "^16.2.1",
+        "performative-ui": "^0.3.0",
         "react": "^19.1.0"
     }
 }
