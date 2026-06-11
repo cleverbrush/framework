@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
+import { PerformativeCodeStage } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import Link from 'next/link';
 import { docsMetadata } from '../site';
@@ -18,6 +19,25 @@ export default function GettingStartedPage() {
                         docs — from a single schema definition.
                     </p>
                 </div>
+
+                <PerformativeCodeStage
+                    sample={{
+                        filename: 'quick-start.ts',
+                        code: `const Todo = object({
+    id: number(),
+    title: string().minLength(1),
+    completed: boolean()
+});
+
+const api = defineApi({
+    todos: {
+        list: endpoint.get('/api/todos').returns(array(Todo))
+    }
+});
+
+const client = createClient(api, { baseUrl });`
+                    }}
+                />
 
                 {/* ── Step 0: Install ─────────────────────────────── */}
                 <InstallBanner

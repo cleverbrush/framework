@@ -1,3 +1,4 @@
+import { PerformativeMetricStrip } from '@cleverbrush/website-shared/components/Performative';
 import Link from 'next/link';
 import { docsMetadata } from '../site';
 
@@ -19,6 +20,15 @@ export default function DemoPage() {
                         and browse the database in pgAdmin straight away.
                     </p>
                 </div>
+
+                <PerformativeMetricStrip
+                    metrics={[
+                        { target: 8, label: 'Docker services' },
+                        { target: 5, label: 'local URLs to inspect' },
+                        { value: '30-60s', label: 'first boot warmup' },
+                        { value: 'OTLP', label: 'trace export path' }
+                    ]}
+                />
 
                 {/* ── Docker Compose setup ─────────────────────────── */}
                 <div className="card">
