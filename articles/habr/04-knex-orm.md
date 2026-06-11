@@ -1,316 +1,706 @@
-# Schema-driven ORM для TypeScript: @cleverbrush/knex-schema и @cleverbrush/orm
+# Schema-driven ORM для TypeScript: `@cleverbrush/knex-schema` и `@cleverbrush/orm`
 
+Статья о том, как превратить TypeScript-схему в единый источник
+истины для работы с базой данных: из одного определения получить типы
+строк, имена таблиц и колонок, типизированные запросы, связи, миграции
+и unit-of-work поверх Knex.
 
-Статья о том, как превратить TypeScript-схему в единый источник истины: из одного определения получить типы данных, DDL-миграции, типизированный query builder и unit-of-work с автоматическим отслеживанием изменений.
+Все примеры ниже взяты из
+[xpenser](https://xpenser.cleverbrush.com) — open-source приложения для
+учёта личных доходов и расходов. Это одновременно полезное приложение,
+которым я сам пользуюсь, и референсная реализация Cleverbrush Framework:
+контракты, сервер, клиент, формы, auth, observability, PostgreSQL,
+Telegram bot и MCP endpoint живут в одном репозитории. Код открыт:
+[github.com/cleverbrush/xpenser](https://github.com/cleverbrush/xpenser).
 
-Дисклеймер: все описываемые библиотеки носят экспериментальный характер — они созданы в рамках эксперимента. Несмотря на это, покрытие тестами у них достаточно хорошее.
+Дисклеймер: все описываемые библиотеки носят экспериментальный характер.
+Несмотря на это, покрытие тестами у них достаточно хорошее.
 
+## Предыстория
 
-Предыстория
+В предыдущих статьях я рассказывал о
+[`@cleverbrush/schema`](https://habr.com/ru/articles/1023038/),
+о типизированном HTTP API через
+[`@cleverbrush/server` и `@cleverbrush/client`](https://habr.com/ru/articles/1030342/),
+а затем о
+[`@cleverbrush/log` и `@cleverbrush/otel`](https://habr.com/ru/articles/1040714/).
 
-В предыдущих статьях я описывал @cleverbrush/schema как краеугольный камень всей экосистемы: на её основе строятся HTTP-сервер, клиент, логирование. Естественным продолжением стало создание слоя работы с базой данных, который тоже опирается на те же самые схемы.
+Общая идея у всех этих пакетов одна: схема должна быть не просто
+валидатором, а источником структурной информации. Если схема уже знает,
+что у объекта есть поле `userId`, что это число, что оно обязательно, и
+что для него можно получить PropertyDescriptor через `t => t.userId`, то
+возникает естественный вопрос: почему бы не использовать это же знание
+для SQL?
 
-Идея проста: вы описываете структуру таблицы один раз в виде объектной схемы. Из этого описания автоматически выводятся TypeScript-типы для строк, генерируются CREATE TABLE / ALTER TABLE для миграций, работает типизированный query builder.
+Небольшое отступление для тех, кто не работал с Knex.
+[Knex](https://knexjs.org) — это query builder для Node.js: он позволяет
+писать SQL-запросы цепочками методов вместо ручной сборки строк, умеет
+работать с PostgreSQL, MySQL, SQLite и другими SQL-базами, поддерживает
+транзакции, connection pool, migrations и schema builder.
 
-Два пакета отвечают за разные уровни абстракции: @cleverbrush/knex-schema — за маппинг схем на SQL и построение запросов через Knex, @cleverbrush/orm — за более высокоуровневый unit-of-work с отслеживанием изменений.
+Люди часто выбирают Knex, когда хотят оставаться близко к SQL, но не
+хотят каждый раз руками собирать `SELECT ... WHERE ...` и следить за
+плейсхолдерами. Это хороший промежуточный слой между raw SQL и тяжёлой
+ORM: меньше магии, проще предсказать итоговый запрос, легко упасть на
+обычный SQL там, где query builder мешает.
 
+Но у Knex есть естественный предел. TypeScript может помочь с типом
+строки через `knex<User>('users')`, но имена таблиц и колонок всё равно
+часто остаются строками: `'users'`, `'user_id'`, `'created_at'`. Если в
+коде доменная модель живёт в camelCase, база в snake_case, а рядом ещё
+есть API-контракты и валидация, появляется риск рассинхронизации. Именно
+этот зазор я и хотел закрыть schema-driven слоем поверх Knex.
 
-@cleverbrush/knex-schema: схема как DDL
+Второй источник вдохновения — Entity Framework. В первой статье я уже
+писал, что идея PropertyDescriptors выросла из желания получить что-то
+похожее на expression trees из .NET: не строку вида
+`'user.address.city'`, а выражение `t => t.user.address.city`, которое
+проверяется компилятором. В database layer эта аналогия стала ещё
+заметнее: `t => t.userId` в `where`, `t => t.category` в `include`,
+`l => l.categoryId` в relation mapping — это тот же подход, только
+применённый к SQL-запросам и связям между таблицами.
 
-Пакет расширяет билдеры из @cleverbrush/schema DB-специфичными методами. Удобнее всего импортировать всё из @cleverbrush/orm, который реэкспортирует все нужные примитивы:
+Так появились два пакета:
 
-    import { object, number, string, boolean, date, array, defineEntity }
-        from '@cleverbrush/orm';
+- `@cleverbrush/knex-schema` — schema-aware слой поверх Knex: имена
+  таблиц и колонок, DDL-метаданные, типизированный query builder,
+  projections, scopes, eager loading.
+- `@cleverbrush/orm` — более высокий уровень: `defineEntity()`,
+  `DbContext`, `DbSet`, relations, транзакции, save graph и tracking
+  context.
 
+Knex при этом никуда не исчезает. Это не попытка заменить SQL
+полностью. Скорее наоборот: Knex остаётся нижним уровнем и escape hatch,
+а схема добавляет к нему типы и договорённости, которых обычно не хватает
+в большом приложении.
 
-Определение схемы таблицы
+## С чего начинается таблица
 
-Метаданные для базы данных добавляются прямо на схему через цепочку вызовов. Каждый метод возвращает новый экземпляр — схемы неизменяемы.
+В xpenser таблицы описаны в `apps/api/src/db/schemas.ts`. Импорт идёт из
+`@cleverbrush/orm`, потому что ORM реэкспортирует все schema builders из
+`@cleverbrush/knex-schema`:
 
-    const UserSchema = object({
-        id: number().primaryKey(),
-        email: string(),
-        role: string(),
-        passwordHash: string().optional().hasColumnName('password_hash'),
-        authProvider: string().hasColumnName('auth_provider'),
-        createdAt: date().hasColumnName('created_at').defaultTo('now')
-    })
-        .hasTableName('users')
-        .projection('public', 'id', 'email', 'role', 'authProvider', 'createdAt')
-        .projection('summary', 'id', 'email');
+```ts
+import {
+    boolean,
+    type DbContext,
+    date,
+    defineEntity,
+    number,
+    object,
+    string
+} from '@cleverbrush/orm';
+```
 
-Что здесь происходит:
+Начнём с простой, но реальной схемы пользователя:
 
-- .primaryKey() — помечает колонку как первичный ключ
-- .hasColumnName('snake_case') — задаёт имя колонки в БД; в TypeScript свойство
-  называется как обычно (camelCase), запросы и маппинг перевода делают автоматически
-- .defaultTo('now') — default значение; 'now' → knex.fn.now(), можно передать
-  литерал или { raw: 'expression' }
-- .hasTableName('users') — имя таблицы
-- .projection('public', ...) — именованный набор колонок для выборки
-
-Для связей между таблицами:
-
-    const TodoSchema = object({
-        id: number().primaryKey(),
-        title: string(),
-        description: string().optional(),
-        completed: boolean().defaultTo(false),
-        userId: number()
-            .hasColumnName('user_id')
-            .references('users', 'id')
-            .onDelete('CASCADE')
-            .index('idx_todos_user_id'),
-        createdAt: date().hasColumnName('created_at'),
-        updatedAt: date().hasColumnName('updated_at'),
-        // поля для навигационных свойств (заполняются через .include())
-        author: UserSchema.optional(),
-    })
-        .hasTableName('todos')
-        .hasTimestamps({ createdAt: 'created_at', updatedAt: 'updated_at' })
-        .softDelete({ column: 'deleted_at' })
-        .projection('response', 'id', 'title', 'description', 'completed',
-            'userId', 'createdAt', 'updatedAt')
-        .scope(
-            'recentFirst',
-            q => q.orderBy('created_at', 'desc')
-        );
-
-- .references('users', 'id') — FK-ссылка на таблицу users
-- .onDelete('CASCADE') — CASCADE при удалении родителя
-- .index('idx_todos_user_id') — индекс по колонке
-- .hasTimestamps(...) — автоматически обновляет updated_at при UPDATE
-- .softDelete({ column: 'deleted_at' }) — мягкое удаление: DELETE превращается
-  в UPDATE deleted_at = NOW(), а SELECT автоматически фильтрует удалённые строки
-- .scope('name', fn) — именованное условие WHERE для переиспользования
-
-
-Определение сущности и отношений
-
-Схема описывает структуру таблицы; Entity оборачивает схему и объявляет отношения:
-
-    const UserEntity = defineEntity(UserSchema);
-
-    const TodoEntity = defineEntity(TodoSchema)
-        .belongsTo(
-            t => t.author,   // навигационное свойство в схеме
-            l => l.userId,   // FK в 'todos'
-            r => r.id        // PK в 'users'
-        );
-
-TypeScript вычисляет типы FK и PK статически — если передать колонку неправильного типа, это ошибка компиляции. Кроме .belongsTo() доступны .hasMany(), .hasOne().
-
-
-Типизированный query builder
-
-Для запросов используется SchemaQueryBuilder:
-
-    import { query } from '@cleverbrush/knex-schema';
-
-    // Получить всех пользователей
-    const users = await query(knex, UserSchema).toArray();
-
-    // Фильтр, сортировка, пагинация
-    const page = await query(knex, TodoSchema)
-        .where(t => t.completed, false)
-        .scoped('recentFirst')
-        .paginate({ page: 1, pageSize: 20 });
-    // page.items: массив Todo, page.total: общее число записей
-
-    // Eager loading связанной сущности
-    const todosWithAuthor = await query(knex, TodoSchema)
-        .include('author')
-        .toArray();
-    // todosWithAuthor[0].author — типизировано как UserSchema | undefined
-
-    // Только нужные колонки через projection
-    const summaries = await query(knex, TodoSchema)
-        .projected('response')   // только колонки из .projection('response', ...)
-        .toArray();
-
-Метод .where() принимает либо колонку по ссылке на свойство схемы (что даёт автодополнение), либо raw Knex-выражение. Имена колонок транслируются автоматически — пишем t => t.userId, в SQL уходит user_id.
-
-Для создания запросов лучше использовать DbSet из @cleverbrush/orm (об этом ниже), но SchemaQueryBuilder доступен и напрямую через query().
-
-
-Генерация миграций
-
-Вместо того чтобы вручную писать ALTER TABLE, достаточно вызвать generateMigrationsForContext(). Функция сравнивает текущие Entity-схемы со снимком предыдущего состояния и генерирует up/down-файл миграции.
-
-    import { generateMigrationsForContext } from '@cleverbrush/knex-schema';
-    import fs from 'fs';
-
-    // При первом запуске prevSnapshot = {}
-    const prevSnapshot = JSON.parse(
-        fs.existsSync('./migrations/snapshot.json')
-            ? fs.readFileSync('./migrations/snapshot.json', 'utf8')
-            : '{}'
+```ts
+export const UserDbSchema = object({
+    id: number().primaryKey(),
+    email: string(),
+    passwordHash: string().optional().hasColumnName('password_hash'),
+    emailVerified: boolean().hasColumnName('email_verified').defaultTo(false),
+    role: string(),
+    authProvider: string().hasColumnName('auth_provider'),
+    defaultCurrency: string().hasColumnName('default_currency'),
+    countryCode: string().hasColumnName('country_code').defaultTo('US'),
+    timezone: string().defaultTo('UTC'),
+    createdAt: date().hasColumnName('created_at').defaultTo('now'),
+    updatedAt: date().hasColumnName('updated_at').defaultTo('now')
+})
+    .hasTableName('users')
+    .projection(
+        'public',
+        'id',
+        'email',
+        'emailVerified',
+        'role',
+        'authProvider',
+        'defaultCurrency',
+        'countryCode',
+        'timezone',
+        'createdAt',
+        'updatedAt'
+    )
+    .projection(
+        'auth',
+        'id',
+        'email',
+        'passwordHash',
+        'emailVerified',
+        'role',
+        'authProvider',
+        'defaultCurrency',
+        'countryCode',
+        'timezone'
     );
+```
 
-    const result = generateMigrationsForContext(
-        [TodoEntity, UserEntity],
-        prevSnapshot
+Здесь обычная schema-валидация дополняется DB-метаданными:
+
+- `.hasTableName('users')` задаёт имя таблицы.
+- `.hasColumnName('password_hash')` связывает camelCase-поле в
+  TypeScript со snake_case-колонкой в SQL.
+- `.primaryKey()` помечает первичный ключ.
+- `.defaultTo(false)` и `.defaultTo('now')` описывают значения по
+  умолчанию на уровне DDL.
+- `.projection('auth', ...)` задаёт именованный набор колонок для
+  выборки.
+
+В обычном Knex можно передать generic-типы в `knex<User>('users')`, но
+имена колонок всё равно остаются строками. Здесь TypeScript-свойство и
+SQL-колонка связаны один раз в схеме, а дальше query builder сам
+переводит `passwordHash` в `password_hash`.
+
+## Projections: типизированный SELECT
+
+В xpenser projections используются там, где нельзя случайно достать
+лишнее поле. Например, при логине нужен `passwordHash`, но публичные
+ответы API не должны его видеть:
+
+```ts
+const user = await db.users
+    .projected('auth')
+    .where(candidate => candidate.email, email)
+    .first();
+```
+
+`projected('auth')` делает две вещи одновременно:
+
+- в SQL уходит только набор колонок из `.projection('auth', ...)`;
+- TypeScript-тип результата сужается до этих полей.
+
+Если выбрать `projected('public')`, то обратиться к `user.passwordHash`
+уже не получится на этапе компиляции. Это именно та мелочь, ради которой
+и хочется держать схему как источник правды, а не как отдельный файл с
+типами рядом с SQL.
+
+## Foreign keys и индексы
+
+Теперь посмотрим на доменную часть xpenser. Пользователь создаёт
+категории, продавцов и транзакции. Транзакция принадлежит пользователю,
+имеет категорию, опционального продавца, валюту, сумму, дату операции и
+рассчитанную сумму в валюте пользователя:
+
+```ts
+export const TransactionDbSchema = object({
+    id: number().primaryKey(),
+    userId: number()
+        .hasColumnName('user_id')
+        .references('users', 'id')
+        .onDelete('CASCADE')
+        .index('idx_transactions_user_id'),
+    categoryId: number()
+        .hasColumnName('category_id')
+        .references('categories', 'id')
+        .onDelete('RESTRICT')
+        .index('idx_transactions_category_id'),
+    vendorId: number()
+        .hasColumnName('vendor_id')
+        .references('vendors', 'id')
+        .onDelete('SET NULL')
+        .index('idx_transactions_vendor_id')
+        .optional(),
+    type: string(),
+    amount: number(),
+    currency: string(),
+    defaultCurrencyAmount: number().hasColumnName('default_currency_amount'),
+    defaultCurrency: string().hasColumnName('default_currency'),
+    exchangeRate: number().hasColumnName('exchange_rate'),
+    exchangeRateDate: string().hasColumnName('exchange_rate_date'),
+    occurredAt: date().hasColumnName('occurred_at'),
+    note: string().optional(),
+    createdAt: date().hasColumnName('created_at').defaultTo('now'),
+    updatedAt: date().hasColumnName('updated_at').defaultTo('now'),
+    category: CategoryDbSchema.optional()
+}).hasTableName('transactions');
+```
+
+Методы `.references()`, `.onDelete()` и `.index()` нужны не только для
+читабельности. Они сохраняются в introspection metadata схемы, а значит
+их можно использовать для генерации DDL, сравнения схем и построения
+миграций.
+
+Обратите внимание на `category: CategoryDbSchema.optional()`. Это
+навигационное свойство: оно нужно ORM, чтобы результат `.include(...)`
+был типизированным. Сама связь объявляется отдельно, на уровне entity.
+
+## Entity и relations
+
+Схема описывает форму строки и DB-метаданные. Entity добавляет связи:
+
+```ts
+export const CategoryEntity = defineEntity(CategoryDbSchema);
+export const VendorEntity = defineEntity(VendorDbSchema);
+
+export const TransactionEntity = defineEntity(TransactionDbSchema).belongsTo(
+    t => t.category,
+    l => l.categoryId,
+    r => r.id
+);
+```
+
+В этом примере:
+
+- `t => t.category` — навигационное свойство в результате;
+- `l => l.categoryId` — FK на таблице `transactions`;
+- `r => r.id` — PK на таблице `categories`.
+
+Все три выражения типизированы. Если переименовать `categoryId` или
+попытаться связать число со строкой, TypeScript покажет ошибку до
+запуска приложения.
+
+Для других случаев есть `.hasOne()`, `.hasMany()` и `.belongsToMany()`.
+В xpenser пока хватает `belongsTo`, но в тестах ORM покрыты и более
+сложные графы: сохранение дерева объектов, many-to-many через pivot
+таблицу, composite primary keys и polymorphic variants.
+
+## DbContext: карта всех таблиц
+
+После объявления entity собираются в обычный объект:
+
+```ts
+export const entityMap = {
+    users: UserEntity,
+    categories: CategoryEntity,
+    vendors: VendorEntity,
+    transactions: TransactionEntity,
+    transactionScans: TransactionScanEntity,
+    transactionScanItems: TransactionScanItemEntity,
+    transactionScanImages: TransactionScanImageEntity,
+    exchangeRates: ExchangeRateEntity
+};
+
+export type AppEntityMap = typeof entityMap;
+export type AppDb = DbContext<AppEntityMap>;
+```
+
+На старте API создаётся `DbContext`:
+
+```ts
+import { createDb } from '@cleverbrush/orm';
+import { instrumentKnex } from '@cleverbrush/otel';
+import knex from 'knex';
+import { entityMap } from '../db/schemas.js';
+
+const connection = instrumentKnex(
+    knex({
+        client: 'pg',
+        connection: config.db.connectionString,
+        pool: { min: 2, max: 10 },
+        acquireConnectionTimeout: 10_000
+    }),
+    { sanitizeStatement: () => '<redacted>' }
+);
+
+const db = createDb(connection, entityMap);
+```
+
+На выходе `db.users`, `db.categories`, `db.transactions` и остальные
+поля становятся типизированными `DbSet`. Это похоже на `DbContext` из
+Entity Framework не случайно: именно EF был для меня референсом по
+ощущению API. Отличие в том, что вместо expression trees рантайма здесь
+используются schema PropertyDescriptors, а вместо декораторов, reflection
+metadata и кодогенерации — обычные TypeScript-объекты.
+
+## Запросы: от простого к реальному
+
+Самый простой запрос выглядит так:
+
+```ts
+const categories = await db.categories.where(
+    category => category.userId,
+    userId
+);
+```
+
+Колонка выбирается через selector. В TypeScript это поле называется
+`userId`, а в SQL уйдёт `user_id`.
+
+Можно загрузить одну транзакцию вместе с категорией:
+
+```ts
+const row = await db.transactions
+    .include(transaction => transaction.category)
+    .where(transaction => transaction.id, transactionId)
+    .where(transaction => transaction.userId, userId)
+    .first();
+```
+
+`include(transaction => transaction.category)` доступен только потому,
+что связь была объявлена в `TransactionEntity`. Результат знает о поле
+`category`, и это поле имеет тип категории, а не `unknown`.
+
+В реальном списке транзакций запрос постепенно собирается из фильтров:
+
+```ts
+let builder = db.transactions
+    .include(transaction => transaction.category)
+    .where(transaction => transaction.userId, userId);
+
+if (query.categoryId) {
+    builder = builder.where(
+        transaction => transaction.categoryId,
+        query.categoryId
     );
+}
 
-    if (!result.isEmpty) {
-        const ts = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
-        fs.writeFileSync(`./migrations/${ts}_changes.ts`, result.full);
-        fs.writeFileSync('./migrations/snapshot.json',
-            JSON.stringify(result.nextSnapshot, null, 2));
-    }
+if (query.from) {
+    builder = builder.where(
+        transaction => transaction.occurredAt,
+        '>=',
+        query.from
+    );
+}
 
-Функция понимает топологический порядок: таблицы с FK создаются после таблиц, на которые они ссылаются. При удалении сущности из Entity Map генерируется DROP TABLE.
+if (query.to) {
+    builder = builder.where(
+        transaction => transaction.occurredAt,
+        '<=',
+        query.to
+    );
+}
 
-Для управления миграциями через командную строку есть отдельный пакет @cleverbrush/orm-cli.
+const rows = await builder
+    .orderBy(transaction => transaction.occurredAt, 'desc')
+    .orderBy(transaction => transaction.id, 'desc');
+```
 
+Это всё ещё Knex-подобный fluent API, но без строковых имён колонок в
+основном пути.
 
-@cleverbrush/orm: unit-of-work поверх query layer
+## Вставка, обновление, удаление
 
-@cleverbrush/orm добавляет более высокоуровневый API: типизированный DbContext с DbSet-ами для каждой сущности, а также TrackedDbContext с отслеживанием изменений.
+Создание транзакции в xpenser выглядит так:
 
+```ts
+const created = await db.transactions.insert({
+    userId,
+    categoryId: body.categoryId,
+    vendorId: body.vendorId ?? undefined,
+    type: category.type,
+    amount: body.amount,
+    currency: body.currency,
+    defaultCurrencyAmount: convertAmount(body.amount, exchange.rate),
+    defaultCurrency: user.defaultCurrency,
+    exchangeRate: exchange.rate,
+    exchangeRateDate: exchange.rateDate,
+    occurredAt: body.occurredAt,
+    note: body.note ?? undefined
+});
+```
 
-Создание DbContext
+Тип payload выводится из схемы. Нельзя передать строку в `amount`,
+нельзя забыть обязательный `categoryId`, нельзя случайно написать
+`default_currency_amount` вместо `defaultCurrencyAmount`.
 
-    import { createDb } from '@cleverbrush/orm';
-    import knex from 'knex';
+Обновление:
 
-    const db = createDb(knex({ client: 'pg', connection: '...' }), {
-        todos: TodoEntity,
-        users: UserEntity
-    });
-
-    // db.todos, db.users — типизированные DbSet<TEntity>
-
-Теперь db.todos — это типизированный DbSet, а все запросы и мутации строго типизированы. TypeScript знает типы всех полей, включая которые обязательны при вставке, а которые опциональны.
-
-
-Запросы через DbSet
-
-DbSet поддерживает тот же интерфейс, что SchemaQueryBuilder, плюс несколько дополнительных методов:
-
-    // Поиск по первичному ключу
-    const todo = await db.todos.find(42);
-    // todo: Todo | undefined
-
-    const user = await db.users.findOrFail(userId);
-    // Бросает EntityNotFoundError, если не найдено
-
-    // Запрос с фильтром и связанной сущностью
-    const todos = await db.todos
-        .where(t => t.userId, userId)
-        .include(t => t.author)   // типизированный eager load
-        .scoped('recentFirst')
-        .paginate({ page, pageSize });
-
-    // Вставка
-    const newTodo = await db.todos.insert({
-        title: 'Buy milk',
-        completed: false,
-        userId: principal.userId,
-        createdAt: new Date(),
+```ts
+await db.transactions
+    .where(transaction => transaction.id, transactionId)
+    .where(transaction => transaction.userId, userId)
+    .update({
+        categoryId: next.categoryId,
+        vendorId: (next.vendorId ?? null) as never,
+        type: category.type,
+        amount: next.amount,
+        currency: next.currency,
+        defaultCurrencyAmount: convertAmount(next.amount, exchange.rate),
+        defaultCurrency: user.defaultCurrency,
+        exchangeRate: exchange.rate,
+        exchangeRateDate: exchange.rateDate,
+        occurredAt: next.occurredAt,
+        note: next.note ?? undefined,
         updatedAt: new Date()
     });
-    // newTodo.id заполнен автоматически из RETURNING
+```
 
-    // Обновление
-    await db.todos
-        .where(t => t.id, todoId)
-        .update({ completed: true, updatedAt: new Date() });
+Удаление:
 
-    // Удаление (с softDelete — это UPDATE deleted_at = NOW())
-    await db.todos
-        .where(t => t.id, todoId)
+```ts
+const deleted = await db.transactions
+    .where(transaction => transaction.id, transactionId)
+    .where(transaction => transaction.userId, userId)
+    .delete();
+
+if (deleted === 0) {
+    throw new TransactionNotFoundError('Transaction was not found.');
+}
+```
+
+При этом escape hatch остаётся. В xpenser есть запросы, где проще взять
+чистый Knex: например, когда нужна ручная выборка из нескольких таблиц,
+специальные aliases или SQL, который не хочется прятать за ORM API. Это
+нормально: ORM не должен мешать писать SQL там, где SQL очевиднее.
+
+## Транзакции
+
+`DbContext` поддерживает callback-форму транзакций:
+
+```ts
+await db.transaction(async trx => {
+    await trx.telegramLinkTokens
+        .where(candidate => candidate.userId, userId)
         .delete();
 
-При вставке TypeScript проверяет типы всех полей: нельзя передать строку туда, где ожидается число, нельзя пропустить обязательное поле. Ошибки отловятся при компиляции, а не в рантайме.
-
-
-Транзакции
-
-    // Вариант 1: колбэк-форма
-    await db.transaction(async tx => {
-        const todo = await tx.todos.insert({ title, userId, ... });
-        await tx.users
-            .where(u => u.id, userId)
-            .update({ updatedAt: new Date() });
-        // Rollback произойдёт автоматически, если колбэк бросит исключение
+    await trx.telegramLinkTokens.insert({
+        userId,
+        tokenHash: hashTelegramLinkToken(token),
+        expiresAt,
+        consumedAt: undefined
     });
+});
+```
 
-    // Вариант 2: ручная транзакция
-    const trx = await knex.transaction();
-    try {
-        const txDb = db.withTransaction(trx);
-        const todo = await txDb.todos.insert({ title, userId, ... });
-        await trx.commit();
-    } catch (err) {
-        await trx.rollback();
-        throw err;
+Если callback бросит исключение, Knex откатит транзакцию. Внутри callback
+вы получаете тот же `DbContext`, но привязанный к `trx`, поэтому
+`trx.users`, `trx.transactions`, `trx.telegramLinkTokens` остаются
+типизированными `DbSet`.
+
+Пример посложнее: перед удалением категории xpenser переносит все её
+транзакции в replacement-категорию и только после этого удаляет старую:
+
+```ts
+await db.transaction(async trx => {
+    await trx.transactions
+        .where(transaction => transaction.userId, userId)
+        .where(transaction => transaction.categoryId, categoryId)
+        .update({
+            categoryId: replacement.id,
+            type: replacement.type,
+            updatedAt: now
+        });
+
+    await trx.categories
+        .where(candidate => candidate.id, categoryId)
+        .where(candidate => candidate.userId, userId)
+        .delete();
+});
+```
+
+Транзакционная граница видна сразу, а типизация никуда не пропадает.
+
+## Миграции
+
+У `@cleverbrush/knex-schema` есть snapshot-based генератор миграций:
+
+```ts
+import {
+    generateMigrationsForContext,
+    loadSnapshot,
+    writeSnapshot
+} from '@cleverbrush/knex-schema';
+
+const prev = loadSnapshot('./migrations/snapshot.json');
+const result = generateMigrationsForContext(
+    Object.values(entityMap),
+    prev
+);
+
+if (!result.isEmpty) {
+    await fs.promises.writeFile(
+        './migrations/20260611000000_changes.ts',
+        result.full
+    );
+    writeSnapshot('./migrations/snapshot.json', result.nextSnapshot);
+}
+```
+
+Функция сравнивает текущие entity-схемы с сериализованным снимком
+предыдущего состояния:
+
+- для новых таблиц генерирует `CREATE TABLE`;
+- для изменённых таблиц генерирует `ALTER TABLE`;
+- для удалённых entity генерирует `DROP TABLE`;
+- сортирует таблицы по FK-зависимостям, чтобы родительские таблицы
+  создавались раньше дочерних.
+
+Важная оговорка: xpenser сейчас использует обычные handwritten Knex
+migrations и запускает их через `knex.migrate.latest(...)`:
+
+```ts
+export async function runMigrations(knex: Knex): Promise<void> {
+    await knex.migrate.latest({
+        directory: migrationsDirectory,
+        tableName: 'knex_migrations',
+        loadExtensions: ['.ts', '.js']
+    });
+}
+```
+
+То есть генератор миграций — возможность framework-пакета, а не
+обязательный путь. Мне нравится иметь оба варианта: простые изменения
+можно получать из diff схем, а сложные data migrations всё равно писать
+руками на Knex.
+
+## Нижний уровень: `query(knex, schema)`
+
+`@cleverbrush/orm` — не единственный вход. Если не нужен `DbContext`,
+можно работать прямо со схемой:
+
+```ts
+import { query } from '@cleverbrush/knex-schema';
+
+const users = await query(knex, UserDbSchema)
+    .where(user => user.emailVerified, true)
+    .projected('public');
+```
+
+Этот слой даёт тот же перевод имён колонок, projections, scopes,
+pagination, insert/update/delete, `joinOne`, `joinMany`, raw escape
+hatches и DDL helpers. ORM просто добавляет поверх него entity map,
+relations, `DbSet`, транзакционный контекст и tracking.
+
+## Tracking context и unit-of-work
+
+Для сценариев в стиле «загрузить объект, поменять несколько свойств,
+сохранить изменения» есть tracking mode:
+
+```ts
+await using db = createDb(knex, entityMap, { tracking: true });
+
+const user = await db.users.findOrFail(userId);
+user.defaultCurrency = 'EUR';
+user.updatedAt = new Date();
+
+const result = await db.saveChanges();
+```
+
+Tracking context поддерживает identity map: если один и тот же primary
+key загружен дважды, вы получите один и тот же object reference. При
+`saveChanges()` ORM сравнит текущие значения со snapshot и отправит в БД
+только изменённые поля.
+
+Доступны и более явные операции:
+
+```ts
+db.attach('users', existingUser);
+
+const entry = db.entry(existingUser);
+entry.isModified('defaultCurrency');
+
+db.remove(existingUser);
+await db.saveChanges();
+```
+
+Перед сохранением можно повесить hook, например для audit-полей:
+
+```ts
+db.onSavingChanges(entry => {
+    if (entry.state === 'Modified' && 'updatedAt' in entry.entity) {
+        (entry.entity as { updatedAt: Date }).updatedAt = new Date();
     }
+});
+```
 
+`await using` здесь работает как runtime guard. При выходе из блока
+вызывается `[Symbol.asyncDispose]()`: если остались несохранённые
+изменения, будет брошен `PendingChangesError`. Это не магия компилятора,
+а практичная защита от тихой потери изменений.
 
-TrackedDbContext: отслеживание изменений
+## Row versioning и конкурентные обновления
 
-Для сценариев вида «загрузить объект, изменить несколько полей, сохранить» удобен TrackedDbContext. Передайте { tracking: true } в createDb():
+Если у сущности есть версия строки, её можно явно отметить:
 
-    // Обычно создаётся как transient-зависимость (каждый раз новый экземпляр)
-    await using db = createDb(knex, entityMap, { tracking: true });
+```ts
+const OrderSchema = object({
+    id: number().primaryKey(),
+    status: string(),
+    version: number().rowVersion()
+}).hasTableName('orders');
+```
 
-    const todo = await db.todos.findOrFail(todoId);
-    // todo теперь отслеживается identity map'ом
+При `saveChanges()` ORM добавит условие вида `AND version = <snapshot>`.
+Если другая транзакция уже обновила строку и версия изменилась,
+`UPDATE` не затронет ни одной строки, а ORM бросит `ConcurrencyError`.
 
-    todo.completed = true;
-    todo.updatedAt = new Date();
-    // Мутируем объект напрямую
+В xpenser эта возможность пока не нужна, но для систем с совместным
+редактированием она закрывает типичный optimistic concurrency сценарий.
 
-    const { updated } = await db.saveChanges();
-    // Эмитирует минимальный UPDATE только для изменённых колонок:
-    // UPDATE todos SET completed = true, updated_at = '...' WHERE id = 42
+## Что получилось
 
-Оператор await using гарантирует вызов [Symbol.asyncDispose]() при выходе из блока. Если в этот момент есть несохранённые изменения, будет брошен PendingChangesError — так случайная потеря данных превращается в ошибку компиляции/рантайма, а не в тихую пропажу.
+Если собрать всё вместе, цепочка выглядит так:
 
-Контекст отслеживания можно настроить через onSavingChanges() — например, автоматически проставлять аудит-поля перед каждым saveChanges():
+```text
+@cleverbrush/schema
+    -> runtime validation
+    -> TypeScript inference
+    -> PropertyDescriptors
+    -> DB metadata via @cleverbrush/knex-schema
+    -> typed queries and DDL helpers
+    -> DbContext / DbSet via @cleverbrush/orm
+```
 
-    db.onSavingChanges(entry => {
-        if (entry.state === 'Modified' && 'updatedAt' in entry.entity) {
-            (entry.entity as any).updatedAt = new Date();
-        }
-    });
+Главная ценность здесь не в том, что можно написать меньше SQL. SQL всё
+равно остаётся важным, а Knex остаётся доступным. Ценность в том, что
+границы приложения начинают проверяться компилятором:
 
-Другие методы TrackedDbContext:
+- поле переименовано в схеме — selectors в запросах перестают
+  компилироваться;
+- колонка называется `default_currency_amount`, но в коде используется
+  `defaultCurrencyAmount`;
+- projection сужает не только SQL `SELECT`, но и TypeScript-тип;
+- relation объявлена один раз и дальше используется через
+  `.include(t => t.category)`;
+- транзакционный `DbContext` сохраняет тот же API внутри `trx`.
 
-- attach(entitySetKey, entity) — начать отслеживать объект, полученный не через DbSet
-- detach(entity) — прекратить отслеживание
-- remove(entity) — пометить для удаления; DELETE произойдёт при saveChanges()
-- discardChanges() — откатить все несохранённые изменения в памяти
-- reload(entity) — перечитать актуальные данные из БД
+## Чего здесь нет
 
+Это не замена Prisma, TypeORM или Drizzle. У этих инструментов свои
+сильные стороны: зрелая экосистема, schema language, studio, generators,
+адаптеры, документация, привычные паттерны.
 
-Единый источник истины
+`@cleverbrush/orm` интересен в другом случае: когда у вас уже есть
+schema-first стек, и вы хотите, чтобы HTTP-контракты, валидация,
+формы, логирование и database layer говорили на одном языке.
 
-Всё вместе: схема, из которой выводятся TypeScript-типы, DDL, query builder и tracking — это и есть идея единого источника истины. Добавили новое поле в схему — TypeScript моментально укажет на все места, где это поле нужно обработать. Переименовали колонку — generateMigrationsForContext() сгенерирует ALTER TABLE RENAME COLUMN. Сделали поле обязательным — все INSERT-вызовы без этого поля станут ошибкой компиляции.
+В xpenser это оказалось удобным компромиссом. Большая часть CRUD и
+domain queries живёт на `DbSet`, а нестандартные запросы остаются на
+обычном Knex. При этом OpenTelemetry-инструментация видит и то, и другое,
+потому что внизу один и тот же Knex connection pool.
 
-Для сравнения: в классическом подходе типы, DDL и запросы существуют независимо, и рассинхронизация между ними обнаруживается только в рантайме.
+## Итоги
 
+`@cleverbrush/knex-schema` и `@cleverbrush/orm` добавляют к Knex
+schema-driven слой:
 
-Итоги
+- схемы описывают TypeScript-тип, DB-имена, defaults, indexes и foreign
+  keys;
+- selectors вида `t => t.userId` заменяют строковые имена колонок;
+- projections сужают и SQL, и TypeScript-тип результата;
+- `defineEntity()` добавляет relations и typed eager loading;
+- `createDb()` превращает entity map в `DbContext` с `DbSet`;
+- транзакции сохраняют тот же типизированный API;
+- tracking context даёт identity map, `saveChanges()` и runtime guard от
+  забытых изменений;
+- Knex остаётся доступным для raw SQL и сложных запросов.
 
-@cleverbrush/knex-schema и @cleverbrush/orm — небольшой, но функциональный ORM-стек поверх Knex. Главные идеи:
+xpenser показывает эту идею на рабочем приложении, а не на искусственном
+todo-примере: пользователи, категории, продавцы, транзакции, курсы валют,
+сканы чеков, API keys, Telegram linking и MCP OAuth живут в одной
+PostgreSQL-модели.
 
-- Единое определение схемы → TypeScript-типы + DDL + query builder
-- Типизированные ссылки на колонки защищают от опечаток в строках
-- generateMigrationsForContext() генерирует миграции из diff схем без ручного DDL
-- TrackedDbContext + saveChanges() + await using = safe unit-of-work по умолчанию
-- softDelete, hasTimestamps — декларативные паттерны без бойлерплейта
+В следующей статье хочу уже подробно разобрать сам xpenser: как устроено
+приложение целиком, почему я сделал его как open-source personal finance
+tracker, как в нём связаны web app, API, Telegram bot, MCP endpoint,
+contracts, typed client, observability и database layer.
 
+## Ссылки
 
-Ссылки
+Cleverbrush Framework: [github.com/cleverbrush/framework](https://github.com/cleverbrush/framework)
 
-GitHub: github.com/cleverbrush/framework
+xpenser app: [xpenser.cleverbrush.com](https://xpenser.cleverbrush.com)
 
-Документация и playground: docs.cleverbrush.com
+xpenser GitHub: [github.com/cleverbrush/xpenser](https://github.com/cleverbrush/xpenser)
 
-npm:
-    npm install @cleverbrush/knex-schema
-    npm install @cleverbrush/orm
+Документация и playground: [docs.cleverbrush.com](https://docs.cleverbrush.com)
 
-Буду рад любой обратной связи — по API, документации, пропущенным фичам. Issues и PR приветствуются.
+Knex: [knexjs.org](https://knexjs.org)
+
+### npm
+
+```bash
+npm install @cleverbrush/knex-schema
+npm install @cleverbrush/orm knex pg
+```
