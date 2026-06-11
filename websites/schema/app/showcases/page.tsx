@@ -1,9 +1,25 @@
-import Link from 'next/link';
+import { PerformativeGlassGrid } from '@cleverbrush/website-shared/components/Performative';
 import { schemaMetadata } from '../site';
 
 export const metadata = schemaMetadata('/showcases');
 
-const SHOWCASES = [
+interface Showcase {
+    href: string;
+    title: string;
+    description: string;
+    badge: string;
+    external?: boolean;
+}
+
+const SHOWCASES: Showcase[] = [
+    {
+        href: 'https://xpenser.cleverbrush.com',
+        title: 'xpenser',
+        description:
+            'Self-hostable personal finance tracker and real Cleverbrush reference app using schemas, contracts, server handlers, typed clients, React forms, OpenAPI, observability, Telegram, and MCP.',
+        badge: 'App',
+        external: true
+    },
     {
         href: '/showcases/tanstack-form',
         title: 'TanStack Form',
@@ -41,48 +57,16 @@ export default function ShowcasesPage() {
                     </p>
                 </div>
 
-                <div className="features-grid">
-                    {SHOWCASES.map(s => (
-                        <Link
-                            key={s.href}
-                            href={s.href}
-                            className="feature-card"
-                        >
-                            <div
-                                style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '0.6rem',
-                                    marginBottom: '0.6rem'
-                                }}
-                            >
-                                <h3 style={{ margin: 0 }}>{s.title}</h3>
-                                <span
-                                    style={{
-                                        fontSize: '0.7rem',
-                                        padding: '0.15rem 0.5rem',
-                                        borderRadius: '4px',
-                                        background: 'rgba(129,140,248,0.12)',
-                                        color: 'var(--accent-indigo)',
-                                        fontWeight: 600,
-                                        letterSpacing: '0.03em'
-                                    }}
-                                >
-                                    {s.badge}
-                                </span>
-                            </div>
-                            <p
-                                style={{
-                                    margin: 0,
-                                    color: 'var(--text-secondary)',
-                                    lineHeight: 1.6
-                                }}
-                            >
-                                {s.description}
-                            </p>
-                        </Link>
-                    ))}
-                </div>
+                <PerformativeGlassGrid
+                    items={SHOWCASES.map(s => ({
+                        title: s.title,
+                        body: s.description,
+                        icon: s.badge,
+                        href: s.href,
+                        external: s.external,
+                        linkLabel: 'Open showcase'
+                    }))}
+                />
             </div>
         </div>
     );

@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { schemaDeclarations } from './schemaDeclarations';
 import { zodDeclarations } from './zodDeclarations';
 
@@ -16,24 +16,57 @@ interface Props {
     onMount?: (editor: unknown, monaco: unknown) => void;
 }
 
+const monacoVsPath = 'https://cdn.jsdelivr.net/npm/monaco-editor@0.55.1/min/vs';
+
+let monacoPrepared = false;
+
 export function PlaygroundEditor({ code, onChange, onMount }: Props) {
     const editorRef = useRef<unknown>(null);
     const monacoRef = useRef<unknown>(null);
-    const initDone = useRef(false);
+    const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
+        'loading'
+    );
+    const [loadError, setLoadError] = useState<string | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        import('@monaco-editor/react')
+            .then(({ loader }) => {
+                loader.config({
+                    paths: {
+                        vs: monacoVsPath
+                    }
+                });
+                return loader.init();
+            })
+            .then(monaco => {
+                if (cancelled) return;
+                prepareMonaco(monaco as MonacoInstance);
+                setLoadState('ready');
+            })
+            .catch(error => {
+                const message = describeMonacoError(error);
+                console.error('Monaco initialization error:', message);
+                if (cancelled) return;
+                setLoadError(message);
+                setLoadState('error');
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const handleBeforeMount = useCallback((monaco: unknown) => {
-        defineTheme(monaco as MonacoInstance);
+        prepareMonaco(monaco as MonacoInstance);
     }, []);
 
     const handleMount = useCallback(
         (editor: unknown, monaco: unknown) => {
             editorRef.current = editor;
             monacoRef.current = monaco;
-
-            if (!initDone.current) {
-                initDone.current = true;
-                configureMonaco(monaco as MonacoInstance);
-            }
+            prepareMonaco(monaco as MonacoInstance);
 
             onMount?.(editor, monaco);
         },
@@ -46,6 +79,24 @@ export function PlaygroundEditor({ code, onChange, onMount }: Props) {
         },
         [onChange]
     );
+
+    if (loadState === 'error') {
+        return (
+            <div className="pg-editor-container">
+                <div className="pg-editor-loading pg-editor-loading--error">
+                    Editor failed to load: {loadError ?? 'unknown error'}
+                </div>
+            </div>
+        );
+    }
+
+    if (loadState === 'loading') {
+        return (
+            <div className="pg-editor-container">
+                <div className="pg-editor-loading">Loading editor...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="pg-editor-container">
@@ -97,6 +148,14 @@ type MonacoInstance = {
     };
 };
 
+function prepareMonaco(monaco: MonacoInstance) {
+    defineTheme(monaco);
+
+    if (monacoPrepared) return;
+    monacoPrepared = true;
+    configureMonaco(monaco);
+}
+
 function defineTheme(monaco: MonacoInstance) {
     monaco.editor.defineTheme('playground-dark', {
         base: 'vs-dark',
@@ -126,6 +185,35 @@ function defineTheme(monaco: MonacoInstance) {
             'editorSuggestWidget.selectedBackground': '#818cf833'
         }
     });
+}
+
+function describeMonacoError(error: unknown): string {
+    if (error instanceof Error) {
+        return error.message;
+    }
+
+    if (typeof Event !== 'undefined' && error instanceof Event) {
+        const target = error.target as
+            | (EventTarget & { src?: string; href?: string })
+            | null;
+        const url = target?.src ?? target?.href;
+        return url
+            ? `${error.type || 'load'} event for ${url}`
+            : `${error.type || 'unknown'} event`;
+    }
+
+    if (typeof error === 'string') {
+        return error;
+    }
+
+    try {
+        const json = JSON.stringify(error);
+        if (json) return json;
+    } catch {
+        // Fall through to String().
+    }
+
+    return String(error);
 }
 
 function configureMonaco(monaco: MonacoInstance) {

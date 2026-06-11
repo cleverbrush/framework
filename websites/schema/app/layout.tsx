@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import 'performative-ui/styles.css';
 import '@cleverbrush/website-shared/styles/globals.css';
 import { ConsentManager } from '@cleverbrush/website-shared/components/ConsentManager';
 import type { FooterSection } from '@cleverbrush/website-shared/components/Footer';

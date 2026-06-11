@@ -1,6 +1,7 @@
 'use client';
 
 import { boolean, number, string } from '@cleverbrush/schema';
+import { PerformativeBeforeAfter } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { useForm } from '@tanstack/react-form';
 import { useState } from 'react';
@@ -380,6 +381,20 @@ export default function TanStackFormPage() {
                         interface.
                     </p>
                 </div>
+
+                <PerformativeBeforeAfter
+                    brand="Standard Schema"
+                    before={[
+                        'Write separate adapters for each validation library',
+                        'Copy form rules away from your domain schema',
+                        'Lose precise errors at individual form fields'
+                    ]}
+                    after={[
+                        'Pass schema builders directly into validators',
+                        'Reuse the same rules across API and UI boundaries',
+                        'Field errors flow through TanStack Form metadata'
+                    ]}
+                />
 
                 {/* ── How it works ─────────────────────────────── */}
                 <div className="card">

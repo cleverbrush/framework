@@ -1,4 +1,5 @@
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
+import { PerformativeBeforeAfter } from '@cleverbrush/website-shared/components/Performative';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { schemaMetadata } from '../site';
 
@@ -15,6 +16,20 @@ export default function MapperPage() {
                         compile-time completeness checking.
                     </p>
                 </div>
+
+                <PerformativeBeforeAfter
+                    brand="@cleverbrush/mapper"
+                    before={[
+                        'Manual DTO assignment repeats property names',
+                        'New target fields can be forgotten at runtime',
+                        'Nested mappings sprawl across helper functions'
+                    ]}
+                    after={[
+                        'Property selectors map source fields type-safely',
+                        'Unmapped target fields become compile-time errors',
+                        'Registered mappings compose through nested schemas'
+                    ]}
+                />
 
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner

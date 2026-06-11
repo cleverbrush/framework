@@ -4,11 +4,11 @@ const isDev = process.env.NODE_ENV === 'development';
 
 const cspHeader = [
     "default-src 'self'",
-    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://www.google-analytics.com`,
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://www.googletagmanager.com https://www.google-analytics.com https://cdn.jsdelivr.net`,
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net",
     "img-src 'self' data: blob:",
-    "font-src 'self' https://fonts.gstatic.com data:",
-    "connect-src 'self' https://www.google-analytics.com",
+    "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:",
+    "connect-src 'self' https://www.google-analytics.com https://cdn.jsdelivr.net",
     'frame-src https://www.googletagmanager.com',
     "worker-src 'self' blob:",
     "object-src 'none'",
