@@ -1,10 +1,7 @@
 import Link from 'next/link';
+import { docsMetadata } from '../site';
 
-export const metadata = {
-    title: 'Demo App — Cleverbrush',
-    description:
-        'Run a production-style full-stack Todo app built entirely with the Cleverbrush framework — backend, frontend, auth, ORM, OpenAPI, tracing, and more.'
-};
+export const metadata = docsMetadata('/demo');
 
 export default function DemoPage() {
     return (
@@ -97,11 +94,14 @@ docker compose -f demos/docker-compose.yml up`}</code>
                     </p>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Service</th>
-                                    <th>URL</th>
-                                    <th>Notes</th>
+                                    <th scope="col">Service</th>
+                                    <th scope="col">URL</th>
+                                    <th scope="col">Notes</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -185,10 +185,13 @@ docker compose -f demos/docker-compose.yml up`}</code>
                     <h3>Framework packages in use</h3>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Package</th>
-                                    <th>Demonstrated by</th>
+                                    <th scope="col">Package</th>
+                                    <th scope="col">Demonstrated by</th>
                                 </tr>
                             </thead>
                             <tbody>

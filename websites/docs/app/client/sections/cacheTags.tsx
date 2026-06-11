@@ -100,11 +100,14 @@ const UpdateTodo = todosResource
                 <h2>Options</h2>
                 <div className="table-wrap">
                     <table className="api-table">
+                        <caption className="visually-hidden">
+                            API reference table
+                        </caption>
                         <thead>
                             <tr>
-                                <th>Option</th>
-                                <th>Type</th>
-                                <th>Default</th>
+                                <th scope="col">Option</th>
+                                <th scope="col">Type</th>
+                                <th scope="col">Default</th>
                             </tr>
                         </thead>
                         <tbody>

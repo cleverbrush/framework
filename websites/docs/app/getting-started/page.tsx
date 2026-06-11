@@ -3,12 +3,9 @@
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import Link from 'next/link';
+import { docsMetadata } from '../site';
 
-export const metadata = {
-    title: 'Getting Started — Cleverbrush Framework',
-    description:
-        'Build a fully typed REST API with server, client, auth, and OpenAPI in 10 minutes.'
-};
+export const metadata = docsMetadata('/getting-started');
 
 export default function GettingStartedPage() {
     return (
@@ -385,10 +382,13 @@ server.use(openapi({
 
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Topic</th>
-                                    <th>What you&apos;ll learn</th>
+                                    <th scope="col">Topic</th>
+                                    <th scope="col">What you&apos;ll learn</th>
                                 </tr>
                             </thead>
                             <tbody>

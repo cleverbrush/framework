@@ -1,12 +1,9 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
 
-export const metadata = {
-    title: 'Comparisons — Cleverbrush vs tRPC, ts-rest, Hono',
-    description:
-        'Feature-by-feature comparison of Cleverbrush with tRPC, ts-rest, and Hono — with honest assessments and code examples.'
-};
+export const metadata = docsMetadata('/comparisons');
 
 export default function ComparisonsPage() {
     return (
@@ -26,13 +23,16 @@ export default function ComparisonsPage() {
                     <h2>Feature matrix</h2>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="comparison-table">
+                            <caption className="visually-hidden">
+                                Comparison table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Feature</th>
-                                    <th>Cleverbrush</th>
-                                    <th>tRPC</th>
-                                    <th>ts-rest</th>
-                                    <th>Hono</th>
+                                    <th scope="col">Feature</th>
+                                    <th scope="col">Cleverbrush</th>
+                                    <th scope="col">tRPC</th>
+                                    <th scope="col">ts-rest</th>
+                                    <th scope="col">Hono</th>
                                 </tr>
                             </thead>
                             <tbody>

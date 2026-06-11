@@ -1,6 +1,9 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: it is intentional */
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
+
+export const metadata = docsMetadata('/otel');
 
 export default function OtelPage() {
     return (
@@ -192,10 +195,13 @@ const logger = createLogger({
                 {/* ── API ──────────────────────────────────────────── */}
                 <h2>📚 API</h2>
                 <table>
+                    <caption className="visually-hidden">
+                        Reference table
+                    </caption>
                     <thead>
                         <tr>
-                            <th>Export</th>
-                            <th>Purpose</th>
+                            <th scope="col">Export</th>
+                            <th scope="col">Purpose</th>
                         </tr>
                     </thead>
                     <tbody>

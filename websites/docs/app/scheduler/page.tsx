@@ -1,11 +1,8 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
 
-export const metadata = {
-    title: 'Scheduler — @cleverbrush/scheduler',
-    description:
-        'Schema-validated job scheduling with worker thread isolation, retries, and event streaming.'
-};
+export const metadata = docsMetadata('/scheduler');
 
 export default function SchedulerPage() {
     return (
@@ -41,10 +38,13 @@ export default function SchedulerPage() {
                     <h2>Key features</h2>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Feature</th>
-                                    <th>Description</th>
+                                    <th scope="col">Feature</th>
+                                    <th scope="col">Description</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -194,11 +194,14 @@ scheduler.on('job:message', ({ jobId, value }) => {
                     <h2>Schedule types</h2>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Type</th>
-                                    <th>Example</th>
-                                    <th>Runs</th>
+                                    <th scope="col">Type</th>
+                                    <th scope="col">Example</th>
+                                    <th scope="col">Runs</th>
                                 </tr>
                             </thead>
                             <tbody>

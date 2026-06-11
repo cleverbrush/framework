@@ -1,12 +1,9 @@
 /** biome-ignore-all lint/security/noDangerouslySetInnerHtml: needed for code examples */
 
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
+import { docsMetadata } from '../site';
 
-export const metadata = {
-    title: 'Examples — Cleverbrush',
-    description:
-        'Full-stack Todo app demonstrating Cleverbrush server, client, auth, DI, schema-driven forms, and more.'
-};
+export const metadata = docsMetadata('/examples');
 
 export default function ExamplesPage() {
     return (
@@ -35,10 +32,15 @@ export default function ExamplesPage() {
                     <h3>Backend packages used</h3>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Package</th>
-                                    <th>What it does in the demo</th>
+                                    <th scope="col">Package</th>
+                                    <th scope="col">
+                                        What it does in the demo
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -127,10 +129,15 @@ export default function ExamplesPage() {
                     <h3>Frontend packages used</h3>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Package</th>
-                                    <th>What it does in the demo</th>
+                                    <th scope="col">Package</th>
+                                    <th scope="col">
+                                        What it does in the demo
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -314,10 +321,13 @@ docker compose up`}</code>
                     <h2>Demo features</h2>
                     <div style={{ overflowX: 'auto' }}>
                         <table className="api-table">
+                            <caption className="visually-hidden">
+                                API reference table
+                            </caption>
                             <thead>
                                 <tr>
-                                    <th>Feature</th>
-                                    <th>What it demonstrates</th>
+                                    <th scope="col">Feature</th>
+                                    <th scope="col">What it demonstrates</th>
                                 </tr>
                             </thead>
                             <tbody>
