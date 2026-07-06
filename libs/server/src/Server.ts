@@ -72,6 +72,14 @@ export interface AuthenticationConfig {
     defaultScheme: string;
     /** Registered authentication schemes. */
     schemes: AuthenticationScheme<any>[];
+    /**
+     * Optional ordered authentication fallback.
+     *
+     * By default, only `defaultScheme` is attempted. Set to `'all'` to try
+     * every registered scheme in registration order, or pass scheme names to
+     * try a specific ordered subset.
+     */
+    trySchemes?: 'all' | readonly string[];
 }
 
 /**
@@ -1384,6 +1392,22 @@ function createAuthenticationMiddleware(
         schemeMap.set(scheme.name, scheme);
     }
 
+    let schemesToTry: AuthenticationScheme<any>[];
+    if (config.trySchemes === 'all') {
+        schemesToTry = config.schemes;
+    } else {
+        const schemeNames: readonly string[] =
+            config.trySchemes && config.trySchemes.length > 0
+                ? config.trySchemes
+                : [config.defaultScheme];
+        schemesToTry = schemeNames
+            .map(name => schemeMap.get(name))
+            .filter(
+                (scheme): scheme is AuthenticationScheme<any> =>
+                    scheme !== undefined
+            );
+    }
+
     return async (ctx, next) => {
         // Skip authentication for public endpoints (authRoles === null)
         const epMeta = ctx.items.get('__endpoint_meta') as
@@ -1396,14 +1420,6 @@ function createAuthenticationMiddleware(
             return;
         }
 
-        const scheme = schemeMap.get(config.defaultScheme);
-        if (!scheme) {
-            // No matching scheme — leave principal as anonymous
-            ctx.principal = Principal.anonymous();
-            await next();
-            return;
-        }
-
         // Build transport-agnostic auth context
         const authCtx: AuthenticationContext = {
             headers: ctx.headers,
@@ -1411,12 +1427,13 @@ function createAuthenticationMiddleware(
             items: ctx.items
         };
 
-        const result = await scheme.authenticate(authCtx);
-
-        if (result.succeeded) {
-            ctx.principal = result.principal;
-        } else {
-            ctx.principal = Principal.anonymous();
+        ctx.principal = Principal.anonymous();
+        for (const scheme of schemesToTry) {
+            const result = await scheme.authenticate(authCtx);
+            if (result.succeeded) {
+                ctx.principal = result.principal;
+                break;
+            }
         }
 
         await next();

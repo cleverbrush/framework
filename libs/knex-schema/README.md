@@ -100,6 +100,65 @@ const newUsers = await query(db, UserSchema).insertMany([
 ]);
 ```
 
+### Guarded upsert for imports
+
+Use `onConflict().merge()` when an import or sync job should insert a row if it
+does not exist, but update it only when the incoming data is newer than the row
+already stored in PostgreSQL.
+
+In this example, products are imported from an external system. The `sku` is the
+unique key. If the product already exists, the price is updated only when the
+incoming `sourceUpdatedAt` timestamp is newer:
+
+```typescript
+await query(db, ProductSchema)
+    .onConflict(t => t.sku)
+    .merge(
+        {
+            sku: 'SKU-123',
+            price: 1999,
+            sourceUpdatedAt: new Date('2026-01-15T10:00:00Z'),
+        },
+        {
+            price: ({ excluded }) => excluded(t => t.price),
+            sourceUpdatedAt: ({ excluded }) =>
+                excluded(t => t.sourceUpdatedAt),
+            syncedAt: ({ knex }) => knex.fn.now(),
+        },
+        {
+            where: (qb, { column }) => {
+                qb.whereRaw('?? < excluded.??', [
+                    column(t => t.sourceUpdatedAt),
+                    column(t => t.sourceUpdatedAt),
+                ]);
+            },
+        }
+    );
+```
+
+What each helper does:
+
+- `excluded(t => t.price)` means "use the incoming value from the failed
+  insert", producing `excluded."price"` in SQL.
+- `knex.fn.now()` sets `synced_at` to the database current timestamp.
+- `column(t => t.sourceUpdatedAt)` resolves the schema property to the mapped
+  SQL column name, for example `source_updated_at`.
+- `where` attaches a PostgreSQL `ON CONFLICT DO UPDATE WHERE ...` guard. If the
+  guard is false, PostgreSQL leaves the existing row unchanged.
+
+Approximate SQL:
+
+```sql
+insert into "products" ("sku", "price", "source_updated_at")
+values (?, ?, ?)
+on conflict ("sku") do update set
+    "price" = excluded."price",
+    "source_updated_at" = excluded."source_updated_at",
+    "synced_at" = CURRENT_TIMESTAMP
+where "source_updated_at" < excluded."source_updated_at"
+returning *
+```
+
 ### Update
 
 ```typescript
@@ -326,6 +385,12 @@ export const PostEntity = defineEntity(PostSchema)
 The returned `Entity` carries the relation map in its type, so downstream `query(db, entity)`
 calls (and `@cleverbrush/orm`'s `DbSet.include()`) get full inference.
 
+For many-to-many replacement flows, use the link table directly: delete the
+current links in a transaction, `insertMany()` the desired links, and use
+`onConflict(...).ignore()` when inserts may race with another writer. This keeps
+the framework primitive generic while still covering tag/category sync
+workflows.
+
 ### Polymorphism (STI / CTI)
 
 Mark a schema as polymorphic to support single-table or class-table inheritance — variants
@@ -346,11 +411,23 @@ See the `@cleverbrush/orm` docs for the full inheritance API (`.ofVariant()` etc
 | `generateMigrationsForContext(entities, prevSnapshot)` | Diff entities against the snapshot and emit a TS migration source plus the next snapshot |
 | `generateMigration(snapshotA, snapshotB)` | Lower-level snapshot-vs-snapshot diff |
 | `diffSchema(schema, dbState)` / `applyDiff(knex, diff, table)` | Live-database diff/apply (used by `cb-orm db push`) |
+| `validateEntitiesAgainstDatabase(knex, entities)` | Read-only live-database validation for CI drift checks |
 | `introspectDatabase(knex, table)` / `tableExistsInDb(knex, table)` | Database introspection helpers |
 | `generateCreateTable(schema)` / `generateCreatePolymorphicTables(schema)` | Knex-statement builders for fresh `CREATE TABLE` |
 
 Most users invoke these indirectly through the [`cb-orm`](https://www.npmjs.com/package/@cleverbrush/orm-cli)
 CLI (`cb-orm migrate generate`, `cb-orm db push`).
+
+### Row typing helpers
+
+Use `InferDatabaseRow<typeof Schema>` when a raw row or mapper can receive SQL
+`NULL` for optional schema properties:
+
+```typescript
+import type { InferDatabaseRow } from '@cleverbrush/knex-schema';
+
+type UserRow = InferDatabaseRow<typeof UserSchema>;
+```
 
 ### Row-version optimistic concurrency
 

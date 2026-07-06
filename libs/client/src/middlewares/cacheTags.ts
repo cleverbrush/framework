@@ -50,21 +50,23 @@ export interface CacheTagMiddlewareOptions {
 /**
  * The root object passed to each `CacheTagPropertyAccessor.getValue()` call.
  */
-interface TagRoot {
+export interface CacheTagRoot {
     params: Record<string, unknown>;
     body: unknown;
     query: Record<string, unknown>;
     headers: Record<string, string>;
 }
 
-/** Shape of a serialised cache tag from endpoint metadata. */
-interface SerializedCacheTag {
+/**
+ * Shape of a serialized cache tag from endpoint metadata.
+ */
+export interface SerializedCacheTag {
     name: string;
     properties: Readonly<
         Record<
             string,
             {
-                getValue(root: TagRoot): {
+                getValue(root: CacheTagRoot): {
                     value?: unknown;
                     success: boolean;
                 };
@@ -82,7 +84,10 @@ interface CacheEntry {
     expiresAt: number;
 }
 
-function isMutating(method: string): boolean {
+/**
+ * Return `true` for HTTP methods that mutate server state.
+ */
+export function isMutatingMethod(method: string): boolean {
     return ['POST', 'PUT', 'DELETE', 'PATCH'].includes(method.toUpperCase());
 }
 
@@ -93,7 +98,10 @@ function isMutating(method: string): boolean {
  * - Tags with properties produce `name:key1=val1,key2=val2` where
  *   keys are sorted alphabetically for determinism.
  */
-function computeKey(tag: SerializedCacheTag, root: TagRoot): string {
+export function computeCacheTagKey(
+    tag: SerializedCacheTag,
+    root: CacheTagRoot
+): string {
     const entries = Object.entries(tag.properties);
 
     if (entries.length === 0) {
@@ -115,6 +123,18 @@ function computeKey(tag: SerializedCacheTag, root: TagRoot): string {
     }
 
     return `${tag.name}:${parts.join(',')}`;
+}
+
+/**
+ * Build the cache-tag accessor root from endpoint metadata.
+ */
+export function createCacheTagRoot(meta: EndpointMeta): CacheTagRoot {
+    return {
+        params: (meta.params as Record<string, unknown>) ?? {},
+        body: meta.body,
+        query: (meta.query as Record<string, unknown>) ?? {},
+        headers: (meta.headers as Record<string, string>) ?? {}
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -149,16 +169,11 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
         const method = (init.method ?? 'GET').toUpperCase();
 
         // -- Invalidation on mutating requests --
-        if (isMutating(method) && tags && tags.length > 0) {
-            const root: TagRoot = {
-                params: (meta?.params as Record<string, unknown>) ?? {},
-                body: meta?.body,
-                query: (meta?.query as Record<string, unknown>) ?? {},
-                headers: (meta?.headers as Record<string, string>) ?? {}
-            };
+        if (isMutatingMethod(method) && meta && tags && tags.length > 0) {
+            const root = createCacheTagRoot(meta);
 
             for (const tag of tags) {
-                const tagKey = computeKey(tag, root);
+                const tagKey = computeCacheTagKey(tag, root);
                 // Invalidate the exact key and any prefixed variants
                 // (tag name prefix match handles dynamic property variants
                 // when the mutation didn't provide the same properties).
@@ -174,18 +189,13 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
         }
 
         // -- Cache lookup for GET requests --
-        if (method === 'GET' && tags && tags.length > 0) {
-            const root: TagRoot = {
-                params: (meta?.params as Record<string, unknown>) ?? {},
-                body: meta?.body,
-                query: (meta?.query as Record<string, unknown>) ?? {},
-                headers: (meta?.headers as Record<string, string>) ?? {}
-            };
+        if (method === 'GET' && meta && tags && tags.length > 0) {
+            const root = createCacheTagRoot(meta);
 
             let foundEntry: CacheEntry | undefined;
 
             for (const tag of tags) {
-                const cacheKey = computeKey(tag, root);
+                const cacheKey = computeCacheTagKey(tag, root);
                 const entry = cache.get(cacheKey);
                 if (entry && entry.expiresAt > Date.now()) {
                     foundEntry = entry;
@@ -203,7 +213,7 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
             return next(url, init).then(response => {
                 if (condition(response)) {
                     for (const tag of tags) {
-                        const cacheKey = computeKey(tag, root);
+                        const cacheKey = computeCacheTagKey(tag, root);
                         const ttl =
                             ttlByTag[tag.name] !== undefined
                                 ? ttlByTag[tag.name]

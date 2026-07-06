@@ -1,8 +1,8 @@
 // @cleverbrush/knex-schema — INSERT / upsert / bulk operations
 
-import type { InferType } from '@cleverbrush/schema';
+import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import { buildColumnMap } from '../columns.js';
+import { buildColumnMap, resolveColumnRef } from '../columns.js';
 import { getTableName } from '../extension.js';
 import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
 import type { ColumnRef, InsertType } from '../types.js';
@@ -18,18 +18,70 @@ import { getState } from './state.js';
 // OnConflictBuilder
 // ---------------------------------------------------------------------------
 
-export class OnConflictBuilder<
-    TLocalSchema extends import('@cleverbrush/schema').ObjectSchemaBuilder<
-        any,
-        any,
-        any,
-        any,
-        any,
-        any,
-        any
-    >,
-    TResult
-> {
+type AnyObjectSchema = ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+
+/**
+ * Helpers available to `onConflict().merge()` update expressions and
+ * conditional `where` callbacks.
+ */
+export interface OnConflictMergeHelpers<TLocalSchema extends AnyObjectSchema> {
+    /** The Knex instance used by the query builder. */
+    readonly knex: Knex;
+
+    /**
+     * Resolve a schema property reference to its mapped database column name.
+     */
+    column(ref: ColumnRef<TLocalSchema>): string;
+
+    /**
+     * Create a raw SQL expression with Knex bindings.
+     */
+    raw(sql: string, bindings?: readonly unknown[]): Knex.Raw;
+
+    /**
+     * Reference the `excluded.<column>` value in an upsert merge expression.
+     */
+    excluded(ref: ColumnRef<TLocalSchema>): Knex.Raw;
+}
+
+/**
+ * Value accepted in explicit `onConflict().merge(data, updateData)` payloads.
+ */
+export type OnConflictUpdateValue<
+    TLocalSchema extends AnyObjectSchema,
+    TValue
+> =
+    | TValue
+    | Knex.Raw
+    | ((helpers: OnConflictMergeHelpers<TLocalSchema>) => TValue | Knex.Raw);
+
+/**
+ * Explicit update payload accepted by `onConflict().merge()`.
+ */
+export type OnConflictUpdateData<TLocalSchema extends AnyObjectSchema> =
+    Partial<{
+        [K in keyof InferType<TLocalSchema>]: OnConflictUpdateValue<
+            TLocalSchema,
+            InferType<TLocalSchema>[K]
+        >;
+    }>;
+
+/**
+ * Options for `onConflict().merge()`.
+ */
+export interface OnConflictMergeOptions<TLocalSchema extends AnyObjectSchema> {
+    /**
+     * Attach a conditional `WHERE` clause to the generated merge.
+     *
+     * This is useful for row-version or timestamp guarded upserts.
+     */
+    where?: (
+        query: Knex.QueryBuilder,
+        helpers: OnConflictMergeHelpers<TLocalSchema>
+    ) => void;
+}
+
+export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
     readonly #knex: Knex;
     readonly #localSchema: TLocalSchema;
     readonly #conflictColumns: string[];
@@ -47,9 +99,37 @@ export class OnConflictBuilder<
 
     async merge(
         data: InsertType<TLocalSchema>,
-        updateData?: Partial<InferType<TLocalSchema>>
+        options?: OnConflictMergeOptions<TLocalSchema>
+    ): Promise<TResult>;
+    async merge(
+        data: InsertType<TLocalSchema>,
+        updateData?: OnConflictUpdateData<TLocalSchema>,
+        options?: OnConflictMergeOptions<TLocalSchema>
+    ): Promise<TResult>;
+    async merge(
+        data: InsertType<TLocalSchema>,
+        updateData?:
+            | OnConflictUpdateData<TLocalSchema>
+            | OnConflictMergeOptions<TLocalSchema>,
+        options?: OnConflictMergeOptions<TLocalSchema>
     ): Promise<TResult> {
-        return this.#execute(data, 'merge', updateData) as Promise<TResult>;
+        let resolvedUpdateData: OnConflictUpdateData<TLocalSchema> | undefined;
+        let resolvedOptions = options;
+
+        if (options === undefined && isMergeOptions(updateData)) {
+            resolvedOptions = updateData;
+        } else {
+            resolvedUpdateData = updateData as
+                | OnConflictUpdateData<TLocalSchema>
+                | undefined;
+        }
+
+        return this.#execute(
+            data,
+            'merge',
+            resolvedUpdateData,
+            resolvedOptions
+        ) as Promise<TResult>;
     }
 
     async ignore(data: InsertType<TLocalSchema>): Promise<TResult | undefined> {
@@ -59,7 +139,8 @@ export class OnConflictBuilder<
     async #execute(
         data: InsertType<TLocalSchema>,
         mode: 'merge' | 'ignore',
-        updateData?: Partial<InferType<TLocalSchema>>
+        updateData?: OnConflictUpdateData<TLocalSchema>,
+        options?: OnConflictMergeOptions<TLocalSchema>
     ): Promise<TResult | undefined> {
         const tableName = getTableName(this.#localSchema);
         const timestamps: { createdAt: string; updatedAt: string } | null =
@@ -90,13 +171,15 @@ export class OnConflictBuilder<
         if (mode === 'ignore') {
             qb = (qb as any).ignore();
         } else {
+            const helpers = this.#createMergeHelpers();
             let mergeObj: Record<string, any>;
             if (updateData) {
                 mergeObj = {};
                 for (const [key, val] of Object.entries(
                     updateData as Record<string, any>
                 )) {
-                    mergeObj[propToCol.get(key) ?? key] = val;
+                    mergeObj[propToCol.get(key) ?? key] =
+                        typeof val === 'function' ? val(helpers) : val;
                 }
             } else {
                 mergeObj = { ...mapped };
@@ -106,6 +189,7 @@ export class OnConflictBuilder<
                 }
             }
             qb = (qb as any).merge(mergeObj);
+            options?.where?.(qb as unknown as Knex.QueryBuilder, helpers);
         }
 
         const rows = await (qb as any).returning('*');
@@ -118,6 +202,41 @@ export class OnConflictBuilder<
         }
         return result as TResult;
     }
+
+    #createMergeHelpers(): OnConflictMergeHelpers<TLocalSchema> {
+        return {
+            knex: this.#knex,
+            column: ref => this.#resolveTopLevelColumn(ref),
+            raw: (sql, bindings = []) => this.#knex.raw(sql, bindings as any),
+            excluded: ref =>
+                this.#knex.raw('excluded.??', [
+                    this.#resolveTopLevelColumn(ref)
+                ])
+        };
+    }
+
+    #resolveTopLevelColumn(ref: ColumnRef<TLocalSchema>): string {
+        const column = resolveColumnRef(
+            ref as ColumnRef<any>,
+            this.#localSchema as any,
+            'onConflict.merge',
+            this.#knex
+        );
+        if (typeof column !== 'string') {
+            throw new Error(
+                'onConflict.merge only accepts top-level column references'
+            );
+        }
+        return column;
+    }
+}
+
+function isMergeOptions<TLocalSchema extends AnyObjectSchema>(
+    value: unknown
+): value is OnConflictMergeOptions<TLocalSchema> {
+    if (!value || typeof value !== 'object') return false;
+    const keys = Object.keys(value);
+    return keys.length > 0 && keys.every(key => key === 'where');
 }
 
 // ---------------------------------------------------------------------------

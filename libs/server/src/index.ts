@@ -4,6 +4,8 @@ export {
     FileResult,
     JsonResult,
     NoContentResult,
+    RawResult,
+    type RawResultHandler,
     RedirectResult,
     StatusCodeResult,
     StreamResult
@@ -15,6 +17,11 @@ export {
     createCacheTagTree,
     serializeTag
 } from './CacheTag.js';
+export {
+    ContentNegotiator,
+    formUrlEncodedContentTypeHandler,
+    jsonContentTypeHandler
+} from './ContentNegotiator.js';
 export {
     type ApiContract,
     type ApiGroup,

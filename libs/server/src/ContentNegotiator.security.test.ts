@@ -49,4 +49,44 @@ describe('ContentNegotiator — security', () => {
 
         expect(handler.deserialize(json)).toBeDefined();
     });
+
+    it('URL-encoded deserializer is registered by default', () => {
+        const cn = new ContentNegotiator();
+        const handler = cn.selectRequestHandler(
+            'application/x-www-form-urlencoded; charset=utf-8'
+        );
+
+        expect(handler).toBeTruthy();
+        expect(handler?.deserialize('name=Jane&enabled=true')).toEqual({
+            name: 'Jane',
+            enabled: 'true'
+        });
+    });
+
+    it('URL-encoded deserializer preserves repeated fields as arrays', () => {
+        const cn = new ContentNegotiator();
+        const handler = cn.selectRequestHandler(
+            'application/x-www-form-urlencoded'
+        )!;
+
+        expect(handler.deserialize('tag=work&tag=travel&single=one')).toEqual({
+            tag: ['work', 'travel'],
+            single: 'one'
+        });
+    });
+
+    it('URL-encoded deserializer skips prototype pollution keys', () => {
+        const cn = new ContentNegotiator();
+        const handler = cn.selectRequestHandler(
+            'application/x-www-form-urlencoded'
+        )!;
+        const result = handler.deserialize(
+            '__proto__=polluted&constructor=x&prototype=y&safe=ok'
+        ) as Record<string, unknown>;
+
+        expect(result.safe).toBe('ok');
+        expect(result.__proto__).toBe(Object.prototype);
+        expect(result.constructor).toBe(Object);
+        expect(({} as any).polluted).toBeUndefined();
+    });
 });

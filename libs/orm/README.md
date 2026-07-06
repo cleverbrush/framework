@@ -337,6 +337,9 @@ npx cb-orm migrate generate add_users_table
 
 # Apply pending migrations
 npx cb-orm migrate run
+
+# Read-only CI check for schema drift
+npx cb-orm validate
 ```
 
 ---

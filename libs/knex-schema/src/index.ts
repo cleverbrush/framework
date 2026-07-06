@@ -63,12 +63,15 @@ export { clearRow, MAPPERS, mapObject, mapValue } from './mappers.js';
 export {
     applyDiff,
     diffSchema,
+    type EntitySchemaValidationIssue,
+    type EntitySchemaValidationResult,
     entitySchemaToTableState,
     generateMigration,
     generateMigrationsForContext,
     introspectDatabase,
     isDiffEmpty,
-    tableExistsInDb
+    tableExistsInDb,
+    validateEntitiesAgainstDatabase
 } from './migration.js';
 // Raw query execution
 export { rawQuery } from './raw.js';
@@ -99,6 +102,8 @@ export type {
     DatabaseForeignKeyInfo,
     DatabaseIndexInfo,
     DatabaseTableState,
+    InferDatabaseRow,
+    InferDatabaseValue,
     InsertType,
     JoinManySpec,
     JoinOneSpec,
