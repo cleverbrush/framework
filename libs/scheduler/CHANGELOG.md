@@ -1,5 +1,11 @@
 # @cleverbrush/scheduler
 
+## 4.4.0
+
+### Patch Changes
+
+- @cleverbrush/schema@4.4.0
+
 ## 4.3.2
 
 ### Patch Changes
