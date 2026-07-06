@@ -1,7 +1,10 @@
 import { checkJsonDepth, safeJsonParse } from './safeJson.js';
 import type { ContentTypeHandler } from './types.js';
 
-const JSON_HANDLER: ContentTypeHandler = {
+/**
+ * Built-in JSON content type handler.
+ */
+export const jsonContentTypeHandler: ContentTypeHandler = {
     mimeType: 'application/json',
     serialize(value: unknown): string {
         return JSON.stringify(value);
@@ -12,6 +15,57 @@ const JSON_HANDLER: ContentTypeHandler = {
         return parsed;
     }
 };
+
+/**
+ * Built-in `application/x-www-form-urlencoded` content type handler.
+ *
+ * Repeated fields are deserialized as arrays in insertion order:
+ * `tag=a&tag=b` becomes `{ tag: ['a', 'b'] }`.
+ */
+export const formUrlEncodedContentTypeHandler: ContentTypeHandler = {
+    mimeType: 'application/x-www-form-urlencoded',
+    serialize(value: unknown): string {
+        const params = new URLSearchParams();
+        if (value && typeof value === 'object') {
+            for (const [key, item] of Object.entries(
+                value as Record<string, unknown>
+            )) {
+                if (item === undefined || item === null) continue;
+                if (Array.isArray(item)) {
+                    for (const nested of item) {
+                        params.append(key, String(nested));
+                    }
+                } else {
+                    params.append(key, String(item));
+                }
+            }
+        }
+        return params.toString();
+    },
+    deserialize(raw: string): unknown {
+        const result: Record<string, string | string[]> = {};
+        const params = new URLSearchParams(raw);
+
+        for (const [key, value] of params) {
+            if (isUnsafeFormKey(key)) continue;
+
+            const existing = result[key];
+            if (existing === undefined) {
+                result[key] = value;
+            } else if (Array.isArray(existing)) {
+                existing.push(value);
+            } else {
+                result[key] = [existing, value];
+            }
+        }
+
+        return result;
+    }
+};
+
+function isUnsafeFormKey(key: string): boolean {
+    return key === '__proto__' || key === 'constructor' || key === 'prototype';
+}
 
 interface ParsedAccept {
     mimeType: string;
@@ -48,7 +102,8 @@ export class ContentNegotiator {
     readonly #handlers: Map<string, ContentTypeHandler> = new Map();
 
     constructor() {
-        this.register(JSON_HANDLER);
+        this.register(jsonContentTypeHandler);
+        this.register(formUrlEncodedContentTypeHandler);
     }
 
     /**

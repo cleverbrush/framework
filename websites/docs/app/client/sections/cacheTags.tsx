@@ -48,7 +48,7 @@ await client.todos.list({ query: { page: 1 } });
 const ListTodos = todosResource
     .get()
     .query(TodoListQuerySchema)
-    .clearsCacheTag('todo-list', p => ({
+    .cacheTag('todo-list', p => ({
         page: p.query.page,
         limit: p.query.limit
     }))
@@ -62,6 +62,36 @@ const UpdateTodo = todosResource
         id: p.params.id
     }))
     .returns(TodoSchema);
+`)
+                        }}
+                    />
+                </pre>
+            </div>
+
+            <div className="card">
+                <h2>External Cache Invalidation</h2>
+                <p>
+                    Use <code>externalCacheTags()</code> to send endpoint{' '}
+                    <code>.clearsCacheTag()</code> metadata to any external
+                    cache system after successful mutations.
+                </p>
+                <pre>
+                    <code
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`import { createClient } from '@cleverbrush/client';
+import { externalCacheTags } from '@cleverbrush/client/cache';
+
+const client = createClient(api, {
+    middlewares: [
+        externalCacheTags({
+            invalidateTag: tag => externalCache.invalidate(tag),
+        }),
+    ],
+});
+
+// Next.js example:
+import { revalidateTag } from 'next/cache';
+externalCacheTags({ invalidateTag: revalidateTag });
 `)
                         }}
                     />

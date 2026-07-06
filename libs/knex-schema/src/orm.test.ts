@@ -1,7 +1,7 @@
 // @cleverbrush/knex-schema — ORM extensions tests
 
 import Knex from 'knex';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
     boolean,
     date,
@@ -14,9 +14,10 @@ import {
     object,
     query,
     rawQuery,
-    string
+    string,
+    validateEntitiesAgainstDatabase
 } from './index.js';
-import type { DatabaseTableState } from './types.js';
+import type { DatabaseTableState, InferDatabaseRow } from './types.js';
 
 const knex = Knex({ client: 'pg' });
 
@@ -1282,6 +1283,73 @@ describe('diffSchema', () => {
     });
 });
 
+describe('validateEntitiesAgainstDatabase', () => {
+    const SimpleSchema = object({
+        id: number().primaryKey(),
+        name: string()
+    }).hasTableName('simple');
+    const SimpleEntity = defineEntity(SimpleSchema);
+
+    it('reports missing tables without mutating the database', async () => {
+        const fakeKnex = {
+            schema: {
+                hasTable: vi.fn().mockResolvedValue(false)
+            },
+            raw: vi.fn()
+        } as any;
+
+        const result = await validateEntitiesAgainstDatabase(fakeKnex, [
+            SimpleEntity
+        ]);
+
+        expect(result.valid).toBe(false);
+        expect(result.checkedTables).toEqual(['simple']);
+        expect(result.issues).toEqual([
+            { type: 'missing-table', tableName: 'simple' }
+        ]);
+        expect(fakeKnex.raw).not.toHaveBeenCalled();
+    });
+
+    it('reports schema drift from live table introspection', async () => {
+        const fakeKnex = {
+            schema: {
+                hasTable: vi.fn().mockResolvedValue(true)
+            },
+            raw: vi.fn(async (sql: string) => {
+                if (sql.includes('information_schema.columns')) {
+                    return {
+                        rows: [
+                            {
+                                column_name: 'id',
+                                data_type: 'integer',
+                                is_nullable: 'NO',
+                                column_default: null,
+                                character_maximum_length: null,
+                                numeric_precision: null
+                            }
+                        ]
+                    };
+                }
+                return { rows: [] };
+            })
+        } as any;
+
+        const result = await validateEntitiesAgainstDatabase(fakeKnex, [
+            SimpleEntity
+        ]);
+
+        expect(result.valid).toBe(false);
+        expect(result.issues).toHaveLength(1);
+        expect(result.issues[0]).toMatchObject({
+            type: 'schema-drift',
+            tableName: 'simple'
+        });
+        if (result.issues[0].type === 'schema-drift') {
+            expect(result.issues[0].diff.addColumns[0].name).toBe('name');
+        }
+    });
+});
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Phase 5: Migration generation
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1622,6 +1690,49 @@ describe('Phase 2 query methods', () => {
         expect(ob).toBeDefined();
         expect(typeof ob.merge).toBe('function');
         expect(typeof ob.ignore).toBe('function');
+    });
+
+    it('onConflict().merge() accepts raw update expressions and where options', () => {
+        const UserSchema = object({
+            id: number().primaryKey(),
+            email: string().unique(),
+            name: string(),
+            updatedAt: date().hasColumnName('updated_at')
+        }).hasTableName('users');
+
+        const compileOnly = false as boolean;
+        if (compileOnly) {
+            void query(knex, UserSchema)
+                .onConflict(t => t.email)
+                .merge(
+                    { email: 'a@example.com', name: 'Alice' },
+                    {
+                        name: ({ excluded }) => excluded(t => t.name),
+                        updatedAt: ({ knex }) => knex.fn.now()
+                    },
+                    {
+                        where: (qb, { column, excluded }) => {
+                            qb.whereRaw('?? < ??', [
+                                column(t => t.updatedAt),
+                                excluded(t => t.updatedAt)
+                            ]);
+                        }
+                    }
+                );
+        }
+
+        const ob = query(knex, UserSchema).onConflict(t => t.email);
+        expect(typeof ob.merge).toBe('function');
+    });
+
+    it('InferDatabaseRow keeps required fields and allows null optional fields', () => {
+        type PostRow = InferDatabaseRow<typeof Post>;
+
+        expectTypeOf<PostRow>().toMatchTypeOf<{
+            id: number;
+            title: string;
+            categoryId?: number | null | undefined;
+        }>();
     });
 
     it('upsert() method is callable', () => {

@@ -8,7 +8,15 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import {
+    afterAll,
+    beforeAll,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi
+} from 'vitest';
 
 import { parseFlags } from './cli.js';
 
@@ -19,6 +27,7 @@ import { parseFlags } from './cli.js';
 const _mockGenerateMigrationsForContext = vi.fn();
 const _mockLoadSnapshot = vi.fn();
 const _mockWriteSnapshot = vi.fn();
+const _mockValidateEntitiesAgainstDatabase = vi.fn();
 
 vi.mock('@cleverbrush/knex-schema', async importOriginal => {
     const actual =
@@ -28,6 +37,7 @@ vi.mock('@cleverbrush/knex-schema', async importOriginal => {
         generateMigrationsForContext: _mockGenerateMigrationsForContext,
         loadSnapshot: _mockLoadSnapshot,
         writeSnapshot: _mockWriteSnapshot,
+        validateEntitiesAgainstDatabase: _mockValidateEntitiesAgainstDatabase,
         getPolymorphicVariantSchemas: vi.fn().mockReturnValue([]),
         getTableName: vi.fn().mockReturnValue('users'),
         tableExistsInDb: vi.fn().mockResolvedValue(false),
@@ -50,6 +60,10 @@ vi.mock('@cleverbrush/knex-schema', async importOriginal => {
         generateCreateTable: vi.fn().mockReturnValue(vi.fn()),
         applyDiff: vi.fn().mockResolvedValue(undefined)
     };
+});
+
+beforeEach(() => {
+    _mockValidateEntitiesAgainstDatabase.mockReset();
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -195,6 +209,85 @@ describe('push command — production guard', () => {
 
         exitSpy.mockRestore();
         process.env.NODE_ENV = originalEnv;
+    });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+describe('validate command', () => {
+    it('routes cb-orm validate with --config and destroys the knex pool', async () => {
+        const destroy = vi.fn().mockResolvedValue(undefined);
+        const fakeKnex = { schema: {}, destroy };
+        _mockValidateEntitiesAgainstDatabase.mockResolvedValueOnce({
+            valid: true,
+            checkedTables: ['users'],
+            issues: []
+        });
+
+        const tmp = path.join(os.tmpdir(), `orm-cli-validate-${Date.now()}`);
+        mkdirSync(tmp, { recursive: true });
+        const cfgPath = path.join(tmp, 'db.config.mjs');
+        const stash = (globalThis as any).__cbOrmFakeKnex;
+        (globalThis as any).__cbOrmFakeKnex = fakeKnex;
+        const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+        try {
+            const fs = await import('node:fs');
+            fs.writeFileSync(
+                cfgPath,
+                `
+                    export default {
+                        knex: globalThis.__cbOrmFakeKnex,
+                        entities: {},
+                        migrations: { directory: ${JSON.stringify(tmp)} }
+                    };
+                `,
+                'utf-8'
+            );
+
+            const { run } = await import('./cli.js');
+            await run(['validate', '--config', cfgPath]);
+
+            expect(_mockValidateEntitiesAgainstDatabase).toHaveBeenCalledWith(
+                fakeKnex,
+                []
+            );
+            expect(log.mock.calls.flat().join(' ')).toMatch(
+                /Schema is in sync/
+            );
+            expect(destroy).toHaveBeenCalledTimes(1);
+        } finally {
+            log.mockRestore();
+            (globalThis as any).__cbOrmFakeKnex = stash;
+            rmSync(tmp, { recursive: true, force: true });
+        }
+    });
+
+    it('exits 1 when schema drift is detected', async () => {
+        _mockValidateEntitiesAgainstDatabase.mockResolvedValueOnce({
+            valid: false,
+            checkedTables: ['users'],
+            issues: [{ type: 'missing-table', tableName: 'users' }]
+        });
+        const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => {
+            throw new Error('process.exit called');
+        }) as any);
+        const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        const { validate } = await import('./commands/validate.js');
+        const config = {
+            knex: {} as any,
+            entities: {},
+            migrations: { directory: './migrations' }
+        };
+
+        await expect(validate(config)).rejects.toThrow('process.exit called');
+        expect(exitSpy).toHaveBeenCalledWith(1);
+        expect(errSpy.mock.calls.flat().join('\n')).toMatch(
+            /Missing table: users/
+        );
+
+        exitSpy.mockRestore();
+        errSpy.mockRestore();
     });
 });
 

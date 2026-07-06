@@ -1,5 +1,7 @@
 // Core API
 export { env } from './env.js';
+export type { EnvBooleanOptions } from './envBoolean.js';
+export { envBoolean } from './envBoolean.js';
 export type { InvalidEnvVar, MissingEnvVar } from './errors.js';
 // Error class
 export { EnvValidationError } from './errors.js';

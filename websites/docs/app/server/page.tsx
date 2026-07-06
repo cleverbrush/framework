@@ -208,8 +208,35 @@ return ActionResult.redirect('/login');
 // File download
 return ActionResult.file(pdfBuffer, 'report.pdf', 'application/pdf');
 
+// Native Node req/res integration
+return ActionResult.raw(async (req, res) => {
+  await webhookHandler(req, res);
+});
+
 // Bare status code
 return ActionResult.status(202);`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── URL Encoded ────────────────────────────────── */}
+                <div className="card">
+                    <h2>URL-Encoded Bodies</h2>
+                    <p>
+                        <code>application/x-www-form-urlencoded</code> request
+                        bodies are parsed by default and validated against the
+                        endpoint body schema. Repeated fields become arrays.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// tag=work&tag=travel&title=Trip
+// Parsed body:
+{
+  tag: ['work', 'travel'],
+  title: 'Trip',
+}`)
                             }}
                         />
                     </pre>
@@ -440,7 +467,9 @@ server
                     role: claims.role as string
                 })
             })
-        ]
+        ],
+        // Optional: try multiple registered schemes in order.
+        trySchemes: 'all'
     })
     .useAuthorization();
 

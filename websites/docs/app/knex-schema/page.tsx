@@ -160,6 +160,68 @@ const user = await query(db, UserSchema)
                     </pre>
                 </div>
 
+                <div className="card">
+                    <h2>Guarded Upserts</h2>
+                    <p>
+                        Use <code>onConflict().merge()</code> when an import or
+                        sync job should insert missing rows, but update existing
+                        rows only when the incoming data is newer.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`await query(db, ProductSchema)
+    .onConflict(t => t.sku)
+    .merge(
+        {
+            sku: 'SKU-123',
+            price: 1999,
+            sourceUpdatedAt: new Date('2026-01-15T10:00:00Z'),
+        },
+        {
+            price: ({ excluded }) => excluded(t => t.price),
+            sourceUpdatedAt: ({ excluded }) =>
+                excluded(t => t.sourceUpdatedAt),
+            syncedAt: ({ knex }) => knex.fn.now(),
+        },
+        {
+            where: (qb, { column }) => {
+                qb.whereRaw('?? < excluded.??', [
+                    column(t => t.sourceUpdatedAt),
+                    column(t => t.sourceUpdatedAt),
+                ]);
+            },
+        }
+    );
+
+import type { InferDatabaseRow } from '@cleverbrush/knex-schema';
+type ProductRow = InferDatabaseRow<typeof ProductSchema>;`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        <code>excluded()</code> references the incoming row from
+                        the failed insert, <code>column()</code> resolves schema
+                        property names to SQL column names, and the{' '}
+                        <code>where</code> callback adds a PostgreSQL guarded
+                        update.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: `insert into "products" ("sku", "price", "source_updated_at")
+values (?, ?, ?)
+on conflict ("sku") do update set
+    "price" = excluded."price",
+    "source_updated_at" = excluded."source_updated_at",
+    "synced_at" = CURRENT_TIMESTAMP
+where "source_updated_at" < excluded."source_updated_at"
+returning *`
+                            }}
+                        />
+                    </pre>
+                </div>
+
                 {/* ── Eager Loading ────────────────────────────────── */}
                 <div className="card">
                     <h2>Eager Loading (No N+1)</h2>

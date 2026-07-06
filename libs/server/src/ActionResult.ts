@@ -7,6 +7,17 @@ import type { ContentNegotiator } from './ContentNegotiator.js';
 // ---------------------------------------------------------------------------
 
 /**
+ * Handler used by {@link ActionResult.raw}.
+ *
+ * The handler receives the native Node request and response and is responsible
+ * for writing headers/body as needed.
+ */
+export type RawResultHandler = (
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+) => void | Promise<void>;
+
+/**
  * Abstract base for all HTTP action results.
  *
  * Instead of writing directly to `res`, handlers return an `ActionResult`
@@ -159,12 +170,49 @@ export abstract class ActionResult {
         return new StreamResult(readable, contentType, fileName);
     }
 
+    /**
+     * Execute a raw Node request/response handler.
+     *
+     * Use this for integrations that already know how to write to
+     * `http.ServerResponse`, such as webhook libraries or compatibility
+     * adapters. The callback is responsible for ending the response when it
+     * writes a body.
+     */
+    static raw(handler: RawResultHandler): RawResult {
+        return new RawResult(handler);
+    }
+
     /** Bare status code with no body. */
     static status<S extends number>(
         status: S,
         headers?: Record<string, string>
     ): StatusCodeResult<S> {
         return new StatusCodeResult(status, headers) as StatusCodeResult<S>;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// RawResult
+// ---------------------------------------------------------------------------
+
+/**
+ * Runs a native Node request/response callback.
+ * Created by `ActionResult.raw()`.
+ */
+export class RawResult extends ActionResult {
+    readonly handler: RawResultHandler;
+
+    constructor(handler: RawResultHandler) {
+        super();
+        this.handler = handler;
+    }
+
+    async executeAsync(
+        req: http.IncomingMessage,
+        res: http.ServerResponse,
+        _contentNegotiator: ContentNegotiator
+    ): Promise<void> {
+        await this.handler(req, res);
     }
 }
 

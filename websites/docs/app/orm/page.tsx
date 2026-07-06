@@ -330,6 +330,9 @@ npx cb-orm migrate run
 # Check migration status
 npx cb-orm migrate status
 
+# Read-only schema drift check
+npx cb-orm validate
+
 # Sync in-place (dev only — no migration file)
 npx cb-orm db push`
                             }}
