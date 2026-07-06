@@ -8,8 +8,8 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 ## Features
 
 - **Fluent endpoint builder** — `endpoint.get('/users').body(schema).query(schema).authorize()` with fully typed handler context.
-- **Action results** — `ActionResult.ok()`, `.created()`, `.noContent()`, `.redirect()`, `.file()`, `.stream()`, `.status()` — no manual `res.write()` / `res.end()`.
-- **Content negotiation** — pluggable `ContentTypeHandler` registry; JSON registered by default; honours the `Accept` request header.
+- **Action results** — `ActionResult.ok()`, `.created()`, `.noContent()`, `.redirect()`, `.file()`, `.stream()`, `.raw()`, `.status()` — no manual `res.write()` / `res.end()` unless you explicitly opt in.
+- **Content negotiation** — pluggable `ContentTypeHandler` registry; JSON and `application/x-www-form-urlencoded` registered by default; honours the `Accept` request header.
 - **Middleware pipeline** — `server.use(middleware)` for global middleware; per-endpoint middleware via `handle(ep, handler, { middlewares })`.
 - **DI integration** — `endpoint.inject({ db: IDbContext })` resolves services per-request from a `@cleverbrush/di` container.
 - **Authentication & authorization** — `server.useAuthentication()` / `server.useAuthorization()` wired to `@cleverbrush/auth` schemes and policies.
@@ -183,7 +183,29 @@ await server.listen(3000);
 | `ActionResult.file(buffer, fileName)` | 200 | Attachment download |
 | `ActionResult.content(body, contentType)` | 200 | Arbitrary string body |
 | `ActionResult.stream(readable, contentType)` | 200 | Pipes a `Readable` |
+| `ActionResult.raw(handler)` | custom | Native Node `req` / `res` escape hatch |
 | `ActionResult.status(status)` | any | Bare status, no body |
+
+Use `ActionResult.raw()` when integrating a library that already writes to
+Node's `http.ServerResponse`:
+
+```ts
+server.handle(WebhookEndpoint, () =>
+    ActionResult.raw(async (req, res) => {
+        await thirdPartyWebhookHandler(req, res);
+    })
+);
+```
+
+## URL-Encoded Bodies
+
+`application/x-www-form-urlencoded` request bodies are parsed by default and
+validated against the endpoint body schema. Repeated fields become arrays:
+
+```ts
+// tag=work&tag=travel&title=Trip
+// → { tag: ['work', 'travel'], title: 'Trip' }
+```
 
 ## File Upload
 
@@ -275,6 +297,17 @@ server.useAuthentication({
 });
 
 server.useAuthorization();
+```
+
+By default, only `defaultScheme` is attempted. Use `trySchemes` when an app
+accepts multiple credential types on the same endpoints:
+
+```ts
+server.useAuthentication({
+    defaultScheme: 'cookie',
+    schemes: [cookieScheme(options), jwtScheme(options)],
+    trySchemes: ['cookie', 'jwt'] // or 'all'
+});
 ```
 
 ## HTTP Errors

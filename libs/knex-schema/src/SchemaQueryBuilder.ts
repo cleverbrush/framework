@@ -35,7 +35,13 @@ import type {
     SelectSelector
 } from './types.js';
 
-export { OnConflictBuilder } from './operations/insert.js';
+export {
+    OnConflictBuilder,
+    type OnConflictMergeHelpers,
+    type OnConflictMergeOptions,
+    type OnConflictUpdateData,
+    type OnConflictUpdateValue
+} from './operations/insert.js';
 
 import {
     deleteImpl,

@@ -586,6 +586,75 @@ export async function tableExistsInDb(
 }
 
 // ---------------------------------------------------------------------------
+// validateEntitiesAgainstDatabase
+// ---------------------------------------------------------------------------
+
+/**
+ * A schema validation issue detected against the live database.
+ */
+export type EntitySchemaValidationIssue =
+    | {
+          type: 'missing-table';
+          tableName: string;
+      }
+    | {
+          type: 'schema-drift';
+          tableName: string;
+          diff: MigrationDiff;
+      };
+
+/**
+ * Result returned by {@link validateEntitiesAgainstDatabase}.
+ */
+export interface EntitySchemaValidationResult {
+    /** `true` when every entity table exists and has an empty schema diff. */
+    valid: boolean;
+    /** Table names inspected during validation. */
+    checkedTables: string[];
+    /** Missing tables or non-empty schema diffs. */
+    issues: EntitySchemaValidationIssue[];
+}
+
+/**
+ * Validate entity schemas against a live database without changing anything.
+ *
+ * This is the read-only counterpart to `db push`: it checks every registered
+ * entity table, including class-table-inheritance variant tables, and reports
+ * missing tables or schema drift.
+ *
+ * @param knex - A configured Knex instance or transaction.
+ * @param entities - The entity definitions to validate.
+ * @returns A validation result with all detected issues.
+ */
+export async function validateEntitiesAgainstDatabase(
+    knex: Knex,
+    entities: Entity<any, any>[]
+): Promise<EntitySchemaValidationResult> {
+    const unique = collectUniqueEntityTables(entities);
+    const issues: EntitySchemaValidationIssue[] = [];
+
+    for (const { schema, tableName } of unique) {
+        const exists = await tableExistsInDb(knex, tableName);
+        if (!exists) {
+            issues.push({ type: 'missing-table', tableName });
+            continue;
+        }
+
+        const dbState = await introspectDatabase(knex, tableName);
+        const diff = diffSchema(schema, dbState);
+        if (!isDiffEmpty(diff)) {
+            issues.push({ type: 'schema-drift', tableName, diff });
+        }
+    }
+
+    return {
+        valid: issues.length === 0,
+        checkedTables: unique.map(entry => entry.tableName),
+        issues
+    };
+}
+
+// ---------------------------------------------------------------------------
 // isDiffEmpty
 // ---------------------------------------------------------------------------
 
@@ -786,34 +855,7 @@ export function generateMigrationsForContext(
     nextSnapshot: SchemaSnapshot;
 } {
     // 1. Collect all (schema, tableName) pairs including CTI variant tables
-    const tableEntries: {
-        schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
-        tableName: string;
-    }[] = [];
-
-    for (const entity of entities) {
-        const schema = entity.schema;
-        const tableName = getTableName(schema);
-        tableEntries.push({ schema, tableName });
-
-        // CTI variant tables each have their own tableName extension set
-        for (const vs of getPolymorphicVariantSchemas(schema)) {
-            const variantTableName = vs.getExtension('tableName') as
-                | string
-                | undefined;
-            if (variantTableName) {
-                tableEntries.push({ schema: vs, tableName: variantTableName });
-            }
-        }
-    }
-
-    // 2. Deduplicate (STI variants share the base table)
-    const seen = new Set<string>();
-    const uniqueEntries = tableEntries.filter(e => {
-        if (seen.has(e.tableName)) return false;
-        seen.add(e.tableName);
-        return true;
-    });
+    const uniqueEntries = collectUniqueEntityTables(entities);
 
     // 3. Topological sort by FK dependencies
     const sorted = topologicalSort(uniqueEntries);
@@ -1097,6 +1139,41 @@ function buildColumnFromDbType(
         default:
             return table.specificType(name, dbType);
     }
+}
+
+function collectUniqueEntityTables(entities: Entity<any, any>[]): {
+    schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+    tableName: string;
+}[] {
+    const tableEntries: {
+        schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+        tableName: string;
+    }[] = [];
+
+    for (const entity of entities) {
+        const schema = entity.schema;
+        const tableName = getTableName(schema);
+        tableEntries.push({ schema, tableName });
+
+        for (const variantSchema of getPolymorphicVariantSchemas(schema)) {
+            const variantTableName = variantSchema.getExtension('tableName') as
+                | string
+                | undefined;
+            if (variantTableName) {
+                tableEntries.push({
+                    schema: variantSchema,
+                    tableName: variantTableName
+                });
+            }
+        }
+    }
+
+    const seen = new Set<string>();
+    return tableEntries.filter(entry => {
+        if (seen.has(entry.tableName)) return false;
+        seen.add(entry.tableName);
+        return true;
+    });
 }
 
 /**

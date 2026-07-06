@@ -194,6 +194,42 @@ export type InsertType<
 > = InferType<ReturnType<T['makeAllPropsOptional']>>;
 
 // ---------------------------------------------------------------------------
+// Database row helpers
+// ---------------------------------------------------------------------------
+
+type OptionalKeys<T> = {
+    [K in keyof T]-?: undefined extends T[K] ? K : never;
+}[keyof T];
+
+type RequiredKeys<T> = Exclude<keyof T, OptionalKeys<T>>;
+
+/**
+ * Normalize a schema-inferred property type to the value shape commonly
+ * returned by database rows.
+ *
+ * Optional schema properties may be absent in payloads, but database rows use
+ * `NULL` for persisted missing values.
+ */
+export type InferDatabaseValue<T> = undefined extends T
+    ? Exclude<T, undefined> | null | undefined
+    : T;
+
+/**
+ * Infer the object shape of a persisted database row from an object schema.
+ *
+ * This is useful for mapper code and raw-query helpers where `InferType<T>`
+ * is too strict because optional schema properties can come back as `null`
+ * from SQL.
+ */
+export type InferDatabaseRow<
+    T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+> = {
+    [K in RequiredKeys<InferType<T>>]: InferDatabaseValue<InferType<T>[K]>;
+} & {
+    [K in OptionalKeys<InferType<T>>]?: InferDatabaseValue<InferType<T>[K]>;
+};
+
+// ---------------------------------------------------------------------------
 // Primary-key type helpers (driven by PRIMARY_KEY_BRAND / COMPOSITE_PRIMARY_KEY_BRAND)
 // ---------------------------------------------------------------------------
 

@@ -98,8 +98,8 @@ export default function EnvPage() {
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { env, parseEnv, splitBy } from '@cleverbrush/env';
-import { string, number, boolean, array } from '@cleverbrush/schema';
+                                __html: highlightTS(`import { env, envBoolean, parseEnv, splitBy } from '@cleverbrush/env';
+import { string, number, array } from '@cleverbrush/schema';
 
 const config = parseEnv({
   db: {
@@ -110,7 +110,7 @@ const config = parseEnv({
   jwt: {
     secret: env('JWT_SECRET', string().minLength(32)),
   },
-  debug: env('DEBUG', boolean().coerce().default(false)),
+  debug: env('DEBUG', envBoolean().default(false)),
   allowedOrigins: env(
     'ALLOWED_ORIGINS',
     array(string()).addPreprocessor(splitBy(','), { mutates: false })
@@ -127,7 +127,7 @@ const config = parseEnv({
 
 config.db.host      // string
 config.db.port      // number (coerced from string)
-config.debug        // boolean (coerced from "true"/"false")
+config.debug        // boolean (coerced from "true", "1", "yes", "on", etc.)
 config.allowedOrigins // string[] (split from "a,b,c")`)
                             }}
                         />
@@ -161,6 +161,34 @@ parseEnv({
     host: env('DB_HOST', string()),
   },
 });`)
+                            }}
+                        />
+                    </pre>
+                </div>
+
+                {/* ── Booleans ─────────────────────────────────────── */}
+                <div className="card">
+                    <h2>Environment Booleans</h2>
+                    <p>
+                        Use <code>envBoolean()</code> for shell-style flags. It
+                        accepts <code>true</code> / <code>false</code>,{' '}
+                        <code>1</code> / <code>0</code>, <code>yes</code> /{' '}
+                        <code>no</code>, and <code>on</code> / <code>off</code>{' '}
+                        by default.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { env, envBoolean } from '@cleverbrush/env';
+
+env('FEATURE_ENABLED', envBoolean().default(false));
+// FEATURE_ENABLED=1   → true
+// FEATURE_ENABLED=off → false
+
+env('MODE', envBoolean({
+  trueValues: ['enabled'],
+  falseValues: ['disabled'],
+}));`)
                             }}
                         />
                     </pre>

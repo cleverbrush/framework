@@ -3,6 +3,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
     EnvValidationError,
     env,
+    envBoolean,
     parseEnv,
     parseEnvFlat,
     splitBy
@@ -36,6 +37,97 @@ describe('splitBy()', () => {
     it('handles single element (no separator present)', () => {
         const split = splitBy(',') as (value: unknown) => unknown;
         expect(split('single')).toEqual(['single']);
+    });
+});
+
+describe('envBoolean()', () => {
+    it('accepts common env-style true values', () => {
+        for (const value of ['true', 'TRUE', '1', 'yes', 'on', ' On ']) {
+            const config = parseEnv(
+                {
+                    enabled: env('FEATURE_ENABLED', envBoolean())
+                },
+                { FEATURE_ENABLED: value }
+            );
+
+            expect(config.enabled).toBe(true);
+            expectTypeOf(config.enabled).toBeBoolean();
+        }
+    });
+
+    it('accepts common env-style false values', () => {
+        for (const value of ['false', 'FALSE', '0', 'no', 'off', ' Off ']) {
+            const config = parseEnv(
+                {
+                    enabled: env('FEATURE_ENABLED', envBoolean())
+                },
+                { FEATURE_ENABLED: value }
+            );
+
+            expect(config.enabled).toBe(false);
+            expectTypeOf(config.enabled).toBeBoolean();
+        }
+    });
+
+    it('respects custom truthy and falsy values', () => {
+        const config = parseEnv(
+            {
+                enabled: env(
+                    'FEATURE_ENABLED',
+                    envBoolean({
+                        trueValues: ['enabled'],
+                        falseValues: ['disabled']
+                    })
+                )
+            },
+            { FEATURE_ENABLED: 'enabled' }
+        );
+
+        expect(config.enabled).toBe(true);
+    });
+
+    it('can match case-sensitive values', () => {
+        const config = parseEnv(
+            {
+                enabled: env(
+                    'FEATURE_ENABLED',
+                    envBoolean({
+                        trueValues: ['YES'],
+                        falseValues: ['NO'],
+                        caseSensitive: true
+                    })
+                )
+            },
+            { FEATURE_ENABLED: 'YES' }
+        );
+
+        expect(config.enabled).toBe(true);
+        expect(() =>
+            parseEnv(
+                {
+                    enabled: env(
+                        'FEATURE_ENABLED',
+                        envBoolean({
+                            trueValues: ['YES'],
+                            falseValues: ['NO'],
+                            caseSensitive: true
+                        })
+                    )
+                },
+                { FEATURE_ENABLED: 'yes' }
+            )
+        ).toThrow(EnvValidationError);
+    });
+
+    it('leaves unknown values for boolean validation', () => {
+        expect(() =>
+            parseEnv(
+                {
+                    enabled: env('FEATURE_ENABLED', envBoolean())
+                },
+                { FEATURE_ENABLED: 'sometimes' }
+            )
+        ).toThrow(EnvValidationError);
     });
 });
 

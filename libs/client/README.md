@@ -280,6 +280,36 @@ automatically invalidate the query cache for the affected group — no manual
 See the [server-side cache tags](/server#cache-tags) section for how to declare
 tags on your endpoints.
 
+### External Cache Tags — `@cleverbrush/client/cache`
+
+Use `externalCacheTags()` to bridge endpoint `.clearsCacheTag()` metadata to
+any cache system that accepts tag invalidation:
+
+```ts
+import { createClient } from '@cleverbrush/client';
+import { externalCacheTags } from '@cleverbrush/client/cache';
+
+const client = createClient(api, {
+    middlewares: [
+        externalCacheTags({
+            invalidateTag: async tag => externalCache.invalidate(tag),
+        }),
+    ],
+});
+```
+
+For Next.js, pass `revalidateTag` as the invalidation callback:
+
+```ts
+import { revalidateTag } from 'next/cache';
+
+externalCacheTags({ invalidateTag: revalidateTag });
+```
+
+The middleware runs after successful `POST`, `PUT`, `PATCH`, and `DELETE`
+responses. Dynamic tags invalidate both the base tag name and the computed key
+by default, for example `expense` and `expense:id=42`.
+
 ## Per-Call Overrides
 
 Override middleware options for individual calls:

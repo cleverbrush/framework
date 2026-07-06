@@ -13,6 +13,7 @@ import type {
     FileResult,
     JsonResult,
     NoContentResult,
+    RawResult,
     RedirectResult,
     StatusCodeResult,
     StreamResult
@@ -178,8 +179,8 @@ type HasResponses<E> = keyof ResponsesOf<E> extends never ? false : true;
  * - Non-null schema for code 200 → also allows a plain object (treated as 200 by the server)
  * - Non-null schema for other codes → `JsonResult<K, Body>`
  *
- * `FileResult`, `StreamResult`, `ContentResult`, and `RedirectResult` are always
- * permitted as an escape hatch for non-JSON responses.
+ * `FileResult`, `StreamResult`, `ContentResult`, `RedirectResult`, and
+ * `RawResult` are always permitted as escape hatches for non-JSON responses.
  */
 export type AllowedResponseReturn<TResponses extends Record<number, any>> =
     | {
@@ -197,7 +198,8 @@ export type AllowedResponseReturn<TResponses extends Record<number, any>> =
     | FileResult
     | StreamResult
     | ContentResult
-    | RedirectResult;
+    | RedirectResult
+    | RawResult;
 
 // ---------------------------------------------------------------------------
 // Handler — the action function type, inferred from an endpoint

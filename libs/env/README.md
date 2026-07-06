@@ -45,8 +45,8 @@ npm install @cleverbrush/env @cleverbrush/schema
 ### Structured config (nested)
 
 ```typescript
-import { env, parseEnv, splitBy } from '@cleverbrush/env';
-import { string, number, boolean, array } from '@cleverbrush/schema';
+import { env, envBoolean, parseEnv, splitBy } from '@cleverbrush/env';
+import { string, number, array } from '@cleverbrush/schema';
 
 const config = parseEnv({
   db: {
@@ -57,7 +57,7 @@ const config = parseEnv({
   jwt: {
     secret: env('JWT_SECRET', string().minLength(32)),
   },
-  debug: env('DEBUG', boolean().coerce().default(false)),
+  debug: env('DEBUG', envBoolean().default(false)),
   allowedOrigins: env(
     'ALLOWED_ORIGINS',
     array(string()).addPreprocessor(splitBy(','), { mutates: false })
@@ -114,6 +114,22 @@ env('ALLOWED_ORIGINS', array(string()).addPreprocessor(splitBy(','), { mutates: 
 env('PORTS', array(number().coerce()).addPreprocessor(splitBy(','), { mutates: false }))
 // "3000, 4000" → [3000, 4000]
 ```
+
+### Environment booleans
+
+Use `envBoolean()` for shell-style boolean flags. It accepts `true` / `false`,
+`1` / `0`, `yes` / `no`, and `on` / `off` by default:
+
+```typescript
+import { env, envBoolean } from '@cleverbrush/env';
+
+env('FEATURE_ENABLED', envBoolean().default(false));
+// FEATURE_ENABLED=1   → true
+// FEATURE_ENABLED=off → false
+```
+
+Pass `trueValues`, `falseValues`, and `caseSensitive` when a project has its
+own flag vocabulary.
 
 ### Error reporting
 
@@ -188,6 +204,7 @@ const config = parseEnv(
 | `parseEnv(config, source?)` | Function | Parses env vars into a validated, typed nested config object. |
 | `parseEnv(config, compute, source?)` | Function | Parses env vars, then deep-merges computed values from the callback. |
 | `parseEnvFlat(schemas, source?)` | Function | Flat convenience — keys are env var names, no `env()` needed. |
+| `envBoolean(options?)` | Function | Boolean schema for env-style values such as `1`, `0`, `yes`, `no`, `on`, `off`. |
 | `splitBy(separator)` | Function | Preprocessor that splits a string into an array. |
 | `EnvValidationError` | Class | Thrown when env vars are missing or invalid. Has `.missing` and `.invalid`. |
 | `EnvField<T>` | Type | Branded wrapper type created by `env()`. |

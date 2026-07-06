@@ -21,7 +21,8 @@ export async function run(argv: string[]): Promise<void> {
         return;
     }
 
-    const flags = parseFlags(rest);
+    const flagArgs = sub?.startsWith('--') ? [sub, ...rest] : rest;
+    const flags = parseFlags(flagArgs);
     const configPath = flags['--config'] as string | undefined;
 
     // Track the loaded config so we can always destroy the knex pool — even
@@ -30,7 +31,11 @@ export async function run(argv: string[]): Promise<void> {
     let loadedConfig: OrmCliConfig | undefined;
 
     try {
-        if (cmd === 'migrate') {
+        if (cmd === 'validate') {
+            loadedConfig = await loadConfig(configPath);
+            const { validate } = await import('./commands/validate.js');
+            await validate(loadedConfig);
+        } else if (cmd === 'migrate') {
             switch (sub) {
                 case 'generate': {
                     // Collect positional args, skipping flag names and their
@@ -159,6 +164,7 @@ COMMANDS
   migrate run               Apply pending migrations  (knex.migrate.latest)
   migrate rollback          Roll back last batch      (knex.migrate.rollback)
   migrate status            List applied and pending migrations
+  validate                  Check entity schemas against the live DB (read-only)
   db push                   Sync schema to DB in-place (dev only — no migration file)
 
 OPTIONS

@@ -8,6 +8,7 @@ cb-orm migrate generate [name]   # diff DB → schema, emit TS migration file (n
 cb-orm migrate run               # apply pending migrations
 cb-orm migrate rollback          # roll back last batch
 cb-orm migrate status            # list applied/pending migrations
+cb-orm validate                  # check entity schemas against the live DB (read-only)
 cb-orm db push                   # sync schema in-place (dev only)
 ```
 
@@ -57,6 +58,7 @@ export default defineConfig({
     "db:run":      "cb-orm migrate run",
     "db:rollback": "cb-orm migrate rollback",
     "db:status":   "cb-orm migrate status",
+    "db:validate": "cb-orm validate",
     "db:push":     "cb-orm db push"
   }
 }
@@ -122,6 +124,19 @@ npx cb-orm migrate status
 #   ○ 20260423120000_add_role_column.ts
 ```
 
+### `validate`
+
+Checks every configured entity against the live database without applying
+changes, writing migration files, or updating snapshots. It exits with status
+`1` when a table is missing or a schema diff is detected.
+
+```sh
+npx cb-orm validate
+# Schema is in sync (4 table(s) checked).
+```
+
+Use this in CI before deploys when you want to fail fast on schema drift.
+
 ### `db push`
 
 Applies all schema changes directly to the database **without** writing a
@@ -160,6 +175,7 @@ The CLI delegates all schema intelligence to `@cleverbrush/knex-schema`:
 | Diff schema vs DB | `diffSchema(schema, dbState)` |
 | Generate ALTER TABLE source | `generateMigration(diff, tableName)` |
 | Apply diff without file | `applyDiff(knex, diff, tableName)` |
+| Validate without changes | `validateEntitiesAgainstDatabase(knex, entities)` |
 | Polymorphic variant tables | `getPolymorphicVariantSchemas(schema)` |
 
 `tsx` is used to load `db.config.ts` at runtime by registering the
