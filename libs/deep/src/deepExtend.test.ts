@@ -70,3 +70,96 @@ test('deepExtend - 13', () => {
         a: null
     });
 });
+
+test('deepExtend skips top-level __proto__ keys', () => {
+    removePollutedMarker();
+
+    try {
+        const payload = JSON.parse(
+            '{"__proto__":{"polluted":"pp"},"safe":"ok"}'
+        ) as Record<string, unknown>;
+
+        const result = deepExtend({}, payload) as Record<string, unknown>;
+
+        expect(result.safe).toBe('ok');
+        expect(Object.hasOwn(result, '__proto__')).toBe(false);
+        expect(({} as any).polluted).toBeUndefined();
+    } finally {
+        removePollutedMarker();
+    }
+});
+
+test('deepExtend skips nested __proto__ keys', () => {
+    removePollutedMarker();
+
+    try {
+        const payload = JSON.parse(
+            '{"a":{"__proto__":{"polluted":"pp"},"safe":1}}'
+        ) as any;
+
+        const result = deepExtend({ a: {} }, payload) as any;
+
+        expect(result.a.safe).toBe(1);
+        expect(Object.hasOwn(result.a, '__proto__')).toBe(false);
+        expect(({} as any).polluted).toBeUndefined();
+    } finally {
+        removePollutedMarker();
+    }
+});
+
+test('deepExtend skips constructor and prototype keys', () => {
+    removePollutedMarker();
+
+    try {
+        const payload = JSON.parse(
+            '{"constructor":{"prototype":{"polluted":true}},' +
+                '"prototype":{"polluted":true},"safe":"ok"}'
+        ) as Record<string, unknown>;
+
+        const result = deepExtend({}, payload) as Record<string, unknown>;
+
+        expect(result.safe).toBe('ok');
+        expect(Object.hasOwn(result, 'constructor')).toBe(false);
+        expect(Object.hasOwn(result, 'prototype')).toBe(false);
+        expect(({} as any).polluted).toBeUndefined();
+    } finally {
+        removePollutedMarker();
+    }
+});
+
+test('deepExtend filters unsafe keys from a single source object', () => {
+    removePollutedMarker();
+
+    try {
+        const payload = JSON.parse(
+            '{"__proto__":{"polluted":"pp"},"safe":"ok"}'
+        ) as Record<string, unknown>;
+
+        const result = deepExtend(payload) as Record<string, unknown>;
+
+        expect(result).not.toBe(payload);
+        expect(result.safe).toBe('ok');
+        expect(Object.hasOwn(result, '__proto__')).toBe(false);
+        expect(({} as any).polluted).toBeUndefined();
+    } finally {
+        removePollutedMarker();
+    }
+});
+
+test('deepExtend does not recurse into inherited target properties', () => {
+    const inheritedRetry = { maxRetries: 1 };
+    const options = Object.create({ retry: inheritedRetry });
+
+    const result = deepExtend(
+        { options },
+        { options: { retry: { minDelay: 10 } } }
+    ) as any;
+
+    expect(inheritedRetry).toEqual({ maxRetries: 1 });
+    expect(result.options.retry).toEqual({ minDelay: 10 });
+    expect(Object.hasOwn(result.options, 'retry')).toBe(true);
+});
+
+function removePollutedMarker(): void {
+    delete (Object.prototype as { polluted?: unknown }).polluted;
+}

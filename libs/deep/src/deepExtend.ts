@@ -1,23 +1,40 @@
+type UnsafeMergeKey = '__proto__' | 'constructor' | 'prototype';
+
+type SafeMergeProps<T> = Omit<T, UnsafeMergeKey>;
+
+type SafeProp<T, K extends PropertyKey> = K extends keyof SafeMergeProps<T>
+    ? SafeMergeProps<T>[K]
+    : never;
+
 /** Properties that exist in both `T1` and `T2`, typed as `T2`'s version. */
 export type CommonProps<T1, T2> = {
-    [k in keyof T1 & keyof T2]: T1[k] extends never
+    [k in keyof SafeMergeProps<T1> & keyof SafeMergeProps<T2>]: SafeProp<
+        T1,
+        k
+    > extends never
         ? never
-        : T2[k] extends never
+        : SafeProp<T2, k> extends never
           ? never
-          : T2[k];
+          : SafeProp<T2, k>;
 };
 
 /** Properties present in `T1` but not in `T2`. */
-export type PropsInFirstOnly<T1, T2> = Omit<T1, keyof T2>;
+export type PropsInFirstOnly<T1, T2> = Omit<
+    SafeMergeProps<T1>,
+    keyof SafeMergeProps<T2>
+>;
 
 /** Recursively merges two object types. Matching keys are merged; unique keys are kept. */
 export type MergeTwo<T1, T2> = PropsInFirstOnly<T1, T2> &
     PropsInFirstOnly<T2, T1> & {
-        [k in keyof CommonProps<T1, T2>]: T1[k] extends Record<string, unknown>
-            ? T2[k] extends Record<string, unknown>
-                ? MergeTwo<T1[k], T2[k]>
-                : T2[k]
-            : T2[k];
+        [k in keyof CommonProps<T1, T2>]: SafeProp<T1, k> extends Record<
+            string,
+            unknown
+        >
+            ? SafeProp<T2, k> extends Record<string, unknown>
+                ? MergeTwo<SafeProp<T1, k>, SafeProp<T2, k>>
+                : SafeProp<T2, k>
+            : SafeProp<T2, k>;
     };
 
 /** Recursively merges a tuple of object types from left to right. */
@@ -26,7 +43,7 @@ export type Merge<T extends unknown[]> = T['length'] extends 3
     : T['length'] extends 2
       ? MergeTwo<T[0], T[1]>
       : T['length'] extends 1
-        ? T[0]
+        ? SafeMergeProps<T[0]>
         : T extends [...infer K, infer PL, infer L]
           ? Merge<[Merge<[...K]>, MergeTwo<PL, L>]>
           : never;
@@ -34,6 +51,8 @@ export type Merge<T extends unknown[]> = T['length'] extends 3
 /**
  * Deep-merges multiple objects into one. Later values override earlier ones;
  * nested objects are merged recursively rather than replaced.
+ * Prototype-polluting keys (`__proto__`, `constructor`, and `prototype`) are
+ * ignored.
  *
  * @example
  * ```ts
@@ -51,7 +70,6 @@ export const deepExtend = ((...rest) => {
     if (rest.length === 0) throw new Error('no arguments');
     if (typeof rest[0] !== 'object' || rest[0] === null)
         throw new Error('not a non-null object');
-    if (rest.length === 1) return rest[0];
 
     const result = {};
 
@@ -59,20 +77,23 @@ export const deepExtend = ((...rest) => {
         const keys = Object.keys(o2);
 
         for (let i = 0; i < keys.length; i++) {
+            const key = keys[i];
+            if (isUnsafeMergeKey(key)) continue;
+
             if (
-                !Reflect.has(o1, keys[i]) ||
+                !Object.hasOwn(o1, key) ||
                 !(
-                    typeof o1[keys[i]] === 'object' &&
-                    o1[keys[i]] !== null &&
-                    typeof o2[keys[i]] === 'object'
+                    typeof o1[key] === 'object' &&
+                    o1[key] !== null &&
+                    typeof o2[key] === 'object'
                 )
             ) {
-                o1[keys[i]] = o2[keys[i]];
+                o1[key] = o2[key];
             } else {
-                if (o1[keys[i]] == null || o2[keys[i]] == null) {
-                    o1[keys[i]] = o2[keys[i]];
+                if (o1[key] == null || o2[key] == null) {
+                    o1[key] = o2[key];
                 } else {
-                    extendObject(o1[keys[i]], o2[keys[i]]);
+                    extendObject(o1[key], o2[key]);
                 }
             }
         }
@@ -88,3 +109,7 @@ export const deepExtend = ((...rest) => {
 
     return result;
 }) as <T extends unknown[]>(...args: T) => Merge<T>;
+
+function isUnsafeMergeKey(key: string): boolean {
+    return key === '__proto__' || key === 'constructor' || key === 'prototype';
+}
