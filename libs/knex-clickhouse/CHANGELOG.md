@@ -1,5 +1,13 @@
 # @cleverbrush/knex-clickhouse
 
+## 4.4.1
+
+### Patch Changes
+
+- Updated dependencies [ef39f76]
+  - @cleverbrush/deep@4.4.1
+  - @cleverbrush/async@4.4.1
+
 ## 4.4.0
 
 ### Patch Changes
