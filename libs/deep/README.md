@@ -56,6 +56,7 @@ deepEqual([1, 2, 3], [3, 1, 2], { disregardArrayOrder: true });
 Deeply merges multiple objects. Works like `Object.assign`, but recursively merges nested objects instead of overwriting them. All arguments must be non-null objects.
 
 Returns a new object that is the deep merge of all provided objects.
+Keys that can mutate the prototype chain (`__proto__`, `constructor`, and `prototype`) are ignored.
 
 ```typescript
 import { deepExtend } from '@cleverbrush/deep';
@@ -156,4 +157,3 @@ const hash = HashObject({ name: 'John', age: 30 });
 ## License
 
 BSD-3-Clause
-
