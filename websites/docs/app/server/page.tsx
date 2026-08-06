@@ -178,6 +178,14 @@ server.handle(GetUser, ({ params }) => {
                             }}
                         />
                     </pre>
+                    <p>
+                        If several route schemas validate the same URL, the
+                        server selects the most specific route regardless of
+                        registration order. Static routes win, followed by
+                        routes with more literal path segments and then fewer
+                        dynamic segments. Registration order only breaks ties;
+                        WebSocket subscriptions use the same precedence.
+                    </p>
                 </div>
 
                 {/* ── Action Results ───────────────────────────────── */}

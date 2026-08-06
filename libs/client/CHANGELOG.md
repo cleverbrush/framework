@@ -1,5 +1,12 @@
 # @cleverbrush/client
 
+## 4.4.1
+
+### Patch Changes
+
+- @cleverbrush/schema@4.4.1
+- @cleverbrush/server@4.4.1
+
 ## 4.4.0
 
 ### Minor Changes

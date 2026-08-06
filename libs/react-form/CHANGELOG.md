@@ -1,5 +1,11 @@
 # @cleverbrush/react-form
 
+## 4.4.1
+
+### Patch Changes
+
+- @cleverbrush/schema@4.4.1
+
 ## 4.4.0
 
 ### Patch Changes

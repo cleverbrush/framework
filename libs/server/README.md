@@ -97,6 +97,12 @@ server.handle(GetUser, ({ params }) => {
 });
 ```
 
+When several route schemas validate the same URL, the server selects the most
+specific route independently of registration order. Exact static routes win,
+followed by routes with more literal path segments and then fewer dynamic
+segments. Registration order only breaks ties between equally specific routes.
+The same precedence applies to WebSocket subscriptions.
+
 ### Authorization
 
 ```ts

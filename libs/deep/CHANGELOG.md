@@ -1,5 +1,11 @@
 # @cleverbrush/deep
 
+## 4.4.1
+
+### Patch Changes
+
+- ef39f76: Prevent `deepExtend()` from merging prototype-polluting keys.
+
 ## 4.4.0
 
 ## 4.3.2
