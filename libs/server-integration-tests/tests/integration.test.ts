@@ -903,3 +903,38 @@ describe('withHealthcheck()', () => {
         expect(builder.withHealthcheck()).toBe(builder);
     });
 });
+
+// ===========================================================================
+// Route specificity
+// ===========================================================================
+
+describe('Route specificity', () => {
+    let server: Server;
+
+    afterEach(async () => {
+        await server?.close();
+    });
+
+    it('dispatches to the most specific handler regardless of registration order', async () => {
+        const SessionPath = route({ id: string() })`/${t => t.id}`;
+        const QuestionPath = route({ id: string() })`/${t => t.id}/question`;
+        const session = endpoint.get('/sessions', SessionPath);
+        const question = endpoint.get('/sessions', QuestionPath);
+
+        server = await createServer()
+            .handle(session, ({ params }) => ({
+                handler: 'session',
+                id: params.id
+            }))
+            .handle(question, ({ params }) => ({
+                handler: 'question',
+                id: params.id
+            }))
+            .listen(0);
+
+        const res = await request(server, 'GET', '/sessions/984/question');
+
+        expect(res.status).toBe(200);
+        expect(json(res)).toEqual({ handler: 'question', id: '984' });
+    });
+});

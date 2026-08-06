@@ -1,8 +1,12 @@
 import { number, object, parseString, string } from '@cleverbrush/schema';
-import { describe, expect, it } from 'vitest';
-import type { EndpointMetadata } from '../src/Endpoint.js';
+import { describe, expect, it, vi } from 'vitest';
+import { type EndpointMetadata, endpoint } from '../src/Endpoint.js';
 import { Router } from '../src/Router.js';
-import type { EndpointRegistration } from '../src/types.js';
+import type { SubscriptionMetadata } from '../src/Subscription.js';
+import type {
+    EndpointRegistration,
+    SubscriptionRegistration
+} from '../src/types.js';
 
 function makeRegistration(
     method: string,
@@ -27,6 +31,16 @@ function makeRegistration(
             responseSchema: null
         },
         handler: () => {}
+    };
+}
+
+function makeSubscriptionRegistration(
+    basePath: string,
+    pathTemplate: SubscriptionMetadata['pathTemplate'] = '/'
+): SubscriptionRegistration {
+    return {
+        endpoint: endpoint.subscription(basePath, pathTemplate).introspect(),
+        handler: async function* () {}
     };
 }
 
@@ -78,6 +92,211 @@ describe('Router', () => {
         const result = router.match('GET', '/api/5/posts/42');
         expect(result.match).not.toBeNull();
         expect(result.match!.parsedPath).toEqual({ userId: 5, postId: 42 });
+    });
+
+    it('prefers a nested dynamic route over an earlier generic route', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const QuestionPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}/question`
+        );
+        const genericValidate = vi.spyOn(GenericPath, 'validate');
+        const router = new Router();
+        const generic = makeRegistration('GET', '/sessions', GenericPath);
+        const question = makeRegistration('GET', '/sessions', QuestionPath);
+        router.addRoute(generic);
+        router.addRoute(question);
+
+        const result = router.match('GET', '/sessions/984/question');
+
+        expect(result.match?.registration).toBe(question);
+        expect(result.match?.parsedPath).toEqual({ id: '984' });
+        expect(genericValidate).not.toHaveBeenCalled();
+    });
+
+    it('falls back when a more-specific route fails validation', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const NumericQuestionPath = parseString(
+            object({ id: number().coerce() }),
+            $t => $t`/${t => t.id}/question`
+        );
+        const specificValidate = vi.spyOn(NumericQuestionPath, 'validate');
+        const genericValidate = vi.spyOn(GenericPath, 'validate');
+        const router = new Router();
+        const generic = makeRegistration('GET', '/sessions', GenericPath);
+        const numericQuestion = makeRegistration(
+            'GET',
+            '/sessions',
+            NumericQuestionPath
+        );
+        router.addRoute(generic);
+        router.addRoute(numericQuestion);
+
+        const result = router.match('GET', '/sessions/not-a-number/question');
+
+        expect(result.match?.registration).toBe(generic);
+        expect(result.match?.parsedPath).toEqual({
+            id: 'not-a-number/question'
+        });
+        expect(specificValidate).toHaveBeenCalledOnce();
+        expect(genericValidate).toHaveBeenCalledOnce();
+    });
+
+    it('re-finalizes after a route is added following a match', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const QuestionPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}/question`
+        );
+        const router = new Router();
+        const generic = makeRegistration('GET', '/sessions', GenericPath);
+        const question = makeRegistration('GET', '/sessions', QuestionPath);
+        router.addRoute(generic);
+
+        expect(
+            router.match('GET', '/sessions/984/question').match?.registration
+        ).toBe(generic);
+
+        router.addRoute(question);
+
+        const result = router.match('GET', '/sessions/984/question');
+        expect(result.match?.registration).toBe(question);
+        expect(result.match?.parsedPath).toEqual({ id: '984' });
+    });
+
+    it('prefers a static-leading dynamic route over a generic route', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const ActivePath = parseString(
+            object({ telegramUserId: string() }),
+            $t => $t`/active/${t => t.telegramUserId}`
+        );
+        const router = new Router();
+        const generic = makeRegistration('GET', '/sessions', GenericPath);
+        const active = makeRegistration('GET', '/sessions', ActivePath);
+        router.addRoute(generic);
+        router.addRoute(active);
+
+        const result = router.match('GET', '/sessions/active/123');
+
+        expect(result.match?.registration).toBe(active);
+        expect(result.match?.parsedPath).toEqual({
+            telegramUserId: '123'
+        });
+    });
+
+    it('prefers an exact static route over a dynamic route', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const genericValidate = vi.spyOn(GenericPath, 'validate');
+        const router = new Router();
+        const generic = makeRegistration('GET', '/sessions', GenericPath);
+        const exact = makeRegistration('GET', '/sessions/984/question');
+        router.addRoute(generic);
+        router.addRoute(exact);
+
+        const result = router.match('GET', '/sessions/984/question');
+
+        expect(result.match?.registration).toBe(exact);
+        expect(result.match?.parsedPath).toBeNull();
+        expect(genericValidate).not.toHaveBeenCalled();
+    });
+
+    it('indexes zero-interpolation templates as exact routes', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const StaticPath = parseString(object({}), $t => $t`/health`);
+        const genericValidate = vi.spyOn(GenericPath, 'validate');
+        const router = new Router();
+        const generic = makeRegistration('GET', '', GenericPath);
+        const exact = makeRegistration('GET', '', StaticPath);
+        router.addRoute(generic);
+        router.addRoute(exact);
+
+        const result = router.match('GET', '/health');
+
+        expect(result.match?.registration).toBe(exact);
+        expect(result.match?.parsedPath).toEqual({});
+        expect(genericValidate).not.toHaveBeenCalled();
+    });
+
+    it('prefers fewer dynamic segments when literal counts are equal', () => {
+        const TwoParamsPath = parseString(
+            object({ first: string(), second: string() }),
+            $t => $t`/${t => t.first}/${t => t.second}/fixed`
+        );
+        const OneParamPath = parseString(
+            object({ value: string() }),
+            $t => $t`/${t => t.value}/fixed`
+        );
+        const router = new Router();
+        const twoParams = makeRegistration('GET', '/routes', TwoParamsPath);
+        const oneParam = makeRegistration('GET', '/routes', OneParamPath);
+        router.addRoute(twoParams);
+        router.addRoute(oneParam);
+
+        const result = router.match('GET', '/routes/one/two/fixed');
+
+        expect(result.match?.registration).toBe(oneParam);
+        expect(result.match?.parsedPath).toEqual({ value: 'one/two' });
+    });
+
+    it('uses registration order for equal-specificity dynamic routes', () => {
+        const TrailingLiteralPath = parseString(
+            object({ value: string() }),
+            $t => $t`/${t => t.value}/fixed`
+        );
+        const LeadingLiteralPath = parseString(
+            object({ value: string() }),
+            $t => $t`/fixed/${t => t.value}`
+        );
+        const secondValidate = vi.spyOn(LeadingLiteralPath, 'validate');
+        const router = new Router();
+        const first = makeRegistration('GET', '/routes', TrailingLiteralPath);
+        const second = makeRegistration('GET', '/routes', LeadingLiteralPath);
+        router.addRoute(first);
+        router.addRoute(second);
+
+        const result = router.match('GET', '/routes/fixed/fixed');
+
+        expect(result.match?.registration).toBe(first);
+        expect(secondValidate).not.toHaveBeenCalled();
+    });
+
+    it('preserves trailing-slash handling when ranking dynamic routes', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const QuestionPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}/question`
+        );
+        const router = new Router();
+        const generic = makeRegistration('GET', '/sessions', GenericPath);
+        const question = makeRegistration('GET', '/sessions', QuestionPath);
+        router.addRoute(generic);
+        router.addRoute(question);
+
+        const result = router.match('GET', '/sessions/984/question/');
+
+        expect(result.match?.registration).toBe(question);
+        expect(result.match?.parsedPath).toEqual({ id: '984' });
     });
 
     it('returns 405 for wrong method', () => {
@@ -203,5 +422,54 @@ describe('Router', () => {
         // which does not match a single-segment name pattern — but crucially
         // the router should not crash or misinterpret the path structure.
         expect(result.badRequest).not.toBe(true);
+    });
+
+    it('ranks WebSocket subscription routes by specificity', () => {
+        const GenericPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}`
+        );
+        const QuestionPath = parseString(
+            object({ id: string() }),
+            $t => $t`/${t => t.id}/question`
+        );
+        const genericValidate = vi.spyOn(GenericPath, 'validate');
+        const router = new Router();
+        const generic = makeSubscriptionRegistration(
+            '/ws/sessions',
+            GenericPath
+        );
+        const question = makeSubscriptionRegistration(
+            '/ws/sessions',
+            QuestionPath
+        );
+        router.addSubscriptionRoute(generic);
+        router.addSubscriptionRoute(question);
+
+        const result = router.matchSubscription('/ws/sessions/984/question/');
+
+        expect(result?.registration).toBe(question);
+        expect(result?.parsedPath).toEqual({ id: '984' });
+        expect(genericValidate).not.toHaveBeenCalled();
+    });
+
+    it('uses registration order for equal-specificity subscriptions', () => {
+        const FirstPath = parseString(
+            object({ value: string() }),
+            $t => $t`/${t => t.value}/fixed`
+        );
+        const SecondPath = parseString(
+            object({ value: string() }),
+            $t => $t`/fixed/${t => t.value}`
+        );
+        const router = new Router();
+        const first = makeSubscriptionRegistration('/ws', FirstPath);
+        const second = makeSubscriptionRegistration('/ws', SecondPath);
+        router.addSubscriptionRoute(first);
+        router.addSubscriptionRoute(second);
+
+        const result = router.matchSubscription('/ws/fixed/fixed');
+
+        expect(result?.registration).toBe(first);
     });
 });
