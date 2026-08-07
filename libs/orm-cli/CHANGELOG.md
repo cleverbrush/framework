@@ -1,5 +1,11 @@
 # @cleverbrush/orm-cli
 
+## 4.4.2
+
+### Patch Changes
+
+- @cleverbrush/knex-schema@4.4.2
+
 ## 4.4.1
 
 ### Patch Changes
