@@ -1,0 +1,202 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="../"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>@cleverbrush/async | Libraries</title><meta name="description" content="Documentation for Libraries"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="../assets/style.css"/><link rel="stylesheet" href="../assets/highlight.css"/><script defer src="../assets/main.js"></script><script async src="../assets/icons.js" id="tsd-icons-script"></script><script async src="../assets/search.js" id="tsd-search-script"></script><script async src="../assets/navigation.js" id="tsd-nav-script"></script><script async src="../assets/hierarchy.js" id="tsd-hierarchy-script"></script><!-- Google Tag Manager --><script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({"gtm.start":new Date().getTime(),event:"gtm.js"});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!="dataLayer"?"&l="+l:"";j.async=true;j.src="https://www.googletagmanager.com/gtm.js?id="+i+dl;f.parentNode.insertBefore(j,f);})(window,document,"script","dataLayer","GTM-WRLXDMG");</script><!-- End Google Tag Manager --></head><body><!-- Google Tag Manager (noscript) --><noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WRLXDMG" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript><!-- End Google Tag Manager (noscript) --><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar"><div class="tsd-toolbar-contents container"><a href="../index.html" class="title">Libraries</a><div id="tsd-toolbar-links"><a href="/">← Back to Website</a><a href="/api-docs/">All Versions</a></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/><ul role="listbox" id="tsd-search-results"></ul><div id="tsd-search-status" aria-live="polite" aria-atomic="true"><div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-menu"></use></svg></a></div></header><div class="container container-main"><div class="col-content"><div class="tsd-page-title"><ul class="tsd-breadcrumb" aria-label="Breadcrumb"><li><a href="" aria-current="page">@cleverbrush/async</a></li></ul><h1>Module @cleverbrush/async</h1></div><section class="tsd-panel tsd-typography"><h1 id="cleverbrushasync" class="tsd-anchor-link">@cleverbrush/async<a href="#cleverbrushasync" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<p><a href="https://github.com/cleverbrush/framework/actions/workflows/ci.yml"><img src="https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+<a href="../../LICENSE"><img src="https://img.shields.io/badge/license-BSD--3--Clause-blue.svg" alt="License: BSD-3-Clause"></a></p>
+<!-- coverage-badge-start -->
+<p><img src="https://img.shields.io/badge/coverage-96.8%25-brightgreen" alt="Coverage"></p>
+<!-- coverage-badge-end -->
+<p>A set of simple utilities for working with asynchronous operations.</p>
+<h2 id="installation" class="tsd-anchor-link">Installation<a href="#installation" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="bash"><span class="hl-2">npm</span><span class="hl-0"> </span><span class="hl-6">install</span><span class="hl-0"> </span><span class="hl-6">@cleverbrush/async</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="usage" class="tsd-anchor-link">Usage<a href="#usage" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="typescript"><span class="hl-5">import</span><span class="hl-0"> { </span><span class="hl-1">Collector</span><span class="hl-0">, </span><span class="hl-1">debounce</span><span class="hl-0">, </span><span class="hl-1">throttle</span><span class="hl-0">, </span><span class="hl-1">retry</span><span class="hl-0">, </span><span class="hl-1">withTimeout</span><span class="hl-0">, </span><span class="hl-1">dedupe</span><span class="hl-0"> } </span><span class="hl-5">from</span><span class="hl-0"> </span><span class="hl-6">&#39;@cleverbrush/async&#39;</span><span class="hl-0">;</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="api" class="tsd-anchor-link">API<a href="#api" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<h3 id="_" class="tsd-anchor-link"><code>Collector&lt;T&gt;</code><a href="#_" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Collects a set of named values and emits an event when all items have been collected. Extends <code>EventEmitter</code>. The constructor accepts a list of keys to collect and an optional timeout in milliseconds.</p>
+<pre><code class="typescript"><span class="hl-3">type</span><span class="hl-0"> </span><span class="hl-9">Person</span><span class="hl-0"> = {</span><br/><span class="hl-0">    </span><span class="hl-1">firstName</span><span class="hl-0">: </span><span class="hl-9">string</span><span class="hl-0">;</span><br/><span class="hl-0">    </span><span class="hl-1">lastName</span><span class="hl-0">: </span><span class="hl-9">string</span><span class="hl-0">;</span><br/><span class="hl-0">};</span><br/><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">collector</span><span class="hl-0"> = </span><span class="hl-3">new</span><span class="hl-0"> </span><span class="hl-2">Collector</span><span class="hl-0">&lt;</span><span class="hl-9">Person</span><span class="hl-0">&gt;([</span><span class="hl-6">&#39;firstName&#39;</span><span class="hl-0">, </span><span class="hl-6">&#39;lastName&#39;</span><span class="hl-0">], </span><span class="hl-7">10000</span><span class="hl-0">);</span><br/><br/><span class="hl-1">collector</span><span class="hl-0">.</span><span class="hl-2">on</span><span class="hl-0">(</span><span class="hl-6">&#39;end&#39;</span><span class="hl-0">, (</span><span class="hl-1">collectedObject</span><span class="hl-0">: </span><span class="hl-9">Person</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-1">console</span><span class="hl-0">.</span><span class="hl-2">log</span><span class="hl-0">(</span><span class="hl-1">collectedObject</span><span class="hl-0">);</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-1">collector</span><span class="hl-0">.</span><span class="hl-2">on</span><span class="hl-0">(</span><span class="hl-6">&#39;timeout&#39;</span><span class="hl-0">, (</span><span class="hl-1">collectedData</span><span class="hl-0">: </span><span class="hl-9">Partial</span><span class="hl-0">&lt;</span><span class="hl-9">Person</span><span class="hl-0">&gt;) </span><span class="hl-3">=&gt;</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-8">// timeout reached before all items were collected</span><br/><span class="hl-0">});</span><br/><br/><span class="hl-1">collector</span><span class="hl-0">.</span><span class="hl-2">collect</span><span class="hl-0">(</span><span class="hl-6">&#39;firstName&#39;</span><span class="hl-0">, </span><span class="hl-6">&#39;John&#39;</span><span class="hl-0">);</span><br/><span class="hl-1">collector</span><span class="hl-0">.</span><span class="hl-2">collect</span><span class="hl-0">(</span><span class="hl-6">&#39;lastName&#39;</span><span class="hl-0">, </span><span class="hl-6">&#39;Smith&#39;</span><span class="hl-0">);</span>
+</code><button type="button">Copy</button></pre>
+
+<p>The <code>Collector</code> can also be used with a <code>Promise</code>-based approach:</p>
+<pre><code class="typescript"><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">collector</span><span class="hl-0"> = </span><span class="hl-3">new</span><span class="hl-0"> </span><span class="hl-2">Collector</span><span class="hl-0">&lt;</span><span class="hl-9">Person</span><span class="hl-0">&gt;([</span><span class="hl-6">&#39;firstName&#39;</span><span class="hl-0">, </span><span class="hl-6">&#39;lastName&#39;</span><span class="hl-0">], </span><span class="hl-7">10000</span><span class="hl-0">);</span><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">promise</span><span class="hl-0"> = </span><span class="hl-1">collector</span><span class="hl-0">.</span><span class="hl-2">toPromise</span><span class="hl-0">();</span><br/><br/><span class="hl-1">collector</span><span class="hl-0">.</span><span class="hl-2">collect</span><span class="hl-0">(</span><span class="hl-6">&#39;firstName&#39;</span><span class="hl-0">, </span><span class="hl-6">&#39;John&#39;</span><span class="hl-0">).</span><span class="hl-2">collect</span><span class="hl-0">(</span><span class="hl-6">&#39;lastName&#39;</span><span class="hl-0">, </span><span class="hl-6">&#39;Smith&#39;</span><span class="hl-0">);</span><br/><br/><span class="hl-5">try</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">person</span><span class="hl-0">: </span><span class="hl-9">Person</span><span class="hl-0"> = </span><span class="hl-5">await</span><span class="hl-0"> </span><span class="hl-1">promise</span><span class="hl-0">;</span><br/><span class="hl-0">} </span><span class="hl-5">catch</span><span class="hl-0"> (</span><span class="hl-1">e</span><span class="hl-0">) {</span><br/><span class="hl-0">    </span><span class="hl-8">// timeout or error occurred</span><br/><span class="hl-0">}</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="_-1" class="tsd-anchor-link"><code>debounce(func, wait, opts?)</code><a href="#_-1" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Ensures a function is only called after a specified delay since the last invocation. Useful for handling rapid user input such as search fields or window resizing.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>func</code></td>
+<td><code>(...args) =&gt; void</code></td>
+<td>The function to debounce</td>
+</tr>
+<tr>
+<td><code>wait</code></td>
+<td><code>number</code></td>
+<td>Delay in milliseconds</td>
+</tr>
+<tr>
+<td><code>opts.immediate</code></td>
+<td><code>boolean</code></td>
+<td>If <code>true</code>, calls the function immediately on the first invocation, then debounces subsequent calls. Default: <code>false</code></td>
+</tr>
+</tbody>
+</table>
+<pre><code class="typescript"><span class="hl-5">import</span><span class="hl-0"> { </span><span class="hl-1">debounce</span><span class="hl-0"> } </span><span class="hl-5">from</span><span class="hl-0"> </span><span class="hl-6">&#39;@cleverbrush/async&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">debouncedSearch</span><span class="hl-0"> = </span><span class="hl-2">debounce</span><span class="hl-0">((</span><span class="hl-1">query</span><span class="hl-0">: </span><span class="hl-9">string</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-8">// perform search</span><br/><span class="hl-0">}, </span><span class="hl-7">300</span><span class="hl-0">);</span><br/><br/><span class="hl-8">// called rapidly, but only the last call executes after 300ms of inactivity</span><br/><span class="hl-2">debouncedSearch</span><span class="hl-0">(</span><span class="hl-6">&#39;h&#39;</span><span class="hl-0">);</span><br/><span class="hl-2">debouncedSearch</span><span class="hl-0">(</span><span class="hl-6">&#39;he&#39;</span><span class="hl-0">);</span><br/><span class="hl-2">debouncedSearch</span><span class="hl-0">(</span><span class="hl-6">&#39;hello&#39;</span><span class="hl-0">);</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="_-2" class="tsd-anchor-link"><code>throttle(func, limit)</code><a href="#_-2" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Ensures a function is called at most once per specified interval. Unlike <code>debounce</code>, it guarantees regular execution during sustained activity.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>func</code></td>
+<td><code>(...args) =&gt; void</code></td>
+<td>The function to throttle</td>
+</tr>
+<tr>
+<td><code>limit</code></td>
+<td><code>number</code></td>
+<td>Minimum interval in milliseconds between calls</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="typescript"><span class="hl-5">import</span><span class="hl-0"> { </span><span class="hl-1">throttle</span><span class="hl-0"> } </span><span class="hl-5">from</span><span class="hl-0"> </span><span class="hl-6">&#39;@cleverbrush/async&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">throttledResize</span><span class="hl-0"> = </span><span class="hl-2">throttle</span><span class="hl-0">(() </span><span class="hl-3">=&gt;</span><span class="hl-0"> {</span><br/><span class="hl-0">    </span><span class="hl-8">// handle resize</span><br/><span class="hl-0">}, </span><span class="hl-7">200</span><span class="hl-0">);</span><br/><br/><span class="hl-1">window</span><span class="hl-0">.</span><span class="hl-2">addEventListener</span><span class="hl-0">(</span><span class="hl-6">&#39;resize&#39;</span><span class="hl-0">, </span><span class="hl-1">throttledResize</span><span class="hl-0">);</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="_-3" class="tsd-anchor-link"><code>retry(fn, options?)</code><a href="#_-3" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Retries an async function with exponential backoff on failure. Returns the result of the first successful attempt.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fn</code></td>
+<td><code>() =&gt; Promise&lt;T&gt;</code></td>
+<td>—</td>
+<td>The async function to retry</td>
+</tr>
+<tr>
+<td><code>options.maxRetries</code></td>
+<td><code>number</code></td>
+<td><code>3</code></td>
+<td>Maximum number of retry attempts</td>
+</tr>
+<tr>
+<td><code>options.minDelay</code></td>
+<td><code>number</code></td>
+<td><code>100</code></td>
+<td>Minimum delay in milliseconds before the first retry</td>
+</tr>
+<tr>
+<td><code>options.delayFactor</code></td>
+<td><code>number</code></td>
+<td><code>2</code></td>
+<td>Multiplier applied to the delay after each retry</td>
+</tr>
+<tr>
+<td><code>options.delayRandomizationPercent</code></td>
+<td><code>number</code></td>
+<td><code>0</code></td>
+<td>Randomization factor (<code>0</code>–<code>1</code>) added to each delay</td>
+</tr>
+<tr>
+<td><code>options.shouldRetry</code></td>
+<td><code>(error) =&gt; boolean</code></td>
+<td>—</td>
+<td>Optional predicate to decide whether to retry a given error</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="typescript"><span class="hl-5">import</span><span class="hl-0"> { </span><span class="hl-1">retry</span><span class="hl-0"> } </span><span class="hl-5">from</span><span class="hl-0"> </span><span class="hl-6">&#39;@cleverbrush/async&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">data</span><span class="hl-0"> = </span><span class="hl-5">await</span><span class="hl-0"> </span><span class="hl-2">retry</span><span class="hl-0">(</span><br/><span class="hl-0">    () </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-2">fetch</span><span class="hl-0">(</span><span class="hl-6">&#39;https://api.example.com/data&#39;</span><span class="hl-0">).</span><span class="hl-2">then</span><span class="hl-0">((</span><span class="hl-1">r</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-1">r</span><span class="hl-0">.</span><span class="hl-2">json</span><span class="hl-0">()),</span><br/><span class="hl-0">    {</span><br/><span class="hl-0">        </span><span class="hl-1">maxRetries:</span><span class="hl-0"> </span><span class="hl-7">5</span><span class="hl-0">,</span><br/><span class="hl-0">        </span><span class="hl-1">minDelay:</span><span class="hl-0"> </span><span class="hl-7">200</span><span class="hl-0">,</span><br/><span class="hl-0">        </span><span class="hl-1">delayFactor:</span><span class="hl-0"> </span><span class="hl-7">2</span><span class="hl-0">,</span><br/><span class="hl-0">        </span><span class="hl-2">shouldRetry</span><span class="hl-1">:</span><span class="hl-0"> (</span><span class="hl-1">err</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-1">err</span><span class="hl-0">.</span><span class="hl-1">status</span><span class="hl-0"> !== </span><span class="hl-7">404</span><br/><span class="hl-0">    }</span><br/><span class="hl-0">);</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="_-4" class="tsd-anchor-link"><code>withTimeout(fn, ms)</code><a href="#_-4" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Wraps a promise-returning function with a timeout. If the function does not resolve within <code>ms</code> milliseconds, the returned promise rejects with a <code>TimeoutError</code> and the internal <code>AbortSignal</code> is triggered.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>fn</code></td>
+<td><code>(signal: AbortSignal) =&gt; Promise&lt;T&gt;</code></td>
+<td>The async function to wrap. Receives an <code>AbortSignal</code> that fires on timeout.</td>
+</tr>
+<tr>
+<td><code>ms</code></td>
+<td><code>number</code></td>
+<td>Timeout in milliseconds</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="typescript"><span class="hl-5">import</span><span class="hl-0"> { </span><span class="hl-1">withTimeout</span><span class="hl-0"> } </span><span class="hl-5">from</span><span class="hl-0"> </span><span class="hl-6">&#39;@cleverbrush/async&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">data</span><span class="hl-0"> = </span><span class="hl-5">await</span><span class="hl-0"> </span><span class="hl-2">withTimeout</span><span class="hl-0">(</span><br/><span class="hl-0">    (</span><span class="hl-1">signal</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-2">fetch</span><span class="hl-0">(</span><span class="hl-6">&#39;/api/slow&#39;</span><span class="hl-0">, { </span><span class="hl-1">signal</span><span class="hl-0"> }).</span><span class="hl-2">then</span><span class="hl-0">(</span><span class="hl-1">r</span><span class="hl-0"> </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-1">r</span><span class="hl-0">.</span><span class="hl-2">json</span><span class="hl-0">()),</span><br/><span class="hl-0">    </span><span class="hl-7">5000</span><br/><span class="hl-0">);</span>
+</code><button type="button">Copy</button></pre>
+
+<h3 id="_-5" class="tsd-anchor-link"><code>dedupe(keyFn, fn)</code><a href="#_-5" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Deduplicates concurrent calls to the same async function. If a call with the same key is already in-flight, returns the existing promise instead of starting a new one.</p>
+<p><strong>Parameters:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Name</th>
+<th>Type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>keyFn</code></td>
+<td><code>(...args) =&gt; string</code></td>
+<td>Computes a cache key from the arguments</td>
+</tr>
+<tr>
+<td><code>fn</code></td>
+<td><code>(...args) =&gt; Promise&lt;T&gt;</code></td>
+<td>The async function to wrap</td>
+</tr>
+</tbody>
+</table>
+<pre><code class="typescript"><span class="hl-5">import</span><span class="hl-0"> { </span><span class="hl-1">dedupe</span><span class="hl-0"> } </span><span class="hl-5">from</span><span class="hl-0"> </span><span class="hl-6">&#39;@cleverbrush/async&#39;</span><span class="hl-0">;</span><br/><br/><span class="hl-3">const</span><span class="hl-0"> </span><span class="hl-4">fetchUser</span><span class="hl-0"> = </span><span class="hl-2">dedupe</span><span class="hl-0">(</span><br/><span class="hl-0">    (</span><span class="hl-1">id</span><span class="hl-0">: </span><span class="hl-9">number</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-6">`user-</span><span class="hl-3">${</span><span class="hl-1">id</span><span class="hl-3">}</span><span class="hl-6">`</span><span class="hl-0">,</span><br/><span class="hl-0">    (</span><span class="hl-1">id</span><span class="hl-0">: </span><span class="hl-9">number</span><span class="hl-0">) </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-2">fetch</span><span class="hl-0">(</span><span class="hl-6">`/api/users/</span><span class="hl-3">${</span><span class="hl-1">id</span><span class="hl-3">}</span><span class="hl-6">`</span><span class="hl-0">).</span><span class="hl-2">then</span><span class="hl-0">(</span><span class="hl-1">r</span><span class="hl-0"> </span><span class="hl-3">=&gt;</span><span class="hl-0"> </span><span class="hl-1">r</span><span class="hl-0">.</span><span class="hl-2">json</span><span class="hl-0">())</span><br/><span class="hl-0">);</span><br/><br/><span class="hl-8">// These two concurrent calls share a single fetch:</span><br/><span class="hl-3">const</span><span class="hl-0"> [</span><span class="hl-4">a</span><span class="hl-0">, </span><span class="hl-4">b</span><span class="hl-0">] = </span><span class="hl-5">await</span><span class="hl-0"> </span><span class="hl-9">Promise</span><span class="hl-0">.</span><span class="hl-2">all</span><span class="hl-0">([</span><span class="hl-2">fetchUser</span><span class="hl-0">(</span><span class="hl-7">1</span><span class="hl-0">), </span><span class="hl-2">fetchUser</span><span class="hl-0">(</span><span class="hl-7">1</span><span class="hl-0">)]);</span>
+</code><button type="button">Copy</button></pre>
+
+<h2 id="code-quality" class="tsd-anchor-link">Code Quality<a href="#code-quality" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li><strong>Linting:</strong> <a href="https://biomejs.dev/">Biome</a> — enforced on every PR via CI</li>
+<li><strong>Type checking:</strong> TypeScript strict mode</li>
+<li><strong>Unit tests:</strong> <a href="https://vitest.dev/">Vitest</a> — covering <code>Collector</code> event/promise modes, debounce/throttle timing, and retry back-off logic</li>
+<li><strong>CI:</strong> Every pull request must pass lint + build + test before merge — see <a href="../media/ci.yml"><code>.github/workflows/ci.yml</code></a></li>
+</ul>
+<h2 id="license" class="tsd-anchor-link">License<a href="#license" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>BSD-3-Clause</p>
+</section><details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Classes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h2>Classes</h2></summary><dl class="tsd-member-summaries"><dt class="tsd-member-summary" id="collector"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><a href="../classes/_cleverbrush_async.Collector.html">Collector</a><a href="#collector" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd><dt class="tsd-member-summary" id="timeouterror"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><a href="../classes/_cleverbrush_async.TimeoutError.html">TimeoutError</a><a href="#timeouterror" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd></dl></details><details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Functions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h2>Functions</h2></summary><dl class="tsd-member-summaries"><dt class="tsd-member-summary" id="debounce"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><a href="../functions/_cleverbrush_async.debounce.html">debounce</a><a href="#debounce" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd><dt class="tsd-member-summary" id="dedupe"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><a href="../functions/_cleverbrush_async.dedupe.html">dedupe</a><a href="#dedupe" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd><dt class="tsd-member-summary" id="retry"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><a href="../functions/_cleverbrush_async.retry.html">retry</a><a href="#retry" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd><dt class="tsd-member-summary" id="throttle"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><a href="../functions/_cleverbrush_async.throttle.html">throttle</a><a href="#throttle" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd><dt class="tsd-member-summary" id="withtimeout"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><a href="../functions/_cleverbrush_async.withTimeout.html">withTimeout</a><a href="#withtimeout" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd></dl></details></div><div class="col-sidebar"><div class="page-menu"><div class="tsd-navigation settings"><details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>Settings</h3></summary><div class="tsd-accordion-details"><div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span><ul id="tsd-filter-options"><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li><li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-external" name="external"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>External</span></label></li></ul></div><div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div><details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h3>On This Page</h3></summary><div class="tsd-accordion-details"><a href="#cleverbrushasync"><span>@cleverbrush/async</span></a><ul><li><a href="#installation"><span>Installation</span></a></li><li><a href="#usage"><span>Usage</span></a></li><li><a href="#api"><span>API</span></a></li><li><ul><li><a href="#_"><span></span></a></li><li><a href="#_-1"><span></span></a></li><li><a href="#_-2"><span></span></a></li><li><a href="#_-3"><span></span></a></li><li><a href="#_-4"><span></span></a></li><li><a href="#_-5"><span></span></a></li></ul></li><li><a href="#code-quality"><span>Code <wbr/>Quality</span></a></li><li><a href="#license"><span>License</span></a></li></ul><details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Classes"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Classes</summary><div><a href="#collector"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><span>Collector</span></a><a href="#timeouterror"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><span>Timeout<wbr/>Error</span></a></div></details><details open class="tsd-accordion tsd-page-navigation-section"><summary class="tsd-accordion-summary" data-key="section-Functions"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg>Functions</summary><div><a href="#debounce"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><span>debounce</span></a><a href="#dedupe"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><span>dedupe</span></a><a href="#retry"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><span>retry</span></a><a href="#throttle"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><span>throttle</span></a><a href="#withtimeout"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="../assets/icons.svg#icon-64"></use></svg><span>with<wbr/>Timeout</span></a></div></details></div></details></div><div class="site-menu"><nav id="tsd-sidebar-links" class="tsd-navigation"><a href="/" class="tsd-nav-link">← Back to Website</a><a href="/api-docs/" class="tsd-nav-link">All Versions</a></nav><nav class="tsd-navigation"><a href="../modules.html">Libraries</a><ul class="tsd-small-nested-navigation" id="tsd-nav-container"><li>Loading...</li></ul></nav></div></div></div><footer><p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer><div class="overlay"></div></body></html>

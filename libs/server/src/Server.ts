@@ -421,6 +421,7 @@ export class ServerBuilder {
         for (const reg of this.#subscriptionRegistrations) {
             router.addSubscriptionRoute(reg);
         }
+        router.finalize();
 
         const serviceProvider = this.#serviceCollection.buildServiceProvider({
             validateScopes: false

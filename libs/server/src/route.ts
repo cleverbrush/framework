@@ -88,6 +88,12 @@ export function route<
 /**
  * Concise shorthand for defining a typed path template.
  *
+ * When multiple registered templates validate the same URL, the server ranks
+ * them by specificity: exact static routes first, then routes with more
+ * literal path segments, then routes with fewer dynamic segments.
+ * Registration order breaks ties between equally specific routes. This
+ * precedence applies to both HTTP endpoints and WebSocket subscriptions.
+ *
  * @example With parameters
  * ```ts
  * const TodoById = route({ id: number().coerce() })`/${t => t.id}`;
