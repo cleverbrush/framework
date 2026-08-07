@@ -1,5 +1,15 @@
 # @cleverbrush/server
 
+## 4.4.2
+
+### Patch Changes
+
+- ce6e0a0: Prefer the most specific matching HTTP or WebSocket route instead of allowing
+  an earlier generic dynamic route to shadow a more literal route.
+  - @cleverbrush/schema@4.4.2
+  - @cleverbrush/auth@4.4.2
+  - @cleverbrush/di@4.4.2
+
 ## 4.4.1
 
 ### Patch Changes

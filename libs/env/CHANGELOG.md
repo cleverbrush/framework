@@ -1,5 +1,11 @@
 # @cleverbrush/env
 
+## 4.4.2
+
+### Patch Changes
+
+- @cleverbrush/deep@4.4.2
+
 ## 4.4.1
 
 ### Patch Changes
