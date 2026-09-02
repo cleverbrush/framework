@@ -1,5 +1,12 @@
 # @cleverbrush/log
 
+## 4.4.3
+
+### Patch Changes
+
+- @cleverbrush/schema@4.4.3
+- @cleverbrush/async@4.4.3
+
 ## 4.4.2
 
 ### Patch Changes
