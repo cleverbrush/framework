@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest';
+import { expect, expectTypeOf, test } from 'vitest';
 
-import { deepExtend } from './deepExtend.js';
+import { deepExtend, type Merge } from './deepExtend.js';
 
 test('deepExtend - 1', () => {
     const res = deepExtend({ a: 1 });
@@ -105,6 +105,101 @@ test('deepExtend skips nested __proto__ keys', () => {
     } finally {
         removePollutedMarker();
     }
+});
+
+test('deepExtend filters unsafe keys from new nested branches', () => {
+    const payload = JSON.parse(
+        '{"settings":{"__proto__":{"isAdmin":true},"safe":true}}'
+    ) as any;
+
+    const merged = deepExtend({}, payload) as any;
+    const downstreamOptions = Object.assign({}, merged.settings);
+
+    expect(merged.settings).not.toBe(payload.settings);
+    expect(Object.hasOwn(merged.settings, '__proto__')).toBe(false);
+    expect(Object.getPrototypeOf(downstreamOptions)).toBe(Object.prototype);
+    expect(Object.hasOwn(downstreamOptions, 'isAdmin')).toBe(false);
+    expect(downstreamOptions.isAdmin).toBeUndefined();
+});
+
+test('deepExtend filters unsafe keys at every new branch depth', () => {
+    const payload = JSON.parse(
+        '{"settings":{"items":[{"safe":1,"__proto__":{},' +
+            '"constructor":{},"prototype":{}}]}}'
+    ) as any;
+
+    const merged = deepExtend({}, payload) as any;
+    const item = merged.settings.items[0];
+
+    expect(Array.isArray(merged.settings.items)).toBe(true);
+    expect(item).not.toBe(payload.settings.items[0]);
+    expect(item.safe).toBe(1);
+    expect(Object.hasOwn(item, '__proto__')).toBe(false);
+    expect(Object.hasOwn(item, 'constructor')).toBe(false);
+    expect(Object.hasOwn(item, 'prototype')).toBe(false);
+});
+
+test('deepExtend creates own properties without invoking prototype setters', () => {
+    const key = '__deepExtendSetterTest__';
+    let setterCalled = false;
+
+    Object.defineProperty(Object.prototype, key, {
+        configurable: true,
+        set: () => {
+            setterCalled = true;
+        }
+    });
+
+    try {
+        const result = deepExtend({}, { [key]: 'safe' }) as any;
+
+        expect(setterCalled).toBe(false);
+        expect(Object.hasOwn(result, key)).toBe(true);
+        expect(result[key]).toBe('safe');
+    } finally {
+        delete (Object.prototype as any)[key];
+    }
+});
+
+test('Merge omits unsafe keys from new nested branches', () => {
+    type Result = Merge<
+        [
+            {},
+            {
+                settings: {
+                    safe: boolean;
+                    __proto__: { isAdmin: boolean };
+                    constructor: { isAdmin: boolean };
+                    prototype: { isAdmin: boolean };
+                };
+            }
+        ]
+    >;
+    type NestedHasUnsafeKeys = Extract<
+        keyof Result['settings'],
+        '__proto__' | 'constructor' | 'prototype'
+    >;
+
+    expectTypeOf<NestedHasUnsafeKeys>().toEqualTypeOf<never>();
+    expectTypeOf<Result['settings']['safe']>().toEqualTypeOf<boolean>();
+
+    type ArrayResult = Merge<
+        [
+            {},
+            {
+                items: Array<{
+                    safe: boolean;
+                    __proto__: { isAdmin: boolean };
+                }>;
+            }
+        ]
+    >;
+    type ArrayItemHasUnsafeKey = Extract<
+        keyof ArrayResult['items'][number],
+        '__proto__'
+    >;
+
+    expectTypeOf<ArrayItemHasUnsafeKey>().toEqualTypeOf<never>();
 });
 
 test('deepExtend skips constructor and prototype keys', () => {
