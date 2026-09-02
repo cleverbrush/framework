@@ -1,5 +1,12 @@
 # @cleverbrush/deep
 
+## 4.4.3
+
+### Patch Changes
+
+- 442c699: Prevent `deepExtend()` from retaining prototype-polluting keys in newly
+  created nested branches.
+
 ## 4.4.2
 
 ## 4.4.1

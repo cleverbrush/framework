@@ -1,5 +1,12 @@
 # @cleverbrush/env
 
+## 4.4.3
+
+### Patch Changes
+
+- Updated dependencies [442c699]
+  - @cleverbrush/deep@4.4.3
+
 ## 4.4.2
 
 ### Patch Changes
