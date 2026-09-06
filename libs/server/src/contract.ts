@@ -31,6 +31,7 @@ export type {
     CacheTagDefinition,
     CacheTagPropertyAccessor
 } from './CacheTag.js';
+export { computeCacheKey } from './cacheKey.js';
 export {
     type ActionContext,
     type AllowedResponseReturn,

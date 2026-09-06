@@ -1,24 +1,26 @@
 import type { SchemaBuilder } from '@cleverbrush/schema';
-import type { ReactNode } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 
 /**
  * A renderer function that receives field state and returns a React node.
  */
-export type FieldRenderer = (props: FieldRenderProps) => ReactNode;
+export type FieldRenderer<TValue = any, TProps = Record<string, unknown>> = (
+    props: FieldRenderProps<TValue, TProps>
+) => ReactNode;
 
 /**
  * Props passed to a field renderer.
  */
-export type FieldRenderProps = {
-    value: any;
-    initialValue: any;
+export type FieldRenderProps<TValue = any, TProps = Record<string, unknown>> = {
+    value: TValue | undefined;
+    initialValue: TValue | undefined;
     dirty: boolean;
     touched: boolean;
     error: string | undefined;
     validating: boolean;
-    onChange: (value: any) => void;
+    onChange: (value: TValue) => void;
     onBlur: () => void;
-    setValue: (value: any) => void;
+    setValue: (value: TValue) => void;
     schema: SchemaBuilder<any, any, any>;
     /**
      * Rendering variant hint passed from the `Field` component.
@@ -69,7 +71,7 @@ export type FieldRenderProps = {
      * />
      * ```
      */
-    fieldProps?: Record<string, unknown>;
+    fieldProps?: TProps;
 };
 
 /**
@@ -136,3 +138,28 @@ export type UseSchemaFormOptions = {
      */
     validationDebounceMs?: number;
 };
+
+/** Reactive state for handleSubmit; independent of any UI kit. */
+export type FormSubmissionState = {
+    readonly submitting: boolean;
+    readonly error: string | undefined;
+};
+
+/** Void denotes success without data; explicit failures preserve user input. */
+export type FormSubmitResult<TData = void> =
+    // biome-ignore lint/suspicious/noConfusingVoidType: callbacks returning void are valid successful submissions
+    void | { ok: true; data?: TData } | { ok: false; error: string };
+
+/** Application-owned success UI and exception translation. Rethrows propagate. */
+export type FormSubmitOptions<TValues, TData = void> = {
+    onSuccess?: (
+        data: TData | undefined,
+        values: TValues
+    ) => void | Promise<void>;
+    onError?: (error: unknown) => string | Promise<string>;
+};
+
+/** Awaitable handler for a form event or a programmatic invocation. */
+export type FormSubmitHandler = (
+    event?: Pick<FormEvent, 'preventDefault'>
+) => Promise<void>;

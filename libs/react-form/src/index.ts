@@ -19,9 +19,19 @@ export type { SchemaFormInstance } from './hooks.js';
 // Hooks
 export { useSchemaForm } from './hooks.js';
 export type {
+    TypedFieldProps,
+    TypedFieldRenderer,
+    TypedRendererRegistry
+} from './system.js';
+export { createFormSystem, defineFieldRenderer } from './system.js';
+export type {
     FieldRenderer,
     FieldRenderProps,
     FieldState,
+    FormSubmissionState,
+    FormSubmitHandler,
+    FormSubmitOptions,
+    FormSubmitResult,
     FormSystemConfig,
     UseFieldResult,
     UseSchemaFormOptions

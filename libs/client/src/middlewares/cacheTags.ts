@@ -3,7 +3,8 @@
  *
  * Caches successful GET responses keyed by endpoint-defined cache tags.
  * Mutating requests (POST, PUT, DELETE, PATCH) invalidate all cache
- * entries whose key starts with each of the endpoint's tag names.
+ * entries whose tag name starts with each of the endpoint's tag names, only
+ * after a successful response. Older in-flight reads cannot refill those tags.
  *
  * @example
  * ```ts
@@ -18,6 +19,7 @@
  * @module
  */
 
+import { computeCacheKey } from '@cleverbrush/server/contract';
 import type { EndpointMeta, Middleware } from '../middleware.js';
 
 // ---------------------------------------------------------------------------
@@ -82,6 +84,7 @@ export interface SerializedCacheTag {
 interface CacheEntry {
     response: Response;
     expiresAt: number;
+    generations: ReadonlyArray<readonly [string, number]>;
 }
 
 /**
@@ -94,35 +97,15 @@ export function isMutatingMethod(method: string): boolean {
 /**
  * Computes a deterministic cache key from a tag and request data.
  *
- * - Tags with no properties produce just the tag name.
- * - Tags with properties produce `name:key1=val1,key2=val2` where
- *   keys are sorted alphabetically for determinism.
+ * Uses the shared, versioned `ct2:` encoding, including property-free tags.
+ * Selected values are type-tagged and retain date precision. Unsupported values
+ * throw TypeError. External cache writers and invalidators must upgrade together.
  */
 export function computeCacheTagKey(
     tag: SerializedCacheTag,
     root: CacheTagRoot
 ): string {
-    const entries = Object.entries(tag.properties);
-
-    if (entries.length === 0) {
-        return tag.name;
-    }
-
-    const parts: string[] = [];
-    for (const [key, accessor] of entries.sort(([a], [b]) =>
-        a.localeCompare(b)
-    )) {
-        const result = accessor.getValue(root);
-        if (result.success && result.value !== undefined) {
-            parts.push(`${key}=${String(result.value)}`);
-        }
-    }
-
-    if (parts.length === 0) {
-        return tag.name;
-    }
-
-    return `${tag.name}:${parts.join(',')}`;
+    return computeCacheKey(tag, root);
 }
 
 /**
@@ -148,8 +131,9 @@ export function createCacheTagRoot(meta: EndpointMeta): CacheTagRoot {
  * compute cache keys. If a valid (non-expired) cache entry exists, the
  * cached response is returned immediately (cloned).
  *
- * On mutating requests (POST, PUT, DELETE, PATCH), all cache entries whose
- * key starts with any of the endpoint's tag names are invalidated.
+ * Successful mutations (POST, PUT, DELETE, PATCH) invalidate entries whose
+ * tag names start with any of the endpoint's tag names, including all aliases.
+ * Generations also prevent older in-flight reads from repopulating them.
  *
  * @param options - Cache configuration.
  * @returns A {@link Middleware} that caches and invalidates by tag.
@@ -162,42 +146,58 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
     } = options;
 
     const cache = new Map<string, CacheEntry>();
+    const generations = new Map<string, number>();
+    const isCurrent = (snapshot: CacheEntry['generations']) =>
+        snapshot.every(
+            ([name, generation]) => generations.get(name) === generation
+        );
 
     return next => (url, init) => {
         const meta = (init as any).__endpointMeta as EndpointMeta | undefined;
         const tags: readonly SerializedCacheTag[] | undefined = meta?.cacheTags;
         const method = (init.method ?? 'GET').toUpperCase();
 
-        // -- Invalidation on mutating requests --
+        // Invalidate only after success, including reads still in flight.
         if (isMutatingMethod(method) && meta && tags && tags.length > 0) {
-            const root = createCacheTagRoot(meta);
-
-            for (const tag of tags) {
-                const tagKey = computeCacheTagKey(tag, root);
-                // Invalidate the exact key and any prefixed variants
-                // (tag name prefix match handles dynamic property variants
-                // when the mutation didn't provide the same properties).
-                for (const [cachedKey] of cache) {
-                    if (
-                        cachedKey === tagKey ||
-                        cachedKey.startsWith(tag.name)
-                    ) {
-                        cache.delete(cachedKey);
+            const names = tags.map(tag => tag.name);
+            return next(url, init).then(response => {
+                if (response.ok) {
+                    for (const [name, generation] of generations) {
+                        if (names.some(prefix => name.startsWith(prefix))) {
+                            generations.set(name, generation + 1);
+                        }
+                    }
+                    for (const [key, entry] of cache) {
+                        if (!isCurrent(entry.generations)) cache.delete(key);
                     }
                 }
-            }
+                return response;
+            });
         }
 
         // -- Cache lookup for GET requests --
         if (method === 'GET' && meta && tags && tags.length > 0) {
             const root = createCacheTagRoot(meta);
+            // Resolve keys once: caller-owned request objects can change while
+            // awaiting the response. A fill must belong to the original read.
+            const keys = tags.map(tag => ({
+                name: tag.name,
+                key: computeCacheTagKey(tag, root)
+            }));
+            const snapshot = keys.map(({ name }) => {
+                if (!generations.has(name)) generations.set(name, 0);
+                return [name, generations.get(name)!] as const;
+            });
 
             let foundEntry: CacheEntry | undefined;
 
-            for (const tag of tags) {
-                const cacheKey = computeCacheTagKey(tag, root);
+            for (const { key: cacheKey } of keys) {
                 const entry = cache.get(cacheKey);
-                if (entry && entry.expiresAt > Date.now()) {
+                if (
+                    entry &&
+                    entry.expiresAt > Date.now() &&
+                    isCurrent(entry.generations)
+                ) {
                     foundEntry = entry;
                     break;
                 }
@@ -211,17 +211,17 @@ export function cacheTags(options: CacheTagMiddlewareOptions = {}): Middleware {
             }
 
             return next(url, init).then(response => {
-                if (condition(response)) {
-                    for (const tag of tags) {
-                        const cacheKey = computeCacheTagKey(tag, root);
+                if (isCurrent(snapshot) && condition(response)) {
+                    for (const { name, key: cacheKey } of keys) {
                         const ttl =
-                            ttlByTag[tag.name] !== undefined
-                                ? ttlByTag[tag.name]
+                            ttlByTag[name] !== undefined
+                                ? ttlByTag[name]
                                 : defaultTtl;
                         if (ttl > 0) {
                             cache.set(cacheKey, {
                                 response: response.clone(),
-                                expiresAt: Date.now() + ttl
+                                expiresAt: Date.now() + ttl,
+                                generations: snapshot
                             });
                         }
                     }
