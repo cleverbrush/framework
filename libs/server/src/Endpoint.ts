@@ -2206,7 +2206,7 @@ export class EndpointBuilder<
      *
      * @example
      * ```ts
-     * // PATCH — clears "todo-list" and "todo:id=42" on success
+     * // PATCH — clears "todo-list" / "todo" names and their computed ct2 keys
      * endpoint.patch('/api/todos/:id')
      *     .clearsCacheTag('todo-list')
      *     .clearsCacheTag('todo', p => ({

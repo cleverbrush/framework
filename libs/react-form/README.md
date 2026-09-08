@@ -54,6 +54,10 @@ npm install @cleverbrush/react-form
 
 ## Quick Start
 
+For typed renderer props/variants and managed submission, see the new
+[consumer examples and migration guide](../../docs/cache-form-migration.md).
+The provider-based APIs below remain supported.
+
 ```tsx
 import { object, string, number } from '@cleverbrush/schema';
 import { useSchemaForm, FormSystemProvider, Field } from '@cleverbrush/react-form';
@@ -316,9 +320,21 @@ const form = useSchemaForm(UserSchema, {
 | `form.useField(forProperty)` | Bind a field by PropertyDescriptor selector |
 | `form.submit()` | Validate and return `ValidationResult` (includes `result.object` on success) |
 | `form.validate()` | Run validation, propagate errors to fields |
-| `form.reset(values?)` | Reset all fields; optionally set new initial values |
+| `form.reset(values?)` | Clear values, or establish supplied values as a clean baseline; synchronize mounted fields and clear errors/touched/dirty/validation |
+| `form.handleSubmit(onValid, options?)` | Awaitable event handler: validate, prevent duplicate submits, handle success/failure results |
+| `form.submitting` | Reactive, read-only pending state from validation through callbacks |
+| `form.error` | Reactive, read-only submission error; cleared on reset or the next attempt |
 | `form.getValue()` | Get current form values as plain object |
-| `form.setValue(values)` | Merge values into form state |
+| `form.setValue(values)` | Shallow-merge values and synchronize mounted fields without marking touched |
+
+Form snapshots and dirty checks use `deepClone` and `deepEqual` from
+[`@cleverbrush/deep`](../deep/README.md). Plain objects, arrays and Dates are cloned
+on reset/setters; changing caller-owned input cannot change their baseline. Cycles,
+shared references, sparse arrays and null prototypes are preserved. Replacing a
+value with structurally equal data clears dirty, even with different sharing of
+child references. Files and other opaque objects retain identity: a different File
+is dirty even if its name/content match. Treat returned snapshots and opaque values
+as read-only; update through setters rather than mutating them in place.
 
 ## useField
 

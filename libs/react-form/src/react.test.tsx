@@ -357,8 +357,8 @@ describe('nested fields', () => {
             result.current.cityField.onChange('Berlin');
         });
 
-        // The field value in state is still updated
-        expect(result.current.cityField.value).toBe('Berlin');
+        // A rejected setter must not display a value missing from form data.
+        expect(result.current.cityField.value).toBeUndefined();
     });
 });
 

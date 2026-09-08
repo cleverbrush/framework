@@ -1,6 +1,7 @@
+import { computeCacheKey } from '@cleverbrush/server/contract';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { EndpointMeta, FetchLike } from '../middleware.js';
-import { cacheTags } from './cacheTags.js';
+import { cacheTags, computeCacheTagKey } from './cacheTags.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -493,5 +494,168 @@ describe('cacheTags middleware', () => {
         expect(body1).toBe(responseBody);
         expect(body2).toBe(responseBody);
         expect(r1).not.toBe(r2);
+    });
+});
+
+describe('cache invalidation races', () => {
+    const tag = (name = 'records') => ({ name, properties: {} });
+    function deferred<T>() {
+        let resolve!: (value: T) => void;
+        const promise = new Promise<T>(done => {
+            resolve = done;
+        });
+        return { promise, resolve };
+    }
+    test.each([
+        400, 500
+    ])('failed mutation %s preserves cached reads', async status => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValueOnce(new Response('old'))
+            .mockResolvedValueOnce(new Response('failed', { status }));
+        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+        const meta = makeTagMeta([tag()]);
+        await mw('/records', makeInit(meta));
+        await mw('/records', makeInit(meta, 'PATCH'));
+        expect(await (await mw('/records', makeInit(meta))).text()).toBe('old');
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+    test('transport rejection preserves cached reads', async () => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValueOnce(new Response('old'))
+            .mockRejectedValueOnce(new Error('offline'));
+        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+        const meta = makeTagMeta([tag()]);
+        await mw('/records', makeInit(meta));
+        await expect(mw('/records', makeInit(meta, 'DELETE'))).rejects.toThrow(
+            'offline'
+        );
+        expect(await (await mw('/records', makeInit(meta))).text()).toBe('old');
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+    test('does not clear entries until the write succeeds', async () => {
+        const write = deferred<Response>();
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValueOnce(new Response('old'))
+            .mockReturnValueOnce(write.promise)
+            .mockResolvedValueOnce(new Response('new'));
+        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+        const meta = makeTagMeta([tag()]);
+        await mw('/records', makeInit(meta));
+        const pending = mw('/records', makeInit(meta, 'PATCH'));
+        expect(await (await mw('/records', makeInit(meta))).text()).toBe('old');
+        write.resolve(new Response(null, { status: 204 }));
+        await pending;
+        expect(await (await mw('/records', makeInit(meta))).text()).toBe('new');
+    });
+    test.each([
+        false,
+        true
+    ])('rejects old fills, read during write: %s', async duringWrite => {
+        const oldRead = deferred<Response>();
+        const write = deferred<Response>();
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockImplementation(async (_url, init) => {
+                if (init?.method === 'PATCH') return write.promise;
+                if (
+                    fetch.mock.calls.filter(([, i]) => i?.method === 'GET')
+                        .length === 1
+                ) {
+                    return oldRead.promise;
+                }
+                return new Response('new');
+            });
+        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+        const meta = makeTagMeta([tag(), tag('other')]);
+        let pendingWrite: Promise<Response>;
+        let pendingRead: Promise<Response>;
+        if (duringWrite) {
+            pendingWrite = mw(
+                '/records',
+                makeInit(makeTagMeta([tag()]), 'PATCH')
+            );
+            pendingRead = mw('/records', makeInit(meta));
+        } else {
+            pendingRead = mw('/records', makeInit(meta));
+            pendingWrite = mw(
+                '/records',
+                makeInit(makeTagMeta([tag()]), 'PATCH')
+            );
+        }
+        write.resolve(new Response(null, { status: 204 }));
+        await pendingWrite;
+        oldRead.resolve(new Response('old'));
+        expect(await (await pendingRead).text()).toBe('old');
+        // No stale body may survive under a second tag either.
+        expect(
+            await (
+                await mw('/records', makeInit(makeTagMeta([tag('other')])))
+            ).text()
+        ).toBe('new');
+    });
+    test('invalidates every alias of a previously cached response', async () => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValueOnce(new Response('old'))
+            .mockResolvedValueOnce(new Response(null, { status: 204 }))
+            .mockResolvedValueOnce(new Response('new'));
+        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+        await mw('/records', makeInit(makeTagMeta([tag(), tag('alias')])));
+        await mw('/records', makeInit(makeTagMeta([tag()]), 'PATCH'));
+        expect(
+            await (
+                await mw('/alias', makeInit(makeTagMeta([tag('alias')])))
+            ).text()
+        ).toBe('new');
+    });
+    test('freezes selected values at dispatch', async () => {
+        const response = deferred<Response>();
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockReturnValueOnce(response.promise)
+            .mockResolvedValueOnce(new Response('second'));
+        const mw = cacheTags({ defaultTtl: 5000 })(fetch);
+        const meta = makeTagMeta(
+            [
+                {
+                    name: 'records',
+                    properties: {
+                        id: {
+                            getValue: root => ({
+                                success: true,
+                                value: root.params.id
+                            })
+                        }
+                    }
+                }
+            ],
+            { params: { id: 1 } }
+        );
+        const pending = mw('/records', makeInit(meta));
+        (meta.params as any).id = 2;
+        response.resolve(new Response('first'));
+        await pending;
+        expect(await (await mw('/records', makeInit(meta))).text()).toBe(
+            'second'
+        );
+        expect(fetch).toHaveBeenCalledTimes(2);
+    });
+    test('client and server helpers use exactly the same encoding', () => {
+        const definition = {
+            name: 'records',
+            properties: {
+                value: makeConstAccessor({
+                    date: new Date(1234),
+                    filter: 'x,y=z'
+                })
+            }
+        };
+        const root = { params: {}, body: undefined, query: {}, headers: {} };
+        expect(computeCacheTagKey(definition, root)).toBe(
+            computeCacheKey(definition, root)
+        );
     });
 });

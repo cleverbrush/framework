@@ -108,8 +108,11 @@ externalCacheTags({ invalidateTag: revalidateTag });
                     </li>
                     <li>
                         <strong>On mutation (POST/PUT/PATCH/DELETE):</strong>{' '}
-                        Invalidates all entries whose key starts with any of the
-                        endpoint&apos;s tag names — no manual callbacks needed.
+                        After a successful response, invalidates entries whose
+                        tag names start with any of the endpoint&apos;s tag
+                        names. Failed writes preserve entries; older in-flight
+                        reads cannot refill an invalidated response or its
+                        aliases.
                     </li>
                     <li>
                         <strong>Property-based keys:</strong> Tags with
@@ -124,6 +127,33 @@ externalCacheTags({ invalidateTag: revalidateTag });
                         TanStack Query cache for the affected group.
                     </li>
                 </ul>
+            </div>
+
+            <div className="card">
+                <h2>Versioned keys: breaking migration</h2>
+                <p>
+                    Server and client helpers, response caches and external
+                    invalidation share the deterministic <code>ct2:</code>{' '}
+                    format. Property and object key order is normalized, values
+                    retain their types, and dates retain milliseconds. Even a
+                    property-free tag computes to{' '}
+                    <code>{'ct2:["records",[]]'}</code>. Unsupported selected
+                    values throw <code>TypeError</code>.
+                </p>
+                <p>
+                    Upgrade external cache writers and invalidators together and
+                    flush or expire old entries. There is no legacy fallback.
+                    Base invalidation labels remain literal names; TTLs are
+                    unchanged. External invalidators send both base labels and
+                    computed keys by default, including property-free tags.
+                </p>
+                <p>
+                    Response shape and auth/tenant isolation remain
+                    consumer-owned: use distinct list/detail names and select
+                    every value that affects a response. URLs and identities are
+                    not automatically included in keys. External caches need
+                    their own protection against stale concurrent writers.
+                </p>
             </div>
 
             <div className="card">

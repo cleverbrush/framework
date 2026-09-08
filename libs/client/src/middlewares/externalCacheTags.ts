@@ -67,19 +67,12 @@ export function externalCacheTags(
     } = options;
 
     return next => async (url, init) => {
-        const response = await next(url, init);
         const meta = (init as any).__endpointMeta as EndpointMeta | undefined;
         const method = (init.method ?? meta?.method ?? 'GET').toUpperCase();
         const tags: readonly SerializedCacheTag[] | undefined = meta?.cacheTags;
 
-        if (
-            !meta ||
-            !tags ||
-            tags.length === 0 ||
-            !isMutatingMethod(method) ||
-            !condition(response)
-        ) {
-            return response;
+        if (!meta || !tags || tags.length === 0 || !isMutatingMethod(method)) {
+            return next(url, init);
         }
 
         const root = createCacheTagRoot(meta);
@@ -91,7 +84,12 @@ export function externalCacheTags(
             tagKeys.add(dynamicKey);
         }
 
-        await Promise.all([...tagKeys].map(tag => invalidateTag(tag)));
+        // Freeze keys before dispatch and reject invalid selectors before a
+        // write is sent, not after the server has already committed it.
+        const response = await next(url, init);
+        if (condition(response)) {
+            await Promise.all([...tagKeys].map(tag => invalidateTag(tag)));
+        }
         return response;
     };
 }
