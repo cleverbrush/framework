@@ -327,6 +327,15 @@ const form = useSchemaForm(UserSchema, {
 | `form.getValue()` | Get current form values as plain object |
 | `form.setValue(values)` | Shallow-merge values and synchronize mounted fields without marking touched |
 
+Form snapshots and dirty checks use `deepClone` and `deepEqual` from
+[`@cleverbrush/deep`](../deep/README.md). Plain objects, arrays and Dates are cloned
+on reset/setters; changing caller-owned input cannot change their baseline. Cycles,
+shared references, sparse arrays and null prototypes are preserved. Replacing a
+value with structurally equal data clears dirty, even with different sharing of
+child references. Files and other opaque objects retain identity: a different File
+is dirty even if its name/content match. Treat returned snapshots and opaque values
+as read-only; update through setters rather than mutating them in place.
+
 ## useField
 
 Binds a single field via PropertyDescriptor selector. Can be used via `form.useField()` or the context-based standalone `useField()`:

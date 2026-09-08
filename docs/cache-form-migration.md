@@ -62,6 +62,48 @@ locale or headers. Keep authenticated caches request/session-scoped unless every
 isolation dimension is encoded. Sharing a base invalidation label does not make
 different response shapes interchangeable.
 
+## Shared data snapshots and equality (breaking)
+
+`@cleverbrush/deep` now exports `deepClone<T>(value: T): T`. React forms use it for
+snapshots and reuse `deepEqual` for dirty checks instead of maintaining private
+copies of these helpers:
+
+```ts
+import { deepClone, deepEqual } from '@cleverbrush/deep';
+
+const saved = { tags: ['a'], updatedAt: new Date(1) };
+const draft = deepClone(saved);
+draft.tags.push('b'); // saved is unchanged
+deepEqual(draft, saved); // false
+draft.tags.pop();
+deepEqual(draft, saved); // true
+```
+
+The clone copies plain objects, arrays and Dates. It preserves cycles, shared
+references, sparse-array lengths, null prototypes and enumerable own string/symbol
+properties. Getters become data properties; non-enumerables/descriptors are not
+copied. Special property names are copied without invoking prototype setters.
+Files, Maps, Sets and other opaque instances remain references, not isolated copies.
+
+**Existing `deepEqual` behavior is corrected for every consumer**, without a legacy
+mode. Object/null comparisons no longer throw; Dates cannot equal plain objects;
+opaque objects compare only by identity. Dates compare timestamps, including two
+invalid Dates as equal. Primitives follow `Object.is` (`NaN` equals itself; signed
+zeros differ). Plain data compares structurally, including equivalent cycles and
+shared references, without requiring identical sharing topology. Enumerable symbol
+keys participate. Array holes differ from explicit `undefined`; unordered matching
+preserves duplicate/hole counts and does not use hashes or mutate inputs.
+
+Audit code relying on previous results, particularly opaque-object content
+comparisons. Project such values to relevant plain data when structural equality
+is desired. See the [deep package README](../libs/deep/README.md) for the complete
+supported-value contract.
+
+`deepExtend`, `HashObject` and schema `Transaction` behavior are unchanged.
+`Transaction` tracks mutations through a proxy; it is not a structural comparison
+against a reset snapshot, and adopting it here would require changes to its dirty
+semantics (including equal replacements, falsy values and array removals).
+
 ## Form values and reset
 
 Previously edit forms could require remount keys or manual field setters to display

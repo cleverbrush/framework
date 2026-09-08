@@ -24,7 +24,7 @@
         "src/**/*.spec.ts",
         "src/**/*.spec.tsx"
     ],
-    "references": [{ "path": "../schema" }],
+    "references": [{ "path": "../deep" }, { "path": "../schema" }],
     "watchOptions": {
         "excludeDirectories": ["./dist"]
     }

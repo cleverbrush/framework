@@ -1,3 +1,4 @@
+import { deepClone, deepEqual } from '@cleverbrush/deep';
 import type { FieldState, FormSubmissionState } from './types.js';
 
 type Binding = {
@@ -5,62 +6,9 @@ type Binding = {
     setValue: (values: any, value: any, options: any) => boolean;
 };
 
-function isPlain(value: any): value is Record<string, any> {
-    return (
-        value != null &&
-        typeof value === 'object' &&
-        (Object.getPrototypeOf(value) === Object.prototype ||
-            Object.getPrototypeOf(value) === null)
-    );
-}
-
-/** Copy editable data; opaque values such as Files retain their identity. */
-function copy(value: any, seen = new WeakMap<object, any>()): any {
-    if (value instanceof Date) return new Date(value.getTime());
-    if (!Array.isArray(value) && !isPlain(value)) return value;
-    if (seen.has(value)) return seen.get(value);
-    const result: any = Array.isArray(value) ? new Array(value.length) : {};
-    seen.set(value, result);
-    for (const key of Object.keys(value)) {
-        Object.defineProperty(result, key, {
-            value: copy(Reflect.get(value, key), seen),
-            enumerable: true,
-            writable: true,
-            configurable: true
-        });
-    }
-    return result;
-}
-
-function equal(a: any, b: any, seen = new WeakMap<object, object>()): boolean {
-    if (Object.is(a, b)) return true;
-    if (a instanceof Date && b instanceof Date) {
-        return Object.is(a.getTime(), b.getTime());
-    }
-    if (Array.isArray(a) !== Array.isArray(b)) return false;
-    if (Array.isArray(a) && a.length !== b.length) return false;
-    if (
-        !(Array.isArray(a) && Array.isArray(b)) &&
-        !(isPlain(a) && isPlain(b))
-    ) {
-        return false;
-    }
-    if (seen.has(a)) return seen.get(a) === b;
-    seen.set(a, b);
-    const keys = Object.keys(a);
-    return (
-        keys.length === Object.keys(b).length &&
-        keys.every(
-            key =>
-                Object.hasOwn(b, key) &&
-                equal(Reflect.get(a, key), Reflect.get(b, key), seen)
-        )
-    );
-}
-
 /** Internal immutable snapshots shared by all bindings of a form. */
 export function createFormStore(initialValues: any) {
-    let values = copy(initialValues ?? {});
+    let values = deepClone(initialValues ?? {});
     let baseline = values;
     let revision = 0;
     let submission: FormSubmissionState = {
@@ -84,7 +32,7 @@ export function createFormStore(initialValues: any) {
             fieldStates.set(path, {
                 value,
                 initialValue,
-                dirty: !equal(value, initialValue),
+                dirty: !deepEqual(value, initialValue),
                 touched: false,
                 error: undefined,
                 validating: false
@@ -121,7 +69,7 @@ export function createFormStore(initialValues: any) {
             updateFieldState(path, {
                 value,
                 initialValue,
-                dirty: !equal(value, initialValue),
+                dirty: !deepEqual(value, initialValue),
                 validating: false,
                 ...(reset ? { touched: false, error: undefined } : {})
             });
@@ -165,7 +113,7 @@ export function createFormStore(initialValues: any) {
         return revision;
     }
     function setValues(newValues: any) {
-        values = copy(newValues ?? {});
+        values = deepClone(newValues ?? {});
         revision++;
         syncFields(false);
     }
@@ -174,17 +122,17 @@ export function createFormStore(initialValues: any) {
         value: any,
         createMissingStructure: boolean
     ) {
-        const next = copy(values);
+        const next = deepClone(values);
         if (
             bindings
                 .get(path)
-                ?.setValue(next, copy(value), { createMissingStructure })
+                ?.setValue(next, deepClone(value), { createMissingStructure })
         ) {
             setValues(next);
         }
     }
     function resetAll(newInitialValues?: any) {
-        values = copy(newInitialValues ?? {});
+        values = deepClone(newInitialValues ?? {});
         baseline = values;
         revision++;
         syncFields(true);
