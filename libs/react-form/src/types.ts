@@ -21,7 +21,7 @@ export type FieldRenderProps<TValue = any, TProps = Record<string, unknown>> = {
     onChange: (value: TValue) => void;
     onBlur: () => void;
     setValue: (value: TValue) => void;
-    schema: SchemaBuilder<any, any, any>;
+    schema: SchemaBuilder<any, any, any, any>;
     /**
      * Rendering variant hint passed from the `Field` component.
      * Used by renderers to select a sub-variant of the base schema type
@@ -107,7 +107,7 @@ export type UseFieldResult<T = any> = {
     onChange: (value: T) => void;
     onBlur: () => void;
     setValue: (value: T) => void;
-    schema: SchemaBuilder<any, any, any>;
+    schema: SchemaBuilder<any, any, any, any>;
 };
 
 /**

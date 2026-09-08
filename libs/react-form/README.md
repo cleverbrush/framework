@@ -58,6 +58,17 @@ For typed renderer props/variants and managed submission, see the new
 [consumer examples and migration guide](../../docs/cache-form-migration.md).
 The provider-based APIs below remain supported.
 
+Typed fields and headless `form.useField()` accept properties with schema
+defaults, including enums, booleans, arrays, and nullable values. A default
+does not erase the property's inferred type. Defaults are applied during
+validation; call `form.reset(values)` to establish a visible clean baseline.
+`reset()` still clears the store rather than restoring schema defaults.
+
+Shared UI packages can directly export `createFormSystem(...)` results and
+`system.Field` while emitting TypeScript declarations. The named
+`TypedFormSystem` and `TypedFieldComponent` types preserve the registry's
+field/variant/props checks across package boundaries.
+
 ```tsx
 import { object, string, number } from '@cleverbrush/schema';
 import { useSchemaForm, FormSystemProvider, Field } from '@cleverbrush/react-form';

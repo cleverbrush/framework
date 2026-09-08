@@ -65,7 +65,7 @@ type RendererChoice<R extends TypedRendererRegistry, V> = {
 
 type FieldDescriptor = {
     readonly [SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]: {
-        getSchema: () => SchemaBuilder<any, any, any>;
+        getSchema: () => SchemaBuilder<any, any, any, any>;
     };
 };
 type DescriptorValue<D extends FieldDescriptor> = InferType<
@@ -86,6 +86,21 @@ export type TypedFieldProps<
     name?: string;
 } & RendererChoice<R, NoInfer<DescriptorValue<TDescriptor>>>;
 
+/** Named callable type also supports exporting system.Field from UI packages. */
+export type TypedFieldComponent<R extends TypedRendererRegistry> = <
+    TSchema extends ObjectSchemaBuilder<any, any, any>,
+    TDescriptor extends FieldDescriptor
+>(
+    props: TypedFieldProps<R, TSchema, TDescriptor>
+) => ReactNode;
+
+/** Named return type keeps exported consumer registries declaration-safe. */
+export type TypedFormSystem<R extends TypedRendererRegistry> = {
+    Field: TypedFieldComponent<R>;
+    Provider: (props: { children: ReactNode }) => ReactNode;
+    renderers: Readonly<R>;
+};
+
 /**
  * Create a typed Field and a provider for an application's renderer registry.
  * The typed Field resolves from this factory's closed registry, so an untyped
@@ -96,7 +111,7 @@ export type TypedFieldProps<
  */
 export function createFormSystem<
     const R extends TypedRendererRegistry
->(config: { renderers: R }) {
+>(config: { renderers: R }): TypedFormSystem<R> {
     const renderers = Object.freeze({ ...config.renderers });
     function TypedField<
         TSchema extends ObjectSchemaBuilder<any, any, any>,
