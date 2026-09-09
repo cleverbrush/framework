@@ -40,7 +40,7 @@ import type {
 export type SchemaFormInstance<
     TSchema extends ObjectSchemaBuilder<any, any, any>
 > = {
-    useField: <TPropertySchema extends SchemaBuilder<any, any, any>>(
+    useField: <TPropertySchema extends SchemaBuilder<any, any, any, any>>(
         forProperty: (
             tree: PropertyDescriptorTree<TSchema, TSchema>
         ) => PropertyDescriptor<TSchema, TPropertySchema, any>
@@ -305,7 +305,7 @@ export function useSchemaForm<
     formContextRef.current = formContextValue;
     const _getFormContext = useCallback(() => formContextRef.current, []);
     const useFieldHook = useCallback(
-        <TPropertySchema extends SchemaBuilder<any, any, any>>(
+        <TPropertySchema extends SchemaBuilder<any, any, any, any>>(
             selector: (
                 tree: PropertyDescriptorTree<TSchema, TSchema>
             ) => PropertyDescriptor<TSchema, TPropertySchema, any>
@@ -406,7 +406,7 @@ export function useFieldFromContext(
 /** Resolve type:variant first, falling back to the base type. */
 export function resolveRenderer(
     config: FormSystemConfig | null,
-    schema: SchemaBuilder<any, any, any>,
+    schema: SchemaBuilder<any, any, any, any>,
     variant?: string
 ): FieldRenderer | undefined {
     if (!config?.renderers) return undefined;

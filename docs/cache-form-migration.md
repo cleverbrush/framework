@@ -224,3 +224,32 @@ Use `boolean` for checkboxes, `string[]` for multi-selects, `number | undefined`
 for numeric inputs that can be cleared, and `string | null` for nullable strings.
 Values can initially be `undefined`; optional/nested fields retain their types.
 No UI-kit dependency or application-specific field vocabulary is introduced.
+
+### Defaulted properties and shared UI packages
+
+`form.useField()` and typed `Field` also support properties such as
+`string().default('Untitled')`, `boolean().default(true)`, and
+`array(string()).default(() => [])`. The default flag does not change which
+renderer value types are compatible. Nullable fields still require nullable
+renderers, enum setters still accept only their literals, and arrays retain
+their element type. Defaults run during validation; initialize visible fields
+with `reset(values)`. A bare `reset()` continues to clear values.
+
+An inferred registry and its field component can be exported from a shared
+package compiled with `declaration: true`:
+
+```tsx
+export const SharedFormSystem = createFormSystem({
+    renderers: { string: text }
+});
+export const SchemaField = SharedFormSystem.Field;
+```
+
+The public `TypedFormSystem<R>` and `TypedFieldComponent<R>` names keep these
+exports declaration-safe; no consumer type assertion is required.
+
+When different value kinds reuse the same variant name (such as
+`string:select` and `number:select`), TypeScript can require explicit parameter
+types for inline callbacks in `fieldProps`. Annotate those parameters or pass
+an already typed handler; the selected renderer still checks its callback
+signature and rejects incompatible props.
