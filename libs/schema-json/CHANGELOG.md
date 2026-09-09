@@ -1,5 +1,7 @@
 # @cleverbrush/schema-json
 
+## 4.5.0
+
 ## 4.4.3
 
 ## 4.4.2

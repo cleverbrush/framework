@@ -5,8 +5,8 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/async": "^4.4.3",
-        "@cleverbrush/deep": "^4.4.3",
+        "@cleverbrush/async": "^4.5.0",
+        "@cleverbrush/deep": "^4.5.0",
         "@clickhouse/client": "^1.18.2"
     },
     "peerDependencies": {
@@ -45,5 +45,5 @@
     },
     "type": "module",
     "types": "./dist/index.d.ts",
-    "version": "4.4.3"
+    "version": "4.5.0"
 }
