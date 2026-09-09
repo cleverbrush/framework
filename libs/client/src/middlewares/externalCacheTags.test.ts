@@ -37,6 +37,62 @@ function makeMeta(overrides: Partial<EndpointMeta> = {}): EndpointMeta {
 }
 
 describe('externalCacheTags middleware', () => {
+    test('property-free tags retain the base label and use a versioned computed key', async () => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockResolvedValue(new Response(null, { status: 204 }));
+        const invalidateTag = vi.fn();
+        await externalCacheTags({ invalidateTag })(fetch)('/records', {
+            method: 'POST',
+            __endpointMeta: makeMeta({
+                cacheTags: [{ name: 'records', properties: {} }]
+            })
+        } as any);
+        expect(invalidateTag.mock.calls).toEqual([
+            ['records'],
+            ['ct2:["records",[]]']
+        ]);
+    });
+
+    test('freezes keys before dispatch and rejects unsupported values before a write', async () => {
+        const meta = makeMeta();
+        const invalidateTag = vi.fn();
+        const fetch = vi.fn<FetchLike>().mockImplementation(async () => {
+            (meta.params as any).id = 99;
+            return new Response(null, { status: 204 });
+        });
+        const middleware = externalCacheTags({ invalidateTag })(fetch);
+        await middleware('/records', {
+            method: 'POST',
+            __endpointMeta: meta
+        } as any);
+        expect(invalidateTag).toHaveBeenCalledWith(
+            'ct2:["expense",[["id",["number","42"]]]]'
+        );
+        (meta.params as any).id = new Map();
+        await expect(
+            middleware('/records', {
+                method: 'POST',
+                __endpointMeta: meta
+            } as any)
+        ).rejects.toThrow(TypeError);
+        expect(fetch).toHaveBeenCalledTimes(1);
+    });
+
+    test('a thrown mutation never calls the invalidator', async () => {
+        const fetch = vi
+            .fn<FetchLike>()
+            .mockRejectedValue(new Error('offline'));
+        const invalidateTag = vi.fn();
+        await expect(
+            externalCacheTags({ invalidateTag })(fetch)('/records', {
+                method: 'POST',
+                __endpointMeta: makeMeta()
+            } as any)
+        ).rejects.toThrow('offline');
+        expect(invalidateTag).not.toHaveBeenCalled();
+    });
+
     test('invalidates base and dynamic tags after a successful mutation', async () => {
         const fetch = vi
             .fn<FetchLike>()
@@ -52,7 +108,9 @@ describe('externalCacheTags middleware', () => {
         expect(response.status).toBe(204);
         expect(fetch).toHaveBeenCalledTimes(1);
         expect(invalidateTag).toHaveBeenCalledWith('expense');
-        expect(invalidateTag).toHaveBeenCalledWith('expense:id=42');
+        expect(invalidateTag).toHaveBeenCalledWith(
+            'ct2:["expense",[["id",["number","42"]]]]'
+        );
         expect(invalidateTag).toHaveBeenCalledTimes(2);
     });
 
@@ -102,7 +160,9 @@ describe('externalCacheTags middleware', () => {
             __endpointMeta: makeMeta()
         } as any);
 
-        expect(invalidateTag).toHaveBeenCalledWith('expense:id=42');
+        expect(invalidateTag).toHaveBeenCalledWith(
+            'ct2:["expense",[["id",["number","42"]]]]'
+        );
         expect(invalidateTag).toHaveBeenCalledTimes(1);
     });
 });

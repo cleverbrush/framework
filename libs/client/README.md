@@ -256,7 +256,7 @@ const client = createClient(api, {
     middlewares: [cacheTags({ defaultTtl: 5000 })],
 });
 
-// Populates cache entries for 'todo-list' and 'todo:id=1' tags.
+// Populates versioned keys for the 'todo-list' and 'todo' tag definitions.
 await client.todos.list({ query: { page: 1 } });
 await client.todos.get({ params: { id: 1 } });
 
@@ -307,8 +307,20 @@ externalCacheTags({ invalidateTag: revalidateTag });
 ```
 
 The middleware runs after successful `POST`, `PUT`, `PATCH`, and `DELETE`
-responses. Dynamic tags invalidate both the base tag name and the computed key
-by default, for example `expense` and `expense:id=42`.
+responses. Tags invalidate both the literal base tag name and the versioned computed
+key by default, for example `expense` and `ct2:["expense",[["id",["number","42"]]]]`.
+Property-free tags also have a computed key: `ct2:["expense",[]]`.
+
+Computed keys share a deterministic, type-tagged encoder with the server;
+property/object key order is normalized and dates retain millisecond precision.
+Only successful mutations invalidate the in-memory cache; older in-flight reads
+cannot refill invalidated entries or aliases. Tag-name-prefix coverage and TTLs
+are unchanged. Unsupported selected values throw `TypeError`.
+
+**Breaking migration:** upgrade all external cache writers and invalidators together
+and retire old entries. Base invalidation labels remain literal names, but all
+computed keys changed. Endpoint and auth/tenant scope are still consumer-defined.
+See the [migration guide](../../docs/cache-form-migration.md#cache-key-migration-breaking).
 
 ## Per-Call Overrides
 

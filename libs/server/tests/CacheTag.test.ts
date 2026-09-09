@@ -210,16 +210,20 @@ describe('computeCacheKey', () => {
         headers: {}
     };
 
-    it('returns tag name for simple tags with no properties', () => {
+    it('uses the versioned format for simple tags with no properties', () => {
         const tag = makeTag('invalidate-all', {});
-        expect(computeCacheKey(tag, emptyRoot)).toBe('invalidate-all');
+        expect(computeCacheKey(tag, emptyRoot)).toBe(
+            'ct2:["invalidate-all",[]]'
+        );
     });
 
     it('builds key with single property', () => {
         const tag = makeTag('todo', {
             id: makeConstAccessor(42)
         });
-        expect(computeCacheKey(tag, emptyRoot)).toBe('todo:id=42');
+        expect(computeCacheKey(tag, emptyRoot)).toBe(
+            'ct2:["todo",[["id",["number","42"]]]]'
+        );
     });
 
     it('builds key with multiple properties sorted alphabetically', () => {
@@ -229,7 +233,7 @@ describe('computeCacheKey', () => {
             m: makeConstAccessor('middle')
         });
         expect(computeCacheKey(tag, emptyRoot)).toBe(
-            'todo:a=first,m=middle,z=last'
+            'ct2:["todo",[["a",["string","first"]],["m",["string","middle"]],["z",["string","last"]]]]'
         );
     });
 
@@ -238,22 +242,24 @@ describe('computeCacheKey', () => {
             id: makeConstAccessor(42),
             optional: makeFailingAccessor()
         });
-        expect(computeCacheKey(tag, emptyRoot)).toBe('todo:id=42');
+        expect(computeCacheKey(tag, emptyRoot)).toBe(
+            'ct2:["todo",[["id",["number","42"]]]]'
+        );
     });
 
-    it('returns tag name when all properties fail', () => {
+    it('uses the property-free versioned key when all properties fail', () => {
         const tag = makeTag('todo', {
             a: makeFailingAccessor(),
             b: makeFailingAccessor()
         });
-        expect(computeCacheKey(tag, emptyRoot)).toBe('todo');
+        expect(computeCacheKey(tag, emptyRoot)).toBe('ct2:["todo",[]]');
     });
 
     it('skips properties with undefined value', () => {
         const tag = makeTag('todo', {
             id: makeConstAccessor(undefined)
         });
-        expect(computeCacheKey(tag, emptyRoot)).toBe('todo');
+        expect(computeCacheKey(tag, emptyRoot)).toBe('ct2:["todo",[]]');
     });
 
     it('produces stable output for the same inputs', () => {
@@ -296,7 +302,9 @@ describe('integration', () => {
 
         const key = computeCacheKey(definition, root);
         // Sorted: filter, orgId, userId
-        expect(key).toBe('resource:filter=active,orgId=10,userId=u1');
+        expect(key).toBe(
+            'ct2:["resource",[["filter",["string","active"]],["orgId",["number","10"]],["userId",["string","u1"]]]]'
+        );
     });
 
     it('end-to-end with params and headers', () => {
@@ -326,6 +334,8 @@ describe('integration', () => {
 
         const key = computeCacheKey(definition, root);
         // Sorted: orgId, projectId, tenant
-        expect(key).toBe('project:orgId=42,projectId=p1,tenant=acme');
+        expect(key).toBe(
+            'ct2:["project",[["orgId",["number","42"]],["projectId",["string","p1"]],["tenant",["string","acme"]]]]'
+        );
     });
 });

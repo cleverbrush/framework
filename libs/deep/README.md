@@ -6,7 +6,7 @@
 ![Coverage](https://img.shields.io/badge/coverage-97.8%25-brightgreen)
 <!-- coverage-badge-end -->
 
-A library for deep operations on JavaScript objects — deep equality, deep merge, and flattening.
+A library for deep operations on JavaScript objects — cloning, equality, merging, and flattening.
 
 ## Installation
 
@@ -17,14 +17,55 @@ npm install @cleverbrush/deep
 ## Usage
 
 ```typescript
-import { deepEqual, deepExtend, deepFlatten } from '@cleverbrush/deep';
+import { deepClone, deepEqual, deepExtend, deepFlatten } from '@cleverbrush/deep';
 ```
 
 ## API
 
+### `deepClone<T>(value: T): T`
+
+Creates an isolated copy of plain data while preserving its TypeScript type.
+
+```typescript
+import { deepClone } from '@cleverbrush/deep';
+
+const input = { tags: ['a'], savedAt: new Date(1) };
+const snapshot = deepClone(input);
+input.tags.push('b');
+input.savedAt.setTime(2);
+// snapshot is still { tags: ['a'], savedAt: new Date(1) }
+```
+
+| Value | `deepClone` | `deepEqual` |
+| --- | --- | --- |
+| Primitives, functions | Returned unchanged | `Object.is` |
+| Plain objects (including null prototypes) | Recursively cloned; prototype preserved | Enumerable own properties compared structurally; null and ordinary prototypes may compare equal |
+| Arrays | Recursively cloned; length and holes preserved | Length, holes, elements and enumerable extra properties compared |
+| Dates | Cloned by timestamp, including invalid dates | Timestamps compared with `Object.is`; two invalid dates compare equal |
+| Files, Maps, Sets, typed arrays, custom instances and other objects | Returned by reference | Identity only |
+
+Cloning preserves cycles and repeated references, including shared Dates. Own
+enumerable string and symbol properties are copied as writable data properties.
+Getters are read once per copied property; accessor descriptors, non-enumerable
+properties and frozen/sealed state are not preserved. Date timestamps and array
+length are copied explicitly. Special keys such as `__proto__` are defined as own
+properties without invoking inherited setters. This is a data snapshot utility,
+not a clone of arbitrary object internals or a replacement for serialization.
+
 ### `deepEqual(a, b, options?)`
 
-Recursively compares two values and returns `true` if they are deeply equal. Supports nested objects, arrays, `Date` instances, and handles circular references.
+Recursively compares supported data values according to the table above. It handles
+nulls and cycles, and does not require identical reference-sharing topology: one
+shared child can compare equal to two separate, structurally equal children. Object
+key order does not matter; symbol keys participate by identity. Dates compare only
+their timestamps, not extra properties. Other opaque objects are never traversed.
+
+Primitives follow `Object.is`: `NaN` equals `NaN`, but `0` differs from `-0`.
+Array holes differ from explicit `undefined`. With `disregardArrayOrder`, each
+element must match one unused element on the other side, preserving duplicate and
+hole counts. Named/symbol array properties still compare by key. Inputs are not
+sorted or mutated, and hash collisions cannot decide equality. Unordered matching
+can require quadratic comparisons; prefer ordered equality for large arrays.
 
 **Parameters:**
 
@@ -49,7 +90,20 @@ deepEqual({ a: { b: 1, c: 2 } }, { a: { b: 1 } });
 // Array order can be ignored
 deepEqual([1, 2, 3], [3, 1, 2], { disregardArrayOrder: true });
 // => true
+
+deepEqual([1, 1, 2], [1, 2, 2], { disregardArrayOrder: true });
+// => false (duplicate counts differ)
+
+deepEqual(new Map(), new Map());
+// => false (opaque objects compare by identity)
 ```
+
+**Breaking comparison corrections:** previous versions could throw for object/null
+pairs, consider Dates equal to unrelated objects, compare distinct opaque objects
+by enumerable shape, and reject equivalent cycles or repeated references. Signed
+zero, invalid Dates, symbol keys and sparse arrays now follow the rules above.
+Audit consumers relying on those outcomes. To compare Maps/Sets/custom instances
+by content, explicitly project their relevant state into plain data first.
 
 ### `deepExtend(...objects)`
 
