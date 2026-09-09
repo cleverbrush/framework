@@ -10,71 +10,70 @@ import {
     ObjectSchemaBuilder,
     SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
 } from '@cleverbrush/schema';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useSyncExternalStore
+} from 'react';
 import type { FormContextValue } from './contexts.js';
-import { debounce } from './debounce.js';
 import type { FormStore } from './FormStore.js';
 import { createFormStore } from './FormStore.js';
 import {
     buildDescriptorPathMap,
-    buildSelectorFromPath,
     ensureNestedStructure,
-    getDescriptorPath,
     getSchemaType
 } from './helpers.js';
 import type {
     FieldRenderer,
+    FormSubmissionState,
+    FormSubmitHandler,
+    FormSubmitOptions,
+    FormSubmitResult,
     FormSystemConfig,
     UseFieldResult,
     UseSchemaFormOptions
 } from './types.js';
 
-// ─── SchemaFormInstance ──────────────────────────────────────────────────────
-
-/**
- * Return type for useSchemaForm — fully typed for IntelliSense.
- * The `useField` method infers the field value type from the schema via PropertyDescriptor.
- */
+/** A stable form controller with reactive field and submission subscriptions. */
 export type SchemaFormInstance<
     TSchema extends ObjectSchemaBuilder<any, any, any>
 > = {
-    useField: <TPropertySchema extends SchemaBuilder<any, any, any>>(
+    useField: <TPropertySchema extends SchemaBuilder<any, any, any, any>>(
         forProperty: (
             tree: PropertyDescriptorTree<TSchema, TSchema>
         ) => PropertyDescriptor<TSchema, TPropertySchema, any>
     ) => UseFieldResult<InferType<TPropertySchema>>;
     submit: () => Promise<ValidationResult<InferType<TSchema>>>;
     validate: () => Promise<ValidationResult<InferType<TSchema>>>;
+    /** Clear values, or establish supplied values as the new clean baseline. */
     reset: (values?: Partial<InferType<TSchema>>) => void;
+    /** Read the current snapshot. Use setters rather than mutating it. */
     getValue: () => InferType<TSchema>;
+    /** Shallow-merge values without marking fields touched. */
     setValue: (values: Partial<InferType<TSchema>>) => void;
-    /** @internal — Used by FormProvider and Field to access internal context */
+    /** Validate and submit once; repeated calls while pending are ignored. */
+    handleSubmit: <TData = void>(
+        onValid: (
+            values: InferType<TSchema>
+        ) => FormSubmitResult<TData> | Promise<FormSubmitResult<TData>>,
+        options?: FormSubmitOptions<InferType<TSchema>, TData>
+    ) => FormSubmitHandler;
+    /** @internal — Used by FormProvider and Field to access internal context. */
     _getFormContext: () => FormContextValue;
-};
+} & FormSubmissionState;
 
-// ─── useSchemaForm ───────────────────────────────────────────────────────────
-
-/**
- * Hook that binds a schema to a form instance.
- * Provides field binding API, form-level validation, submit, reset.
- */
+/** Bind a schema to independently subscribed fields and a stable form instance. */
 export function useSchemaForm<
     TSchema extends ObjectSchemaBuilder<any, any, any>
 >(
     schema: TSchema,
     options?: UseSchemaFormOptions
 ): SchemaFormInstance<TSchema> {
-    const resolvedOptions: UseSchemaFormOptions = {
-        createMissingStructure: true,
-        ...options
-    };
-
     const storeRef = useRef<FormStore | null>(null);
-    if (!storeRef.current) {
-        storeRef.current = createFormStore({});
-    }
+    if (!storeRef.current) storeRef.current = createFormStore({});
     const store = storeRef.current;
-
     const descriptorTreeRef = useRef<PropertyDescriptorTree<
         TSchema,
         TSchema
@@ -85,7 +84,6 @@ export function useSchemaForm<
         ) as PropertyDescriptorTree<TSchema, TSchema>;
     }
     const descriptorTree = descriptorTreeRef.current;
-
     const pathMapRef = useRef<Map<
         PropertyDescriptorInner<any, any, any>,
         string
@@ -94,206 +92,238 @@ export function useSchemaForm<
         pathMapRef.current = buildDescriptorPathMap(descriptorTree, schema);
     }
     const pathMap = pathMapRef.current;
-
+    for (const [descriptor] of pathMap) {
+        store.registerField(descriptor.toJsonPointer(), descriptor);
+    }
     const schemaRef = useRef(schema);
-    const optionsRef = useRef(resolvedOptions);
-    optionsRef.current = resolvedOptions;
-
-    const formContextValue = useMemo<FormContextValue>(
-        () => ({
-            store,
-            descriptorTree,
-            schema: schemaRef.current,
-            options: optionsRef.current,
-            pathMap
-        }),
-        [store, descriptorTree, pathMap]
-    );
-
-    const formContextRef = useRef(formContextValue);
-    formContextRef.current = formContextValue;
-
-    // Generation counter to discard stale validation results from concurrent runs
+    const optionsRef = useRef<UseSchemaFormOptions>({});
+    optionsRef.current = { createMissingStructure: true, ...options };
+    const mountedRef = useRef(true);
+    const epochRef = useRef(0);
     const validationGenRef = useRef(0);
+    const submissionLockRef = useRef(false);
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const cancelScheduledValidation = useCallback(() => {
+        if (timerRef.current !== null) clearTimeout(timerRef.current);
+        timerRef.current = null;
+    }, []);
+    useEffect(() => {
+        mountedRef.current = true;
+        return () => {
+            mountedRef.current = false;
+            epochRef.current++;
+            validationGenRef.current++;
+            cancelScheduledValidation();
+        };
+    }, [cancelScheduledValidation]);
 
-    /**
-     * Runs full schema validation using getErrorsFor to extract per-field errors.
-     * Optionally marks all fields as touched (used by submit/explicit validate).
-     */
     const runValidation = useCallback(
         async (
             markTouched: boolean
         ): Promise<ValidationResult<InferType<TSchema>>> => {
+            cancelScheduledValidation();
             const gen = ++validationGenRef.current;
-            const values = store.getValues();
-            // Ensure all nested object structures exist to prevent
-            // ObjectSchemaBuilder.validateAsync() from throwing on undefined nested objects
-            const safeValues = ensureNestedStructure(values, schemaRef.current);
+            const revision = store.getRevision();
+            for (const path of store.getAllFieldPaths()) {
+                store.updateFieldState(path, { validating: true });
+            }
+            const safeValues = ensureNestedStructure(
+                store.getValues(),
+                schemaRef.current
+            );
             let result: ValidationResult<InferType<TSchema>>;
             try {
                 result = (await schemaRef.current.validateAsync(safeValues, {
                     doNotStopOnFirstError: true
                 })) as ValidationResult<InferType<TSchema>>;
             } catch {
-                // If validation itself throws, treat as invalid
-                return { valid: false } as ValidationResult<InferType<TSchema>>;
+                result = { valid: false } as ValidationResult<
+                    InferType<TSchema>
+                >;
             }
+            // A value update invalidates validation immediately, even while the next
+            // validation is only scheduled (debounced) and has not started yet.
+            if (
+                !mountedRef.current ||
+                gen !== validationGenRef.current ||
+                revision !== store.getRevision()
+            )
+                return result;
 
-            // Discard results if a newer validation has started since this one began
-            if (gen !== validationGenRef.current) {
-                return result as ValidationResult<InferType<TSchema>>;
+            for (const path of store.getAllFieldPaths()) {
+                store.updateFieldState(path, {
+                    error: undefined,
+                    validating: false,
+                    ...(markTouched ? { touched: true } : {})
+                });
             }
-
-            // Clear all existing field errors
-            const allPaths = store.getAllFieldPaths();
-            for (const p of allPaths) {
-                const patch: Partial<{
-                    error: string | undefined;
-                    touched: boolean;
-                }> = { error: undefined };
-                if (markTouched) {
-                    patch.touched = true;
-                }
-                store.updateFieldState(p, patch);
-            }
-
-            // Use getErrorsFor to extract per-field errors via tree selectors
-            const resultWithErrors = result as ValidationResult<
-                InferType<TSchema>
-            > & {
-                getErrorsFor?: (selector: (t: any) => any) => {
-                    errors: ReadonlyArray<string>;
-                    isValid: boolean;
-                };
-                errors?: ReadonlyArray<{ message: string; path?: string }>;
-            };
-
-            // Build a map of errors found via getErrorsFor so we can detect gaps
-            const fieldsWithErrors = new Set<string>();
-
-            if (typeof resultWithErrors.getErrorsFor === 'function') {
-                const getErrorsFor = resultWithErrors.getErrorsFor;
-
-                // Extract per-field errors by building selectors from field paths
-                for (const [, path] of pathMap) {
+            const getErrorsFor = (result as any).getErrorsFor;
+            if (typeof getErrorsFor === 'function') {
+                for (const [descriptor] of pathMap) {
+                    const path = descriptor.toJsonPointer();
+                    const parts = path
+                        .slice(1)
+                        .split('/')
+                        .map(part =>
+                            part.replace(/~1/g, '/').replace(/~0/g, '~')
+                        );
                     try {
-                        const selector = buildSelectorFromPath(path);
-                        const fieldResult = getErrorsFor(selector);
+                        const field = getErrorsFor((tree: any) =>
+                            parts.reduce(
+                                (value: any, key) => value?.[key],
+                                tree
+                            )
+                        );
                         if (
-                            fieldResult &&
-                            Array.isArray(fieldResult.errors) &&
-                            fieldResult.errors.length > 0
+                            Array.isArray(field?.errors) &&
+                            field.errors.length
                         ) {
-                            const errorMessage = fieldResult.errors[0];
-                            const patch: Partial<{
-                                error: string | undefined;
-                                touched: boolean;
-                            }> = { error: errorMessage };
-                            if (markTouched) {
-                                patch.touched = true;
-                            }
-                            store.updateFieldState(path, patch);
-                            fieldsWithErrors.add(path);
+                            store.updateFieldState(path, {
+                                error: field.errors[0]
+                            });
                         }
                     } catch {
-                        // If getErrorsFor fails for this path, skip
+                        // A missing error selector must not prevent other fields
+                        // from receiving their validation results.
                     }
                 }
             }
-
-            return result as ValidationResult<InferType<TSchema>>;
+            return result;
         },
-        [store, pathMap]
+        [cancelScheduledValidation, store, pathMap]
     );
 
-    const validate = useCallback(async (): Promise<
-        ValidationResult<InferType<TSchema>>
-    > => {
-        return runValidation(true);
-    }, [runValidation]);
-
-    const submit = useCallback(async (): Promise<
-        ValidationResult<InferType<TSchema>>
-    > => {
-        return validate();
-    }, [validate]);
-
+    const validate = useCallback(() => runValidation(true), [runValidation]);
+    const submit = useCallback(() => validate(), [validate]);
     const reset = useCallback(
         (values?: Partial<InferType<TSchema>>) => {
-            const newValues = values ?? {};
-            store.resetAll(newValues);
+            epochRef.current++;
+            validationGenRef.current++;
+            cancelScheduledValidation();
+            store.resetAll(values);
         },
+        [store, cancelScheduledValidation]
+    );
+    const getValue = useCallback(
+        (): InferType<TSchema> => store.getValues(),
         [store]
     );
-
-    const getValue = useCallback((): InferType<TSchema> => {
-        return store.getValues();
-    }, [store]);
-
-    const setValueFn = useCallback(
+    const setValue = useCallback(
         (values: Partial<InferType<TSchema>>) => {
-            const currentValues = store.getValues();
-            const merged = { ...currentValues, ...values };
-            store.setValues(merged);
-            store.notifyAll();
+            cancelScheduledValidation();
+            store.setValues({ ...store.getValues(), ...values });
         },
-        [store]
+        [store, cancelScheduledValidation]
     );
-
-    const _getFormContext = useCallback(() => formContextRef.current, []);
-
-    // Validate on mount when requested — runs once after first render
-    const validateOnMountRef = useRef(resolvedOptions.validateOnMount);
-    // biome-ignore lint/correctness/useExhaustiveDependencies: We only want to check validateOnMount on the initial mount, ignoring changes to it after that
-    useEffect(() => {
-        if (validateOnMountRef.current) {
-            runValidation(true);
-        }
-    }, []);
-
-    // Create a debounced version of runValidation for onChange triggers.
-    // validate(), submit(), and validateOnMount always use runValidation directly.
-    const debouncedValidationRef = useRef<
-        ((markTouched: boolean) => void) | null
-    >(null);
-    if (
-        resolvedOptions.validationDebounceMs != null &&
-        resolvedOptions.validationDebounceMs > 0 &&
-        !debouncedValidationRef.current
-    ) {
-        debouncedValidationRef.current = debounce((markTouched: boolean) => {
-            runValidation(markTouched);
-        }, resolvedOptions.validationDebounceMs);
-    }
-
     const triggerValidation = useCallback(
         (markTouched: boolean) => {
-            if (debouncedValidationRef.current) {
-                debouncedValidationRef.current(markTouched);
-                return Promise.resolve(
-                    undefined as unknown as ValidationResult<InferType<TSchema>>
-                );
+            cancelScheduledValidation();
+            const delay = optionsRef.current.validationDebounceMs;
+            if (delay != null && delay > 0) {
+                timerRef.current = setTimeout(() => {
+                    timerRef.current = null;
+                    void runValidation(markTouched);
+                }, delay);
+                return Promise.resolve();
             }
             return runValidation(markTouched);
         },
-        [runValidation]
+        [runValidation, cancelScheduledValidation]
     );
 
+    const handleSubmit = useCallback(
+        <TData>(
+            onValid: (
+                values: InferType<TSchema>
+            ) => FormSubmitResult<TData> | Promise<FormSubmitResult<TData>>,
+            submissionOptions?: FormSubmitOptions<InferType<TSchema>, TData>
+        ): FormSubmitHandler =>
+            async event => {
+                event?.preventDefault();
+                if (submissionLockRef.current || !mountedRef.current) return;
+                submissionLockRef.current = true;
+                const epoch = epochRef.current;
+                const current = () =>
+                    mountedRef.current && epoch === epochRef.current;
+                store.setSubmissionState({
+                    submitting: true,
+                    error: undefined
+                });
+                try {
+                    const revision = store.getRevision();
+                    const result = await runValidation(true);
+                    if (
+                        !current() ||
+                        revision !== store.getRevision() ||
+                        !result.valid ||
+                        result.object === undefined
+                    )
+                        return;
+                    const values = result.object;
+                    let outcome: FormSubmitResult<TData>;
+                    try {
+                        outcome = await onValid(values);
+                    } catch (error) {
+                        if (!current()) return;
+                        if (!submissionOptions?.onError) throw error;
+                        const message = await submissionOptions.onError(error);
+                        if (current())
+                            store.setSubmissionState({ error: message });
+                        return;
+                    }
+                    if (!current()) return;
+                    if (outcome && !outcome.ok) {
+                        store.setSubmissionState({ error: outcome.error });
+                        return;
+                    }
+                    // Errors from success callbacks (including redirects) propagate;
+                    // they are not translated as failures of a completed submission.
+                    await submissionOptions?.onSuccess?.(outcome?.data, values);
+                } finally {
+                    submissionLockRef.current = false;
+                    if (mountedRef.current)
+                        store.setSubmissionState({ submitting: false });
+                }
+            },
+        [runValidation, store]
+    );
+
+    const formContextValue = useMemo<FormContextValue>(
+        () => ({
+            store,
+            descriptorTree,
+            schema: schemaRef.current,
+            pathMap,
+            get options() {
+                return optionsRef.current;
+            },
+            triggerValidation
+        }),
+        [store, descriptorTree, pathMap, triggerValidation]
+    );
+    const formContextRef = useRef(formContextValue);
+    formContextRef.current = formContextValue;
+    const _getFormContext = useCallback(() => formContextRef.current, []);
     const useFieldHook = useCallback(
-        <TPropertySchema extends SchemaBuilder<any, any, any>>(
-            forProperty: (
+        <TPropertySchema extends SchemaBuilder<any, any, any, any>>(
+            selector: (
                 tree: PropertyDescriptorTree<TSchema, TSchema>
             ) => PropertyDescriptor<TSchema, TPropertySchema, any>
-        ): UseFieldResult<InferType<TPropertySchema>> => {
-            return useFieldFromContext(
-                formContextRef.current,
-                forProperty,
-                triggerValidation
-            ) as UseFieldResult<InferType<TPropertySchema>>;
-        },
-        [triggerValidation]
+        ): UseFieldResult<InferType<TPropertySchema>> =>
+            useFieldFromContext(formContextRef.current, selector),
+        []
     );
+    const validateOnMountRef = useRef(options?.validateOnMount);
+    useEffect(() => {
+        if (validateOnMountRef.current) void runValidation(true);
+    }, [runValidation]);
 
+    // Subscribe to submission state without changing the controller's identity.
+    useSyncExternalStore(
+        store.subscribeGlobal,
+        store.getSubmissionState,
+        store.getSubmissionState
+    );
     return useMemo(
         () => ({
             useField: useFieldHook,
@@ -301,8 +331,15 @@ export function useSchemaForm<
             validate,
             reset,
             getValue,
-            setValue: setValueFn,
-            _getFormContext
+            setValue,
+            handleSubmit,
+            _getFormContext,
+            get submitting() {
+                return store.getSubmissionState().submitting;
+            },
+            get error() {
+                return store.getSubmissionState().error;
+            }
         }),
         [
             useFieldHook,
@@ -310,122 +347,72 @@ export function useSchemaForm<
             validate,
             reset,
             getValue,
-            setValueFn,
-            _getFormContext
+            setValue,
+            handleSubmit,
+            _getFormContext,
+            store
         ]
     );
 }
 
-// ─── useField (from context) ─────────────────────────────────────────────────
-
-/**
- * Internal useField implementation, requires FormContextValue.
- * Returns UseFieldResult with untyped values — callers should cast to the proper generic type.
- */
+/** Internal field binding shared by direct and context-based hooks. */
 export function useFieldFromContext(
     formContext: FormContextValue,
     forProperty: (tree: any) => any,
-    triggerValidation?: (markTouched: boolean) => Promise<any>
+    triggerValidation = formContext.triggerValidation
 ): UseFieldResult {
-    const { store, descriptorTree, options, pathMap } = formContext;
-
-    const descriptor = forProperty(descriptorTree as any);
-    const inner = descriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
-    const path = getDescriptorPath(inner, pathMap);
-    const fieldSchema = inner.getSchema();
-
-    // Initialize field state from current values on first access
-    const initializedRef = useRef<string | null>(null);
-
-    if (initializedRef.current !== path) {
-        const values = store.getValues();
-        const { success, value } = inner.getValue(values);
-        const currentState = store.getFieldState(path);
-        if (currentState.initialValue === undefined && !currentState.touched) {
-            const resolvedValue = success ? value : undefined;
-            store.updateFieldState(path, {
-                value: resolvedValue,
-                initialValue: resolvedValue,
-                dirty: false
-            });
-        }
-        initializedRef.current = path;
-    }
-
-    const [, setRenderTick] = useState(0);
-
-    // Subscribe to field changes with proper cleanup on unmount/path change
-    useEffect(() => {
-        const unsub = store.subscribe(path, () => {
-            setRenderTick(c => c + 1);
-        });
-        return unsub;
-    }, [store, path]);
-
+    const { store, descriptorTree, options } = formContext;
+    const inner =
+        forProperty(descriptorTree)[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+    const path = inner.toJsonPointer();
+    store.registerField(path, inner);
+    const subscribe = useCallback(
+        (listener: () => void) => store.subscribe(path, listener),
+        [store, path]
+    );
+    const getSnapshot = useCallback(
+        () => store.getFieldState(path),
+        [store, path]
+    );
+    const fieldState = useSyncExternalStore(
+        subscribe,
+        getSnapshot,
+        getSnapshot
+    );
     const onChange = useCallback(
         (value: any) => {
-            const values = store.getValues();
-            inner.setValue(values, value, {
-                createMissingStructure: options.createMissingStructure !== false
-            });
-            store.setValues(values);
-            const currentState = store.getFieldState(path);
-            store.updateFieldState(path, {
+            store.setFieldValue(
+                path,
                 value,
-                dirty: value !== currentState.initialValue
-            });
-            // Run validation on every field change (without marking all fields touched)
-            if (triggerValidation) {
-                triggerValidation(false);
-            }
+                options.createMissingStructure !== false
+            );
+            void triggerValidation?.(false);
         },
-        [store, inner, path, options, triggerValidation]
+        [store, path, options.createMissingStructure, triggerValidation]
     );
-
-    const onBlur = useCallback(() => {
-        store.updateFieldState(path, { touched: true });
-    }, [store, path]);
-
-    const setValue = useCallback(
-        (value: any) => {
-            onChange(value);
-        },
-        [onChange]
+    const onBlur = useCallback(
+        () => store.updateFieldState(path, { touched: true }),
+        [store, path]
     );
-
-    const fieldState = store.getFieldState(path);
-
     return {
-        value: fieldState.value,
-        initialValue: fieldState.initialValue,
-        dirty: fieldState.dirty,
-        touched: fieldState.touched,
-        error: fieldState.error,
-        validating: fieldState.validating,
+        ...fieldState,
         onChange,
         onBlur,
-        setValue,
-        schema: fieldSchema
+        setValue: onChange,
+        schema: inner.getSchema()
     };
 }
 
-/**
- * Resolves a renderer from the FormSystem config based on schema type and optional variant.
- *
- * When `variant` is provided the registry is checked for `"type:variant"` first
- * (e.g. `"string:password"`). If no match is found it falls back to the base
- * `"type"` key (e.g. `"string"`).
- */
+/** Resolve type:variant first, falling back to the base type. */
 export function resolveRenderer(
     config: FormSystemConfig | null,
-    schema: SchemaBuilder<any, any, any>,
+    schema: SchemaBuilder<any, any, any, any>,
     variant?: string
 ): FieldRenderer | undefined {
     if (!config?.renderers) return undefined;
     const type = getSchemaType(schema);
-    if (variant) {
-        const variantRenderer = config.renderers[`${type}:${variant}`];
-        if (variantRenderer) return variantRenderer;
-    }
-    return config.renderers[type];
+    return (
+        (variant ? config.renderers[`${type}:${variant}`] : undefined) ??
+        config.renderers[type]
+    );
 }

@@ -5,6 +5,7 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
+        "@cleverbrush/deep": "^4.4.3",
         "@cleverbrush/schema": "^4.4.3"
     },
     "devDependencies": {

@@ -1,113 +1,117 @@
-import { HashObject } from './hashObject.js';
+import { enumerableKeys, isPlainObject } from './data.js';
 
-const isBothNaN = (v1: any, v2: any) => Number.isNaN(v1) && Number.isNaN(v2);
+function isArrayIndex(key: string | symbol): boolean {
+    if (typeof key !== 'string') return false;
+    const index = Number(key);
+    return (
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < 2 ** 32 - 1 &&
+        String(index) === key
+    );
+}
 
 /**
- * Compares two objects and returns true if they
- * have the same structure and values. Can work
- * with arrays and objects, nested objects,
- * recursive objects, dates, etc.
- * @param p1 first object
- * @param p2 second object
- * @param options additional options
- * @returns {boolean} `true` if the objects are equal, `false` otherwise
+ * Structurally compares plain objects and arrays (including cycles). Dates
+ * compare by timestamp; primitives and opaque objects use Object.is semantics.
+ * Only enumerable own string/symbol properties participate in structural
+ * comparisons. Shared-reference topology does not affect equality.
  */
 export const deepEqual = (
     p1: any,
     p2: any,
     options?: {
-        /**
-         * if true, the order of the elements in the array will be disregarded
-         * e.g. [1, 2] and [2, 1] will be considered equal
-         */
+        /** Ignore array element order, but preserve duplicate and hole counts. */
         disregardArrayOrder?: boolean;
     }
 ): boolean => {
-    const cache = new Map();
+    // Track pairs on the current recursion path, not all objects ever visited.
+    // Removing pairs on return also isolates failed unordered-array candidates.
+    const active = new WeakMap<object, Set<object>>();
 
-    const compare = (...args: any[]) => {
-        const arraysAreIdentical = (a1: any, a2: any) => {
-            if (a1.length !== a2.length) return false;
-            if (a1.length === 0 && a2.length === 0) return true;
+    function compareProperties(
+        left: object,
+        right: object,
+        leftKeys: (string | symbol)[],
+        rightKeys: (string | symbol)[]
+    ): boolean {
+        const rightKeySet = new Set(rightKeys);
+        return (
+            leftKeys.length === rightKeys.length &&
+            leftKeys.every(
+                key =>
+                    rightKeySet.has(key) &&
+                    compare(Reflect.get(left, key), Reflect.get(right, key))
+            )
+        );
+    }
 
-            const c1 = options?.disregardArrayOrder
-                ? a1
-                      .map((t: any) => t)
-                      .sort((l: any, r: any) => {
-                          const hash1 = HashObject(l);
-                          const hash2 = HashObject(r);
-                          return hash1 < hash2 ? 1 : -1;
-                      })
-                : a1.map((t: any) => t);
-            const c2 = options?.disregardArrayOrder
-                ? a2
-                      .map((t: any) => t)
-                      .sort((l: any, r: any) => {
-                          const hash1 = HashObject(l);
-                          const hash2 = HashObject(r);
-                          return hash1 < hash2 ? 1 : -1;
-                      })
-                : a2.map((t: any) => t);
-
-            for (let i = 0; i < c1.length; i++) {
-                if (!compare(c1[i], c2[i])) return false;
-            }
-            return true;
-        };
-
-        if (args.length !== 2) return false;
-        const [o1, o2] = args;
-        if (o1 === o2) return true;
-        if (typeof o1 !== typeof o2) return false;
-        if (isBothNaN(o1, o2)) return true;
-
+    function compareUnordered(
+        left: object,
+        right: object,
+        leftKeys: (string | symbol)[],
+        rightKeys: (string | symbol)[]
+    ): boolean {
+        const leftIndices = leftKeys.filter(isArrayIndex);
+        const rightIndices = rightKeys.filter(isArrayIndex);
+        if (leftIndices.length !== rightIndices.length) return false;
         if (
-            (Array.isArray(o1) && !Array.isArray(o2)) ||
-            (!Array.isArray(o1) && Array.isArray(o2))
+            !compareProperties(
+                left,
+                right,
+                leftKeys.filter(key => !isArrayIndex(key)),
+                rightKeys.filter(key => !isArrayIndex(key))
+            )
         ) {
             return false;
         }
-        if (Array.isArray(o1) && Array.isArray(o2)) {
-            return arraysAreIdentical(o1, o2);
-        }
 
-        if (typeof o1 === 'object' && o1 !== null) {
-            if (cache.get(o1) === true) {
+        const unmatched = new Set(rightIndices);
+        for (const key of leftIndices) {
+            const value = Reflect.get(left, key);
+            const match = Array.from(unmatched).find(candidate =>
+                compare(value, Reflect.get(right, candidate))
+            );
+            if (match === undefined) return false;
+            unmatched.delete(match);
+        }
+        return true;
+    }
+
+    function compare(left: any, right: any): boolean {
+        if (Object.is(left, right)) return true;
+        if (left instanceof Date || right instanceof Date) {
+            return (
+                left instanceof Date &&
+                right instanceof Date &&
+                Object.is(left.getTime(), right.getTime())
+            );
+        }
+        if (Array.isArray(left)) {
+            if (!Array.isArray(right) || left.length !== right.length) {
                 return false;
             }
-
-            cache.set(o1, true);
-
-            if (o1 instanceof Date && o2 instanceof Date) {
-                return (
-                    // biome-ignore lint/suspicious/noGlobalIsNan: isNaN coerces Date to number, which is the intended behavior here
-                    !isNaN(o1 as any) &&
-                    // biome-ignore lint/suspicious/noGlobalIsNan: isNaN coerces Date to number, which is the intended behavior here
-                    !isNaN(o2 as any) &&
-                    o1.getTime() === o2.getTime()
-                );
-            }
-
-            const keys1 = Object.keys(o1);
-            const keys2 = Object.keys(o2);
-            if (keys1.length !== keys2.length) return false;
-
-            keys1.sort();
-            keys2.sort();
-            for (let i = 0; i < keys1.length; i++) {
-                if (keys1[i] !== keys2[i]) {
-                    return false;
-                }
-
-                const v1 = o1[keys1[i]];
-                const v2 = o2[keys1[i]];
-                if (!compare(v1, v2)) return false;
-            }
-            return true;
+        } else if (!isPlainObject(left) || !isPlainObject(right)) {
+            return false;
         }
 
-        return false;
-    };
+        let partners = active.get(left);
+        if (partners?.has(right)) return true;
+        if (!partners) {
+            partners = new Set();
+            active.set(left, partners);
+        }
+        partners.add(right);
+        try {
+            const leftKeys = enumerableKeys(left);
+            const rightKeys = enumerableKeys(right);
+            return Array.isArray(left) && options?.disregardArrayOrder
+                ? compareUnordered(left, right, leftKeys, rightKeys)
+                : compareProperties(left, right, leftKeys, rightKeys);
+        } finally {
+            partners.delete(right);
+        }
+    }
 
     return compare(p1, p2);
 };

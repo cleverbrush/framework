@@ -147,7 +147,7 @@ const UpdateTodo = endpoint
     .patch('/api/todos/:id')
     .body(UpdateTodoBody)
     .clearsCacheTag('todo-list')               // clears the collection cache
-    .clearsCacheTag('todo', p => ({ id: p.params.id }))  // clears specific entity
+    .clearsCacheTag('todo', p => ({ id: p.params.id }))  // entity label + external computed key
     .returns(TodoSchema);
 ```
 
@@ -159,6 +159,18 @@ const UpdateTodo = endpoint
   property becomes part of the cache key (different pages → different entries).
 - **Immutability** — both methods return a new builder; the original is
   unchanged.
+
+`computeCacheKey` (also exported from the browser-safe `@cleverbrush/server/contract`)
+and the client's `computeCacheTagKey` use the same deterministic `ct2:` encoding.
+It distinguishes types, normalizes property order and preserves date milliseconds.
+`cacheResponse()` invalidates only after successful mutations and prevents older
+in-flight reads from refilling any invalidated alias. In-memory invalidation retains
+tag-name-prefix coverage; it is not limited to the mutation's selected entity ID.
+
+**Breaking:** computed keys changed, even for property-free tags. Upgrade external
+writers/invalidators together and retire old entries. Literal base labels and TTLs
+are unchanged. Endpoint response identity and auth/tenant isolation remain the
+consumer's responsibility. See the [migration guide](../../docs/cache-form-migration.md#cache-key-migration-breaking).
 
 ## Registering and Handling Endpoints
 

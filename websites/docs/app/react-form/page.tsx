@@ -10,6 +10,7 @@ import { number, object, string } from '@cleverbrush/schema';
 import { InstallBanner } from '@cleverbrush/website-shared/components/InstallBanner';
 import { highlightTS } from '@cleverbrush/website-shared/lib/highlight';
 import { type InputHTMLAttributes, type ReactNode, useState } from 'react';
+import LifecycleDemo from './LifecycleDemo';
 
 /* ── Live Quick-Start form ──────────────────────────────────────── */
 
@@ -296,6 +297,75 @@ function App() {
                         out-of-range age to see validation in action:
                     </p>
                     <QuickStartLiveDemo />
+                </div>
+
+                <div className="card">
+                    <h2>Typed renderers and submission lifecycle</h2>
+                    <p>
+                        Create a UI-agnostic typed registry once with{' '}
+                        <code>defineFieldRenderer&lt;Value, Props&gt;</code> and{' '}
+                        <code>createFormSystem</code>. Its <code>Field</code>{' '}
+                        checks the selected value, variant and custom props.
+                        Extend it by spreading <code>system.renderers</code>.
+                        Its optional <code>Provider</code> also configures
+                        legacy fields.
+                    </p>
+                    <pre>
+                        <code
+                            // biome-ignore lint/security/noDangerouslySetInnerHtml: highlighted static example
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const select = defineFieldRenderer<string, { options: string[] }>(props => (
+  <select value={props.value ?? ''} onChange={e => props.onChange(e.target.value)}>
+    {props.fieldProps?.options.map(value => <option key={value}>{value}</option>)}
+  </select>
+));
+const ui = createFormSystem({ renderers: { 'string:select': select } });
+
+function ProfileForm() {
+  const form = useSchemaForm(ProfileSchema);
+  const submit = form.handleSubmit(saveProfile, {
+    onSuccess: saved => { showConfirmation('Saved'); form.reset(); },
+    onError: error => {
+      if (isExpectedNetworkError(error)) return 'Please try again';
+      throw error;
+    }
+  });
+  return <form onSubmit={submit}>
+    <ui.Field form={form} forProperty={t => t.role} variant="select"
+      fieldProps={{ options: ['reader', 'editor'] }} />
+    {form.error && <p role="alert">{form.error}</p>}
+    <button disabled={form.submitting}>Save</button>
+  </form>;
+}`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        The submit callback returns <code>void</code>,{' '}
+                        <code>{'{ ok: true, data? }'}</code>, or{' '}
+                        <code>{'{ ok: false, error: string }'}</code>. Duplicate
+                        submissions are locked from validation onward. Errors
+                        propagate unless <code>onError</code> translates them;
+                        exceptions in <code>onSuccess</code> always propagate.
+                        Notifications and navigation remain application-owned.
+                    </p>
+                    <p>
+                        <code>reset(values)</code> updates mounted text, select
+                        and checkbox fields and establishes a clean baseline;
+                        <code> reset()</code> clears them. The form controller
+                        is stable. Value changes invalidate old async
+                        validation. Reset/unmount suppresses old submission
+                        callbacks without cancelling a network operation or
+                        prematurely unlocking it.
+                    </p>
+                    <h3>Try the lifecycle</h3>
+                    <p>
+                        Load sample values, edit or clear them, and try a failed
+                        save followed by a retry. A successful save clears the
+                        mounted fields. This demo waits 600 ms locally and sends
+                        no data to a server.
+                    </p>
+                    <LifecycleDemo />
                 </div>
 
                 {/* ── Why ──────────────────────────────────────────── */}
@@ -775,9 +845,10 @@ function App() {
                                         <code>form.reset(values?)</code>
                                     </td>
                                     <td>
-                                        Resets the form to initial values (or
-                                        provided values). Clears dirty/touched
-                                        state.
+                                        Clears values, or establishes supplied
+                                        values as a new clean baseline. Updates
+                                        mounted fields and clears errors,
+                                        dirty/touched/validating state.
                                     </td>
                                 </tr>
                                 <tr>
@@ -794,8 +865,9 @@ function App() {
                                         <code>form.setValue(values)</code>
                                     </td>
                                     <td>
-                                        Sets form values programmatically
-                                        (partial update).
+                                        Shallow-merges values and updates
+                                        mounted fields without marking them
+                                        touched.
                                     </td>
                                 </tr>
                                 <tr>
@@ -806,6 +878,29 @@ function App() {
                                         Hook to access a specific field&apos;s
                                         state. Type-safe via PropertyDescriptor
                                         selector.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>
+                                            form.handleSubmit(onValid, options?)
+                                        </code>
+                                    </td>
+                                    <td>
+                                        Validates, locks duplicate submissions
+                                        and handles explicit results and
+                                        callbacks.
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>
+                                        <code>
+                                            form.submitting / form.error
+                                        </code>
+                                    </td>
+                                    <td>
+                                        Reactive, read-only submission state on
+                                        a stable form controller.
                                     </td>
                                 </tr>
                             </tbody>
@@ -919,10 +1014,7 @@ function App() {
                                     <td>
                                         <code>() =&gt; void</code>
                                     </td>
-                                    <td>
-                                        Mark the field as touched (triggers
-                                        validation)
-                                    </td>
+                                    <td>Mark the field as touched</td>
                                 </tr>
                                 <tr>
                                     <td>
