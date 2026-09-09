@@ -3,6 +3,12 @@
 These changes are application-agnostic. Libraries do not choose an application's
 auth scope, UI kit, notifications, navigation behavior, or cache backend.
 
+This batch is scheduled as a coordinated **minor release** of the fixed package
+group. This release classification does not remove the compatibility changes
+below: external-cache users must coordinate the key-format migration, and
+consumers relying on previous `deepEqual` results must review those assumptions.
+The existing public form APIs remain available.
+
 ## Cache key migration (breaking)
 
 Previously, selected values were converted to strings and joined with delimiters.

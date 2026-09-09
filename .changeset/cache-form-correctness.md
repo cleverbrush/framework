@@ -1,7 +1,7 @@
 ---
-'@cleverbrush/server': major
-'@cleverbrush/client': major
-'@cleverbrush/deep': major
+'@cleverbrush/server': minor
+'@cleverbrush/client': minor
+'@cleverbrush/deep': minor
 '@cleverbrush/react-form': minor
 ---
 
