@@ -30,6 +30,7 @@ export type {
     EntityResultByVariant,
     ExtractBranch,
     HasVariants,
+    RelatedSchema,
     RelKeyTree,
     ResolvedRel,
     SaveGraph,

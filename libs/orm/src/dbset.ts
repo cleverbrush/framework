@@ -23,11 +23,14 @@ import {
     type SchemaQueryBuilder,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
+import type { InferType } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 
 import { EntityNotFoundError } from './errors.js';
+
 import type {
     EntityResult,
+    RelatedSchema,
     RelKeyTree,
     SaveGraph,
     VariantInsertPayload,
@@ -42,6 +45,15 @@ import {
     insertVariant as _insertVariant,
     updateVariant as _updateVariant
 } from './variant-write.js';
+
+const scalarAggregateMethods = new Set<PropertyKey>([
+    'countValue',
+    'countDistinctValue',
+    'sumValue',
+    'avgValue',
+    'minValue',
+    'maxValue'
+]);
 
 // ---------------------------------------------------------------------------
 // EntityQuery — public typed query handle
@@ -70,7 +82,12 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
      */
     include<K extends keyof EntityRelations<TEntity> & string>(
         sel: (t: RelKeyTree<TEntity>) => K,
-        customize?: (q: SchemaQueryBuilder<any, any>) => void
+        customize?: (
+            q: SchemaQueryBuilder<
+                RelatedSchema<TEntity, K>,
+                InferType<RelatedSchema<TEntity, K>>
+            >
+        ) => void
     ): EntityQuery<TEntity, WithIncluded<TEntity, TResult, K>>;
 
     /**
@@ -83,7 +100,14 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
     includeVariant<TVariant extends string, TRel extends string>(
         variantKey: TVariant,
         relationName: TRel,
-        customize?: (q: SchemaQueryBuilder<any, any>) => void
+        customize?: (
+            q: TRel extends keyof EntityRelations<TEntity>
+                ? SchemaQueryBuilder<
+                      RelatedSchema<TEntity, TRel>,
+                      InferType<RelatedSchema<TEntity, TRel>>
+                  >
+                : SchemaQueryBuilder<any, any>
+        ) => void
     ): EntityQuery<
         TEntity,
         TRel extends keyof EntityRelations<TEntity> & string
@@ -232,15 +256,33 @@ export interface VariantDbSet<
     > {
     // Re-declared so that `this` resolves to `VariantDbSet<TEntity, K>`
     // rather than the raw `SchemaQueryBuilder` (Omit doesn't preserve `this`).
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(
         column: ColumnRef<EntitySchema<TEntity>>,
         operator: string,
         value: any
     ): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(column: ColumnRef<EntitySchema<TEntity>>, value: any): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(raw: Knex.Raw, operator: string, value: any): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(callback: (builder: Knex.QueryBuilder) => void): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(record: Record<string, any>): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(raw: Knex.Raw): this;
     /**
      * Eager-load a relation declared on `TEntity`. Identical to
@@ -248,7 +290,12 @@ export interface VariantDbSet<
      */
     include<R extends keyof EntityRelations<TEntity> & string>(
         sel: (t: RelKeyTree<TEntity>) => R,
-        customize?: (q: SchemaQueryBuilder<any, any>) => void
+        customize?: (
+            q: SchemaQueryBuilder<
+                RelatedSchema<TEntity, R>,
+                InferType<RelatedSchema<TEntity, R>>
+            >
+        ) => void
     ): VariantDbSet<TEntity, K>;
 
     /** Look up a single row by PK, typed to this variant. */
@@ -417,6 +464,8 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                     // Wrap Promise results to auto-attach tracked entities.
                     if (
                         onResults != null &&
+                        sqb.returnsEntityRows &&
+                        !scalarAggregateMethods.has(prop) &&
                         result != null &&
                         typeof (result as any).then === 'function'
                     ) {
@@ -910,6 +959,8 @@ function wrapVariantQuery<
                     if (result === sqb) return proxy;
                     if (
                         onResults != null &&
+                        sqb.returnsEntityRows &&
+                        !scalarAggregateMethods.has(prop) &&
                         result != null &&
                         typeof (result as any).then === 'function'
                     ) {

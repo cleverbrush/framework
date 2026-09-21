@@ -297,11 +297,19 @@ export function createDb<TMap extends EntityMap>(
     entities: TMap,
     opts: { tracking: true }
 ): TrackedDbContext<TMap>;
+/**
+ * Create a database context with a fresh typed query starter for each entity.
+ * @param knex - Database connection or transaction.
+ * @param entities - Named entity definitions exposed as context properties.
+ * @param opts - Enable tracking to add identity-map and explicit saveChanges() behavior.
+ * @returns A non-tracking context by default; the tracking overload adds unit-of-work APIs.
+ */
 export function createDb<TMap extends EntityMap>(
     knex: Knex,
     entities: TMap,
     opts?: { tracking?: false | undefined }
 ): DbContext<TMap>;
+/** Create the tracking or non-tracking context selected by opts.tracking. */
 export function createDb<TMap extends EntityMap>(
     knex: Knex,
     entities: TMap,

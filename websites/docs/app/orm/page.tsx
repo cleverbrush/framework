@@ -505,6 +505,23 @@ npx cb-orm db push`
 
                 {/* ── See Also ─────────────────────────────────────── */}
                 <div className="card">
+                    <h2>Reliable query composition</h2>
+                    <p>
+                        Eager loading retains parent ordering and page size.
+                        Relation customization callbacks infer the foreign
+                        schema. Scalar aggregate helpers accept optional output
+                        schemas; typed projections support grouped aggregates.
+                        DTOs are not tracked as entities.
+                    </p>
+                    <p>
+                        ORM re-exports flat-join aliases and aggregate
+                        expressions. Composite cursors support non-null scalar
+                        sort fields with a declared unique tie-breaker. Read the{' '}
+                        <a href="/knex-schema">query guide</a> for examples and
+                        compatibility details.
+                    </p>
+                </div>
+                <div className="card">
                     <h2>See Also</h2>
                     <ul>
                         <li>

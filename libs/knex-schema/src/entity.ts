@@ -48,7 +48,13 @@ export interface RelationInfo<
         any
     > = ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > {
+    /**
+     * Relation cardinality used to infer nested object or collection results.
+     */
     readonly kind: TKind;
+    /**
+     * Foreign schema retained at the type level for relation callback completion.
+     */
     readonly foreign: TForeign;
 }
 
@@ -197,6 +203,11 @@ export class Entity<
     /** @internal Phantom slot to retain `TVariantUnion` in inferred types. */
     private declare readonly __variantUnion__: TVariantUnion;
 
+    /**
+     * Wrap a schema as an entity definition with typed relation metadata.
+     * Prefer defineEntity(schema) for inference. Relation/variant methods return new
+     * definitions; constructing an Entity does not query or create database tables.
+     */
     constructor(schema: TSchema) {
         this.schema = schema;
     }
@@ -226,7 +237,7 @@ export class Entity<
      * via `opts.foreign` only when peeling fails.
      *
      * @param navSel    Selector of nav property: `t => t.author`
-     * @param localSel  Selector of local-side join key: `l => l.id`
+     * @param _localSel Selector of local-side join key: `l => l.id`
      * @param remoteSel Selector of remote-side FK on foreign schema: `r => r.userId`
      * @param opts      Optional `{ optional?: boolean }` (default false).
      */
@@ -270,7 +281,7 @@ export class Entity<
      * Declare a one-to-many relation where the FK lives on the FOREIGN table.
      *
      * @param navSel    Selector of nav array property: `t => t.posts`
-     * @param localSel  Selector of local-side join key: `l => l.id`
+     * @param _localSel Selector of local-side join key: `l => l.id`
      * @param remoteSel Selector of remote-side FK on foreign schema: `r => r.userId`
      */
     hasMany<
@@ -311,7 +322,7 @@ export class Entity<
      *
      * @param navSel    Selector of nav property (foreign schema, usually `.optional()`).
      * @param localSel  Selector of local-side FK property: `l => l.userId`
-     * @param remoteSel Selector of foreign-side PK property: `r => r.id`
+     * @param _remoteSel Selector of foreign-side PK property: `r => r.id`
      */
     belongsTo<
         TKey extends keyof SchemaProps<TSchema> & string,

@@ -344,7 +344,37 @@ npx cb-orm validate
 
 ---
 
-## See also
+## Composable queries
+
+ORM re-exports `alias`, `eq`, `and`, `or`, and `aggregate`. Use
+`query(db.knex, alias(TaskSchema, 'task'))` for flat DTO joins and `include` for
+nested relations. Transaction-bound contexts expose their transaction as `db.knex`.
+
+`countValue`, `countDistinctValue`, `sumValue`, `avgValue`, `minValue`, and
+`maxValue` are available on entity queries. An optional `{ output: schema }`
+replaces default decoding and controls the inferred output, including nulls.
+Aggregate/DTO projections are not attached as entities in tracked contexts.
+
+```ts
+const tasks = await db.tasks
+    .orderBy(t => t.createdAt, 'desc')
+    .orderBy(t => t.id, 'desc')
+    .include(t => t.owner, owners => {
+        owners.where(t => t.name, 'Alice'); // foreign schema, not any
+    })
+    .limit(20);
+```
+
+Eager loading retains parent order and page size. Filtering an included relation
+does not necessarily filter parents. Callback types infer the declared foreign
+schema, including variant queries when the relation schema is known.
+
+`paginateAfter({ limit, cursor, orderBy: [...] })` supports non-null scalar sorts
+with a declared unique tie-breaker; single-column cursor calls are unchanged.
+See the [complete query guide](../knex-schema/COMPOSABLE_QUERIES.md) for defaults,
+precision policy, grouped aggregates, cursor restrictions, and migration examples.
+
+## Related packages
 
 - [`@cleverbrush/knex-schema`](../knex-schema) — the underlying schema DSL and
   query builder

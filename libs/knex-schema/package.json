@@ -12,7 +12,8 @@
     },
     "description": "Type-safe schema-driven query builder for Knex using @cleverbrush/schema — strongly typed CRUD, eager loading, and column mapping for PostgreSQL",
     "files": [
-        "dist"
+        "dist",
+        "COMPOSABLE_QUERIES.md"
     ],
     "homepage": "https://docs.cleverbrush.com/knex-schema",
     "keywords": [

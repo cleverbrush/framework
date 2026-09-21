@@ -24,6 +24,10 @@ export interface QueryBuilderState {
 
     /** Name of the projection currently applied, for error messages. */
     appliedProjection: string | null;
+    /** Output aliases and decoders for typed object projections. */
+    projectionColumns: Record<string, string | Knex.Raw> | null;
+    projectionDecoders: Record<string, (value: unknown) => unknown>;
+    hiddenColumns: Set<string>;
 
     /** When true, soft-delete filter is NOT applied. */
     includeDeleted: boolean;

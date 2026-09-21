@@ -9,9 +9,18 @@
  * @public
  */
 export class EntityNotFoundError extends Error {
+    /**
+     * Table/entity label identifying which lookup failed.
+     */
     readonly entity: string;
+    /**
+     * Requested primary-key value, or ordered tuple for a composite key.
+     */
     readonly pk: unknown;
 
+    /**
+     * Describe a failed entity lookup while retaining its entity label and requested key.
+     */
     constructor(entity: string, pk: unknown) {
         super(
             `Entity "${entity}" not found for primary key ${JSON.stringify(pk)}`
@@ -37,6 +46,9 @@ export class ConcurrencyError extends Error {
     /** The row-version value the ORM expected. */
     readonly expected: unknown;
 
+    /**
+     * Describe an optimistic-concurrency failure with the key and row-version value expected by the caller.
+     */
     constructor(entity: string, pk: unknown, expected: unknown) {
         super(
             `Concurrency conflict on "${entity}" (pk=${JSON.stringify(pk)}): ` +
@@ -57,10 +69,22 @@ export class ConcurrencyError extends Error {
  * @public
  */
 export class InvariantViolationError extends Error {
+    /**
+     * Table/entity label whose tracked identity invariant was violated.
+     */
     readonly entity: string;
+    /**
+     * Primary-key value(s) identifying the affected tracked entity.
+     */
     readonly pk: unknown;
+    /**
+     * Immutable identity/discriminator property that was changed.
+     */
     readonly field: string;
 
+    /**
+     * Describe an invalid tracked identity change, preserving its entity, key and field for diagnostics.
+     */
     constructor(entity: string, pk: unknown, field: string, detail: string) {
         super(
             `Invariant violation on "${entity}" (pk=${JSON.stringify(pk)}): ${detail}`
@@ -85,6 +109,9 @@ export class PendingChangesError extends Error {
     /** Number of dirty / added / deleted entries. */
     readonly pendingCount: number;
 
+    /**
+     * Describe disposal with unsaved changes; pendingCount is the number of dirty entries and summary explains them.
+     */
     constructor(pendingCount: number, summary: string) {
         super(
             `DbContext disposed with ${pendingCount} pending change(s). ` +

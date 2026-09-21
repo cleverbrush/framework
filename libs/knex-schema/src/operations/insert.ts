@@ -81,11 +81,18 @@ export interface OnConflictMergeOptions<TLocalSchema extends AnyObjectSchema> {
     ) => void;
 }
 
+/**
+ * Configure one-row conflict handling after SchemaQueryBuilder.onConflict(); merge()/ignore() execute the insert.
+ */
 export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
     readonly #knex: Knex;
     readonly #localSchema: TLocalSchema;
     readonly #conflictColumns: string[];
 
+    /**
+     * Create conflict handling for a schema and resolved conflict columns.
+     * Prefer query(...).onConflict(...) to map property references automatically.
+     */
     constructor(
         knex: Knex,
         localSchema: TLocalSchema,
@@ -97,15 +104,33 @@ export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
         this.#conflictColumns = conflictColumns;
     }
 
+    /**
+     * Insert a row or merge values into the conflicting row.
+     * Without an explicit update payload, merges inserted values; a supplied payload
+     * can contain raw or helper-built expressions. options.where guards the update.
+     * Uses the configured connection/transaction and returns the mapped returned row.
+     */
     async merge(
         data: InsertType<TLocalSchema>,
         options?: OnConflictMergeOptions<TLocalSchema>
     ): Promise<TResult>;
+    /**
+     * Insert a row or merge values into the conflicting row.
+     * Without an explicit update payload, merges inserted values; a supplied payload
+     * can contain raw or helper-built expressions. options.where guards the update.
+     * Uses the configured connection/transaction and returns the mapped returned row.
+     */
     async merge(
         data: InsertType<TLocalSchema>,
         updateData?: OnConflictUpdateData<TLocalSchema>,
         options?: OnConflictMergeOptions<TLocalSchema>
     ): Promise<TResult>;
+    /**
+     * Insert a row or merge values into the conflicting row.
+     * Without an explicit update payload, merges inserted values; a supplied payload
+     * can contain raw or helper-built expressions. options.where guards the update.
+     * Uses the configured connection/transaction and returns the mapped returned row.
+     */
     async merge(
         data: InsertType<TLocalSchema>,
         updateData?:
@@ -132,6 +157,10 @@ export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
         ) as Promise<TResult>;
     }
 
+    /**
+     * Insert the row but do nothing on conflict.
+     * @returns The mapped inserted row, or undefined when PostgreSQL returns no row.
+     */
     async ignore(data: InsertType<TLocalSchema>): Promise<TResult | undefined> {
         return this.#execute(data, 'ignore');
     }
