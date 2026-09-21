@@ -7,6 +7,7 @@ import type {
     PropertyDescriptorTree
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
+import type { AggregateExpression } from './expressions.js';
 
 // ---------------------------------------------------------------------------
 // Utility: extract string keys from an ObjectSchemaBuilder's inferred type
@@ -351,7 +352,9 @@ type DescriptorPropertySchema<T> =
  * @public
  */
 export type SelectProjection<R extends Record<string, unknown>> = {
-    [K in keyof R]: InferType<DescriptorPropertySchema<R[K]>>;
+    [K in keyof R]: R[K] extends AggregateExpression<infer T>
+        ? T
+        : InferType<DescriptorPropertySchema<R[K]>>;
 };
 
 /**
@@ -365,7 +368,10 @@ export type SelectSelector<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = (
     tree: PropertyDescriptorTree<SchemaBase<T>, SchemaBase<T>>
-) => Record<string, PropertyDescriptor<any, any, any>>;
+) => Record<
+    string,
+    PropertyDescriptor<any, any, any> | AggregateExpression<any>
+>;
 
 // ---------------------------------------------------------------------------
 // Pagination result types

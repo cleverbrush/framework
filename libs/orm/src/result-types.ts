@@ -74,6 +74,12 @@ export type RelKeyTree<TEntity extends Entity<any, any, any>> = {
     readonly [K in keyof EntityRelations<TEntity> & string]: K;
 };
 
+/** Schema of an entity's declared navigation property. */
+export type RelatedSchema<
+    TEntity extends Entity<any, any, any>,
+    K extends keyof EntityRelations<TEntity>
+> = EntityRelations<TEntity>[K] extends RelationInfo<any, infer S> ? S : never;
+
 /**
  * Result type after `.include('rel')` is applied.
  *

@@ -43,3 +43,32 @@ jobs:
 
       - name: Test & Typecheck
         run: npm run test
+
+  query-integration:
+    name: PostgreSQL Query Integration
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: framework_queries
+          POSTGRES_USER: framework_test
+          POSTGRES_PASSWORD: framework_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U framework_test -d framework_queries"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      QUERY_TEST_DATABASE_URL: postgres://framework_test:framework_test@127.0.0.1:5432/framework_queries
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:queries:integration

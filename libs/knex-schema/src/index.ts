@@ -1,6 +1,14 @@
 // @cleverbrush/knex-schema — Type-safe schema-driven query builder for Knex
 
 export type {
+    AliasTables,
+    JoinedProjection,
+    JoinPredicate,
+    TableAlias
+} from './aliased-query.js';
+// Types
+export { AliasedQueryBuilder, alias, and, eq, or } from './aliased-query.js';
+export type {
     PrimaryKeyColumns,
     RowVersionColumn,
     RowVersionStrategy
@@ -33,6 +41,14 @@ export type {
 } from './entity.js';
 // Entity wrapper
 export { defineEntity, Entity } from './entity.js';
+export type {
+    AggregateExpression,
+    AggregateOptions,
+    AggregateResult,
+    AliasedColumn,
+    OutputSchema
+} from './expressions.js';
+export { aggregate } from './expressions.js';
 // Schema extension (hasColumnName / hasTableName + DDL/ORM)
 export {
     any,
@@ -73,6 +89,7 @@ export {
     tableExistsInDb,
     validateEntitiesAgainstDatabase
 } from './migration.js';
+export type { CompositeCursorOptions } from './operations/composite-cursor.js';
 // Raw query execution
 export { rawQuery } from './raw.js';
 export type { BoundQuery } from './SchemaQueryBuilder.js';
@@ -88,8 +105,6 @@ export {
     loadSnapshot,
     writeSnapshot
 } from './snapshot.js';
-
-// Types
 export type {
     AddColumnDiff,
     AddForeignKeyDiff,

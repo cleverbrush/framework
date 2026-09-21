@@ -6,6 +6,7 @@ import {
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { buildColumnMap } from '../columns.js';
+import { compileAggregate, isAggregate } from '../expressions.js';
 import { getProjections } from '../extension.js';
 import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
 import type { ColumnRef } from '../types.js';
@@ -40,11 +41,26 @@ export function selectImpl(
             state.selectionMode = 'projection';
             state.appliedProjection = '<inline>';
 
-            const aliasMap: Record<string, string> = {};
+            const aliasMap: Record<string, string | Knex.Raw> = {};
             state.explicitSelects ??= [];
             for (const [alias, descriptor] of Object.entries(
                 result as Record<string, unknown>
             )) {
+                if (isAggregate(descriptor)) {
+                    const compiled = compileAggregate(
+                        state.knex,
+                        descriptor,
+                        column =>
+                            resolveColumn(
+                                builder,
+                                () => column,
+                                `select(selector).${alias}`
+                            )
+                    );
+                    aliasMap[alias] = compiled.sql;
+                    state.projectionDecoders[alias] = compiled.decode;
+                    continue;
+                }
                 if (
                     !descriptor ||
                     typeof descriptor !== 'object' ||
@@ -65,6 +81,7 @@ export function selectImpl(
                 aliasMap[alias] = col as string;
                 state.explicitSelects.push(col as string);
             }
+            state.projectionColumns = aliasMap;
             state.baseQuery.select(aliasMap);
             return builder;
         }

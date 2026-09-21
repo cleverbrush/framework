@@ -26,8 +26,10 @@ import {
 import type { Knex } from 'knex';
 
 import { EntityNotFoundError } from './errors.js';
+
 import type {
     EntityResult,
+    RelatedSchema,
     RelKeyTree,
     SaveGraph,
     VariantInsertPayload,
@@ -42,6 +44,15 @@ import {
     insertVariant as _insertVariant,
     updateVariant as _updateVariant
 } from './variant-write.js';
+
+const scalarAggregateMethods = new Set<PropertyKey>([
+    'countValue',
+    'countDistinctValue',
+    'sumValue',
+    'avgValue',
+    'minValue',
+    'maxValue'
+]);
 
 // ---------------------------------------------------------------------------
 // EntityQuery — public typed query handle
@@ -70,7 +81,14 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
      */
     include<K extends keyof EntityRelations<TEntity> & string>(
         sel: (t: RelKeyTree<TEntity>) => K,
-        customize?: (q: SchemaQueryBuilder<any, any>) => void
+        customize?: (
+            q: SchemaQueryBuilder<
+                RelatedSchema<TEntity, K>,
+                import('@cleverbrush/schema').InferType<
+                    RelatedSchema<TEntity, K>
+                >
+            >
+        ) => void
     ): EntityQuery<TEntity, WithIncluded<TEntity, TResult, K>>;
 
     /**
@@ -83,7 +101,16 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
     includeVariant<TVariant extends string, TRel extends string>(
         variantKey: TVariant,
         relationName: TRel,
-        customize?: (q: SchemaQueryBuilder<any, any>) => void
+        customize?: (
+            q: TRel extends keyof EntityRelations<TEntity>
+                ? SchemaQueryBuilder<
+                      RelatedSchema<TEntity, TRel>,
+                      import('@cleverbrush/schema').InferType<
+                          RelatedSchema<TEntity, TRel>
+                      >
+                  >
+                : SchemaQueryBuilder<any, any>
+        ) => void
     ): EntityQuery<
         TEntity,
         TRel extends keyof EntityRelations<TEntity> & string
@@ -248,7 +275,14 @@ export interface VariantDbSet<
      */
     include<R extends keyof EntityRelations<TEntity> & string>(
         sel: (t: RelKeyTree<TEntity>) => R,
-        customize?: (q: SchemaQueryBuilder<any, any>) => void
+        customize?: (
+            q: SchemaQueryBuilder<
+                RelatedSchema<TEntity, R>,
+                import('@cleverbrush/schema').InferType<
+                    RelatedSchema<TEntity, R>
+                >
+            >
+        ) => void
     ): VariantDbSet<TEntity, K>;
 
     /** Look up a single row by PK, typed to this variant. */
@@ -417,6 +451,8 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                     // Wrap Promise results to auto-attach tracked entities.
                     if (
                         onResults != null &&
+                        sqb.returnsEntityRows &&
+                        !scalarAggregateMethods.has(prop) &&
                         result != null &&
                         typeof (result as any).then === 'function'
                     ) {
@@ -910,6 +946,8 @@ function wrapVariantQuery<
                     if (result === sqb) return proxy;
                     if (
                         onResults != null &&
+                        sqb.returnsEntityRows &&
+                        !scalarAggregateMethods.has(prop) &&
                         result != null &&
                         typeof (result as any).then === 'function'
                     ) {

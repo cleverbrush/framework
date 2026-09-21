@@ -7,8 +7,26 @@ import {
     type ObjectSchemaBuilder
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
+import {
+    AliasedQueryBuilder,
+    type AliasTables,
+    isTableAlias,
+    type TableAlias
+} from './aliased-query.js';
 import { buildColumnMap } from './columns.js';
+import type {
+    AggregateOptions,
+    AggregateResult,
+    ExtremumResult,
+    ExtremumValue,
+    OutputSchema
+} from './expressions.js';
 import { getTableName, POLYMORPHIC_TYPE_BRAND } from './extension.js';
+import { scalarAggregate } from './operations/aggregate.js';
+import {
+    type CompositeCursorOptions,
+    compositeCursor
+} from './operations/composite-cursor.js';
 // Operations
 import {
     avgImpl,
@@ -166,6 +184,9 @@ export class SchemaQueryBuilder<
             explicitSelects: null,
             selectionMode: null,
             appliedProjection: null,
+            projectionColumns: null,
+            projectionDecoders: {},
+            hiddenColumns: new Set(),
             includeDeleted: false,
             onlyDeleted: false,
             skipDefaultScope: false,
@@ -215,6 +236,89 @@ export class SchemaQueryBuilder<
 
     avg(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
         return (avgImpl as any)(this, column);
+    }
+
+    /** Count the unpaginated matching source, rejecting unsafe integer results. */
+    countValue<S extends OutputSchema<any> | undefined = undefined>(
+        options?: AggregateOptions<S>
+    ): Promise<AggregateResult<S, number>>;
+    countValue<S extends OutputSchema<any> | undefined = undefined>(
+        column: ColumnRef<TLocalSchema>,
+        options?: AggregateOptions<S>
+    ): Promise<AggregateResult<S, number>>;
+    countValue(
+        columnOrOptions?: ColumnRef<TLocalSchema> | AggregateOptions<any>,
+        options?: AggregateOptions<any>
+    ): Promise<any> {
+        const hasColumn =
+            typeof columnOrOptions === 'string' ||
+            typeof columnOrOptions === 'function';
+        return scalarAggregate(
+            this,
+            'count',
+            hasColumn ? columnOrOptions : undefined,
+            hasColumn ? options : columnOrOptions
+        );
+    }
+
+    countDistinctValue<S extends OutputSchema<any> | undefined = undefined>(
+        column: ColumnRef<TLocalSchema>,
+        options?: AggregateOptions<S>
+    ): Promise<AggregateResult<S, number>> {
+        return scalarAggregate(this, 'countDistinct', column, options);
+    }
+
+    /** Exact database numeric text (or null), unless an output schema is supplied. */
+    sumValue<S extends OutputSchema<any> | undefined = undefined>(
+        column: ColumnRef<TLocalSchema>,
+        options?: AggregateOptions<S>
+    ): Promise<AggregateResult<S, string | null>> {
+        return scalarAggregate(this, 'sum', column, options);
+    }
+
+    avgValue<S extends OutputSchema<any> | undefined = undefined>(
+        column: ColumnRef<TLocalSchema>,
+        options?: AggregateOptions<S>
+    ): Promise<AggregateResult<S, string | null>> {
+        return scalarAggregate(this, 'avg', column, options);
+    }
+
+    minValue<
+        C extends ColumnRef<TLocalSchema>,
+        S extends OutputSchema<any> | undefined = undefined
+    >(
+        column: C,
+        options?: AggregateOptions<S>
+    ): Promise<
+        AggregateResult<
+            S,
+            C extends (...args: any[]) => infer D
+                ? ExtremumValue<D>
+                : C extends keyof InferType<TLocalSchema>
+                  ? ExtremumResult<InferType<TLocalSchema>[C]>
+                  : unknown
+        >
+    > {
+        return scalarAggregate(this, 'min', column, options);
+    }
+
+    maxValue<
+        C extends ColumnRef<TLocalSchema>,
+        S extends OutputSchema<any> | undefined = undefined
+    >(
+        column: C,
+        options?: AggregateOptions<S>
+    ): Promise<
+        AggregateResult<
+            S,
+            C extends (...args: any[]) => infer D
+                ? ExtremumValue<D>
+                : C extends keyof InferType<TLocalSchema>
+                  ? ExtremumResult<InferType<TLocalSchema>[C]>
+                  : unknown
+        >
+    > {
+        return scalarAggregate(this, 'max', column, options);
     }
 
     selectRaw(sql: string, bindings?: any[]): this {
@@ -438,12 +542,17 @@ export class SchemaQueryBuilder<
         >;
     }
 
-    async paginateAfter(opts: {
+    paginateAfter(
+        opts: CompositeCursorOptions<TLocalSchema>
+    ): Promise<CursorPaginationResult<TResult>>;
+    paginateAfter(opts: {
         cursor?: any;
         limit: number;
         column?: ColumnRef<TLocalSchema>;
         direction?: 'asc' | 'desc';
-    }): Promise<CursorPaginationResult<TResult>> {
+    }): Promise<CursorPaginationResult<TResult>>;
+    async paginateAfter(opts: any): Promise<CursorPaginationResult<TResult>> {
+        if ('orderBy' in opts) return compositeCursor(this as any, opts);
         return (paginateAfterImpl as any)(this, opts) as Promise<
             CursorPaginationResult<TResult>
         >;
@@ -709,6 +818,11 @@ export class SchemaQueryBuilder<
             : null;
         builderState.selectionMode = state.selectionMode;
         builderState.appliedProjection = state.appliedProjection;
+        builderState.projectionColumns = state.projectionColumns
+            ? { ...state.projectionColumns }
+            : null;
+        builderState.projectionDecoders = { ...state.projectionDecoders };
+        builderState.hiddenColumns = new Set(state.hiddenColumns);
         builderState.includeDeleted = state.includeDeleted;
         builderState.onlyDeleted = state.onlyDeleted;
         builderState.skipDefaultScope = state.skipDefaultScope;
@@ -730,6 +844,11 @@ export class SchemaQueryBuilder<
 
     toQuery(): string {
         return getQuery(this).toQuery();
+    }
+
+    /** @internal ORM tracking must never attach aggregate or DTO rows as entities. */
+    get returnsEntityRows(): boolean {
+        return getState(this).selectionMode === null;
     }
 
     toKnexQuery(): Knex.QueryBuilder {
@@ -782,6 +901,10 @@ registerSchemaQueryBuilder(SchemaQueryBuilder);
 // ---------------------------------------------------------------------------
 
 export function query<
+    S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+    N extends string
+>(knex: Knex, schema: TableAlias<S, N>): AliasedQueryBuilder<AliasTables<S, N>>;
+export function query<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 >(
     knex: Knex,
@@ -796,18 +919,13 @@ export function query<
     baseQuery: Knex.QueryBuilder
 ): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>;
 
-export function query<
-    TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
->(
+export function query(
     knex: Knex,
-    schema: TLocalSchema,
+    schema: any,
     baseQuery?: Knex.QueryBuilder
-): SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>> {
-    return new SchemaQueryBuilder<TLocalSchema, QueryResultType<TLocalSchema>>(
-        knex,
-        schema,
-        baseQuery
-    );
+): any {
+    if (isTableAlias(schema)) return new AliasedQueryBuilder(knex, schema);
+    return new SchemaQueryBuilder(knex, schema, baseQuery);
 }
 
 // ---------------------------------------------------------------------------
@@ -815,6 +933,12 @@ export function query<
 // ---------------------------------------------------------------------------
 
 export interface BoundQuery {
+    <
+        S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+        N extends string
+    >(
+        schema: TableAlias<S, N>
+    ): AliasedQueryBuilder<AliasTables<S, N>>;
     <
         TLocalSchema extends ObjectSchemaBuilder<
             any,

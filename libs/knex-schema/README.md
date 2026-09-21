@@ -464,6 +464,11 @@ The schema's `hasColumnName()` metadata is used to map `firstName` → `first_na
 
 ## API Reference
 
+See [Composable read queries](./COMPOSABLE_QUERIES.md) for typed flat joins with
+`alias`, all aggregate families with optional output schemas, preserved eager-load
+ordering, and multi-column cursor pagination. These APIs preserve existing calls
+and include runtime, type, and PostgreSQL integration coverage.
+
 ### `query(knex, schema, baseQuery?)`
 
 Creates a `SchemaQueryBuilder`. `schema` must have `.hasTableName()` set.

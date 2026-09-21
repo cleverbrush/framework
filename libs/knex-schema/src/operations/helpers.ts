@@ -26,6 +26,7 @@ import type {
     ResolvedVariantRelationSpec,
     ValidatedSpec
 } from '../types.js';
+import { compileOrder, privateColumn } from './ordering.js';
 import { getState } from './state.js';
 
 // ---------------------------------------------------------------------------
@@ -751,32 +752,74 @@ export function buildQuery(
     if (state.specs.length === 0) {
         return queryBase;
     }
+    if (Object.keys(state.projectionDecoders).length) {
+        throw new Error(
+            'Aggregate projections cannot include entity relations; use a flat grouped query'
+        );
+    }
 
     const knex = state.knex;
     const specs = state.specs;
 
     const requiredLocalColumns = [...new Set(specs.map(s => s.localColumn))];
 
-    let cteQuery = queryBase;
+    const cteQuery = queryBase.clone();
     let extraColumns: string[] = [];
 
     if (state.explicitSelects !== null) {
-        const selectedSet = new Set(state.explicitSelects);
+        const selectedSet = new Set(
+            state.projectionColumns
+                ? Object.keys(state.projectionColumns)
+                : state.explicitSelects
+        );
         extraColumns = requiredLocalColumns.filter(
             col => !selectedSet.has(col)
         );
         if (extraColumns.length > 0) {
-            cteQuery = queryBase.clone();
             for (const col of extraColumns) {
                 cteQuery.column(col);
             }
         }
     }
 
+    const order = compileOrder(
+        knex,
+        queryBase,
+        state.projectionColumns,
+        state.explicitSelects
+    );
+    const ordinal = privateColumn(
+        [
+            ...buildColumnMap(state.localSchema).colToProp.keys(),
+            ...Object.keys(state.projectionColumns ?? {}),
+            ...state.hiddenColumns
+        ],
+        'order'
+    );
+    if (order) {
+        // DENSE_RANK, unlike ROW_NUMBER, does not turn equal DISTINCT rows
+        // into different rows. The outer join cannot discard the requested order.
+        if (
+            !(cteQuery as any)._statements.some(
+                (s: any) => s.grouping === 'columns'
+            )
+        ) {
+            cteQuery.select(`${state.tableName}.*`);
+        }
+        cteQuery.select(
+            knex.raw('dense_rank() over (?) as ??', [order, ordinal])
+        );
+        state.hiddenColumns.add(ordinal);
+    }
     const resultQuery = knex.queryBuilder().with('originalQuery', cteQuery);
 
-    if (extraColumns.length > 0 && state.explicitSelects !== null) {
-        for (const col of state.explicitSelects) {
+    if (
+        state.projectionColumns ||
+        (extraColumns.length > 0 && state.explicitSelects !== null)
+    ) {
+        for (const col of state.projectionColumns
+            ? Object.keys(state.projectionColumns)
+            : state.explicitSelects!) {
             resultQuery.select(
                 knex.raw(':originalQuery:.:col: as :col:', {
                     originalQuery: 'originalQuery',
@@ -804,6 +847,8 @@ export function buildQuery(
             buildJoinMany(builder, resultQuery, spec, relationAlias, i);
         }
     }
+
+    if (order) resultQuery.orderBy(`originalQuery.${ordinal}`, 'asc');
 
     return resultQuery;
 }
@@ -856,8 +901,13 @@ export function cleanAndMapRow(
     const manySpecs = state.specs.filter(
         (s): s is ValidatedSpec & { type: 'many' } => s.type === 'many'
     );
-    const cleaned = clearRow(row, oneSpecs, manySpecs);
-    return mapRow(builder, cleaned);
+    const cleaned = clearRow({ ...row }, oneSpecs, manySpecs);
+    for (const key of state.hiddenColumns) delete cleaned[key];
+    for (const [key, decode] of Object.entries(state.projectionDecoders)) {
+        if (Object.hasOwn(cleaned, key)) cleaned[key] = decode(cleaned[key]);
+    }
+    // An explicit DTO alias is already the public property name.
+    return state.projectionColumns ? cleaned : mapRow(builder, cleaned);
 }
 
 export function mapObjectToColumns(
