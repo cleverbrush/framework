@@ -16,9 +16,17 @@ import { getState } from './state.js';
 export interface CompositeCursorOptions<
     S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > {
+    /** Opaque nextCursor from a compatible page; null/undefined starts a new stream. */
     cursor?: string | null;
+    /** Positive safe integer page size; one extra row determines whether more exist. */
     limit: number;
-    orderBy: readonly { column: ColumnRef<S>; direction: 'asc' | 'desc' }[];
+    /** Complete non-null sort, including a declared primary/unique key; replaces prior ordering. */
+    orderBy: readonly {
+        /** Required, non-null scalar schema property participating in the sort. */
+        column: ColumnRef<S>;
+        /** Direction for this component; mixed directions are supported. */
+        direction: 'asc' | 'desc';
+    }[];
 }
 
 export async function compositeCursor(

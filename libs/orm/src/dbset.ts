@@ -23,6 +23,7 @@ import {
     type SchemaQueryBuilder,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
+import type { InferType } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 
 import { EntityNotFoundError } from './errors.js';
@@ -84,9 +85,7 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
         customize?: (
             q: SchemaQueryBuilder<
                 RelatedSchema<TEntity, K>,
-                import('@cleverbrush/schema').InferType<
-                    RelatedSchema<TEntity, K>
-                >
+                InferType<RelatedSchema<TEntity, K>>
             >
         ) => void
     ): EntityQuery<TEntity, WithIncluded<TEntity, TResult, K>>;
@@ -105,9 +104,7 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
             q: TRel extends keyof EntityRelations<TEntity>
                 ? SchemaQueryBuilder<
                       RelatedSchema<TEntity, TRel>,
-                      import('@cleverbrush/schema').InferType<
-                          RelatedSchema<TEntity, TRel>
-                      >
+                      InferType<RelatedSchema<TEntity, TRel>>
                   >
                 : SchemaQueryBuilder<any, any>
         ) => void
@@ -259,15 +256,33 @@ export interface VariantDbSet<
     > {
     // Re-declared so that `this` resolves to `VariantDbSet<TEntity, K>`
     // rather than the raw `SchemaQueryBuilder` (Omit doesn't preserve `this`).
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(
         column: ColumnRef<EntitySchema<TEntity>>,
         operator: string,
         value: any
     ): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(column: ColumnRef<EntitySchema<TEntity>>, value: any): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(raw: Knex.Raw, operator: string, value: any): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(callback: (builder: Knex.QueryBuilder) => void): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(record: Record<string, any>): this;
+    /**
+     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
+     */
     where(raw: Knex.Raw): this;
     /**
      * Eager-load a relation declared on `TEntity`. Identical to
@@ -278,9 +293,7 @@ export interface VariantDbSet<
         customize?: (
             q: SchemaQueryBuilder<
                 RelatedSchema<TEntity, R>,
-                import('@cleverbrush/schema').InferType<
-                    RelatedSchema<TEntity, R>
-                >
+                InferType<RelatedSchema<TEntity, R>>
             >
         ) => void
     ): VariantDbSet<TEntity, K>;

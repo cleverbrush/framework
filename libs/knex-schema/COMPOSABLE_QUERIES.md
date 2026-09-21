@@ -23,6 +23,36 @@ filters; filtering the right-hand source does not turn a left join into an inner
 join. `createQuery(knex)` also accepts aliased schemas. `eq`, `and`, and `or`
 compose column-based join conditions. Duplicate aliases are errors.
 
+Both `and` and `or` accept multiple predicates and can be nested. Each group
+becomes a parenthesized SQL expression, preserving the intended precedence:
+
+```ts
+import { alias, and, eq, or, query } from '@cleverbrush/knex-schema';
+
+const rows = await query(knex, alias(TaskSchema, 'task'))
+    .join(alias(UserSchema, 'owner'), t => or(
+        eq(t.task.ownerId, t.owner.id),
+        and(
+            eq(t.task.approverId, t.owner.id),
+            or(
+                eq(t.task.teamId, t.owner.teamId),
+                eq(t.task.creatorId, t.owner.id)
+            )
+        )
+    ))
+    .select(t => ({ id: t.task.id, ownerName: t.owner.name }));
+```
+
+This example assumes the illustrated ID properties exist on the schemas.
+Empty `and()`/`or()` groups are rejected. Predicates describe SQL; they do not
+execute a JavaScript callback for each returned row.
+
+`isSqlIdentifier(value)` is an exported type guard used by `alias()`. It accepts
+one ASCII identifier (`task_owner2`), not qualified names (`public.tasks`), quoted
+names, whitespace or non-string values. This deliberately conservative format
+does not describe every valid PostgreSQL identifier and does not replace Knex
+identifier quoting. Existing table/column metadata APIs are not restricted by it.
+
 The read-only aliased builder requires an explicit, non-empty projection and
 supports `where`, `whereIn`, `whereNull`, `whereNotNull`, `orderBy`, `orderByRaw`,
 `groupBy`, `having`, `limit`, `offset`, `first`, `execute`, `transacting`, and
@@ -31,6 +61,11 @@ on result shape/cardinality are the caller's responsibility. Values remain bound
 and identifiers quoted. Flat collection joins can repeat parents; they do not
 deduplicate or fetch one related row at a time. Choose ORM eager loading for
 nested related objects instead.
+
+For reusable connection/transaction handling, ordinary and aliased schemas retain
+the same inference through `createQuery(knex)`, `withTransaction(trx)`, and
+`transaction(callback)`. Only ordinary-schema calls accept a custom Knex base
+query. These APIs and their JSDoc are also available through `@cleverbrush/orm`.
 
 ## Aggregates with optional output schemas
 

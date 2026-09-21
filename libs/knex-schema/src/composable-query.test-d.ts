@@ -1,3 +1,4 @@
+import type { Knex as KnexTypes } from 'knex';
 import Knex from 'knex';
 import { expectTypeOf, test } from 'vitest';
 import {
@@ -6,6 +7,7 @@ import {
     createQuery,
     date,
     eq,
+    isSqlIdentifier,
     number,
     object,
     query,
@@ -22,6 +24,61 @@ const Task = object({
     amount: number(),
     createdAt: date()
 }).hasTableName('tasks');
+
+declare const trx: KnexTypes.Transaction;
+
+test('factories retain schema, alias and result inference through every call shape', async () => {
+    const bound = createQuery(db);
+    const transactional = bound.withTransaction(trx);
+    const plain = query(db, Task);
+    expectTypeOf(plain).not.toBeAny();
+    expectTypeOf(await plain.select(t => ({ id: t.id }))).toEqualTypeOf<
+        { id: number }[]
+    >();
+    expectTypeOf(
+        await query(db, Task, db('tasks')).select(t => ({ amount: t.amount }))
+    ).toEqualTypeOf<{ amount: number }[]>();
+    for (const factory of [bound, transactional]) {
+        const ordinary = factory(Task);
+        expectTypeOf(ordinary).not.toBeAny();
+        expectTypeOf(
+            await ordinary.select(t => ({ createdAt: t.createdAt }))
+        ).toEqualTypeOf<{ createdAt: Date }[]>();
+        expectTypeOf(
+            await factory(Task, db('tasks')).select(t => ({ id: t.id }))
+        ).toEqualTypeOf<{ id: number }[]>();
+        const aliased = factory(alias(Task, 'task'));
+        expectTypeOf(aliased).not.toBeAny();
+        const rows = await aliased
+            .leftJoin(alias(User, 'owner'), t => eq(t.task.ownerId, t.owner.id))
+            .select(t => ({ id: t.task.id, ownerName: t.owner.name }));
+        expectTypeOf(rows).toEqualTypeOf<
+            { id: number; ownerName: string | null }[]
+        >();
+        expectTypeOf(rows[0].id).not.toBeAny();
+        // @ts-expect-error Unselected fields are unavailable.
+        rows[0].amount;
+        // @ts-expect-error Invalid schema fields must not become any.
+        factory(Task).select(t => ({ missing: t.missing }));
+        // @ts-expect-error Aliased tables retain their own fields.
+        factory(alias(Task, 'task')).select(t => ({ missing: t.task.name }));
+        // @ts-expect-error An aliased query does not accept a custom base query.
+        factory(alias(Task, 'task'), db('tasks'));
+    }
+    expectTypeOf(
+        await bound.transaction(async tx =>
+            tx(Task).select(t => ({ id: t.id }))
+        )
+    ).toEqualTypeOf<{ id: number }[]>();
+    expectTypeOf(
+        await bound.transaction(async tx =>
+            tx(alias(Task, 'task')).select(t => ({ id: t.task.id }))
+        )
+    ).toEqualTypeOf<{ id: number }[]>();
+    const unknownName: unknown = 'task';
+    if (isSqlIdentifier(unknownName))
+        expectTypeOf(unknownName).toEqualTypeOf<string>();
+});
 
 test('flat join projection inference and nullable right-hand fields', async () => {
     const task = alias(Task, 'task');

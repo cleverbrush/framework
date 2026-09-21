@@ -32,10 +32,7 @@ describe('typed aliases and aggregate SQL', () => {
         const before = Task.introspect();
         const compiled = query(db, alias(Task, 'task'))
             .join(alias(User, 'owner'), t =>
-                and(
-                    eq(t.task.ownerId, t.owner.id),
-                    or(eq(t.task.ownerId, t.owner.id))
-                )
+                or(eq(t.task.ownerId, t.owner.id), eq(t.task.id, t.owner.id))
             )
             .where(t => t.owner.name, "O'Reilly")
             .orderBy(t => t.task.id, 'desc')
@@ -46,6 +43,34 @@ describe('typed aliases and aggregate SQL', () => {
         expect(compiled.sql).toContain('"task"."owner_id" = "owner"."id"');
         expect(compiled.bindings).toEqual(["O'Reilly"]);
         expect(Task.introspect()).toEqual(before);
+    });
+
+    it('preserves multiple predicates at every nested AND/OR level', () => {
+        const compiled = query(db, alias(Task, 'task'))
+            .join(alias(Task, 'peer'), t =>
+                and(
+                    or(
+                        eq(t.task.ownerId, t.peer.ownerId),
+                        eq(t.task.id, t.peer.id)
+                    ),
+                    or(
+                        eq(t.task.id, t.peer.id),
+                        and(
+                            eq(t.task.ownerId, t.peer.id),
+                            eq(t.task.id, t.peer.ownerId)
+                        )
+                    )
+                )
+            )
+            .select(t => ({ id: t.task.id }))
+            .toKnexQuery()
+            .toSQL();
+        expect(compiled.sql).toContain(
+            'on (("task"."owner_id" = "peer"."owner_id" or "task"."id" = "peer"."id") and ("task"."id" = "peer"."id" or ("task"."owner_id" = "peer"."id" and "task"."id" = "peer"."owner_id")))'
+        );
+        expect(compiled.bindings).toEqual([]);
+        expect(() => and()).toThrow('at least one');
+        expect(() => or()).toThrow('at least one');
     });
 
     it('supports two aliases of one schema and rejects duplicate aliases', () => {

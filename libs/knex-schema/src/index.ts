@@ -105,6 +105,7 @@ export {
     loadSnapshot,
     writeSnapshot
 } from './snapshot.js';
+export { isSqlIdentifier } from './sql-identifiers.js';
 export type {
     AddColumnDiff,
     AddForeignKeyDiff,

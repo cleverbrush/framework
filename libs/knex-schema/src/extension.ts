@@ -1146,14 +1146,41 @@ const extended = withExtensions(
     ddlExtension
 );
 
+/**
+ * Create a string schema with database column, key, reference and mapping extensions.
+ */
 export const string = extended.string;
+/**
+ * Create a numeric schema with database type, precision, key and reference extensions.
+ */
 export const number = extended.number;
+/**
+ * Create a boolean schema with database column mapping and DDL metadata extensions.
+ */
 export const boolean = extended.boolean;
+/**
+ * Create a date schema with database column mapping and DDL metadata extensions.
+ */
 export const date = extended.date;
+/**
+ * Create an object schema with table, relation, scope, projection and lifecycle extensions.
+ */
 export const object = extended.object;
+/**
+ * Create an array schema from its element schema; use object elements for collection navigation properties.
+ */
 export const array = extended.array;
+/**
+ * Create a union schema using the database-extended schema factory.
+ */
 export const union = extended.union;
+/**
+ * Create a function schema using the database-extended schema factory; this does not create a SQL function.
+ */
 export const func = extended.func;
+/**
+ * Create an unconstrained schema with database extensions; prefer a specific schema when value typing matters.
+ */
 export const any = extended.any;
 
 // ---------------------------------------------------------------------------

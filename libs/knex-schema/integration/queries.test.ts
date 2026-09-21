@@ -2,14 +2,17 @@ import { randomUUID } from 'node:crypto';
 import {
     aggregate,
     alias,
+    and,
     array,
     boolean,
     createDb,
+    createQuery,
     date,
     defineEntity,
     eq,
     number,
     object,
+    or,
     query,
     string
 } from '@cleverbrush/orm';
@@ -170,6 +173,55 @@ afterAll(async () => {
 });
 
 describe('flat joins', () => {
+    it('executes ordinary and aliased queries through a bound transaction callback', async () => {
+        const result = await createQuery(knex).transaction(async tx => ({
+            ordinary: await tx(Task)
+                .where(t => t.id, 105)
+                .select(t => ({ id: t.id }))
+                .first(),
+            joined: await tx(alias(Task, 'task'))
+                .leftJoin(alias(User, 'owner'), t =>
+                    eq(t.task.ownerId, t.owner.id)
+                )
+                .where(t => t.task.id, 105)
+                .select(t => ({ id: t.task.id, ownerName: t.owner.name }))
+                .first()
+        }));
+        expect(result).toEqual({
+            ordinary: { id: 105 },
+            joined: { id: 105, ownerName: 'Alice' }
+        });
+    });
+    it('executes nested AND/OR predicates with their explicit grouping', async () => {
+        const rows = await query(knex, alias(Task, 'task'))
+            .join(alias(Task, 'peer'), t =>
+                and(
+                    or(
+                        eq(t.task.ownerId, t.peer.ownerId),
+                        eq(t.task.projectId, t.peer.projectId)
+                    ),
+                    or(
+                        eq(t.task.id, t.peer.id),
+                        and(
+                            eq(t.task.ownerId, t.peer.projectId),
+                            eq(t.task.projectId, t.peer.ownerId)
+                        )
+                    )
+                )
+            )
+            .where(t => t.task.projectId, 1)
+            .orderBy(t => t.task.id, 'desc')
+            .orderBy(t => t.peer.id, 'desc')
+            .select(t => ({ task: t.task.id, peer: t.peer.id }));
+        expect(rows).toEqual([
+            { task: 105, peer: 105 },
+            { task: 105, peer: 102 },
+            { task: 104, peer: 104 },
+            { task: 103, peer: 103 },
+            { task: 102, peer: 105 },
+            { task: 102, peer: 102 }
+        ]);
+    });
     it('preserves left joins when the right-hand schema has scopes and soft deletion', async () => {
         const rows = await query(knex, alias(Task, 'task'))
             .leftJoin(alias(User, 'owner'), t => eq(t.task.ownerId, t.owner.id))
@@ -438,6 +490,12 @@ describe('aggregate results', () => {
                     .select(t => ({ id: t.task.id }))
                     .transacting(trx);
                 expect(rows).toEqual([{ id: 999 }]);
+                const bound = createQuery(knex).withTransaction(trx);
+                expect(
+                    await bound(alias(Task, 'task'))
+                        .where(t => t.task.id, 999)
+                        .select(t => ({ id: t.task.id }))
+                ).toEqual([{ id: 999 }]);
                 throw new Error('test rollback');
             })
         ).rejects.toThrow('test rollback');

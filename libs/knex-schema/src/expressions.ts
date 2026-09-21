@@ -8,6 +8,9 @@ import type { Knex } from 'knex';
 
 /** A synchronous schema parser. Framework schemas implement this interface. */
 export interface OutputSchema<T> {
+    /**
+     * Synchronously validate/convert a raw driver value, including null; throw to reject the query.
+     */
     parse(value: unknown): T;
 }
 
@@ -15,6 +18,9 @@ export interface OutputSchema<T> {
 export interface AggregateOptions<
     S extends OutputSchema<any> | undefined = undefined
 > {
+    /**
+     * Replace the default decoder with this parser; its output type becomes the aggregate result type.
+     */
     output?: S;
 }
 
@@ -36,6 +42,9 @@ export interface AliasedColumn<T> {
         column: string;
         schema: any;
     };
+    /**
+     * Type-only marker carrying column nullability and value type; not a runtime row value.
+     */
     readonly __value?: T;
 }
 
@@ -73,6 +82,9 @@ export interface AggregateExpression<T> {
         column?: SelectableColumn;
         output?: OutputSchema<unknown>;
     };
+    /**
+     * Type-only marker describing the decoded result of this SQL expression.
+     */
     readonly __result?: T;
 }
 
@@ -106,6 +118,13 @@ export function createAggregate<T>(
 
 /** Typed aggregate expressions for scalar or grouped object projections. */
 export const aggregate = {
+    /**
+     * Describe COUNT(*) or COUNT(column) for a typed projection or HAVING clause.
+     * @param column - Omit to count rows; supply a column to count its non-null values.
+     * @param options - Optional raw-value parser; use undefined as column for custom COUNT(*).
+     * @returns An expression decoded as a safe number unless a parser is supplied.
+     * @throws During execution if the default result exceeds the safe integer range.
+     */
     count<S extends OutputSchema<any> | undefined = undefined>(
         column?: SelectableColumn,
         options?: AggregateOptions<S>
@@ -116,6 +135,11 @@ export const aggregate = {
             options
         );
     },
+    /**
+     * Describe COUNT(DISTINCT column), excluding nulls.
+     * @param options - Optional parser replacing checked safe-integer decoding.
+     * @returns A typed aggregate expression, not an executed query.
+     */
     countDistinct<S extends OutputSchema<any> | undefined = undefined>(
         column: SelectableColumn,
         options?: AggregateOptions<S>
@@ -126,6 +150,11 @@ export const aggregate = {
             options
         );
     },
+    /**
+     * Describe SUM(column) with exact database numeric text as the default result.
+     * Empty/all-null inputs produce null. An output parser receives the raw driver
+     * value and takes responsibility for precision and null handling.
+     */
     sum<S extends OutputSchema<any> | undefined = undefined>(
         column: SelectableColumn,
         options?: AggregateOptions<S>
@@ -136,6 +165,11 @@ export const aggregate = {
             options
         );
     },
+    /**
+     * Describe AVG(column), preserving database numeric text or null by default.
+     * An output parser can explicitly convert it to a number or domain decimal type.
+     * Text output cannot recover precision already lost in floating-point storage.
+     */
     avg<S extends OutputSchema<any> | undefined = undefined>(
         column: SelectableColumn,
         options?: AggregateOptions<S>
@@ -146,6 +180,11 @@ export const aggregate = {
             options
         );
     },
+    /**
+     * Describe MIN(column), returning the column representation or null.
+     * Numeric/decimal/bigint SQL overrides preserve exact strings; dates return Date.
+     * An optional output parser replaces this decoding policy.
+     */
     min<
         C extends SelectableColumn,
         S extends OutputSchema<any> | undefined = undefined
@@ -156,6 +195,11 @@ export const aggregate = {
             options
         );
     },
+    /**
+     * Describe MAX(column), returning the column representation or null.
+     * Numeric/decimal/bigint SQL overrides preserve exact strings; dates return Date.
+     * An optional output parser replaces this decoding policy.
+     */
     max<
         C extends SelectableColumn,
         S extends OutputSchema<any> | undefined = undefined

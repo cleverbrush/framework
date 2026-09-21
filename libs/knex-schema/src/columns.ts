@@ -96,6 +96,11 @@ export function resolveColumnRef(
     label: string,
     knex: Knex
 ): string | Knex.Raw;
+/**
+ * Resolve a schema property key/accessor to its mapped database column.
+ * With a Knex instance, nested JSON paths become bound SQL expressions. Without
+ * Knex, nested paths throw. Unknown string names pass through as database names.
+ */
 export function resolveColumnRef(
     ref: ColumnRef<any>,
     schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
@@ -246,7 +251,13 @@ export function resolvePropertyKey(
  * @public
  */
 export interface PrimaryKeyColumns {
+    /**
+     * Schema property names in primary-key declaration order; this order defines composite-key tuples.
+     */
     readonly propertyKeys: readonly string[];
+    /**
+     * Corresponding mapped SQL column names in the same order as propertyKeys.
+     */
     readonly columnNames: readonly string[];
 }
 

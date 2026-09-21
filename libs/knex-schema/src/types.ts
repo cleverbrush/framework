@@ -12,6 +12,9 @@ import type { AggregateExpression } from './expressions.js';
 // ---------------------------------------------------------------------------
 // Utility: extract string keys from an ObjectSchemaBuilder's inferred type
 // ---------------------------------------------------------------------------
+/**
+ * String property names available on a schema-inferred row, before SQL column-name mapping.
+ */
 export type SchemaKeys<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = keyof InferType<T> & string;
@@ -35,6 +38,9 @@ type SchemaBase<
         ? ObjectSchemaBuilder<P, Req>
         : never;
 
+/**
+ * Reference a schema property by key or typed descriptor selector; nested selectors may address JSON paths.
+ */
 export type ColumnRef<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > =
@@ -46,6 +52,9 @@ export type ColumnRef<
 // ---------------------------------------------------------------------------
 // JoinOne specification — single related object (N:1 / belongsTo / hasOne)
 // ---------------------------------------------------------------------------
+/**
+ * Configure a single nested eager relation, including its join keys, requiredness and foreign query.
+ */
 export interface JoinOneSpec<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TForeignSchema extends ObjectSchemaBuilder<
@@ -81,6 +90,9 @@ export interface JoinOneSpec<
 // ---------------------------------------------------------------------------
 // JoinMany specification — collection of related objects (1:N / hasMany)
 // ---------------------------------------------------------------------------
+/**
+ * Configure a nested eager collection with child-level ordering/paging independent of parent paging.
+ */
 export interface JoinManySpec<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TForeignSchema extends ObjectSchemaBuilder<
@@ -163,26 +175,77 @@ export type WithJoinedMany<
 // ---------------------------------------------------------------------------
 // Internal validated spec (after runtime validation)
 // ---------------------------------------------------------------------------
+/**
+ * Normalized one-object relation specification with resolved SQL names and an executable foreign query.
+ */
 export interface ValidatedJoinOneSpec {
+    /**
+     * Resolved SQL join column on the parent table.
+     */
     localColumn: string;
+    /**
+     * Resolved SQL join column on the related table.
+     */
     foreignColumn: string;
+    /**
+     * Result property receiving the nested related object.
+     */
     as: string;
+    /**
+     * Whether unmatched parent rows are excluded by an inner join.
+     */
     required: boolean;
+    /**
+     * Prepared Knex query describing eligible related rows.
+     */
     foreignQuery: Knex.QueryBuilder;
+    /**
+     * Optional related-field conversions applied after SQL returns.
+     */
     mappers?: Record<string, ((value: any) => any) | string>;
 }
 
+/**
+ * Normalized collection relation specification consumed by the eager-loading compiler.
+ */
 export interface ValidatedJoinManySpec {
+    /**
+     * Resolved parent SQL column matched to each child group.
+     */
     localColumn: string;
+    /**
+     * Resolved child SQL column used to group related rows.
+     */
     foreignColumn: string;
+    /**
+     * Result property receiving the array of related rows.
+     */
     as: string;
+    /**
+     * Prepared Knex query describing eligible children.
+     */
     foreignQuery: Knex.QueryBuilder;
+    /**
+     * Maximum children per parent, or null for no child limit.
+     */
     limit: number | null;
+    /**
+     * Children skipped per parent, or null for no offset.
+     */
     offset: number | null;
+    /**
+     * Resolved child ordering, or null to leave child order unspecified.
+     */
     orderBy: { column: string; direction: 'asc' | 'desc' } | null;
+    /**
+     * Optional child-field conversions applied after SQL returns.
+     */
     mappers?: Record<string, ((value: any) => any) | string>;
 }
 
+/**
+ * Discriminated normalized eager-relation specification used by row-mapping helpers.
+ */
 export type ValidatedSpec =
     | ({ type: 'one' } & ValidatedJoinOneSpec)
     | ({ type: 'many' } & ValidatedJoinManySpec);
@@ -190,6 +253,9 @@ export type ValidatedSpec =
 // ---------------------------------------------------------------------------
 // InsertType — all properties optional (DB may generate some, e.g. SERIAL id)
 // ---------------------------------------------------------------------------
+/**
+ * Schema-shaped insert payload with optional properties so database-generated/defaulted values may be omitted.
+ */
 export type InsertType<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = InferType<ReturnType<T['makeAllPropsOptional']>>;
@@ -414,6 +480,9 @@ export type VariantStorageType = 'cti' | 'sti';
 
 /** @internal Resolved form of a variant relation stored on {@link ResolvedVariantSpec}. */
 export interface ResolvedVariantRelationSpec {
+    /**
+     * Physical column name reported by PostgreSQL.
+     */
     name: string;
     type: 'hasMany' | 'hasOne' | 'belongsTo' | 'belongsToMany';
     schema: any;
@@ -477,42 +546,105 @@ export interface RelationSpec {
 /** Column information read from the database. */
 export interface DatabaseColumnInfo {
     name: string;
+    /**
+     * Database type name used for schema comparison.
+     */
     type: string;
+    /**
+     * Whether SQL NULL is accepted by this column.
+     */
     nullable: boolean;
+    /**
+     * Database default expression, or null when no default is declared.
+     */
     defaultValue: string | null;
+    /**
+     * Declared character limit, or null when the type has no such limit.
+     */
     maxLength: number | null;
+    /**
+     * Declared numeric precision, or null when unavailable/not applicable.
+     */
     numericPrecision: number | null;
 }
 
 /** Index information read from the database. */
 export interface DatabaseIndexInfo {
+    /**
+     * Physical database index name.
+     */
     name: string;
+    /**
+     * Indexed column names in database-reported order.
+     */
     columns: string[];
+    /**
+     * Whether this index enforces uniqueness.
+     */
     unique: boolean;
+    /**
+     * Database-provided SQL definition of the index.
+     */
     definition: string;
 }
 
 /** Foreign key information read from the database. */
 export interface DatabaseForeignKeyInfo {
+    /**
+     * Physical foreign-key constraint name.
+     */
     constraintName: string;
+    /**
+     * Referencing SQL column on the inspected table.
+     */
     columnName: string;
+    /**
+     * Referenced table name.
+     */
     foreignTable: string;
+    /**
+     * Referenced SQL column name.
+     */
     foreignColumn: string;
+    /**
+     * Database ON DELETE action, such as CASCADE or NO ACTION.
+     */
     deleteRule: string;
+    /**
+     * Database ON UPDATE action for referenced-key changes.
+     */
     updateRule: string;
 }
 
 /** Check constraint information read from the database. */
 export interface DatabaseCheckInfo {
+    /**
+     * Physical CHECK constraint name.
+     */
     name: string;
+    /**
+     * Database-provided CHECK expression/definition.
+     */
     definition: string;
 }
 
 /** Full database table state from introspection. */
 export interface DatabaseTableState {
+    /**
+     * Column metadata keyed by physical SQL column name.
+     */
     columns: Record<string, DatabaseColumnInfo>;
+    /**
+     * Indexes discovered for the table.
+     */
     indexes: DatabaseIndexInfo[];
+    /**
+     * Foreign-key constraints discovered for the table.
+     */
     foreignKeys: DatabaseForeignKeyInfo[];
+    /**
+     * CHECK constraints discovered for the table.
+     */
     checks: DatabaseCheckInfo[];
 }
 
@@ -530,6 +662,9 @@ export interface DatabaseTableState {
  * @public
  */
 export interface SchemaSnapshot {
+    /**
+     * Snapshot format version; currently 1.
+     */
     version: 1;
     /** Map of table name → database state derived from entity schemas. */
     tables: Record<string, DatabaseTableState>;
@@ -541,44 +676,116 @@ export interface SchemaSnapshot {
 
 /** A column to add in a migration. */
 export interface AddColumnDiff {
+    /**
+     * Physical SQL name of the new column.
+     */
     name: string;
+    /**
+     * SQL type to create, including any declared length/precision.
+     */
     type: string;
+    /**
+     * Whether the new column permits SQL NULL.
+     */
     nullable: boolean;
+    /**
+     * Optional default value or expression metadata for the new column.
+     */
     defaultValue?: any;
+    /**
+     * Optional referenced table/column for a new foreign key.
+     */
     references?: { table: string; column: string };
+    /**
+     * Optional ON DELETE action for the reference.
+     */
     onDelete?: string;
+    /**
+     * Optional ON UPDATE action for the reference.
+     */
     onUpdate?: string;
 }
 
 /** Changes to apply to an existing column. */
 export interface AlterColumnDiff {
+    /**
+     * Physical SQL name of the column to alter.
+     */
     name: string;
+    /**
+     * Changed attributes with their previous and desired values.
+     */
     changes: Record<string, { from: any; to: any }>;
 }
 
 /** An index to add in a migration. */
 export interface AddIndexDiff {
+    /**
+     * Physical column names forming the index, in order.
+     */
     columns: string[];
+    /**
+     * Optional explicit index name; otherwise migration generation chooses one.
+     */
     name?: string;
+    /**
+     * Whether the new index must enforce uniqueness.
+     */
     unique?: boolean;
 }
 
 /** A foreign key to add in a migration. */
 export interface AddForeignKeyDiff {
+    /**
+     * Referencing SQL column on the table being altered.
+     */
     column: string;
+    /**
+     * Referenced table name.
+     */
     foreignTable: string;
+    /**
+     * Referenced SQL column name.
+     */
     foreignColumn: string;
+    /**
+     * Optional ON DELETE action.
+     */
     onDelete?: string;
+    /**
+     * Optional ON UPDATE action.
+     */
     onUpdate?: string;
 }
 
 /** Schema diff result between the code-first model and the live database. */
 export interface MigrationDiff {
+    /**
+     * New column definitions to create.
+     */
     addColumns: AddColumnDiff[];
+    /**
+     * Physical column names to remove; reviewing these avoids unintended data loss.
+     */
     dropColumns: string[];
+    /**
+     * Existing columns whose attributes must change.
+     */
     alterColumns: AlterColumnDiff[];
+    /**
+     * New indexes to create.
+     */
     addIndexes: AddIndexDiff[];
+    /**
+     * Physical index names to remove.
+     */
     dropIndexes: string[];
+    /**
+     * New foreign-key constraints to create.
+     */
     addForeignKeys: AddForeignKeyDiff[];
+    /**
+     * Physical foreign-key constraint names to remove.
+     */
     dropForeignKeys: string[];
 }
