@@ -11,57 +11,28 @@ function escapeJsonPointerSegment(s: string): string {
     return s.replace(/~/g, '~0').replace(/\//g, '~1');
 }
 
-/** Whether a property must be present on the selected side of a boundary. */
-function isRequiredInMode(
-    schema: SchemaBuilder<any, any, any>,
-    mode: 'input' | 'output'
-): boolean {
-    const info = schema.introspect() as any;
-    // Output presence follows the wrapper's final modifiers. In particular,
-    // optional().default(...) produces a required output despite the earlier
-    // explicit input-omission modifier.
-    if (mode === 'output') return info.isRequired !== false;
-    if (info.hasDefault) return false;
-    if (info.type === 'decode' || info.type === 'reference') {
-        if (info.presence !== undefined) return info.presence;
-        return isRequiredInMode(info.inputSchema, mode);
-    }
-    return info.isRequired !== false;
-}
-
 type Resolver =
     | ((schema: SchemaBuilder<any, any, any>) => string | null)
     | undefined;
 
 function convertNodeInner(
     schema: SchemaBuilder<any, any, any>,
-    resolver: Resolver,
-    mode: 'input' | 'output'
+    resolver: Resolver
 ): Out {
     const info = schema.introspect() as any;
     const ext: Record<string, unknown> = info.extensions ?? {};
     const readOnly: Out = info.isReadonly === true ? { readOnly: true } : {};
 
     switch (info.type) {
-        case 'reference':
-        case 'decode': {
-            const target =
-                mode === 'input' ? info.inputSchema : info.outputSchema;
-            const out: Out = { allOf: [convertNode(target, resolver, mode)] };
+        case 'reference': {
+            const out: Out = {
+                ...readOnly,
+                allOf: [convertNode(info.targetSchema, resolver)]
+            };
             if (info.nullability === false)
                 (out.allOf as Out[]).push({ not: { type: 'null' } });
             return out;
         }
-        case 'record':
-            return {
-                type: 'object',
-                propertyNames: convertNode(info.keySchema, resolver, mode),
-                additionalProperties: convertNode(
-                    info.valueSchema,
-                    resolver,
-                    mode
-                )
-            };
         case 'string': {
             if (info.equalsTo !== undefined)
                 return { ...readOnly, const: info.equalsTo };
@@ -133,7 +104,7 @@ function convertNodeInner(
         case 'array': {
             const out: Out = { ...readOnly, type: 'array' };
             if (info.elementSchema)
-                out['items'] = convertNode(info.elementSchema, resolver, mode);
+                out['items'] = convertNode(info.elementSchema, resolver);
             if (info.minLength !== undefined) out['minItems'] = info.minLength;
             if (info.maxLength !== undefined) out['maxItems'] = info.maxLength;
             if (ext['nonempty'] === true && out['minItems'] === undefined)
@@ -146,11 +117,11 @@ function convertNodeInner(
                 info.elements ?? [];
             const out: Out = {
                 type: 'array',
-                prefixItems: elements.map(e => convertNode(e, resolver, mode)),
+                prefixItems: elements.map(e => convertNode(e, resolver)),
                 minItems: elements.length
             };
             if (info.restSchema) {
-                out['items'] = convertNode(info.restSchema, resolver, mode);
+                out['items'] = convertNode(info.restSchema, resolver);
             } else {
                 out['items'] = false;
                 out['maxItems'] = elements.length;
@@ -167,8 +138,9 @@ function convertNodeInner(
                 const outProps: Record<string, unknown> = {};
                 const required: string[] = [];
                 for (const [key, propSchema] of Object.entries(props)) {
-                    outProps[key] = convertNode(propSchema, resolver, mode);
-                    if (isRequiredInMode(propSchema, mode)) required.push(key);
+                    outProps[key] = convertNode(propSchema, resolver);
+                    if ((propSchema.introspect() as any).isRequired !== false)
+                        required.push(key);
                 }
                 out['properties'] = outProps;
                 if (required.length > 0) out['required'] = required;
@@ -201,7 +173,7 @@ function convertNodeInner(
             }
             if (allConst) return { ...readOnly, enum: enumValues };
 
-            const converted = options.map(o => convertNode(o, resolver, mode));
+            const converted = options.map(o => convertNode(o, resolver));
             const out: Out = {
                 ...readOnly,
                 anyOf: converted
@@ -254,8 +226,8 @@ function convertNodeInner(
             return {
                 ...readOnly,
                 allOf: [
-                    convertNode(left, resolver, mode),
-                    convertNode(right, resolver, mode)
+                    convertNode(left, resolver),
+                    convertNode(right, resolver)
                 ]
             };
         }
@@ -267,7 +239,7 @@ function convertNodeInner(
             // Recursive schemas without a registered name will cause infinite
             // recursion here; callers must use .schemaName() to break the cycle.
             const resolved: SchemaBuilder<any, any, any> = info.getter();
-            return convertNode(resolved, resolver, mode);
+            return convertNode(resolved, resolver);
         }
 
         default:
@@ -277,8 +249,7 @@ function convertNodeInner(
 
 function convertNode(
     schema: SchemaBuilder<any, any, any>,
-    resolver: Resolver,
-    mode: 'input' | 'output'
+    resolver: Resolver
 ): Out {
     if (resolver) {
         const name = resolver(schema);
@@ -288,7 +259,7 @@ function convertNode(
             };
         }
     }
-    const out = convertNodeInner(schema, resolver, mode);
+    const out = convertNodeInner(schema, resolver);
     const info = schema.introspect() as any;
     if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
@@ -301,10 +272,6 @@ function convertNode(
     // Emit default for serializable primitives (not factory functions)
     if (
         info.hasDefault === true &&
-        !(
-            mode === 'input' &&
-            (info.type === 'decode' || info.type === 'reference')
-        ) &&
         info.defaultValue !== undefined &&
         typeof info.defaultValue !== 'function'
     ) {
@@ -313,7 +280,7 @@ function convertNode(
 
     // Handle nullable — JSON Schema 2020-12 style: type becomes an array
     if (
-        info.type === 'reference' || info.type === 'decode'
+        info.type === 'reference'
             ? info.nullability === true
             : info.isNullable === true
     ) {
@@ -324,11 +291,10 @@ function convertNode(
             if (!hasNull) anyOf.push({ type: 'null' });
         } else if (out['allOf'] !== undefined && out['type'] === undefined) {
             // Intersection type without a top-level type — wrap in oneOf with null
-            out[
-                info.type === 'reference' || info.type === 'decode'
-                    ? 'anyOf'
-                    : 'oneOf'
-            ] = [{ allOf: out['allOf'] as Out[] }, { type: 'null' }];
+            out[info.type === 'reference' ? 'anyOf' : 'oneOf'] = [
+                { allOf: out['allOf'] as Out[] },
+                { type: 'null' }
+            ];
             delete out['allOf'];
         } else if (out['enum'] !== undefined) {
             // Enum — add null to enum values if not already present
@@ -412,11 +378,7 @@ export function toJsonSchema(
     schema: SchemaBuilder<any, any, any, any, any>,
     opts?: ToJsonSchemaOptions
 ): Record<string, unknown> {
-    const body = convertNode(
-        schema,
-        opts?.nameResolver,
-        opts?.mode ?? 'output'
-    );
+    const body = convertNode(schema, opts?.nameResolver);
     if (opts?.$schema === false) return body;
     const draft = opts?.draft ?? '2020-12';
     const uri =

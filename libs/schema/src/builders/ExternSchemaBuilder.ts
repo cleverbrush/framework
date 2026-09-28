@@ -100,8 +100,7 @@ export class ExternSchemaBuilder<
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions,
-    StandardSchemaV1.InferInput<TStandardSchema>
+    TExtensions
 > {
     #standardSchema: TStandardSchema;
 

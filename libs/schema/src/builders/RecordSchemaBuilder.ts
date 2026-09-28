@@ -14,7 +14,6 @@
  */
 import {
     type BRAND,
-    type InferInput,
     type InferType,
     type PreValidationResult,
     SchemaBuilder,
@@ -242,8 +241,7 @@ export class RecordSchemaBuilder<
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions,
-    Record<InferType<TKeySchema>, InferInput<TValueSchema>>
+    TExtensions
 > {
     #keySchema!: TKeySchema;
     #valueSchema!: TValueSchema;

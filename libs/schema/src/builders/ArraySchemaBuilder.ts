@@ -5,7 +5,6 @@ import type {
 import {
     type BRAND,
     createHybridErrorArray,
-    type InferInput,
     type InferType,
     type NestedValidationResult,
     type PropertyDescriptor,
@@ -102,8 +101,8 @@ export class ArraySchemaBuilder<
     TResult = TExplicitType extends undefined
         ? TElementSchema extends undefined
             ? Array<any>
-            : TElementSchema extends SchemaBuilder<any, any, any, any, any>
-              ? Array<InferType<TElementSchema>>
+            : TElementSchema extends SchemaBuilder<infer T1, infer T2>
+              ? Array<InferType<SchemaBuilder<T1, T2>>>
               : never
         : TExplicitType
 > extends SchemaBuilder<
@@ -111,8 +110,7 @@ export class ArraySchemaBuilder<
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions,
-    Array<InferInput<TElementSchema>>
+    TExtensions
 > {
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<

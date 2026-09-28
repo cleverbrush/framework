@@ -12,13 +12,7 @@ for use in OpenAPI specs, form generators, or any other JSON Schema consumer.
 
 ## When to use this library
 
-### Input and output views
-
-`toJsonSchema(schema, { mode: 'input' })` describes input before decoding/defaults;
-`mode: 'output'` (the default) describes validated output.
-`withStandardJsonSchema(schema)` exposes the same distinction through
-`jsonSchema.input()` and `jsonSchema.output()`. Converters are never executed.
-Their arbitrary logic is not representable in JSON Schema.
+### Named references
 
 Named reference wrappers preserve use-site annotations, optionality and nullability
 without changing the shared definition. See the [composition guide](../schema/BOUNDARIES.md).

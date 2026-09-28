@@ -137,8 +137,6 @@ export type InferFromJsonSchema<S> = S extends { readonly const: infer V }
 
 /** Options accepted by {@link toJsonSchema}. */
 export type ToJsonSchemaOptions = {
-    /** Declared input before decoding/defaults, or validated output. @default 'output' */
-    mode?: 'input' | 'output';
     /**
      * JSON Schema draft version to reference in the `$schema` header.
      * @default '2020-12'

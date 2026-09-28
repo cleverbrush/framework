@@ -7,12 +7,8 @@ describe('published boundary documentation', () => {
         const missing: string[] = [];
         for (const [path, names] of [
             [
-                '../dist/builders/BoundarySchemaBuilder.d.ts',
-                ['BoundarySchemaBuilder', 'schemaRef', 'decode']
-            ],
-            [
-                '../dist/builders/SchemaBuilder.d.ts',
-                ['InferInput', 'InferOutput']
+                '../dist/builders/ReferenceSchemaBuilder.d.ts',
+                ['ReferenceSchemaBuilder', 'schemaRef']
             ],
             ['../../schema-json/dist/types.d.ts', ['ToJsonSchemaOptions']]
         ] as const) {

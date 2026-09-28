@@ -18,12 +18,10 @@ type NameResolver = (
  *
  * @param schema   - The schema to convert, or `null`/`undefined`.
  * @param registry - Optional registry or resolver function for `$ref` deduplication.
- * @param mode - Input before decoding/defaults, or validated output (default).
  */
 export function convertSchema(
     schema: SchemaBuilder<any, any, any, any, any> | null | undefined,
-    registry?: SchemaRegistry | NameResolver,
-    mode: 'input' | 'output' = 'output'
+    registry?: SchemaRegistry | NameResolver
 ): Record<string, unknown> {
     if (schema == null) return {};
 
@@ -34,14 +32,13 @@ export function convertSchema(
         if (typeof registry === 'function') {
             nameResolver = s => registry(s) ?? null;
         } else {
-            nameResolver = s => registry.getName(s, mode);
+            nameResolver = s => registry.getName(s);
         }
     }
 
     return toJsonSchema(schema, {
         $schema: false,
         draft: '2020-12',
-        nameResolver,
-        mode
+        nameResolver
     });
 }

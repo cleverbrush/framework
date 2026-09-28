@@ -2,12 +2,9 @@
 
 ## Schemas across boundaries
 
-Use optional-aware `catch(undefined)`, `schemaRef(namedSchema)` for per-use
-annotations, and `decode(inputSchema, outputSchema, converter)` for explicit
-conversion. `InferInput` describes editable input; `InferOutput` and the existing
-`InferType` describe validated output. See the [boundary composition guide](./BOUNDARIES.md)
-for examples, null-compatibility limitations, and the separate form/client
-adoption boundary.
+Use optional-aware `catch(undefined)` and `schemaRef(namedSchema)` for per-use
+annotations without cloning named definitions. See the
+[composition guide](./BOUNDARIES.md) for examples and null-compatibility limits.
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)

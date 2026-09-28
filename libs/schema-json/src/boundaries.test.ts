@@ -1,82 +1,13 @@
-import {
-    array,
-    decode,
-    lazy,
-    number,
-    object,
-    record,
-    schemaRef,
-    string,
-    tuple,
-    union
-} from '@cleverbrush/schema';
-import { describe, expect, it, vi } from 'vitest';
+import { object, schemaRef, string } from '@cleverbrush/schema';
+import { describe, expect, it } from 'vitest';
 import { withStandardJsonSchema } from './standardJsonSchema.js';
 import { toJsonSchema } from './toJsonSchema.js';
 
-describe('boundary JSON Schema views', () => {
-    it('does not transfer output nullability or output defaults to input', () => {
-        const schema = decode(string(), number().nullable(), () => null);
-        expect(toJsonSchema(schema, { $schema: false, mode: 'input' })).toEqual(
-            { allOf: [{ type: 'string' }] }
-        );
-        expect(toJsonSchema(schema, { $schema: false }).allOf).toEqual([
-            { type: ['integer', 'null'] }
-        ]);
-        const withDefault = decode(string(), number(), Number).default(3);
-        expect(
-            toJsonSchema(withDefault, { mode: 'input' }).default
-        ).toBeUndefined();
-        expect(toJsonSchema(withDefault).default).toBe(3);
-    });
-    it('exports declared input/output without running converters', () => {
-        const converter = vi.fn(Number);
-        const size = decode(
-            string().minLength(1),
-            number().isInteger().min(1),
-            converter
-        );
-        expect(toJsonSchema(size, { $schema: false, mode: 'input' })).toEqual({
-            allOf: [{ type: 'string', minLength: 1 }]
-        });
-        expect(toJsonSchema(size, { $schema: false })).toEqual({
-            allOf: [{ type: 'integer', minimum: 1 }]
-        });
-        const standard = withStandardJsonSchema(size)['~standard'].jsonSchema;
-        expect(standard.input({ target: 'draft-2020-12' })).not.toEqual(
-            standard.output({ target: 'draft-2020-12' })
-        );
-        expect(converter).not.toHaveBeenCalled();
-    });
-
-    it('tracks input defaults separately from required output', () => {
-        const size = decode(string().default('1'), number(), Number);
-        const schema = object({ size, title: string().default('new') });
-        expect(
-            toJsonSchema(schema, { mode: 'input' }).required
-        ).toBeUndefined();
-        expect(toJsonSchema(schema).required).toEqual(['size', 'title']);
-    });
-
-    it('respects output presence when defaults follow optional modifiers', () => {
-        const size = decode(string(), number(), Number).optional().default(5);
-        const name = schemaRef(string().schemaName('Name'))
-            .optional()
-            .default('untitled');
-        const schema = object({ size, name });
-        expect(schema.parse({})).toEqual({ size: 5, name: 'untitled' });
-        expect(
-            toJsonSchema(schema, { mode: 'input' }).required
-        ).toBeUndefined();
-        expect(toJsonSchema(schema).required).toEqual(['size', 'name']);
-        const optionalOutput = object({ size: size.optional() });
-        expect(toJsonSchema(optionalOutput).required).toBeUndefined();
-    });
-
+describe('named reference JSON Schema', () => {
     it.each([
         '2020-12',
         '07'
-    ] as const)('keeps ref annotations outside the definition in draft %s', draft => {
+    ] as const)('keeps annotations outside the definition in draft %s', draft => {
         const user = object({ name: string() }).schemaName('User');
         const schema = object({
             user: schemaRef(user),
@@ -106,18 +37,30 @@ describe('boundary JSON Schema views', () => {
         expect(user.introspect().description).toBeUndefined();
     });
 
-    it('projects nested containers and lazy wrappers', () => {
-        const size = decode(string(), number(), Number);
-        const schema = object({
-            list: array(size),
-            pair: tuple([size]),
-            values: record(string(), size),
-            option: union(size).or(string()),
-            later: lazy(() => size)
-        });
-        const input = JSON.stringify(toJsonSchema(schema, { mode: 'input' }));
-        const output = JSON.stringify(toJsonSchema(schema));
-        expect(input).not.toContain('"type":"integer"');
-        expect(output).toContain('"type":"integer"');
+    it('keeps final local default and nullability modifiers', () => {
+        const target = string().nullable().schemaName('Name');
+        const ref = schemaRef(target).notNullable().optional().default('new');
+        const schema = object({ name: ref });
+        const json = toJsonSchema(schema) as any;
+        expect(schema.parse({})).toEqual({ name: 'new' });
+        expect(json.required).toEqual(['name']);
+        expect(json.properties.name.default).toBe('new');
+        expect(json.properties.name.allOf).toEqual([
+            { type: ['string', 'null'] },
+            { not: { type: 'null' } }
+        ]);
+        const nullableAgain = toJsonSchema(ref.nullable());
+        expect(nullableAgain.anyOf).toBeDefined();
+        expect(toJsonSchema(ref.readonly()).readOnly).toBe(true);
+    });
+
+    it('retains identical Standard JSON Schema views', () => {
+        const ref = schemaRef(string().schemaName('Name'))
+            .optional()
+            .describe('A name');
+        const standard = withStandardJsonSchema(ref)['~standard'].jsonSchema;
+        expect(standard.input({ target: 'draft-2020-12' })).toEqual(
+            standard.output({ target: 'draft-2020-12' })
+        );
     });
 });

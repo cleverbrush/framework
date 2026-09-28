@@ -21,13 +21,13 @@ export default function ServerOpenApiPage() {
                 </div>
 
                 <div className="card">
-                    <h2>Named references and input/output views</h2>
+                    <h2>Named references and local annotations</h2>
                     <p>
                         Use schemaRef to annotate one use of a named definition
-                        without cloning it. Requests use input views and
-                        responses use output views; differing named
-                        representations receive collision-checked Input and
-                        Output suffixes.
+                        without cloning it. Optionality, nullability and
+                        descriptions remain local, while the target has one
+                        canonical component. Conflicting named definitions still
+                        fail registration.
                     </p>
                     <a href="https://schema.cleverbrush.com/docs/schema-boundaries">
                         Schema boundary composition and compatibility

@@ -1,8 +1,6 @@
 import {
     array,
-    decode,
     lazy,
-    number,
     object,
     type SchemaBuilder,
     schemaRef,
@@ -10,93 +8,117 @@ import {
 } from '@cleverbrush/schema';
 import { endpoint } from '@cleverbrush/server';
 import { describe, expect, it } from 'vitest';
+import { generateAsyncApiSpec } from './generateAsyncApiSpec.js';
 import { generateOpenApiSpec } from './generateOpenApiSpec.js';
 import { SchemaRegistry, walkSchemas } from './schemaRegistry.js';
 
-describe('schema boundaries in OpenAPI', () => {
-    it('uses input requests, output responses, and directional nested components', () => {
-        const size = decode(string(), number().isInteger(), Number).schemaName(
-            'Size'
-        );
-        const request = object({ size: schemaRef(size) }).schemaName(
-            'Envelope'
-        );
+describe('named schema references in API documents', () => {
+    it('uses one canonical component for requests, responses and annotated references', () => {
+        const user = object({ name: string() }).schemaName('User');
+        const history = object({
+            current: schemaRef(user),
+            previous: schemaRef(user).nullable().optional().describe('Previous')
+        });
         const contract = endpoint
-            .post('/items')
-            .body(request)
-            .responses({ 200: request });
+            .post('/history')
+            .body(history)
+            .responses({ 200: history });
         const spec = generateOpenApiSpec({
             registrations: [
                 { endpoint: contract.introspect(), handler: () => {} }
             ],
-            info: { title: 'Boundaries', version: '1' }
+            info: { title: 'References', version: '1' }
         }) as any;
-        expect(
-            spec.paths['/items'].post.requestBody.content['application/json']
-                .schema
-        ).toEqual({ $ref: '#/components/schemas/EnvelopeInput' });
-        expect(
-            spec.paths['/items'].post.responses['200'].content[
+        expect(Object.keys(spec.components.schemas)).toEqual(['User']);
+        const request =
+            spec.paths['/history'].post.requestBody.content['application/json']
+                .schema;
+        const response =
+            spec.paths['/history'].post.responses['200'].content[
                 'application/json'
-            ].schema
-        ).toEqual({ $ref: '#/components/schemas/EnvelopeOutput' });
-        expect(spec.components.schemas.SizeInput).toEqual({
-            allOf: [{ type: 'string' }]
+            ].schema;
+        expect(request).toEqual(response);
+        expect(request.required).toEqual(['current']);
+        expect(request.properties.current.allOf[0].$ref).toBe(
+            '#/components/schemas/User'
+        );
+        expect(request.properties.previous.description).toBe('Previous');
+        expect(spec.components.schemas.User).toMatchObject({
+            type: 'object',
+            required: ['name']
         });
-        expect(spec.components.schemas.SizeOutput).toEqual({
-            allOf: [{ type: 'integer' }]
-        });
-        expect(
-            spec.components.schemas.EnvelopeInput.properties.size.allOf[0].$ref
-        ).toBe('#/components/schemas/SizeInput');
     });
 
-    it('registers one target with independently annotated references', () => {
+    it('preserves strict instance-based naming conflicts', () => {
         const user = object({ name: string() }).schemaName('User');
-        const root = object({
-            user,
-            previous: schemaRef(user).nullable().optional().describe('Previous')
-        });
         const registry = new SchemaRegistry();
-        walkSchemas(root, registry);
-        expect(
-            [...registry.directionalEntries()].map(([name]) => name)
-        ).toEqual(['User']);
+        walkSchemas(
+            object({
+                current: user,
+                previous: schemaRef(user).nullable().optional()
+            }),
+            registry
+        );
+        expect([...registry.entries()].map(([name]) => name)).toEqual(['User']);
         expect(() => walkSchemas(user.optional(), registry)).toThrow(
             /already registered/
         );
+        expect(() =>
+            walkSchemas(string().schemaName('User'), registry)
+        ).toThrow(/already registered/);
     });
 
-    it('rejects generated-name collisions regardless of registration order', () => {
-        const size = decode(string(), number(), Number).schemaName('Size');
-        const collision = string().schemaName('SizeInput');
-        for (const schemas of [
-            [size, collision],
-            [collision, size]
-        ]) {
-            const registry = new SchemaRegistry();
-            for (const schema of schemas) walkSchemas(schema, registry);
-            expect(() => [...registry.directionalEntries()]).toThrow(
-                /SizeInput/
-            );
-        }
-    });
-
-    it('terminates on named recursive references', () => {
+    it('terminates on named recursive references in OpenAPI and AsyncAPI', () => {
         type Node = { name: string; children: Node[] };
         const node: SchemaBuilder<Node> = object({
             name: string(),
             children: array(lazy(() => schemaRef(node)))
         }).schemaName('Node');
         const contract = endpoint.get('/nodes').responses({ 200: node });
-        const spec = generateOpenApiSpec({
+        const openapi = generateOpenApiSpec({
             registrations: [
                 { endpoint: contract.introspect(), handler: () => {} }
             ],
             info: { title: 'Nodes', version: '1' }
         }) as any;
-        expect(
-            spec.components.schemas.Node.properties.children.items.allOf[0].$ref
-        ).toBe('#/components/schemas/Node');
+        const asyncapi = generateAsyncApiSpec({
+            subscriptions: [
+                {
+                    endpoint: {
+                        protocol: 'subscription',
+                        basePath: '/ws',
+                        pathTemplate: '/nodes',
+                        incomingSchema: schemaRef(node),
+                        outgoingSchema: schemaRef(node),
+                        querySchema: null,
+                        headerSchema: null,
+                        serviceSchemas: null,
+                        authRoles: null,
+                        summary: null,
+                        description: null,
+                        tags: [],
+                        operationId: null,
+                        deprecated: false,
+                        externalDocs: null
+                    },
+                    handler: async function* () {}
+                }
+            ],
+            info: { title: 'Nodes', version: '1' }
+        }) as any;
+        for (const spec of [openapi, asyncapi]) {
+            expect(Object.keys(spec.components.schemas)).toEqual(['Node']);
+            expect(
+                spec.components.schemas.Node.properties.children.items.allOf[0]
+                    .$ref
+            ).toBe('#/components/schemas/Node');
+        }
+        const channels = Object.values(asyncapi.channels) as any[];
+        expect(channels).toHaveLength(1);
+        expect(channels[0].address).toBe('/ws/nodes');
+        const messages = channels[0].messages;
+        expect(messages.ClientMessage.payload).toEqual(
+            messages.ServerEvent.payload
+        );
     });
 });

@@ -4,8 +4,8 @@ export default function SchemaBoundariesSection() {
             <div className="section-header">
                 <h1>Schemas Across Boundaries</h1>
                 <p className="subtitle">
-                    Compose named references and explicit input-to-output
-                    decoding without duplicating validation rules.
+                    Compose optional fallbacks and named references without
+                    duplicating validation rules.
                 </p>
             </div>
             <div className="card">
@@ -38,45 +38,13 @@ const History = object({
                 </p>
             </div>
             <div className="card">
-                <h2>Declared input and output</h2>
-                <pre>
-                    <code>{`const PageSize = decode(
-    string(),
-    number().isInteger().min(1).max(100),
-    value => Number(value)
-);
-type Editable = InferInput<typeof PageSize>; // string
-type Validated = InferOutput<typeof PageSize>; // number
-PageSize.parse('20'); // 20`}</code>
-                </pre>
+                <h2>API documents</h2>
                 <p>
-                    The input is validated before conversion; the converted
-                    result is validated against the output schema. Converter
-                    errors become validation failures. Use parseAsync for
-                    asynchronous converters. InferType remains an output alias.
-                </p>
-                <p>
-                    Nested schemas and Standard Schema retain both types.
-                    Defaults on the input schema run before conversion; a
-                    default on the boundary is an output default.
-                </p>
-            </div>
-            <div className="card">
-                <h2>Export and adoption</h2>
-                <pre>
-                    <code>{`toJsonSchema(PageSize, { mode: 'input' });
-toJsonSchema(PageSize, { mode: 'output' }); // default`}</code>
-                </pre>
-                <p>
-                    OpenAPI uses input for requests and output for responses,
-                    splitting named components when their shapes differ. Export
-                    describes declared shapes, not arbitrary conversion logic.
-                </p>
-                <p>
-                    Form state and typed-client request inference are separate
-                    integrations. Until adopted there, keep explicit wire
-                    contracts and decode at your application boundary. No
-                    reverse conversion is inferred.
+                    JSON Schema, OpenAPI and AsyncAPI preserve one canonical
+                    named definition with local reference annotations.
+                    Independent definitions with the same name still fail
+                    registration. Existing inference and static type overrides
+                    are unchanged.
                 </p>
                 <a href="https://github.com/cleverbrush/framework/blob/development/libs/schema/BOUNDARIES.md">
                     Read the full composition guide

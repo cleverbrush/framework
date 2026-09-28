@@ -1,5 +1,4 @@
 import type { SchemaBuilder } from '@cleverbrush/schema';
-import { toJsonSchema } from '@cleverbrush/schema-json';
 
 // ---------------------------------------------------------------------------
 // SchemaRegistry
@@ -31,9 +30,6 @@ export class SchemaRegistry {
     >();
     /** name → first-registered schema instance */
     private readonly byName = new Map<string, SchemaBuilder<any, any, any>>();
-    private directions:
-        | Map<SchemaBuilder<any, any, any>, { input: string; output: string }>
-        | undefined;
 
     /**
      * Attempts to register `schema` in the registry.
@@ -68,7 +64,6 @@ export class SchemaRegistry {
 
         this.byInstance.set(schema, name);
         this.byName.set(name, schema);
-        this.directions = undefined;
     }
 
     /**
@@ -78,93 +73,8 @@ export class SchemaRegistry {
      * @param schema - The schema builder to look up.
      * @returns The registered name, or `null`.
      */
-    getName(
-        schema: SchemaBuilder<any, any, any>,
-        mode: 'input' | 'output' = 'output'
-    ): string | null {
-        if (!this.byInstance.has(schema)) return null;
-        this.prepareDirections();
-        return this.directions!.get(schema)![mode];
-    }
-
-    /**
-     * Emits independent input/output definitions only when their declared
-     * representations differ. Derived names are collision checked.
-     * @throws Error when a generated component name is already reserved.
-     */
-    *directionalEntries(): IterableIterator<
-        [string, SchemaBuilder<any, any, any>, 'input' | 'output']
-    > {
-        this.prepareDirections();
-        for (const [schema, names] of this.directions!) {
-            if (names.input !== names.output)
-                yield [names.input, schema, 'input'];
-            yield [names.output, schema, 'output'];
-        }
-    }
-
-    private prepareDirections(): void {
-        if (this.directions) return;
-        const different = new Set<SchemaBuilder<any, any, any>>();
-        // A changed named child changes its parents' references. Iterate to a
-        // fixed point; named recursive edges are always references, not recursion.
-        let changed = true;
-        while (changed) {
-            changed = false;
-            for (const [, schema] of this.byName) {
-                if (different.has(schema)) continue;
-                const render = (mode: 'input' | 'output') => {
-                    let rootInlined = false;
-                    return JSON.stringify(
-                        toJsonSchema(schema, {
-                            $schema: false,
-                            mode,
-                            nameResolver: candidate => {
-                                if (candidate === schema && !rootInlined) {
-                                    rootInlined = true;
-                                    return null;
-                                }
-                                const name = this.byInstance.get(candidate);
-                                return name
-                                    ? name +
-                                          (different.has(candidate)
-                                              ? mode === 'input'
-                                                  ? 'Input'
-                                                  : 'Output'
-                                              : '')
-                                    : null;
-                            }
-                        })
-                    );
-                };
-                if (render('input') !== render('output')) {
-                    different.add(schema);
-                    changed = true;
-                }
-            }
-        }
-        const names = new Map<string, SchemaBuilder<any, any, any>>(
-            this.byName
-        );
-        const directions = new Map<
-            SchemaBuilder<any, any, any>,
-            { input: string; output: string }
-        >();
-        for (const [name, schema] of this.byName) {
-            const pair = different.has(schema)
-                ? { input: name + 'Input', output: name + 'Output' }
-                : { input: name, output: name };
-            for (const derived of new Set(Object.values(pair))) {
-                if (names.has(derived) && names.get(derived) !== schema) {
-                    throw new Error(
-                        `Schema component name "${derived}" conflicts with a generated input/output name.`
-                    );
-                }
-                names.set(derived, schema);
-            }
-            directions.set(schema, pair);
-        }
-        this.directions = directions;
+    getName(schema: SchemaBuilder<any, any, any>): string | null {
+        return this.byInstance.get(schema) ?? null;
     }
 
     /**
@@ -217,9 +127,7 @@ export function walkSchemas(
 
     switch (info.type) {
         case 'reference':
-        case 'decode':
-            walkSchemas(info.inputSchema, registry, visited);
-            walkSchemas(info.outputSchema, registry, visited);
+            walkSchemas(info.targetSchema, registry, visited);
             break;
         case 'intersection':
             walkSchemas(info.left, registry, visited);

@@ -5,7 +5,6 @@ import type {
 import {
     type BRAND,
     createHybridErrorArray,
-    type InferInput,
     type InferType,
     type NestedValidationResult,
     type PropertyDescriptor,
@@ -173,8 +172,7 @@ export class UnionSchemaBuilder<
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions,
-    InferInput<TOptions[number]>
+    TExtensions
 > {
     #options!: TOptions;
     #discriminatorKey: string | null = null;

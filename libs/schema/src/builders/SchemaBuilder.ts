@@ -9,8 +9,6 @@ import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
 /** @internal Symbol used as the key for the type brand on schema builders. */
 declare const __type: unique symbol;
-/** @internal Input type marker. */
-declare const __input: unique symbol;
 /** @internal */
 export type SchemaTypeBrand = typeof __type;
 
@@ -58,18 +56,6 @@ export type InferType<T> = T extends {
     : T extends { readonly [K in SchemaTypeBrand]: infer TType }
       ? TType
       : T;
-
-/** Validated output of a schema; compatibility alias for {@link InferType}. */
-export type InferOutput<T> = InferType<T>;
-
-/**
- * Declared input before decoding and defaults. Parsers still validate unknown
- * data at runtime. Legacy preprocessors do not infer a separate input type.
- * @typeParam T - Schema whose input is required.
- */
-export type InferInput<T> = T extends { readonly [__input]: infer I }
-    ? I
-    : InferType<T>;
 
 /**
  * Represents a single validation error with a human-readable error message.
@@ -583,7 +569,7 @@ export type PropertyDescriptorTree<
                               K & string
                           > &
                               ExternOutputPropertyDescriptors<
-                                  NonNullable<InferOutput<TProperties[K]>>,
+                                  NonNullable<InferType<TProperties[K]>>,
                                   TRootSchema,
                                   PropertyDescriptor<
                                       TRootSchema,
@@ -751,8 +737,6 @@ type ResolvedSchemaType<
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
  * @typeparam TResult Type of the object that will be returned by `validate()` method.
  * @typeparam TRequired If `true`, object will be required. If `false`, object will be optional.
- * @typeParam TInput - Declared input before decoding. Defaults to TResult so
- * existing generic arguments retain their meaning.
  */
 export abstract class SchemaBuilder<
     TResult = any,
@@ -760,11 +744,7 @@ export abstract class SchemaBuilder<
     TNullable extends boolean = false,
     THasDefault extends boolean = false,
     // biome-ignore lint/correctness/noUnusedVariables: used in extensions
-    TExtensions = {},
-    TInput = TResult,
-    TResolvedInput =
-        | ResolvedSchemaType<TInput, TRequired, TNullable>
-        | (THasDefault extends true ? undefined : never)
+    TExtensions = {}
 > {
     #isRequired = true;
     #isNullable = false;
@@ -792,7 +772,6 @@ export abstract class SchemaBuilder<
      */
     #standardProps:
         | StandardSchemaV1.Props<
-              TResolvedInput,
               ResolvedSchemaType<TResult, TRequired, TNullable>
           >
         | undefined;
@@ -814,9 +793,6 @@ export abstract class SchemaBuilder<
      * @internal
      */
     declare readonly [__hasDefault]: THasDefault;
-
-    /** @internal Input type, including omission when a default exists. */
-    declare readonly [__input]: TResolvedInput;
 
     /**
      * Standard Schema v1 interface.
@@ -868,7 +844,6 @@ export abstract class SchemaBuilder<
      * @see https://standardschema.dev/
      */
     get ['~standard'](): StandardSchemaV1.Props<
-        TResolvedInput,
         ResolvedSchemaType<TResult, TRequired, TNullable>
     > {
         if (this.#standardProps) return this.#standardProps;
@@ -1783,7 +1758,7 @@ export abstract class SchemaBuilder<
      * @param options - Whether the callback can mutate its argument.
      * @returns A new builder preserving the original schema.
      * @remarks Legacy callback parameter typing is preserved for compatibility.
-     * For a separately typed external input, use decode(input, output, fn).
+     * Unknown external data still needs runtime validation.
      */
     public addPreprocessor(
         preprocessor: (
