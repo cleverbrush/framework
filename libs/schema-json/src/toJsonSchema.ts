@@ -17,13 +17,14 @@ function isRequiredInMode(
     mode: 'input' | 'output'
 ): boolean {
     const info = schema.introspect() as any;
-    if (mode === 'input' && info.hasDefault) return false;
+    // Output presence follows the wrapper's final modifiers. In particular,
+    // optional().default(...) produces a required output despite the earlier
+    // explicit input-omission modifier.
+    if (mode === 'output') return info.isRequired !== false;
+    if (info.hasDefault) return false;
     if (info.type === 'decode' || info.type === 'reference') {
         if (info.presence !== undefined) return info.presence;
-        return isRequiredInMode(
-            mode === 'input' ? info.inputSchema : info.outputSchema,
-            mode
-        );
+        return isRequiredInMode(info.inputSchema, mode);
     }
     return info.isRequired !== false;
 }

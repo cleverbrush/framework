@@ -58,6 +58,21 @@ describe('boundary JSON Schema views', () => {
         expect(toJsonSchema(schema).required).toEqual(['size', 'title']);
     });
 
+    it('respects output presence when defaults follow optional modifiers', () => {
+        const size = decode(string(), number(), Number).optional().default(5);
+        const name = schemaRef(string().schemaName('Name'))
+            .optional()
+            .default('untitled');
+        const schema = object({ size, name });
+        expect(schema.parse({})).toEqual({ size: 5, name: 'untitled' });
+        expect(
+            toJsonSchema(schema, { mode: 'input' }).required
+        ).toBeUndefined();
+        expect(toJsonSchema(schema).required).toEqual(['size', 'name']);
+        const optionalOutput = object({ size: size.optional() });
+        expect(toJsonSchema(optionalOutput).required).toBeUndefined();
+    });
+
     it.each([
         '2020-12',
         '07'
