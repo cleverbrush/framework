@@ -1,5 +1,7 @@
 import {
     type BRAND,
+    type InferInput,
+    type InferOutput,
     SchemaBuilder,
     type ValidationContext,
     type ValidationErrorMessageProvider,
@@ -49,13 +51,15 @@ export class LazySchemaBuilder<
     TRequired extends boolean = true,
     TNullable extends boolean = false,
     THasDefault extends boolean = false,
-    TExtensions = {}
+    TExtensions = {},
+    TInput = TResult
 > extends SchemaBuilder<
     TResult,
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions
+    TExtensions,
+    TInput
 > {
     #getter: () => SchemaBuilder<TResult, any, any>;
     #resolvedSchema: SchemaBuilder<TResult, any, any> | null = null;
@@ -210,7 +214,7 @@ export class LazySchemaBuilder<
      */
     public hasType<T>(
         _notUsed?: T
-    ): LazySchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
+    ): LazySchemaBuilder<T, true, TNullable, THasDefault, TExtensions, TInput> &
         TExtensions {
         return this.createFromProps({
             ...this.introspect()
@@ -225,7 +229,8 @@ export class LazySchemaBuilder<
         TRequired,
         TNullable,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TInput
     > &
         TExtensions {
         return this.createFromProps({
@@ -238,7 +243,14 @@ export class LazySchemaBuilder<
      */
     public required(
         errorMessage?: ValidationErrorMessageProvider
-    ): LazySchemaBuilder<TResult, true, TNullable, THasDefault, TExtensions> &
+    ): LazySchemaBuilder<
+        TResult,
+        true,
+        TNullable,
+        THasDefault,
+        TExtensions,
+        TInput
+    > &
         TExtensions {
         return super.required(errorMessage);
     }
@@ -251,7 +263,8 @@ export class LazySchemaBuilder<
         false,
         TNullable,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TInput
     > &
         TExtensions {
         return super.optional();
@@ -262,7 +275,7 @@ export class LazySchemaBuilder<
      */
     public default(
         value: TResult | (() => TResult)
-    ): LazySchemaBuilder<TResult, true, TNullable, true, TExtensions> &
+    ): LazySchemaBuilder<TResult, true, TNullable, true, TExtensions, TInput> &
         TExtensions {
         return super.default(value) as any;
     }
@@ -275,7 +288,8 @@ export class LazySchemaBuilder<
         TRequired,
         TNullable,
         false,
-        TExtensions
+        TExtensions,
+        TInput
     > &
         TExtensions {
         return super.clearDefault() as any;
@@ -291,7 +305,8 @@ export class LazySchemaBuilder<
         TRequired,
         TNullable,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TInput
     > &
         TExtensions {
         return super.brand(_name);
@@ -305,7 +320,8 @@ export class LazySchemaBuilder<
         TRequired,
         TNullable,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TInput
     > &
         TExtensions {
         return super.readonly();
@@ -319,7 +335,8 @@ export class LazySchemaBuilder<
         TRequired,
         true,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TInput
     > &
         TExtensions {
         return super.nullable() as any;
@@ -333,7 +350,8 @@ export class LazySchemaBuilder<
         TRequired,
         false,
         THasDefault,
-        TExtensions
+        TExtensions,
+        TInput
     > &
         TExtensions {
         return super.notNullable() as any;
@@ -372,6 +390,12 @@ export class LazySchemaBuilder<
  * });
  * ```
  */
+export function lazy<S extends SchemaBuilder<any, any, any, any, any, any>>(
+    getter: () => S
+): LazySchemaBuilder<InferOutput<S>, true, false, false, {}, InferInput<S>>;
+export function lazy<TResult>(
+    getter: () => SchemaBuilder<TResult, any, any>
+): LazySchemaBuilder<TResult, true, false, false, {}>;
 export function lazy<TResult>(
     getter: () => SchemaBuilder<TResult, any, any>
 ): LazySchemaBuilder<TResult, true, false, false, {}> {

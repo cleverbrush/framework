@@ -256,7 +256,7 @@ export function generateAsyncApiSpec(
             messages['ClientMessage'] = {
                 name: 'ClientMessage',
                 ...(inInfo.description ? { summary: inInfo.description } : {}),
-                payload: convertSchema(m.incomingSchema, registry)
+                payload: convertSchema(m.incomingSchema, registry, 'input')
             };
         }
 
@@ -325,8 +325,19 @@ export function generateAsyncApiSpec(
 
     if (!registry.isEmpty) {
         const schemas: Record<string, unknown> = {};
-        for (const [name, schema] of registry.entries()) {
-            schemas[name] = convertSchema(schema, registry);
+        for (const [name, schema, mode] of registry.directionalEntries()) {
+            let rootInlined = false;
+            schemas[name] = convertSchema(
+                schema,
+                candidate => {
+                    if (candidate === schema && !rootInlined) {
+                        rootInlined = true;
+                        return null;
+                    }
+                    return registry.getName(candidate, mode);
+                },
+                mode
+            );
         }
         doc.components = { schemas };
     }

@@ -5,6 +5,7 @@ import type {
 import {
     type BRAND,
     createHybridErrorArray,
+    type InferInput,
     type InferType,
     type NestedValidationResult,
     type PropertyDescriptor,
@@ -160,7 +161,13 @@ export class TupleSchemaBuilder<
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions
+    TExtensions,
+    TRestSchema extends SchemaBuilder<any, any, any, any, any>
+        ? [
+              ...{ [K in keyof TElements]: InferInput<TElements[K]> },
+              ...Array<InferInput<TRestSchema>>
+          ]
+        : { [K in keyof TElements]: InferInput<TElements[K]> }
 > {
     #elements!: TElements;
     #restSchema:

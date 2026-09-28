@@ -19,6 +19,7 @@ export const SECTION_GROUPS = [
         label: 'Composition',
         slugs: [
             'immutability',
+            'schema-boundaries',
             'discriminated-unions',
             'recursive-schemas',
             'parse-string',
@@ -50,6 +51,11 @@ export const SECTION_GROUPS = [
 ];
 
 export const SCHEMA_SECTIONS: SchemaSection[] = [
+    {
+        slug: 'schema-boundaries',
+        title: 'Schema Boundaries',
+        group: 'Composition'
+    },
     { slug: 'why', title: 'Why @cleverbrush/schema?', group: 'Fundamentals' },
     {
         slug: 'getting-started',

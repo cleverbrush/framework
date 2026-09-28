@@ -9,7 +9,6 @@
 // extension (compatible with the existing query/include implementation).
 
 import {
-    type ArraySchemaBuilder,
     type InferType,
     ObjectSchemaBuilder,
     type PropertyDescriptorTree,
@@ -129,18 +128,27 @@ export type EntityPropSelector<
  *
  * @public
  */
-export type UnwrapNavSchema<TProp> =
-    TProp extends ArraySchemaBuilder<infer TEl, any, any, any>
-        ? TEl extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-            ? TEl
+export type UnwrapNavSchema<TProp> = TProp extends {
+    introspect(): { elementSchema: infer TEl };
+}
+    ? NonNullable<TEl> extends ObjectSchemaBuilder<
+          any,
+          any,
+          any,
+          any,
+          any,
+          any,
+          any
+      >
+        ? NonNullable<TEl>
+        : never
+    : TProp extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+      ? TProp
+      : TProp extends SchemaBuilder<infer T, any, any, any, any>
+        ? T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+            ? T
             : never
-        : TProp extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-          ? TProp
-          : TProp extends SchemaBuilder<infer T, any, any, any, any>
-            ? T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-                ? T
-                : never
-            : never;
+        : never;
 
 /**
  * Merge type for a single polymorphic variant branch: variant schema fields

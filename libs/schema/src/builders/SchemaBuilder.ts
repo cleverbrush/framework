@@ -5,11 +5,12 @@ import {
     transaction
 } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
-import type { ExternSchemaBuilder } from './ExternSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
 /** @internal Symbol used as the key for the type brand on schema builders. */
 declare const __type: unique symbol;
+/** @internal Input type marker. */
+declare const __input: unique symbol;
 /** @internal */
 export type SchemaTypeBrand = typeof __type;
 
@@ -57,6 +58,18 @@ export type InferType<T> = T extends {
     : T extends { readonly [K in SchemaTypeBrand]: infer TType }
       ? TType
       : T;
+
+/** Validated output of a schema; compatibility alias for {@link InferType}. */
+export type InferOutput<T> = InferType<T>;
+
+/**
+ * Declared input before decoding and defaults. Parsers still validate unknown
+ * data at runtime. Legacy preprocessors do not infer a separate input type.
+ * @typeParam T - Schema whose input is required.
+ */
+export type InferInput<T> = T extends { readonly [__input]: infer I }
+    ? I
+    : InferType<T>;
 
 /**
  * Represents a single validation error with a human-readable error message.
@@ -538,77 +551,85 @@ export type PropertyDescriptorTree<
     TParentPropertyDescriptor = undefined
 > = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> &
     (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
-        ? {
-              [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
-                  any,
-                  any,
-                  any
-              >
-                  ? PropertyDescriptorTree<
-                        TProperties[K],
-                        TRootSchema,
-                        any,
-                        PropertyDescriptor<
+        ? 0 extends 1 & TProperties
+            ? { [key: string]: any }
+            : {
+                  [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
+                      any,
+                      any,
+                      any
+                  >
+                      ? PropertyDescriptorTree<
+                            TProperties[K],
                             TRootSchema,
-                            TSchema,
-                            TParentPropertyDescriptor
+                            any,
+                            PropertyDescriptor<
+                                TRootSchema,
+                                TSchema,
+                                TParentPropertyDescriptor
+                            >
                         >
-                    >
-                  : TProperties[K] extends ExternSchemaBuilder<
-                          any,
-                          any,
-                          any,
-                          any,
-                          any,
-                          any,
-                          infer TExternResult
-                      >
-                    ? PropertyDescriptor<
-                          TRootSchema,
-                          TProperties[K],
-                          PropertyDescriptor<
+                      : TProperties[K] extends {
+                              readonly [SYMBOL_HAS_PROPERTIES]: true;
+                          }
+                        ? PropertyDescriptor<
                               TRootSchema,
-                              TSchema,
-                              TParentPropertyDescriptor
-                          >,
-                          K & string
-                      > &
-                          ExternOutputPropertyDescriptors<
-                              TExternResult,
-                              TRootSchema,
+                              TProperties[K],
                               PropertyDescriptor<
                                   TRootSchema,
-                                  TProperties[K],
+                                  TSchema,
+                                  TParentPropertyDescriptor
+                              >,
+                              K & string
+                          > &
+                              ExternOutputPropertyDescriptors<
+                                  NonNullable<InferOutput<TProperties[K]>>,
+                                  TRootSchema,
                                   PropertyDescriptor<
                                       TRootSchema,
-                                      TSchema,
-                                      TParentPropertyDescriptor
-                                  >,
-                                  K & string
+                                      TProperties[K],
+                                      PropertyDescriptor<
+                                          TRootSchema,
+                                          TSchema,
+                                          TParentPropertyDescriptor
+                                      >,
+                                      K & string
+                                  >
                               >
-                          >
-                    : TProperties[K] extends ArraySchemaBuilder<
-                            infer TArrayElement,
-                            any,
-                            any
-                        >
-                      ? TArrayElement extends ObjectSchemaBuilder<
-                            any,
-                            any,
-                            any,
-                            any,
-                            any
-                        >
-                          ? PropertyDescriptor<
-                                TRootSchema,
-                                TProperties[K],
-                                PropertyDescriptor<
-                                    TRootSchema,
-                                    TSchema,
-                                    TParentPropertyDescriptor
-                                >,
-                                K & string
+                        : TProperties[K] extends ArraySchemaBuilder<
+                                infer TArrayElement,
+                                any,
+                                any
                             >
+                          ? TArrayElement extends ObjectSchemaBuilder<
+                                any,
+                                any,
+                                any,
+                                any,
+                                any
+                            >
+                              ? PropertyDescriptor<
+                                    TRootSchema,
+                                    TProperties[K],
+                                    PropertyDescriptor<
+                                        TRootSchema,
+                                        TSchema,
+                                        TParentPropertyDescriptor
+                                    >,
+                                    K & string
+                                >
+                              : InferType<TProperties[K]> extends TAssignableTo
+                                ? PropertyDescriptor<
+                                      TRootSchema,
+                                      TProperties[K],
+                                      PropertyDescriptor<
+                                          TRootSchema,
+                                          TSchema,
+                                          TParentPropertyDescriptor
+                                      >,
+                                      K & string
+                                  >
+                                : never
                           : InferType<TProperties[K]> extends TAssignableTo
                             ? PropertyDescriptor<
                                   TRootSchema,
@@ -620,20 +641,8 @@ export type PropertyDescriptorTree<
                                   >,
                                   K & string
                               >
-                            : never
-                      : InferType<TProperties[K]> extends TAssignableTo
-                        ? PropertyDescriptor<
-                              TRootSchema,
-                              TProperties[K],
-                              PropertyDescriptor<
-                                  TRootSchema,
-                                  TSchema,
-                                  TParentPropertyDescriptor
-                              >,
-                              K & string
-                          >
-                        : never;
-          }
+                            : never;
+              }
         : never);
 
 /**
@@ -742,6 +751,8 @@ type ResolvedSchemaType<
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
  * @typeparam TResult Type of the object that will be returned by `validate()` method.
  * @typeparam TRequired If `true`, object will be required. If `false`, object will be optional.
+ * @typeParam TInput - Declared input before decoding. Defaults to TResult so
+ * existing generic arguments retain their meaning.
  */
 export abstract class SchemaBuilder<
     TResult = any,
@@ -749,7 +760,11 @@ export abstract class SchemaBuilder<
     TNullable extends boolean = false,
     THasDefault extends boolean = false,
     // biome-ignore lint/correctness/noUnusedVariables: used in extensions
-    TExtensions = {}
+    TExtensions = {},
+    TInput = TResult,
+    TResolvedInput =
+        | ResolvedSchemaType<TInput, TRequired, TNullable>
+        | (THasDefault extends true ? undefined : never)
 > {
     #isRequired = true;
     #isNullable = false;
@@ -777,6 +792,7 @@ export abstract class SchemaBuilder<
      */
     #standardProps:
         | StandardSchemaV1.Props<
+              TResolvedInput,
               ResolvedSchemaType<TResult, TRequired, TNullable>
           >
         | undefined;
@@ -799,6 +815,9 @@ export abstract class SchemaBuilder<
      */
     declare readonly [__hasDefault]: THasDefault;
 
+    /** @internal Input type, including omission when a default exists. */
+    declare readonly [__input]: TResolvedInput;
+
     /**
      * Standard Schema v1 interface.
      *
@@ -807,13 +826,13 @@ export abstract class SchemaBuilder<
      * consumes the spec — including tRPC, TanStack Form, React Hook Form, T3 Env,
      * Hono, Elysia, next-safe-action, and 50+ other tools.
      *
-     * Every `SchemaBuilder` subclass (all 13 builders) inherits this property
+     * Every `SchemaBuilder` subclass inherits this property
      * automatically — no additional setup required.
      *
      * **Shape of the returned object:**
      * - `version` — always `1` (Standard Schema spec version)
      * - `vendor` — `'@cleverbrush/schema'`
-     * - `validate(value)` — synchronous; wraps this builder's own `.validate()`
+     * - `validate(value)` — asynchronous; wraps this builder's `.validateAsync()`
      *   and converts its result to the Standard Schema `Result<Output>` format:
      *   - Success: `{ value: <validated output> }`
      *   - Failure: `{ issues: [{ message: string }, …] }`
@@ -849,6 +868,7 @@ export abstract class SchemaBuilder<
      * @see https://standardschema.dev/
      */
     get ['~standard'](): StandardSchemaV1.Props<
+        TResolvedInput,
         ResolvedSchemaType<TResult, TRequired, TNullable>
     > {
         if (this.#standardProps) return this.#standardProps;
@@ -1555,7 +1575,10 @@ export abstract class SchemaBuilder<
      *
      * When `.catch()` is set, {@link parse} and {@link parseAsync} will **never throw**.
      *
-     * @param value - the fallback value, or a factory function producing the fallback
+     * @param value - A value (or factory) compatible with the resolved output:
+     * optional schemas allow undefined; nullable schemas allow null.
+     * @remarks Legacy optional schemas also accept null at runtime, so
+     * catch(undefined) does not normalize null. Use an explicit preprocessor.
      *
      * @example
      * ```ts
@@ -1584,7 +1607,11 @@ export abstract class SchemaBuilder<
      * c.validate(42);        // { valid: true, object: 'anon' }  ← also fires
      * ```
      */
-    public catch(value: TResult | (() => TResult)): this {
+    public catch(
+        value:
+            | ResolvedSchemaType<TResult, TRequired, TNullable>
+            | (() => ResolvedSchemaType<TResult, TRequired, TNullable>)
+    ): this {
         return this.createFromProps({
             ...this.introspect(),
             catchValue: value,
@@ -1750,10 +1777,20 @@ export abstract class SchemaBuilder<
     }
 
     /**
-     * Adds a `preprocessor` to a preprocessors list
+     * Adds an immutable preprocessing step. It may return the resolved value,
+     * including undefined for optional schemas and null for nullable schemas.
+     * @param preprocessor - Existing value-to-value conversion, optionally async.
+     * @param options - Whether the callback can mutate its argument.
+     * @returns A new builder preserving the original schema.
+     * @remarks Legacy callback parameter typing is preserved for compatibility.
+     * For a separately typed external input, use decode(input, output, fn).
      */
     public addPreprocessor(
-        preprocessor: Preprocessor<TResult>,
+        preprocessor: (
+            object: TResult
+        ) =>
+            | ResolvedSchemaType<TResult, TRequired, TNullable>
+            | Promise<ResolvedSchemaType<TResult, TRequired, TNullable>>,
         options?: { mutates?: boolean }
     ): this {
         if (typeof preprocessor !== 'function') {

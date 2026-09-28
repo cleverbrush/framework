@@ -1,4 +1,8 @@
-import type { SchemaBuilder } from '@cleverbrush/schema';
+import type {
+    InferInput,
+    InferOutput,
+    SchemaBuilder
+} from '@cleverbrush/schema';
 import type { StandardJSONSchemaV1 } from '@standard-schema/spec';
 import { toJsonSchema } from './toJsonSchema.js';
 
@@ -31,9 +35,8 @@ function targetToOptions(target: StandardJSONSchemaV1.Target): {
  * [Standard JSON Schema v1](https://standardschema.dev/) interface.
  *
  * The returned schema object's `~standard` property is enriched with a
- * `jsonSchema` converter. Because `@cleverbrush/schema` does not
- * distinguish between input and output types, both `input()` and `output()`
- * produce the same JSON Schema document.
+ * `jsonSchema` converter. Input describes values before decoding/defaults;
+ * output describes validated values. Converter functions are never executed.
  *
  * **Note:** this mutates the schema instance by overriding the `~standard`
  * property. The returned reference is the same schema object.
@@ -56,13 +59,19 @@ function targetToOptions(target: StandardJSONSchemaV1.Target): {
  */
 export function withStandardJsonSchema<
     T extends SchemaBuilder<any, any, any, any, any>
->(schema: T): T & StandardJSONSchemaV1 {
+>(schema: T): T & StandardJSONSchemaV1<InferInput<T>, InferOutput<T>> {
     const converter: StandardJSONSchemaV1.Converter = {
         input(options: StandardJSONSchemaV1.Options): Record<string, unknown> {
-            return toJsonSchema(schema, targetToOptions(options.target));
+            return toJsonSchema(schema, {
+                ...targetToOptions(options.target),
+                mode: 'input'
+            });
         },
         output(options: StandardJSONSchemaV1.Options): Record<string, unknown> {
-            return toJsonSchema(schema, targetToOptions(options.target));
+            return toJsonSchema(schema, {
+                ...targetToOptions(options.target),
+                mode: 'output'
+            });
         }
     };
 
@@ -85,5 +94,5 @@ export function withStandardJsonSchema<
         enumerable: false
     });
 
-    return schema as T & StandardJSONSchemaV1;
+    return schema as T & StandardJSONSchemaV1<InferInput<T>, InferOutput<T>>;
 }

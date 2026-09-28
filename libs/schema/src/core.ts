@@ -12,6 +12,11 @@ export {
     BooleanSchemaBuilder,
     boolean
 } from './builders/BooleanSchemaBuilder.js';
+export {
+    BoundarySchemaBuilder,
+    decode,
+    schemaRef
+} from './builders/BoundarySchemaBuilder.js';
 export { DateSchemaBuilder, date } from './builders/DateSchemaBuilder.js';
 export {
     ExternSchemaBuilder,
@@ -51,6 +56,8 @@ export {
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type {
+    InferInput,
+    InferOutput,
     NestedValidationResult,
     PropertyDescriptor,
     PropertyDescriptorInner,

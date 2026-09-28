@@ -6,7 +6,8 @@
     },
     "description": "Schema Definition And Validation library, that allows to define and validate objects of any complexity",
     "files": [
-        "dist"
+        "dist",
+        "BOUNDARIES.md"
     ],
     "homepage": "https://schema.cleverbrush.com/docs/getting-started",
     "keywords": [

@@ -161,6 +161,16 @@ function buildParameterObject(
     return param;
 }
 
+/** Determines omission on the request side without executing conversions. */
+function isInputRequired(schema: SchemaBuilder<any, any, any>): boolean {
+    const info = schema.introspect() as any;
+    if (info.hasDefault) return false;
+    if (info.type === 'reference' || info.type === 'decode') {
+        return info.presence ?? isInputRequired(info.inputSchema);
+    }
+    return info.isRequired !== false;
+}
+
 function buildRequestBody(
     bodySchema: SchemaBuilder<any, any, any, any, any>,
     registry: SchemaRegistry,
@@ -173,18 +183,18 @@ function buildRequestBody(
 ): Record<string, unknown> {
     const bodyInfo = bodySchema.introspect() as any;
     const body: Record<string, unknown> = {
-        required: bodyInfo.isRequired !== false
+        required: isInputRequired(bodySchema)
     };
 
     // When file uploads are enabled, emit multipart/form-data
     if (fileUpload) {
-        const jsonSchema = convertSchema(bodySchema, registry);
+        const jsonSchema = convertSchema(bodySchema, registry, 'input');
         const mediaType: Record<string, unknown> = { schema: jsonSchema };
         body['content'] = {
             'multipart/form-data': mediaType
         };
     } else {
-        const jsonSchema = convertSchema(bodySchema, registry);
+        const jsonSchema = convertSchema(bodySchema, registry, 'input');
         const mediaType: Record<string, unknown> = { schema: jsonSchema };
         if (example != null) {
             mediaType['example'] = example;
@@ -481,7 +491,7 @@ function buildOperation(
         > = queryInfo.properties ?? {};
         for (const [name, propSchema] of Object.entries(props)) {
             const propInfo = propSchema.introspect() as any;
-            const isRequired = propInfo.isRequired !== false;
+            const isRequired = isInputRequired(propSchema);
             const description =
                 typeof propInfo.description === 'string' &&
                 propInfo.description !== ''
@@ -491,7 +501,7 @@ function buildOperation(
                 buildParameterObject(
                     name,
                     'query',
-                    convertSchema(propSchema, registry),
+                    convertSchema(propSchema, registry, 'input'),
                     isRequired,
                     description
                 )
@@ -508,7 +518,7 @@ function buildOperation(
         > = headerInfo.properties ?? {};
         for (const [name, propSchema] of Object.entries(props)) {
             const propInfo = propSchema.introspect() as any;
-            const isRequired = propInfo.isRequired !== false;
+            const isRequired = isInputRequired(propSchema);
             const description =
                 typeof propInfo.description === 'string' &&
                 propInfo.description !== ''
@@ -518,7 +528,7 @@ function buildOperation(
                 buildParameterObject(
                     name,
                     'header',
-                    convertSchema(propSchema, registry),
+                    convertSchema(propSchema, registry, 'input'),
                     isRequired,
                     description
                 )
@@ -667,6 +677,13 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
         if (meta.bodySchema) walkSchemas(meta.bodySchema, registry, visited);
         if (meta.responseSchema)
             walkSchemas(meta.responseSchema, registry, visited);
+        if (meta.responseHeaderSchema)
+            walkSchemas(meta.responseHeaderSchema, registry, visited);
+        if (meta.produces) {
+            for (const entry of Object.values(meta.produces)) {
+                if (entry.schema) walkSchemas(entry.schema, registry, visited);
+            }
+        }
         if (meta.responsesSchemas) {
             for (const schema of Object.values(meta.responsesSchemas)) {
                 if (schema) walkSchemas(schema, registry, visited);
@@ -707,7 +724,8 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
     }
 
     const resolveComponentSchemaName = (
-        rootSchema: SchemaBuilder<any, any, any>
+        rootSchema: SchemaBuilder<any, any, any>,
+        mode: 'input' | 'output'
     ) => {
         // The root schema must be inlined exactly once — for the component
         // definition itself. Any subsequent encounter (e.g. through a lazy
@@ -721,7 +739,7 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
                 inlinedRoot = true;
                 return undefined; // inline the root definition once
             }
-            return registry.getName(candidate) ?? undefined;
+            return registry.getName(candidate, mode) ?? undefined;
         };
     };
 
@@ -813,13 +831,14 @@ export function generateOpenApiSpec(options: OpenApiOptions): OpenApiDocument {
 
     // Components — security schemes + named component schemas
     const componentSchemas: Record<string, unknown> = {};
-    for (const [name, schema] of registry.entries()) {
+    for (const [name, schema, mode] of registry.directionalEntries()) {
         // Inline the root schema to avoid a self-referential $ref, but resolve
         // nested named schemas through the shared registry so component
         // definitions can still deduplicate via $ref.
         componentSchemas[name] = convertSchema(
             schema,
-            resolveComponentSchemaName(schema)
+            resolveComponentSchemaName(schema, mode),
+            mode
         );
     }
     const hasSchemas = Object.keys(componentSchemas).length > 0;

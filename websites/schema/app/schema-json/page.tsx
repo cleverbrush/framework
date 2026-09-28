@@ -32,6 +32,19 @@ export default function SchemaJsonPage() {
                     ]}
                 />
 
+                <div className="card">
+                    <h2>Input and output views</h2>
+                    <p>
+                        Pass mode: &apos;input&apos; to describe values before
+                        decoding and defaults, or mode: &apos;output&apos; for
+                        validated values (the default). Standard JSON Schema
+                        input/output converters use the same views without
+                        executing conversions.
+                    </p>
+                    <a href="/docs/schema-boundaries">
+                        Named references, decoding, and compatibility
+                    </a>
+                </div>
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     commands={[

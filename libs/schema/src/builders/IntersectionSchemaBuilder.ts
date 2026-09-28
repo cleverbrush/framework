@@ -1,5 +1,6 @@
 import {
     type BRAND,
+    type InferInput,
     type InferType,
     SchemaBuilder,
     type ValidationContext,
@@ -36,7 +37,8 @@ export class IntersectionSchemaBuilder<
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions
+    TExtensions,
+    InferInput<TLeft> & InferInput<TRight>
 > {
     #left!: TLeft;
     #right!: TRight;

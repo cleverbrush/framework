@@ -20,6 +20,19 @@ export default function ServerOpenApiPage() {
                     </p>
                 </div>
 
+                <div className="card">
+                    <h2>Named references and input/output views</h2>
+                    <p>
+                        Use schemaRef to annotate one use of a named definition
+                        without cloning it. Requests use input views and
+                        responses use output views; differing named
+                        representations receive collision-checked Input and
+                        Output suffixes.
+                    </p>
+                    <a href="https://schema.cleverbrush.com/docs/schema-boundaries">
+                        Schema boundary composition and compatibility
+                    </a>
+                </div>
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     command="npm install @cleverbrush/server-openapi @cleverbrush/server"

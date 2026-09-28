@@ -1,6 +1,7 @@
 import { PropertyValidationResult } from './PropertyValidationResult.js';
 import {
     type BRAND,
+    type InferInput,
     type InferType,
     type NestedValidationResult,
     type PreValidationResult,
@@ -137,9 +138,9 @@ export type RespectPropsOptionality<
 type RespectPropsOptionalityForInput<
     T extends Record<string, SchemaBuilder<any, any, any, any, any>>
 > = {
-    [K in RequiredInputProps<T>]: InferType<T[K]>;
+    [K in RequiredInputProps<T>]: InferInput<T[K]>;
 } & {
-    [K in NotRequiredInputProps<T>]?: InferType<T[K]>;
+    [K in NotRequiredInputProps<T>]?: InferInput<T[K]>;
 };
 
 type MakeChildrenRequired<
@@ -376,7 +377,8 @@ export class ObjectSchemaBuilder<
     TRequired,
     TNullable,
     THasDefault,
-    TExtensions
+    TExtensions,
+    RespectPropsOptionalityForInput<TProperties>
 > {
     #properties: TProperties = {} as any;
     #acceptUnknownProps = false;
@@ -1073,7 +1075,9 @@ export class ObjectSchemaBuilder<
                     ObjectSchemaBuilder.#propagateNestedErrors(
                         result as any,
                         descriptor,
-                        addErrorFor
+                        addErrorFor,
+                        (result as any).__boundaryErrorSchema ??
+                            this.#properties[key]
                     );
                     // For extern schemas, also record errors on the extern
                     // descriptor itself so getErrorsFor(t => t.extern) works,
@@ -1842,7 +1846,8 @@ export class ObjectSchemaBuilder<
         TRequired,
         TNullable,
         THasDefault,
-        TExtensions
+        TExtensions,
+        RespectPropsOptionalityForInput<TProperties>
     > {
         return this.createFromProps({
             ...this.introspect()
@@ -2759,9 +2764,12 @@ export class ObjectSchemaBuilder<
             descriptor: any,
             message: string,
             parentDescriptor?: any
-        ) => void
+        ) => void,
+        schemaOverride?: SchemaBuilder<any, any, any, any, any>
     ): void {
         const schema =
+            schemaOverride ??
+            result.__boundaryErrorSchema ??
             ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(descriptor);
         const properties = (schema.introspect() as any).properties;
 
@@ -2813,7 +2821,8 @@ export class ObjectSchemaBuilder<
                     ObjectSchemaBuilder.#propagateNestedErrors(
                         result,
                         nestedPropertyDescriptor,
-                        addErrorFor
+                        addErrorFor,
+                        nestedSchema
                     );
                 }
             }
@@ -3114,33 +3123,11 @@ type NotRequiredProps<
 type RequiredInputProps<
     T extends Record<string, SchemaBuilder<any, any, any, any, any>>
 > = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<
-        any,
-        infer TReq,
-        any,
-        infer THasDef
-    >
-        ? TReq extends true
-            ? THasDef extends true
-                ? never
-                : k
-            : never
-        : never]: T[k];
+    [k in keyof T as undefined extends InferInput<T[k]> ? never : k]: T[k];
 };
 
 type NotRequiredInputProps<
     T extends Record<string, SchemaBuilder<any, any, any, any, any>>
 > = keyof {
-    [k in keyof T as T[k] extends SchemaBuilder<
-        any,
-        infer TReq,
-        any,
-        infer THasDef
-    >
-        ? TReq extends true
-            ? THasDef extends true
-                ? k
-                : never
-            : k
-        : never]: T[k];
+    [k in keyof T as undefined extends InferInput<T[k]> ? k : never]: T[k];
 };
