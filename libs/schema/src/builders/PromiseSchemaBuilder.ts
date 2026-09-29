@@ -107,9 +107,12 @@ export class PromiseSchemaBuilder<
         TResolvedTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -124,9 +127,12 @@ export class PromiseSchemaBuilder<
         TResolvedTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -410,7 +416,7 @@ export class PromiseSchemaBuilder<
         TSchema
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             resolvedType: schema
         } as any) as any;

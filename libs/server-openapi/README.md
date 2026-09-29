@@ -141,9 +141,31 @@ const AddressSchema = object({ street: string(), city: string() }).schemaName('A
 const CreateUserBody = object({ address: AddressSchema, name: string() });
 ```
 
+### Local modifiers and changed shapes
+
+Ordinary use-site modifiers retain the canonical named component:
+
+```ts
+const History = object({
+    current: UserSchema,
+    previous: UserSchema.optional().nullable().describe('Previous user')
+});
+// One User component; previous composes local nullability and annotations.
+
+const PatchUser = UserSchema.partial(); // unnamed, exported inline
+const PublicUser = UserSchema.omit('id').schemaName('PublicUser'); // new component
+```
+
+Presence, nullability, annotations and type-only modifiers preserve the original
+definition. Shape/rule edits, callbacks, defaults, fallbacks and extension changes
+discard inherited names. Their nested named children still reuse components.
+Apply `schemaName` after these edits when the result needs its own component;
+later optionality or annotations do not reconnect an unnamed derivative.
+See the [complete naming rules](https://schema.cleverbrush.com/docs/schema-modifiers#schema-name).
+
 ### Conflict rule
 
-Registering **two different schema instances** under the same name throws immediately during spec generation:
+Registering **two independent definitions** under the same name throws immediately during spec generation, even if their shapes match:
 
 ```ts
 const A = object({ x: string() }).schemaName('Thing');
@@ -153,7 +175,9 @@ generateOpenApiSpec({ registrations: [...], info: { … } });
 // Error: Schema name "Thing" is already registered by a different schema instance.
 ```
 
-Re-registering the **same** instance (because it appears in multiple endpoints) is a no-op.
+Re-registering the **same** instance or its use-site modifiers is a no-op. Calling
+`schemaName` explicitly establishes a new independent definition, even on a
+modified use; reusing an already registered name then conflicts.
 
 ### `SchemaRegistry` (advanced)
 
@@ -445,6 +469,10 @@ Each subscription endpoint becomes:
 - A **`receive` operation** if the endpoint has an incoming schema (client → server messages).
 
 Named schemas (registered via `.schemaName()`) are collected into `components.schemas` and referenced via `$ref` pointers in the channel messages.
+
+AsyncAPI uses the same canonical-reference, local-modifier and name-conflict
+rules as OpenAPI. Named recursive schemas are expanded once per component,
+with recursive uses referencing that component.
 
 ### `AsyncApiOptions`
 

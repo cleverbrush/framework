@@ -120,6 +120,48 @@ console.log(schema.introspect().catchValue);  // 'unknown'`)
                         }}
                     />
                 </pre>
+                <h3>Optional and nullable fallbacks</h3>
+                <p>
+                    Fallback values and factories respect the resolved output
+                    type: optional schemas allow <code>undefined</code>, and
+                    nullable schemas allow <code>null</code>.
+                </p>
+                <pre>
+                    <code>{`const text = string().optional().catch(undefined);
+const nullableText = string().nullable().catch(() => null);
+
+text.parse(42); // undefined
+nullableText.parse(42); // null
+array(text).parse(['ok', 42]); // ['ok', undefined] — no entries dropped`}</code>
+                </pre>
+                <p>
+                    Fallbacks are opt-in. A property fallback does not make a
+                    malformed required root object valid, and a fallback factory
+                    runs only when validation fails.
+                </p>
+                <p>
+                    Legacy optional schemas accept <code>null</code> at runtime
+                    even when their inferred type omits it. A fallback does not
+                    replace a value that passed validation, so normalize null
+                    explicitly when your application requires undefined:
+                </p>
+                <pre>
+                    <code>{`const normalizedText = string().optional()
+    .addPreprocessor(value => value == null ? undefined : value)
+    .catch(undefined);
+
+normalizedText.parse(null); // undefined`}</code>
+                </pre>
+                <p>
+                    Preprocessors may return optional/nullable values, including
+                    asynchronously. Their callback parameter types do not
+                    guarantee that unknown input already has that type; guard
+                    untrusted values before using type-specific methods. Use{' '}
+                    <code>parseAsync</code> / <code>validateAsync</code> for
+                    async callbacks. Existing <code>InferType</code> and{' '}
+                    <code>hasType</code> behavior is unchanged; static overrides
+                    do not convert or validate runtime values.
+                </p>
             </div>
 
             {/* ── Readonly ─────────────────────────────────────── */}
@@ -283,6 +325,71 @@ console.log(UserSchema.introspect().schemaName); // 'User'
                         }}
                     />
                 </pre>
+                <h3>Reuse the definition with ordinary modifiers</h3>
+                <pre>
+                    <code>{`const History = object({
+    current: UserSchema,
+    previous: UserSchema.optional().nullable().describe('Previous user')
+});
+// One User component, with local annotations and nullability for previous.`}</code>
+                </pre>
+                <p>
+                    No wrapper is needed. The original remains unchanged, and
+                    concrete builder methods, extensions, inference and nested
+                    property selectors are preserved. Modifier chains reference
+                    the original definition, not another alias.
+                </p>
+                <ul>
+                    <li>
+                        Presence/nullability: <code>optional</code>,{' '}
+                        <code>required</code>, <code>nullable</code>,{' '}
+                        <code>notNullable</code>.
+                    </li>
+                    <li>
+                        Annotations: <code>describe</code>, <code>example</code>
+                        , <code>readonly</code>.
+                    </li>
+                    <li>
+                        Type-only changes: <code>brand</code>,{' '}
+                        <code>hasType</code>, <code>clearHasType</code>,{' '}
+                        <code>optimize</code>.
+                    </li>
+                </ul>
+                <h3>Shape and rule changes become unnamed</h3>
+                <p>
+                    Property edits, partial/pick/omit, constraints, validators,
+                    preprocessors, defaults, fallbacks and their available clear
+                    methods discard inherited names. Extension changes detach
+                    conservatively too. Later annotations or optionality do not
+                    reconnect the derivative; existing nested named children
+                    still reuse their own definitions.
+                </p>
+                <pre>
+                    <code>{`const PatchUser = UserSchema.partial(); // unnamed
+const UserWithEmail = UserSchema.addProp('email', string()); // unnamed
+const PublicUser = UserSchema.omit('id').schemaName('PublicUser');
+const ShortName = string().schemaName('Name').maxLength(20); // unnamed`}</code>
+                </pre>
+                <p>
+                    Apply <code>schemaName</code> after shape/rule edits when
+                    the result needs a stable component name. Code that
+                    previously relied on edits retaining an inherited name
+                    should name the final result explicitly.
+                </p>
+                <p>
+                    Explicit naming always creates an independent definition,
+                    even on an alias. Independent definitions sharing a name
+                    still conflict, including identical shapes; use-site
+                    modifiers of the same definition do not.
+                </p>
+                <p>
+                    Canonical-reference metadata affects exporters, not runtime
+                    validation. Defaults and fallbacks follow ordinary builder
+                    semantics; <code>clearDefault()</code> removes the default
+                    completely without revealing a hidden canonical default.
+                    JSON Schema, OpenAPI and AsyncAPI keep one canonical
+                    definition with local annotations and nullability.
+                </p>
             </div>
 
             {/* ── Promise Schemas ──────────────────────────────── */}

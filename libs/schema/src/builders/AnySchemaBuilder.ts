@@ -62,9 +62,12 @@ export class AnySchemaBuilder<
         _notUsed?: T
     ): AnySchemaBuilder<true, TNullable, T, THasDefault, TExtensions> &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -78,9 +81,12 @@ export class AnySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #buildResult(

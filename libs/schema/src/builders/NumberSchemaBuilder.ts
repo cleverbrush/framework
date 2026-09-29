@@ -285,9 +285,12 @@ export class NumberSchemaBuilder<
         _notUsed?: T
     ): NumberSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -301,9 +304,12 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getConstraintViolation(
@@ -557,7 +563,7 @@ export class NumberSchemaBuilder<
         >
     ) {
         if (typeof value !== 'number') throw new Error('number expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
@@ -582,7 +588,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: undefined
         }) as any;
@@ -600,7 +606,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             isInteger: false,
             ensureIsIntegerErrorMessageProvider:
@@ -619,7 +625,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             isInteger: false,
             ensureIsIntegerErrorMessageProvider:
@@ -645,7 +651,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             isInteger: true,
             ensureIsIntegerErrorMessageProvider: errorMessage
@@ -752,7 +758,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureNotNaN: true,
             ensureNotNaNErrorMessageProvider: errorMessage
@@ -770,7 +776,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureNotNaN: false,
             ensureNotNaNErrorMessageProvider:
@@ -796,7 +802,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureIsFinite: true,
             ensureIsFiniteErrorMessageProvider: errorMessage
@@ -814,7 +820,7 @@ export class NumberSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureIsFinite: false,
             ensureIsFiniteErrorMessageProvider:
@@ -870,7 +876,7 @@ export class NumberSchemaBuilder<
         TExtensions {
         if (typeof minValue !== 'number')
             throw new Error('minValue must be a number');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             min: minValue,
             minValidationErrorMessageProvider: errorMessage
@@ -890,7 +896,7 @@ export class NumberSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.min;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -916,7 +922,7 @@ export class NumberSchemaBuilder<
         TExtensions {
         if (typeof maxValue !== 'number')
             throw new Error('maxValue must be a number');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             max: maxValue,
             maxValidationErrorMessageProvider: errorMessage
@@ -936,7 +942,7 @@ export class NumberSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.max;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }

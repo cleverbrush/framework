@@ -156,6 +156,40 @@ Descriptions set via `.describe(text)` are emitted as the `description` field on
 
 Examples set via `.example(value)` are emitted as the `examples` array on the corresponding JSON Schema node.
 
+#### Named references and local annotations
+
+Ordinary modifiers such as `User.optional().nullable().describe('Previous')`
+preserve the canonical named definition. With a `nameResolver`, direct reuse
+emits a `$ref`; modified uses compose around that reference so annotations and
+nullability remain local in both Draft 07 and Draft 2020-12.
+
+```ts
+const User = object({ name: string() }).schemaName('User');
+const History = object({
+    current: User,
+    previous: User.optional().nullable().describe('Previous user')
+});
+const json = toJsonSchema(History, {
+    $schema: false,
+    nameResolver: schema => schema.introspect().schemaName ?? null
+});
+// json.required: ['current']
+// json.properties.current: { $ref: '#/components/schemas/User' }
+// json.properties.previous: local description and a nullable reference to User
+```
+
+Use-site modifiers are handled before name resolution, which receives the
+canonical target. The resolver does not create component definitions itself;
+supply them in the containing document or use `@cleverbrush/server-openapi`.
+Without a resolver, the target is converted inline.
+
+Shape, validation-rule, default, fallback and extension changes discard the
+inherited name and export inline, while nested named children still reuse their
+definitions. Apply `schemaName` after such edits to name a new definition. See
+the [schema naming rules](https://schema.cleverbrush.com/docs/schema-modifiers#schema-name).
+Standard JSON Schema `input()` and `output()` retain their existing identical
+representation; no separate directional schemas are introduced.
+
 #### Discriminated unions
 
 When a `union()` is a **discriminated union** — all branches are objects sharing a required property with unique literal values — `toJsonSchema()` automatically emits the `discriminator` keyword alongside `anyOf`:
@@ -188,7 +222,7 @@ This enables code-generation tools (openapi-generator, orval, etc.) to produce p
 | --- | --- | --- | --- |
 | `draft` | `'2020-12' \| '07'` | `'2020-12'` | JSON Schema draft version for the `$schema` URI |
 | `$schema` | `boolean` | `true` | Whether to include the `$schema` header in the output |
-| `nameResolver` | `(schema: SchemaBuilder) => string \| null` | `undefined` | Called for every node before conversion. Return a non-null string to emit `{ $ref: '#/components/schemas/<name>' }` instead of an inline schema. Used by `@cleverbrush/server-openapi` to wire named schemas from `.schemaName()` into `$ref` pointers. |
+| `nameResolver` | `(schema: SchemaBuilder) => string \| null` | `undefined` | Return a component name to emit `{ $ref: '#/components/schemas/<name>' }` instead of an inline definition. Use-site modifiers resolve their canonical target and compose local annotations/nullability around it. Used by `@cleverbrush/server-openapi` for named components. |
 
 ```ts
 // Embed in OpenAPI (suppress the $schema header)

@@ -361,9 +361,12 @@ export class GenericSchemaBuilder<
         _notUsed?: T
     ): GenericSchemaBuilder<TFn, true, TNullable, T, THasDefault, TExtensions> &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -378,9 +381,12 @@ export class GenericSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**

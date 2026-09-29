@@ -314,9 +314,12 @@ export class StringSchemaBuilder<
         _notUsed?: T
     ): StringSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -330,9 +333,12 @@ export class StringSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getConstraintViolation(
@@ -584,7 +590,7 @@ export class StringSchemaBuilder<
         >
     ) {
         if (typeof value !== 'string') throw new Error('string expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
@@ -609,7 +615,7 @@ export class StringSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: undefined
         }) as any;
@@ -747,7 +753,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             minLength: length,
             minLengthValidationErrorMessageProvider: errorMessage
@@ -767,7 +773,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.minLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -794,7 +800,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof length !== 'number')
             throw new Error('length must be a number');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             maxLength: length,
             maxLengthValidationErrorMessageProvider: errorMessage
@@ -814,7 +820,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.maxLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -840,7 +846,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof val !== 'string' || !val)
             throw new Error('non empty string expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             startsWith: val,
             startsWithValidationErrorMessageProvider: errorMessage
@@ -860,7 +866,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.startsWith;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -886,7 +892,7 @@ export class StringSchemaBuilder<
         TExtensions {
         if (typeof val !== 'string' || !val)
             throw new Error('non empty string expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             endsWith: val,
             endsWithValidationErrorMessageProvider: errorMessage
@@ -906,7 +912,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.endsWith;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -932,7 +938,7 @@ export class StringSchemaBuilder<
     > &
         TExtensions {
         if (!(regexp instanceof RegExp)) throw new Error('regexp expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             matches: regexp,
             matchesValidationErrorMessageProvider: errorMessage
@@ -952,7 +958,7 @@ export class StringSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.matches;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }

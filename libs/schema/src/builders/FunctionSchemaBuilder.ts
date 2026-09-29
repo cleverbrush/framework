@@ -129,9 +129,12 @@ export class FunctionSchemaBuilder<
         TReturnTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -147,9 +150,12 @@ export class FunctionSchemaBuilder<
         TReturnTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -436,7 +442,7 @@ export class FunctionSchemaBuilder<
         TReturnTypeSchema
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             parameters: [...this.#parameters, schema]
         } as any) as any;
@@ -477,7 +483,7 @@ export class FunctionSchemaBuilder<
         TSchema
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             returnType: schema
         } as any) as any;

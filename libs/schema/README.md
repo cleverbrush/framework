@@ -1125,6 +1125,43 @@ console.log(info.hasCatch);    // true
 console.log(info.catchValue);  // 'unknown'
 ```
 
+### Optional and nullable fallbacks
+
+Fallback values and factories respect the schema's resolved output type:
+optional schemas allow `undefined`, and nullable schemas allow `null`.
+
+```typescript
+const optionalText = string().optional().catch(undefined);
+const nullableText = string().nullable().catch(() => null);
+
+optionalText.parse(42); // undefined
+nullableText.parse(42); // null
+object({ text: optionalText }).parse({ text: false }); // { text: undefined }
+array(optionalText).parse(['ok', 42]); // ['ok', undefined] — no entries dropped
+```
+
+Fallbacks are opt-in: a fallback on a property does not make a malformed required
+root object valid. A fallback factory runs only when validation fails.
+
+**Null compatibility:** legacy optional schemas accept `null` at runtime even
+though their inferred type does not include it. `.optional().catch(undefined)`
+therefore leaves `null` unchanged. Normalize it explicitly when needed:
+
+```typescript
+const normalizedText = string().optional()
+    .addPreprocessor(value => value == null ? undefined : value)
+    .catch(undefined);
+
+normalizedText.parse(null); // undefined
+```
+
+Preprocessors can return optional/nullable values, including asynchronously.
+Their existing callback parameter typing does not guarantee that unknown input
+already has that type: guard untrusted values before using type-specific methods.
+Use `parseAsync` / `validateAsync` for async preprocessors or validators.
+`InferType` and `hasType` keep their existing meaning; static overrides and casts
+do not perform runtime conversion or validation.
+
 ## Readonly Modifier
 
 Every schema builder supports `.readonly()`. This is a **type-level-only** modifier — it marks the inferred TypeScript type as immutable, but does not alter validation behaviour or freeze the validated value at runtime.
@@ -1189,7 +1226,7 @@ export const UserSchema = object({
 UserSchema.introspect().schemaName; // 'User'
 ```
 
-Chains naturally with all other modifiers:
+Annotations can be applied after naming a definition:
 
 ```typescript
 const ProductSchema = object({
@@ -1210,12 +1247,64 @@ import { generateOpenApiSpec } from '@cleverbrush/server-openapi';
 generateOpenApiSpec({ registrations, info: { title: 'My API', version: '1.0.0' } });
 ```
 
-> **Name uniqueness:** Registering two *different* schema instances under the same name throws an error. Always export named schemas as constants and reuse the same reference everywhere.
+### Reusing a named definition
+
+Use the plain constant directly, or apply ordinary use-site modifiers. No wrapper
+is needed; the concrete builder, fluent and extension methods, inferred types,
+and nested property selectors are preserved. The original remains unchanged.
+
+```typescript
+const History = object({
+    current: UserSchema,
+    previous: UserSchema.optional().nullable().describe('Previous user')
+});
+// One canonical User component; previous has local annotations/nullability.
+```
+
+These modifiers retain the canonical named definition for document exporters:
+
+- Presence/nullability: `optional`, `required`, `nullable`, `notNullable`.
+- Annotations: `describe`, `example`, `readonly`.
+- Type-only changes: `brand`, `hasType`, `clearHasType`, `optimize`.
+
+Modifier chains reference the original definition, not another alias. JSON Schema,
+OpenAPI and AsyncAPI compose local annotations and nullability around that
+definition, including Draft 07 references. Runtime validation still follows the
+ordinary builder's behavior; canonical-reference metadata is for exporters.
+
+### Shape and rule changes discard inherited names
+
+Property additions/removals, `partial`, `pick`, `omit`, constraints, validators,
+preprocessors, defaults, fallbacks and their available clear methods produce
+unnamed derivatives. Extension changes detach conservatively too. Later
+annotations or optionality do not reconnect the derivative to the original.
+
+```typescript
+const PatchUser = UserSchema.partial(); // unnamed, changed shape
+const UserWithEmail = UserSchema.addProp('email', string()); // unnamed
+const PublicUser = UserSchema.omit('id').schemaName('PublicUser'); // new definition
+const ShortName = string().schemaName('Name').maxLength(20); // unnamed rule change
+```
+
+Existing nested named schemas still reuse their own definitions. Apply
+`schemaName` **after** shape/rule edits when the result needs a stable component
+name. This changes inherited-name behavior: code that relied on property or
+constraint edits retaining a name should name the final result explicitly.
+
+Defaults and fallbacks keep ordinary builder semantics. Adding or clearing them
+detaches the inherited name; `clearDefault()` removes the default completely,
+without revealing a hidden default from the canonical definition.
+
+> **Name uniqueness:** Independent definitions with the same name still conflict,
+> even with identical shapes; there is no name-only or structural deduplication.
+> Use-site modifiers reuse the original definition and do not conflict. Calling
+> `schemaName` explicitly always establishes a fresh independent definition,
+> even on an alias or when the previous name is reused.
 
 | Method / Property | Signature | Notes |
 |---|---|---|
 | `.schemaName(name)` | `schemaName(name: string): this` | Returns a new builder; original is unchanged |
-| `.introspect().schemaName` | `string \| undefined` | The name passed to `.schemaName()`, or `undefined` |
+| `.introspect().schemaName` | `string \| undefined` | The explicit or preserved name; `undefined` after a shape/rule change |
 
 ## Describe
 
