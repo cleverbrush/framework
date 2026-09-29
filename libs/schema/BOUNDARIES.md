@@ -1,6 +1,6 @@
 # Schemas across boundaries
 
-These APIs are additive. `InferType<S>` continues to mean validated output;
+`InferType<S>` continues to mean validated output;
 existing builder generic arguments and legacy preprocessors keep their meaning.
 
 ## Optional fallbacks
@@ -46,31 +46,62 @@ Before, cloning `User.schemaName('User')` with `.optional()` created another
 named instance and conflicted during OpenAPI generation.
 
 ```ts
-import { number, object, schemaRef, string } from '@cleverbrush/schema';
+import { number, object, string } from '@cleverbrush/schema';
 
 const User = object({ id: number(), name: string() }).schemaName('User');
 const History = object({
-    current: schemaRef(User),
-    previous: schemaRef(User).nullable().optional()
+    current: User,
+    previous: User.nullable().optional()
         .describe('The previous user, when known.')
 });
 ```
 
-`schemaRef` requires a named target. Its local modifiers do not rename, clone,
-or mutate that target. References delegate validation and preserve nested
-property selectors/errors. Independent schemas sharing a name still conflict;
-there is no name-only deduplication. Use-site optionality controls omission;
-nullability controls null acceptance for the wrapper independently.
+No wrapper is needed. Ordinary immutable modifiers keep the concrete builder,
+fluent methods, extension methods, inference, and nested property selectors.
+They validate normally; canonical-reference metadata only affects exporters.
+The original definition is never mutated. Reuse the plain constant when there
+are no local modifiers. Independent definitions sharing a name still conflict;
+there is no name-based or structural deduplication.
+
+### Which changes preserve the named definition?
+
+- Use-site presence/nullability: `optional`, `required`, `nullable`, `notNullable`.
+- Annotations: `describe`, `example`, `readonly`.
+- Type-only changes: `brand`, `hasType`, `clearHasType`, `optimize`.
+
+Chains of these modifiers always reference the original canonical definition,
+not another alias. Calling `schemaName` explicitly creates a new independent
+definition, even when the previous name is reused.
+
+### Shape and rule changes become unnamed
+
+Property additions/removals, `partial`, `pick`, `omit`, constraints, validators,
+preprocessors, defaults, fallbacks, and their clear methods discard the inherited
+name and canonical association. Extension changes detach conservatively, too.
+These derivatives cannot safely claim to be the original definition. Later
+annotations or optionality do not reconnect them.
+
+```ts
+const PartialUser = User.partial(); // unnamed, all properties optional
+const UserWithEmail = User.addProp('email', string()); // unnamed, new shape
+const PublicUser = User.omit('id').schemaName('PublicUser'); // new definition
+const ShortName = string().schemaName('Name').maxLength(20); // unnamed rule change
+```
+
+Existing nested named schemas still reuse their own definitions. To retain a
+stable component name after a shape or rule change, call `schemaName` **last**.
+This intentionally changes inherited-name behavior; review code that relied on
+constraint/property modifications retaining the old component name.
 
 JSON Schema/OpenAPI keeps one definition and uses reference composition for
 local annotations, examples and nullability, including Draft 07 references.
 
 ## Defaults and validation
 
-A default on the reference overrides missing values at that use site and is
-validated by the target. Clearing it leaves any target default intact. Local
-fallbacks use the existing catch semantics. Async target validators and local
-callbacks require `parseAsync`/`validateAsync`.
+Defaults and fallbacks retain ordinary builder behavior, not delegated wrapper
+behavior. Adding or clearing either detaches the name. Clearing a default removes
+it completely; it does not reveal a hidden canonical default. Async validators
+and preprocessors still require `parseAsync`/`validateAsync`.
 
 Use `InferType` for schema inference and the existing `hasType` method when an
 explicit static override is needed. Static overrides and casts do not change

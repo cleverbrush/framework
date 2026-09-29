@@ -9,10 +9,12 @@ OpenAPI 3.1 specification generation for [`@cleverbrush/server`](../server). Con
 
 ### Schema boundaries
 
-Use `schemaRef(NamedSchema).optional().nullable().describe(...)` to annotate a
-single use without cloning the named definition. Conflicting named definitions
+Use `NamedSchema.optional().nullable().describe(...)` to annotate a
+single use while preserving the canonical named definition. Conflicting named definitions
 still fail. OpenAPI and AsyncAPI retain one canonical component per named target.
-See the [composition guide](../schema/BOUNDARIES.md).
+Shape and rule changes detach the inherited name; name the result explicitly
+with `schemaName` when it needs its own component.
+See the [composition guide](https://github.com/cleverbrush/framework/blob/development/libs/schema/BOUNDARIES.md).
 
 - **`generateOpenApiSpec()`** — converts `@cleverbrush/server` endpoint registrations into an OpenAPI 3.1 document.
 - **`generateAsyncApiSpec()`** — converts `@cleverbrush/server` WebSocket subscription registrations into an AsyncAPI 3.0 document.

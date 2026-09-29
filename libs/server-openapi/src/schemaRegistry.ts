@@ -11,8 +11,8 @@ import type { SchemaBuilder } from '@cleverbrush/schema';
  * `$ref: '#/components/schemas/<name>'` pointers.
  *
  * **Conflict rule**: registering two *different* schema instances (different
- * object references) under the same name throws immediately. Re-registering
- * the same instance is a no-op.
+ * object references) under the same name throws immediately. Use-site aliases
+ * register their canonical target; re-registering that target is a no-op.
  *
  * @example
  * ```ts
@@ -37,6 +37,7 @@ export class SchemaRegistry {
      * - If the schema has no `schemaName` in its introspect output, it is
      *   silently skipped.
      * - If the same instance is already registered, this is a no-op.
+     * - Use-site modifiers register their canonical definition, not the alias.
      * - If a **different** instance is already registered under the same name,
      *   an error is thrown.
      *
@@ -44,6 +45,7 @@ export class SchemaRegistry {
      * @throws {Error} When two distinct schema instances share the same name.
      */
     register(schema: SchemaBuilder<any, any, any>): void {
+        schema = schema.introspect().referenceTarget ?? schema;
         const name = (schema.introspect() as any).schemaName as
             | string
             | undefined;
@@ -74,6 +76,7 @@ export class SchemaRegistry {
      * @returns The registered name, or `null`.
      */
     getName(schema: SchemaBuilder<any, any, any>): string | null {
+        schema = schema.introspect().referenceTarget ?? schema;
         return this.byInstance.get(schema) ?? null;
     }
 
@@ -104,9 +107,8 @@ export class SchemaRegistry {
  * schemas may safely be shared across multiple branches without causing
  * infinite recursion.
  *
- * **Excluded schema types**
- * - `lazy` — deferred resolution would require calling the getter, which may
- *   itself reference the parent schema; lazy schemas are handled separately.
+ * Use-site aliases walk their canonical definition. Lazy schemas resolve their
+ * getter; the shared visited set prevents cycles through named recursive roots.
  *
  * @param schema  - Root schema to start the walk from.
  * @param registry - Registry to register named schemas into.
@@ -125,10 +127,12 @@ export function walkSchemas(
 
     const info = schema.introspect() as any;
 
+    if (info.referenceTarget) {
+        walkSchemas(info.referenceTarget, registry, visited);
+        return;
+    }
+
     switch (info.type) {
-        case 'reference':
-            walkSchemas(info.targetSchema, registry, visited);
-            break;
         case 'intersection':
             walkSchemas(info.left, registry, visited);
             walkSchemas(info.right, registry, visited);

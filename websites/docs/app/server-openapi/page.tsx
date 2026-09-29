@@ -23,11 +23,12 @@ export default function ServerOpenApiPage() {
                 <div className="card">
                     <h2>Named references and local annotations</h2>
                     <p>
-                        Use schemaRef to annotate one use of a named definition
-                        without cloning it. Optionality, nullability and
-                        descriptions remain local, while the target has one
-                        canonical component. Conflicting named definitions still
-                        fail registration.
+                        Use ordinary fluent modifiers on a named definition.
+                        Optionality, nullability and descriptions remain local,
+                        while the target has one canonical component.
+                        Conflicting named definitions still fail registration.
+                        Shape and rule changes become unnamed; apply schemaName
+                        last to name a new definition.
                     </p>
                     <a href="https://schema.cleverbrush.com/docs/schema-boundaries">
                         Schema boundary composition and compatibility

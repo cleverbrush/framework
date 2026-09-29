@@ -2,9 +2,10 @@
 
 ## Schemas across boundaries
 
-Use optional-aware `catch(undefined)` and `schemaRef(namedSchema)` for per-use
-annotations without cloning named definitions. See the
-[composition guide](./BOUNDARIES.md) for examples and null-compatibility limits.
+Use optional-aware `catch(undefined)` and ordinary named-schema modifiers for per-use
+annotations while preserving canonical named definitions. See the
+[composition guide](https://github.com/cleverbrush/framework/blob/development/libs/schema/BOUNDARIES.md)
+for examples, naming rules and null-compatibility limits.
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)

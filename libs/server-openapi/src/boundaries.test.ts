@@ -3,7 +3,6 @@ import {
     lazy,
     object,
     type SchemaBuilder,
-    schemaRef,
     string
 } from '@cleverbrush/schema';
 import { endpoint } from '@cleverbrush/server';
@@ -16,8 +15,8 @@ describe('named schema references in API documents', () => {
     it('uses one canonical component for requests, responses and annotated references', () => {
         const user = object({ name: string() }).schemaName('User');
         const history = object({
-            current: schemaRef(user),
-            previous: schemaRef(user).nullable().optional().describe('Previous')
+            current: user,
+            previous: user.nullable().optional().describe('Previous')
         });
         const contract = endpoint
             .post('/history')
@@ -39,7 +38,7 @@ describe('named schema references in API documents', () => {
             ].schema;
         expect(request).toEqual(response);
         expect(request.required).toEqual(['current']);
-        expect(request.properties.current.allOf[0].$ref).toBe(
+        expect(request.properties.current.$ref).toBe(
             '#/components/schemas/User'
         );
         expect(request.properties.previous.description).toBe('Previous');
@@ -55,14 +54,18 @@ describe('named schema references in API documents', () => {
         walkSchemas(
             object({
                 current: user,
-                previous: schemaRef(user).nullable().optional()
+                previous: user.nullable().optional()
             }),
             registry
         );
         expect([...registry.entries()].map(([name]) => name)).toEqual(['User']);
-        expect(() => walkSchemas(user.optional(), registry)).toThrow(
-            /already registered/
-        );
+        expect(() => walkSchemas(user.optional(), registry)).not.toThrow();
+        expect(() =>
+            walkSchemas(user.optional().schemaName('User'), registry)
+        ).toThrow(/already registered/);
+        expect(() =>
+            walkSchemas(object({ name: string() }).schemaName('User'), registry)
+        ).toThrow(/already registered/);
         expect(() =>
             walkSchemas(string().schemaName('User'), registry)
         ).toThrow(/already registered/);
@@ -72,7 +75,7 @@ describe('named schema references in API documents', () => {
         type Node = { name: string; children: Node[] };
         const node: SchemaBuilder<Node> = object({
             name: string(),
-            children: array(lazy(() => schemaRef(node)))
+            children: array(lazy(() => node.optional()))
         }).schemaName('Node');
         const contract = endpoint.get('/nodes').responses({ 200: node });
         const openapi = generateOpenApiSpec({
@@ -88,8 +91,8 @@ describe('named schema references in API documents', () => {
                         protocol: 'subscription',
                         basePath: '/ws',
                         pathTemplate: '/nodes',
-                        incomingSchema: schemaRef(node),
-                        outgoingSchema: schemaRef(node),
+                        incomingSchema: node,
+                        outgoingSchema: node,
                         querySchema: null,
                         headerSchema: null,
                         serviceSchemas: null,
@@ -119,6 +122,49 @@ describe('named schema references in API documents', () => {
         const messages = channels[0].messages;
         expect(messages.ClientMessage.payload).toEqual(
             messages.ServerEvent.payload
+        );
+    });
+
+    it('separates inline derivatives, explicit new definitions and nested shared components', () => {
+        const name = string().schemaName('Name');
+        const user = object({ name, role: string() }).schemaName('User');
+        const patch = user.partial();
+        const renamed = user.omit('role').schemaName('PublicUser');
+        const schema = object({
+            user,
+            patch,
+            public: renamed.optional(),
+            short: name.maxLength(2)
+        });
+        const contract = endpoint
+            .post('/mixed')
+            .body(schema)
+            .responses({ 200: schema });
+        const spec = generateOpenApiSpec({
+            registrations: [
+                { endpoint: contract.introspect(), handler: () => {} }
+            ],
+            info: { title: 'Mixed', version: '1' }
+        }) as any;
+        expect(Object.keys(spec.components.schemas).sort()).toEqual([
+            'Name',
+            'PublicUser',
+            'User'
+        ]);
+        expect(
+            spec.components.schemas.PublicUser.properties
+        ).not.toHaveProperty('role');
+        const props =
+            spec.paths['/mixed'].post.requestBody.content['application/json']
+                .schema.properties;
+        expect(props.patch.type).toBe('object');
+        expect(props.patch.required).toBeUndefined();
+        expect(props.patch.properties.name.allOf[0].$ref).toBe(
+            '#/components/schemas/Name'
+        );
+        expect(props.short).toEqual({ type: 'string', maxLength: 2 });
+        expect(props.public.allOf[0].$ref).toBe(
+            '#/components/schemas/PublicUser'
         );
     });
 });

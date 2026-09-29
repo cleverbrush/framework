@@ -24,15 +24,6 @@ function convertNodeInner(
     const readOnly: Out = info.isReadonly === true ? { readOnly: true } : {};
 
     switch (info.type) {
-        case 'reference': {
-            const out: Out = {
-                ...readOnly,
-                allOf: [convertNode(info.targetSchema, resolver)]
-            };
-            if (info.nullability === false)
-                (out.allOf as Out[]).push({ not: { type: 'null' } });
-            return out;
-        }
         case 'string': {
             if (info.equalsTo !== undefined)
                 return { ...readOnly, const: info.equalsTo };
@@ -251,6 +242,22 @@ function convertNode(
     schema: SchemaBuilder<any, any, any>,
     resolver: Resolver
 ): Out {
+    const info = schema.introspect();
+    if (info.referenceTarget) {
+        const target = info.referenceTarget;
+        const canonical = target.introspect();
+        // Handle aliases before name lookup so use-site modifiers survive.
+        let out: Out = { allOf: [convertNode(target, resolver)] };
+        if (info.isNullable && !canonical.isNullable) {
+            out = { anyOf: [out, { type: 'null' }] };
+        } else if (!info.isNullable && canonical.isNullable) {
+            (out.allOf as Out[]).push({ not: { type: 'null' } });
+        }
+        if (info.description !== undefined) out.description = info.description;
+        if (info.example !== undefined) out.examples = [info.example];
+        if (info.isReadonly) out.readOnly = true;
+        return out;
+    }
     if (resolver) {
         const name = resolver(schema);
         if (typeof name === 'string' && name.length > 0) {
@@ -260,7 +267,6 @@ function convertNode(
         }
     }
     const out = convertNodeInner(schema, resolver);
-    const info = schema.introspect() as any;
     if (typeof info.description === 'string' && info.description !== '')
         out['description'] = info.description;
 
@@ -279,11 +285,7 @@ function convertNode(
     }
 
     // Handle nullable — JSON Schema 2020-12 style: type becomes an array
-    if (
-        info.type === 'reference'
-            ? info.nullability === true
-            : info.isNullable === true
-    ) {
+    if (info.isNullable === true) {
         if (out['anyOf'] !== undefined) {
             // Union type — add { type: 'null' } to anyOf if not already present
             const anyOf = out['anyOf'] as Out[];
@@ -291,10 +293,7 @@ function convertNode(
             if (!hasNull) anyOf.push({ type: 'null' });
         } else if (out['allOf'] !== undefined && out['type'] === undefined) {
             // Intersection type without a top-level type — wrap in oneOf with null
-            out[info.type === 'reference' ? 'anyOf' : 'oneOf'] = [
-                { allOf: out['allOf'] as Out[] },
-                { type: 'null' }
-            ];
+            out['oneOf'] = [{ allOf: out['allOf'] as Out[] }, { type: 'null' }];
             delete out['allOf'];
         } else if (out['enum'] !== undefined) {
             // Enum — add null to enum values if not already present

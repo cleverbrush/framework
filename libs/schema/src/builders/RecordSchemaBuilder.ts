@@ -288,9 +288,12 @@ export class RecordSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -306,9 +309,12 @@ export class RecordSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**

@@ -215,9 +215,12 @@ export class TupleSchemaBuilder<
         TRestSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -233,9 +236,12 @@ export class TupleSchemaBuilder<
         TRestSchema
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getLengthError(arr: any[]): string | null {
@@ -914,7 +920,7 @@ export class TupleSchemaBuilder<
         TSchema
     > &
         TExtensions {
-        return TupleSchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             restSchema: schema
         } as any) as any;
@@ -934,7 +940,7 @@ export class TupleSchemaBuilder<
         undefined
     > &
         TExtensions {
-        return TupleSchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             restSchema: undefined
         } as any) as any;

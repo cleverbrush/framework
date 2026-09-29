@@ -5,6 +5,7 @@ import {
     transaction
 } from '../utils/transaction.js';
 import type { ArraySchemaBuilder } from './ArraySchemaBuilder.js';
+import type { ExternSchemaBuilder } from './ExternSchemaBuilder.js';
 import type { ObjectSchemaBuilder } from './ObjectSchemaBuilder.js';
 
 /** @internal Symbol used as the key for the type brand on schema builders. */
@@ -244,6 +245,8 @@ export type SchemaBuilderProps<T> = {
     hasCatch?: boolean;
     description?: string;
     schemaName?: string;
+    /** @internal Canonical named definition for a use-site-only derivative. */
+    referenceTarget?: SchemaBuilder<any, any, any, any, any>;
     example?: unknown;
 };
 
@@ -537,85 +540,77 @@ export type PropertyDescriptorTree<
     TParentPropertyDescriptor = undefined
 > = PropertyDescriptor<TRootSchema, TSchema, TParentPropertyDescriptor> &
     (TSchema extends ObjectSchemaBuilder<infer TProperties, any, any>
-        ? 0 extends 1 & TProperties
-            ? { [key: string]: any }
-            : {
-                  [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
-                      any,
-                      any,
-                      any
-                  >
-                      ? PropertyDescriptorTree<
-                            TProperties[K],
+        ? {
+              [K in keyof TProperties]: TProperties[K] extends ObjectSchemaBuilder<
+                  any,
+                  any,
+                  any
+              >
+                  ? PropertyDescriptorTree<
+                        TProperties[K],
+                        TRootSchema,
+                        any,
+                        PropertyDescriptor<
                             TRootSchema,
-                            any,
-                            PropertyDescriptor<
-                                TRootSchema,
-                                TSchema,
-                                TParentPropertyDescriptor
-                            >
+                            TSchema,
+                            TParentPropertyDescriptor
                         >
-                      : TProperties[K] extends {
-                              readonly [SYMBOL_HAS_PROPERTIES]: true;
-                          }
-                        ? PropertyDescriptor<
+                    >
+                  : TProperties[K] extends ExternSchemaBuilder<
+                          any,
+                          any,
+                          any,
+                          any,
+                          any,
+                          any,
+                          infer TExternResult
+                      >
+                    ? PropertyDescriptor<
+                          TRootSchema,
+                          TProperties[K],
+                          PropertyDescriptor<
                               TRootSchema,
-                              TProperties[K],
+                              TSchema,
+                              TParentPropertyDescriptor
+                          >,
+                          K & string
+                      > &
+                          ExternOutputPropertyDescriptors<
+                              TExternResult,
+                              TRootSchema,
                               PropertyDescriptor<
                                   TRootSchema,
-                                  TSchema,
-                                  TParentPropertyDescriptor
-                              >,
-                              K & string
-                          > &
-                              ExternOutputPropertyDescriptors<
-                                  NonNullable<InferType<TProperties[K]>>,
-                                  TRootSchema,
+                                  TProperties[K],
                                   PropertyDescriptor<
                                       TRootSchema,
-                                      TProperties[K],
-                                      PropertyDescriptor<
-                                          TRootSchema,
-                                          TSchema,
-                                          TParentPropertyDescriptor
-                                      >,
-                                      K & string
-                                  >
+                                      TSchema,
+                                      TParentPropertyDescriptor
+                                  >,
+                                  K & string
                               >
-                        : TProperties[K] extends ArraySchemaBuilder<
-                                infer TArrayElement,
-                                any,
-                                any
-                            >
-                          ? TArrayElement extends ObjectSchemaBuilder<
-                                any,
-                                any,
-                                any,
-                                any,
-                                any
-                            >
-                              ? PropertyDescriptor<
+                          >
+                    : TProperties[K] extends ArraySchemaBuilder<
+                            infer TArrayElement,
+                            any,
+                            any
+                        >
+                      ? TArrayElement extends ObjectSchemaBuilder<
+                            any,
+                            any,
+                            any,
+                            any,
+                            any
+                        >
+                          ? PropertyDescriptor<
+                                TRootSchema,
+                                TProperties[K],
+                                PropertyDescriptor<
                                     TRootSchema,
-                                    TProperties[K],
-                                    PropertyDescriptor<
-                                        TRootSchema,
-                                        TSchema,
-                                        TParentPropertyDescriptor
-                                    >,
-                                    K & string
-                                >
-                              : InferType<TProperties[K]> extends TAssignableTo
-                                ? PropertyDescriptor<
-                                      TRootSchema,
-                                      TProperties[K],
-                                      PropertyDescriptor<
-                                          TRootSchema,
-                                          TSchema,
-                                          TParentPropertyDescriptor
-                                      >,
-                                      K & string
-                                  >
-                                : never
+                                    TSchema,
+                                    TParentPropertyDescriptor
+                                >,
+                                K & string
+                            >
                           : InferType<TProperties[K]> extends TAssignableTo
                             ? PropertyDescriptor<
                                   TRootSchema,
@@ -627,8 +622,20 @@ export type PropertyDescriptorTree<
                                   >,
                                   K & string
                               >
-                            : never;
-              }
+                            : never
+                      : InferType<TProperties[K]> extends TAssignableTo
+                        ? PropertyDescriptor<
+                              TRootSchema,
+                              TProperties[K],
+                              PropertyDescriptor<
+                                  TRootSchema,
+                                  TSchema,
+                                  TParentPropertyDescriptor
+                              >,
+                              K & string
+                          >
+                        : never;
+          }
         : never);
 
 /**
@@ -751,6 +758,7 @@ export abstract class SchemaBuilder<
     #isReadonly = false;
     #description: string | undefined;
     #schemaName: string | undefined;
+    #referenceTarget: SchemaBuilder<any, any, any, any, any> | undefined;
     #preprocessors: PreprocessorEntry<TResult>[] = [];
     #validators: ValidatorEntry<TResult>[] = [];
     #hasMutating = false;
@@ -904,6 +912,27 @@ export abstract class SchemaBuilder<
      * @param props arbitrary props object
      */
     protected abstract createFromProps(props: any): this;
+
+    /**
+     * Constructs an immutable derivative through the existing subclass hook.
+     * Shape, rule and extension changes detach from inherited component names
+     * by default. Only presence, nullability, annotations and type-only changes
+     * may preserve the canonical definition. Preserve chains collapse to their
+     * original target; an unnamed derivative never reconnects automatically.
+     * @param props - Complete introspection properties for the new builder.
+     * @param preserveReference - Whether only use-site metadata changed.
+     * @internal
+     */
+    protected derive(props: any, preserveReference = false): this {
+        return this.createFromProps({
+            ...props,
+            schemaName: preserveReference ? this.#schemaName : undefined,
+            referenceTarget:
+                preserveReference && this.#schemaName
+                    ? (this.#referenceTarget ?? this)
+                    : undefined
+        });
+    }
 
     /**
      * The string identifier of the schema type (e.g. `'string'`, `'number'`, `'object'`).
@@ -1456,6 +1485,14 @@ export abstract class SchemaBuilder<
              */
             schemaName: this.#schemaName,
             /**
+             * Canonical named definition retained by use-site modifiers.
+             * Exporters must compose local annotations/nullability around this
+             * target before resolving the derivative's inherited name.
+             * Structural and validation-rule derivatives have no target.
+             * @internal
+             */
+            referenceTarget: this.#referenceTarget,
+            /**
              * Whether a catch/fallback value has been set on this schema via `.catch()`.
              */
 
@@ -1476,10 +1513,13 @@ export abstract class SchemaBuilder<
      * Makes schema optional (consider `null` and `undefined` as valid objects for this schema)
      */
     public optional() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isRequired: false
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isRequired: false
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1490,10 +1530,13 @@ export abstract class SchemaBuilder<
      * `.optional()` to accept both `null` and `undefined`.
      */
     public nullable() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isNullable: true
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isNullable: true
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1501,10 +1544,13 @@ export abstract class SchemaBuilder<
      * value. This is the counterpart of `.nullable()`.
      */
     public notNullable() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isNullable: false
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isNullable: false
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1529,7 +1575,7 @@ export abstract class SchemaBuilder<
      * ```
      */
     public default(value: TResult | (() => TResult)) {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             defaultValue: value
         }) as any;
@@ -1587,7 +1633,7 @@ export abstract class SchemaBuilder<
             | ResolvedSchemaType<TResult, TRequired, TNullable>
             | (() => ResolvedSchemaType<TResult, TRequired, TNullable>)
     ): this {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             catchValue: value,
             hasCatch: true
@@ -1598,7 +1644,7 @@ export abstract class SchemaBuilder<
      * Removes the default value set by a previous call to `.default()`.
      */
     public clearDefault() {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             defaultValue: undefined
         }) as any;
@@ -1624,10 +1670,13 @@ export abstract class SchemaBuilder<
      * ```
      */
     public describe(text: string): this {
-        return this.createFromProps({
-            ...this.introspect(),
-            description: text
-        }) as unknown as this;
+        return this.derive(
+            {
+                ...this.introspect(),
+                description: text
+            },
+            true
+        ) as unknown as this;
     }
 
     /**
@@ -1647,10 +1696,13 @@ export abstract class SchemaBuilder<
      * ```
      */
     public example(value: TResult): this {
-        return this.createFromProps({
-            ...this.introspect(),
-            example: value
-        }) as unknown as this;
+        return this.derive(
+            {
+                ...this.introspect(),
+                example: value
+            },
+            true
+        ) as unknown as this;
     }
 
     /**
@@ -1665,6 +1717,15 @@ export abstract class SchemaBuilder<
      * same constant (same object reference) to multiple consumers is always
      * safe; how conflicts between different instances with the same name are
      * handled depends on the tool.
+     *
+     * Ordinary presence, nullability, annotation and type-only modifiers retain
+     * this canonical definition for document exporters. Shape, validation-rule,
+     * default, fallback and extension changes discard the inherited name. Apply
+     * `schemaName` after those edits to give the derivative its own component.
+     * Calling this method always establishes a fresh definition, even on an alias.
+     *
+     * @param name - Component name for this independent schema definition.
+     * @returns A new named builder without an inherited canonical target.
      *
      * @example
      * ```ts
@@ -1681,7 +1742,8 @@ export abstract class SchemaBuilder<
     public schemaName(name: string): this {
         return this.createFromProps({
             ...this.introspect(),
-            schemaName: name
+            schemaName: name,
+            referenceTarget: undefined
         }) as unknown as this;
     }
 
@@ -1702,9 +1764,12 @@ export abstract class SchemaBuilder<
      * ```
      */
     public brand<TBrand extends string | symbol>(_name?: TBrand) {
-        return this.createFromProps({
-            ...this.introspect()
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1725,10 +1790,13 @@ export abstract class SchemaBuilder<
      * ```
      */
     public readonly() {
-        return this.createFromProps({
-            ...this.introspect(),
-            isReadonly: true
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isReadonly: true
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1736,19 +1804,22 @@ export abstract class SchemaBuilder<
      * @param errorMessage - optional custom error message or provider for the 'is required' validation error
      */
     public required(errorMessage?: ValidationErrorMessageProvider) {
-        return this.createFromProps({
-            ...this.introspect(),
-            isRequired: true,
-            ...(errorMessage !== undefined
-                ? {
-                      requiredValidationErrorMessageProvider:
-                          this.assureValidationErrorMessageProvider(
-                              errorMessage,
-                              this.#defaultRequiredErrorMessageProvider
-                          )
-                  }
-                : {})
-        }) as any;
+        return this.derive(
+            {
+                ...this.introspect(),
+                isRequired: true,
+                ...(errorMessage !== undefined
+                    ? {
+                          requiredValidationErrorMessageProvider:
+                              this.assureValidationErrorMessageProvider(
+                                  errorMessage,
+                                  this.#defaultRequiredErrorMessageProvider
+                              )
+                      }
+                    : {})
+            },
+            true
+        ) as any;
     }
 
     /**
@@ -1771,7 +1842,7 @@ export abstract class SchemaBuilder<
         if (typeof preprocessor !== 'function') {
             throw new Error('preprocessor must be a function');
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             preprocessors: [
                 ...this.preprocessors,
@@ -1784,7 +1855,7 @@ export abstract class SchemaBuilder<
      * Remove all preprocessors for this schema.
      */
     public clearPreprocessors(): this {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             preprocessors: []
         });
@@ -1800,7 +1871,7 @@ export abstract class SchemaBuilder<
         if (typeof validator !== 'function') {
             throw new Error('validator must be a function');
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             validators: [
                 ...this.validators,
@@ -1813,7 +1884,7 @@ export abstract class SchemaBuilder<
      * Remove all validators for this schema.
      */
     public clearValidators(): this {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             validators: []
         });
@@ -2009,7 +2080,7 @@ export abstract class SchemaBuilder<
      * @internal Used by extension authors inside `defineExtension()` callbacks.
      */
     public withExtension(key: string, value: unknown): this {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             extensions: {
                 ...this.#extensions,
@@ -2133,6 +2204,7 @@ export abstract class SchemaBuilder<
         if (typeof props.schemaName === 'string') {
             this.#schemaName = props.schemaName;
         }
+        this.#referenceTarget = props.referenceTarget;
 
         if (props.example !== undefined) {
             this.#example = props.example;

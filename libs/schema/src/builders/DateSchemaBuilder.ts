@@ -309,9 +309,12 @@ export class DateSchemaBuilder<
         _notUsed?: T
     ): DateSchemaBuilder<T, true, TNullable, THasDefault, TExtensions> &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -325,9 +328,12 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getConstraintViolation(
@@ -582,7 +588,7 @@ export class DateSchemaBuilder<
     ): DateSchemaBuilder<T, TRequired, TNullable, THasDefault, TExtensions> &
         TExtensions {
         if (!(value instanceof Date)) throw new Error('Date expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
@@ -607,7 +613,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: undefined
         }) as any;
@@ -713,7 +719,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureIsInFuture: true,
             ensureIsInFutureValidationErrorMessageProvider: errorMessage
@@ -731,7 +737,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureIsInFuture: false
         }) as any;
@@ -755,7 +761,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureIsInPast: true,
             ensureIsInPastValidationErrorMessageProvider: errorMessage
@@ -773,7 +779,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             ensureIsInPast: false
         }) as any;
@@ -800,7 +806,7 @@ export class DateSchemaBuilder<
         TExtensions {
         if (!(minValue instanceof Date))
             throw new Error('minValue must be a Date');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             min: minValue,
             minValidationErrorMessageProvider: errorMessage
@@ -820,7 +826,7 @@ export class DateSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.min;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -846,7 +852,7 @@ export class DateSchemaBuilder<
         TExtensions {
         if (!(maxValue instanceof Date))
             throw new Error('maxValue must be a Date');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             max: maxValue,
             maxValidationErrorMessageProvider: errorMessage
@@ -866,7 +872,7 @@ export class DateSchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.max;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         }) as any;
     }
@@ -920,7 +926,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             parseFromJson: true
         }) as any;
@@ -937,7 +943,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             parseFromJson: false
         }) as any;
@@ -955,7 +961,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             parseFromEpoch: true
         }) as any;
@@ -972,7 +978,7 @@ export class DateSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             parseFromEpoch: false
         }) as any;

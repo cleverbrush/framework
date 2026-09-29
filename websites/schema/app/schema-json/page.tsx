@@ -35,10 +35,12 @@ export default function SchemaJsonPage() {
                 <div className="card">
                     <h2>Named references</h2>
                     <p>
-                        Use schemaRef to reuse a named definition with local
-                        annotations and nullability. Reference composition
-                        preserves the original definition in both Draft 7 and
-                        Draft 2020-12.
+                        Use ordinary fluent modifiers to reuse a named
+                        definition with local annotations and nullability.
+                        Reference composition preserves the original definition
+                        in both Draft 7 and Draft 2020-12. Shape and rule
+                        changes detach the inherited name; apply schemaName last
+                        when naming a new definition.
                     </p>
                     <a href="/docs/schema-boundaries">
                         Named references and optional fallbacks

@@ -14,8 +14,10 @@ for use in OpenAPI specs, form generators, or any other JSON Schema consumer.
 
 ### Named references
 
-Named reference wrappers preserve use-site annotations, optionality and nullability
-without changing the shared definition. See the [composition guide](../schema/BOUNDARIES.md).
+Ordinary modifiers such as `User.optional().nullable().describe('Previous')`
+preserve a named definition automatically. Shape and validation-rule changes
+become unnamed derivatives; apply `schemaName` last to name a new definition.
+See the [composition guide](https://github.com/cleverbrush/framework/blob/development/libs/schema/BOUNDARIES.md).
 
 - **Consuming external APIs** — you have a JSON Schema from an OpenAPI spec or
   a third-party service and want to validate incoming data with full TypeScript

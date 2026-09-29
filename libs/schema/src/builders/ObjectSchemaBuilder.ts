@@ -1073,8 +1073,7 @@ export class ObjectSchemaBuilder<
                     ObjectSchemaBuilder.#propagateNestedErrors(
                         result as any,
                         descriptor,
-                        addErrorFor,
-                        this.#properties[key]
+                        addErrorFor
                     );
                     // For extern schemas, also record errors on the extern
                     // descriptor itself so getErrorsFor(t => t.extern) works,
@@ -1575,7 +1574,7 @@ export class ObjectSchemaBuilder<
         TConstructorSchemas
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             acceptUnknownProps: true
         } as any) as any;
@@ -1595,7 +1594,7 @@ export class ObjectSchemaBuilder<
         TConstructorSchemas
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             acceptUnknownProps: false
         } as any) as any;
@@ -1616,9 +1615,12 @@ export class ObjectSchemaBuilder<
         TConstructorSchemas
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -1634,9 +1636,12 @@ export class ObjectSchemaBuilder<
         TConstructorSchemas
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -1722,7 +1727,7 @@ export class ObjectSchemaBuilder<
             );
         }
 
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             constructorSchemas: [...this.#constructorSchemas, schema]
         } as any) as any;
@@ -1768,7 +1773,7 @@ export class ObjectSchemaBuilder<
         []
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             constructorSchemas: []
         } as any) as any;
@@ -1810,7 +1815,7 @@ export class ObjectSchemaBuilder<
             );
         }
 
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             properties: {
                 ...this.introspect().properties,
@@ -1845,9 +1850,12 @@ export class ObjectSchemaBuilder<
         THasDefault,
         TExtensions
     > {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -1918,7 +1926,7 @@ export class ObjectSchemaBuilder<
             newProps[key] = props[key] as any;
         }
 
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             properties: newProps
         } as any) as any;
@@ -1997,7 +2005,7 @@ export class ObjectSchemaBuilder<
                 );
             }
 
-            return this.createFromProps({
+            return this.derive({
                 ...this.introspect(),
                 properties: (() => {
                     const result = { ...this.#properties };
@@ -2037,7 +2045,7 @@ export class ObjectSchemaBuilder<
                 delete props.properties[key];
             }
 
-            return this.createFromProps(props as any);
+            return this.derive(props as any);
         } else if (
             propNameOrArrayOrPropsOrBuilder instanceof ObjectSchemaBuilder
         ) {
@@ -2055,7 +2063,7 @@ export class ObjectSchemaBuilder<
                 }
             }
 
-            return this.createFromProps(props as any);
+            return this.derive(props as any);
         }
 
         throw new Error('this parameter type is not supported');
@@ -2109,7 +2117,7 @@ export class ObjectSchemaBuilder<
             {} as Record<string, any>
         );
 
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             properties: newProps
         } as any) as any;
@@ -2169,7 +2177,7 @@ export class ObjectSchemaBuilder<
             typeof propNameOrArray === 'undefined' ||
             propNameOrArray === null
         ) {
-            return this.createFromProps({
+            return this.derive({
                 ...this.introspect(),
                 properties: Object.keys(this.#properties).reduce(
                     (acc, key) => {
@@ -2207,7 +2215,7 @@ export class ObjectSchemaBuilder<
                     newProps.properties[key].optional();
             });
 
-            return this.createFromProps(newProps);
+            return this.derive(newProps);
         }
 
         if (typeof propNameOrArray === 'string') {
@@ -2304,7 +2312,7 @@ export class ObjectSchemaBuilder<
                 newProps[key] = prop.optional();
             }
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             properties: newProps
         } as any) as any;
@@ -2381,7 +2389,7 @@ export class ObjectSchemaBuilder<
                 throw new Error(`property ${property} does not exists`);
             }
 
-            return this.createFromProps({
+            return this.derive({
                 ...this.introspect(),
                 properties: {
                     [property]: this.#properties[property]
@@ -2407,7 +2415,7 @@ export class ObjectSchemaBuilder<
                 return acc;
             }, {});
 
-            return this.createFromProps({
+            return this.derive({
                 ...this.introspect(),
                 properties: newProperties
             } as any);
@@ -2483,7 +2491,7 @@ export class ObjectSchemaBuilder<
             [propName]: callbackResult
         };
 
-        return this.createFromProps(props) as any;
+        return this.derive(props) as any;
     }
 
     /**
@@ -2544,7 +2552,7 @@ export class ObjectSchemaBuilder<
         TConstructorSchemas
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             properties: Object.keys(this.#properties).reduce(
                 (acc, curr) => {
@@ -2570,7 +2578,7 @@ export class ObjectSchemaBuilder<
         TConstructorSchemas
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             properties: Object.keys(this.#properties).reduce(
                 (acc, curr) => {
@@ -2760,11 +2768,9 @@ export class ObjectSchemaBuilder<
             descriptor: any,
             message: string,
             parentDescriptor?: any
-        ) => void,
-        schemaOverride?: SchemaBuilder<any, any, any, any, any>
+        ) => void
     ): void {
         const schema =
-            schemaOverride ??
             ObjectSchemaBuilder.#getSchemaForPropertyDescriptor(descriptor);
         const properties = (schema.introspect() as any).properties;
 
@@ -2816,8 +2822,7 @@ export class ObjectSchemaBuilder<
                     ObjectSchemaBuilder.#propagateNestedErrors(
                         result,
                         nestedPropertyDescriptor,
-                        addErrorFor,
-                        nestedSchema
+                        addErrorFor
                     );
                 }
             }

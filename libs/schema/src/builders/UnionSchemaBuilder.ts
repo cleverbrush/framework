@@ -324,9 +324,12 @@ export class UnionSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -341,9 +344,12 @@ export class UnionSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #createValidationSetup(
@@ -995,7 +1001,7 @@ export class UnionSchemaBuilder<
                 'schema must be an instance of the SchemaBuilder class'
             );
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             options: [...this.#options, schema]
         } as any) as any;
@@ -1024,7 +1030,7 @@ export class UnionSchemaBuilder<
         ) {
             throw new Error('index must be >= 0 and <= count of the options');
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             options: this.#options.filter((_v, i) => i !== index)
         } as any) as any;
@@ -1071,7 +1077,7 @@ export class UnionSchemaBuilder<
                 'schema must be an instance of the SchemaBuilder class'
             );
         }
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             options: [schema]
         } as any) as any;

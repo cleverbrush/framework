@@ -50,10 +50,6 @@ export {
 } from './builders/PromiseSchemaBuilder.js';
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
-export {
-    ReferenceSchemaBuilder,
-    schemaRef
-} from './builders/ReferenceSchemaBuilder.js';
 export type {
     NestedValidationResult,
     PropertyDescriptor,

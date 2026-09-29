@@ -122,9 +122,12 @@ export class BooleanSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -139,9 +142,12 @@ export class BooleanSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #getConstraintViolation(
@@ -458,7 +464,7 @@ export class BooleanSchemaBuilder<
         >
     ) {
         if (typeof value !== 'boolean') throw new Error('boolean expected');
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: value,
             equalsToValidationErrorMessageProvider: errorMessage
@@ -485,7 +491,7 @@ export class BooleanSchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
+        return this.derive({
             ...this.introspect(),
             equalsTo: undefined
         } as any) as any;

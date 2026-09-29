@@ -26,15 +26,18 @@ const nullableText = string().nullable().catch(null);`}</code>
                 <pre>
                     <code>{`const User = object({ name: string() }).schemaName('User');
 const History = object({
-    current: schemaRef(User),
-    previous: schemaRef(User).nullable().optional()
+    current: User,
+    previous: User.nullable().optional()
         .describe('Previous user')
 });`}</code>
                 </pre>
                 <p>
-                    Reference modifiers apply at the use site. The original
-                    named definition remains unchanged, and genuinely
-                    conflicting definitions still fail registration.
+                    Ordinary modifiers apply at the use site. The original named
+                    definition remains unchanged, and genuinely conflicting
+                    definitions still fail registration. Shape, rule, default,
+                    fallback and extension changes discard inherited names.
+                    Apply schemaName after those edits when the result needs its
+                    own component.
                 </p>
             </div>
             <div className="card">

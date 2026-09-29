@@ -188,9 +188,12 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     /**
@@ -205,9 +208,12 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return this.createFromProps({
-            ...this.introspect()
-        } as any) as any;
+        return this.derive(
+            {
+                ...this.introspect()
+            } as any,
+            true
+        ) as any;
     }
 
     #createValidationSetup(
@@ -839,7 +845,7 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             elementSchema: schema
         } as any) as any;
@@ -858,7 +864,7 @@ export class ArraySchemaBuilder<
         TExtensions
     > &
         TExtensions {
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             elementSchema: undefined
         } as any) as any;
@@ -891,7 +897,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             minLength: length,
             minLengthValidationErrorMessageProvider: errorMessage
@@ -912,7 +918,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.minLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         } as any) as any;
     }
@@ -944,7 +950,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         if (typeof length !== 'number' || length < 0)
             throw new Error('length is expected to be a number which is >= 0');
-        return ArraySchemaBuilder.create({
+        return this.derive({
             ...this.introspect(),
             maxLength: length,
             maxLengthValidationErrorMessageProvider: errorMessage
@@ -965,7 +971,7 @@ export class ArraySchemaBuilder<
         TExtensions {
         const schema = this.introspect();
         delete schema.maxLength;
-        return this.createFromProps({
+        return this.derive({
             ...schema
         } as any) as any;
     }
