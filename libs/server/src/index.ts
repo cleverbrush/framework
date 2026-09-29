@@ -51,6 +51,13 @@ export {
     type ScopedEndpointFactory
 } from './Endpoint.js';
 export {
+    ErrorMap,
+    type ErrorResponse,
+    type ErrorResponsesOf,
+    errorMap,
+    withErrors
+} from './ErrorMap.js';
+export {
     BadRequestError,
     ConflictError,
     ForbiddenError,
@@ -58,6 +65,17 @@ export {
     NotFoundError,
     UnauthorizedError
 } from './HttpError.js';
+export {
+    ApiImplementation,
+    type ImplementationDefaults,
+    type ImplementationGroupOptions,
+    type ImplementationHandlerEntry,
+    type ImplementationHandlers,
+    ImplementationModule,
+    type ImplementationOperationOptions,
+    ImplementationScope,
+    implement
+} from './Implementation.js';
 export {
     idempotency,
     type ServerIdempotencyOptions

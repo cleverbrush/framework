@@ -20,6 +20,50 @@ A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema
 - **Health check** — optional `/health` endpoint via `server.withHealthcheck()`.
 - **WebSocket subscriptions** — `endpoint.subscription('/ws/path')` with typed incoming/outgoing schemas, `tracked()` events, and async generator handlers.
 - **Contract composition** — `mergeContracts`, `pickGroups`, and `omitGroups` enable audience-scoped bundles: ship only the endpoints each consumer needs.
+- **Modular implementations** — `implement(api)` derives server-configured scopes, keeps separate handler files strongly typed, and checks full contract coverage at final registration.
+- **Typed error policies** — `errorMap()` and `withErrors()` translate known handler exceptions without repeated catch blocks or widening endpoint responses.
+
+## Large APIs and shared error handling
+
+Keep contracts, server configuration, handlers, and composition in separate files:
+
+```ts
+// scope.ts — does not import handlers
+export const items = implement(api).group('items', {
+    inject: { db: DbToken },
+    tags: ['items'],
+    operations: { remove: { summary: 'Remove an item' } }
+});
+
+// handlers/remove.ts
+import type { items } from '../scope.js';
+export const remove: Handler<typeof items.endpoints.remove> = async (
+    { params }, { db }
+) => {
+    await deleteItem(db, params.id);
+    return ActionResult.noContent();
+};
+
+// module.ts — bind only compatible, declared error responses
+const missing = errorMap().on(MissingItemError, () =>
+    ActionResult.notFound({ message: 'Item not found' })
+);
+export const itemsModule = items.withHandlers({
+    list,
+    remove: { handler: remove, errors: missing }
+});
+
+// server.ts — every operation in api must be implemented
+server.handleAll(implement(api).use(itemsModule).complete());
+```
+
+The excerpt assumes an `items` contract with `list` and `remove`, including the
+remove operation's 204/404 responses. `pick(...)` splits a large group into
+smaller modules without losing root completeness checks. Existing `handle` and
+`mapHandlers` users can adopt `withErrors(endpoint, policy, handler)` alone.
+
+See the [complete modular consumer guide](docs/implementations.md), including
+configuration precedence, subscriptions, failure behavior, and migration examples.
 
 ## Installation
 

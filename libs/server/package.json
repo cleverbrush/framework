@@ -17,7 +17,8 @@
     },
     "description": "Schema-first HTTP server framework — schema-driven controllers, DI, auto-validation, RFC 9457 errors",
     "files": [
-        "dist"
+        "dist",
+        "docs"
     ],
     "homepage": "https://docs.cleverbrush.com/server",
     "keywords": [
