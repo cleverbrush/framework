@@ -17,7 +17,6 @@ import ObjectConstructorsSection from '../sections/object-constructors';
 import ParseStringSection from '../sections/parse-string';
 import PropertyDescriptorsSection from '../sections/property-descriptors';
 import RecursiveSchemasSection from '../sections/recursive-schemas';
-import SchemaBoundariesSection from '../sections/schema-boundaries';
 import SchemaModifiersSection from '../sections/schema-modifiers';
 import SchemaTypesSection from '../sections/schema-types';
 import StandardSchemaSection from '../sections/standard-schema';
@@ -50,7 +49,6 @@ const SECTION_COMPONENTS: Record<string, React.ComponentType> = {
     'parse-string': ParseStringSection,
     'object-constructors': ObjectConstructorsSection,
     'schema-modifiers': SchemaModifiersSection,
-    'schema-boundaries': SchemaBoundariesSection,
     extensions: ExtensionsSection,
     'built-in-extensions': BuiltInExtensionsSection,
     'generic-schemas': GenericSchemasSection,

@@ -20,20 +20,6 @@ export default function ServerOpenApiPage() {
                     </p>
                 </div>
 
-                <div className="card">
-                    <h2>Named references and local annotations</h2>
-                    <p>
-                        Use ordinary fluent modifiers on a named definition.
-                        Optionality, nullability and descriptions remain local,
-                        while the target has one canonical component.
-                        Conflicting named definitions still fail registration.
-                        Shape and rule changes become unnamed; apply schemaName
-                        last to name a new definition.
-                    </p>
-                    <a href="https://schema.cleverbrush.com/docs/schema-boundaries">
-                        Schema boundary composition and compatibility
-                    </a>
-                </div>
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     command="npm install @cleverbrush/server-openapi @cleverbrush/server"
@@ -283,11 +269,44 @@ const CreateUserBody = object({ address: AddressSchema, name: string() });`
                         />
                     </pre>
                     <p>
-                        <strong>Conflict rule:</strong> registering two{' '}
-                        <em>different</em> schema instances under the same name
-                        throws during spec generation. Always export named
-                        schemas as constants and share the same object
-                        reference.
+                        Ordinary use-site modifiers retain the canonical
+                        component, with local annotations and nullability:
+                    </p>
+                    <pre>
+                        <code>{`const History = object({
+    current: UserSchema,
+    previous: UserSchema.optional().nullable().describe('Previous user')
+});
+// One User component shared by both properties.
+
+const PatchUser = UserSchema.partial(); // unnamed, exported inline
+const PublicUser = UserSchema.omit('id').schemaName('PublicUser');`}</code>
+                    </pre>
+                    <p>
+                        Shape/rule edits, callbacks, defaults, fallbacks and
+                        extension changes discard inherited names. Nested named
+                        children still reuse components. Apply{' '}
+                        <code>schemaName</code> after these edits when the
+                        result needs its own component. Later optionality or
+                        annotations do not reconnect an unnamed derivative. See
+                        the{' '}
+                        <a href="https://schema.cleverbrush.com/docs/schema-modifiers#schema-name">
+                            complete naming rules
+                        </a>
+                        .
+                    </p>
+                    <p>
+                        <strong>Conflict rule:</strong> independent definitions
+                        sharing a name throw during spec generation, even if
+                        their shapes match. Reusing a constant or its use-site
+                        modifiers does not conflict. Explicitly calling{' '}
+                        <code>schemaName</code> always creates a new independent
+                        definition, including on a modified use.
+                    </p>
+                    <p>
+                        AsyncAPI follows the same rules: one canonical component
+                        per named definition, local annotations in message
+                        payloads, and references for recursive uses.
                     </p>
                 </div>
 

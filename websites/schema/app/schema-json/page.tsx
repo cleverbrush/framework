@@ -32,20 +32,6 @@ export default function SchemaJsonPage() {
                     ]}
                 />
 
-                <div className="card">
-                    <h2>Named references</h2>
-                    <p>
-                        Use ordinary fluent modifiers to reuse a named
-                        definition with local annotations and nullability.
-                        Reference composition preserves the original definition
-                        in both Draft 7 and Draft 2020-12. Shape and rule
-                        changes detach the inherited name; apply schemaName last
-                        when naming a new definition.
-                    </p>
-                    <a href="/docs/schema-boundaries">
-                        Named references and optional fallbacks
-                    </a>
-                </div>
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     commands={[
@@ -469,6 +455,51 @@ const withRefs = toJsonSchema(ProductSchema, {
                             }}
                         />
                     </pre>
+                    <h3>Named references and local annotations</h3>
+                    <p>
+                        Ordinary use-site modifiers preserve a named definition.
+                        Direct reuse emits a <code>$ref</code>; modified uses
+                        compose local annotations and nullability around it in
+                        both Draft 7 and Draft 2020-12:
+                    </p>
+                    <pre>
+                        <code>{`const User = object({ name: string() }).schemaName('User');
+const History = object({
+    current: User,
+    previous: User.optional().nullable().describe('Previous user')
+});
+const json = toJsonSchema(History, {
+    $schema: false,
+    nameResolver: schema => schema.introspect().schemaName ?? null
+});
+// json.required: ['current']
+// current references User; previous adds local description and nullability.`}</code>
+                    </pre>
+                    <p>
+                        Use-site modifiers are processed before name resolution,
+                        which receives their canonical target. The resolver does
+                        not create component definitions: supply those in the
+                        containing document or use{' '}
+                        <code>@cleverbrush/server-openapi</code>. Without a
+                        resolver, the target is converted inline.
+                    </p>
+                    <p>
+                        Shape, rule, default, fallback and extension changes
+                        discard inherited names and export inline. Nested named
+                        children still reuse their definitions. Apply{' '}
+                        <code>schemaName</code> after those edits to name a new
+                        definition. See the{' '}
+                        <a href="/docs/schema-modifiers#schema-name">
+                            schema naming rules
+                        </a>
+                        .
+                    </p>
+                    <p>
+                        Standard JSON Schema <code>input()</code> and{' '}
+                        <code>output()</code> keep their existing identical
+                        representation; no separate directional schemas are
+                        introduced.
+                    </p>
                 </div>
 
                 {/* ── TypeScript inference ─────────────────────────── */}
