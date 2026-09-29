@@ -5,6 +5,6 @@
         "strict": true,
         "rootDir": "."
     },
-    "include": ["src/**/*.test-d.ts", "type-fixtures/**/*.ts"],
+    "include": ["src/**/*.test-d.ts"],
     "exclude": []
 }

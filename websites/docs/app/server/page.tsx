@@ -566,7 +566,7 @@ server.handle(RemoveItemEndpoint,
                     </p>
                     <p>
                         See the{' '}
-                        <a href="https://github.com/cleverbrush/framework/blob/development/libs/server/docs/implementations.md">
+                        <a href="https://github.com/cleverbrush/framework/blob/development/libs/server/README.md#large-apis-and-shared-error-handling">
                             complete multi-file consumer guide
                         </a>{' '}
                         for configuration precedence, module composition, and

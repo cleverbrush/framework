@@ -1,29 +1,106 @@
-import { number, object, string } from '@cleverbrush/schema';
+import { array, number, object, string } from '@cleverbrush/schema';
 import {
     ActionResult,
+    createServer,
     errorMap,
     type Handler,
     type HandlerMapping,
     implement,
     withErrors
 } from '@cleverbrush/server';
-import { defineApi, endpoint, pickGroups } from '@cleverbrush/server/contract';
-import { expectTypeOf, test } from 'vitest';
-import { api } from '../type-fixtures/contracts.js';
-import type { create } from '../type-fixtures/handlers/create.js';
-import { list } from '../type-fixtures/handlers/list.js';
-import { remove } from '../type-fixtures/handlers/remove.js';
 import {
-    itemsImplementation,
-    live,
-    reads,
-    writes
-} from '../type-fixtures/module.js';
-import { missingItem } from '../type-fixtures/policies.js';
-import { Db, items } from '../type-fixtures/scope.js';
-import { mapping } from '../type-fixtures/server.js';
+    defineApi,
+    endpoint,
+    pickGroups,
+    route
+} from '@cleverbrush/server/contract';
+import { expectTypeOf, test } from 'vitest';
 
-test('cross-file declarations preserve exact request, DI and return types', () => {
+const Item = object({ id: number(), title: string() });
+const Message = object({ message: string() });
+const Principal = object({ userId: string() });
+const resource = endpoint.resource('/items').authorize(Principal, 'member');
+const byId = route({ id: number().coerce() })`/${p => p.id}`;
+
+const api = defineApi({
+    items: {
+        list: resource
+            .get()
+            .query(object({ search: string() }))
+            .responses({ 200: array(Item), 400: Message }),
+        create: resource
+            .post()
+            .body(object({ title: string() }))
+            .responses({ 201: Item, 404: Message }),
+        remove: resource.delete(byId).responses({ 204: null, 404: Message }),
+        upload: endpoint
+            .post('/items/upload')
+            .authorize(Principal)
+            .upload()
+            .responses({ 204: null })
+    },
+    live: {
+        changes: endpoint.subscription('/changes').outgoing(Item)
+    }
+});
+
+const Db = object({ name: string() });
+const Mailer = object({ host: string() });
+const items = implement(api).group('items', {
+    inject: { db: Db },
+    tags: ['items'],
+    operations: {
+        list: { summary: 'List items' },
+        create: { inject: { mailer: Mailer }, operationId: 'createItem' }
+    }
+});
+
+const list: Handler<typeof items.endpoints.list> = async (
+    { principal, query },
+    { db }
+) => [{ id: 1, title: `${principal.userId}:${query.search}:${db.name}` }];
+
+const create: Handler<typeof items.endpoints.create> = (
+    { body },
+    { db, mailer }
+) =>
+    ActionResult.created({
+        id: 1,
+        title: `${body.title}:${db.name}:${mailer.host}`
+    });
+
+const remove: Handler<typeof items.endpoints.remove> = ({ params }) => {
+    if (params.id < 0) throw new Error('Not a persisted item');
+    return ActionResult.noContent();
+};
+
+class MissingItem extends Error {}
+const missingItem = errorMap().on(MissingItem, () =>
+    ActionResult.notFound({ message: 'Item not found' })
+);
+
+const reads = items.pick('list').withHandlers({ list });
+const writes = items.pick('create', 'remove', 'upload').withHandlers({
+    create: { handler: create, errors: missingItem },
+    remove: { handler: remove, errors: missingItem },
+    upload: ({ files }, { db }) => {
+        if (!files.image || !db.name) throw new Error('Missing image');
+        return ActionResult.noContent();
+    }
+});
+const itemsImplementation = implement(api).use(reads, writes);
+const live = implement(api)
+    .group('live')
+    .withHandlers({
+        changes: async function* ({ signal }) {
+            if (!signal.aborted) yield { id: 1, title: 'Changed' };
+        }
+    });
+
+const mapping = implement(api).use(itemsImplementation, live).complete();
+
+test('separately declared handlers preserve exact request, DI and return types', () => {
+    createServer().handleAll(mapping);
     expectTypeOf(mapping).toEqualTypeOf<HandlerMapping>();
     expectTypeOf<Parameters<typeof list>[0]['query']>().toEqualTypeOf<{
         search: string;
