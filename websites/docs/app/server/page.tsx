@@ -490,6 +490,90 @@ const AdminEp = endpoint
                     </pre>
                 </div>
 
+                <div className="card" id="modular-implementations">
+                    <h2>Modular implementations</h2>
+                    <p>
+                        Build large APIs with separate configuration, handler,
+                        and feature-module files. <code>implement(api)</code>
+                        derives configured scopes from the shared contract;
+                        <code>complete()</code> checks that every operation is
+                        implemented before producing an ordinary handler
+                        mapping.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// scope.ts — no handler imports
+export const items = implement(api).group('items', {
+    inject: { db: DbToken },
+    tags: ['items'],
+    operations: { remove: { summary: 'Remove an item' } }
+});
+
+// handlers/remove.ts
+import type { items } from '../scope.js';
+export const remove: Handler<typeof items.endpoints.remove> = async (
+    { params }, { db }
+) => {
+    await removeItem(db, params.id);
+    return ActionResult.noContent();
+};
+
+// module.ts — list/remove are this example's complete contract
+export const itemsModule = items.withHandlers({ list, remove });
+
+// server.ts
+server.handleAll(implement(api).use(itemsModule).complete());`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Use <code>pick(...operationNames)</code> to split a
+                        large group. Shared and per-operation services merge
+                        while request, principal, service, and response types
+                        remain available inside each handler file. Subscription
+                        handlers can be composed through the same API. Existing
+                        <code>handle</code> and <code>mapHandlers</code> remain
+                        supported.
+                    </p>
+                    <h3>Shared, typed error policies</h3>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const itemErrors = errorMap().on(MissingItemError, () =>
+    ActionResult.notFound({ message: 'Item not found' })
+);
+
+const itemsModule = items.withHandlers({
+    list,
+    remove: { handler: remove, errors: itemErrors }
+});
+
+// Or adopt the policy without changing existing registration:
+server.handle(RemoveItemEndpoint,
+    withErrors(RemoveItemEndpoint, itemErrors, removeHandler));`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        A policy must fit each endpoint&apos;s explicitly
+                        declared response statuses and bodies. Only known
+                        exceptions from the handler are translated. Unknown
+                        exceptions retain the existing safe 500 handling;
+                        middleware, validation, DI, and serialization failures
+                        are not intercepted. Policies are HTTP-only and do not
+                        change subscription errors.
+                    </p>
+                    <p>
+                        See the{' '}
+                        <a href="https://github.com/cleverbrush/framework/blob/development/libs/server/README.md#large-apis-and-shared-error-handling">
+                            complete multi-file consumer guide
+                        </a>{' '}
+                        for configuration precedence, module composition, and
+                        migration.
+                    </p>
+                </div>
+
                 {/* ── WebSocket Subscriptions ──────────────────────── */}
                 <div className="card">
                     <h2>WebSocket Subscriptions</h2>

@@ -72,7 +72,7 @@ import type { SubscriptionBuilder as _SB } from './Subscription.js';
  */
 export type ApiGroup = Record<
     string,
-    | _EB<any, any, any, any, any, any, any, any, any>
+    | _EB<any, any, any, any, any, any, any, any, any, any>
     | _SB<any, any, any, any, any, any, any, any>
 >;
 
