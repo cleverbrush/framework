@@ -6,6 +6,30 @@ const Source = object({ id: number(), title: string() });
 const Target = object({ id: number(), label: string() });
 
 describe('inferred synchronous mapping', () => {
+    it('does not confuse unrelated registered schemas with primitive steps', () => {
+        const Id = object({ id: number() });
+        const IdDto = object({ id: number() });
+        const registry = mapper()
+            .configure(Source, Target, m =>
+                m.for(t => t.label).compute(async s => s.title)
+            )
+            .configure(Id, IdDto, m => m);
+        expect(registry.getSyncMapper(Id, IdDto)({ id: 1 })).toEqual({ id: 1 });
+        const OptionalChild = object({ child: Source.optional() });
+        const RequiredChild = object({ child: Target });
+        expect(() => {
+            // @ts-expect-error a required child mapping does not map an optional source
+            registry.configure(OptionalChild, RequiredChild, m => m);
+        }).toThrow(/not mapped/);
+        const Empty = object({});
+        const Parent = object({ child: Source });
+        const ParentDto = object({ child: Target });
+        const emptyRegistry = mapper().configure(Empty, Empty, m => m);
+        expect(() => {
+            // @ts-expect-error an empty registration cannot supply the missing child mapping
+            emptyRegistry.configure(Parent, ParentDto, m => m);
+        }).toThrow(/not mapped/);
+    });
     it('returns an ordinary value and preserves the async API', async () => {
         const compute = vi.fn((s: { title: string }) => s.title.toUpperCase());
         const registry = mapper().configure(Source, Target, m =>

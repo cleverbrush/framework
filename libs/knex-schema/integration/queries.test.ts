@@ -73,6 +73,25 @@ const taskEntity = defineEntity(Task)
     );
 const db = createDb(knex, { tasks: taskEntity });
 
+it('transaction clones retain row schemas and raw-query safety guards', async () => {
+    const read = db.tasks.withRowSchema().select(t => ({ title: t.title }));
+    await knex.transaction(async trx => {
+        const inTransaction = read.transacting(trx);
+        expect(inTransaction.rowSchema).toBe(read.rowSchema);
+        expect(await inTransaction.where(t => t.id, 104).first()).toEqual(
+            await read.where(t => t.id, 104).first()
+        );
+        expect(() =>
+            query(knex, Task)
+                .apply(q => {
+                    q.whereRaw('true');
+                })
+                .transacting(trx)
+                .withRowSchema()
+        ).toThrow(/before raw/);
+    });
+});
+
 it('schema-aware reads stay detached in a tracked context', async () => {
     const tracked = createDb(knex, { tasks: taskEntity }, { tracking: true });
     const calls: unknown[] = [];

@@ -1311,6 +1311,7 @@ export class SchemaQueryBuilder<
         builderState.includeDeleted = state.includeDeleted;
         builderState.onlyDeleted = state.onlyDeleted;
         builderState.skipDefaultScope = state.skipDefaultScope;
+        builderState.opaqueReadShape = state.opaqueReadShape;
         builderState.variantConfig = state.variantConfig;
         builderState.enabledVariants =
             state.enabledVariants !== null
