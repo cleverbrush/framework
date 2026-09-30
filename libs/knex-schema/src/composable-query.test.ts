@@ -118,8 +118,8 @@ describe('typed aliases and aggregate SQL', () => {
                 count: aggregate.countDistinct(t.id)
             }))
             .toQuery();
-        expect(sql).toContain('count(distinct "id")');
-        expect(sql).toContain('group by "owner_id"');
+        expect(sql).toMatch(/count\(distinct "__schema_read_\d+"\."id"\)/);
+        expect(sql).toMatch(/group by "__schema_read_\d+"\."owner_id"/);
     });
 });
 

@@ -98,7 +98,7 @@ export function mapObject<T extends Record<string, any>>(
  * the `mappers` defined on each spec to the nested data, and returns the
  * mutated row.
  *
- * This is an internal helper used by {@link SchemaQueryBuilder}'s result
+ * This is an internal helper used by {@link QuerySource}'s result
  * mapping pipeline. Exported to allow custom post-processing if needed.
  *
  * @param row - The raw result row (mutated in place).

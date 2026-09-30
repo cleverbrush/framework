@@ -8,15 +8,18 @@
 // Calling any query method (`.where()`, `.include()`, `.first()`, `.insert()`,
 // etc.) on a `DbSet` allocates a fresh `SchemaQueryBuilder` and forwards the
 // call to it.  Subsequent calls on the returned `EntityQuery` reuse that
-// same underlying builder.
+// independent immutable builders.
 
 import type {
-    ColumnRef,
     Entity,
     EntityRelations,
     EntitySchema,
+    PolymorphicQueryBuilder,
     PrimaryKeyValueOf,
-    SchemaAwareQuery
+    ReadQueryShape,
+    SchemaAwareQuery,
+    SchemaForValue,
+    VariantReadSchemas
 } from '@cleverbrush/knex-schema';
 import {
     getPrimaryKeyColumns,
@@ -24,7 +27,7 @@ import {
     type SchemaQueryBuilder,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
-import type { InferType } from '@cleverbrush/schema';
+import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 
 import { EntityNotFoundError } from './errors.js';
@@ -37,7 +40,6 @@ import type {
     VariantInsertPayload,
     VariantResult,
     VariantUpdatePayload,
-    WithIncluded,
     WithVariantIncluded
 } from './result-types.js';
 import { saveGraph } from './save-graph.js';
@@ -47,9 +49,45 @@ import {
     updateVariant as _updateVariant
 } from './variant-write.js';
 
+type EntityRowSchema<T> = ObjectSchemaBuilder<
+    { [K in keyof T & string]-?: SchemaForValue<T[K]> },
+    true,
+    false,
+    T
+>;
+type WriteMethod =
+    | 'insert'
+    | 'insertMany'
+    | 'update'
+    | 'delete'
+    | 'hardDelete'
+    | 'restore'
+    | 'bulkInsert'
+    | 'bulkUpdate'
+    | 'bulkUpsert'
+    | 'upsert'
+    | 'onConflict';
+type EntityWrites<
+    TEntity extends Entity<any, any, any>,
+    TResult,
+    Writable extends boolean
+> = {
+    [K in WriteMethod]: Writable extends true
+        ? OmitThisParameter<
+              SchemaQueryBuilder<
+                  EntitySchema<TEntity>,
+                  EntityRowSchema<TResult>
+              >[K]
+          >
+        : never;
+};
+
 // These methods return scalars or detached read plans, not tracked entity rows.
 const untrackedResultMethods = new Set<PropertyKey>([
-    'withRowSchema',
+    'apply',
+    'selectRaw',
+    'toKnexQuery',
+    'pluck',
     'countValue',
     'countDistinctValue',
     'sumValue',
@@ -73,30 +111,79 @@ const untrackedResultMethods = new Set<PropertyKey>([
  *
  * @public
  */
-export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
-    extends Omit<
-        SchemaQueryBuilder<EntitySchema<TEntity>, TResult>,
-        'include' | 'includeVariant' | 'withRowSchema'
-    > {
-    /**
-     * Start an immutable detached read model with inferred runtime row schemas.
-     * Enable before select/include operations; results never attach to tracking.
-     */
-    withRowSchema(): SchemaAwareQuery<EntitySchema<TEntity>>;
+export type EntityQuery<
+    TEntity extends Entity<any, any, any>,
+    TResult,
+    Writable extends boolean = true
+> =
+    SchemaAwareQuery<EntitySchema<TEntity>> extends PolymorphicQueryBuilder<
+        any,
+        any
+    >
+        ? PolymorphicEntityQuery<TEntity>
+        : TableEntityQuery<TEntity, TResult, Writable>;
+
+/** A tracked-capable polymorphic read; projections use forVariant(). */
+export interface PolymorphicEntityQuery<TEntity extends Entity<any, any, any>>
+    extends PolymorphicQueryBuilder<EntitySchema<TEntity>>,
+        Pick<
+            TableEntityQuery<TEntity, EntityResult<TEntity>>,
+            'find' | 'findOrFail' | 'findMany'
+        > {}
+
+/** Table query with ORM identity tracking and primary-key lookup helpers. */
+export interface TableEntityQuery<
+    TEntity extends Entity<any, any, any>,
+    TResult,
+    Writable extends boolean = true
+> extends Omit<
+            SchemaQueryBuilder<
+                EntitySchema<TEntity>,
+                EntityRowSchema<TResult>,
+                EntityRelations<TEntity>,
+                Writable
+            >,
+            'include' | 'includeVariant' | WriteMethod
+        >,
+        EntityWrites<TEntity, TResult, Writable> {
+    /** Configure a discriminator branch with the canonical strongly typed query API. */
+    forVariant: SchemaAwareQuery<EntitySchema<TEntity>> extends {
+        forVariant: infer F;
+    }
+        ? F
+        : never;
+    /** Restrict a polymorphic query to declared variants and narrow its row schema. */
+    selectVariants: SchemaAwareQuery<EntitySchema<TEntity>> extends {
+        selectVariants: infer F;
+    }
+        ? F
+        : never;
     /**
      * Eager-load a relation declared on `TEntity` via `.hasOne()` /
      * `.hasMany()` / `.belongsTo()` / `.belongsToMany()`. Selector returns
      * the relation key as a string literal.
      */
-    include<K extends keyof EntityRelations<TEntity> & string>(
+    include<
+        K extends keyof EntityRelations<TEntity> & string,
+        Child extends ReadQueryShape = SchemaAwareQuery<
+            RelatedSchema<TEntity, K>
+        >
+    >(
         sel: (t: RelKeyTree<TEntity>) => K,
         customize?: (
-            q: SchemaQueryBuilder<
-                RelatedSchema<TEntity, K>,
-                InferType<RelatedSchema<TEntity, K>>
-            >
-        ) => void
-    ): EntityQuery<TEntity, WithIncluded<TEntity, TResult, K>>;
+            query: SchemaAwareQuery<RelatedSchema<TEntity, K>>
+        ) => Child
+    ): EntityQuery<
+        TEntity,
+        TResult & {
+            [P in K]: EntityRelations<TEntity>[K] extends {
+                kind: 'hasMany' | 'belongsToMany';
+            }
+                ? InferType<Child['rowSchema']>[]
+                : InferType<Child['rowSchema']> | null;
+        },
+        false
+    >;
 
     /**
      * Eager-load a relation declared inside a polymorphic variant (CTI/STI).
@@ -112,10 +199,10 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
             q: TRel extends keyof EntityRelations<TEntity>
                 ? SchemaQueryBuilder<
                       RelatedSchema<TEntity, TRel>,
-                      InferType<RelatedSchema<TEntity, TRel>>
+                      EntityRowSchema<InferType<RelatedSchema<TEntity, TRel>>>
                   >
                 : SchemaQueryBuilder<any, any>
-        ) => void
+        ) => ReadQueryShape
     ): EntityQuery<
         TEntity,
         TRel extends keyof EntityRelations<TEntity> & string
@@ -178,8 +265,14 @@ export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
  *
  * @public
  */
-export interface DbSet<TEntity extends Entity<any, any, any>>
-    extends EntityQuery<TEntity, EntityResult<TEntity>> {
+export type DbSet<TEntity extends Entity<any, any, any>> = EntityQuery<
+    TEntity,
+    EntityResult<TEntity>
+> &
+    DbSetOperations<TEntity>;
+
+/** Entity registration, transactions and graph/variant write entry points. */
+export interface DbSetOperations<TEntity extends Entity<any, any, any>> {
     /** The wrapped entity definition. */
     readonly entity: TEntity;
 
@@ -258,54 +351,13 @@ export interface DbSet<TEntity extends Entity<any, any, any>>
 export interface VariantDbSet<
     TEntity extends Entity<any, any, any>,
     K extends string
-> extends Omit<
-        SchemaQueryBuilder<EntitySchema<TEntity>, VariantResult<TEntity, K>>,
-        'include' | 'includeVariant' | 'insert' | 'update' | 'delete' | 'where'
+> extends PolymorphicQueryBuilder<
+        EntitySchema<TEntity>,
+        Pick<
+            VariantReadSchemas<EntitySchema<TEntity>>,
+            Extract<K, keyof VariantReadSchemas<EntitySchema<TEntity>>>
+        >
     > {
-    // Re-declared so that `this` resolves to `VariantDbSet<TEntity, K>`
-    // rather than the raw `SchemaQueryBuilder` (Omit doesn't preserve `this`).
-    /**
-     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
-     */
-    where(
-        column: ColumnRef<EntitySchema<TEntity>>,
-        operator: string,
-        value: any
-    ): this;
-    /**
-     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
-     */
-    where(column: ColumnRef<EntitySchema<TEntity>>, value: any): this;
-    /**
-     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
-     */
-    where(raw: Knex.Raw, operator: string, value: any): this;
-    /**
-     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
-     */
-    where(callback: (builder: Knex.QueryBuilder) => void): this;
-    /**
-     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
-     */
-    where(record: Record<string, any>): this;
-    /**
-     * Add an AND filter on this polymorphic branch using a mapped property, record or Knex callback.
-     */
-    where(raw: Knex.Raw): this;
-    /**
-     * Eager-load a relation declared on `TEntity`. Identical to
-     * {@link EntityQuery.include}.
-     */
-    include<R extends keyof EntityRelations<TEntity> & string>(
-        sel: (t: RelKeyTree<TEntity>) => R,
-        customize?: (
-            q: SchemaQueryBuilder<
-                RelatedSchema<TEntity, R>,
-                InferType<RelatedSchema<TEntity, R>>
-            >
-        ) => void
-    ): VariantDbSet<TEntity, K>;
-
     /** Look up a single row by PK, typed to this variant. */
     find(
         pk: PrimaryKeyValueOf<EntitySchema<TEntity>>
@@ -347,33 +399,6 @@ export interface VariantDbSet<
 // Runtime construction
 // ---------------------------------------------------------------------------
 
-const ENTITY_KEY_TREE_CACHE = new WeakMap<object, Record<string, string>>();
-
-function getEntityKeyTree(
-    entity: Entity<any, any, any>
-): Record<string, string> {
-    const cached = ENTITY_KEY_TREE_CACHE.get(entity);
-    if (cached) return cached;
-    const props =
-        (
-            entity.schema as {
-                introspect?: () => { properties?: Record<string, unknown> };
-            }
-        ).introspect?.()?.properties ?? {};
-    const tree: Record<string, string> = {};
-    for (const k of Object.keys(props)) tree[k] = k;
-    ENTITY_KEY_TREE_CACHE.set(entity, tree);
-    return tree;
-}
-
-/**
- * Extract the Knex instance from a `SchemaQueryBuilder`.
- * SchemaQueryBuilder stores it as `#knex` (private), but the `query()`
- * factory function passes it as the first constructor argument.
- * We retrieve it via the `.toQuery()` builder's knex client reference.
- * @internal
- */
-
 /**
  * Wrap a `SchemaQueryBuilder` in a Proxy that overlays typed
  * `.include()` / `.includeVariant()` methods and re-wraps `this`-returning
@@ -382,7 +407,7 @@ function getEntityKeyTree(
  * @internal
  */
 function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
-    sqb: SchemaQueryBuilder<EntitySchema<TEntity>, TResult>,
+    sqb: SchemaQueryBuilder<EntitySchema<TEntity>, EntityRowSchema<TResult>>,
     entity: TEntity,
     _knexInst: Knex,
     onResults?: (items: unknown[]) => unknown[] | undefined
@@ -391,45 +416,6 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
         sqb as unknown as object,
         {
             get(target, prop, receiver) {
-                if (prop === 'include') {
-                    return (
-                        sel: (t: Record<string, string>) => string,
-                        customize?: (q: SchemaQueryBuilder<any, any>) => void
-                    ) => {
-                        const name = sel(getEntityKeyTree(entity));
-                        (
-                            sqb as unknown as {
-                                include: (
-                                    n: string,
-                                    c?: (
-                                        q: SchemaQueryBuilder<any, any>
-                                    ) => void
-                                ) => void;
-                            }
-                        ).include(name, customize);
-                        return proxy;
-                    };
-                }
-                if (prop === 'includeVariant') {
-                    return (
-                        variantKey: string,
-                        relationName: string,
-                        customize?: (q: SchemaQueryBuilder<any, any>) => void
-                    ) => {
-                        (
-                            sqb as unknown as {
-                                includeVariant: (
-                                    v: string,
-                                    r: string,
-                                    c?: (
-                                        q: SchemaQueryBuilder<any, any>
-                                    ) => void
-                                ) => void;
-                            }
-                        ).includeVariant(variantKey, relationName, customize);
-                        return proxy;
-                    };
-                }
                 if (prop === '_sqb') return sqb;
                 if (prop === '_entity') return entity;
 
@@ -466,9 +452,27 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                 const value = Reflect.get(target, prop, receiver);
                 if (typeof value !== 'function') return value;
                 return function (this: unknown, ...args: unknown[]) {
+                    if (prop === 'then') {
+                        const [resolve, reject] = args;
+                        return sqb
+                            .execute()
+                            .then(rows => {
+                                if (!onResults || !sqb.returnsEntityRows)
+                                    return rows;
+                                return onResults(rows) ?? rows;
+                            })
+                            .then(resolve as any, reject as any);
+                    }
                     const result = (value as Function).apply(sqb, args);
                     // Re-wrap `this`-returning methods so chains keep typing.
                     if (result === sqb) return proxy;
+                    if (
+                        result &&
+                        typeof result.execute === 'function' &&
+                        typeof result.sameSource === 'function' &&
+                        sqb.sameSource(result)
+                    )
+                        return wrapQuery(result, entity, _knexInst, onResults);
                     // Wrap Promise results to auto-attach tracked entities.
                     if (
                         onResults != null &&
@@ -479,6 +483,21 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                     ) {
                         return (result as Promise<unknown>).then(
                             (resolved: unknown) => {
+                                if (
+                                    (prop === 'paginate' ||
+                                        prop === 'paginateAfter') &&
+                                    resolved &&
+                                    typeof resolved === 'object' &&
+                                    'data' in resolved &&
+                                    Array.isArray(resolved.data)
+                                ) {
+                                    return {
+                                        ...resolved,
+                                        data:
+                                            onResults(resolved.data) ??
+                                            resolved.data
+                                    };
+                                }
                                 if (Array.isArray(resolved)) {
                                     const entities = resolved.filter(
                                         r =>
@@ -544,9 +563,9 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
  */
 function makeFindMethod<TEntity extends Entity<any, any, any>>(
     method: 'find' | 'findOrFail' | 'findMany',
-    sqb: SchemaQueryBuilder<any, any>,
+    _sqb: SchemaQueryBuilder<any, any>,
     entity: TEntity,
-    proxy: EntityQuery<TEntity, unknown>
+    proxy: any
 ): (...args: unknown[]) => Promise<unknown> {
     return async (...args: unknown[]): Promise<unknown> => {
         const pkInfo = getPrimaryKeyColumns(
@@ -568,87 +587,51 @@ function makeFindMethod<TEntity extends Entity<any, any, any>>(
             ).getExtension?.('tableName') ?? '<entity>';
         const entityLabel = String(tableName);
 
-        const applyPkFilter = (pk: unknown): void => {
+        const tupleFor = (pk: unknown) => {
             const tuple = normalisePkTuple(pk, isComposite, method);
-            if (tuple.length !== propertyKeys.length) {
+            if (tuple.length !== propertyKeys.length)
                 throw new Error(
                     `${method}(): expected ${propertyKeys.length} primary-key value(s), got ${tuple.length}.`
                 );
-            }
-            for (let i = 0; i < propertyKeys.length; i++) {
-                (
-                    proxy as unknown as {
-                        andWhere: (
-                            col: string,
-                            op: string,
-                            val: unknown
-                        ) => void;
-                    }
-                ).andWhere(propertyKeys[i], '=', tuple[i]);
-            }
+            return tuple;
         };
-
         if (method === 'findMany') {
-            const pks = (args[0] ?? []) as ReadonlyArray<unknown>;
-            if (!Array.isArray(pks)) {
+            const pks = args[0] ?? [];
+            if (!Array.isArray(pks))
                 throw new Error(
                     'findMany(): expected an array of primary-key values.'
                 );
-            }
-            if (pks.length === 0) return [];
-            if (!isComposite) {
-                const propKey = propertyKeys[0];
-                const tuples = pks.map(p =>
-                    normalisePkTuple(p, false, 'findMany')
-                );
-                (
-                    proxy as unknown as {
-                        whereIn: (
-                            col: string,
-                            vals: readonly unknown[]
-                        ) => void;
-                    }
-                ).whereIn(
-                    propKey,
-                    tuples.map(t => t[0])
-                );
-                return await (
-                    proxy as unknown as { execute: () => Promise<unknown[]> }
-                ).execute();
-            }
-            // Composite PK — emit OR-grouped predicates. We must use
-            // COLUMN names (not property names) here because the inner
-            // knex `apply()` callback bypasses SchemaQueryBuilder's
-            // property-to-column translation.
-            const columnNames = pkInfo.columnNames;
-            (
-                sqb as unknown as {
-                    apply: (fn: (qb: Knex.QueryBuilder) => void) => void;
-                }
-            ).apply(qb => {
-                qb.andWhere(function (this: Knex.QueryBuilder) {
-                    for (const pk of pks) {
-                        const tuple = normalisePkTuple(pk, true, 'findMany');
-                        this.orWhere(function (this: Knex.QueryBuilder) {
-                            for (let i = 0; i < columnNames.length; i++) {
-                                this.andWhere(columnNames[i], tuple[i] as any);
-                            }
-                        });
-                    }
-                });
-            });
-            return await (
-                proxy as unknown as { execute: () => Promise<unknown[]> }
-            ).execute();
+            if (!pks.length) return [];
+            const tuples = pks.map(tupleFor);
+            if (!isComposite)
+                return (proxy as any)
+                    .whereIn(
+                        propertyKeys[0],
+                        tuples.map(tuple => tuple[0])
+                    )
+                    .execute();
+            return (proxy as any)
+                .where((group: any) =>
+                    tuples.reduce(
+                        (outer, tuple) =>
+                            outer.orWhere((inner: any) =>
+                                propertyKeys.reduce(
+                                    (query, key, i) =>
+                                        query.where(key, tuple[i]),
+                                    inner
+                                )
+                            ),
+                        group
+                    )
+                )
+                .execute();
         }
-
-        // find / findOrFail
-        applyPkFilter(args[0]);
-        const row = await (
-            proxy as unknown as {
-                first: () => Promise<unknown | undefined>;
-            }
-        ).first();
+        const tuple = tupleFor(args[0]);
+        const filtered = propertyKeys.reduce(
+            (query, key, i) => query.andWhere(key, '=', tuple[i]),
+            proxy as any
+        );
+        const row = await filtered.first();
         if (row === undefined && method === 'findOrFail') {
             throw new EntityNotFoundError(entityLabel, args[0]);
         }
@@ -700,9 +683,9 @@ export function makeDbSet<TEntity extends Entity<any, any, any>>(
                         entity.schema as EntitySchema<TEntity>
                     );
                     return wrapQuery(
-                        sqb as SchemaQueryBuilder<
+                        sqb as unknown as SchemaQueryBuilder<
                             EntitySchema<TEntity>,
-                            EntityResult<TEntity>
+                            EntityRowSchema<EntityResult<TEntity>>
                         >,
                         entity,
                         knex,
@@ -754,9 +737,9 @@ export function makeDbSet<TEntity extends Entity<any, any, any>>(
                 entity.schema as EntitySchema<TEntity>
             );
             const query = wrapQuery(
-                fresh as SchemaQueryBuilder<
+                fresh as unknown as SchemaQueryBuilder<
                     EntitySchema<TEntity>,
-                    EntityResult<TEntity>
+                    EntityRowSchema<EntityResult<TEntity>>
                 >,
                 entity,
                 knex,
@@ -789,7 +772,10 @@ function wrapVariantQuery<
     TEntity extends Entity<any, any, any>,
     K extends string
 >(
-    sqb: SchemaQueryBuilder<EntitySchema<TEntity>, VariantResult<TEntity, K>>,
+    sqb: SchemaQueryBuilder<
+        EntitySchema<TEntity>,
+        EntityRowSchema<VariantResult<TEntity, K>>
+    >,
     entity: TEntity,
     variantKey: K,
     knexInst: Knex,
@@ -799,47 +785,6 @@ function wrapVariantQuery<
         sqb as unknown as object,
         {
             get(target, prop, receiver) {
-                // --- Typed include override (same as wrapQuery) ---
-                if (prop === 'include') {
-                    return (
-                        sel: (t: Record<string, string>) => string,
-                        customize?: (q: SchemaQueryBuilder<any, any>) => void
-                    ) => {
-                        const name = sel(getEntityKeyTree(entity));
-                        (
-                            sqb as unknown as {
-                                include: (
-                                    n: string,
-                                    c?: (
-                                        q: SchemaQueryBuilder<any, any>
-                                    ) => void
-                                ) => void;
-                            }
-                        ).include(name, customize);
-                        return proxy;
-                    };
-                }
-                if (prop === 'includeVariant') {
-                    return (
-                        vk: string,
-                        relationName: string,
-                        customize?: (q: SchemaQueryBuilder<any, any>) => void
-                    ) => {
-                        (
-                            sqb as unknown as {
-                                includeVariant: (
-                                    v: string,
-                                    r: string,
-                                    c?: (
-                                        q: SchemaQueryBuilder<any, any>
-                                    ) => void
-                                ) => void;
-                            }
-                        ).includeVariant(vk, relationName, customize);
-                        return proxy;
-                    };
-                }
-
                 if (prop === '_sqb') return sqb;
                 if (prop === '_entity') return entity;
 
@@ -963,8 +908,32 @@ function wrapVariantQuery<
                 const value = Reflect.get(target, prop, receiver);
                 if (typeof value !== 'function') return value;
                 return function (this: unknown, ...args: unknown[]) {
+                    if (prop === 'then') {
+                        const [resolve, reject] = args;
+                        return sqb
+                            .execute()
+                            .then(rows => {
+                                if (!onResults || !sqb.returnsEntityRows)
+                                    return rows;
+                                return onResults(rows) ?? rows;
+                            })
+                            .then(resolve as any, reject as any);
+                    }
                     const result = (value as Function).apply(sqb, args);
                     if (result === sqb) return proxy;
+                    if (
+                        result &&
+                        typeof result.execute === 'function' &&
+                        typeof result.sameSource === 'function' &&
+                        sqb.sameSource(result)
+                    )
+                        return wrapVariantQuery(
+                            result,
+                            entity,
+                            variantKey,
+                            knexInst,
+                            onResults
+                        );
                     if (
                         onResults != null &&
                         sqb.returnsEntityRows &&
@@ -974,6 +943,21 @@ function wrapVariantQuery<
                     ) {
                         return (result as Promise<unknown>).then(
                             (resolved: unknown) => {
+                                if (
+                                    (prop === 'paginate' ||
+                                        prop === 'paginateAfter') &&
+                                    resolved &&
+                                    typeof resolved === 'object' &&
+                                    'data' in resolved &&
+                                    Array.isArray(resolved.data)
+                                ) {
+                                    return {
+                                        ...resolved,
+                                        data:
+                                            onResults(resolved.data) ??
+                                            resolved.data
+                                    };
+                                }
                                 if (Array.isArray(resolved)) {
                                     const entities = resolved.filter(
                                         r =>
@@ -1055,19 +1039,13 @@ function makeVariantDbSet<
             }
             // Allocate a fresh SQB with the variant filter baked in, then
             // wrap it in the variant-aware query proxy.
-            const fresh = schemaQuery(
-                knex,
-                entity.schema as EntitySchema<TEntity>
-            );
-            (
-                fresh as unknown as {
-                    selectVariants?: (keys: string[]) => void;
-                }
-            ).selectVariants?.([variantKey]);
+            const fresh = (
+                schemaQuery(knex, entity.schema as any) as any
+            ).selectVariants([variantKey]);
             const query = wrapVariantQuery(
-                fresh as SchemaQueryBuilder<
+                fresh as unknown as SchemaQueryBuilder<
                     EntitySchema<TEntity>,
-                    VariantResult<TEntity, K>
+                    EntityRowSchema<VariantResult<TEntity, K>>
                 >,
                 entity,
                 variantKey,

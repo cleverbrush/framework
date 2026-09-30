@@ -8,7 +8,8 @@ import type {
     Entity,
     EntityRelations,
     EntitySchema,
-    RelationInfo
+    RelationInfo,
+    SchemaAwareQuery
 } from '@cleverbrush/knex-schema';
 import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
 
@@ -28,12 +29,9 @@ import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
  *
  * @public
  */
-export type EntityResult<TEntity extends Entity<any, any, any>> =
-    TEntity extends Entity<any, any, infer U>
-        ? [U] extends [never]
-            ? InferType<EntitySchema<TEntity>>
-            : U
-        : InferType<EntitySchema<TEntity>>;
+export type EntityResult<TEntity extends Entity<any, any, any>> = InferType<
+    SchemaAwareQuery<EntitySchema<TEntity>>['rowSchema']
+>;
 
 /**
  * Discriminated-union variant rows for a polymorphic entity. Resolves to
@@ -45,7 +43,7 @@ export type EntityResultByVariant<TEntity extends Entity<any, any, any>> =
     TEntity extends Entity<any, any, infer U>
         ? [U] extends [never]
             ? never
-            : U
+            : EntityResult<TEntity>
         : never;
 
 /**

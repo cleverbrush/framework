@@ -91,7 +91,7 @@ const value: InferType<typeof tagged> = undefined;
 const invalidUnit: InferExtensionMetadata<typeof tagged>['unit'] = 'seconds';
 // @ts-expect-error importing database libraries cannot install global storage methods
 number().bigint();
-export const read = query(knex, Account).withRowSchema().select(a => ({ id: a.id, balance: a.balance }));
+export const read = query(knex, Account).select(a => ({ id: a.id, balance: a.balance }));
 const PublicAccount = object({ id: string(), balance: string().nullable() });
 export const convert = mapper().configure(read.rowSchema, PublicAccount, m => m)
     .getSyncMapper(read.rowSchema, PublicAccount);

@@ -1,6 +1,6 @@
 import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import { AliasedReadQuery } from './AliasedReadQuery.js';
+
 import { buildColumnMap } from './columns.js';
 import type { SchemaProps } from './entity.js';
 import {
@@ -10,11 +10,9 @@ import {
     compileAggregate,
     isAggregate
 } from './expressions.js';
-import {
-    ALLOWED_OPS,
-    getEffectiveBaseQuery,
-    getSchemaQueryBuilderCtor
-} from './operations/helpers.js';
+import { getTableName } from './extension.js';
+import { ALLOWED_OPS } from './operations/helpers.js';
+import { SchemaQueryBuilder } from './SchemaQueryBuilder.js';
 import { isSqlIdentifier } from './sql-identifiers.js';
 
 type TableSchema = ObjectSchemaBuilder<any, any, any, any, any, any, any>;
@@ -135,8 +133,8 @@ export function or(...items: JoinPredicate[]): JoinPredicate {
     return { [PREDICATE]: { op: 'or', items } };
 }
 
-/** Read-only flat query builder. Explicit projections avoid ambiguous SELECT *. */
-export class AliasedQueryBuilder<TTables, TResult = never> {
+/** @internal Mutable native SQL planner, never returned by a public factory. */
+export class AliasedQuerySource<TTables, TResult = never> {
     private sql: Knex.QueryBuilder;
     private tables = new Map<string, TableSchema>();
     private selected = false;
@@ -144,17 +142,8 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
     private nullableTables = new Set<string>();
     private opaqueReadShape = false;
 
-    /** Enter immutable read mode before select/raw changes; an explicit projection is required. */
-    withRowSchema(): AliasedReadQuery<TTables> {
-        if (this.selected || this.opaqueReadShape)
-            throw new Error(
-                'Call withRowSchema() before select/apply operations'
-            );
-        return new AliasedReadQuery(this.cloneReadSource());
-    }
-
     /** @internal Snapshot the SQL planner without sharing mutable query state. */
-    cloneReadSource(): AliasedQueryBuilder<TTables, TResult> {
+    cloneReadSource(): AliasedQuerySource<TTables, TResult> {
         const copy = Object.assign(
             Object.create(Object.getPrototypeOf(this)),
             this
@@ -166,7 +155,7 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
         return copy;
     }
 
-    /** @internal Schema-backed state used by the immutable opt-in adapter. */
+    /** @internal Schema-backed state used by the immutable public builder. */
     readContext(): { knex: Knex; sql: Knex.QueryBuilder; columns: TTables } {
         return { knex: this.knex, sql: this.sql.clone(), columns: this.tree() };
     }
@@ -185,9 +174,12 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
     }
 
     private source(table: TableAlias<TableSchema, string>): Knex.QueryBuilder {
-        const Constructor = getSchemaQueryBuilderCtor();
-        return getEffectiveBaseQuery(new Constructor(this.knex, table.schema))
-            .clone()
+        return new SchemaQueryBuilder(
+            this.knex,
+            table.schema,
+            this.knex(getTableName(table.schema))
+        )
+            .storageQuery()
             .as(table.name);
     }
 
@@ -257,7 +249,7 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
     join<S extends TableSchema, const N extends string>(
         table: N extends keyof TTables ? never : TableAlias<S, N>,
         on: (tables: TTables & AliasTables<S, N>) => JoinPredicate
-    ): AliasedQueryBuilder<TTables & AliasTables<S, N>, TResult> {
+    ): AliasedQuerySource<TTables & AliasTables<S, N>, TResult> {
         this.addJoin(table, on as any, false);
         return this as any;
     }
@@ -270,7 +262,7 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
     leftJoin<S extends TableSchema, const N extends string>(
         table: N extends keyof TTables ? never : TableAlias<S, N>,
         on: (tables: TTables & AliasTables<S, N>) => JoinPredicate
-    ): AliasedQueryBuilder<TTables & AliasTables<S, N, true>, TResult> {
+    ): AliasedQuerySource<TTables & AliasTables<S, N, true>, TResult> {
         this.addJoin(table, on as any, true);
         return this as any;
     }
@@ -421,7 +413,7 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
      */
     select<S extends Selection>(
         selector: (tables: TTables) => S
-    ): AliasedQueryBuilder<TTables, JoinedProjection<S>> {
+    ): AliasedQuerySource<TTables, JoinedProjection<S>> {
         if (this.selected)
             throw new Error('Only one object projection per query');
         const columns: Record<string, string | Knex.Raw> = {};
@@ -467,12 +459,9 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
      * Clone this builder onto an existing transaction, preserving its tables/projection.
      * Does not modify the source or commit/roll back the transaction.
      */
-    transacting(trx: Knex.Transaction): AliasedQueryBuilder<TTables, TResult> {
-        const [name, schema] = this.tables.entries().next().value!;
-        const copy = new AliasedQueryBuilder<TTables, TResult>(
-            trx as unknown as Knex,
-            alias(schema, name)
-        );
+    transacting(trx: Knex.Transaction): AliasedQuerySource<TTables, TResult> {
+        const copy = this.cloneReadSource();
+        Object.assign(copy, { knex: trx });
         copy.sql = this.sql.clone().transacting(trx);
         copy.tables = new Map(this.tables);
         copy.selected = this.selected;

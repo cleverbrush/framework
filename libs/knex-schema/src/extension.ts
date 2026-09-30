@@ -1,4 +1,5 @@
 // @cleverbrush/knex-schema — Schema extension: hasColumnName / hasTableName
+
 import type {
     AnySchemaBuilder,
     ArraySchemaBuilder,
@@ -28,6 +29,7 @@ import {
     stringExtensions,
     withExtensions
 } from '@cleverbrush/schema';
+import type { QueryScope } from './query-scope.js';
 import type {
     ResolvedVariantConfig,
     ResolvedVariantRelationSpec,
@@ -731,12 +733,15 @@ export const ddlExtension = defineExtension({
         },
         /** Register a named query scope.
          * @param name - Scope name to use with `.scoped(name)`.
-         * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
+         * @param fn - Synchronous callback returning its configured immutable query (filters/order/paging only).
          */
-        scope<N extends string>(
-            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+        scope<
+            N extends string,
+            S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+        >(
+            this: S,
             name: N,
-            fn: Function
+            fn: (query: QueryScope<S>) => QueryScope<S>
         ): typeof this & { readonly [METHOD_LITERAL_BRAND]?: N } {
             const existing =
                 (this.getExtension('scopes') as Record<string, Function>) ?? {};
@@ -886,12 +891,11 @@ export const ddlExtension = defineExtension({
             };
         },
         /** Set a default scope applied to all queries unless `.unscoped()` is called.
-         * @param fn - Function that receives a `SchemaQueryBuilder` and applies filters.
+         * @param fn - Synchronous function that returns its configured immutable query scope.
          */
-        defaultScope(
-            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
-            fn: Function
-        ) {
+        defaultScope<
+            S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
+        >(this: S, fn: (query: QueryScope<S>) => QueryScope<S>) {
             return this.withExtension('defaultScope', fn);
         },
         /** Register a before-insert lifecycle hook.
@@ -928,7 +932,7 @@ export const ddlExtension = defineExtension({
             return this.withExtension('beforeUpdate', [...existing, fn]);
         },
         /** Register a before-delete lifecycle hook.
-         * @param fn - Async function `(query)` called before deleting.
+         * @param fn - Observational async function `(query)` called before deleting; query configuration is immutable. Apply delete filters before calling delete().
          */
         beforeDelete(
             this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
@@ -1004,7 +1008,7 @@ export const ddlExtension = defineExtension({
         // The internal worker {@link applyVariantsToSchema} (below this
         // `defineExtension` block) is invoked by the Entity layer and stores
         // the same `'variants'` / `'polymorphicVariants'` extensions that
-        // `SchemaQueryBuilder` reads at runtime.
+        // `QuerySource` reads at runtime.
     }
 });
 
@@ -1035,7 +1039,7 @@ export interface VariantInputForResolver {
 /**
  * @internal Validate + apply a fully-resolved variant config to a base
  * schema. Stores the `'variants'` and `'polymorphicVariants'` extensions
- * read by {@link SchemaQueryBuilder}.
+ * read by {@link QuerySource}.
  *
  * Called by the {@link Entity} chain (`.discriminator().ctiVariant().stiVariant()`).
  * Replaces the previous schema-level `.withVariants()` method.
@@ -1333,7 +1337,7 @@ export function getProjections(
  * Retrieve the resolved variant configuration stored by `.withVariants()`.
  * Returns `null` when the schema is not polymorphic.
  *
- * @internal — used by {@link SchemaQueryBuilder}.
+ * @internal — used by {@link QuerySource}.
  */
 export function getVariants(
     schema: ObjectSchemaBuilder<any, any, any, any, any, any, any>

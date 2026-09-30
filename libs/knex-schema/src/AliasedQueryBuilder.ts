@@ -1,7 +1,7 @@
 import { type InferType, object } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import type {
-    AliasedQueryBuilder,
+    AliasedQuerySource,
     AliasTables,
     JoinPredicate,
     TableAlias
@@ -11,8 +11,10 @@ import {
     type AliasedColumn,
     COLUMN
 } from './expressions.js';
+import { OpaqueQuery, type QueryOutput } from './OpaqueQuery.js';
 import {
     captureReadRaw,
+    captureValue,
     type ReadPredicate,
     type ReadPredicateContext,
     ReadPredicates
@@ -26,7 +28,7 @@ import {
     type ReadValue,
     type SchemaForValue
 } from './read-schema.js';
-import type { ReadColumn, ReadProjection } from './SchemaReadQuery.js';
+import type { ReadColumn, ReadProjection } from './SchemaQueryBuilder.js';
 
 /** Schema-backed aliases whose exact numeric and outer-join values match decoded rows. */
 export type ReadAliasTables<T> = {
@@ -42,15 +44,15 @@ type Selection = Record<string, ReadColumn<any> | AggregateExpression<any>>;
 type Selector<T> = (tables: ReadAliasTables<T>) => AliasedColumn<any>;
 
 /** Immutable flat joined read. Supply select() before accessing rowSchema or executing. */
-export class AliasedReadQuery<
+export class AliasedQueryBuilder<
     T,
     Row extends ReadObject = never
 > extends ReadPredicates<ReadAliasTables<T>> {
     private fields?: Record<string, ReadField>;
     private schema?: Row;
     private predicates: readonly ReadPredicate[] = [];
-    /** @internal Enter through an aliased query's withRowSchema() method. */
-    constructor(private planner: AliasedQueryBuilder<T, any>) {
+    /** @internal Create through query(knex, alias(schema, name)). */
+    constructor(private planner: AliasedQuerySource<T, any>) {
         super();
     }
 
@@ -71,7 +73,7 @@ export class AliasedReadQuery<
     join<S extends ReadObject, N extends string>(
         table: N extends keyof T ? never : TableAlias<S, N>,
         on: (tables: ReadAliasTables<T & AliasTables<S, N>>) => JoinPredicate
-    ): AliasedReadQuery<T & AliasTables<S, N>, Row> {
+    ): AliasedQueryBuilder<T & AliasTables<S, N>, Row> {
         const copy = this.copy();
         copy.planner = copy.planner.join(table, on as any) as any;
         return copy as any;
@@ -82,7 +84,7 @@ export class AliasedReadQuery<
         on: (
             tables: ReadAliasTables<T & AliasTables<S, N, true>>
         ) => JoinPredicate
-    ): AliasedReadQuery<T & AliasTables<S, N, true>, Row> {
+    ): AliasedQueryBuilder<T & AliasTables<S, N, true>, Row> {
         const copy = this.copy();
         copy.planner = copy.planner.leftJoin(table, on as any) as any;
         return copy as any;
@@ -90,11 +92,7 @@ export class AliasedReadQuery<
     /** Select exact columns and aggregates; opaque raw expressions are deliberately unsupported. */
     select<P extends Selection>(
         select: (tables: ReadAliasTables<T>) => P
-    ): AliasedReadQuery<T, ReadProjection<P>> {
-        if (this.fields)
-            throw new ReadSchemaError(
-                'Only one projection is allowed per read query'
-            );
+    ): AliasedQueryBuilder<T, ReadProjection<P>> {
         const { knex, columns } = this.planner.readContext();
         const entries = Object.values(
             columns as Record<string, Record<string, AliasedColumn<any>>>
@@ -133,6 +131,10 @@ export class AliasedReadQuery<
         return {
             knex,
             column: selector => {
+                if (typeof selector !== 'function')
+                    throw new ReadSchemaError(
+                        'Aliased predicates require a column selector'
+                    );
                 const column = selector(columns as ReadAliasTables<T>);
                 if (!entries.includes(column))
                     throw new ReadSchemaError(
@@ -177,7 +179,11 @@ export class AliasedReadQuery<
         right: unknown
     ): this {
         const copy = this.copy();
-        copy.planner.having(value as any, operator, right);
+        copy.planner.having(
+            value as any,
+            operator,
+            captureValue(this.planner.readContext().knex, right)()
+        );
         return copy;
     }
     /** Limit the flat row count, including repeated parents produced by joins. */
@@ -221,6 +227,41 @@ export class AliasedReadQuery<
     /** Render SQL for debugging without executing it. */
     toQuery(): string {
         return this.compile().toQuery();
+    }
+    /** Return an independent mutable Knex snapshot. */
+    toKnexQuery(): Knex.QueryBuilder {
+        return this.compile();
+    }
+    /** Configure raw SQL once and declare its complete output contract. */
+    apply<O extends ReadObject>(
+        configure: (query: Knex.QueryBuilder) => Knex.QueryBuilder | undefined,
+        options: QueryOutput<O>
+    ): OpaqueQuery<O> {
+        const { knex, sql: source } = this.planner.readContext();
+        const sql = this.fields ? this.compile() : source;
+        if (!this.fields)
+            for (const predicate of this.predicates) predicate(sql);
+        const result = configure(sql);
+        if (result !== undefined && result !== sql) {
+            if (result instanceof Promise) void result.catch(() => {});
+            throw new ReadSchemaError(
+                'Raw configuration must synchronously configure the supplied Knex builder'
+            );
+        }
+        return OpaqueQuery.capture(knex, sql, options);
+    }
+    /** Replace the projection with trusted SQL and an explicit output contract. */
+    selectRaw<O extends ReadObject>(
+        sql: string,
+        bindings: readonly Knex.RawBinding[],
+        options: QueryOutput<O>
+    ): OpaqueQuery<O> {
+        const { knex } = this.planner.readContext();
+        const captured = captureReadRaw(knex, sql, bindings);
+        return this.apply(
+            query => query.clearSelect().select(captured()),
+            options
+        );
     }
     /** Execute one statement and validate/decode its detached results. */
     async execute(): Promise<InferType<Row>[]> {

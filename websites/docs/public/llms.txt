@@ -177,10 +177,10 @@ belong to these packages. Knex is a peer dependency; PostgreSQL also needs `pg`.
   exposes typed DbSets. Ordinary entity queries support identity tracking,
   change persistence, optimistic concurrency and STI/CTI variants. Use
   `@cleverbrush/orm-cli` for migrations. [ORM guide](/orm).
-- **Projection-aware reads:** enter `.withRowSchema()` before selecting or
-  including. It returns an immutable, read-only query. `rowSchema` describes the
-  decoded selection, not the full table, and accessing it never executes SQL.
-  Results are detached even in tracking contexts. SQL nulls stay `null`, dates
+- **Immutable queries:** every Framework query exposes `rowSchema` automatically;
+  `.withRowSchema()` is removed. Retain returned builders. `rowSchema` describes
+  the decoded selection, and accessing it never executes SQL. Full ORM entities
+  remain tracked when enabled; projected, grouped, distinct and raw rows are detached. SQL nulls stay `null`, dates
   decode to `Date` throughout nested graphs, and declared decimal/bigint columns
   retain exact strings. Input defaults and preprocessors are not replayed.
   [Read schemas](/knex-schema#row-schemas), [detached ORM reads](/orm#detached-read-schemas).
@@ -190,10 +190,11 @@ belong to these packages. Knex is a peer dependency; PostgreSQL also needs `pg`.
   `orWhereRaw` / `orderByRaw` with positional bindings and `ref(selector)` for
   quoted mapped columns, including generated child aliases. Group callbacks run
   synchronously once and receive only predicate methods; retained groups are
-  closed after the callback. Subquery SQL/bindings are captured without executing
+  immutable too. Return the configured group, never void or a Promise. Subquery SQL/bindings are captured without executing
   SQL. These operations retain rowSchema identity; assign their returned reader.
   Raw fragments are trusted application SQL, not a sandbox. Keep authorization
-  outside grouped search ORs. No unrestricted apply() exists in read mode.
+  outside grouped search ORs. Opaque SELECTs use `apply(configure, { output })` or
+  `selectRaw(sql, bindings, { output })` with a synchronous Framework object schema.
   Numbered pagination retains ordering; composite cursors replace it with their
   explicit orderBy specification. [Read predicates](/knex-schema#read-predicates).
 - **Nested and polymorphic reads:** child customizers return their configured

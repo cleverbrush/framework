@@ -13,9 +13,11 @@ const Task = object({
     done: date().optional()
 }).hasTableName('tasks');
 test('projection row type equals its runtime schema inference', async () => {
-    const read = query(Knex({ client: 'pg' }), Task)
-        .withRowSchema()
-        .select(t => ({ id: t.id, amount: t.amount, done: t.done }));
+    const read = query(Knex({ client: 'pg' }), Task).select(t => ({
+        id: t.id,
+        amount: t.amount,
+        done: t.done
+    }));
     type Row = { id: number; amount: string | null; done: Date | null };
     expectTypeOf<InferType<typeof read.rowSchema>>().toEqualTypeOf<Row>();
     expectTypeOf(await read).toEqualTypeOf<Row[]>();
@@ -25,7 +27,7 @@ test('projection row type equals its runtime schema inference', async () => {
 
 test('flat joins retain exact storage and left join nullability', async () => {
     const read = query(Knex({ client: 'pg' }), alias(Task, 'task'))
-        .withRowSchema()
+
         .leftJoin(alias(Task, 'other'), t => eq(t.task.id, t.other.id))
         .select(t => ({
             amount: t.task.amount,
@@ -56,18 +58,16 @@ test('optional declared joins and explicit relation customizers retain their sha
         u => u.id,
         { optional: true }
     );
-    const read = query(Knex({ client: 'pg' }), entity.schema)
-        .withRowSchema()
-        .include(
-            r => r.owner,
-            q => q.select(u => ({ name: u.name }))
-        );
+    const read = query(Knex({ client: 'pg' }), entity.schema).include(
+        r => r.owner,
+        q => q.select(u => ({ name: u.name }))
+    );
     const row = (await read)[0];
     expectTypeOf(row.owner).toExtend<{ name: string } | null>();
     // @ts-expect-error the relation may be null
     const _required: { name: string } = row.owner;
     const explicit = query(Knex({ client: 'pg' }), Task)
-        .withRowSchema()
+
         .select(t => ({ title: t.title }))
         .joinMany(
             {

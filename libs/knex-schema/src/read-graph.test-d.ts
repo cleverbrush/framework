@@ -46,14 +46,12 @@ const Album = defineEntity(
 const knex = Knex({ client: 'pg' });
 
 test('polymorphic read branches retain discriminators and nested relation types', async () => {
-    const read = query(knex, Asset.schema)
-        .withRowSchema()
-        .forVariant('photo', q =>
-            q.include(
-                r => r.labels,
-                labels => labels.select(l => ({ text: l.label }))
-            )
-        );
+    const read = query(knex, Asset.schema).forVariant('photo', q =>
+        q.include(
+            r => r.labels,
+            labels => labels.select(l => ({ text: l.label }))
+        )
+    );
     type PhotoRow = InferType<typeof read.variantRowSchemas.photo>;
     type Expected = {
         id: number;
@@ -80,12 +78,10 @@ test('polymorphic read branches retain discriminators and nested relation types'
 });
 
 test('polymorphic reads compose inside an ordinary relation', async () => {
-    const read = query(knex, Album.schema)
-        .withRowSchema()
-        .include(
-            r => r.assets,
-            assets => assets.forVariant('photo', q => q.include(r => r.labels))
-        );
+    const read = query(knex, Album.schema).include(
+        r => r.assets,
+        assets => assets.forVariant('photo', q => q.include(r => r.labels))
+    );
     const rows = await read;
     const asset = rows[0].assets[0];
     if (asset.kind === 'photo')

@@ -8,21 +8,21 @@ import {
     createAggregate,
     type SelectableColumn
 } from '../expressions.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type { ColumnRef } from '../types.js';
 import {
     buildQuery,
     getEffectiveBaseQuery,
-    getSchemaQueryBuilderCtor
+    getQuerySourceCtor
 } from './helpers.js';
 import { getState } from './state.js';
 
 /** Clone Framework metadata as well as Knex state; terminal helpers never mutate the source. */
 export function cloneQuery(
-    builder: SchemaQueryBuilder<any, any>
-): SchemaQueryBuilder<any, any> {
+    builder: QuerySource<any, any>
+): QuerySource<any, any> {
     const state = getState(builder);
-    const Constructor = getSchemaQueryBuilderCtor();
+    const Constructor = getQuerySourceCtor();
     const copy = new Constructor(
         state.knex,
         state.localSchema,
@@ -78,7 +78,7 @@ export function assertScalarSource(query: Knex.QueryBuilder): void {
 export async function scalarAggregate<
     S extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 >(
-    builder: SchemaQueryBuilder<S, any>,
+    builder: QuerySource<S, any>,
     kind: AggregateKind,
     column?: ColumnRef<S>,
     options?: AggregateOptions<any>

@@ -16,13 +16,11 @@ const knex = Knex({ client: 'pg' });
 
 describe('schema-aware read metadata', () => {
     it('describes only projected fields, SQL nulls and exact storage', () => {
-        const read = query(knex, Task)
-            .withRowSchema()
-            .select(t => ({
-                title: t.title,
-                amount: t.amount,
-                done: t.completedAt
-            }));
+        const read = query(knex, Task).select(t => ({
+            title: t.title,
+            amount: t.amount,
+            done: t.completedAt
+        }));
         const properties = read.rowSchema.introspect().properties;
         expect(Object.keys(properties)).toEqual(['title', 'amount', 'done']);
         expect(
@@ -41,7 +39,7 @@ describe('schema-aware read metadata', () => {
         expect(read.toQuery()).not.toContain('"id" as');
     });
     it('preserves schema identity across immutable filters and transactions', () => {
-        const read = query(knex, Task).withRowSchema();
+        const read = query(knex, Task);
         const one = read.where(t => t.id, 1).limit(1);
         const two = read.where(t => t.id, 2).offset(1);
         expect(one.rowSchema).toBe(read.rowSchema);
@@ -88,58 +86,48 @@ describe('schema-aware read metadata', () => {
         ).toBe('2026-01-02T01:04:05.000Z');
     });
     it('retains aggregate output schemas and rejects opaque parsers', () => {
-        const read = query(knex, Task)
-            .withRowSchema()
-            .select(t => ({
-                count: aggregate.count(),
-                total: aggregate.sum(t.amount)
-            }));
+        const read = query(knex, Task).select(t => ({
+            count: aggregate.count(),
+            total: aggregate.sum(t.amount)
+        }));
         expect(read.rowSchema.validate({ count: 3, total: null }).valid).toBe(
             true
         );
         expect(() =>
-            query(knex, Task)
-                .withRowSchema()
-                .select(() => ({
-                    count: aggregate.count(undefined, {
-                        output: { parse: () => 1 }
-                    })
-                }))
+            query(knex, Task).select(() => ({
+                count: aggregate.count(undefined, {
+                    output: { parse: () => 1 }
+                })
+            }))
         ).toThrow(/introspectable/);
     });
-    it('rejects entry after legacy shape changes', () => {
-        expect(() =>
+    it('exposes metadata automatically and requires schemas for opaque SQL', () => {
+        expect(
             query(knex, Task)
                 .orderBy(t => t.id)
-                .withRowSchema()
-        ).toThrow(/before ordering/);
-        expect(() => query(knex, Task).limit(1).withRowSchema()).toThrow(
-            /before ordering/
-        );
-        expect(() => query(knex, Task).offset(1).withRowSchema()).toThrow(
-            /before ordering/
-        );
+                .limit(1).rowSchema
+        ).toBeDefined();
+        expect(
+            Object.keys(
+                query(knex, Task)
+                    .select(t => ({ id: t.id }))
+                    .rowSchema.introspect().properties
+            )
+        ).toEqual(['id']);
         expect(() =>
-            query(knex, Task)
-                .select(t => ({ id: t.id }))
-                .withRowSchema()
-        ).toThrow(/before/);
+            (query(knex, Task) as any).selectRaw('1 as other', [])
+        ).toThrow(/output/);
         expect(() =>
-            query(knex, Task).selectRaw('1 as other').withRowSchema()
-        ).toThrow();
+            (query(knex, Task) as any).apply((q: any) => q.whereRaw('true'))
+        ).toThrow(/output/);
         expect(() =>
-            query(knex, Task)
-                .apply(q => q.whereRaw('true'))
-                .withRowSchema()
-        ).toThrow(/before/);
-        expect(() =>
-            query(knex, alias(Task, 'task'))
-                .apply(q => q.select('id'))
-                .withRowSchema()
-        ).toThrow(/before/);
+            (query(knex, alias(Task, 'task')) as any).apply((q: any) =>
+                q.select('id')
+            )
+        ).toThrow(/output/);
     });
     it('describes immutable flat left joins with SQL nulls', () => {
-        const base = query(knex, alias(Task, 'task')).withRowSchema();
+        const base = query(knex, alias(Task, 'task'));
         expect(() => base.rowSchema).toThrow(/explicit select/);
         const joined = base
             .leftJoin(alias(Task, 'other'), t => eq(t.task.id, t.other.id))

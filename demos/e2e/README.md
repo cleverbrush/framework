@@ -27,7 +27,7 @@ npx vitest --run src/api/todos.api.test.ts    # single file
 
 ### One-time browser install
 
-The UI project requires Chromium. After `npm install`, run:
+The UI project requires Chromium. After `npm ci`, run:
 
 ```bash
 cd demos/e2e && npx playwright install chromium
@@ -41,6 +41,7 @@ cd demos/e2e && npx playwright install chromium
 | `RESET`                   | `0`                      | If `1`, run `docker compose down -v` before bringing the stack up (wipes Postgres).    |
 | `CI`                      | unset                    | Setting `CI=true` flips `KEEP_STACK` default to `0` and forces full teardown.          |
 | `HEADED`                  | `0`                      | If `1`, launch Chromium headed so you can watch UI tests run.                          |
+| `E2E_BROWSER_EXECUTABLE_PATH` | unset                 | Optional path to an existing Chromium executable; otherwise uses Playwright's managed browser. |
 | `SLOWMO`                  | `0`                      | Slow-motion delay (ms) for Playwright actions — useful with `HEADED=1`.                |
 | `E2E_API_URL`             | `http://localhost:3000`  | Backend HTTP base URL.                                                                 |
 | `E2E_WS_URL`              | `ws://localhost:3000`    | Backend WebSocket base URL.                                                            |

@@ -13,6 +13,7 @@ import {
     union
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
+import { buildColumnMap } from './columns.js';
 
 /** A schema builder accepted by the database-read schema compiler. */
 export type ReadSchema = SchemaBuilder<any, any, any, any, any>;
@@ -298,9 +299,36 @@ export function decodeObject(
 export function readExpression(
     knex: Knex,
     node: ReadNode,
-    column: string
+    column: string | Knex.Raw
 ): Knex.Raw {
     return node.exact || node.schema.introspect().type === 'date'
         ? knex.raw('cast(?? as text)', [column])
         : knex.raw('??', [column]);
+}
+
+/** @internal Preserve exact numerics and dates before driver parsing of write-returning rows. */
+export function returningReadColumns(
+    knex: Knex,
+    source: ReadObject
+): Knex.Raw[] {
+    const info = source.introspect();
+    const excluded = new Set(
+        ((info.extensions?.relations ?? []) as { name: string }[]).map(
+            relation => relation.name
+        )
+    );
+    const { propToCol } = buildColumnMap(source);
+    return Object.entries(info.properties)
+        .filter(([key]) => !excluded.has(key))
+        .map(([key, schema]) => {
+            const column = propToCol.get(key) ?? key;
+            return knex.raw('? as ??', [
+                readExpression(
+                    knex,
+                    compileReadSchema(schema as ReadSchema),
+                    column
+                ),
+                column
+            ]);
+        });
 }

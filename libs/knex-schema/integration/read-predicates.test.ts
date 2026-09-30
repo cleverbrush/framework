@@ -148,11 +148,10 @@ afterAll(async () => {
 
 describe('schema-aware read predicates against PostgreSQL', () => {
     it('keeps outer access filters around grouped raw search and correlated EXISTS', async () => {
-        const base = query(knex, alias(Task, 'task'))
-            .withRowSchema()
-            .join(alias(Project, 'project'), t =>
-                eq(t.task.projectId, t.project.id)
-            );
+        const base = query(knex, alias(Task, 'task')).join(
+            alias(Project, 'project'),
+            t => eq(t.task.projectId, t.project.id)
+        );
         const linked = query(knex, Link)
             .where(l => l.labelId, 2)
             .where(
@@ -213,7 +212,7 @@ describe('schema-aware read predicates against PostgreSQL', () => {
             .select(l => l.id)
             .toKnexQuery();
         const read = query(knex, alias(Label, 'label'))
-            .withRowSchema()
+
             .leftJoin(alias(Link, 'link'), t => eq(t.label.id, t.link.labelId))
             .whereIn(t => t.label.id, page)
             .groupBy(
@@ -232,7 +231,7 @@ describe('schema-aware read predicates against PostgreSQL', () => {
 
     it('uses raw conditional ordering with independent ordinary numbered and cursor pages', async () => {
         const source = query(knex, Project)
-            .withRowSchema()
+
             .where(p => p.ownerId, 1)
             .select(p => ({ id: p.id, name: p.name }));
         const priority = source
@@ -264,7 +263,7 @@ describe('schema-aware read predicates against PostgreSQL', () => {
 
     it('orders aliased reads with bound CASE expressions and retains nullable left joins', async () => {
         const source = query(knex, alias(Project, 'project'))
-            .withRowSchema()
+
             .leftJoin(alias(Task, 'task'), t =>
                 eq(t.project.id, t.task.projectId)
             )
@@ -279,7 +278,7 @@ describe('schema-aware read predicates against PostgreSQL', () => {
         expect((await result)[0]).toEqual({ id: 2, taskId: 103 });
         expect(result.rowSchema).toBe(source.rowSchema);
         const empty = query(knex, alias(Project, 'project'))
-            .withRowSchema()
+
             .leftJoin(alias(Label, 'label'), t =>
                 eq(t.project.id, t.label.projectId)
             )
@@ -298,7 +297,7 @@ describe('schema-aware read predicates against PostgreSQL', () => {
             { tracking: true }
         );
         const source = db.projects
-            .withRowSchema()
+
             .select(p => ({ id: p.id }))
             .include(
                 p => p.tasks,
@@ -345,9 +344,7 @@ describe('schema-aware read predicates against PostgreSQL', () => {
     });
 
     it('preserves captured predicates in transaction clones without touching the source', async () => {
-        const read = query(knex, Task)
-            .withRowSchema()
-            .where(t => t.projectId, 1);
+        const read = query(knex, Task).where(t => t.projectId, 1);
         const noLabels = knex(names.links)
             .select('task_id')
             .where(

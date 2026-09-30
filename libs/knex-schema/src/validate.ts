@@ -15,7 +15,7 @@ import type {
 /**
  * Resolve foreignQuery: use the provided one, or auto-derive from
  * the foreign schema's tableName extension.
- * Also normalizes SchemaQueryBuilder instances to raw Knex.QueryBuilder
+ * Also normalizes QuerySource instances to raw Knex.QueryBuilder
  * by calling `.toKnexQuery()` if available.
  */
 function resolveForeignQuery(

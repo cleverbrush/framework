@@ -910,7 +910,7 @@ export type EntityVariantUnion<E> =
 
 /**
  * Type-level helper: union of relation key names declared on an entity.
- * Used by `SchemaQueryBuilder.insert()/update()/upsert()` to omit relation
+ * Used by `QuerySource.insert()/update()/upsert()` to omit relation
  * navigation properties from accepted input.
  * @public
  */

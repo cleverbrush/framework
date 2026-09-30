@@ -1,7 +1,7 @@
 // @cleverbrush/knex-schema — Type-safe schema-driven query builder for Knex
 
-export type { ReadAliasTables } from './AliasedReadQuery.js';
-export { AliasedReadQuery } from './AliasedReadQuery.js';
+export type { ReadAliasTables } from './AliasedQueryBuilder.js';
+export { AliasedQueryBuilder } from './AliasedQueryBuilder.js';
 export type {
     AliasTables,
     JoinedProjection,
@@ -9,7 +9,7 @@ export type {
     TableAlias
 } from './aliased-query.js';
 // Types
-export { AliasedQueryBuilder, alias, and, eq, or } from './aliased-query.js';
+export { alias, and, eq, or } from './aliased-query.js';
 export type {
     PrimaryKeyColumns,
     RowVersionColumn,
@@ -92,13 +92,18 @@ export {
     tableExistsInDb,
     validateEntitiesAgainstDatabase
 } from './migration.js';
+export { OpaqueQuery, type QueryOutput } from './OpaqueQuery.js';
 export type { CompositeCursorOptions } from './operations/composite-cursor.js';
 export type {
     PolymorphicRowSchema,
     VariantReadSchema,
     VariantReadSchemas
-} from './PolymorphicReadQuery.js';
-export { PolymorphicReadQuery } from './PolymorphicReadQuery.js';
+} from './PolymorphicQueryBuilder.js';
+export { PolymorphicQueryBuilder } from './PolymorphicQueryBuilder.js';
+export type { BoundQuery } from './query.js';
+// Main entry point
+export { createQuery, query } from './query.js';
+export type { QueryScope } from './query-scope.js';
 // Raw query execution
 export { rawQuery } from './raw.js';
 export type {
@@ -125,20 +130,14 @@ export type {
     SchemaForValue
 } from './read-schema.js';
 export { ReadSchemaError } from './read-schema.js';
-export type { BoundQuery } from './SchemaQueryBuilder.js';
-// Main entry point
-export {
-    createQuery,
-    query,
-    SchemaQueryBuilder
-} from './SchemaQueryBuilder.js';
 export type {
     ReadColumn,
     ReadColumns,
     ReadProjection,
+    ReadQueryShape,
     SchemaAwareQuery
-} from './SchemaReadQuery.js';
-export { SchemaReadQuery } from './SchemaReadQuery.js';
+} from './SchemaQueryBuilder.js';
+export { SchemaQueryBuilder } from './SchemaQueryBuilder.js';
 // Snapshot-based migration
 export {
     entitiesToSnapshot,

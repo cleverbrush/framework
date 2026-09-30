@@ -3,6 +3,7 @@
 import Knex from 'knex';
 import { afterAll, describe, expect, expectTypeOf, it, vi } from 'vitest';
 import {
+    array,
     boolean,
     date,
     defineEntity,
@@ -317,7 +318,9 @@ describe('DDL extensions', () => {
     });
 
     it('string.jsonb() shorthand stores columnType', () => {
-        const schema = object({ meta: string().jsonb() }).hasTableName('test');
+        const schema = object({
+            meta: object({ status: string() }).jsonb()
+        }).hasTableName('test');
         const ext = (schema.introspect() as any).properties.meta.introspect()
             .extensions;
         expect(ext.columnType).toBe('jsonb');
@@ -484,7 +487,7 @@ describe('generateCreateTable', () => {
             id: number().primaryKey(),
             count: number().bigint(),
             externalId: string().asUuid(),
-            meta: string().jsonb(),
+            meta: object({ status: string() }).jsonb(),
             price: number().decimal(10, 2),
             createdAt: date().timestamptz(),
             birthDate: date().dateOnly()
@@ -599,55 +602,64 @@ describe('relation metadata', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('include()', () => {
-    const PostWithRelations = Post.belongsTo('author', {
-        schema: User,
-        foreignKey: (t: any) => t.authorId
-    });
+    const PostWithRelations = defineEntity(
+        Post.addProp('author', User.optional())
+    ).belongsTo(
+        t => t.author,
+        t => t.authorId,
+        u => u.id
+    ).schema;
 
     it('include belongsTo generates joinOne SQL', () => {
         const sql = query(knex, PostWithRelations).include('author').toQuery();
-        expect(sql).toContain('originalQuery');
+        expect(sql).toContain('to_jsonb');
         expect(sql).toContain('"users"');
         expect(sql).toContain('"author"');
     });
 
     it('include category belongsTo generates joinOne SQL', () => {
-        const PostWithCategory = Post.belongsTo('category', {
-            schema: Category,
-            foreignKey: (t: any) => t.categoryId
-        });
+        const PostWithCategory = defineEntity(
+            Post.addProp('category', Category.optional())
+        ).belongsTo(
+            t => t.category,
+            t => t.categoryId,
+            c => c.id
+        ).schema;
         const sql = query(knex, PostWithCategory).include('category').toQuery();
-        expect(sql).toContain('originalQuery');
+        expect(sql).toContain('to_jsonb');
         expect(sql).toContain('"categories"');
         expect(sql).toContain('"category"');
     });
 
     it('include throws for unknown relation', () => {
         expect(() =>
+            // @ts-expect-error runtime guard for an undeclared relation
             query(knex, PostWithRelations).include('nonexistent')
-        ).toThrow('Unknown relation "nonexistent"');
+        ).toThrow('Unknown relation: nonexistent');
     });
 
     it('hasMany include generates joinMany SQL', () => {
-        const UserWithPosts = User.hasMany('posts', {
-            schema: Post,
-            foreignKey: (t: any) => t.authorId
-        });
+        const UserWithPosts = defineEntity(
+            User.addProp('posts', array(Post).optional())
+        ).hasMany(
+            u => u.posts,
+            u => u.id,
+            p => p.authorId
+        ).schema;
 
         const sql = query(knex, UserWithPosts).include('posts').toQuery();
-        expect(sql).toContain('originalQuery');
+        expect(sql).toContain('to_jsonb');
         expect(sql).toContain('"posts"');
     });
 
     it('belongsToMany include generates pivot join SQL', () => {
-        const PostWithTags = Post.belongsToMany('tags', {
-            schema: Tag,
-            through: {
-                table: 'post_tags',
-                localKey: 'post_id',
-                foreignKey: 'tag_id'
-            }
-        });
+        const PostWithTags = defineEntity(
+            Post.addProp('tags', array(Tag).optional())
+        ).belongsToMany(p => p.tags, {
+            table: 'post_tags',
+            localKey: 'post_id',
+            foreignKey: 'tag_id'
+        }).schema;
 
         const sql = query(knex, PostWithTags).include('tags').toQuery();
         expect(sql).toContain('post_tags');
@@ -698,9 +710,9 @@ describe('soft delete', () => {
         expect(sql).toContain('"deleted_at" is not null');
     });
 
-    it('unscoped() removes soft delete filter', () => {
+    it('unscoped() preserves the independent soft delete filter', () => {
         const sql = query(knex, SoftPost).unscoped().toQuery();
-        expect(sql).not.toContain('deleted_at');
+        expect(sql).toContain('"deleted_at" is null');
     });
 
     it('delete() generates UPDATE for soft-delete schemas', () => {
@@ -807,7 +819,7 @@ describe('scopes', () => {
         expect(() =>
             // @ts-expect-error — 'nonexistent' is not a registered scope name
             query(knex, ScopedPost).scoped('nonexistent')
-        ).toThrow('Unknown scope "nonexistent"');
+        ).toThrow('Unknown scope: nonexistent');
     });
 
     it('scoped() type: only registered scope names are accepted', () => {
@@ -834,7 +846,7 @@ describe('scopes', () => {
 
     it('unscoped() bypasses default scope', () => {
         const sql = query(knex, ScopedPost).unscoped().toQuery();
-        expect(sql).not.toContain('is_active');
+        expect(sql).not.toContain('"is_active" = true');
     });
 });
 
@@ -912,7 +924,7 @@ describe('projections', () => {
         expect(() =>
             // @ts-expect-error — 'bogus' is not a registered projection name
             query(knex, PostSchema).projected('bogus')
-        ).toThrow('Unknown projection "bogus"');
+        ).toThrow('Unknown projection: bogus');
     });
 
     it('projected() type: only registered names are accepted', () => {
@@ -927,40 +939,46 @@ describe('projections', () => {
         void _check3;
     });
 
-    it('projected() after select() throws', () => {
-        expect(() =>
-            query(knex, PostSchema)
-                .select(t => t.id)
-                .projected('summary')
-        ).toThrow(/projected.*select|select.*projected/i);
-    });
-
-    it('select() after projected() throws', () => {
-        expect(() =>
-            query(knex, PostSchema)
-                .projected('summary')
-                .select(t => t.id)
-        ).toThrow(/select.*projected|projected.*select/i);
-    });
-
-    it('count() after projected() throws', () => {
-        expect(() =>
-            query(knex, PostSchema).projected('summary').count()
-        ).toThrow(/count.*projected|projected.*count/i);
-    });
-
-    it('projected() after count() throws', () => {
-        expect(() =>
-            query(knex, PostSchema).count().projected('summary')
-        ).toThrow(/projected.*aggregate|aggregate.*projected/i);
-    });
-
-    it('two projected() calls throw', () => {
-        expect(() =>
-            query(knex, PostSchema).projected('summary').projected('withStatus')
-        ).toThrow(
-            /Cannot call .projected\(\).*projected\(|Only one projection/i
-        );
+    it.each([
+        [
+            'selected to named',
+            (q: any) => q.select('id').projected('summary'),
+            ['id', 'title']
+        ],
+        [
+            'named to selected',
+            (q: any) => q.projected('summary').select('id'),
+            ['id']
+        ],
+        [
+            'named to aggregate',
+            (q: any) => q.projected('summary').count(),
+            ['count']
+        ],
+        [
+            'aggregate to named',
+            (q: any) => q.count().projected('summary'),
+            ['id', 'title']
+        ],
+        [
+            'named to named',
+            (q: any) => q.projected('summary').projected('withStatus'),
+            ['id', 'status']
+        ]
+    ])('replaces a projection: %s', (_name, configure, keys) => {
+        const root = query(knex, PostSchema);
+        const projected = configure(root);
+        expect(
+            Object.keys(projected.rowSchema.introspect().properties)
+        ).toEqual(keys);
+        expect(Object.keys(root.rowSchema.introspect().properties)).toEqual([
+            'id',
+            'title',
+            'body',
+            'status',
+            'isActive'
+        ]);
+        expect(projected).not.toBe(root);
     });
 
     it('projection() throws on duplicate name', () => {
@@ -1035,8 +1053,9 @@ describe('selectRaw', () => {
     it('selectRaw() adds raw SQL to select clause', () => {
         const sql = query(knex, Post)
             .selectRaw(
-                '*, ts_rank(search_vector, plainto_tsquery(?)) AS rank',
-                ['search term']
+                'ts_rank(search_vector, plainto_tsquery(?)) AS rank',
+                ['search term'],
+                { output: object({ rank: number() }) }
             )
             .toQuery();
         expect(sql).toContain('ts_rank');
@@ -1619,21 +1638,25 @@ describe('extension method chaining', () => {
 
 describe('Phase 2 query methods', () => {
     it('whereNotExists generates correct SQL', () => {
-        const sql = query(knex, User)
+        const root = query(knex, User);
+        const sql = root
             .whereNotExists(
                 knex
                     .queryBuilder()
                     .from('posts')
-                    .where('posts.author_id', knex.raw('users.id'))
+                    .where(
+                        'posts.author_id',
+                        root.ref(t => t.id)
+                    )
             )
             .toQuery();
-        expect(sql).toContain('where not exists');
+        expect(sql).toContain('not exists');
     });
 
     it('whereJsonPath generates jsonb_path_query_first SQL', () => {
         const DataSchema = object({
             id: number().primaryKey(),
-            meta: string().jsonb()
+            meta: object({ status: string() }).jsonb()
         }).hasTableName('data_items');
 
         const sql = query(knex, DataSchema)
@@ -1646,7 +1669,7 @@ describe('Phase 2 query methods', () => {
     it('whereJsonPath throws on non-pg client', () => {
         const DataSchema = object({
             id: number().primaryKey(),
-            meta: string().jsonb()
+            meta: object({ status: string() }).jsonb()
         }).hasTableName('data_items');
 
         // Create a separate pg knex instance and override the client config
@@ -1669,7 +1692,7 @@ describe('Phase 2 query methods', () => {
     it('whereJsonPath with @? operator generates existence check SQL', () => {
         const DataSchema = object({
             id: number().primaryKey(),
-            tags: string().jsonb()
+            tags: object({ tags: array(string()) }).jsonb()
         }).hasTableName('data_items');
 
         const sql = query(knex, DataSchema)
@@ -1751,16 +1774,16 @@ describe('Phase 2 query methods', () => {
         expect(typeof q.pluck).toBe('function');
     });
 
-    it('toQuery() result is memoized and invalidated by mutations', () => {
+    it('toQuery() is stable and configuration creates an independent branch', () => {
         const q = query(knex, User).where(t => t.name, 'Alice');
         const sql1 = q.toQuery();
         const sql2 = q.toQuery();
         // Same instance, same result — should be identical strings
         expect(sql1).toBe(sql2);
 
-        // Mutating invalidates the cache — new SQL includes the extra condition
-        q.where(t => t.role, 'admin');
-        const sql3 = q.toQuery();
+        const branch = q.where(t => t.role, 'admin');
+        const sql3 = branch.toQuery();
+        expect(q.toQuery()).toBe(sql1);
         expect(sql3).not.toBe(sql1);
         expect(sql3).toContain('admin');
     });
@@ -1832,19 +1855,19 @@ describe('nested object jsonb columns', () => {
             }).jsonb()
         }).hasTableName('people');
 
-        it('accessor t => t.address.city generates ->? SQL', () => {
+        it('accessor t => t.address.city generates typed JSON path SQL', () => {
             const sql = query(knex, PersonSchema)
                 .where(t => (t as any).address.city, '=', 'NYC')
                 .toQuery();
-            expect(sql).toContain('->');
+            expect(sql).toContain('#>>');
             expect(sql).toContain('city');
         });
 
-        it('dotted string path address.city generates ->? SQL', () => {
+        it('dotted string path address.city generates typed JSON path SQL', () => {
             const sql = query(knex, PersonSchema)
                 .where('address.city' as any, '=', 'NYC')
                 .toQuery();
-            expect(sql).toContain('->');
+            expect(sql).toContain('#>>');
             expect(sql).toContain('city');
         });
 
@@ -2091,9 +2114,10 @@ describe('withVariants (polymorphic schemas)', () => {
         it('documents the expected result shape via SQL analysis', () => {
             // Integration-style: verify the SELECT aliases are generated
             const sql = query(knex, FileSchema).toQuery();
-            // Each CTI column should appear as __v_image__<col>
-            expect(sql).toContain('__v_image');
-            expect(sql).toContain('__v_document');
+            // Branch shapes stay separate inside the union's JSON envelope.
+            expect(sql).toContain('to_jsonb(__read_branch)');
+            expect(sql).toContain('image_file');
+            expect(sql).toContain('document_file');
         });
     });
 
@@ -2188,23 +2212,23 @@ describe('withVariants — per-variant relations', () => {
     // SQL generation — includeVariant
     // -------------------------------------------------------------------------
 
-    it('includeVariant generates LEFT JOIN with namespaced alias', () => {
+    it('includeVariant generates a CTI body join and a correlated relation', () => {
         const sql = query(knex, AssetSchema)
             .includeVariant('licensed', 'owner')
             .toQuery();
 
         expect(sql.toLowerCase()).toContain('left join');
         expect(sql.toLowerCase()).toContain('owners');
-        expect(sql).toContain('__v_licensed__rel_owner');
+        expect(sql).toContain('as "owner"');
     });
 
-    it('includeVariant selects foreign columns with prefix', () => {
+    it('includeVariant aliases foreign properties inside a nested object', () => {
         const sql = query(knex, AssetSchema)
             .includeVariant('licensed', 'owner')
             .toQuery();
 
-        expect(sql).toContain('__v_licensed__rel_owner__id');
-        expect(sql).toContain('__v_licensed__rel_owner__email');
+        expect(sql).toContain('"id" as "id"');
+        expect(sql).toContain('"email" as "email"');
     });
 
     it('includeVariant with projection selects only projected columns', () => {
@@ -2233,9 +2257,9 @@ describe('withVariants — per-variant relations', () => {
             )
             .toQuery();
 
-        expect(sql).toContain('__v_licensed__rel_owner__id');
-        expect(sql).toContain('__v_licensed__rel_owner__email');
-        expect(sql).not.toContain('__v_licensed__rel_owner__name');
+        expect(sql).toContain('"id" as "id"');
+        expect(sql).toContain('"email" as "email"');
+        expect(sql).not.toContain('"name" as "name"');
     });
 
     // -------------------------------------------------------------------------
@@ -2243,13 +2267,15 @@ describe('withVariants — per-variant relations', () => {
     // -------------------------------------------------------------------------
 
     it('include() auto-routes to includeVariant when relation is unambiguous', () => {
-        const sql = query(knex, AssetSchema).include('owner').toQuery();
-        expect(sql).toContain('__v_licensed__rel_owner');
+        const sql = (query(knex, AssetSchema) as any)
+            .include('owner')
+            .toQuery();
+        expect(sql).toContain('as "owner"');
     });
 
     it('include() throws for truly unknown relations on polymorphic schema', () => {
         expect(() => {
-            query(knex, AssetSchema).include('nonexistent').toQuery();
+            (query(knex, AssetSchema) as any).include('nonexistent').toQuery();
         }).toThrow(/Unknown relation/);
     });
 
@@ -2280,7 +2306,7 @@ describe('withVariants — per-variant relations', () => {
             }).schema;
 
         expect(() => {
-            query(knex, AmbigSchema).include('owner').toQuery();
+            (query(knex, AmbigSchema) as any).include('owner').toQuery();
         }).toThrow(/[Aa]mbiguous/);
     });
 
@@ -2291,39 +2317,40 @@ describe('withVariants — per-variant relations', () => {
     it('includeVariant throws for non-polymorphic schema', () => {
         const Plain = object({ id: number().primaryKey() }).hasTableName('t');
         expect(() => {
+            // @ts-expect-error non-polymorphic queries do not expose variant operations
             query(knex, Plain).includeVariant('x', 'y');
-        }).toThrow(/not polymorphic/);
+        }).toThrow(/includeVariant is not a function/);
     });
 
     it('includeVariant throws for unknown variant key', () => {
         expect(() => {
+            // @ts-expect-error runtime guard for an unknown variant
             query(knex, AssetSchema).includeVariant('unknown_variant', 'owner');
-        }).toThrow(/unknown variant key/);
+        }).toThrow(/Unknown variant/);
     });
 
     it('includeVariant throws for unknown relation name', () => {
         expect(() => {
             query(knex, AssetSchema).includeVariant('licensed', 'nonexistent');
-        }).toThrow(/unknown relation/);
+        }).toThrow(/Unknown relation/);
     });
 
     // -------------------------------------------------------------------------
     // Row mapping — Pass 3 (observable via SQL + alias presence)
     // -------------------------------------------------------------------------
 
-    it('includeVariant generates relation column aliases in SQL (Pass 3 input)', () => {
-        // Verify all 3 Owner columns are aliased into the query result so that
-        // Pass 3 of #mapPolymorphicRow can read them.
+    it('includeVariant includes every related property inside its JSON object', () => {
+        // All three Owner properties are selected inside the related JSON object.
         const sql = query(knex, AssetSchema)
             .includeVariant('licensed', 'owner')
             .toQuery();
 
-        expect(sql).toContain('__v_licensed__rel_owner__id');
-        expect(sql).toContain('__v_licensed__rel_owner__email');
-        expect(sql).toContain('__v_licensed__rel_owner__name');
+        expect(sql).toContain('"id" as "id"');
+        expect(sql).toContain('"email" as "email"');
+        expect(sql).toContain('"name" as "name"');
     });
 
-    it('STI variant with includeVariant generates correct ON discriminator gate', () => {
+    it('STI relation is confined to the matching discriminator branch', () => {
         // STI variant: no separate table alias, gate uses base table discriminator
         const StiSchema = defineEntity(AssetBase)
             .discriminator('kind')
@@ -2344,7 +2371,7 @@ describe('withVariants — per-variant relations', () => {
 
         // Should join owners and gate ON discriminator = 'free'
         expect(sql.toLowerCase()).toContain('owners');
-        expect(sql).toContain('__v_free__rel_owner');
+        expect(sql).toContain('as "owner"');
         expect(sql).toContain('free');
     });
 });
@@ -2358,7 +2385,7 @@ describe('joinOne / joinMany validation errors', () => {
                 foreignColumn: (t: any) => t.authorId,
                 as: '' as any
             })
-        ).toThrow('as must be a non-empty string');
+        ).toThrow(/non-empty/);
     });
 
     it('joinMany throws when as is missing', () => {
@@ -2369,7 +2396,7 @@ describe('joinOne / joinMany validation errors', () => {
                 foreignColumn: (t: any) => t.authorId,
                 as: '' as any
             })
-        ).toThrow('as must be a non-empty string');
+        ).toThrow(/non-empty/);
     });
 
     it('joinOne throws when mappers is not an object', () => {
@@ -2379,8 +2406,9 @@ describe('joinOne / joinMany validation errors', () => {
                 localColumn: (t: any) => t.id,
                 foreignColumn: (t: any) => t.authorId,
                 as: 'posts',
+                // @ts-expect-error removed raw mapper escape cannot supply a row schema
                 mappers: 'invalid' as any
             })
-        ).toThrow('mappers must be an object');
+        ).toThrow(/typed child customizer/);
     });
 });

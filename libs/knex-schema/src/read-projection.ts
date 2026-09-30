@@ -25,7 +25,10 @@ export type ReadField = {
 export function compileReadProjection(
     knex: Knex,
     selection: Record<string, AliasedColumn<any> | AggregateExpression<any>>,
-    resolve: (column: AliasedColumn<any>) => { name: string; node: ReadNode }
+    resolve: (column: AliasedColumn<any>) => {
+        name: string | Knex.Raw;
+        node: ReadNode;
+    }
 ): Record<string, ReadField> {
     if (!Object.keys(selection).length)
         throw new ReadSchemaError('A non-empty projection is required');

@@ -1,11 +1,12 @@
 // @cleverbrush/knex-schema — DELETE / soft-delete / restore operations
 
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
+import { returningReadColumns } from '../read-schema.js';
 import { getSoftDelete, invalidateCache, mapRow } from './helpers.js';
 import { getState } from './state.js';
 
 export async function deleteImpl(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): Promise<number> {
     const state = getState(builder);
 
@@ -14,7 +15,7 @@ export async function deleteImpl(
             | Function[]
             | undefined) ?? [];
     for (const hook of hooks) {
-        await hook(builder);
+        await hook(state.hookQuery ?? builder);
     }
 
     const softDelete = getSoftDelete(builder);
@@ -26,14 +27,14 @@ export async function deleteImpl(
     return state.baseQuery.delete();
 }
 
-export function withDeletedImpl(builder: SchemaQueryBuilder<any, any>): any {
+export function withDeletedImpl(builder: QuerySource<any, any>): any {
     const state = getState(builder);
     invalidateCache(builder);
     state.includeDeleted = true;
     return builder;
 }
 
-export function onlyDeletedImpl(builder: SchemaQueryBuilder<any, any>): any {
+export function onlyDeletedImpl(builder: QuerySource<any, any>): any {
     const state = getState(builder);
     invalidateCache(builder);
     state.onlyDeleted = true;
@@ -42,7 +43,7 @@ export function onlyDeletedImpl(builder: SchemaQueryBuilder<any, any>): any {
 }
 
 export async function hardDeleteImpl(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): Promise<number> {
     const state = getState(builder);
     const hooks =
@@ -50,13 +51,13 @@ export async function hardDeleteImpl(
             | Function[]
             | undefined) ?? [];
     for (const hook of hooks) {
-        await hook(builder);
+        await hook(state.hookQuery ?? builder);
     }
     return state.baseQuery.delete();
 }
 
 export async function restoreImpl(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): Promise<any[]> {
     const state = getState(builder);
     const softDelete = getSoftDelete(builder);
@@ -67,6 +68,6 @@ export async function restoreImpl(
     }
     const rows = await state.baseQuery
         .update({ [softDelete.column]: null })
-        .returning('*');
+        .returning(returningReadColumns(state.knex, state.localSchema));
     return rows.map((row: any) => mapRow(builder, row));
 }

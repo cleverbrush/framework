@@ -3,7 +3,7 @@
 import type { Knex } from 'knex';
 import { resolveColumnRef } from '../columns.js';
 import { getTableName } from '../extension.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type {
     JoinManySpec,
     JoinOneSpec,
@@ -17,7 +17,7 @@ import {
 } from '../validate.js';
 import {
     findPrimaryKeyColumn,
-    getSchemaQueryBuilderCtor,
+    getQuerySourceCtor,
     getVariantConfig,
     invalidateCache,
     resolveSchema
@@ -25,7 +25,7 @@ import {
 import { getState } from './state.js';
 
 export function joinOneImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     spec: JoinOneSpec<any, any, any, any>
 ): any {
     const state = getState(builder);
@@ -37,7 +37,7 @@ export function joinOneImpl(
 }
 
 export function joinManyImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     spec: JoinManySpec<any, any, any>
 ): any {
     const state = getState(builder);
@@ -49,9 +49,9 @@ export function joinManyImpl(
 }
 
 export function includeImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     relationName: string,
-    customize?: (q: SchemaQueryBuilder<any, any>) => void
+    customize?: (q: QuerySource<any, any>) => void
 ): any {
     const state = getState(builder);
     invalidateCache(builder);
@@ -110,7 +110,7 @@ export function includeImpl(
             const foreignQuery1: Knex.QueryBuilder =
                 state.knex(foreignTableName);
             if (customize) {
-                const SQB = getSchemaQueryBuilderCtor();
+                const SQB = getQuerySourceCtor();
                 const proxy = new SQB(state.knex, foreignSchema, foreignQuery1);
                 customize(proxy);
             }
@@ -138,7 +138,7 @@ export function includeImpl(
             const foreignQuery2: Knex.QueryBuilder =
                 state.knex(foreignTableName);
             if (customize) {
-                const SQB = getSchemaQueryBuilderCtor();
+                const SQB = getQuerySourceCtor();
                 const proxy = new SQB(state.knex, foreignSchema, foreignQuery2);
                 customize(proxy);
             }
@@ -167,7 +167,7 @@ export function includeImpl(
             const foreignQuery3: Knex.QueryBuilder =
                 state.knex(foreignTableName);
             if (customize) {
-                const SQB = getSchemaQueryBuilderCtor();
+                const SQB = getQuerySourceCtor();
                 const proxy = new SQB(state.knex, foreignSchema, foreignQuery3);
                 customize(proxy);
             }
@@ -201,7 +201,7 @@ export function includeImpl(
                 );
 
             if (customize) {
-                const SQB = getSchemaQueryBuilderCtor();
+                const SQB = getQuerySourceCtor();
                 const proxy = new SQB(state.knex, foreignSchema, foreignQuery);
                 customize(proxy);
             }
@@ -221,10 +221,10 @@ export function includeImpl(
 }
 
 export function includeVariantImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     variantKey: string,
     relationName: string,
-    customize?: (q: SchemaQueryBuilder<any, any>) => void
+    customize?: (q: QuerySource<any, any>) => void
 ): any {
     const state = getState(builder);
     invalidateCache(builder);

@@ -76,12 +76,14 @@ describe('SchemaQueryBuilder.select(selector) — DTO projection', () => {
             query(knex, User).select(_t => ({
                 bogus: 'not-a-descriptor' as any
             }))
-        ).toThrow(/property descriptor/);
+        ).toThrow(/does not belong/);
     });
 
     it('still supports the existing column-list overload', () => {
         const sql = query(knex, User).select('id', 'name').toQuery();
-        expect(sql).toContain('select "id", "name"');
+        expect(sql).toMatch(
+            /select "__schema_read_\d+"\."id" as "id", "__schema_read_\d+"\."name" as "name"/
+        );
     });
 });
 

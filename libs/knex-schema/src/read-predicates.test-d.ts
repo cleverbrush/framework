@@ -14,9 +14,10 @@ const Item = object({
 }).hasTableName('items');
 
 test('ordinary reader predicates retain projection types and contextual groups', async () => {
-    const read = query(knex, Item)
-        .withRowSchema()
-        .select(t => ({ name: t.name, amount: t.amount }));
+    const read = query(knex, Item).select(t => ({
+        name: t.name,
+        amount: t.amount
+    }));
     const filtered = read
         .where(p => p.where(t => t.id, 1).orWhere(t => t.name, 'two'))
         .whereIn(t => t.id, knex('links').select('item_id'))
@@ -54,6 +55,7 @@ test('ordinary reader predicates retain projection types and contextual groups',
         p.execute();
         // @ts-expect-error group lifecycle is owned by the reader
         p.finish();
+        return p;
     });
     // @ts-expect-error unrestricted mutation is still unavailable
     read.apply(q => q.select('*'));
@@ -61,7 +63,7 @@ test('ordinary reader predicates retain projection types and contextual groups',
 
 test('aliased selectors preserve joined nullability and exact storage types', async () => {
     const read = query(knex, alias(Item, 'item'))
-        .withRowSchema()
+
         .leftJoin(alias(Item, 'parent'), t => eq(t.item.id, t.parent.id))
         .select(t => ({
             id: t.item.id,

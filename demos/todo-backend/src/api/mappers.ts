@@ -7,7 +7,6 @@ import type { TodoActivityResponse } from './schemas.js';
 const UserRowSchema = object({
     id: number(),
     email: string(),
-    passwordHash: string().optional(),
     role: string(),
     authProvider: string(),
     createdAt: date()
@@ -16,13 +15,13 @@ const UserRowSchema = object({
 const TodoRowSchema = object({
     id: number(),
     title: string(),
-    description: string().optional(),
+    description: string().nullable(),
     completed: boolean(),
     userId: number(),
     createdAt: date(),
     updatedAt: date(),
-    attachmentName: string().optional(),
-    attachmentMimeType: string().optional()
+    attachmentName: string().nullable(),
+    attachmentMimeType: string().nullable()
 });
 
 export const mappingRegistry = mapper()
@@ -33,6 +32,10 @@ export const mappingRegistry = mapper()
         m
             .for(t => t.description)
             .compute(f => f.description ?? undefined)
+            .for(t => t.attachmentName)
+            .compute(f => f.attachmentName ?? undefined)
+            .for(t => t.attachmentMimeType)
+            .compute(f => f.attachmentMimeType ?? undefined)
             .for(t => t.attachmentSize)
             .ignore()
     );
@@ -40,7 +43,7 @@ export const mappingRegistry = mapper()
 const _mapUserFn = mappingRegistry.getMapper(UserRowSchema, UserResponseSchema);
 const _mapTodoFn = mappingRegistry.getMapper(TodoRowSchema, TodoResponseSchema);
 
-export const mapUser = (row: UserDb) => _mapUserFn(row);
+export const mapUser = (row: Omit<UserDb, 'passwordHash'>) => _mapUserFn(row);
 export const mapTodo = (row: TodoDb) => _mapTodoFn(row);
 
 export function mapTodoActivity(row: ActivityDb & Record<string, unknown>): TodoActivityResponse {

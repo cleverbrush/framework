@@ -17,7 +17,7 @@ const Task = object({
     completedAt: date().optional().hasColumnName('completed_at')
 }).hasTableName('tasks');
 const knex = Knex({ client: 'pg' });
-const readTask = () => query(knex, Task).withRowSchema();
+const readTask = () => query(knex, Task);
 
 describe('shape-preserving read predicates', () => {
     it('groups AND/OR conditions without mutating the source or its schema', () => {
@@ -181,12 +181,12 @@ describe('shape-preserving read predicates', () => {
         expect(compiled.toNative().sql).toContain('::jsonb ?');
     });
 
-    it('runs group callbacks once and seals retained group builders', () => {
+    it('runs group callbacks once and isolates retained immutable builders', () => {
         const read = readTask();
         let retained!: ReadPredicateBuilder<any>;
         const callback = vi.fn((p: ReadPredicateBuilder<any>) => {
             retained = p;
-            p.where(t => t.id, 1);
+            const configured = p.where(t => t.id, 1);
             for (const method of [
                 'select',
                 'join',
@@ -198,14 +198,16 @@ describe('shape-preserving read predicates', () => {
                 'then'
             ])
                 expect(method in p).toBe(false);
+            return configured;
         });
         const filtered = read.where(callback);
         filtered.toQuery();
         filtered.toQuery();
         expect(callback).toHaveBeenCalledTimes(1);
-        expect(() => retained.where(t => t.id, 2)).toThrow(/already closed/);
+        expect(retained.where(t => t.id, 2)).not.toBe(retained);
+        expect(filtered.toQuery()).not.toContain('= 2');
         expect(filtered.toQuery()).toContain('= 1');
-        expect(read.where(() => {}).toQuery()).toBe(read.toQuery());
+        expect(read.where(p => p).toQuery()).toBe(read.toQuery());
     });
 
     it('rejects async or throwing groups without changing their parent', async () => {
@@ -244,11 +246,10 @@ describe('shape-preserving read predicates', () => {
     });
 
     it('applies the same predicates and binding snapshots to aliased joins', () => {
-        const base = query(knex, alias(Task, 'task'))
-            .withRowSchema()
-            .leftJoin(alias(Task, 'other'), t =>
-                eq(t.task.id, t.other.projectId)
-            );
+        const base = query(knex, alias(Task, 'task')).leftJoin(
+            alias(Task, 'other'),
+            t => eq(t.task.id, t.other.projectId)
+        );
         const source = base.select(t => ({
             id: t.task.id,
             otherId: t.other.id,
@@ -283,11 +284,11 @@ describe('shape-preserving read predicates', () => {
                 .valid
         ).toBe(true);
         expect(source.toQuery()).not.toContain(' where ');
-        expect('apply' in source).toBe(false);
+        expect('apply' in source).toBe(true);
         expect(() =>
             query(knex, alias(Task, 'task'))
+                // @ts-expect-error opaque SQL requires its output contract
                 .apply(q => q.where('id', 1))
-                .withRowSchema()
-        ).toThrow(/before select\/apply/);
+        ).toThrow(/output/);
     });
 });

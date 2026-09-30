@@ -138,7 +138,7 @@ afterAll(async () => {
 describe('schema-aware polymorphic graphs', () => {
     it('allows schema-preserving predicates inside an explicit variant branch', async () => {
         const read = db.assets
-            .withRowSchema()
+
             .selectVariants(['photo'])
             .forVariant('photo', photo =>
                 photo
@@ -155,7 +155,7 @@ describe('schema-aware polymorphic graphs', () => {
     });
     it('orders using native values even when branch projections omit sort fields', async () => {
         const read = db.assets
-            .withRowSchema()
+
             .forVariant('photo', q =>
                 q.select(a => ({ id: a.id, kind: a.kind }))
             )
@@ -171,14 +171,12 @@ describe('schema-aware polymorphic graphs', () => {
             { id: 1, kind: 'photo' }
         ]);
         expect(() =>
-            db.assets
-                .withRowSchema()
-                .forVariant('text', q => q.select(a => ({ id: a.id })))
+            db.assets.forVariant('text', q => q.select(a => ({ id: a.id })))
         ).toThrow(/retain.*discriminator/);
     });
     it('exposes exact branch schemas, dates and numeric ordering in one statement', async () => {
         const read = db.assets
-            .withRowSchema()
+
             .forVariant('photo', q =>
                 q.include(
                     r => r.labels,
@@ -221,7 +219,7 @@ describe('schema-aware polymorphic graphs', () => {
 
     it('decodes nested polymorphic relations and empty arrays without hidden fetches', async () => {
         const read = db.albums
-            .withRowSchema()
+
             .include(
                 r => r.assets,
                 assets =>
@@ -259,25 +257,20 @@ describe('schema-aware polymorphic graphs', () => {
         ]);
         try {
             await expect(
-                db.assets
-                    .withRowSchema()
-                    .where(a => a.id, 3)
-                    .execute()
+                db.assets.where(a => a.id, 3).execute()
             ).rejects.toThrow('unknown polymorphic discriminator');
             await expect(
-                db.assets
-                    .withRowSchema()
-                    .where(a => a.id, 4)
-                    .execute()
+                db.assets.where(a => a.id, 4).execute()
             ).rejects.toThrow('missing CTI variant body');
             const tolerant = defineEntity(Asset.schema)
                 .discriminator(a => a.kind)
                 .ctiVariant('photo', Photo, p => p.assetId, {
                     allowOrphan: true
                 });
-            const reader = createDb(knex, { assets: tolerant })
-                .assets.withRowSchema()
-                .where(a => a.id, 4);
+            const reader = createDb(knex, { assets: tolerant }).assets.where(
+                a => a.id,
+                4
+            );
             const orphan = await reader.first();
             expect(orphan).toMatchObject({
                 id: 4,
