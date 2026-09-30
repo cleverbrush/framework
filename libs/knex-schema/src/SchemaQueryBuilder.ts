@@ -129,6 +129,7 @@ import {
     whereNullImpl,
     whereRawImpl
 } from './operations/where.js';
+import { type SchemaAwareQuery, schemaReadQuery } from './SchemaReadQuery.js';
 
 // ---------------------------------------------------------------------------
 // Type-level helpers
@@ -175,6 +176,14 @@ export class SchemaQueryBuilder<
     TLocalSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TResult
 > {
+    /**
+     * Enter immutable, detached schema-aware read mode before selecting/loading fields.
+     * Row metadata never runs SQL; existing query behavior remains unchanged.
+     * @throws ReadSchemaError if result-shaping operations were already applied.
+     */
+    withRowSchema(): SchemaAwareQuery<TLocalSchema> {
+        return schemaReadQuery(this);
+    }
     /**
      * Create a query over the schema's configured table.
      * @param knex - Database connection or transaction used to execute the query.
@@ -1259,6 +1268,7 @@ export class SchemaQueryBuilder<
      */
     apply(fn: (builder: Knex.QueryBuilder) => void): this {
         const state = getState(this);
+        state.opaqueReadShape = true;
         invalidateCache(this);
         fn(state.baseQuery);
         return this;
@@ -1301,6 +1311,7 @@ export class SchemaQueryBuilder<
         builderState.includeDeleted = state.includeDeleted;
         builderState.onlyDeleted = state.onlyDeleted;
         builderState.skipDefaultScope = state.skipDefaultScope;
+        builderState.opaqueReadShape = state.opaqueReadShape;
         builderState.variantConfig = state.variantConfig;
         builderState.enabledVariants =
             state.enabledVariants !== null

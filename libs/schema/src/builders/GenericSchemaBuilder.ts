@@ -113,6 +113,17 @@ export class GenericSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'generic',
+        TFn,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
+
     #templateFn?: (...args: any[]) => SchemaBuilder<any, any, any, any, any>;
     #defaults?: readonly any[];
     #cachedDefaultSchema?: SchemaBuilder<any, any, any, any, any>;

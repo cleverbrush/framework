@@ -73,6 +73,17 @@ export class PromiseSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'promise',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResolvedTypeSchema,
+        TResult
+    ];
+
     #resolvedType?: SchemaBuilder<any, any, any, any, any>;
 
     /**

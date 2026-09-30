@@ -87,13 +87,21 @@ export type {
     CleanExtended,
     ExtensionConfig,
     ExtensionDescriptor,
+    ExtraProperties,
     ExtraTypeBrandSymbol,
     FixedMethods,
     HiddenExtensionMethods,
+    InferExtensionMetadata,
+    MetadataExtended,
+    MetadataMethod,
+    MetadataMethodBuilder,
+    MetadataMethods,
+    MetadataState,
     MethodLiteralBrandSymbol
 } from './extension.js';
 export {
     defineExtension,
+    defineMetadataMethod,
     EXTRA_TYPE_BRAND,
     METHOD_LITERAL_BRAND,
     withExtensions

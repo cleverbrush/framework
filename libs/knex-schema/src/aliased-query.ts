@@ -1,6 +1,8 @@
 import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
+import { AliasedReadQuery } from './AliasedReadQuery.js';
 import { buildColumnMap } from './columns.js';
+import type { SchemaProps } from './entity.js';
 import {
     type AggregateExpression,
     type AliasedColumn,
@@ -66,7 +68,9 @@ type Columns<S extends TableSchema, Nullable extends boolean = false> = {
     [K in keyof InferType<S>]-?: AliasedColumn<
         | Exclude<InferType<S>[K], undefined>
         | (undefined extends InferType<S>[K] ? null : never)
-        | (Nullable extends true ? null : never)
+        | (Nullable extends true ? null : never),
+        K extends keyof SchemaProps<S> ? SchemaProps<S>[K] : never,
+        Nullable
     >;
 };
 
@@ -137,6 +141,35 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
     private tables = new Map<string, TableSchema>();
     private selected = false;
     private decoders: Record<string, (value: unknown) => unknown> = {};
+    private nullableTables = new Set<string>();
+    private opaqueReadShape = false;
+
+    /** Enter immutable read mode before select/raw changes; an explicit projection is required. */
+    withRowSchema(): AliasedReadQuery<TTables> {
+        if (this.selected || this.opaqueReadShape)
+            throw new Error(
+                'Call withRowSchema() before select/apply operations'
+            );
+        return new AliasedReadQuery(this.cloneReadSource());
+    }
+
+    /** @internal Snapshot the SQL planner without sharing mutable query state. */
+    cloneReadSource(): AliasedQueryBuilder<TTables, TResult> {
+        const copy = Object.assign(
+            Object.create(Object.getPrototypeOf(this)),
+            this
+        );
+        copy.sql = this.sql.clone();
+        copy.tables = new Map(this.tables);
+        copy.nullableTables = new Set(this.nullableTables);
+        copy.decoders = { ...this.decoders };
+        return copy;
+    }
+
+    /** @internal Schema-backed state used by the immutable opt-in adapter. */
+    readContext(): { knex: Knex; sql: Knex.QueryBuilder; columns: TTables } {
+        return { knex: this.knex, sql: this.sql.clone(), columns: this.tree() };
+    }
 
     /**
      * Create a read-only query for one aliased schema.
@@ -172,7 +205,9 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
                                 [COLUMN]: {
                                     alias: name,
                                     column,
-                                    schema: properties[key]
+                                    schema: this.nullableTables.has(name)
+                                        ? properties[key].nullable()
+                                        : properties[key]
                                 }
                             }
                         ])
@@ -248,11 +283,13 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
         if (this.tables.has(table.name))
             throw new Error(`Duplicate table alias: ${table.name}`);
         this.tables.set(table.name, table.schema);
+        if (left) this.nullableTables.add(table.name);
         try {
             const predicate = this.predicate(on(this.tree()));
             this.sql[left ? 'leftJoin' : 'join'](this.source(table), predicate);
         } catch (error) {
             this.tables.delete(table.name);
+            this.nullableTables.delete(table.name);
             throw error;
         }
     }
@@ -421,6 +458,7 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
 
     /** Raw escape hatch; callers own any effects on result shape or cardinality. */
     apply(callback: (query: Knex.QueryBuilder) => void): this {
+        this.opaqueReadShape = true;
         callback(this.sql);
         return this;
     }
@@ -439,6 +477,8 @@ export class AliasedQueryBuilder<TTables, TResult = never> {
         copy.tables = new Map(this.tables);
         copy.selected = this.selected;
         copy.decoders = { ...this.decoders };
+        copy.nullableTables = new Set(this.nullableTables);
+        copy.opaqueReadShape = this.opaqueReadShape;
         return copy;
     }
 

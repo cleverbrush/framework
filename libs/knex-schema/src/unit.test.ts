@@ -104,12 +104,12 @@ describe('schema extension', () => {
 
     it('hasColumnName survives .optional() chaining', () => {
         const schema = string().hasColumnName('col_name').optional();
-        expect(schema.getExtension('columnName')).toBe('col_name');
+        expect(schema.introspect().extensions.columnName).toBe('col_name');
     });
 
     it('hasColumnName survives .required() chaining', () => {
         const schema = number().hasColumnName('col_a').optional().required();
-        expect(schema.getExtension('columnName')).toBe('col_a');
+        expect(schema.introspect().extensions.columnName).toBe('col_a');
     });
 
     it('hasTableName survives .optional()/.required() chaining', () => {
@@ -117,7 +117,7 @@ describe('schema extension', () => {
             .hasTableName('my_table')
             .optional()
             .required();
-        expect(schema.getExtension('tableName')).toBe('my_table');
+        expect(schema.introspect().extensions.tableName).toBe('my_table');
     });
 });
 

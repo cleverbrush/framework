@@ -1,4 +1,7 @@
-export type { SchemaToSchemaMapperResult } from './MappingRegistry.js';
+export type {
+    SchemaToSchemaMapperResult,
+    SyncSchemaToSchemaMapperResult
+} from './MappingRegistry.js';
 export {
     Mapper,
     MapperConfigurationError,

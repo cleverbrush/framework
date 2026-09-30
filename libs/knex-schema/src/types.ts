@@ -536,6 +536,11 @@ export interface RelationSpec {
     name: string;
     schema: any;
     foreignKey?: any;
+    /** Explicit schema property names retained for opt-in read correlation. */
+    localKey?: string;
+    remoteKey?: string;
+    /** Nullable belongs-to relations do not filter out their parent rows. */
+    optional?: boolean;
     through?: { table: string; localKey: string; foreignKey: string };
 }
 

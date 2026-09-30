@@ -36,7 +36,7 @@ export const COLUMN = Symbol('query-column');
 export const EXPRESSION = Symbol('query-expression');
 
 /** A schema-backed SQL column belonging to one explicit table alias. */
-export interface AliasedColumn<T> {
+export interface AliasedColumn<T, S = any, Nullable extends boolean = boolean> {
     readonly [COLUMN]: {
         alias: string;
         column: string;
@@ -46,6 +46,10 @@ export interface AliasedColumn<T> {
      * Type-only marker carrying column nullability and value type; not a runtime row value.
      */
     readonly __value?: T;
+    /** Type-only original schema used by opt-in projection metadata. */
+    readonly __readSource?: S;
+    /** Type-only join nullability, independent of the stored column schema. */
+    readonly __leftJoined?: Nullable;
 }
 
 export type SelectableColumn =

@@ -63,6 +63,15 @@ export class NumberSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'number',
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault
+    ];
+
     #min?: number;
     #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
         NumberSchemaBuilder<TResult, TRequired>

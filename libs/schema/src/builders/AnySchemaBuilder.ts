@@ -41,6 +41,16 @@ export class AnySchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'any',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
+
     /**
      * @hidden
      */

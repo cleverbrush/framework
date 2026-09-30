@@ -260,7 +260,16 @@ export class ServiceCollection {
      */
     public addSingletonFromSchema<
         TTargetSchema extends SchemaBuilder<any, any, any, any, any>,
-        TFuncSchema extends FunctionSchemaBuilder<any, any, any, any, any, any>
+        TFuncSchema extends FunctionSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
     >(
         targetSchema: TTargetSchema,
         funcSchema: TFuncSchema,
@@ -295,7 +304,16 @@ export class ServiceCollection {
      */
     public addScopedFromSchema<
         TTargetSchema extends SchemaBuilder<any, any, any, any, any>,
-        TFuncSchema extends FunctionSchemaBuilder<any, any, any, any, any, any>
+        TFuncSchema extends FunctionSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
     >(
         targetSchema: TTargetSchema,
         funcSchema: TFuncSchema,
@@ -330,7 +348,16 @@ export class ServiceCollection {
      */
     public addTransientFromSchema<
         TTargetSchema extends SchemaBuilder<any, any, any, any, any>,
-        TFuncSchema extends FunctionSchemaBuilder<any, any, any, any, any, any>
+        TFuncSchema extends FunctionSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
     >(
         targetSchema: TTargetSchema,
         funcSchema: TFuncSchema,
@@ -416,7 +443,16 @@ export class ServiceCollection {
 
     #addFromSchema<
         TTargetSchema extends SchemaBuilder<any, any, any, any, any>,
-        TFuncSchema extends FunctionSchemaBuilder<any, any, any, any, any, any>
+        TFuncSchema extends FunctionSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
     >(
         targetSchema: TTargetSchema,
         funcSchema: TFuncSchema,
@@ -451,7 +487,7 @@ export class ServiceCollection {
  * Used internally to type-check `addSingletonFromSchema`-style registrations.
  */
 type FuncSchemaParameters<
-    T extends FunctionSchemaBuilder<any, any, any, any, any, any>
+    T extends FunctionSchemaBuilder<any, any, any, any, any, any, any, any>
 > =
     T extends FunctionSchemaBuilder<
         any,
@@ -459,7 +495,9 @@ type FuncSchemaParameters<
         any,
         any,
         any,
-        infer TParams extends SchemaBuilder<any, any, any, any, any>[]
+        infer TParams extends SchemaBuilder<any, any, any, any, any>[],
+        any,
+        any
     >
         ? { [K in keyof TParams]: InferType<TParams[K]> }
         : never;

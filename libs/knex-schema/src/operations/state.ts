@@ -10,6 +10,8 @@ import type {
 } from '../types.js';
 
 export interface QueryBuilderState {
+    /** Raw callbacks have no statically declared result shape for opt-in reads. */
+    opaqueReadShape?: boolean;
     knex: Knex;
     baseQuery: Knex.QueryBuilder;
     localSchema: ObjectSchemaBuilder<any, any, any, any, any, any, any>;

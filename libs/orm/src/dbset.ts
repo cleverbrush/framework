@@ -15,7 +15,8 @@ import type {
     Entity,
     EntityRelations,
     EntitySchema,
-    PrimaryKeyValueOf
+    PrimaryKeyValueOf,
+    SchemaAwareQuery
 } from '@cleverbrush/knex-schema';
 import {
     getPrimaryKeyColumns,
@@ -46,7 +47,9 @@ import {
     updateVariant as _updateVariant
 } from './variant-write.js';
 
-const scalarAggregateMethods = new Set<PropertyKey>([
+// These methods return scalars or detached read plans, not tracked entity rows.
+const untrackedResultMethods = new Set<PropertyKey>([
+    'withRowSchema',
     'countValue',
     'countDistinctValue',
     'sumValue',
@@ -73,8 +76,13 @@ const scalarAggregateMethods = new Set<PropertyKey>([
 export interface EntityQuery<TEntity extends Entity<any, any, any>, TResult>
     extends Omit<
         SchemaQueryBuilder<EntitySchema<TEntity>, TResult>,
-        'include' | 'includeVariant'
+        'include' | 'includeVariant' | 'withRowSchema'
     > {
+    /**
+     * Start an immutable detached read model with inferred runtime row schemas.
+     * Enable before select/include operations; results never attach to tracking.
+     */
+    withRowSchema(): SchemaAwareQuery<EntitySchema<TEntity>>;
     /**
      * Eager-load a relation declared on `TEntity` via `.hasOne()` /
      * `.hasMany()` / `.belongsTo()` / `.belongsToMany()`. Selector returns
@@ -465,7 +473,7 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                     if (
                         onResults != null &&
                         sqb.returnsEntityRows &&
-                        !scalarAggregateMethods.has(prop) &&
+                        !untrackedResultMethods.has(prop) &&
                         result != null &&
                         typeof (result as any).then === 'function'
                     ) {
@@ -960,7 +968,7 @@ function wrapVariantQuery<
                     if (
                         onResults != null &&
                         sqb.returnsEntityRows &&
-                        !scalarAggregateMethods.has(prop) &&
+                        !untrackedResultMethods.has(prop) &&
                         result != null &&
                         typeof (result as any).then === 'function'
                     ) {

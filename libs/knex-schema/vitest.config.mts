@@ -5,7 +5,7 @@ export default defineConfig({
         include: ['src/**/*.test.ts'],
         typecheck: {
             enabled: true,
-            include: ['src/**/*.test-d.ts'],
+            include: ['src/**/*.test-d.ts', 'src/read-*.test.ts'],
             tsconfig: './tsconfig.typecheck.json'
         }
     }

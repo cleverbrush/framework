@@ -1565,6 +1565,55 @@ console.log(priceSchema.introspect().extensions.currency);
 // { maxDecimals: 4 }  — structured metadata, not the raw args
 ```
 
+### Typed metadata methods
+
+Use `defineMetadataMethod()` when a method only records metadata and its value
+must also be available to TypeScript consumers. It works inside the same
+`defineExtension()` / `withExtensions()` system:
+
+```ts
+import {
+    defineExtension, defineMetadataMethod, withExtensions,
+    type InferExtensionMetadata, type InferType
+} from '@cleverbrush/schema';
+
+const labels = defineExtension({
+    string: {
+        label: defineMetadataMethod('label').argument<string>(),
+        internal: defineMetadataMethod('visibility').value('internal'),
+        lengthHint: defineMetadataMethod('lengthHint').compute(
+            (min: number, max: number) => ({ min, max })
+        )
+    }
+});
+const s = withExtensions(labels);
+const title = s.string().label('Title').internal().optional();
+type Value = InferType<typeof title>; // string | undefined
+type Label = InferExtensionMetadata<typeof title>['label']; // 'Title'
+
+const renamed = title.label('Display name').lengthHint(1, 80);
+type UpdatedLabel = InferExtensionMetadata<typeof renamed>['label']; // 'Display name'
+renamed.introspect().extensions.lengthHint; // { min: 1, max: 80 }
+title.introspect().extensions.label; // 'Title' — original is unchanged
+```
+
+- `.argument<T>()` creates a one-argument method constrained to `T` and retains
+  the caller's literal type. Omit `T` to accept any metadata value.
+- `.value(value)` creates a zero-argument method storing a fixed value.
+- `.compute(fn)` retains the callback's parameter and return types. Use a literal
+  or template-literal return type when that precision matters; arbitrary callback
+  results cannot be evaluated by TypeScript.
+
+The key passed to `defineMetadataMethod` controls runtime storage independently
+of the method name. A subsequent write replaces that key's value and inferred
+type. Metadata and ordinary extension methods compose through native modifiers
+without resetting optionality, nullability or defaults. Only factories produced
+by `withExtensions()` receive the methods; global builder prototypes are not
+modified. Metadata is descriptive: these helpers do not add validators, transform
+schema values or assign domain meaning to keys. Consumers decide how to use it.
+Ordinary `defineExtension()` methods remain appropriate for validation and other
+behavior; use `this.withExtension()` inside them for runtime-only metadata.
+
 ### Stacking Extensions
 
 Multiple extensions can be stacked — their methods are merged per builder type. A runtime error is thrown if two extensions define the same method name on the same builder type:

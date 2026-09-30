@@ -193,7 +193,16 @@ export class ServiceProvider implements IServiceProvider {
      * @see {@link FunctionSchemaBuilder.hasReturnType}
      */
     public invoke<
-        TFuncSchema extends FunctionSchemaBuilder<any, any, any, any, any, any>
+        TFuncSchema extends FunctionSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
     >(
         funcSchema: TFuncSchema,
         implementation: InferType<TFuncSchema>

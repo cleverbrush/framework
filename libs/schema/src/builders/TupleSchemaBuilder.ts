@@ -162,6 +162,18 @@ export class TupleSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'tuple',
+        TElements,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TRestSchema,
+        TResult
+    ];
+
     #elements!: TElements;
     #restSchema:
         | (TRestSchema & SchemaBuilder<any, any, any, any, any>)

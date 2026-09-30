@@ -1,5 +1,7 @@
 // @cleverbrush/knex-schema — Type-safe schema-driven query builder for Knex
 
+export type { ReadAliasTables } from './AliasedReadQuery.js';
+export { AliasedReadQuery } from './AliasedReadQuery.js';
 export type {
     AliasTables,
     JoinedProjection,
@@ -50,6 +52,7 @@ export type {
 } from './expressions.js';
 export { aggregate } from './expressions.js';
 // Schema extension (hasColumnName / hasTableName + DDL/ORM)
+export type { PrimaryKeyColumn } from './extension.js';
 export {
     any,
     array,
@@ -90,8 +93,32 @@ export {
     validateEntitiesAgainstDatabase
 } from './migration.js';
 export type { CompositeCursorOptions } from './operations/composite-cursor.js';
+export type {
+    PolymorphicRowSchema,
+    VariantReadSchema,
+    VariantReadSchemas
+} from './PolymorphicReadQuery.js';
+export { PolymorphicReadQuery } from './PolymorphicReadQuery.js';
 // Raw query execution
 export { rawQuery } from './raw.js';
+export type {
+    EntityReadSchema,
+    ReadRelations,
+    ReadVariant,
+    ReadVariantMetadata,
+    ReadVariants,
+    WithReadVariant
+} from './read-entity.js';
+export { READ_ENTITY } from './read-entity.js';
+export type {
+    ColumnReadSchema,
+    ObjectReadSchema,
+    ReadObject,
+    ReadSchema,
+    ReadValue,
+    SchemaForValue
+} from './read-schema.js';
+export { ReadSchemaError } from './read-schema.js';
 export type { BoundQuery } from './SchemaQueryBuilder.js';
 // Main entry point
 export {
@@ -99,6 +126,13 @@ export {
     query,
     SchemaQueryBuilder
 } from './SchemaQueryBuilder.js';
+export type {
+    ReadColumn,
+    ReadColumns,
+    ReadProjection,
+    SchemaAwareQuery
+} from './SchemaReadQuery.js';
+export { SchemaReadQuery } from './SchemaReadQuery.js';
 // Snapshot-based migration
 export {
     entitiesToSnapshot,

@@ -462,9 +462,387 @@ The schema's `hasColumnName()` metadata is used to map `firstName` → `first_na
 
 ---
 
+## Composable read queries
+
+Use aliases for flat results, aggregate expressions for summaries, and composite
+cursors for deterministic sequential paging. Nested eager loading returns graphs.
+
+### Typed flat joins
+
+```ts
+import { alias, eq, query } from '@cleverbrush/knex-schema';
+
+const task = alias(TaskSchema, 'task');
+const owner = alias(UserSchema, 'owner');
+const rows = await query(knex, task)
+    .leftJoin(owner, t => eq(t.task.ownerId, t.owner.id))
+    .where(t => t.task.projectId, projectId)
+    .orderBy(t => t.task.id, 'desc')
+    .select(t => ({ id: t.task.id, ownerName: t.owner.name }));
+// ownerName includes null because owner is left-joined.
+```
+
+Aliases do not mutate schemas. Each source retains default scopes and soft-delete
+filters; filtering the right-hand source does not turn a left join into an inner
+join. `createQuery(knex)` also accepts aliased schemas. `eq`, `and`, and `or`
+compose column-based join conditions. Duplicate aliases are errors.
+
+Both `and` and `or` accept multiple predicates and can be nested. Each group
+becomes a parenthesized SQL expression, preserving the intended precedence:
+
+```ts
+import { alias, and, eq, or, query } from '@cleverbrush/knex-schema';
+
+const rows = await query(knex, alias(TaskSchema, 'task'))
+    .join(alias(UserSchema, 'owner'), t => or(
+        eq(t.task.ownerId, t.owner.id),
+        and(
+            eq(t.task.approverId, t.owner.id),
+            or(
+                eq(t.task.teamId, t.owner.teamId),
+                eq(t.task.creatorId, t.owner.id)
+            )
+        )
+    ))
+    .select(t => ({ id: t.task.id, ownerName: t.owner.name }));
+```
+
+This example assumes the illustrated ID properties exist on the schemas.
+Empty `and()`/`or()` groups are rejected. Predicates describe SQL; they do not
+execute a JavaScript callback for each returned row.
+
+`isSqlIdentifier(value)` is an exported type guard used by `alias()`. It accepts
+one ASCII identifier (`task_owner2`), not qualified names (`public.tasks`), quoted
+names, whitespace or non-string values. This deliberately conservative format
+does not describe every valid PostgreSQL identifier and does not replace Knex
+identifier quoting. Existing table/column metadata APIs are not restricted by it.
+
+The read-only aliased builder requires an explicit, non-empty projection and
+supports `where`, `whereIn`, `whereNull`, `whereNotNull`, `orderBy`, `orderByRaw`,
+`groupBy`, `having`, `limit`, `offset`, `first`, `execute`, `transacting`, and
+awaiting the query. `apply`/`toKnexQuery` remain raw escape hatches whose effects
+on result shape/cardinality are the caller's responsibility. Values remain bound
+and identifiers quoted. Flat collection joins can repeat parents; they do not
+deduplicate or fetch one related row at a time. Choose ORM eager loading for
+nested related objects instead.
+
+For reusable connection/transaction handling, ordinary and aliased schemas retain
+the same inference through `createQuery(knex)`, `withTransaction(trx)`, and
+`transaction(callback)`. Only ordinary-schema calls accept a custom Knex base
+query. These APIs and their JSDoc are also available through `@cleverbrush/orm`.
+
+### Aggregates with optional output schemas
+
+```ts
+import { aggregate, number } from '@cleverbrush/knex-schema';
+
+const count = await query(knex, TaskSchema).countValue(); // number
+const total = await query(knex, TaskSchema)
+    .sumValue(t => t.estimate); // string | null
+
+const grouped = await query(knex, TaskSchema)
+    .groupBy(t => t.ownerId)
+    .select(t => ({
+        ownerId: t.ownerId,
+        count: aggregate.count(),
+        total: aggregate.sum(t.estimate)
+    }));
+
+// Explicit floating-point conversion when appropriate for your domain.
+const average = await query(knex, TaskSchema)
+    .avgValue(t => t.estimate, {
+        output: number().isFloat().coerce().nullable()
+    }); // number | null
+```
+
+| API | Default result |
+| --- | --- |
+| `countValue(options?)`, `countValue(column, options?)` | Safe number; counts rows or non-null values |
+| `countDistinctValue(column, options?)` | Safe number |
+| `sumValue(column, options?)`, `avgValue(column, options?)` | Database numeric text, or null |
+| `minValue(column, options?)`, `maxValue(column, options?)` | Column's database representation, or null |
+
+The corresponding `aggregate.count/countDistinct/sum/avg/min/max` expressions
+work in ordinary and aliased object projections. Expression options are the
+second argument: `aggregate.count(undefined, { output: schema })` customizes
+`COUNT(*)`. Aliased `having` also accepts aggregate expressions; its comparisons
+use native SQL values, not decoded/text-formatted values.
+
+Counts reject malformed results and integers outside JavaScript's safe range.
+Sum/average preserve PostgreSQL's result as text without changing global driver
+parsers. This does not make floating-point source columns exact. Numeric/decimal/
+bigint extrema retain strings; because existing SQL overrides are not fully
+represented in schema types, numeric extrema are conservatively typed as
+`number | string | null`. Date extrema return `Date | null`.
+
+An optional **output schema replaces the default decoder**. Its synchronous
+`parse` receives the raw driver value, including null, before default conversion.
+Its schema output type determines the result, including nullable/optional
+modifiers. PostgreSQL counts normally reach it as strings, so a number schema
+needs explicit coercion. Validation failures reject the query. Custom parsers
+may return bigint/domain decimal types; JSON serialization remains application
+code. With custom parsers, the application owns their conversion/precision policy.
+
+Scalar helpers clone the source, ignore its limit/offset/order, and retain
+filters, semantic joins, scopes, and transactions. They reject grouped, HAVING,
+distinct, and already aggregated queries; use aggregate projections for those.
+An empty scalar count is zero; other empty/all-null aggregates are null. An
+empty grouped query returns no rows. Legacy `.count()`, `.sum()`, etc. keep their
+existing behavior and signatures.
+
+### Eager-loading order
+
+```ts
+const tasks = await query(knex, TaskSchema)
+    .orderBy(t => t.createdAt, 'desc')
+    .orderBy(t => t.id, 'desc')
+    .joinMany({
+        foreignSchema: NoteSchema,
+        localColumn: t => t.id,
+        foreignColumn: t => t.taskId,
+        as: 'notes'
+    })
+    .limit(20);
+```
+
+The final SELECT retains parent order, including bound raw ordering expressions.
+Limits/offsets select parents, not expanded child rows. Internal fields are
+removed from mapped results. Parent ordering, child ordering, and relation
+filtering are separate operations. Add a unique tie-breaker for deterministic
+ordering of tied parents.
+
+### Composite cursors
+
+```ts
+const page = await query(knex, TaskSchema)
+    .where(t => t.projectId, projectId)
+    .select(t => ({ id: t.id, title: t.title }))
+    .paginateAfter({
+        cursor: previousPage?.nextCursor,
+        limit: 50,
+        orderBy: [
+            { column: t => t.createdAt, direction: 'desc' },
+            { column: t => t.id, direction: 'desc' }
+        ]
+    });
+// { data, nextCursor: string | null, hasMore: boolean }
+```
+
+The opt-in `orderBy` form controls the full sort, replacing earlier ordering.
+Mixed directions, projections, and eager loading are supported. Sort fields must
+be non-null scalar columns and include a schema-declared primary/unique key.
+Required eager relations filter parents before the cursor page limit is applied.
+Offsets, flat joins, distinct/grouped/aggregate queries, malformed cursors, and
+cursors from a different table/order are rejected. The source builder is not
+mutated. The original `column`/`direction` form is unchanged.
+
+Cursors are versioned opaque strings preserving database timestamp precision
+and numeric values without Date/number round-trips. Clients must not parse them.
+Reapply access filters on every request and discard cursors when filters change:
+they are positions, not authorization. They do not provide snapshot isolation;
+sort-key updates can move records across the cursor. Sequential paging does not
+support arbitrary page-number jumps; counts remain separate queries. Indexes
+and representative query-plan measurements remain application work.
+
+### Integration verification
+
+From the repository root, run `npm run test:queries:integration` with
+`QUERY_TEST_DATABASE_URL` pointing to a dedicated PostgreSQL test database.
+The suite creates/drops only its randomly named fixture tables and fails if the
+URL is missing. CI runs PostgreSQL 16 integration tests alongside unit/type tests.
+
+## Projection-aware reads
+
+`withRowSchema()` is an **opt-in PostgreSQL read API**. Schema-aware queries are immutable,
+detached read plans: capture the returned value when adding filters or includes.
+They do not track entities, save changes, or run SQL when inspecting metadata.
+
+### Definitions can live in separate files
+
+```ts
+// user-read.ts
+import { createQuery, date, number, object, string } from '@cleverbrush/knex-schema';
+import { knex } from './database.js';
+
+const UserTable = object({
+    id: number().primaryKey(), name: string(),
+    lastSeen: date().optional().hasColumnName('last_seen'),
+    secret: string()
+}).hasTableName('users');
+
+export const userRead = createQuery(knex)(UserTable).withRowSchema()
+    .select(u => ({ id: u.id, name: u.name, lastSeen: u.lastSeen }));
+export const UserRow = userRead.rowSchema;
+```
+
+```ts
+// user-mapping.ts
+import { date, number, object, string } from '@cleverbrush/schema';
+import { mapper } from '@cleverbrush/mapper';
+import { UserRow } from './user-read.js';
+
+export const PublicUser = object({
+    id: number(), name: string(), lastSeen: date().optional()
+});
+export const toPublicUser = mapper().configure(UserRow, PublicUser, m => m
+    .for(t => t.lastSeen).compute(row => row.lastSeen ?? undefined))
+    .getSyncMapper(UserRow, PublicUser);
+```
+
+```ts
+// user-service.ts
+import { userRead } from './user-read.js';
+import { toPublicUser } from './user-mapping.js';
+
+export async function findPublicUser(id: number) {
+    const row = await userRead.where(u => u.id, id).first();
+    return row === undefined ? undefined : toPublicUser(row);
+}
+```
+
+Configure reusable mappings once. `where`, ordering, limits, offsets and
+transaction clones retain the same `rowSchema` object. A different projection or
+include produces a different schema. Independently created queries do not share
+schema identity; the mapper registry keys mappings by schema identity.
+
+### What values does the schema describe?
+
+| Stored value | Decoded read value |
+| --- | --- |
+| Required integer/float | Finite JavaScript `number` |
+| `number().bigint()` or `.decimal(p, s)` | Exact `string` |
+| Optional or nullable SQL column | Present property containing its value or `null` |
+| Date/timestamp | `Date`, including inside JSON relation graphs |
+| Missing optional JSON property | Absent property, unlike SQL null |
+| Missing optional object relation | `null` |
+| Missing collection relation | `[]` |
+
+Exact numeric fields are cast to text **before** PostgreSQL JSON aggregation and
+driver parsing. Converting a rounded JavaScript number to a string is not used.
+Use the SQL-type builder methods to declare storage accurately; unknown SQL types
+are rejected. A widened dynamic numeric SQL type has a conservative
+`number | string` read type. Driver custom parsers must still honor the declared
+representation, or decoding fails.
+
+Timezone-less SQL dates/timestamps are interpreted as UTC in this opt-in mode;
+explicit offsets preserve their instant. Native date fields are projected as text
+before decoding, so root and nested values do not depend on a driver's local-time
+date parser. This is a deliberate opt-in convention, not a change to legacy reads.
+
+Input defaults, preprocessors and input-only validators are not replayed on stored
+rows. Read schemas are structural output schemas. Optional schemas with input
+defaults are rejected: `optional().default(...)` hides the storage requirement
+in the inferred input/output type. Keep defaults in a separate input schema,
+and use an accurately required/optional storage schema for these reads.
+JavaScript `Date` has
+millisecond precision: use explicit application representations if an API must
+expose microseconds. Composite cursor tokens retain native timestamp precision
+in private text columns, independently of the public date values.
+
+### Projections, aliases and aggregates
+
+```ts
+const read = query(knex, alias(UserTable, 'user')).withRowSchema()
+    .leftJoin(alias(ProfileTable, 'profile'), t => eq(t.user.id, t.profile.userId))
+    .select(t => ({ id: t.user.id, displayName: t.profile.displayName }));
+// displayName is nullable even if ProfileTable declares it required.
+const rows = await read;
+read.rowSchema.validate(rows[0]);
+```
+
+Aliased reads require an explicit selection before execution or accessing
+`rowSchema`. Declared named projections use `.projected('name')` on ordinary
+readers. Typed aggregates work in object selections: count returns a safe number,
+sum/average preserve exact text, and empty extrema/sums remain nullable. An explicit
+Framework output schema replaces aggregate decoding and is parsed once; opaque
+parser objects without schema introspection are rejected in this mode.
+
+### Nested graphs
+
+Declare relations on entities as usual, and return the child query from customizers:
+
+```ts
+const read = db.projects.withRowSchema()
+    .select(p => ({ id: p.id, name: p.name }))
+    .include(r => r.tasks, tasks => tasks
+        .select(t => ({ title: t.title, createdAt: t.createdAt }))
+        .orderBy(t => t.id, 'desc').limit(3)
+        .include(r => r.notes, notes => notes.select(n => ({ body: n.body }))));
+```
+
+This executes one SQL statement. Child scopes, filters, ordering, projections and
+limits apply independently per parent. Collections are not lazy-loaded. Required
+belongs-to joins filter missing parents; `{ optional: true }` belongs-to and has-one
+reads expose nullable objects. `joinOne(spec, customize)` and
+`joinMany(spec, customize)` support explicit local/foreign keys without declaring
+an entity relation. Use their typed child customizer for ordering/projections;
+raw `foreignQuery` and post-load `mappers` cannot supply trustworthy row metadata.
+
+Numbered `.paginate({ page, pageSize })` performs a count and a page query.
+`.paginateAfter({ limit, cursor, orderBy })` on ordinary readers reuses lossless
+composite cursors, including unique-key validation. Cursor fields need not be in
+the public projection. Reapply authorization filters for every page; a cursor is
+not a permission or a transaction snapshot. Grouped/aggregate cursor reads are
+rejected.
+
+### Polymorphic graphs and explicit dispatch
+
+STI/CTI entities produce a genuine union `rowSchema` and an object schema for each
+discriminator in `variantRowSchemas`. All declared branch bodies are selected by
+default. Use `selectVariants(['photo'])` to narrow the returned union, or
+`forVariant()` to project a branch or load its relations:
+
+```ts
+const read = db.assets.withRowSchema()
+    .forVariant('photo', q => q.include(r => r.tags))
+    .forVariant('text', q => q.select(a => ({ id: a.id, kind: a.kind, body: a.body })));
+
+const photoSource = read.variantRowSchemas.photo;
+const textSource = read.variantRowSchemas.text;
+const registry = mapper()
+    .configure(photoSource, PublicPhoto, configurePhoto)
+    .configure(textSource, PublicText, configureText);
+const photo = registry.getSyncMapper(photoSource, PublicPhoto);
+const text = registry.getSyncMapper(textSource, PublicText);
+const result = (await read).map(row => row.kind === 'photo' ? photo(row) : text(row));
+```
+
+Keep the original discriminator in branch projections. Framework intentionally
+does not choose a public DTO or automatically dispatch a union mapper. Polymorphic
+readers also work inside ordinary includes. A missing required CTI body or unknown
+discriminator fails decoding. Explicit `allowOrphan: true` makes body fields
+nullable. Union ordering/pagination applies to the combined branches, not to each
+branch separately. Use `forVariant()` for branch-specific filtering/includes.
+
+### API boundaries
+
+- Enter read mode **before** legacy select/include/join, ordering/pagination,
+  raw callbacks or variant-specific operations. Continue configuration on the
+  immutable reader. Default scopes may filter rows but must not preselect,
+  order or paginate them.
+- The opt-in surface is deliberately read-only. It is not a replacement for
+  entity writes or tracked queries, and has no raw SQL shape escape hatch.
+- Reads are PostgreSQL-oriented; this does not promise equivalent JSON/CTI SQL
+  behavior on other Knex dialects.
+- Declared graph metadata must match storage. Unsupported opaque shapes throw
+  rather than pretending an entity schema describes their output. Explicit
+  TypeScript assertions such as `hasType()` remain the caller's responsibility.
+- Ordinary queries are mutable and retain their driver-value behavior.
+  Read mode is opt-in; it does not change application nulls or numeric values
+  globally.
+- `getSyncMapper()` accepts only complete mappings with synchronous final steps
+  and nested mappings. It never probes callbacks. Known async mappings are
+  rejected; a disguised thenable throws when invoked. Keep `getMapper()` for
+  asynchronous work. Fetch/enrich data explicitly before pure mapping.
+
+Run the mapper-only benchmark with
+`npm run bench -- --project benchmarks mapper.bench.ts`. It compares prepared
+sync/async functions with identical rows and excludes SQL/network time. Do not
+interpret its result as an endpoint-latency guarantee.
+
 ## API Reference
 
-See [Composable read queries](./COMPOSABLE_QUERIES.md) for typed flat joins with
+See [Composable read queries](#composable-read-queries) for typed flat joins with
 `alias`, all aggregate families with optional output schemas, preserved eager-load
 ordering, and multi-column cursor pagination. These APIs preserve existing calls
 and include runtime, type, and PostgreSQL integration coverage.
