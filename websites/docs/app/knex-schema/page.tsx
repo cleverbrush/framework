@@ -18,6 +18,37 @@ export default function KnexSchemaPage() {
                     </p>
                 </div>
 
+                <div className="card" id="row-schemas">
+                    <h2>Opt-in projection-aware reads</h2>
+                    <p>
+                        Start with withRowSchema() before selecting or including
+                        fields. The immutable PostgreSQL reader exposes the
+                        actual decoded result schema: SQL null stays null, dates
+                        are Date objects at every depth, and decimal/bigint
+                        values are exact strings before JSON parsing.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const read = query(knex, TaskSchema).withRowSchema()
+    .select(t => ({ title: t.title, amount: t.amount }));
+const Source = read.rowSchema;
+const rows = await read.where(t => t.id, taskId);`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Typed aliases, aggregates, named projections and nested
+                        graphs retain their selected shape. Polymorphic readers
+                        expose a union rowSchema and per-variant object schemas.
+                        Raw shapes are rejected; existing query behavior is
+                        unchanged.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/READ-SCHEMAS.md">
+                        Read representation, pagination and migration details
+                    </a>
+                </div>
+
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     commands={[

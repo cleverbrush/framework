@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { mapper } from '@cleverbrush/mapper';
 import {
     aggregate,
     alias,
@@ -71,6 +72,132 @@ const taskEntity = defineEntity(Task)
         t => t.taskId
     );
 const db = createDb(knex, { tasks: taskEntity });
+
+it('schema-aware reads stay detached in a tracked context', async () => {
+    const tracked = createDb(knex, { tasks: taskEntity }, { tracking: true });
+    const calls: unknown[] = [];
+    const listener = (sql: unknown) => calls.push(sql);
+    knex.on('query', listener);
+    try {
+        const read = tracked.tasks
+            .withRowSchema()
+            .select(t => ({ id: t.id, title: t.title }));
+        expect(calls).toHaveLength(0);
+        const row = await read.where(t => t.id, 102).first();
+        expect(calls).toHaveLength(1);
+        expect(() => tracked.entry(row!)).toThrow(/not tracked/i);
+        expect(await read.where(t => t.id, 102).first()).not.toBe(row);
+    } finally {
+        knex.off('query', listener);
+    }
+});
+
+it('schema-aware explicit joins preserve nullable objects and custom collections', async () => {
+    const read = query(knex, Task)
+        .withRowSchema()
+        .select(t => ({ id: t.id }))
+        .joinOne(
+            {
+                as: 'person',
+                localColumn: t => t.ownerId,
+                foreignColumn: u => u.id,
+                foreignSchema: User,
+                required: false
+            },
+            q => q.select(u => ({ name: u.name }))
+        )
+        .joinMany(
+            {
+                as: 'comments',
+                localColumn: t => t.id,
+                foreignColumn: n => n.taskId,
+                foreignSchema: Note
+            },
+            q =>
+                q
+                    .select(n => ({ text: n.body }))
+                    .orderBy(n => n.id, 'desc')
+                    .limit(1)
+        )
+        .where(t => t.id, 104);
+    const row = await read.first();
+    expect(row).toEqual({ id: 104, person: null, comments: [{ text: 'two' }] });
+    expect(read.rowSchema.validate(row).valid).toBe(true);
+});
+
+it('schema-aware optional belongs-to joins keep unmatched parents', async () => {
+    const optional = defineEntity(Task).belongsTo(
+        t => t.owner,
+        t => t.ownerId,
+        u => u.id,
+        { optional: true }
+    );
+    const read = query(knex, optional.schema)
+        .withRowSchema()
+        .select(t => ({ id: t.id }))
+        .include(
+            r => r.owner,
+            q => q.select(u => ({ name: u.name }))
+        )
+        .where(t => t.id, 104);
+    const row = await read.first();
+    expect(row).toEqual({ id: 104, owner: null });
+    expect(read.rowSchema.validate(row).valid).toBe(true);
+});
+
+it('schema-aware flat joins preserve precision and scoped outer join nulls', async () => {
+    const read = query(knex, alias(Task, 'task'))
+        .withRowSchema()
+        .leftJoin(alias(User, 'owner'), t => eq(t.task.ownerId, t.owner.id))
+        .select(t => ({
+            id: t.task.id,
+            amount: t.task.amount,
+            date: t.task.createdAt,
+            owner: t.owner.name
+        }))
+        .orderBy(t => t.task.id);
+    const rows = await read;
+    expect(rows.find(r => r.id === 102)?.amount).toBe(
+        '9007199254740993.000001'
+    );
+    expect(rows.find(r => r.id === 104)?.owner).toBeNull();
+    expect(rows.find(r => r.id === 102)?.owner).toBe('Alice');
+    expect(
+        rows.every(
+            r => r.date instanceof Date && read.rowSchema.validate(r).valid
+        )
+    ).toBe(true);
+});
+
+it('schema-aware cursor pages keep microsecond ordering private', async () => {
+    const read = db.tasks
+        .withRowSchema()
+        .select(t => ({ title: t.title }))
+        .include(r => r.notes)
+        .where(t => t.projectId, 1);
+    const first = await read.paginateAfter({
+        limit: 2,
+        orderBy: [
+            { column: t => t.createdAt, direction: 'desc' },
+            { column: t => t.id, direction: 'desc' }
+        ]
+    });
+    const second = await read.paginateAfter({
+        limit: 2,
+        cursor: first.nextCursor,
+        orderBy: [
+            { column: t => t.createdAt, direction: 'desc' },
+            { column: t => t.id, direction: 'desc' }
+        ]
+    });
+    expect(first.data.map(row => row.title)).toEqual(['B', 'A']);
+    expect(second.data.map(row => row.title)).toEqual(['A', 'C']);
+    expect(second.hasMore).toBe(false);
+    expect(Object.keys(first.data[0]).sort()).toEqual(['notes', 'title']);
+    expect(first.data.every(row => read.rowSchema.validate(row).valid)).toBe(
+        true
+    );
+});
 const orderBy = [
     { column: (t: any) => t.createdAt, direction: 'desc' as const },
     { column: (t: any) => t.id, direction: 'desc' as const }
@@ -173,6 +300,76 @@ afterAll(async () => {
 });
 
 describe('flat joins', () => {
+    it('reads exact values and selected relation schemas without hidden queries', async () => {
+        const read = db.tasks
+            .withRowSchema()
+            .select(t => ({
+                id: t.id,
+                amount: t.amount,
+                createdAt: t.createdAt
+            }))
+            .include(
+                t => t.notes,
+                q =>
+                    q.select(n => ({ body: n.body })).orderBy(n => n.id, 'desc')
+            )
+            .where(t => t.id, 104);
+        let queries = 0;
+        const onQuery = () => {
+            queries++;
+        };
+        knex.on('query', onQuery);
+        try {
+            expect(read.rowSchema).toBe(read.where(t => t.id, 104).rowSchema);
+            expect(queries).toBe(0);
+            const rows = await read;
+            expect(queries).toBe(1);
+            expect(rows).toEqual([
+                {
+                    id: 104,
+                    amount: '0.200000',
+                    createdAt: expect.any(Date),
+                    notes: [{ body: 'two' }, { body: 'one' }]
+                }
+            ]);
+            expect(read.rowSchema.validate(rows[0]).valid).toBe(true);
+            const exact = await db.tasks
+                .withRowSchema()
+                .where(t => t.id, 102)
+                .select(t => ({ amount: t.amount }))
+                .first();
+            expect(exact).toEqual({ amount: '9007199254740993.000001' });
+            const AmountRow = db.tasks
+                .withRowSchema()
+                .select(t => ({ amount: t.amount }));
+            const PublicAmount = object({ amount: string().optional() });
+            const toPublic = mapper()
+                .configure(AmountRow.rowSchema, PublicAmount, m =>
+                    m.for(t => t.amount).compute(s => s.amount ?? undefined)
+                )
+                .getSyncMapper(AmountRow.rowSchema, PublicAmount);
+            expect(
+                (await AmountRow.where(t => t.id, 102)).map(toPublic)
+            ).toEqual([{ amount: '9007199254740993.000001' }]);
+        } finally {
+            knex.off('query', onQuery);
+        }
+    });
+
+    it('decodes typed aggregate outputs once in schema-aware reads', async () => {
+        const read = db.tasks
+            .withRowSchema()
+            .where(t => t.projectId, 1)
+            .select(t => ({
+                count: aggregate.count(),
+                total: aggregate.sum(t.amount)
+            }));
+        const [row] = await read;
+        expect(row.count).toBe(4);
+        expect(typeof row.total).toBe('string');
+        expect(read.rowSchema.validate(row).valid).toBe(true);
+    });
+
     it('executes ordinary and aliased queries through a bound transaction callback', async () => {
         const result = await createQuery(knex).transaction(async tx => ({
             ordinary: await tx(Task)

@@ -1,4 +1,5 @@
 // @cleverbrush/knex-schema — Schema extension: hasColumnName / hasTableName
+export { READ_SQL_TYPE } from './read-storage.js';
 
 import type {
     AnySchemaBuilder,

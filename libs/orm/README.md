@@ -21,6 +21,27 @@ npm install @cleverbrush/orm
 
 `knex` is a peer dependency (install it alongside `@cleverbrush/orm`). `@cleverbrush/knex-schema` is a direct dependency and is installed automatically.
 
+## Detached reads with result schemas
+
+`db.users.withRowSchema()` enters an immutable read-only API whose `rowSchema`
+matches its decoded selection and includes. Results remain **detached even when
+the context uses `{ tracking: true }`**. This avoids attaching partial projections
+as incomplete tracked entities. Ordinary entity queries keep their old behavior.
+
+```ts
+const read = db.users.withRowSchema()
+    .select(u => ({ id: u.id, name: u.name }));
+const Source = read.rowSchema;
+const toDto = mapper().configure(Source, UserDto, m => m)
+    .getSyncMapper(Source, UserDto);
+const users = (await read).map(toDto);
+```
+
+Typed relation customizers return their configured query; nested graphs are
+decoded in one SQL statement. STI/CTI readers expose `variantRowSchemas` for
+explicit application mapping. See the [read-schema consumer guide](../knex-schema/READ-SCHEMAS.md)
+for numeric/null/date rules, examples and compatibility boundaries.
+
 ---
 
 ## Quick start

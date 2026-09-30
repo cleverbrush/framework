@@ -19,6 +19,37 @@ export default function OrmPage() {
                     </p>
                 </div>
 
+                <div className="card" id="detached-read-schemas">
+                    <h2>Detached reads with projection schemas</h2>
+                    <p>
+                        db.users.withRowSchema() returns an immutable read-only
+                        query with runtime metadata matching its projection and
+                        relation graph. Results stay detached even in a tracking
+                        context, so partial selections cannot silently become
+                        incomplete tracked entities.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const read = db.projects.withRowSchema()
+    .select(p => ({ id: p.id, name: p.name }))
+    .include(r => r.tasks, tasks => tasks
+        .select(t => ({ title: t.title })));
+const Source = read.rowSchema; // nested task schema included
+const projects = await read; // one SQL statement`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Return child queries from customizers. STI/CTI reads
+                        expose variantRowSchemas for explicit mapper dispatch.
+                        Ordinary entity reads and writes remain unchanged.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/READ-SCHEMAS.md">
+                        Projection-aware consumer guide
+                    </a>
+                </div>
+
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     commands={[

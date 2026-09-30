@@ -20,6 +20,23 @@ The key differentiator is **contract-first architecture**: a shared API contract
 | `@cleverbrush/scheduler` | Job scheduling with worker thread isolation | [/scheduler](/scheduler) |
 | `@cleverbrush/schema` | Schema validation library (see [schema.cleverbrush.com](https://schema.cleverbrush.com)) | — |
 
+## Projection-aware reads and synchronous mapping
+
+`query(knex, Schema).withRowSchema()` and `db.entities.withRowSchema()` opt into
+immutable detached PostgreSQL reads. `rowSchema` matches the selected decoded
+shape, including nested relations, SQL nulls, Date values and exact decimal/bigint
+strings. Metadata access never executes SQL. STI/CTI readers expose
+`variantRowSchemas` for explicit application discriminator dispatch. Legacy reads
+are unchanged. See [/knex-schema#row-schemas](/knex-schema#row-schemas) and
+[/orm#detached-read-schemas](/orm#detached-read-schemas).
+
+`mapper().configure(Source, Target, configure).getSyncMapper(Source, Target)`
+returns a synchronous complete mapping when all final steps and nested mappings
+are synchronous. Async or disguised thenables are rejected; callbacks are not
+probed at configuration time. `getMapper()` remains asynchronous. Reuse schemas
+and prepared mappings; do not fetch data inside pure mapping. See
+[/mapper#synchronous-mapping](/mapper#synchronous-mapping).
+
 ## Core Workflow
 
 ### 1. Define schemas (shared)

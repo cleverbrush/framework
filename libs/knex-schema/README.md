@@ -10,6 +10,24 @@ npm install @cleverbrush/knex-schema
 
 **Peer dependency:** `knex >= 3.1.0`
 
+## Opt-in projection-aware reads
+
+Call `.withRowSchema()` before selecting or including fields to get an immutable,
+detached PostgreSQL read query. Its `rowSchema` describes the actual decoded
+projection, including SQL nulls, nested dates and exact decimal/bigint strings.
+
+```ts
+const read = query(knex, UserSchema).withRowSchema()
+    .select(u => ({ id: u.id, createdAt: u.createdAt }));
+const SourceSchema = read.rowSchema; // metadata only; no SQL
+const rows = await read.where(u => u.id, 42);
+```
+
+Supports typed flat joins/aggregates, declared and explicit nested relations,
+named projections, composite cursors and STI/CTI branch schemas. Existing query
+behavior is unchanged. See the [consumer guide](./READ-SCHEMAS.md) for multi-file
+mapping examples, representation rules, supported operations and migration limits.
+
 ## Quick Start
 
 ```typescript

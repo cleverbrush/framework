@@ -40,6 +40,32 @@ npm install @cleverbrush/mapper
 
 **Peer dependency:** `@cleverbrush/schema`
 
+## Synchronous mapping
+
+Use the same `configure()` API and retrieve a synchronous mapper when every final
+step and nested mapping is synchronous:
+
+```ts
+const registry = mapper().configure(Source, Target, m => m
+    .for(t => t.label).compute(s => s.name.toUpperCase()));
+const toTarget = registry.getSyncMapper(Source, Target);
+const results = rows.map(toTarget); // ordinary values, not promises
+```
+
+Completeness checking, `.from()`, ignores, nested objects/arrays and compatible
+auto-mapping still apply. Async computations or nested async mappings reject
+`getSyncMapper()` at compile time; runtime guards cover JavaScript and unsafe
+casts too. Callbacks are never probed during configuration. A function falsely
+typed as synchronous that returns a promise/thenable throws when invoked.
+`getMapper()` still always returns an async function. There is no separate
+`configureSync()` API.
+
+Configure once and reuse the same source/target schema instances. Queries can
+provide their projection schema through `.withRowSchema().rowSchema`; see the
+[projection-aware read guide](../knex-schema/READ-SCHEMAS.md), including separate
+definition/mapping/service files and explicit polymorphic dispatch. The mapper
+performs no database calls or application enrichment.
+
 ## Quick Start
 
 ```typescript

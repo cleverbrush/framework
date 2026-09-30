@@ -31,7 +31,9 @@ export interface CompositeCursorOptions<
 
 export async function compositeCursor(
     builder: SchemaQueryBuilder<any, any>,
-    options: CompositeCursorOptions<any>
+    options: CompositeCursorOptions<any>,
+    decode?: (row: Record<string, unknown>) => any,
+    sourceIdentity?: string
 ): Promise<CursorPaginationResult<any>> {
     if (
         !Number.isSafeInteger(options.limit) ||
@@ -121,9 +123,11 @@ export async function compositeCursor(
         );
     }
     const identity = JSON.stringify([
-        state.tableName,
+        sourceIdentity ?? state.tableName,
         order.map(({ column, direction, type }) => [column, direction, type])
     ]);
+    const nativeColumn = (column: string) =>
+        sourceIdentity ? `${state.tableName}.${column}` : column;
     let values: string[] | undefined;
     if (options.cursor != null) {
         try {
@@ -193,10 +197,13 @@ export async function compositeCursor(
             order.forEach((item, index) => {
                 this.orWhere(function () {
                     for (let before = 0; before < index; before++) {
-                        this.where(order[before].column, cursorValues[before]);
+                        this.where(
+                            nativeColumn(order[before].column),
+                            cursorValues[before]
+                        );
                     }
                     this.where(
-                        item.column,
+                        nativeColumn(item.column),
                         item.direction === 'desc' ? '<' : '>',
                         cursorValues[index]
                     );
@@ -209,7 +216,7 @@ export async function compositeCursor(
     if (!statements(sql).some(s => s.grouping === 'columns'))
         sql.select(`${state.tableName}.*`);
     for (const item of order) {
-        sql.orderBy(item.column, item.direction);
+        sql.orderBy(nativeColumn(item.column), item.direction);
         const key = privateColumn(
             [
                 ...colToProp.keys(),
@@ -219,7 +226,9 @@ export async function compositeCursor(
             ],
             'cursor'
         );
-        const value = state.knex.raw('cast(?? as text)', [item.column]);
+        const value = state.knex.raw('cast(?? as text)', [
+            nativeColumn(item.column)
+        ]);
         sql.select({ [key]: value });
         state.explicitSelects?.push(key);
         // Object projections must carry hidden cursor values through eager wrapping.
@@ -256,7 +265,9 @@ export async function compositeCursor(
               ).toString('base64url')
             : null;
     return {
-        data: page.map(row => cleanAndMapRow(copy, row)),
+        data: page.map(row =>
+            decode ? decode(row) : cleanAndMapRow(copy, row)
+        ),
         nextCursor,
         hasMore
     };
