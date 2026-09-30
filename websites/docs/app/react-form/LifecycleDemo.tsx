@@ -5,7 +5,7 @@ import {
     defineFieldRenderer,
     useSchemaForm
 } from '@cleverbrush/react-form';
-import { boolean, object, string } from '@cleverbrush/schema';
+import { array, boolean, object, string } from '@cleverbrush/schema';
 import { useState } from 'react';
 import styles from './LifecycleDemo.module.css';
 
@@ -14,7 +14,8 @@ const ProfileSchema = object({
         .required('Name is required')
         .minLength(2, 'Use at least two characters'),
     role: string().required('Choose a role'),
-    active: boolean()
+    active: boolean(),
+    addresses: array(object({ city: string().required('City is required') }))
 });
 const text = defineFieldRenderer<string, { id: string }>(props => (
     <div className="demo-field">
@@ -85,7 +86,13 @@ export default function LifecycleDemo() {
             if (fail)
                 return {
                     ok: false,
-                    error: 'Demo failure: your values are preserved. Try again.'
+                    error: 'Demo failure: your values are preserved. Try again.',
+                    issues: [
+                        {
+                            pointer: '/addresses/0/city',
+                            detail: 'This city is unavailable in the simulated response.'
+                        }
+                    ]
                 };
             return { ok: true, data: values };
         },
@@ -143,12 +150,25 @@ export default function LifecycleDemo() {
                     Simulate failure
                 </label>
             </p>
+            <div className="demo-form-row">
+                <label htmlFor="profile-city">First address city</label>
+                <ui.Field
+                    form={form}
+                    forProperty={t => t.addresses[0].city}
+                    fieldProps={{ id: 'profile-city' }}
+                />
+            </div>
             <button
                 type="button"
                 className="demo-submit"
                 onClick={() => {
                     setConfirmation('');
-                    form.reset({ name: 'Ada', role: 'editor', active: true });
+                    form.reset({
+                        name: 'Ada',
+                        role: 'editor',
+                        active: true,
+                        addresses: [{ city: 'Paris' }]
+                    });
                 }}
             >
                 Load sample

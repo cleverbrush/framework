@@ -54,3 +54,7 @@ export type {
     SubscriptionOutgoing,
     TypedClient
 } from './types.js';
+export {
+    decodeValidationIssues,
+    type ValidationIssueSource
+} from './validationIssues.js';

@@ -1,6 +1,6 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { Socket } from 'node:net';
-import { number, object, string } from '@cleverbrush/schema';
+import { array, number, object, string } from '@cleverbrush/schema';
 import { describe, expect, it } from 'vitest';
 import type { EndpointMetadata } from '../src/Endpoint.js';
 import { needsBody, resolveArgs } from '../src/ParameterResolver.js';
@@ -43,6 +43,36 @@ function makeMeta(overrides: Partial<EndpointMetadata> = {}): EndpointMetadata {
 }
 
 describe('ParameterResolver', () => {
+    it('keeps indexed body paths and escapes query/header property names', async () => {
+        const result = await resolveArgs(
+            makeMeta({
+                bodySchema: object({
+                    addresses: array(object({ city: string() }))
+                }),
+                querySchema: object({ 'a/b': number() }),
+                headerSchema: object({ 'x~name': number() })
+            }),
+            null,
+            createMockContext({
+                queryParams: { 'a/b': 'bad' },
+                headers: { 'x~name': 'bad' }
+            }),
+            { addresses: [{ city: 123 }] }
+        );
+        expect(result.valid).toBe(false);
+        if (!result.valid)
+            expect(
+                (result.problemDetails.errors as any[]).map(
+                    issue => issue.pointer
+                )
+            ).toEqual(
+                expect.arrayContaining([
+                    '/body/addresses/0/city',
+                    '/query/a~1b',
+                    '/headers/x~0name'
+                ])
+            );
+    });
     describe('needsBody', () => {
         it('returns false when no body schema', () => {
             expect(needsBody(makeMeta())).toBe(false);

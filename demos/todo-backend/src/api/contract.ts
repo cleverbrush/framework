@@ -4,8 +4,9 @@
  * This is the **single source of truth** for both the backend and the
  * frontend.  It defines the shape of every API endpoint (HTTP method,
  * path, body / query / header schemas, and response schemas) without any
- * server-specific concerns like authorization, dependency injection, or
- * OpenAPI metadata.
+ * server-only dependencies or OpenAPI metadata. Authentication requirements
+ * belong in shared contracts so clients know when to attach their tokens;
+ * the backend remains responsible for enforcing permissions.
  *
  * - The **backend** imports this contract and extends each endpoint with
  *   `.authorize()`, `.inject()`, and OpenAPI metadata.
@@ -29,6 +30,7 @@ import {
     ImportTodosBodySchema,
     LoginBodySchema,
     PaginationQuerySchema,
+    PrincipalSchema,
     RegisterBodySchema,
     TodoEventSchema,
     TodoListQuerySchema,
@@ -47,7 +49,7 @@ const ById = route({ id: number().coerce() })`/${t => t.id}`;
 
 // ── Resource factories ────────────────────────────────────────────────────────
 
-const todosResource = endpoint.resource('/api/todos');
+const todosResource = endpoint.resource('/api/todos').authorize(PrincipalSchema);
 const usersResource = endpoint.resource('/api/users');
 const activityResource = endpoint.resource('/api/activity');
 
@@ -222,6 +224,7 @@ export const api = defineApi({
         }),
 
         me: usersResource.get(route({})`/me`)
+            .authorize(PrincipalSchema)
             .cacheTag('user-profile')
             .returns(UserResponseSchema)
     },

@@ -601,7 +601,7 @@ export type PropertyDescriptorTree<
                             any,
                             any
                         >
-                          ? PropertyDescriptor<
+                          ? IndexedPropertyDescriptor<
                                 TRootSchema,
                                 TProperties[K],
                                 PropertyDescriptor<
@@ -612,7 +612,7 @@ export type PropertyDescriptorTree<
                                 K & string
                             >
                           : InferType<TProperties[K]> extends TAssignableTo
-                            ? PropertyDescriptor<
+                            ? IndexedPropertyDescriptor<
                                   TRootSchema,
                                   TProperties[K],
                                   PropertyDescriptor<
@@ -637,6 +637,31 @@ export type PropertyDescriptorTree<
                         : never;
           }
         : never);
+
+/**
+ * A descriptor that preserves its array binding and exposes lazy indexed child
+ * descriptors. Indices are non-negative integers; they are positions, not item
+ * identities. Object and nested-array elements retain their schema types.
+ *
+ * @example `object.getPropertiesFor(schema).addresses[0].city`
+ */
+export type IndexedPropertyDescriptor<
+    TRoot extends ObjectSchemaBuilder<any, any, any, any, any>,
+    TSchema,
+    TParent,
+    TKey extends string = string
+> = PropertyDescriptor<TRoot, TSchema, TParent, TKey> &
+    (TSchema extends ObjectSchemaBuilder<any, any, any>
+        ? PropertyDescriptorTree<TSchema, TRoot, any, TParent>
+        : TSchema extends ArraySchemaBuilder<infer TElement, any, any>
+          ? {
+                readonly [index: number]: IndexedPropertyDescriptor<
+                    TRoot,
+                    TElement,
+                    PropertyDescriptor<TRoot, TSchema, TParent, TKey>
+                >;
+            }
+          : {});
 
 /**
  * Recursively maps the keys of an extern schema's output type into

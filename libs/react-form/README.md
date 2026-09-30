@@ -8,6 +8,117 @@
 
 A headless, schema-driven form system for React based on `@cleverbrush/schema`. Uses PropertyDescriptors for type-safe field binding, supports global UI renderer configuration via a provider, and is completely UI-agnostic — works with plain HTML, MUI, Ant Design, or any component library.
 
+## Server validation issues
+
+Return `{ ok: false, error: string, issues }` from `handleSubmit` to apply a
+submission message and field issues together. An issue is plain
+`{ pointer: string, detail: string }` data: `pointer` is a **form-relative JSON
+Pointer**, not a dotted path. `''` means a form-level error. No HTTP, client, or
+Next.js dependency is needed by this package.
+
+### A multi-file client/action/form example
+
+The API contract, server handler, action and component remain separate. The
+following assumes your application exports a configured typed `client` for
+`api`; authentication, persistence and safe fallback messages stay application-owned.
+
+```ts
+// profile-contract.ts (shared)
+import { object, string } from '@cleverbrush/schema';
+import { defineApi, endpoint } from '@cleverbrush/server/contract';
+export const Profile = object({ name: string().minLength(2) });
+export const api = defineApi({ profiles: {
+    save: endpoint.post('/profiles').body(Profile).responses({ 200: Profile })
+} });
+```
+
+```ts
+// profile-handler.ts (server)
+import type { Handler } from '@cleverbrush/server';
+import { api } from './profile-contract';
+export const saveProfileHandler: Handler<typeof api.profiles.save> =
+    async ({ body }) => body; // Replace with application persistence.
+// Register this handler with your application's implementation scope.
+```
+
+```ts
+// save-profile.ts (server action / application boundary)
+import { decodeValidationIssues } from '@cleverbrush/client';
+import type { InferType } from '@cleverbrush/schema';
+import { Profile } from './profile-contract';
+import { client } from './api-client';
+export async function saveProfile(values: InferType<typeof Profile>) {
+    try {
+        return { ok: true as const, data: await client.profiles.save({ body: values }) };
+    } catch (error) {
+        const issues = decodeValidationIssues(error, { source: 'body' });
+        if (issues) return { ok: false as const, error: 'Check your input.', issues };
+        // Add application-owned handling for expected general errors here.
+        throw error;
+    }
+}
+```
+
+```tsx
+// ProfileForm.tsx (browser; add your framework's client directive if needed)
+import { useSchemaForm } from '@cleverbrush/react-form';
+import { Profile } from './profile-contract';
+import { saveProfile } from './save-profile';
+export function ProfileForm() {
+    const form = useSchemaForm(Profile);
+    const name = form.useField(t => t.name);
+    return <form onSubmit={form.handleSubmit(saveProfile)}>
+        <label>Name <input value={name.value ?? ''}
+            onChange={e => name.onChange(e.target.value)} onBlur={name.onBlur}
+            aria-invalid={name.touched && !!name.error} aria-describedby="name-error" /></label>
+        <span id="name-error">{name.touched && name.error}</span>
+        {form.error && <p role="alert">{form.error}</p>}
+        <button disabled={form.submitting}>Save</button>
+    </form>;
+}
+```
+
+Ordinary shared-schema errors are already caught locally. This bridge handles
+structured server rejections (including schema-version differences); it does
+not manufacture field errors from business-error strings. Never serialize an
+`ApiError` instance to the browser. Only its decoded issue data crosses the action
+boundary. A form with different property names must explicitly map the returned
+pointers to its own paths before returning the failure result.
+
+### Manual issues, indexed fields and lifecycle
+
+Use `form.setIssues(issues)` for custom flows; it replaces the external issue set.
+`form.setIssues([])` clears only external errors, not local schema errors. Prefer
+returned issues for asynchronous submissions: `handleSubmit` ignores stale issues
+after any value update, reset or unmount. Manual callers own that race protection.
+
+```tsx
+const form = useSchemaForm(object({ addresses: array(object({ city: string() })) }));
+const city = form.useField(t => t.addresses[0].city); // string | undefined
+form.setIssues([{ pointer: '/addresses/0/city', detail: 'Choose another city.' }]);
+// Equivalent with Field / a typed form system:
+// <Field form={form} forProperty={t => t.addresses[0].city} />
+```
+
+- Matched fields become touched and show their first external message through
+  `field.error`. External messages take precedence until cleared.
+- Local validation, including debounced validation, does not erase external
+  issues on unchanged fields. Editing clears related ancestor/descendant issues,
+  not unrelated fields. Root issues clear when values change.
+- `setValue` clears issues for changed values. Replacing/reordering an array
+  clears its indexed issues: indices are positions, not stable item identities.
+- Reset and the next submission clear all external issues. Existing string-only
+  submission errors continue to work and clear on reset/resubmission.
+- Root, unknown, and currently unbound field issues are included in `form.error`
+  alongside the application message, joined by newlines. Render that summary even
+  when using inline messages. Binding/unbinding a field updates the summary.
+- Indexed selectors support object, primitive and nested arrays, but are not
+  native arrays: no `push`, negative indices, or add/remove/reorder UI helpers.
+
+JSON Pointer escaping preserves distinct names: `/a.b`, `/a/b`, `/a~1b`, and
+`/a~0b` target a dotted name, a nested field, a slash in a name, and a tilde in a
+name respectively. Unknown paths never create values or mutate the form.
+
 ## Why @cleverbrush/react-form?
 
 **The problem:** Every popular React form library — React Hook Form, Formik, React Final Form — requires you to reference fields by **string names**: `register("email")`, `<Field name="address.city" />`. The moment you pass a field name as a string, you lose TypeScript's type safety. Rename a property in your data model and the compiler stays silent — your form just silently breaks at runtime. The larger your codebase, the more of these invisible string references you accumulate, and the more fragile every refactor becomes.

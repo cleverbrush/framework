@@ -110,7 +110,7 @@ export async function resolveArgs(
             } else {
                 for (const err of result.errors ?? []) {
                     errors.push({
-                        pointer: `/query/${qName}`,
+                        pointer: `/query/${qName.replace(/~/g, '~0').replace(/\//g, '~1')}`,
                         detail: err.message
                     });
                 }
@@ -142,7 +142,7 @@ export async function resolveArgs(
             } else {
                 for (const err of result.errors ?? []) {
                     errors.push({
-                        pointer: `/headers/${hName}`,
+                        pointer: `/headers/${hName.replace(/~/g, '~0').replace(/\//g, '~1')}`,
                         detail: err.message
                     });
                 }

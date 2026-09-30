@@ -51,6 +51,7 @@ export {
 export type { RecordSchemaValidationResult } from './builders/RecordSchemaBuilder.js';
 export { RecordSchemaBuilder, record } from './builders/RecordSchemaBuilder.js';
 export type {
+    IndexedPropertyDescriptor,
     NestedValidationResult,
     PropertyDescriptor,
     PropertyDescriptorInner,

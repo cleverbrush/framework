@@ -364,6 +364,17 @@ export class ArraySchemaBuilder<
         ) as any;
     }
 
+    /** Keep indexed object validators attached to their actual root descriptor. */
+    #elementContext(
+        context: ValidationContext,
+        index: number
+    ): ValidationContext {
+        const descriptor = (context.currentPropertyDescriptor as any)?.[index];
+        return descriptor?.[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+            ? { ...context, currentPropertyDescriptor: descriptor }
+            : { ...context };
+    }
+
     /**
      * Performs synchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validate}
      */
@@ -535,9 +546,10 @@ export class ArraySchemaBuilder<
 
                 for (let i = 0; i < objToValidate.length; i++) {
                     results.push(
-                        this.#elementSchema.validate(objToValidate[i], {
-                            ...prevalidationContext
-                        })
+                        this.#elementSchema.validate(
+                            objToValidate[i],
+                            this.#elementContext(prevalidationContext, i)
+                        )
                     );
                 }
 
@@ -551,9 +563,7 @@ export class ArraySchemaBuilder<
                 for (let i = 0; i < objToValidate.length; i++) {
                     const result = this.#elementSchema.validate(
                         objToValidate[i],
-                        {
-                            ...prevalidationContext
-                        }
+                        this.#elementContext(prevalidationContext, i)
                     );
                     elementResults[i] = result as any;
                     if (result.valid) {
@@ -630,10 +640,10 @@ export class ArraySchemaBuilder<
         ) {
             if (prevalidationContext.doNotStopOnFirstError) {
                 const results = await Promise.all(
-                    objToValidate.map(o =>
+                    objToValidate.map((o, i) =>
                         this.#elementSchema?.validateAsync(
                             o,
-                            prevalidationContext
+                            this.#elementContext(prevalidationContext, i)
                         )
                     )
                 );
@@ -648,9 +658,7 @@ export class ArraySchemaBuilder<
                 for (let i = 0; i < objToValidate.length; i++) {
                     const result = await this.#elementSchema.validateAsync(
                         objToValidate[i],
-                        {
-                            ...prevalidationContext
-                        }
+                        this.#elementContext(prevalidationContext, i)
                     );
                     elementResults[i] = result as any;
                     if (result.valid) {
