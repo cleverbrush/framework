@@ -80,6 +80,15 @@ export class StringSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'string',
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault
+    ];
+
     #minLength?: number;
     #defaultMinLengthErrorMessageProvider: ValidationErrorMessageProvider<
         StringSchemaBuilder<TResult, TRequired>

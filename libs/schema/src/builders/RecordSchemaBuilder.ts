@@ -243,6 +243,18 @@ export class RecordSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'record',
+        TKeySchema,
+        TValueSchema,
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TResult
+    ];
+
     #keySchema!: TKeySchema;
     #valueSchema!: TValueSchema;
 

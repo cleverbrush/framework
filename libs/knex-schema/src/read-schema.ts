@@ -3,6 +3,7 @@ import {
     array,
     boolean,
     date,
+    type InferExtensionMetadata,
     type InferType,
     number,
     type ObjectSchemaBuilder,
@@ -12,7 +13,6 @@ import {
     union
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
-import { READ_SQL_TYPE } from './read-storage.js';
 
 /** A schema builder accepted by the database-read schema compiler. */
 export type ReadSchema = SchemaBuilder<any, any, any, any, any>;
@@ -53,20 +53,21 @@ export type SchemaForValue<T> = 0 extends 1 & T
                 null extends T ? true : false
             >;
 
-type StorageValue<S> = S extends {
-    readonly [READ_SQL_TYPE]: infer SQL extends string;
-}
-    ? string extends SQL
-        ? string | NonNullable<InferType<S>>
-        : Lowercase<SQL> extends
-                | 'bigint'
-                | 'bigserial'
-                | 'int8'
-                | `decimal${string}`
-                | `numeric${string}`
-          ? string
-          : NonNullable<InferType<S>>
-    : NonNullable<InferType<S>>;
+type StorageValue<S> =
+    InferExtensionMetadata<S> extends {
+        columnType: infer SQL extends string;
+    }
+        ? string extends SQL
+            ? string | NonNullable<InferType<S>>
+            : Lowercase<SQL> extends
+                    | 'bigint'
+                    | 'bigserial'
+                    | 'int8'
+                    | `decimal${string}`
+                    | `numeric${string}`
+              ? string
+              : NonNullable<InferType<S>>
+        : NonNullable<InferType<S>>;
 /** Database columns are present; optional persisted values are represented by SQL null. */
 export type ReadValue<S> =
     | StorageValue<S>

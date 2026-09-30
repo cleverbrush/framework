@@ -87,6 +87,18 @@ export class FunctionSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'func',
+        TRequired,
+        TNullable,
+        TExplicitType,
+        THasDefault,
+        TParameters,
+        TReturnTypeSchema,
+        TResult
+    ];
+
     #parameters: SchemaBuilder<any, any, any, any, any>[] = [];
     #returnType?: SchemaBuilder<any, any, any, any, any>;
 

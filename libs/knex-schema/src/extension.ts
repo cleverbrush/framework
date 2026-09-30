@@ -1,6 +1,4 @@
 // @cleverbrush/knex-schema — Schema extension: hasColumnName / hasTableName
-export { READ_SQL_TYPE } from './read-storage.js';
-
 import type {
     AnySchemaBuilder,
     ArraySchemaBuilder,
@@ -19,6 +17,7 @@ import type {
 import {
     arrayExtensions,
     defineExtension,
+    defineMetadataMethod,
     EXTRA_TYPE_BRAND,
     METHOD_LITERAL_BRAND,
     NumberSchemaBuilder as NumberSchemaBuilderClass,
@@ -56,6 +55,9 @@ export { EXTRA_TYPE_BRAND, METHOD_LITERAL_BRAND } from '@cleverbrush/schema';
 export const PRIMARY_KEY_BRAND: unique symbol = Symbol.for(
     '@cleverbrush/knex-schema:primaryKey'
 );
+
+/** @internal Named primary-key result so exported consumer schemas emit portable declarations. */
+export type PrimaryKeyColumn<S> = S & { readonly [PRIMARY_KEY_BRAND]?: true };
 
 /**
  * Phantom-type brand placed on an object schema by `.hasPrimaryKey([cols])`
@@ -335,34 +337,19 @@ export const ddlExtension = defineExtension({
             return this.withExtension('unique', name ?? true);
         },
         /** Override the SQL column type (e.g. `'bigint'`, `'smallint'`). */
-        columnType(
-            this: NumberSchemaBuilder<any, any, any, any, any>,
-            type: string
-        ) {
-            return this.withExtension('columnType', type);
-        },
+        columnType: defineMetadataMethod('columnType').argument<string>(),
         /** Shorthand for `.columnType('bigint')`. */
-        bigint(this: NumberSchemaBuilder<any, any, any, any, any>) {
-            return this.withExtension('columnType', 'bigint');
-        },
+        bigint: defineMetadataMethod('columnType').value('bigint'),
         /** Shorthand for `.columnType('smallint')`. */
-        smallint(this: NumberSchemaBuilder<any, any, any, any, any>) {
-            return this.withExtension('columnType', 'smallint');
-        },
+        smallint: defineMetadataMethod('columnType').value('smallint'),
         /** Shorthand for `.columnType('decimal(p,s)')` — exact numeric.
          * @param precision - Total digits.
          * @param scale     - Digits after decimal point.
          */
-        decimal(
-            this: NumberSchemaBuilder<any, any, any, any, any>,
-            precision: number,
-            scale: number
-        ) {
-            return this.withExtension(
-                'columnType',
-                `decimal(${precision},${scale})`
-            );
-        },
+        decimal: defineMetadataMethod('columnType').compute(
+            (precision: number, scale: number) =>
+                `decimal(${precision},${scale})` as const
+        ),
         /** Set a raw SQL default expression.
          * @param expression - Raw SQL expression (e.g. `"nextval('my_seq')"`).
          */
@@ -1216,9 +1203,7 @@ declare module '@cleverbrush/schema' {
         /** Mark this column as a primary key.
          * @param opts - Options. `autoIncrement` defaults to `true`.
          */
-        primaryKey(opts?: { autoIncrement?: boolean }): this & {
-            readonly [PRIMARY_KEY_BRAND]?: true;
-        };
+        primaryKey(opts?: { autoIncrement?: boolean }): PrimaryKeyColumn<this>;
     }
 
     interface StringSchemaBuilder<
@@ -1229,9 +1214,7 @@ declare module '@cleverbrush/schema' {
         TExtensions
     > {
         /** Mark this column as a primary key (non-auto-increment). */
-        primaryKey(): this & {
-            readonly [PRIMARY_KEY_BRAND]?: true;
-        };
+        primaryKey(): PrimaryKeyColumn<this>;
     }
 
     interface ObjectSchemaBuilder<

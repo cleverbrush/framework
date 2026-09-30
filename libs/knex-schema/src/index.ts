@@ -52,6 +52,7 @@ export type {
 } from './expressions.js';
 export { aggregate } from './expressions.js';
 // Schema extension (hasColumnName / hasTableName + DDL/ORM)
+export type { PrimaryKeyColumn } from './extension.js';
 export {
     any,
     array,
@@ -118,8 +119,6 @@ export type {
     SchemaForValue
 } from './read-schema.js';
 export { ReadSchemaError } from './read-schema.js';
-export type { SqlNumber } from './read-storage.js';
-export { READ_SQL_TYPE } from './read-storage.js';
 export type { BoundQuery } from './SchemaQueryBuilder.js';
 // Main entry point
 export {

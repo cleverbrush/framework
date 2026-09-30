@@ -1,7 +1,11 @@
-import type { InferType } from '@cleverbrush/schema';
+import {
+    type InferExtensionMetadata,
+    type InferType,
+    number as plainNumber
+} from '@cleverbrush/schema';
 import { expectTypeOf, test } from 'vitest';
-import { number } from './extension.js';
-import type { READ_SQL_TYPE } from './read-storage.js';
+import { number, type PRIMARY_KEY_BRAND } from './extension.js';
+import type { ReadValue } from './read-schema.js';
 
 test('numeric storage metadata survives schema modifiers', () => {
     const price = number()
@@ -10,8 +14,8 @@ test('numeric storage metadata survives schema modifiers', () => {
         .hasColumnName('price_value');
     expectTypeOf<InferType<typeof price>>().toEqualTypeOf<number | undefined>();
     expectTypeOf<
-        (typeof price)[typeof READ_SQL_TYPE]
-    >().toEqualTypeOf<'decimal'>();
+        InferExtensionMetadata<typeof price>['columnType']
+    >().toEqualTypeOf<`decimal(${number},${number})`>();
     const named = number()
         .hasColumnName('price_value')
         .decimal(20, 4)
@@ -19,11 +23,40 @@ test('numeric storage metadata survives schema modifiers', () => {
         .index();
     expectTypeOf<InferType<typeof named>>().toEqualTypeOf<number | null>();
     expectTypeOf<
-        (typeof named)[typeof READ_SQL_TYPE]
-    >().toEqualTypeOf<'decimal'>();
+        InferExtensionMetadata<typeof named>['columnType']
+    >().toEqualTypeOf<`decimal(${number},${number})`>();
     const overridden = named.columnType('integer').required().notNullable();
     expectTypeOf<
-        (typeof overridden)[typeof READ_SQL_TYPE]
+        InferExtensionMetadata<typeof overridden>['columnType']
     >().toEqualTypeOf<'integer'>();
     expectTypeOf<InferType<typeof overridden>>().toEqualTypeOf<number>();
+});
+
+test('storage inference retains precision, dynamic types and other brands', () => {
+    const id = number().primaryKey().bigint().optional().hasColumnName('key');
+    expectTypeOf<ReadValue<typeof id>>().toEqualTypeOf<string | null>();
+    expectTypeOf<
+        NonNullable<(typeof id)[typeof PRIMARY_KEY_BRAND]>
+    >().toEqualTypeOf<true>();
+    const small = id.smallint().required();
+    expectTypeOf<ReadValue<typeof small>>().toEqualTypeOf<number>();
+    const exact = small.columnType('NUMERIC(24,6)').nullable().index();
+    expectTypeOf<ReadValue<typeof exact>>().toEqualTypeOf<string | null>();
+    const dynamic = (type: string) => number().columnType(type).optional();
+    expectTypeOf<ReadValue<ReturnType<typeof dynamic>>>().toEqualTypeOf<
+        number | string | null
+    >();
+    // @ts-expect-error storage types must be strings
+    number().columnType(5);
+});
+
+test('database methods do not augment plain schema numbers', () => {
+    // @ts-expect-error database storage methods require the database factory
+    plainNumber().bigint();
+    // @ts-expect-error database storage methods require the database factory
+    plainNumber().decimal(10, 2);
+    // @ts-expect-error database storage methods require the database factory
+    plainNumber().columnType('integer');
+    // @ts-expect-error database storage methods require the database factory
+    plainNumber().smallint();
 });

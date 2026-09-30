@@ -305,7 +305,16 @@ export class ScopedServiceProvider implements IServiceProvider {
      * @see {@link ServiceProvider.invoke}
      */
     public invoke<
-        TFuncSchema extends FunctionSchemaBuilder<any, any, any, any, any, any>
+        TFuncSchema extends FunctionSchemaBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any,
+            any
+        >
     >(
         funcSchema: TFuncSchema,
         implementation: InferType<TFuncSchema>

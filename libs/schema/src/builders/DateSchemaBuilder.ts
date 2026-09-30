@@ -86,6 +86,15 @@ export class DateSchemaBuilder<
     THasDefault,
     TExtensions
 > {
+    /** Native type parameters for extension rebinding; never emitted at runtime. @internal */
+    declare readonly __cleverbrush_builder_type__: readonly [
+        'date',
+        TResult,
+        TRequired,
+        TNullable,
+        THasDefault
+    ];
+
     #min?: Date;
     #defaultMinErrorMessageProvider: ValidationErrorMessageProvider<
         DateSchemaBuilder<TResult, TRequired>

@@ -18,37 +18,6 @@ export default function KnexSchemaPage() {
                     </p>
                 </div>
 
-                <div className="card" id="row-schemas">
-                    <h2>Opt-in projection-aware reads</h2>
-                    <p>
-                        Start with withRowSchema() before selecting or including
-                        fields. The immutable PostgreSQL reader exposes the
-                        actual decoded result schema: SQL null stays null, dates
-                        are Date objects at every depth, and decimal/bigint
-                        values are exact strings before JSON parsing.
-                    </p>
-                    <pre>
-                        <code
-                            dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const read = query(knex, TaskSchema).withRowSchema()
-    .select(t => ({ title: t.title, amount: t.amount }));
-const Source = read.rowSchema;
-const rows = await read.where(t => t.id, taskId);`)
-                            }}
-                        />
-                    </pre>
-                    <p>
-                        Typed aliases, aggregates, named projections and nested
-                        graphs retain their selected shape. Polymorphic readers
-                        expose a union rowSchema and per-variant object schemas.
-                        Raw shapes are rejected; existing query behavior is
-                        unchanged.
-                    </p>
-                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/READ-SCHEMAS.md">
-                        Read representation, pagination and migration details
-                    </a>
-                </div>
-
                 {/* ── Installation ─────────────────────────────────── */}
                 <InstallBanner
                     commands={[
@@ -119,68 +88,6 @@ const rows = await read.where(t => t.id, taskId);`)
                             without calling <code>.execute()</code>.
                         </li>
                     </ul>
-                </div>
-
-                <div className="card">
-                    <h2>Composable read queries</h2>
-                    <p>
-                        Use <code>alias(schema, name)</code> with typed flat
-                        joins and object projections for DTOs. Left-joined
-                        fields include null; source scopes and soft deletion are
-                        retained.
-                    </p>
-                    <pre
-                        dangerouslySetInnerHTML={{
-                            __html: highlightTS(`const task = alias(TaskSchema, 'task');
-const owner = alias(UserSchema, 'owner');
-const rows = await query(knex, task)
-    .leftJoin(owner, t => eq(t.task.ownerId, t.owner.id))
-    .select(t => ({ id: t.task.id, ownerName: t.owner.name }));`)
-                        }}
-                    />
-                    <h3>Aggregates and optional output schemas</h3>
-                    <p>
-                        Count helpers return checked numbers; sum and average
-                        preserve database numeric text or null. Min/max follow
-                        the column representation. Optional output schemas
-                        replace decoding and receive raw driver values,
-                        including null. Typed aggregate expressions support
-                        grouped results.
-                    </p>
-                    <pre
-                        dangerouslySetInnerHTML={{
-                            __html: highlightTS(`const count = await query(knex, TaskSchema).countValue();
-const average = await query(knex, TaskSchema).avgValue(t => t.estimate, {
-    output: number().isFloat().coerce().nullable()
-});`)
-                        }}
-                    />
-                    <h3>Ordering and composite cursors</h3>
-                    <p>
-                        Eager loading preserves final parent order and page
-                        size. Composite cursors retain timestamp precision and
-                        require non-null scalar columns with a declared unique
-                        tie-breaker. Reapply access filters; cursors are not
-                        authorization.
-                    </p>
-                    <pre
-                        dangerouslySetInnerHTML={{
-                            __html: highlightTS(`const page = await query(knex, TaskSchema).paginateAfter({
-    limit: 50, cursor,
-    orderBy: [
-        { column: t => t.createdAt, direction: 'desc' },
-        { column: t => t.id, direction: 'desc' }
-    ]
-});`)
-                        }}
-                    />
-                    <p>
-                        Existing APIs remain unchanged. Read the{' '}
-                        <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/COMPOSABLE_QUERIES.md">
-                            complete query guide
-                        </a>{' '}
-                        for examples, precision policy, and restrictions.
-                    </p>
                 </div>
 
                 {/* ── Quick Start ──────────────────────────────────── */}
@@ -410,6 +317,99 @@ const activeUsers = await query(db, UserSchema, base)
                             }}
                         />
                     </pre>
+                </div>
+
+                <div className="card">
+                    <h2>Composable read queries</h2>
+                    <p>
+                        Use <code>alias(schema, name)</code> with typed flat
+                        joins and object projections for DTOs. Left-joined
+                        fields include null; source scopes and soft deletion are
+                        retained.
+                    </p>
+                    <pre
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`const task = alias(TaskSchema, 'task');
+const owner = alias(UserSchema, 'owner');
+const rows = await query(knex, task)
+    .leftJoin(owner, t => eq(t.task.ownerId, t.owner.id))
+    .select(t => ({ id: t.task.id, ownerName: t.owner.name }));`)
+                        }}
+                    />
+                    <h3>Aggregates and optional output schemas</h3>
+                    <p>
+                        Count helpers return checked numbers; sum and average
+                        preserve database numeric text or null. Min/max follow
+                        the column representation. Optional output schemas
+                        replace decoding and receive raw driver values,
+                        including null. Typed aggregate expressions support
+                        grouped results.
+                    </p>
+                    <pre
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`const count = await query(knex, TaskSchema).countValue();
+const average = await query(knex, TaskSchema).avgValue(t => t.estimate, {
+    output: number().isFloat().coerce().nullable()
+});`)
+                        }}
+                    />
+                    <h3>Ordering and composite cursors</h3>
+                    <p>
+                        Eager loading preserves final parent order and page
+                        size. Composite cursors retain timestamp precision and
+                        require non-null scalar columns with a declared unique
+                        tie-breaker. Reapply access filters; cursors are not
+                        authorization.
+                    </p>
+                    <pre
+                        dangerouslySetInnerHTML={{
+                            __html: highlightTS(`const page = await query(knex, TaskSchema).paginateAfter({
+    limit: 50, cursor,
+    orderBy: [
+        { column: t => t.createdAt, direction: 'desc' },
+        { column: t => t.id, direction: 'desc' }
+    ]
+});`)
+                        }}
+                    />
+                    <p>
+                        Existing APIs remain unchanged. Read the{' '}
+                        <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#composable-read-queries">
+                            complete query guide
+                        </a>{' '}
+                        for examples, precision policy, and restrictions.
+                    </p>
+                </div>
+
+                <div className="card" id="row-schemas">
+                    <h2>Opt-in projection-aware reads</h2>
+                    <p>
+                        Start with withRowSchema() before selecting or including
+                        fields. The immutable PostgreSQL reader exposes the
+                        actual decoded result schema: SQL null stays null, dates
+                        are Date objects at every depth, and decimal/bigint
+                        values are exact strings before JSON parsing.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const read = query(knex, TaskSchema).withRowSchema()
+    .select(t => ({ title: t.title, amount: t.amount }));
+const Source = read.rowSchema;
+const rows = await read.where(t => t.id, taskId);`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Typed aliases, aggregates, named projections and nested
+                        graphs retain their selected shape. Polymorphic readers
+                        expose a union rowSchema and per-variant object schemas.
+                        Raw shapes are rejected; existing query behavior is
+                        unchanged.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#projection-aware-reads">
+                        Read representation, pagination and migration details
+                    </a>
                 </div>
 
                 {/* ── API Reference ────────────────────────────────── */}
