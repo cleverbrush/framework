@@ -26,13 +26,19 @@ import {
     compositeCursor
 } from './operations/composite-cursor.js';
 import {
-    ALLOWED_OPS,
     getEffectiveBaseQuery,
     getSchemaQueryBuilderCtor
 } from './operations/helpers.js';
 import { getState } from './operations/state.js';
 import { PolymorphicReadQuery } from './PolymorphicReadQuery.js';
 import type { ReadRelations, ReadVariantMetadata } from './read-entity.js';
+import {
+    captureReadRaw,
+    type ReadPredicate,
+    type ReadPredicateContext,
+    type ReadPredicateSelector,
+    ReadPredicates
+} from './read-predicates.js';
 import { compileReadProjection, type ReadField } from './read-projection.js';
 import {
     type ColumnReadSchema,
@@ -156,7 +162,7 @@ export class SchemaReadQuery<
     S extends ReadObject,
     Row extends ReadObject = ObjectReadSchema<S, keyof ReadRelations<S>>,
     Relations extends Record<string, RelationInfo> = ReadRelations<S>
-> {
+> extends ReadPredicates<ReadColumns<S, keyof Relations>> {
     /** @internal Nominal identity for typed child-query customizers. */
     declare readonly [READ_QUERY]: true;
     private readonly alias = `__schema_read_${readAliasSequence++}`;
@@ -175,6 +181,7 @@ export class SchemaReadQuery<
         private readonly source: S,
         base: Knex.QueryBuilder
     ) {
+        super();
         this.base = knex.queryBuilder().from(base.clone().as(this.alias));
         const relations = (source.introspect().extensions?.relations ??
             []) as RelationSpec[];
@@ -233,16 +240,19 @@ export class SchemaReadQuery<
     }
 
     private column(
-        selector: Selector<ReadColumns<S, keyof Relations>>
+        selector: ReadPredicateSelector<ReadColumns<S, keyof Relations>>
     ): ReadColumn<any> {
         const column = selector(
             this.columns as ReadColumns<S, keyof Relations>
         );
-        if (!column || !Object.values(this.columns).includes(column))
+        if (
+            !column ||
+            !Object.values(this.columns).some(candidate => candidate === column)
+        )
             throw new ReadSchemaError(
                 'Column does not belong to this read query'
             );
-        return column;
+        return column as ReadColumn<any>;
     }
 
     private name(column: ReadColumn<any>): string {
@@ -328,55 +338,17 @@ export class SchemaReadQuery<
         ) as any;
     }
 
-    /** Add a bound comparison, returning an independent query with the same row schema. */
-    where(
-        column: Selector<ReadColumns<S, keyof Relations>>,
-        value: unknown
-    ): this;
-    /** Add a bound comparison using a supported SQL operator. */
-    where(
-        column: Selector<ReadColumns<S, keyof Relations>>,
-        operator: string,
-        value: unknown
-    ): this;
-    /** Add a bound comparison using a supported SQL operator. */
-    where(
-        column: Selector<ReadColumns<S, keyof Relations>>,
-        ...args: [unknown] | [string, unknown]
-    ): this {
-        const operator = args.length === 1 ? '=' : args[0].toLowerCase();
-        if (!ALLOWED_OPS.has(operator))
-            throw new ReadSchemaError(
-                `Unsupported comparison operator: ${operator}`
-            );
-        const copy = this.copy();
-        copy.base.where(
-            this.name(this.column(column)),
-            operator,
-            (args.length === 1 ? args[0] : args[1]) as any
-        );
-        return copy;
+    protected readPredicateContext(): ReadPredicateContext<
+        ReadColumns<S, keyof Relations>
+    > {
+        return {
+            knex: this.knex,
+            column: selector => this.name(this.column(selector))
+        };
     }
-
-    /** Filter SQL null values without changing the declared read shape. */
-    whereNull(column: Selector<ReadColumns<S, keyof Relations>>): this {
+    protected addReadPredicate(predicate: ReadPredicate): this {
         const copy = this.copy();
-        copy.base.whereNull(this.name(this.column(column)));
-        return copy;
-    }
-    /** Exclude SQL null values without implicitly narrowing schema nullability. */
-    whereNotNull(column: Selector<ReadColumns<S, keyof Relations>>): this {
-        const copy = this.copy();
-        copy.base.whereNotNull(this.name(this.column(column)));
-        return copy;
-    }
-    /** Filter against a bound list of values. An empty list produces no rows. */
-    whereIn(
-        column: Selector<ReadColumns<S, keyof Relations>>,
-        values: readonly unknown[]
-    ): this {
-        const copy = this.copy();
-        copy.base.whereIn(this.name(this.column(column)), [...values] as any[]);
+        predicate(copy.base);
         return copy;
     }
     /** Order parent rows independently of any child relation's ordering. */
@@ -386,6 +358,13 @@ export class SchemaReadQuery<
     ): this {
         const copy = this.copy();
         copy.base.orderBy(this.name(this.column(column)), direction);
+        return copy;
+    }
+    /** Append trusted raw ordering with captured positional bindings; ref() supplies quoted columns. */
+    orderByRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): this {
+        const captured = captureReadRaw(this.knex, sql, bindings);
+        const copy = this.copy();
+        copy.base.orderByRaw(captured());
         return copy;
     }
     /** Group rows before typed aggregate projection. */

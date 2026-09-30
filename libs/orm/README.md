@@ -232,6 +232,14 @@ decoded in one SQL statement. STI/CTI readers expose `variantRowSchemas` for
 explicit application mapping. See the [read-schema consumer guide](../knex-schema/README.md#projection-aware-reads)
 for numeric/null/date rules, examples and compatibility boundaries.
 
+Detached ordinary readers also support grouped `where`/`andWhere`/`orWhere`,
+IN/EXISTS subqueries, bound `whereRaw`/`orderByRaw`, and `ref(selector)` for quoted
+column references. These operations preserve the reader's `rowSchema` identity
+and work in nested relation customizers; polymorphic branches use `forVariant()`.
+Group callbacks are synchronous and predicate-only. See
+[filtering and ordering](../knex-schema/README.md#filtering-and-ordering-without-changing-the-result-schema)
+for scoped search, subquery snapshots, pagination, and raw-SQL boundaries.
+
 ---
 
 ## Polymorphic entities (STI / CTI)

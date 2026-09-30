@@ -412,6 +412,43 @@ const rows = await read.where(t => t.id, taskId);`)
                     </a>
                 </div>
 
+                <div className="card" id="read-predicates">
+                    <h2>Filtering and ordering schema-aware reads</h2>
+                    <p>
+                        Group AND/OR search predicates without changing the
+                        selected row schema. IN/EXISTS subqueries, null checks,
+                        and bound raw predicates and ordering remain explicit.
+                        Every outer operation returns an independent reader.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const base = query(knex, TaskSchema).withRowSchema()
+    .select(t => ({ id: t.id, title: t.title }));
+const read = base.where(t => t.projectId, projectId)
+    .andWhere(group => group
+        .where(t => t.title, 'ilike', pattern)
+        .orWhereExists(labelMatches))
+    .orderByRaw('case when ?? = ? then 0 else 1 end', [
+        base.ref(t => t.id), priorityTaskId
+    ]);
+// read.rowSchema === base.rowSchema`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Group callbacks run synchronously once and expose only
+                        predicates. Subquery SQL and bindings are captured on
+                        attachment, with no database execution. Use ref() for
+                        quoted columns and generated aliases; keep values in
+                        bindings and raw SQL fragments application-authored.
+                        Unrestricted apply() remains unavailable.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#filtering-and-ordering-without-changing-the-result-schema">
+                        Multi-file examples and compatibility boundaries
+                    </a>
+                </div>
+
                 {/* ── API Reference ────────────────────────────────── */}
                 <div className="card">
                     <h2>API Reference</h2>

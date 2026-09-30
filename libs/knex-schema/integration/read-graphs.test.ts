@@ -136,6 +136,23 @@ afterAll(async () => {
 });
 
 describe('schema-aware polymorphic graphs', () => {
+    it('allows schema-preserving predicates inside an explicit variant branch', async () => {
+        const read = db.assets
+            .withRowSchema()
+            .selectVariants(['photo'])
+            .forVariant('photo', photo =>
+                photo
+                    .where(p => p.where(a => a.id, 1).orWhere(a => a.id, 999))
+                    .whereRaw('?? > ?', [
+                        photo.ref(a => a.size),
+                        '9007199254740992'
+                    ])
+                    .orderByRaw('?? desc', [photo.ref(a => a.id)])
+            );
+        const rows = await read;
+        expect(rows.map(row => row.id)).toEqual([1]);
+        expect(read.rowSchema.validate(rows[0]).valid).toBe(true);
+    });
     it('orders using native values even when branch projections omit sort fields', async () => {
         const read = db.assets
             .withRowSchema()

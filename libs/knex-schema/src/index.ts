@@ -111,6 +111,12 @@ export type {
 } from './read-entity.js';
 export { READ_ENTITY } from './read-entity.js';
 export type {
+    ReadMembership,
+    ReadPredicateBuilder,
+    ReadPredicateGroup,
+    ReadPredicateSelector
+} from './read-predicates.js';
+export type {
     ColumnReadSchema,
     ObjectReadSchema,
     ReadObject,

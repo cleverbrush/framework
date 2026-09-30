@@ -42,7 +42,7 @@ test('documentation and multi-file metadata consumers compile against published 
             )
         ];
         expect(namedBlocks(llms)).toHaveLength(4);
-        expect(namedBlocks(queryDocs)).toHaveLength(3);
+        expect(namedBlocks(queryDocs)).toHaveLength(4);
         for (const [, name, content] of [
             ...namedBlocks(llms),
             ...namedBlocks(queryDocs)

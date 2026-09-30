@@ -666,6 +666,7 @@ import { knex } from './database.js';
 
 const UserTable = object({
     id: number().primaryKey(), name: string(),
+    tenantId: number().hasColumnName('tenant_id'),
     lastSeen: date().optional().hasColumnName('last_seen'),
     secret: string()
 }).hasTableName('users');
@@ -756,6 +757,83 @@ readers. Typed aggregates work in object selections: count returns a safe number
 sum/average preserve exact text, and empty extrema/sums remain nullable. An explicit
 Framework output schema replaces aggregate decoding and is parsed once; opaque
 parser objects without schema introspection are rejected in this mode.
+
+### Filtering and ordering without changing the result schema
+
+Ordinary and aliased readers provide the following shape-preserving operations.
+All return an independent reader with the **same `rowSchema` object**; retain the
+returned reader when adding conditional filters. Filtering a nullable field does
+not implicitly narrow its declared result type.
+
+| Operation | API |
+| --- | --- |
+| Comparisons and parenthesized groups | `where`, `andWhere`, `orWhere` |
+| SQL null checks | `whereNull`, `whereNotNull`, `orWhereNull`, `orWhereNotNull` |
+| Value-list or SELECT-subquery membership | `whereIn`, `whereNotIn`, `orWhereIn`, `orWhereNotIn` |
+| SELECT-subquery existence | `whereExists`, `whereNotExists`, `orWhereExists`, `orWhereNotExists` |
+| Bound custom predicates | `whereRaw(sql, bindings)`, `orWhereRaw(sql, bindings)` |
+| Bound custom ordering | `orderByRaw(sql, bindings)` |
+| Quoted mapped column reference | `ref(columnSelector)` |
+
+Reuse the prepared read from `user-read.ts` in a separate query-composition file:
+
+```ts
+// user-search.ts
+import { number, object, query, string } from '@cleverbrush/knex-schema';
+import { knex } from './database.js';
+import { userRead } from './user-read.js';
+
+const UserLabel = object({
+    userId: number().hasColumnName('user_id'), label: string()
+}).hasTableName('user_labels');
+
+export function searchUsers(tenantId: number, term: string, priorityUserId: number) {
+    const labeledUsers = query(knex, UserLabel)
+        .where(l => l.userId, userRead.ref(u => u.id))
+        .where(l => l.label, term)
+        .select(l => l.userId).toKnexQuery();
+
+    return userRead.where(u => u.tenantId, tenantId)
+        .andWhere(group => group
+            .where(u => u.name, 'ilike', `%${term}%`)
+            .orWhereExists(labeledUsers))
+        .orderByRaw('case when ?? = ? then 0 else 1 end', [
+            userRead.ref(u => u.id), priorityUserId
+        ])
+        .orderBy(u => u.name)
+        .orderBy(u => u.id);
+}
+```
+
+The outer tenant filter applies to the **entire** search group. Group callbacks
+are synchronous and run once when the predicate is attached, not during SQL
+execution. Their scoped builder accumulates predicates, has no selection, join,
+ordering, mutation, or execution methods, and is closed after the callback.
+Return the provided group builder or nothing. An empty group adds no condition.
+Async callbacks and returned thenables are rejected; thenables are not executed.
+
+`ref()` resolves mapped columns and generated aliases for ordinary readers,
+explicit aliases for joined readers, and the correct child alias inside relation
+customizers. Pass references as `??` identifier bindings or as Knex comparison
+values when correlating a subquery. Values use `?` bindings. Raw SQL fragments
+must be application-authored, not interpolated user input; this API is **not a SQL
+sandbox**. Search escaping and application authorization remain caller policies.
+
+For membership, pass a value array or a single-column Knex SELECT subquery, for
+example `read.whereIn(u => u.id, labelPage.toKnexQuery())`. Put ordering and limits
+on that subquery to restrict IDs before joining/aggregating. EXISTS accepts a
+Knex SELECT subquery; construct it separately instead of passing a Knex callback.
+Subquery SQL and bindings are captured on attachment without database execution,
+including nested subquery callbacks. Later changes to those builders do not
+change the prepared reader. Empty IN lists match no rows; empty NOT IN lists
+match all rows, with ordinary SQL null semantics for non-empty lists/subqueries.
+
+These operations also work in ordinary ORM reads and nested relation customizers.
+For polymorphic reads, use them inside `forVariant()`; the union root does not
+offer raw filtering or ordering. Numbered pagination retains raw ordering while
+its count drops ordering/limits/offsets. `paginateAfter()` uses its explicit
+complete `orderBy` specification, replacing prior ordering, including raw order.
+No unrestricted `.apply()` or raw result-shape mutation is available in read mode.
 
 ### Nested graphs
 
