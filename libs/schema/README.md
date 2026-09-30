@@ -14,6 +14,30 @@ A schema definition and validation library for TypeScript — faster than Zod in
 
 Define a schema **once** and get TypeScript type inference, runtime validation, object mapping ([`@cleverbrush/mapper`](../mapper)), auto-generated React forms ([`@cleverbrush/react-form`](../react-form)), and bidirectional JSON Schema conversion ([`@cleverbrush/schema-json`](../schema-json)) — all from the same immutable, fluent API.
 
+## Indexed property descriptors
+
+Array descriptors keep their whole-array binding and expose lazy, cached indexed
+children for primitive, object and nested-array elements:
+
+```ts
+import { object, array, string, SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR } from '@cleverbrush/schema';
+const Profile = object({ addresses: array(object({ city: string().minLength(2) })) });
+const profile = { addresses: [{ city: 'Rome' }] };
+const properties = object.getPropertiesFor(Profile);
+const city = properties.addresses[0].city[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+city.toJsonPointer(); // '/addresses/0/city'
+city.setValue(profile, 'Paris', { createMissingStructure: true });
+const result = Profile.validate(profile, { doNotStopOnFirstError: true });
+result.getErrorsFor(t => t.addresses[0].city);
+```
+
+Both sync and async validation expose precise indexed paths in
+`getInvalidProperties()`, while retaining aggregate array errors. Indexed setters
+create actual arrays when requested; with `createMissingStructure: false` they
+do not create missing containers. Valid indices are canonical non-negative array
+indices, not negative/fractional positions. Descriptors are positional, not keyed
+item identities, and do not add array mutation methods to the descriptor tree.
+
 ## Why @cleverbrush/schema?
 
 **The problem:** In a typical TypeScript project, types and runtime validation are separate concerns. You define a `User` type in one file, then write Joi / Yup / Zod schemas (or manual `if` checks) in another. Over time these drift apart — the type says a field is required, but the validation allows it to be `undefined`. Tests pass, but production data breaks because the validation didn't match the type.

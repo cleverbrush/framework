@@ -27,6 +27,7 @@ import {
 } from './helpers.js';
 import type {
     FieldRenderer,
+    FormIssue,
     FormSubmissionState,
     FormSubmitHandler,
     FormSubmitOptions,
@@ -53,6 +54,13 @@ export type SchemaFormInstance<
     getValue: () => InferType<TSchema>;
     /** Shallow-merge values without marking fields touched. */
     setValue: (values: Partial<InferType<TSchema>>) => void;
+    /**
+     * Replace external issues without changing values. Empty pointers and unbound
+     * fields appear in form.error; bound fields receive the first issue and are
+     * marked touched. Prefer returned submission issues for async race protection.
+     * Pass [] to clear external issues without clearing local validation errors.
+     */
+    setIssues: (issues: readonly FormIssue[]) => void;
     /** Validate and submit once; repeated calls while pending are ignored. */
     handleSubmit: <TData = void>(
         onValid: (
@@ -159,8 +167,7 @@ export function useSchemaForm<
             }
             const getErrorsFor = (result as any).getErrorsFor;
             if (typeof getErrorsFor === 'function') {
-                for (const [descriptor] of pathMap) {
-                    const path = descriptor.toJsonPointer();
+                for (const path of store.getAllFieldPaths()) {
                     const parts = path
                         .slice(1)
                         .split('/')
@@ -190,7 +197,7 @@ export function useSchemaForm<
             }
             return result;
         },
-        [cancelScheduledValidation, store, pathMap]
+        [cancelScheduledValidation, store]
     );
 
     const validate = useCallback(() => runValidation(true), [runValidation]);
@@ -245,6 +252,7 @@ export function useSchemaForm<
                 const epoch = epochRef.current;
                 const current = () =>
                     mountedRef.current && epoch === epochRef.current;
+                store.setIssues([]);
                 store.setSubmissionState({
                     submitting: true,
                     error: undefined
@@ -273,7 +281,12 @@ export function useSchemaForm<
                     }
                     if (!current()) return;
                     if (outcome && !outcome.ok) {
-                        store.setSubmissionState({ error: outcome.error });
+                        store.setSubmissionFailure(
+                            outcome.error,
+                            revision === store.getRevision()
+                                ? outcome.issues
+                                : undefined
+                        );
                         return;
                     }
                     // Errors from success callbacks (including redirects) propagate;
@@ -332,6 +345,7 @@ export function useSchemaForm<
             reset,
             getValue,
             setValue,
+            setIssues: store.setIssues,
             handleSubmit,
             _getFormContext,
             get submitting() {

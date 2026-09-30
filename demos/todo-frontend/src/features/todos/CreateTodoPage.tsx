@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
     Box,
@@ -9,31 +8,26 @@ import {
 } from '@radix-ui/themes';
 import { Field, useSchemaForm } from '@cleverbrush/react-form';
 import { CreateTodoBodySchema } from '@cleverbrush/todo-backend/contract';
-import { ApiError } from '@cleverbrush/client';
+import { ApiError, decodeValidationIssues } from '@cleverbrush/client';
 import { client } from '../../api/client';
 
 export function CreateTodoPage() {
     const navigate = useNavigate();
-    const [error, setError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-
     const form = useSchemaForm(CreateTodoBodySchema);
 
-    const handleSubmit = async () => {
-        const result = await form.submit();
-        if (!result.valid || !result.object) return;
-
-        setLoading(true);
-        setError(null);
+    const handleSubmit = form.handleSubmit(async values => {
         try {
-            const todo = await client.todos.create({ body: result.object });
-            navigate(`/todos/${todo.id}`);
+            const todo = await client.todos.create({ body: values });
+            return { ok: true, data: todo };
         } catch (e) {
-            setError(e instanceof ApiError ? e.message : 'Failed to create todo.');
-        } finally {
-            setLoading(false);
+            const issues = decodeValidationIssues(e, { source: 'body' });
+            return {
+                ok: false,
+                error: issues ? 'Check the highlighted fields.' : e instanceof ApiError ? e.message : 'Failed to create todo.',
+                issues
+            };
         }
-    };
+    }, { onSuccess: todo => { navigate(`/todos/${todo!.id}`); } });
 
     return (
         <Box style={{ maxWidth: 540 }}>
@@ -42,9 +36,9 @@ export function CreateTodoPage() {
                 <Heading size="5">New Todo</Heading>
             </Flex>
 
-            {error && (
+            {form.error && (
                 <Callout.Root color="red" mb="4">
-                    <Callout.Text>{error}</Callout.Text>
+                    <Callout.Text>{form.error}</Callout.Text>
                 </Callout.Root>
             )}
 
@@ -52,7 +46,7 @@ export function CreateTodoPage() {
             <Field forProperty={(t) => t.description} form={form} label="Description (optional)" variant="textarea" />
 
             <Flex gap="3" mt="2">
-                <Button onClick={handleSubmit} loading={loading}>
+                <Button onClick={handleSubmit} loading={form.submitting}>
                     Create Todo
                 </Button>
                 <Button variant="soft" color="gray" onClick={() => navigate('/todos')}>

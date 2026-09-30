@@ -5,6 +5,20 @@
 
 A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema`](../schema) for request validation, [`@cleverbrush/di`](../di) for dependency injection, and [`@cleverbrush/auth`](../auth) for authentication — all wired together through a fluent builder API.
 
+## Structured validation paths for forms
+
+Request validation retains its existing 400 Problem Details envelope and
+`errors: [{ pointer, detail }]` extension. Nested arrays now expose indexed paths
+such as `/body/addresses/0/city` alongside existing aggregate errors. Property
+names use JSON Pointer escaping (`~0` for `~`, `~1` for `/`), including query and
+header names. These paths describe the request, not a particular UI.
+
+The optional client `decodeValidationIssues(error, { source: 'body' })` adapter
+produces serializable form-relative issues; see the
+[multi-file consumer example](../react-form/README.md#server-validation-issues).
+Application-owned business errors need explicit structured paths to appear beside
+fields; the framework never derives a field name from an exception's message.
+
 ## Features
 
 - **Fluent endpoint builder** — `endpoint.get('/users').body(schema).query(schema).authorize()` with fully typed handler context.

@@ -30,6 +30,7 @@ export type {
     FieldRenderer,
     FieldRenderProps,
     FieldState,
+    FormIssue,
     FormSubmissionState,
     FormSubmitHandler,
     FormSubmitOptions,

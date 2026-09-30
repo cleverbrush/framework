@@ -1101,6 +1101,15 @@ export class ObjectSchemaBuilder<
                         for (const error of result.errors) {
                             addErrorFor(descriptor, error.message);
                         }
+                        if (
+                            Array.isArray((result as any).getNestedErrors?.())
+                        ) {
+                            ObjectSchemaBuilder.#propagateIndexedErrors(
+                                result,
+                                descriptor,
+                                addErrorFor
+                            );
+                        }
                     }
                 }
             }
@@ -2676,6 +2685,13 @@ export class ObjectSchemaBuilder<
                         result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
                     );
                 }
+            } else if (propSchema.introspect().type === 'array') {
+                (result as any)[propName] = createIndexedDescriptor(
+                    propSchema,
+                    selector,
+                    propName,
+                    result[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                );
             } else if ((propSchema as any)[SYMBOL_HAS_PROPERTIES] === true) {
                 // Extern schema — create a Proxy-based descriptor that
                 // lazily creates child descriptors on property access.
@@ -2807,6 +2823,38 @@ export class ObjectSchemaBuilder<
                     );
                 }
             }
+            // Indexed descriptors are created lazily, so they are not keys in
+            // an object's static property map. Copy precise invalid descriptors
+            // below this property as well as the existing aggregate messages.
+            if (
+                nestedPropertyDescriptor[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR]
+                    .getSchema()
+                    ?.introspect().type === 'array' &&
+                typeof result.getInvalidProperties === 'function'
+            ) {
+                const prefix =
+                    nestedPropertyDescriptor[
+                        SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR
+                    ].toJsonPointer() + '/';
+                for (const invalid of result.getInvalidProperties()) {
+                    const pointer = invalid.descriptor.toJsonPointer();
+                    if (!pointer.startsWith(prefix)) continue;
+                    const target = pointer
+                        .slice(prefix.length)
+                        .split('/')
+                        .reduce(
+                            (node: any, part: string) =>
+                                node?.[
+                                    part.replace(/~1/g, '/').replace(/~0/g, '~')
+                                ],
+                            nestedPropertyDescriptor
+                        );
+                    if (!ObjectSchemaBuilder.isValidPropertyDescriptor(target))
+                        continue;
+                    for (const message of invalid.errors)
+                        addErrorFor(target, message, nestedPropertyDescriptor);
+                }
+            }
             // Recurse into nested object schemas (only when we have a property map)
             if (properties) {
                 const nestedSchema = properties[nestedPropertyName];
@@ -2827,6 +2875,65 @@ export class ObjectSchemaBuilder<
                 }
             }
         }
+    }
+
+    /** Propagate structured array results without interpreting message strings. */
+    static #propagateIndexedErrors(
+        result: any,
+        descriptor: any,
+        addErrorFor: (descriptor: any, message: string, parent?: any) => void
+    ): void {
+        const children = result.getNestedErrors?.();
+        if (!Array.isArray(children)) return;
+        children.forEach((child, index) => {
+            const indexed = descriptor[index];
+            if (
+                !child ||
+                child.valid ||
+                !ObjectSchemaBuilder.isValidPropertyDescriptor(indexed)
+            )
+                return;
+            if (typeof child.getInvalidProperties === 'function') {
+                const prefix =
+                    indexed[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR].toJsonPointer();
+                for (const invalid of child.getInvalidProperties()) {
+                    const pointer = invalid.descriptor.toJsonPointer();
+                    const relative =
+                        pointer === prefix
+                            ? ''
+                            : pointer.startsWith(prefix + '/')
+                              ? pointer.slice(prefix.length)
+                              : pointer;
+                    const target =
+                        relative === ''
+                            ? indexed
+                            : relative
+                                  .slice(1)
+                                  .split('/')
+                                  .reduce(
+                                      (node: any, part: string) =>
+                                          node?.[
+                                              part
+                                                  .replace(/~1/g, '/')
+                                                  .replace(/~0/g, '~')
+                                          ],
+                                      indexed
+                                  );
+                    if (!ObjectSchemaBuilder.isValidPropertyDescriptor(target))
+                        continue;
+                    for (const message of invalid.errors)
+                        addErrorFor(target, message, descriptor);
+                }
+            } else {
+                for (const error of child.errors ?? [])
+                    addErrorFor(indexed, error.message, descriptor);
+                ObjectSchemaBuilder.#propagateIndexedErrors(
+                    child,
+                    indexed,
+                    addErrorFor
+                );
+            }
+        });
     }
 
     static #getSchemaForPropertyDescriptor(
@@ -3002,6 +3109,85 @@ const createPropertyDescriptorFor = (
         }
     }
 });
+
+/** Build only requested array indices, preserving descriptor identity. */
+const createIndexedDescriptor = (
+    schema: SchemaBuilder<any, any, any, any, any>,
+    parentSelector: (value: any, create: boolean) => any,
+    name: string,
+    parent: PropertyDescriptorInner<any, any, any>
+): any => {
+    const base = createPropertyDescriptorFor(
+        parentSelector,
+        name,
+        schema,
+        parent
+    );
+    const intro = schema.introspect() as any;
+    const valueSelector = (root: any, create: boolean) => {
+        const container = parentSelector(root, create);
+        if (!container || typeof container !== 'object') return null;
+        if (
+            create &&
+            (!Object.hasOwn(container, name) || container[name] == null)
+        ) {
+            Object.defineProperty(container, name, {
+                value: intro.type === 'array' ? [] : {},
+                enumerable: true,
+                writable: true,
+                configurable: true
+            });
+        }
+        return Object.hasOwn(container, name) ? container[name] : null;
+    };
+    const inner = base[SYMBOL_SCHEMA_PROPERTY_DESCRIPTOR];
+    if (intro.type === 'array') {
+        const indices = new Map<string, any>();
+        return new Proxy(base, {
+            get(target, key, receiver) {
+                if (
+                    typeof key !== 'string' ||
+                    !/^(0|[1-9]\d*)$/.test(key) ||
+                    Number(key) >= 4294967295
+                ) {
+                    return Reflect.get(target, key, receiver);
+                }
+                if (!intro.elementSchema) return undefined;
+                if (!indices.has(key)) {
+                    indices.set(
+                        key,
+                        createIndexedDescriptor(
+                            intro.elementSchema,
+                            (root, create) => {
+                                const array = valueSelector(root, create);
+                                return Array.isArray(array) ? array : null;
+                            },
+                            key,
+                            inner as any
+                        )
+                    );
+                }
+                return indices.get(key);
+            }
+        });
+    }
+    if (intro.properties) {
+        for (const [key, child] of Object.entries(intro.properties)) {
+            Object.defineProperty(base, key, {
+                value: createIndexedDescriptor(
+                    child as any,
+                    valueSelector,
+                    key,
+                    inner as any
+                ),
+                enumerable: true
+            });
+        }
+    } else if ((schema as any)[SYMBOL_HAS_PROPERTIES]) {
+        return createExternProxyDescriptor(base, valueSelector);
+    }
+    return base;
+};
 
 /**
  * Creates a Proxy-wrapped property descriptor for an extern schema.

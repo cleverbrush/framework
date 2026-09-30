@@ -2,6 +2,35 @@
 
 Typed HTTP client for `@cleverbrush/server` API contracts — zero codegen, full type safety. Optional React + TanStack Query integration via `@cleverbrush/client/react`.
 
+## Decoding field validation errors
+
+`decodeValidationIssues(error, { source: 'body' })` recognizes `ApiError`
+validation Problem Details with status 400 or 422. It returns plain
+`{ pointer, detail }[]`, structurally compatible with React Form's `FormIssue`,
+or `undefined` for unrelated/malformed errors. No React import is needed.
+
+```ts
+import { decodeValidationIssues } from '@cleverbrush/client';
+try {
+    await client.profiles.save({ body: values });
+} catch (error) {
+    const issues = decodeValidationIssues(error, { source: 'body' });
+    if (issues) return { ok: false, error: 'Check your input.', issues };
+    throw error; // Or translate expected failures into an application-safe message.
+}
+```
+
+The source is required (`body`, `query`, or `headers`). Only that prefix is
+stripped: `/body/addresses/0/city` becomes `/addresses/0/city`. Other sources,
+unknown request roots and root errors become empty-pointer form-level issues,
+not silently dropped fields. JSON Pointer escapes are validated and preserved.
+Malformed entries reject the entire payload; retain a safe general-error fallback.
+The `errors` collection is Framework's extension, not a universal Problem Details
+standard. Business messages and network exceptions are never guessed into fields.
+
+See the [multi-file action/form example](../react-form/README.md#server-validation-issues)
+for serialization boundaries and the form issue lifecycle.
+
 ## Overview
 
 `@cleverbrush/client` provides a Proxy-based HTTP client that infers all endpoint types (params, body, query, headers, responses) from an API contract defined with `defineApi()` from `@cleverbrush/server/contract`. No code generation or manual type annotations are needed.
