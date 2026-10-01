@@ -1,4 +1,4 @@
-# Migrating to immutable queries (Framework v5)
+# Migrating from Framework v4.x to v5: immutable queries
 
 This is a coordinated **major release of all 19 published Framework packages**.
 Upgrade them together. Prerelease snapshots still use beta versions; the stable

@@ -2,8 +2,8 @@
 
 Type-safe, schema-driven query builder for [Knex](https://knexjs.org/). Use `@cleverbrush/schema` object builders to describe your PostgreSQL tables — column name mapping, eager loading, and full CRUD are handled automatically with complete TypeScript inference.
 
-This major release makes every Framework query immutable and exposes `.rowSchema` automatically.
-See the [migration guide](./MIGRATION-v5.md) before upgrading from v4 or an opt-in read beta.
+Every Framework query is immutable and exposes `.rowSchema` automatically.
+Upgrading? See [Migrating from v4.x to v5](./MIGRATION-v5.md).
 
 ## Installation
 
@@ -538,7 +538,7 @@ nested related objects instead.
 
 For reusable connection/transaction handling, ordinary and aliased schemas retain
 the same inference through `createQuery(knex)`, `withTransaction(trx)`, and
-`transaction(callback)`. Custom Knex base-query overloads are removed; use `rawQuery(knex, Output, sql)`
+`transaction(callback)`. Use `rawQuery(knex, Output, sql)`
 or `.apply(configure, { output })` for an explicit raw output contract. These APIs and their JSDoc are also available through `@cleverbrush/orm`.
 
 ### Aggregates with optional output schemas
@@ -665,7 +665,7 @@ URL is missing. CI runs PostgreSQL 16 integration tests alongside unit/type test
 ## Projection-aware reads
 
 Every Framework query is immutable and exposes its decoded `.rowSchema`
-automatically. There is no `.withRowSchema()` call or mutable compatibility mode.
+automatically.
 Capture returned queries when adding filters, projections or includes. Inspecting
 metadata never runs SQL. Ordinary table queries also support writes; projected
 results are detached, while full ORM entities can still use identity tracking.

@@ -13,7 +13,7 @@ EF-Core-like typed ORM layer on top of [`@cleverbrush/knex-schema`](../knex-sche
 
 ---
 
-For the breaking immutable-query release, read the [v5 migration guide](../knex-schema/MIGRATION-v5.md). All published Framework packages advance together.
+Upgrading? See [Migrating from v4.x to v5](../knex-schema/MIGRATION-v5.md).
 
 ## Installation
 
@@ -395,7 +395,7 @@ const tasks = await db.tasks
     .orderBy(t => t.createdAt, 'desc')
     .orderBy(t => t.id, 'desc')
     .include(t => t.owner, owners => {
-        owners.where(t => t.name, 'Alice'); // foreign schema, not any
+        return owners.where(t => t.name, 'Alice'); // foreign schema, not any
     })
     .limit(20);
 ```
@@ -405,9 +405,9 @@ does not necessarily filter parents. Callback types infer the declared foreign
 schema, including variant queries when the relation schema is known.
 
 `paginateAfter({ limit, cursor, orderBy: [...] })` supports non-null scalar sorts
-with a declared unique tie-breaker; single-column cursor calls are unchanged.
+with a declared unique tie-breaker. Use `column` for a single-column cursor.
 See the [complete query guide](../knex-schema/README.md#composable-read-queries) for defaults,
-precision policy, grouped aggregates, cursor restrictions, and migration examples.
+precision policy, grouped aggregates, cursor restrictions, and examples.
 
 ## Related packages
 

@@ -46,7 +46,7 @@ export interface AliasedColumn<T, S = any, Nullable extends boolean = boolean> {
      * Type-only marker carrying column nullability and value type; not a runtime row value.
      */
     readonly __value?: T;
-    /** Type-only original schema used by opt-in projection metadata. */
+    /** Type-only source schema used by projection metadata. */
     readonly __readSource?: S;
     /** Type-only join nullability, independent of the stored column schema. */
     readonly __leftJoined?: Nullable;

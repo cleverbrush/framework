@@ -116,7 +116,7 @@ src/
 - **Todos** — full CRUD, list pagination, `getWithAuthor`, polymorphic
   events (`assigned` / `commented` / `completed`), optimistic concurrency
   on `complete` (200 / 409 with `If-Match`), cross-user 403, attachment
-  download, `legacyReplace` redirect.
+  download, PUT redirect.
 - **Import / Export** — 207 small batch, 202 large batch, idempotency
   header (contract-level), CSV export with quoting + content headers.
 - **Users (admin)** — list (admin only), delete user, self-delete blocked,

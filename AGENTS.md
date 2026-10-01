@@ -135,6 +135,17 @@ The `demos/` directory is linted separately (see `demos/todo-backend/biome.json`
 - Target `ES2022`; use modern syntax freely
 - Type assertions with `as` are acceptable (the linter won't block them)
 
+## Documentation and Project Boundaries
+
+- Framework is an independent, application-agnostic project. Use generic domain
+  examples in source, documentation, changesets and PR descriptions. Consumer
+  application references belong only in website showcase links.
+- Describe the current supported API in READMEs, guides and JSDoc. Keep historical
+  API comparisons and upgrade instructions in explicitly labeled v4.x-to-v5
+  migration documentation, and link to it from current guides where useful.
+- Preserve accurate API contracts and deprecation annotations; do not change
+  runtime behavior just to simplify documentation.
+
 ---
 
 ## Testing Conventions

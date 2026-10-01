@@ -943,72 +943,8 @@ export const ddlExtension = defineExtension({
             return this.withExtension('beforeDelete', [...existing, fn]);
         }
 
-        /**
-         * Declare polymorphic variants for this schema.
-         *
-         * Turns a base schema into a **polymorphic schema** where a discriminator
-         * column determines which variant each row belongs to. Variants can store
-         * their extra fields either in a separate table (CTI — Class Table
-         * Inheritance) or as nullable columns on the base table (STI — Single
-         * Table Inheritance).
-         *
-         * The return type carries a phantom brand
-         * (`[POLYMORPHIC_TYPE_BRAND]`) so that `query(db, schema)` automatically
-         * infers the full discriminated-union result type.
-         *
-         * @param config.discriminator - Property key (or accessor) of the
-         *   discriminator column on the base table (e.g. `'type'` or `t => t.type`).
-         * @param config.variants - Map from discriminator value to
-         *   `{ schema, storage, foreignKey?, allowOrphan?, enforceCheck? }`.
-         *   - `storage: 'cti'` — variant fields are in a separate table;
-         *     `foreignKey` (the FK column on the variant table) is required.
-         *   - `storage: 'sti'` — variant fields are nullable columns on the base table.
-         *
-         * @example
-         * ```ts
-         * const FileBase = object({ id: number().primaryKey(), name: string(), type: string() })
-         *   .hasTableName('files');
-         *
-         * const ImageExtras = object({ width: number(), height: number(), format: string() })
-         *   .hasTableName('image_file');
-         *
-         * const DocumentExtras = object({ size: number(), issueDate: date() })
-         *   .hasTableName('document_file');
-         *
-         * const ImageExtras = object({
-         *   fileId: number().hasColumnName('file_id'),
-         *   type:   string('image'),
-         *   width: number(), height: number(), format: string()
-         * }).hasTableName('image_file');
-         *
-         * const DocumentExtras = object({
-         *   fileId: number().hasColumnName('file_id'),
-         *   type:   string('document'),
-         *   size: number(), issueDate: date()
-         * }).hasTableName('document_file');
-         *
-         * const FileSchema = FileBase.withVariants({
-         *   discriminator: t => t.type,
-         *   variants: {
-         *     image:    { schema: ImageExtras,    storage: 'cti', foreignKey: t => t.fileId },
-         *     document: { schema: DocumentExtras, storage: 'cti', foreignKey: t => t.fileId },
-         *   },
-         * });
-         *
-         * // query(db, FileSchema) returns:
-         * // Array<
-         * //   | { id: number; name: string; type: 'image';    width: number; height: number; format: string }
-         * //   | { id: number; name: string; type: 'document'; size: number; issueDate: Date }
-         * // >
-         * ```
-         */
-        // NOTE: the public `.withVariants()` schema-level method has been
-        // removed. Variants are now declared on the {@link Entity} chain via
-        // `defineEntity(...).discriminator(...).ctiVariant(...).stiVariant(...)`.
-        // The internal worker {@link applyVariantsToSchema} (below this
-        // `defineExtension` block) is invoked by the Entity layer and stores
-        // the same `'variants'` / `'polymorphicVariants'` extensions that
-        // `QuerySource` reads at runtime.
+        // Entity declarations use applyVariantsToSchema to store the variant
+        // metadata consumed by polymorphic queries.
     }
 });
 

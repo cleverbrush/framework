@@ -22,6 +22,10 @@
 
 Make Framework query builders immutable and infer row schemas automatically.
 
-This breaking release requires consumers to retain returned query builders, return synchronous builders from scopes and grouped predicates, and supply an explicit Framework object output schema for opaque raw SELECTs. Remove withRowSchema() calls: ordinary, aliased, polymorphic and ORM queries now expose their row schemas directly. Projections replace scalar selections, and projected/aggregate/raw queries cannot perform entity writes. Reads and write-returning rows consistently preserve exact decimal/bigint strings, Date objects and SQL nulls.
+Retain returned query builders, return synchronous builders from scopes and grouped predicates, and supply an explicit Framework object output schema for opaque raw SELECTs. Ordinary, aliased, polymorphic and ORM queries expose their row schemas directly. Projections replace scalar selections, and projected/aggregate/raw queries cannot perform entity writes. Reads and write-returning rows consistently preserve exact decimal/bigint strings, Date objects and SQL nulls.
 
-All published Framework packages advance together to the next major version. See the knex-schema and ORM migration guides before upgrading; tracked entity objects remain mutable.
+All published Framework packages advance together to the next major version. Tracked entity objects remain mutable.
+
+### Migrating from v4.x to v5
+
+Remove `withRowSchema()` calls and retain each configured query instead of relying on mutation. Replace raw base-query overloads with explicit output contracts. See `libs/knex-schema/MIGRATION-v5.md` for the complete migration guide.

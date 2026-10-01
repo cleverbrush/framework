@@ -237,7 +237,7 @@ export class QuerySource<
     }
 
     /**
-     * Append a legacy SQL COUNT selection without executing the query.
+     * Append a internal SQL COUNT selection without executing the query.
      * The driver controls the result shape/value type. Prefer countValue() for a
      * checked scalar number, or aggregate.count() in a typed object projection.
      */
@@ -246,16 +246,16 @@ export class QuerySource<
     }
 
     /**
-     * Append a legacy COUNT(DISTINCT column) selection.
+     * Append a internal COUNT(DISTINCT column) selection.
      * Prefer countDistinctValue() for a checked scalar or aggregate.countDistinct()
-     * for an inferred grouped result; this legacy method retains the builder type.
+     * for an inferred grouped result; this planner method retains the builder type.
      */
     countDistinct(column?: ColumnRef<TLocalSchema> | Knex.Raw): this {
         return (countDistinctImpl as any)(this, column);
     }
 
     /**
-     * Append a legacy MIN selection without changing the result type.
+     * Append a internal MIN selection without changing the result type.
      * Use minValue() for a scalar with explicit decoding, or aggregate.min() in a
      * typed projection. SQL returns null for an empty/all-null input.
      */
@@ -264,7 +264,7 @@ export class QuerySource<
     }
 
     /**
-     * Append a legacy MAX selection without changing the result type.
+     * Append a internal MAX selection without changing the result type.
      * Use maxValue() for a scalar with explicit decoding, or aggregate.max() in a
      * typed projection. SQL returns null for an empty/all-null input.
      */
@@ -273,7 +273,7 @@ export class QuerySource<
     }
 
     /**
-     * Append a legacy SUM selection, leaving numeric conversion to the driver.
+     * Append a internal SUM selection, leaving numeric conversion to the driver.
      * Prefer sumValue() or aggregate.sum() to preserve exact numeric text by default.
      */
     sum(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
@@ -281,7 +281,7 @@ export class QuerySource<
     }
 
     /**
-     * Append a legacy AVG selection, leaving numeric conversion to the driver.
+     * Append a internal AVG selection, leaving numeric conversion to the driver.
      * Prefer avgValue() or aggregate.avg() for a typed, precision-preserving result.
      */
     avg(column: ColumnRef<TLocalSchema> | Knex.Raw): this {
@@ -874,7 +874,7 @@ export class QuerySource<
     /**
      * Read a cursor page without running a total-count query.
      * The orderBy form clones the source and preserves exact composite sort values;
-     * its non-null sort must contain a declared unique key. The legacy column form
+     * its non-null sort must contain a declared unique key. The single-column form
      * mutates this builder and defaults to id descending. Reapply access filters on
      * every request: cursors are positions, not authorization or snapshots.
      * @returns Mapped data, hasMore, and a nextCursor that is null on the last page.
@@ -886,7 +886,7 @@ export class QuerySource<
     /**
      * Read a cursor page without running a total-count query.
      * The orderBy form clones the source and preserves exact composite sort values;
-     * its non-null sort must contain a declared unique key. The legacy column form
+     * its non-null sort must contain a declared unique key. The single-column form
      * mutates this builder and defaults to id descending. Reapply access filters on
      * every request: cursors are positions, not authorization or snapshots.
      * @returns Mapped data, hasMore, and a nextCursor that is null on the last page.
@@ -897,7 +897,7 @@ export class QuerySource<
         cursor?: any;
         /** Maximum parent rows to return; one extra row determines hasMore. */
         limit: number;
-        /** Unique sort property; defaults to id in the legacy API. */
+        /** Unique sort property; defaults to id for single-column paging. */
         column?: ColumnRef<TLocalSchema>;
         /** Sort/continuation direction; defaults to descending. */
         direction?: 'asc' | 'desc';
@@ -905,7 +905,7 @@ export class QuerySource<
     /**
      * Read a cursor page without running a total-count query.
      * The orderBy form clones the source and preserves exact composite sort values;
-     * its non-null sort must contain a declared unique key. The legacy column form
+     * its non-null sort must contain a declared unique key. The single-column form
      * mutates this builder and defaults to id descending. Reapply access filters on
      * every request: cursors are positions, not authorization or snapshots.
      * @returns Mapped data, hasMore, and a nextCursor that is null on the last page.

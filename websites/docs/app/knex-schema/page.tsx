@@ -374,7 +374,7 @@ const average = await query(knex, TaskSchema).avgValue(t => t.estimate, {
                         }}
                     />
                     <p>
-                        Queries are immutable in this major release. Read the{' '}
+                        Queries are immutable. Read the{' '}
                         <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#composable-read-queries">
                             complete query guide
                         </a>{' '}
@@ -385,12 +385,11 @@ const average = await query(knex, TaskSchema).avgValue(t => t.estimate, {
                 <div className="card" id="row-schemas">
                     <h2>Automatic projection-aware schemas</h2>
                     <p>
-                        Every query exposes rowSchema automatically; no extra
-                        mode switch is needed. Immutable PostgreSQL queries
-                        describe the actual decoded result schema: SQL null
-                        stays null, dates are Date objects at every depth, and
-                        decimal/bigint values are exact strings before JSON
-                        parsing.
+                        Every query exposes rowSchema automatically. Immutable
+                        PostgreSQL queries describe the actual decoded result
+                        schema: SQL null stays null, dates are Date objects at
+                        every depth, and decimal/bigint values are exact strings
+                        before JSON parsing.
                     </p>
                     <pre>
                         <code
@@ -410,7 +409,7 @@ const rows = await read.where(t => t.id, taskId);`)
                         Retain every returned builder when configuring a query.
                     </p>
                     <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#projection-aware-reads">
-                        Read representation, pagination and migration details
+                        Read representation and pagination details
                     </a>
                 </div>
 

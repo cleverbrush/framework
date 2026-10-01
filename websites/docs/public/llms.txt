@@ -177,8 +177,8 @@ belong to these packages. Knex is a peer dependency; PostgreSQL also needs `pg`.
   exposes typed DbSets. Ordinary entity queries support identity tracking,
   change persistence, optimistic concurrency and STI/CTI variants. Use
   `@cleverbrush/orm-cli` for migrations. [ORM guide](/orm).
-- **Immutable queries:** every Framework query exposes `rowSchema` automatically;
-  `.withRowSchema()` is removed. Retain returned builders. `rowSchema` describes
+- **Immutable queries:** every Framework query exposes `rowSchema` automatically.
+  Retain returned builders. `rowSchema` describes
   the decoded selection, and accessing it never executes SQL. Full ORM entities
   remain tracked when enabled; projected, grouped, distinct and raw rows are detached. SQL nulls stay `null`, dates
   decode to `Date` throughout nested graphs, and declared decimal/bigint columns

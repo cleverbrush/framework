@@ -307,8 +307,8 @@ function App() {
                         <code>createFormSystem</code>. Its <code>Field</code>{' '}
                         checks the selected value, variant and custom props.
                         Extend it by spreading <code>system.renderers</code>.
-                        Its optional <code>Provider</code> also configures
-                        legacy fields.
+                        Its optional <code>Provider</code> supplies renderers to
+                        descendant fields.
                     </p>
                     <pre>
                         <code
