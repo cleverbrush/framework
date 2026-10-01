@@ -140,8 +140,8 @@ array(text).parse(['ok', 42]); // ['ok', undefined] — no entries dropped`}</co
                     runs only when validation fails.
                 </p>
                 <p>
-                    Legacy optional schemas accept <code>null</code> at runtime
-                    even when their inferred type omits it. A fallback does not
+                    Optional schemas accept <code>null</code> at runtime even
+                    when their inferred type omits it. A fallback does not
                     replace a value that passed validation, so normalize null
                     explicitly when your application requires undefined:
                 </p>

@@ -98,12 +98,9 @@ deepEqual(new Map(), new Map());
 // => false (opaque objects compare by identity)
 ```
 
-**Breaking comparison corrections:** previous versions could throw for object/null
-pairs, consider Dates equal to unrelated objects, compare distinct opaque objects
-by enumerable shape, and reject equivalent cycles or repeated references. Signed
-zero, invalid Dates, symbol keys and sparse arrays now follow the rules above.
-Audit consumers relying on those outcomes. To compare Maps/Sets/custom instances
-by content, explicitly project their relevant state into plain data first.
+To compare Maps/Sets/custom instances by content, explicitly project their
+relevant state into plain data first. For upgrade considerations, see the
+[v4.x-to-v5 migration guide](../../docs/cache-form-migration.md#shared-data-snapshots-and-equality-breaking).
 
 ### `deepExtend(...objects)`
 

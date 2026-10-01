@@ -109,7 +109,7 @@ describe('published query/ORM API documentation', () => {
     it('documents aggregate expressions, bound factory overloads and cursor options', () => {
         for (const [path, name] of [
             ['../dist/expressions.d.ts', 'aggregate'],
-            ['../dist/SchemaQueryBuilder.d.ts', 'BoundQuery'],
+            ['../dist/query.d.ts', 'BoundQuery'],
             [
                 '../dist/operations/composite-cursor.d.ts',
                 'CompositeCursorOptions'

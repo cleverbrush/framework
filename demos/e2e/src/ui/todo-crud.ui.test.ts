@@ -62,6 +62,12 @@ describe('UI — todo CRUD', () => {
 
             // Detail page after creation
             await page.waitForURL(/\/todos\/\d+$/, { timeout: 10_000 });
+            // Stay on the detail page until its requests settle: an admin-only
+            // picker lookup must not sign out an ordinary user after creation.
+            await page.getByRole('button', { name: 'Save Changes', exact: true }).waitFor();
+            await page.waitForLoadState('networkidle');
+            expect(page.url()).toMatch(/\/todos\/\d+$/);
+            expect(await page.locator('input').first().inputValue()).toBe(title);
             const url = page.url();
             const todoId = Number(url.match(/\/todos\/(\d+)$/)![1]);
 

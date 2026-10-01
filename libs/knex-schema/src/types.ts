@@ -7,7 +7,10 @@ import type {
     PropertyDescriptorTree
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
+import type { SchemaProps } from './entity.js';
 import type { AggregateExpression } from './expressions.js';
+import type { ReadRelations } from './read-entity.js';
+import type { ObjectReadSchema, ReadValue } from './read-schema.js';
 
 // ---------------------------------------------------------------------------
 // Utility: extract string keys from an ObjectSchemaBuilder's inferred type
@@ -258,17 +261,15 @@ export type ValidatedSpec =
  */
 export type InsertType<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-> = InferType<ReturnType<T['makeAllPropsOptional']>>;
+> = {
+    [K in Exclude<keyof SchemaProps<T>, keyof ReadRelations<T>>]?:
+        | InferType<SchemaProps<T>[K]>
+        | ReadValue<SchemaProps<T>[K]>;
+};
 
 // ---------------------------------------------------------------------------
 // Database row helpers
 // ---------------------------------------------------------------------------
-
-type OptionalKeys<T> = {
-    [K in keyof T]-?: undefined extends T[K] ? K : never;
-}[keyof T];
-
-type RequiredKeys<T> = Exclude<keyof T, OptionalKeys<T>>;
 
 /**
  * Normalize a schema-inferred property type to the value shape commonly
@@ -290,11 +291,7 @@ export type InferDatabaseValue<T> = undefined extends T
  */
 export type InferDatabaseRow<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
-> = {
-    [K in RequiredKeys<InferType<T>>]: InferDatabaseValue<InferType<T>[K]>;
-} & {
-    [K in OptionalKeys<InferType<T>>]?: InferDatabaseValue<InferType<T>[K]>;
-};
+> = InferType<ObjectReadSchema<T, keyof ReadRelations<T>>>;
 
 // ---------------------------------------------------------------------------
 // Primary-key type helpers (driven by PRIMARY_KEY_BRAND / COMPOSITE_PRIMARY_KEY_BRAND)
@@ -379,7 +376,12 @@ export type PrimaryKeyValueOf<
             ? PkTupleValue<S, PrimaryKeyOf<S>>
             : never
         : PrimaryKeyOf<S> extends string
-          ? InferType<S>[PrimaryKeyOf<S> & keyof InferType<S>]
+          ?
+                | InferType<S>[PrimaryKeyOf<S> & keyof InferType<S>]
+                | ReadValue<
+                      SchemaPropsForPk<S>[PrimaryKeyOf<S> &
+                          keyof SchemaPropsForPk<S>]
+                  >
           : never;
 
 /**
@@ -392,7 +394,11 @@ type PkTupleValue<
     TKeys extends readonly string[]
 > = {
     [I in keyof TKeys]: TKeys[I] extends keyof InferType<S>
-        ? InferType<S>[TKeys[I]]
+        ?
+              | InferType<S>[TKeys[I]]
+              | ReadValue<
+                    SchemaPropsForPk<S>[TKeys[I] & keyof SchemaPropsForPk<S>]
+                >
         : unknown;
 };
 
@@ -536,7 +542,7 @@ export interface RelationSpec {
     name: string;
     schema: any;
     foreignKey?: any;
-    /** Explicit schema property names retained for opt-in read correlation. */
+    /** Explicit schema property names used for read correlation. */
     localKey?: string;
     remoteKey?: string;
     /** Nullable belongs-to relations do not filter out their parent rows. */

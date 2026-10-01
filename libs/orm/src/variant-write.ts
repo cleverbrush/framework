@@ -9,13 +9,31 @@ import {
     buildColumnMap,
     getPrimaryKeyColumns,
     getVariants,
+    object,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
+import type { ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/** Keep table metadata and hooks without constructing a polymorphic reader. */
+function storageSchema(
+    schema: any,
+    properties = schema.introspect().properties
+): ObjectSchemaBuilder<any, any, any, any, any, any, any> {
+    let stored: ObjectSchemaBuilder<any, any, any, any, any, any, any> =
+        object(properties);
+    for (const [key, value] of Object.entries(
+        schema.introspect().extensions ?? {}
+    )) {
+        if (key !== 'variants' && key !== 'polymorphicVariants')
+            stored = stored.withExtension(key, value) as typeof stored;
+    }
+    return stored;
+}
 
 /**
  * Resolve the variant config for a schema, throwing if the schema is not
@@ -90,10 +108,13 @@ export async function insertVariant(
         if (spec.storage === 'sti') {
             // Single-table: insert into base table with discriminator column
             const row = { ...payload, [discKey]: variantKey };
-            const sqb = schemaQuery(t, schema) as unknown as {
-                insert: (data: unknown) => Promise<Record<string, unknown>>;
+            const props = {
+                ...schema.introspect().properties,
+                ...spec.schema.introspect().properties
             };
-            return (await sqb.insert(row)) ?? row;
+            const stored = storageSchema(schema, props);
+            const result = await schemaQuery(t, stored).insert(row as any);
+            return result as Record<string, unknown>;
         }
 
         // CTI: two-table insert
@@ -129,20 +150,11 @@ export async function insertVariant(
             // Keys that match neither schema are silently dropped
         }
 
-        // 1. Insert base row using raw knex (not SchemaQueryBuilder) to avoid
-        //    polymorphic result-resolution running before the variant row exists.
-        const { propToCol: basePropToCol } = buildColumnMap(schema);
-        const baseRowForInsert: Record<string, unknown> = {};
-        for (const [propKey, val] of Object.entries(basePayload)) {
-            baseRowForInsert[basePropToCol.get(propKey) ?? propKey] = val;
-        }
-        const baseInsertResult = await (t as unknown as Knex)(baseTableName)
-            .insert(baseRowForInsert)
-            .returning('*');
-        const baseRow: Record<string, unknown> =
-            Array.isArray(baseInsertResult) && baseInsertResult.length > 0
-                ? (baseInsertResult[0] as Record<string, unknown>)
-                : baseRowForInsert;
+        // 1. Decode base RETURNING values before using the PK. In particular,
+        // bigint IDs must be text-cast in SQL before driver parsers can round them.
+        const baseRow = (await schemaQuery(t, storageSchema(schema)).insert(
+            basePayload as any
+        )) as Record<string, unknown>;
 
         // Resolve the base PK value from the returned row
         const pkInfo = getPrimaryKeyColumns(schema);
@@ -179,17 +191,17 @@ export async function insertVariant(
         }
         await (t as unknown as Knex)(variantTableName).insert(variantRow);
 
-        // 3. Merge and return
-        const { colToProp: baseColToProp } = buildColumnMap(schema);
-        const result: Record<string, unknown> = {};
-        for (const [col, val] of Object.entries(baseRow)) {
-            result[baseColToProp.get(col) ?? col] = val;
-        }
-        // Ensure discriminator and variant payload are in the result
-        result[discKey] = variantKey;
-        for (const [propKey, val] of Object.entries(variantPayload)) {
-            result[propKey] = val;
-        }
+        // Read the completed branch inside the same transaction for one consistent storage representation.
+        const result = await (schemaQuery(t, schema) as any)
+            .selectVariants([variantKey])
+            .unscoped()
+            .withDeleted()
+            .where(pkPropKey, pkValue)
+            .first();
+        if (!result)
+            throw new Error(
+                'insertVariant: inserted row could not be read back'
+            );
         return result;
     };
 

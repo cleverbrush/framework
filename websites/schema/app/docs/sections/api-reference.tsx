@@ -264,11 +264,9 @@ export default function ApiReferenceSection() {
                                 <td>
                                     Result of <code>.validate()</code>. Contains{' '}
                                     <code>valid</code>, <code>errors</code>, and{' '}
-                                    <code>object</code>. For object schemas,
-                                    also includes <code>getErrorsFor()</code> (
-                                    <code>errors</code> is{' '}
-                                    <strong>deprecated</strong> on object schema
-                                    results).
+                                    <code>object</code>. For object schemas, use{' '}
+                                    <code>getErrorsFor()</code> for per-property
+                                    errors.
                                 </td>
                             </tr>
                             <tr>

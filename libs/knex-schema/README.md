@@ -2,6 +2,9 @@
 
 Type-safe, schema-driven query builder for [Knex](https://knexjs.org/). Use `@cleverbrush/schema` object builders to describe your PostgreSQL tables — column name mapping, eager loading, and full CRUD are handled automatically with complete TypeScript inference.
 
+Every Framework query is immutable and exposes `.rowSchema` automatically.
+Upgrading? See [Migrating from v4.x to v5](./MIGRATION-v5.md).
+
 ## Installation
 
 ```bash
@@ -32,7 +35,7 @@ const db = knex({ client: 'pg', connection: process.env.DB_URL });
 const adults = await query(db, UserSchema)
     .where(t => t.age, '>', 18)
     .orderBy(t => t.lastName);
-// → typed as Array<{ id: number; firstName: string; lastName: string; age?: number; createdAt: Date }>
+// → typed as Array<{ id: number; firstName: string; lastName: string; age: number | null; createdAt: Date }>
 ```
 
 ## Schema Definition
@@ -217,7 +220,7 @@ query(db, UserSchema)
 
 ## Eager Loading (No N+1)
 
-Related rows are loaded in a **single query** using PostgreSQL CTEs and `jsonb_agg`.
+Related rows are loaded in a **single query** using correlated PostgreSQL subqueries and `jsonb_agg`.
 
 ### `joinOne` — one-to-one / many-to-one
 
@@ -248,27 +251,32 @@ const users = await query(db, UserSchema)
         foreignColumn: t => t.authorId,
         as:            'posts',
         limit:         5,
-        orderBy:       { column: t => t.id, direction: 'desc' },
-    });
+    }, posts => posts.orderBy(t => t.id, 'desc'));
 // users[0].posts — typed as Array<{ id: number; title: string; authorId: number }> ✓
 ```
 
-The `joinMany` spec supports:
-- `limit` / `offset` — per-parent pagination using `row_number()` window functions
-- `orderBy` — `{ column, direction }` for the sub-collection
-- `foreignQuery` — pre-filtered `Knex.QueryBuilder` (e.g. for soft-delete scopes)
-- `required` (`joinOne` only) — `true` = inner join, `false` = left join (nullable result)
+The `joinMany` spec accepts per-parent `limit` / `offset`. Return the configured
+child from its second argument for filtering, ordering and projection. Child
+default scopes and soft-delete filters apply automatically. `joinOne` additionally
+accepts `required: false` for nullable related objects; required relations filter
+parents without a matching child. Raw `foreignQuery`, `mappers` and `orderBy` spec
+properties are replaced by the typed child customizer.
 
 ---
 
 ## Escape Hatch
 
-When you need a Knex feature not exposed by this API, use `.apply()`:
+When Framework cannot infer a SQL shape, declare a complete object output schema.
+The Knex callback runs once on an isolated builder. The output parser receives
+each raw row once; it does not get an additional entity-decoding pass:
 
 ```typescript
-const rows = await query(db, UserSchema)
-    .apply(qb => qb.forUpdate().noWait())
-    .where(t => t.id, id);
+const Totals = object({ count: number().coerce() });
+const totals = query(db, UserSchema)
+    .where(t => t.age, '>', 18)
+    .apply(qb => qb.clearSelect().count({ count: '*' }), { output: Totals });
+const rows = await totals;
+// totals.rowSchema === Totals
 ```
 
 ---
@@ -295,7 +303,7 @@ const posts = await query(db, PostSchema)
     .scoped('published')
     .scoped('recent');
 
-// Bypass default scope (also skips soft-delete filter if present)
+// Bypass only the default scope; use .withDeleted() separately for soft deletes
 const all = await query(db, PostSchema).unscoped();
 ```
 
@@ -340,10 +348,12 @@ The accessor receives the schema's property-descriptor tree; each element resolv
 property name at runtime. This form is more refactor-safe but does not provide the compile-time
 `Pick<>` narrowing that the tuple form offers.
 
-### Conflict rules
+### Projection replacement
 
-`.projected()` cannot be combined with `.select()`, `.distinct()`, or any aggregate
-(`.count()`, `.min()`, etc.) on the same query. Attempting to do so throws at runtime.
+Each `.select()`, `.projected()`, or aggregate projection returns a new query and
+replaces its scalar selection. Previously prepared queries keep their shape.
+Included relations remain independent of scalar projections. Projected, grouped,
+distinct and joined queries are read-only; begin writes from an unprojected table query.
 
 ### Column-name mapping
 
@@ -382,7 +392,7 @@ export const PostEntity = defineEntity(PostSchema)
     .belongsTo(t => t.author, l => l.authorId, r => r.id);
 ```
 
-The returned `Entity` carries the relation map in its type, so downstream `query(db, entity)`
+The returned `Entity` carries the relation map in its type, so downstream `query(db, entity.schema)`
 calls (and `@cleverbrush/orm`'s `DbSet.include()`) get full inference.
 
 For many-to-many replacement flows, use the link table directly: delete the
@@ -520,16 +530,16 @@ identifier quoting. Existing table/column metadata APIs are not restricted by it
 The read-only aliased builder requires an explicit, non-empty projection and
 supports `where`, `whereIn`, `whereNull`, `whereNotNull`, `orderBy`, `orderByRaw`,
 `groupBy`, `having`, `limit`, `offset`, `first`, `execute`, `transacting`, and
-awaiting the query. `apply`/`toKnexQuery` remain raw escape hatches whose effects
-on result shape/cardinality are the caller's responsibility. Values remain bound
+awaiting the query. `apply` requires `{ output }`; `toKnexQuery()` returns an independent native SQL
+snapshot whose execution bypasses Framework decoding. Values remain bound
 and identifiers quoted. Flat collection joins can repeat parents; they do not
 deduplicate or fetch one related row at a time. Choose ORM eager loading for
 nested related objects instead.
 
 For reusable connection/transaction handling, ordinary and aliased schemas retain
 the same inference through `createQuery(knex)`, `withTransaction(trx)`, and
-`transaction(callback)`. Only ordinary-schema calls accept a custom Knex base
-query. These APIs and their JSDoc are also available through `@cleverbrush/orm`.
+`transaction(callback)`. Use `rawQuery(knex, Output, sql)`
+or `.apply(configure, { output })` for an explicit raw output contract. These APIs and their JSDoc are also available through `@cleverbrush/orm`.
 
 ### Aggregates with optional output schemas
 
@@ -571,9 +581,10 @@ use native SQL values, not decoded/text-formatted values.
 Counts reject malformed results and integers outside JavaScript's safe range.
 Sum/average preserve PostgreSQL's result as text without changing global driver
 parsers. This does not make floating-point source columns exact. Numeric/decimal/
-bigint extrema retain strings; because existing SQL overrides are not fully
-represented in schema types, numeric extrema are conservatively typed as
-`number | string | null`. Date extrema return `Date | null`.
+bigint extrema retain strings; known SQL-type metadata controls their inferred
+representation. Ordinary number extrema are `number | null`, exact numeric extrema
+are `string | null`, and Date extrema are `Date | null`. Dynamic widened SQL hints
+may conservatively infer `number | string | null`.
 
 An optional **output schema replaces the default decoder**. Its synchronous
 `parse` receives the raw driver value, including null, before default conversion.
@@ -587,8 +598,8 @@ Scalar helpers clone the source, ignore its limit/offset/order, and retain
 filters, semantic joins, scopes, and transactions. They reject grouped, HAVING,
 distinct, and already aggregated queries; use aggregate projections for those.
 An empty scalar count is zero; other empty/all-null aggregates are null. An
-empty grouped query returns no rows. Legacy `.count()`, `.sum()`, etc. keep their
-existing behavior and signatures.
+empty grouped query returns no rows. `.count()`, `.sum()`, etc. now produce typed
+single-field projections with automatically updated row schemas.
 
 ### Eager-loading order
 
@@ -653,9 +664,11 @@ URL is missing. CI runs PostgreSQL 16 integration tests alongside unit/type test
 
 ## Projection-aware reads
 
-`withRowSchema()` is an **opt-in PostgreSQL read API**. Schema-aware queries are immutable,
-detached read plans: capture the returned value when adding filters or includes.
-They do not track entities, save changes, or run SQL when inspecting metadata.
+Every Framework query is immutable and exposes its decoded `.rowSchema`
+automatically.
+Capture returned queries when adding filters, projections or includes. Inspecting
+metadata never runs SQL. Ordinary table queries also support writes; projected
+results are detached, while full ORM entities can still use identity tracking.
 
 ### Definitions can live in separate files
 
@@ -666,11 +679,12 @@ import { knex } from './database.js';
 
 const UserTable = object({
     id: number().primaryKey(), name: string(),
+    tenantId: number().hasColumnName('tenant_id'),
     lastSeen: date().optional().hasColumnName('last_seen'),
     secret: string()
 }).hasTableName('users');
 
-export const userRead = createQuery(knex)(UserTable).withRowSchema()
+export const userRead = createQuery(knex)(UserTable)
     .select(u => ({ id: u.id, name: u.name, lastSeen: u.lastSeen }));
 export const UserRow = userRead.rowSchema;
 ```
@@ -724,10 +738,10 @@ are rejected. A widened dynamic numeric SQL type has a conservative
 `number | string` read type. Driver custom parsers must still honor the declared
 representation, or decoding fails.
 
-Timezone-less SQL dates/timestamps are interpreted as UTC in this opt-in mode;
+Timezone-less SQL dates/timestamps are interpreted as UTC;
 explicit offsets preserve their instant. Native date fields are projected as text
 before decoding, so root and nested values do not depend on a driver's local-time
-date parser. This is a deliberate opt-in convention, not a change to legacy reads.
+date parser. This applies to ordinary reads, nested graphs and write-returning rows.
 
 Input defaults, preprocessors and input-only validators are not replayed on stored
 rows. Read schemas are structural output schemas. Optional schemas with input
@@ -742,7 +756,7 @@ in private text columns, independently of the public date values.
 ### Projections, aliases and aggregates
 
 ```ts
-const read = query(knex, alias(UserTable, 'user')).withRowSchema()
+const read = query(knex, alias(UserTable, 'user'))
     .leftJoin(alias(ProfileTable, 'profile'), t => eq(t.user.id, t.profile.userId))
     .select(t => ({ id: t.user.id, displayName: t.profile.displayName }));
 // displayName is nullable even if ProfileTable declares it required.
@@ -755,14 +769,94 @@ Aliased reads require an explicit selection before execution or accessing
 readers. Typed aggregates work in object selections: count returns a safe number,
 sum/average preserve exact text, and empty extrema/sums remain nullable. An explicit
 Framework output schema replaces aggregate decoding and is parsed once; opaque
-parser objects without schema introspection are rejected in this mode.
+parser objects without schema introspection cannot supply projection metadata.
+
+### Filtering and ordering without changing the result schema
+
+Ordinary and aliased readers provide the following shape-preserving operations.
+All return an independent reader with the **same `rowSchema` object**; retain the
+returned reader when adding conditional filters. Filtering a nullable field does
+not implicitly narrow its declared result type.
+
+| Operation | API |
+| --- | --- |
+| Comparisons and parenthesized groups | `where`, `andWhere`, `orWhere` |
+| SQL null checks | `whereNull`, `whereNotNull`, `orWhereNull`, `orWhereNotNull` |
+| Value-list or SELECT-subquery membership | `whereIn`, `whereNotIn`, `orWhereIn`, `orWhereNotIn` |
+| SELECT-subquery existence | `whereExists`, `whereNotExists`, `orWhereExists`, `orWhereNotExists` |
+| Bound custom predicates | `whereRaw(sql, bindings)`, `orWhereRaw(sql, bindings)` |
+| Bound custom ordering | `orderByRaw(sql, bindings)` |
+| Quoted mapped column reference | `ref(columnSelector)` |
+
+Reuse the prepared read from `user-read.ts` in a separate query-composition file:
+
+```ts
+// user-search.ts
+import { number, object, query, string } from '@cleverbrush/knex-schema';
+import { knex } from './database.js';
+import { userRead } from './user-read.js';
+
+const UserLabel = object({
+    userId: number().hasColumnName('user_id'), label: string()
+}).hasTableName('user_labels');
+
+export function searchUsers(tenantId: number, term: string, priorityUserId: number) {
+    const labeledUsers = query(knex, UserLabel)
+        .where(l => l.userId, userRead.ref(u => u.id))
+        .where(l => l.label, term)
+        .select(l => l.userId).toKnexQuery();
+
+    return userRead.where(u => u.tenantId, tenantId)
+        .andWhere(group => group
+            .where(u => u.name, 'ilike', `%${term}%`)
+            .orWhereExists(labeledUsers))
+        .orderByRaw('case when ?? = ? then 0 else 1 end', [
+            userRead.ref(u => u.id), priorityUserId
+        ])
+        .orderBy(u => u.name)
+        .orderBy(u => u.id);
+}
+```
+
+The outer tenant filter applies to the **entire** search group. Group callbacks
+are synchronous and run once when the predicate is attached, not during SQL
+execution. Their predicate-only builder is immutable too: it has no selection,
+join, ordering, write or execution methods. Return the configured group; a void
+return, async result or unrelated builder is rejected. An empty group returned
+unchanged adds no condition. Retaining a group and deriving another branch later
+cannot change the already-attached predicates.
+
+`ref()` resolves mapped columns and generated aliases for ordinary readers,
+explicit aliases for joined readers, and the correct child alias inside relation
+customizers. Pass references as `??` identifier bindings or as Knex comparison
+values when correlating a subquery. Values use `?` bindings. Raw SQL fragments
+must be application-authored, not interpolated user input; this API is **not a SQL
+sandbox**. Search escaping and application authorization remain caller policies.
+
+For membership, pass a value array or a single-column Knex SELECT subquery, for
+example `read.whereIn(u => u.id, labelPage.toKnexQuery())`. Put ordering and limits
+on that subquery to restrict IDs before joining/aggregating. EXISTS accepts a
+Knex SELECT subquery; construct it separately instead of passing a Knex callback.
+Subquery SQL and bindings are captured on attachment without database execution,
+including nested subquery callbacks. Later changes to those builders do not
+change the prepared reader. Empty IN lists match no rows; empty NOT IN lists
+match all rows, with ordinary SQL null semantics for non-empty lists/subqueries.
+
+These operations also work in ordinary ORM reads and nested relation customizers.
+Polymorphic roots also offer common-property predicates, including bound raw
+filters. Use `forVariant()` for branch-specific predicates, projections and raw
+ordering; root `orderBy()` orders the union globally. Numbered pagination retains raw ordering while
+its count drops ordering/limits/offsets. `paginateAfter()` uses its explicit
+complete `orderBy` specification, replacing prior ordering, including raw order.
+Opaque SQL changes require `.apply(configure, { output })` or
+`.selectRaw(sql, bindings, { output })`; the declared schema owns raw row parsing.
 
 ### Nested graphs
 
 Declare relations on entities as usual, and return the child query from customizers:
 
 ```ts
-const read = db.projects.withRowSchema()
+const read = db.projects
     .select(p => ({ id: p.id, name: p.name }))
     .include(r => r.tasks, tasks => tasks
         .select(t => ({ title: t.title, createdAt: t.createdAt }))
@@ -793,7 +887,7 @@ default. Use `selectVariants(['photo'])` to narrow the returned union, or
 `forVariant()` to project a branch or load its relations:
 
 ```ts
-const read = db.assets.withRowSchema()
+const read = db.assets
     .forVariant('photo', q => q.include(r => r.tags))
     .forVariant('text', q => q.select(a => ({ id: a.id, kind: a.kind, body: a.body })));
 
@@ -816,20 +910,22 @@ branch separately. Use `forVariant()` for branch-specific filtering/includes.
 
 ### API boundaries
 
-- Enter read mode **before** legacy select/include/join, ordering/pagination,
-  raw callbacks or variant-specific operations. Continue configuration on the
-  immutable reader. Default scopes may filter rows but must not preselect,
-  order or paginate them.
-- The opt-in surface is deliberately read-only. It is not a replacement for
-  entity writes or tracked queries, and has no raw SQL shape escape hatch.
-- Reads are PostgreSQL-oriented; this does not promise equivalent JSON/CTI SQL
-  behavior on other Knex dialects.
-- Declared graph metadata must match storage. Unsupported opaque shapes throw
-  rather than pretending an entity schema describes their output. Explicit
-  TypeScript assertions such as `hasType()` remain the caller's responsibility.
-- Ordinary queries are mutable and retain their driver-value behavior.
-  Read mode is opt-in; it does not change application nulls or numeric values
-  globally.
+- Query configuration is immutable across tables, aliases, polymorphic roots and
+  ORM entry points. Native Knex remains mutable only inside explicit raw callbacks
+  or separately obtained snapshots.
+- Scopes are synchronous, shape-preserving callbacks. Return their configured
+  query. They can filter, order and paginate; they cannot select, load relations,
+  execute or write. Defaults are captured once when creating the query, not on
+  every render/execution. `unscoped()` preserves explicit filters and soft deletion.
+- Writes require an unprojected, ungrouped, non-distinct table query with no loaded
+  relations. A primary key is required to target a limited/offset write safely.
+  Polymorphic writes use ORM `ofVariant()` instead of a union query.
+- Reads and JSON/CTI SQL are PostgreSQL-oriented; equivalent behavior is not
+  promised on other Knex dialects. Schema metadata must match actual storage.
+- Raw outputs require synchronous, introspectable Framework object schemas. They
+  are detached and read-only. Explicit assertions such as `hasType()` remain the
+  caller's responsibility. Use SQL aliases matching output property names and
+  text casts for exact numbers before driver parsing.
 - `getSyncMapper()` accepts only complete mappings with synchronous final steps
   and nested mappings. It never probes callbacks. Known async mappings are
   rejected; a disguised thenable throws when invoked. Keep `getMapper()` for

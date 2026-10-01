@@ -26,7 +26,7 @@
 
 ### Minor Changes
 
-- c75bff4: Add framework affordances discovered while reviewing Xpenser:
+- c75bff4: Add reusable environment, HTTP, cache, database and migration capabilities:
 
   - `@cleverbrush/env`: add `envBoolean()` for environment-style boolean values
     such as `1`, `0`, `yes`, `no`, `on`, and `off`.

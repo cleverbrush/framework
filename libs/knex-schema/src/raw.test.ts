@@ -1,123 +1,115 @@
-// @cleverbrush/knex-schema — rawQuery() tests
-
-import Knex from 'knex';
-import { afterAll, describe, expect, it, vi } from 'vitest';
+import Knex, { type Knex as Connection } from 'knex';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { number, object, string } from './index.js';
 import { rawQuery } from './raw.js';
 
-const Post = object({
-    id: number(),
-    title: string(),
-    authorId: number().hasColumnName('author_id'),
-    createdAt: string().hasColumnName('created_at')
-}).hasTableName('posts');
+// Stub only the driver boundary: raw() must still build real captured SQL.
+describe('rawQuery explicit output contract', () => {
+    let knex: Connection;
+    let response: unknown[];
+    let statements: Array<{ sql: string; bindings: unknown[] }>;
+    beforeEach(() => {
+        knex = Knex({ client: 'pg' });
+        response = [];
+        statements = [];
+        const client = knex.client as any;
+        client.acquireConnection = async () => ({});
+        client.releaseConnection = async () => {};
+        client._query = async (_connection: unknown, statement: any) => {
+            statements.push(statement);
+            return { rows: response };
+        };
+        client.processResponse = (result: any) => result.rows;
+    });
+    afterEach(async () => {
+        await knex.destroy();
+    });
 
-const knex = Knex({ client: 'pg' });
-
-afterAll(async () => {
-    await knex.destroy();
-});
-
-describe('rawQuery', () => {
-    it('runs a raw SQL string and maps column names back to property names', async () => {
-        const rawSpy = vi.spyOn(knex, 'raw').mockResolvedValueOnce({
-            rows: [
-                { id: 1, title: 'Hi', author_id: 7, created_at: '2024-01-01' }
-            ]
-        } as any);
-
+    it('parses SQL-aliased properties once, preserving the caller output contract', async () => {
+        const output = object({
+            id: number(),
+            authorId: number(),
+            total: number().coerce()
+        });
+        const parse = vi.spyOn(output, 'parse');
+        response = [{ id: 1, authorId: 7, total: '12' }];
         const rows = await rawQuery(
             knex,
-            Post,
-            'SELECT * FROM posts WHERE id = ?',
+            output,
+            'select id, author_id as "authorId", total from posts where id = ?',
             [1]
         );
+        expect(rows).toEqual([{ id: 1, authorId: 7, total: 12 }]);
+        expect(parse).toHaveBeenCalledExactlyOnceWith(response[0]);
+        expect(statements[0].bindings).toEqual([1]);
+    });
 
-        expect(rawSpy).toHaveBeenCalledWith(
-            'SELECT * FROM posts WHERE id = ?',
-            [1]
+    it('does not silently remap raw output or accept a missing selected column', async () => {
+        response = [{ author_id: 7 }];
+        await expect(
+            rawQuery(
+                knex,
+                object({ authorId: number() }),
+                'select author_id from posts'
+            )
+        ).rejects.toThrow();
+    });
+
+    it('returns an empty result without invoking the row parser', async () => {
+        const output = object({ id: number() });
+        const parse = vi.spyOn(output, 'parse');
+        expect(await rawQuery(knex, output, 'select id from posts')).toEqual(
+            []
         );
-        expect(rows).toEqual([
-            { id: 1, title: 'Hi', authorId: 7, createdAt: '2024-01-01' }
-        ]);
-
-        rawSpy.mockRestore();
+        expect(parse).not.toHaveBeenCalled();
+        expect(statements[0].bindings).toEqual([]);
     });
 
-    it('defaults bindings to [] when omitted', async () => {
-        const rawSpy = vi
-            .spyOn(knex, 'raw')
-            .mockResolvedValueOnce({ rows: [] } as any);
-
-        await rawQuery(knex, Post, 'SELECT 1');
-
-        expect(rawSpy).toHaveBeenCalledWith('SELECT 1', []);
-
-        rawSpy.mockRestore();
+    it('snapshots a caller-owned Knex SELECT without mutating or retaining it', async () => {
+        response = [{ id: 9 }];
+        const source = knex('posts').select('id').where('id', 9);
+        const pending = rawQuery(knex, object({ id: number() }), source);
+        source.where('id', 100);
+        expect(await pending).toEqual([{ id: 9 }]);
+        expect(statements[0].bindings).toEqual([9]);
     });
 
-    it('handles drivers that return an array directly (no .rows wrapper)', async () => {
-        const rawSpy = vi
-            .spyOn(knex, 'raw')
-            .mockResolvedValueOnce([
-                { id: 2, title: 'X', author_id: 3, created_at: '2024-02-02' }
-            ] as any);
-
-        const rows = await rawQuery(knex, Post, 'SELECT *');
-
-        expect(rows).toEqual([
-            { id: 2, title: 'X', authorId: 3, createdAt: '2024-02-02' }
-        ]);
-
-        rawSpy.mockRestore();
+    it('keeps exact numeric text exact with an explicit text output', async () => {
+        response = [{ amount: '12345678901234567890.012345' }];
+        expect(
+            await rawQuery(
+                knex,
+                object({ amount: string() }),
+                'select amount::text as amount from invoices'
+            )
+        ).toEqual(response);
     });
 
-    it('returns [] when rows is not an array', async () => {
-        const rawSpy = vi
-            .spyOn(knex, 'raw')
-            .mockResolvedValueOnce({ rows: { not: 'an array' } } as any);
-
-        const rows = await rawQuery(knex, Post, 'SELECT *');
-        expect(rows).toEqual([]);
-
-        rawSpy.mockRestore();
+    it('rejects invalid raw rows', async () => {
+        response = [{ id: 'not a number' }];
+        await expect(
+            rawQuery(knex, object({ id: number() }), 'select id from posts')
+        ).rejects.toThrow();
     });
 
-    it('passes through extra columns not in the schema unchanged', async () => {
-        const rawSpy = vi.spyOn(knex, 'raw').mockResolvedValueOnce({
-            rows: [
-                {
-                    id: 1,
-                    title: 'Hi',
-                    author_id: 7,
-                    created_at: '2024-01-01',
-                    extra_count: 42
-                }
-            ]
-        } as any);
-
-        const rows = await rawQuery(knex, Post, 'SELECT *');
-
-        expect(rows[0]).toMatchObject({
-            id: 1,
-            authorId: 7,
-            createdAt: '2024-01-01',
-            extra_count: 42 // unmapped column passes through
-        });
-
-        rawSpy.mockRestore();
+    it('rejects non-object output and non-SELECT builders before execution', () => {
+        expect(() =>
+            rawQuery(knex, string() as any, 'select id from posts')
+        ).toThrow(/object schema/);
+        expect(() =>
+            rawQuery(knex, object({ id: number() }), knex('posts').delete())
+        ).toThrow(/SELECT/);
+        expect(statements).toEqual([]);
     });
 
-    it('awaits a Knex query builder directly', async () => {
-        const result = [
-            { id: 9, title: 'Q', author_id: 1, created_at: '2024-03-03' }
-        ];
-        const qb = Promise.resolve(result) as any;
-
-        const rows = await rawQuery(knex, Post, qb);
-
-        expect(rows).toEqual([
-            { id: 9, title: 'Q', authorId: 1, createdAt: '2024-03-03' }
-        ]);
+    it('rejects asynchronous output parsers instead of returning promises as rows', async () => {
+        response = [{ id: 1 }];
+        const output = object({ id: number() });
+        vi.spyOn(output, 'parse').mockImplementation((async () => ({
+            id: 1
+        })) as any);
+        await expect(
+            rawQuery(knex, output, 'select id from posts')
+        ).rejects.toThrow(/synchronously/);
     });
 });

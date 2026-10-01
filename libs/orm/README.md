@@ -13,6 +13,8 @@ EF-Core-like typed ORM layer on top of [`@cleverbrush/knex-schema`](../knex-sche
 
 ---
 
+Upgrading? See [Migrating from v4.x to v5](../knex-schema/MIGRATION-v5.md).
+
 ## Installation
 
 ```sh
@@ -80,7 +82,7 @@ const updated = await db.users.save({ id: 1, email: 'alice@example.com', name: '
 | `.include(t => t.rel)` | Eager-loads a relation (chainable) |
 | `.save(graph)` | Insert or update a row graph (transactional) |
 | `.ofVariant(key)` | Return a typed `VariantDbSet` scoped to a polymorphic variant |
-| `.withRowSchema()` | Creates a detached read-only query with a matching result schema |
+| `.rowSchema` | Automatically describes the decoded result; reading metadata runs no SQL |
 | `.query()` | Returns the underlying `EntityQuery` for advanced querying |
 | `.withTransaction(trx)` | Returns a new `DbSet` bound to an existing transaction |
 
@@ -211,15 +213,17 @@ async function updateUser(userId: number) {
 
 ---
 
-## Detached reads with result schemas
+## Immutable queries and projection schemas
 
-`db.users.withRowSchema()` enters an immutable read-only API whose `rowSchema`
-matches its decoded selection and includes. Results remain **detached even when
-the context uses `{ tracking: true }`**. This avoids attaching partial projections
-as incomplete tracked entities. Ordinary entity queries keep their old behavior.
+Every DbSet/query chain is immutable and automatically exposes `rowSchema`.
+Full entity reads still participate in the identity map when `{ tracking: true }`.
+Selected, grouped, distinct and raw results are detached; partial rows never
+replace tracked entities. Entity objects themselves remain mutable: edit a full
+entity and call `saveChanges()` as before. Reads, reloads and write-returning rows
+now consistently use exact bigint/decimal strings, `Date` objects and SQL `null`.
 
 ```ts
-const read = db.users.withRowSchema()
+const read = db.users
     .select(u => ({ id: u.id, name: u.name }));
 const Source = read.rowSchema;
 const toDto = mapper().configure(Source, UserDto, m => m)
@@ -231,6 +235,15 @@ Typed relation customizers return their configured query; nested graphs are
 decoded in one SQL statement. STI/CTI readers expose `variantRowSchemas` for
 explicit application mapping. See the [read-schema consumer guide](../knex-schema/README.md#projection-aware-reads)
 for numeric/null/date rules, examples and compatibility boundaries.
+
+Ordinary queries also support grouped `where`/`andWhere`/`orWhere`,
+IN/EXISTS subqueries, bound `whereRaw`/`orderByRaw`, and `ref(selector)` for quoted
+column references. These operations preserve the reader's `rowSchema` identity
+and work in nested relation customizers; polymorphic branches use `forVariant()`.
+Group callbacks are synchronous, immutable and predicate-only; always return
+the configured group. Conditional filters must reassign the returned query. See
+[filtering and ordering](../knex-schema/README.md#filtering-and-ordering-without-changing-the-result-schema)
+for scoped search, subquery snapshots, pagination, and raw-SQL boundaries.
 
 ---
 
@@ -382,7 +395,7 @@ const tasks = await db.tasks
     .orderBy(t => t.createdAt, 'desc')
     .orderBy(t => t.id, 'desc')
     .include(t => t.owner, owners => {
-        owners.where(t => t.name, 'Alice'); // foreign schema, not any
+        return owners.where(t => t.name, 'Alice'); // foreign schema, not any
     })
     .limit(20);
 ```
@@ -392,9 +405,9 @@ does not necessarily filter parents. Callback types infer the declared foreign
 schema, including variant queries when the relation schema is known.
 
 `paginateAfter({ limit, cursor, orderBy: [...] })` supports non-null scalar sorts
-with a declared unique tie-breaker; single-column cursor calls are unchanged.
+with a declared unique tie-breaker. Use `column` for a single-column cursor.
 See the [complete query guide](../knex-schema/README.md#composable-read-queries) for defaults,
-precision policy, grouped aggregates, cursor restrictions, and migration examples.
+precision policy, grouped aggregates, cursor restrictions, and examples.
 
 ## Related packages
 

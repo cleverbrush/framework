@@ -18,7 +18,14 @@ export type {
     TrackedDbContext
 } from './dbcontext.js';
 export { createDb } from './dbcontext.js';
-export type { DbSet, EntityQuery, VariantDbSet } from './dbset.js';
+export type {
+    DbSet,
+    DbSetOperations,
+    EntityQuery,
+    PolymorphicEntityQuery,
+    TableEntityQuery,
+    VariantDbSet
+} from './dbset.js';
 export {
     ConcurrencyError,
     EntityNotFoundError,

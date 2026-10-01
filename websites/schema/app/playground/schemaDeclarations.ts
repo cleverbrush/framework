@@ -2495,7 +2495,7 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
      * This is the **recommended** way to inspect validation errors — it provides type-safe,
      * per-property error details including \`isValid\`, \`errors\`, and \`seenValue\`.
      *
-     * Prefer this over the deprecated \`errors\` array.
+     * Inspect root or property-specific validation errors with a selector.
      *
      * @param selector a callback function to select property from the schema.
      */
@@ -2565,7 +2565,7 @@ export type ObjectSchemaValidationResult<T, TRootSchema extends ObjectSchemaBuil
  * });
  *
  * // result.valid === false
- * // result.errors is deprecated — use result.getErrorsFor() instead
+ * // Inspect property errors using result.getErrorsFor().
  * // result.getErrorsFor((p) => p.age).errors // ["is expected to have property 'age'"]
  * \`\`\`
  *

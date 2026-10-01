@@ -25,7 +25,7 @@ describe('query schemas as reusable mapping sources', () => {
             n => n.taskId
         );
         const read = query(Knex({ client: 'pg' }), Task.schema)
-            .withRowSchema()
+
             .select(t => ({ id: t.id, amount: t.amount, done: t.done }))
             .include(
                 r => r.notes,

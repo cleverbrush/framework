@@ -5,7 +5,7 @@ import {
     getPrimaryKeyColumns,
     resolvePropertyKey
 } from '../columns.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type { ColumnRef, CursorPaginationResult } from '../types.js';
 import { cloneQuery, statements } from './aggregate.js';
 import { cleanAndMapRow, getEffectiveBaseQuery, getQuery } from './helpers.js';
@@ -30,7 +30,7 @@ export interface CompositeCursorOptions<
 }
 
 export async function compositeCursor(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     options: CompositeCursorOptions<any>,
     decode?: (row: Record<string, unknown>) => any,
     sourceIdentity?: string

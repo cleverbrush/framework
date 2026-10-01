@@ -74,7 +74,7 @@ const taskEntity = defineEntity(Task)
 const db = createDb(knex, { tasks: taskEntity });
 
 it('transaction clones retain row schemas and raw-query safety guards', async () => {
-    const read = db.tasks.withRowSchema().select(t => ({ title: t.title }));
+    const read = db.tasks.select(t => ({ title: t.title }));
     await knex.transaction(async trx => {
         const inTransaction = read.transacting(trx);
         expect(inTransaction.rowSchema).toBe(read.rowSchema);
@@ -82,13 +82,12 @@ it('transaction clones retain row schemas and raw-query safety guards', async ()
             await read.where(t => t.id, 104).first()
         );
         expect(() =>
-            query(knex, Task)
+            query(knex, taskEntity.schema)
                 .apply(q => {
                     q.whereRaw('true');
                 })
                 .transacting(trx)
-                .withRowSchema()
-        ).toThrow(/before raw/);
+        ).toThrow(/output/);
     });
 });
 
@@ -98,9 +97,7 @@ it('schema-aware reads stay detached in a tracked context', async () => {
     const listener = (sql: unknown) => calls.push(sql);
     knex.on('query', listener);
     try {
-        const read = tracked.tasks
-            .withRowSchema()
-            .select(t => ({ id: t.id, title: t.title }));
+        const read = tracked.tasks.select(t => ({ id: t.id, title: t.title }));
         expect(calls).toHaveLength(0);
         const row = await read.where(t => t.id, 102).first();
         expect(calls).toHaveLength(1);
@@ -112,8 +109,8 @@ it('schema-aware reads stay detached in a tracked context', async () => {
 });
 
 it('schema-aware explicit joins preserve nullable objects and custom collections', async () => {
-    const read = query(knex, Task)
-        .withRowSchema()
+    const read = query(knex, taskEntity.schema)
+
         .select(t => ({ id: t.id }))
         .joinOne(
             {
@@ -152,7 +149,7 @@ it('schema-aware optional belongs-to joins keep unmatched parents', async () => 
         { optional: true }
     );
     const read = query(knex, optional.schema)
-        .withRowSchema()
+
         .select(t => ({ id: t.id }))
         .include(
             r => r.owner,
@@ -166,7 +163,7 @@ it('schema-aware optional belongs-to joins keep unmatched parents', async () => 
 
 it('schema-aware flat joins preserve precision and scoped outer join nulls', async () => {
     const read = query(knex, alias(Task, 'task'))
-        .withRowSchema()
+
         .leftJoin(alias(User, 'owner'), t => eq(t.task.ownerId, t.owner.id))
         .select(t => ({
             id: t.task.id,
@@ -190,7 +187,7 @@ it('schema-aware flat joins preserve precision and scoped outer join nulls', asy
 
 it('schema-aware cursor pages keep microsecond ordering private', async () => {
     const read = db.tasks
-        .withRowSchema()
+
         .select(t => ({ title: t.title }))
         .include(r => r.notes)
         .where(t => t.projectId, 1);
@@ -321,7 +318,7 @@ afterAll(async () => {
 describe('flat joins', () => {
     it('reads exact values and selected relation schemas without hidden queries', async () => {
         const read = db.tasks
-            .withRowSchema()
+
             .select(t => ({
                 id: t.id,
                 amount: t.amount,
@@ -353,14 +350,12 @@ describe('flat joins', () => {
             ]);
             expect(read.rowSchema.validate(rows[0]).valid).toBe(true);
             const exact = await db.tasks
-                .withRowSchema()
+
                 .where(t => t.id, 102)
                 .select(t => ({ amount: t.amount }))
                 .first();
             expect(exact).toEqual({ amount: '9007199254740993.000001' });
-            const AmountRow = db.tasks
-                .withRowSchema()
-                .select(t => ({ amount: t.amount }));
+            const AmountRow = db.tasks.select(t => ({ amount: t.amount }));
             const PublicAmount = object({ amount: string().optional() });
             const toPublic = mapper()
                 .configure(AmountRow.rowSchema, PublicAmount, m =>
@@ -377,7 +372,7 @@ describe('flat joins', () => {
 
     it('decodes typed aggregate outputs once in schema-aware reads', async () => {
         const read = db.tasks
-            .withRowSchema()
+
             .where(t => t.projectId, 1)
             .select(t => ({
                 count: aggregate.count(),
@@ -476,7 +471,10 @@ describe('eager ordering', () => {
             .orderBy(t => t.title)
             .orderBy(t => t.id, 'desc')
             .include(t => t.notes)
-            .include(t => t.owner)
+            .include(
+                t => t.owner,
+                owner => owner.unscoped().withDeleted()
+            )
             .limit(2);
         expect(rows.map(row => row.id)).toEqual([104, 103]);
         expect(rows[0].notes).toHaveLength(2);
@@ -488,7 +486,7 @@ describe('eager ordering', () => {
 
     it('handles projected-away sort/FK fields, mapped aliases, raw bindings, offset and transactions', async () => {
         await knex.transaction(async trx => {
-            const rows = await query(knex, Task)
+            const rows = await query(knex, taskEntity.schema)
                 .where(t => t.projectId, 1)
                 .orderByRaw('case when ?? = ? then 0 else 1 end, ?? desc', [
                     'id',
@@ -513,7 +511,7 @@ describe('eager ordering', () => {
 
     it('retains distinct/grouped parent cardinality', async () => {
         for (const distinct of [true, false]) {
-            let q = query(knex, Task)
+            let q = query(knex, taskEntity.schema)
                 .where(t => t.projectId, 1)
                 .select(t => ({ owner_id: t.ownerId }))
                 .orderBy(t => t.ownerId);
@@ -533,7 +531,7 @@ describe('eager ordering', () => {
         '"taskId" desc',
         '1 desc'
     ])('retains ordering by a projected alias or position: %s', async order => {
-        const rows = await query(knex, Task)
+        const rows = await query(knex, taskEntity.schema)
             .where(t => t.projectId, 1)
             .select(t => ({ taskId: t.id }))
             .orderByRaw(order)
@@ -563,11 +561,10 @@ describe('aggregate results', () => {
                 .include(t => t.notes)
                 .countValue()
         ).toBe(4);
-        const visibleOwner = query(knex, Task)
+        const visibleOwner = query(knex, taskEntity.schema)
             .where(t => t.projectId, 1)
             .joinOne({
                 foreignSchema: User,
-                foreignQuery: query(knex, User),
                 localColumn: t => t.ownerId,
                 foreignColumn: t => t.id,
                 as: 'owner',
@@ -580,20 +577,22 @@ describe('aggregate results', () => {
     });
 
     it('retains default-scope filters while ignoring default-scope pagination', async () => {
-        const Scoped = object({ id: number().primaryKey() })
+        const Scoped = object({
+            id: number().primaryKey(),
+            projectId: number().hasColumnName('project_id'),
+            deletedAt: date().optional().hasColumnName('deleted_at')
+        })
             .hasTableName(tables.tasks)
             .defaultScope((q: any) =>
                 q
-                    .where('project_id', 1)
-                    .whereNull('deleted_at')
+                    .where('projectId', 1)
+                    .whereNull('deletedAt')
                     .limit(1)
                     .offset(1)
             );
         expect(await query(knex, Scoped).countValue()).toBe(4);
         const Grouped = Scoped.defaultScope((q: any) => q.groupBy('id'));
-        await expect(query(knex, Grouped).countValue()).rejects.toThrow(
-            'ungrouped'
-        );
+        expect(() => query(knex, Grouped)).toThrow(/Scopes/);
     });
 
     it('preserves sum/average/decimal extrema and returns date/string extrema', async () => {
@@ -615,7 +614,7 @@ describe('aggregate results', () => {
     });
 
     it('handles empty/all-null inputs and caller-supplied parsers', async () => {
-        const empty = () => query(knex, Task).where(t => t.id, -1);
+        const empty = () => query(knex, taskEntity.schema).where(t => t.id, -1);
         expect(await empty().countValue()).toBe(0);
         for (const method of [
             'sumValue',
@@ -626,12 +625,12 @@ describe('aggregate results', () => {
             expect(await empty()[method]('amount')).toBe(null);
         }
         expect(
-            await query(knex, Task)
+            await query(knex, taskEntity.schema)
                 .where(t => t.id, 103)
                 .sumValue(t => t.amount)
         ).toBe(null);
         expect(
-            await query(knex, Task)
+            await query(knex, taskEntity.schema)
                 .where(t => t.id, 105)
                 .sumValue(t => t.amount, {
                     output: number().isFloat().coerce()
@@ -643,7 +642,7 @@ describe('aggregate results', () => {
     });
 
     it('decodes every grouped aggregate without treating rows as entities', async () => {
-        const rows = await query(knex, Task)
+        const rows = await query(knex, taskEntity.schema)
             .where(t => t.projectId, 1)
             .groupBy(t => t.ownerId)
             .orderBy(t => t.ownerId)
@@ -671,14 +670,14 @@ describe('aggregate results', () => {
             max: 'A'
         });
         await expect(
-            query(knex, Task)
+            query(knex, taskEntity.schema)
                 .groupBy(t => t.ownerId)
                 .countValue()
         ).rejects.toThrow('ungrouped');
     });
 
     it('retains source state and transaction visibility', async () => {
-        const base = query(knex, Task)
+        const base = query(knex, taskEntity.schema)
             .where(t => t.projectId, 1)
             .select(t => ({ id: t.id }))
             .limit(1);
@@ -745,11 +744,10 @@ describe('aggregate results', () => {
 describe('composite cursor pages', () => {
     it('applies required relation filters before testing whether another page exists', async () => {
         const base = () =>
-            query(knex, Task)
+            query(knex, taskEntity.schema)
                 .where(t => t.projectId, 1)
                 .joinOne({
                     foreignSchema: User,
-                    foreignQuery: query(knex, User),
                     localColumn: t => t.ownerId,
                     foreignColumn: t => t.id,
                     as: 'owner',
@@ -769,7 +767,7 @@ describe('composite cursor pages', () => {
 
     it('does not skip tied timestamps and retains microsecond precision with projections and includes', async () => {
         const base = () =>
-            query(knex, Task)
+            query(knex, taskEntity.schema)
                 .where(t => t.projectId, 1)
                 .select(t => ({ taskId: t.id }))
                 .joinMany({
@@ -813,7 +811,7 @@ describe('composite cursor pages', () => {
             .where(t => t.projectId, -1)
             .paginateAfter({ limit: 1, orderBy });
         expect(empty).toEqual({ data: [], hasMore: false, nextCursor: null });
-        const projected = await query(knex, Task)
+        const projected = await query(knex, taskEntity.schema)
             .where(t => t.projectId, 1)
             .select(t => t.id)
             .paginateAfter({ limit: 2, orderBy });
@@ -847,7 +845,7 @@ describe('composite cursor pages', () => {
 
     it('groups an existing OR filter before applying continuation predicates', async () => {
         const base = () =>
-            query(knex, Task)
+            query(knex, taskEntity.schema)
                 .where(t => t.id, 105)
                 .orWhere(t => t.id, 104);
         const first = await base().paginateAfter({ limit: 1, orderBy });

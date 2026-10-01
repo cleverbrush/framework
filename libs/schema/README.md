@@ -122,10 +122,6 @@ if (result.valid) {
     const nameErrors = result.getErrorsFor((p) => p.name);
     console.log(nameErrors.isValid); // false
     console.log(nameErrors.errors); // ['Name must be at least 2 characters']
-
-    // result.errors on object schemas is deprecated — use getErrorsFor() instead
-    console.log('Errors:', result.errors);
-    // Array of { message: string }
 }
 ```
 
@@ -865,8 +861,7 @@ const result = UserSchema.validate(someObject);
 if (result.valid) {
     console.log(result.object); // typed as InferType<typeof UserSchema>
 } else {
-    // For object schemas, prefer getErrorsFor() for per-property error inspection (see below)
-    console.log(result.errors); // deprecated for object schemas — Array of { message: string }
+    console.log(result.getErrorsFor(t => t.name).errors); // field error strings
 }
 
 // Async validation (use when validators/preprocessors are async)
@@ -883,12 +878,12 @@ const result = UserSchema.validate(
     { doNotStopOnFirstError: true }
 );
 
-console.log(result.errors);
-// [
-//   { message: 'Name must be at least 2 characters' },
-//   { message: 'Please enter a valid email' },
-//   { message: 'Age cannot be negative' }
-// ]
+console.log(result.getErrorsFor(t => t.name).errors);
+// ['Name must be at least 2 characters']
+console.log(result.getErrorsFor(t => t.email).errors);
+// ['Please enter a valid email']
+console.log(result.getErrorsFor(t => t.age).errors);
+// ['Age cannot be negative']
 ```
 
 ### Custom Error Messages
@@ -979,11 +974,11 @@ result.getErrorsFor((t) => t.password).errors;
 // → []
 ```
 
-You can target multiple properties from a single validator by returning multiple errors with different `property` selectors. Errors without a `property` selector are attached to the root object as before.
+You can target multiple properties from a single validator by returning multiple errors with different `property` selectors. Errors without a `property` selector are attached to the root object.
 
 ### Per-Property Errors with `getErrorsFor()` (Recommended)
 
-`ObjectSchemaBuilder.validate()` returns an extended result with a `getErrorsFor()` method for inspecting errors on individual properties — perfect for showing inline form errors. **This is the recommended way to inspect validation errors on object schemas** and replaces the deprecated `errors` array on `ObjectSchemaValidationResult`:
+`ObjectSchemaBuilder.validate()` returns a result with a `getErrorsFor()` method for inspecting errors on individual properties — useful for showing inline form errors:
 
 ```typescript
 const PersonSchema = object({
@@ -1167,7 +1162,7 @@ array(optionalText).parse(['ok', 42]); // ['ok', undefined] — no entries dropp
 Fallbacks are opt-in: a fallback on a property does not make a malformed required
 root object valid. A fallback factory runs only when validation fails.
 
-**Null compatibility:** legacy optional schemas accept `null` at runtime even
+**Null handling:** optional schemas accept `null` at runtime even
 though their inferred type does not include it. `.optional().catch(undefined)`
 therefore leaves `null` unchanged. Normalize it explicitly when needed:
 

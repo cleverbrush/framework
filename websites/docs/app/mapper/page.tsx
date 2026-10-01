@@ -229,7 +229,7 @@ const registry = mapper()
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const read = db.users.withRowSchema()
+                                __html: highlightTS(`const read = db.users
     .select(u => ({ id: u.id, name: u.name }));
 const Source = read.rowSchema; // no SQL
 const toDto = mapper().configure(Source, UserDto, m => m)

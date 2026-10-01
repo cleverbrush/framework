@@ -244,16 +244,16 @@ try {
                 <div className="card" id="detached-read-schemas">
                     <h2>Detached reads with projection schemas</h2>
                     <p>
-                        db.users.withRowSchema() returns an immutable read-only
-                        query with runtime metadata matching its projection and
-                        relation graph. Results stay detached even in a tracking
-                        context, so partial selections cannot silently become
-                        incomplete tracked entities.
+                        Every DbSet query is immutable, with metadata matching
+                        its decoded projection and relations. Full entities
+                        retain identity tracking when enabled. Projected,
+                        grouped, distinct and raw results remain detached, so
+                        incomplete selections cannot replace tracked entities.
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const read = db.projects.withRowSchema()
+                                __html: highlightTS(`const read = db.projects
     .select(p => ({ id: p.id, name: p.name }))
     .include(r => r.tasks, tasks => tasks
         .select(t => ({ title: t.title })));
@@ -265,7 +265,9 @@ const projects = await read; // one SQL statement`)
                     <p>
                         Return child queries from customizers. STI/CTI reads
                         expose variantRowSchemas for explicit mapper dispatch.
-                        Ordinary entity reads and writes remain unchanged.
+                        Entity objects remain mutable. Reads, reloads and
+                        returning writes share exact numeric, date and null
+                        representations.
                     </p>
                     <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#projection-aware-reads">
                         Projection-aware consumer guide

@@ -1,13 +1,13 @@
-# Cache keys and schema-form lifecycle
+# Migrating from Framework v4.x to v5: cache keys and schema-form lifecycle
 
 These changes are application-agnostic. Libraries do not choose an application's
 auth scope, UI kit, notifications, navigation behavior, or cache backend.
 
-This batch is scheduled as a coordinated **minor release** of the fixed package
-group. This release classification does not remove the compatibility changes
-below: external-cache users must coordinate the key-format migration, and
-consumers relying on previous `deepEqual` results must review those assumptions.
-The existing public form APIs remain available.
+This guide covers cache and form contracts to review when upgrading from v4.x
+to the coordinated v5 release. External-cache users must coordinate the key-format
+migration, and consumers relying on previous `deepEqual` results must review those
+assumptions. If a v4.x prerelease already provided these contracts, retain that
+integration. The public form APIs described below remain available.
 
 ## Cache key migration (breaking)
 

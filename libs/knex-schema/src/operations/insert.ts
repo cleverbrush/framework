@@ -4,7 +4,8 @@ import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { buildColumnMap, resolveColumnRef } from '../columns.js';
 import { getTableName } from '../extension.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
+import { returningReadColumns } from '../read-schema.js';
 import type { ColumnRef, InsertType } from '../types.js';
 import {
     getTimestamps,
@@ -82,12 +83,13 @@ export interface OnConflictMergeOptions<TLocalSchema extends AnyObjectSchema> {
 }
 
 /**
- * Configure one-row conflict handling after SchemaQueryBuilder.onConflict(); merge()/ignore() execute the insert.
+ * Configure one-row conflict handling after QuerySource.onConflict(); merge()/ignore() execute the insert.
  */
 export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
     readonly #knex: Knex;
     readonly #localSchema: TLocalSchema;
     readonly #conflictColumns: string[];
+    readonly #decodeRow?: (row: Record<string, any>) => Record<string, any>;
 
     /**
      * Create conflict handling for a schema and resolved conflict columns.
@@ -96,12 +98,13 @@ export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
     constructor(
         knex: Knex,
         localSchema: TLocalSchema,
-        _parent: SchemaQueryBuilder<TLocalSchema, TResult>,
+        _parent: QuerySource<TLocalSchema, TResult>,
         conflictColumns: string[]
     ) {
         this.#knex = knex;
         this.#localSchema = localSchema;
         this.#conflictColumns = conflictColumns;
+        this.#decodeRow = getState(_parent).decodeRow;
     }
 
     /**
@@ -221,7 +224,9 @@ export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
             options?.where?.(qb as unknown as Knex.QueryBuilder, helpers);
         }
 
-        const rows = await (qb as any).returning('*');
+        const rows = await (qb as any).returning(
+            returningReadColumns(this.#knex, this.#localSchema)
+        );
         if (!rows || rows.length === 0) return undefined;
 
         const { colToProp } = buildColumnMap(this.#localSchema as any);
@@ -229,7 +234,7 @@ export class OnConflictBuilder<TLocalSchema extends AnyObjectSchema, TResult> {
         for (const [col, val] of Object.entries(rows[0])) {
             result[colToProp.get(col) ?? col] = val;
         }
-        return result as TResult;
+        return (this.#decodeRow ? this.#decodeRow(result) : result) as TResult;
     }
 
     #createMergeHelpers(): OnConflictMergeHelpers<TLocalSchema> {
@@ -273,7 +278,7 @@ function isMergeOptions<TLocalSchema extends AnyObjectSchema>(
 // ---------------------------------------------------------------------------
 
 export async function insertImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     data: InsertType<any>
 ): Promise<any> {
     const state = getState(builder);
@@ -299,7 +304,7 @@ export async function insertImpl(
     const [row] = await state
         .knex(state.tableName)
         .insert(mapped)
-        .returning('*');
+        .returning(returningReadColumns(state.knex, state.localSchema));
     const result = mapRow(builder, row);
 
     const afterHooks =
@@ -314,7 +319,7 @@ export async function insertImpl(
 }
 
 export async function insertManyImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     data: InsertType<any>[]
 ): Promise<any[]> {
     const state = getState(builder);
@@ -341,7 +346,7 @@ export async function insertManyImpl(
     const rows = await state
         .knex(state.tableName)
         .insert(mapped)
-        .returning('*');
+        .returning(returningReadColumns(state.knex, state.localSchema));
     const results = rows.map((row: any) => mapRow(builder, row));
 
     const afterHooks =
@@ -358,7 +363,7 @@ export async function insertManyImpl(
 }
 
 export function onConflictImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     ...conflictColumns: ColumnRef<any>[]
 ): OnConflictBuilder<any, any> {
     const state = getState(builder);
@@ -369,7 +374,7 @@ export function onConflictImpl(
 }
 
 export async function upsertImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     data: InsertType<any>,
     opts: {
         conflictColumns: ColumnRef<any>[];
@@ -395,12 +400,14 @@ export async function upsertImpl(
         (qb as any).merge();
     }
 
-    const [row] = await (qb as any).returning('*');
+    const [row] = await (qb as any).returning(
+        returningReadColumns(state.knex, state.localSchema)
+    );
     return mapRow(builder, row);
 }
 
 export async function bulkInsertImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     rows: InsertType<any>[],
     opts?: {
         chunkSize?: number;
@@ -485,7 +492,9 @@ export async function bulkInsertImpl(
             }
         }
 
-        const inserted: any[] = await qb.returning('*');
+        const inserted: any[] = await qb.returning(
+            returningReadColumns(state.knex, state.localSchema)
+        );
         for (const row of inserted) {
             const mappedRow = mapRow(builder, row);
             for (const hook of afterHooks) {
@@ -499,7 +508,7 @@ export async function bulkInsertImpl(
 }
 
 export async function bulkUpsertImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     rows: InsertType<any>[],
     opts: {
         conflictColumns: ColumnRef<any>[];

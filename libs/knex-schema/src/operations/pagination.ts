@@ -1,7 +1,7 @@
 // @cleverbrush/knex-schema — Pagination (offset & cursor-based)
 
 import { resolvePropertyKey } from '../columns.js';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type {
     ColumnRef,
     CursorPaginationResult,
@@ -16,20 +16,14 @@ import {
 import { getState } from './state.js';
 import { orderByImpl, whereImpl } from './where.js';
 
-export function limitImpl(
-    builder: SchemaQueryBuilder<any, any>,
-    n: number
-): any {
+export function limitImpl(builder: QuerySource<any, any>, n: number): any {
     const state = getState(builder);
     invalidateCache(builder);
     state.baseQuery.limit(n);
     return builder;
 }
 
-export function offsetImpl(
-    builder: SchemaQueryBuilder<any, any>,
-    n: number
-): any {
+export function offsetImpl(builder: QuerySource<any, any>, n: number): any {
     const state = getState(builder);
     invalidateCache(builder);
     state.baseQuery.offset(n);
@@ -37,7 +31,7 @@ export function offsetImpl(
 }
 
 export async function paginateImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     opts: {
         page: number;
         pageSize: number;
@@ -74,7 +68,7 @@ export async function paginateImpl(
 }
 
 export async function paginateAfterImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     opts: {
         cursor?: any;
         limit: number;
@@ -112,7 +106,7 @@ export async function paginateAfterImpl(
 }
 
 export async function executeImpl(
-    builder: SchemaQueryBuilder<any, any>
+    builder: QuerySource<any, any>
 ): Promise<any[]> {
     const query = getQuery(builder);
     const rows = await query;

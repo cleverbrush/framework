@@ -35,8 +35,12 @@ test('factories retain schema, alias and result inference through every call sha
     expectTypeOf(await plain.select(t => ({ id: t.id }))).toEqualTypeOf<
         { id: number }[]
     >();
+    // @ts-expect-error implicit raw base queries cannot declare an output contract
+    query(db, Task, db('tasks'));
     expectTypeOf(
-        await query(db, Task, db('tasks')).select(t => ({ amount: t.amount }))
+        await query(db, Task).selectRaw('1 as amount', [], {
+            output: object({ amount: number() })
+        })
     ).toEqualTypeOf<{ amount: number }[]>();
     for (const factory of [bound, transactional]) {
         const ordinary = factory(Task);
@@ -44,8 +48,12 @@ test('factories retain schema, alias and result inference through every call sha
         expectTypeOf(
             await ordinary.select(t => ({ createdAt: t.createdAt }))
         ).toEqualTypeOf<{ createdAt: Date }[]>();
+        // @ts-expect-error bound factories cannot accept an opaque raw base query
+        factory(Task, db('tasks'));
         expectTypeOf(
-            await factory(Task, db('tasks')).select(t => ({ id: t.id }))
+            await factory(Task).selectRaw('1 as id', [], {
+                output: object({ id: number() })
+            })
         ).toEqualTypeOf<{ id: number }[]>();
         const aliased = factory(alias(Task, 'task'));
         expectTypeOf(aliased).not.toBeAny();
@@ -113,10 +121,10 @@ test('aggregate defaults and supplied output schemas infer accurately', async ()
         await query(db, Task).maxValue('createdAt')
     ).toEqualTypeOf<Date | null>();
     expectTypeOf(await query(db, Task).minValue('amount')).toEqualTypeOf<
-        number | string | null
+        number | null
     >();
     expectTypeOf(await query(db, Task).minValue(t => t.amount)).toEqualTypeOf<
-        number | string | null
+        number | null
     >();
     expectTypeOf(
         await query(db, Task).countValue({ output: string() })

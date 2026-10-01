@@ -19,9 +19,7 @@ export default function ValidationSection() {
                 only when your schema includes async validators or
                 preprocessors. For object schemas, the result also includes a{' '}
                 <code>getErrorsFor()</code> method for per-property error
-                inspection — the flat <code>errors</code> array is{' '}
-                <strong>deprecated</strong> on object schema results and will be
-                removed in a future major version.
+                inspection.
             </p>
             <pre>
                 <code
@@ -57,8 +55,7 @@ if (result.valid) {
                     This is the recommended way to inspect validation errors on
                     object schemas
                 </strong>{' '}
-                and replaces the deprecated <code>errors</code> array on object
-                schema validation results. It returns an object with{' '}
+                using property selectors. It returns an object with{' '}
                 <code>isValid</code> (boolean), <code>errors</code> (array of
                 error strings), and <code>seenValue</code> (the value that was
                 validated).

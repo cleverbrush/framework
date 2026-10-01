@@ -228,9 +228,10 @@ returning *`
                     <p>
                         <code>.joinOne()</code> and <code>.joinMany()</code>{' '}
                         load related rows in a{' '}
-                        <strong>single PostgreSQL query</strong> using CTEs and{' '}
-                        <code>jsonb_agg</code>. The inferred TypeScript type is
-                        updated automatically for each join you add.
+                        <strong>single PostgreSQL query</strong> using
+                        correlated subqueries and <code>jsonb_agg</code>. The
+                        inferred TypeScript type is updated automatically for
+                        each join you add.
                     </p>
                     <pre>
                         <code
@@ -248,9 +249,7 @@ const users = await query(db, UserSchema)
         localColumn:   t => t.id,
         foreignColumn: t => t.authorId,
         as:            'posts',
-        limit:         5,
-        orderBy:       { column: t => t.id, direction: 'desc' },
-    });
+    }, posts => posts.orderBy(t => t.id, 'desc').limit(5));
 // users[0].posts → Array<{ id: number; title: string; authorId: number }>
 
 // Many-to-one — attach the author to each post
@@ -298,22 +297,24 @@ const posts = await query(db, PostSchema)
                 <div className="card">
                     <h2>Escape Hatch</h2>
                     <p>
-                        Use <code>.apply(fn)</code> to call any Knex method not
-                        exposed by this API — the raw{' '}
-                        <code>Knex.QueryBuilder</code> is passed to your
+                        Use <code>.apply(fn, {'{ output }'})</code> with a
+                        complete output schema for raw SQL. The independently
+                        mutable <code>Knex.QueryBuilder</code> is passed to your
                         callback:
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const rows = await query(db, UserSchema)
+                                __html: highlightTS(`const UserName = object({ name: string() });
+const rows = await query(db, UserSchema)
     .where(t => t.id, id)
-    .apply(qb => qb.forUpdate().noWait());
+    .apply(qb => qb.clearSelect().select({ name: 'first_name' }), {
+        output: UserName,
+    });
 
-// Pre-scoped base query (e.g. soft-delete filter)
-const base = db('users').where('deleted_at', null);
-const activeUsers = await query(db, UserSchema, base)
-    .where(t => t.age, '>', 18);`)
+// Share an immutable Framework base query; retain each configured result.
+const base = query(db, UserSchema).whereNull(t => t.deletedAt);
+const activeUsers = await base.where(t => t.age, '>', 18);`)
                             }}
                         />
                     </pre>
@@ -373,7 +374,7 @@ const average = await query(knex, TaskSchema).avgValue(t => t.estimate, {
                         }}
                     />
                     <p>
-                        Existing APIs remain unchanged. Read the{' '}
+                        Queries are immutable. Read the{' '}
                         <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#composable-read-queries">
                             complete query guide
                         </a>{' '}
@@ -382,18 +383,18 @@ const average = await query(knex, TaskSchema).avgValue(t => t.estimate, {
                 </div>
 
                 <div className="card" id="row-schemas">
-                    <h2>Opt-in projection-aware reads</h2>
+                    <h2>Automatic projection-aware schemas</h2>
                     <p>
-                        Start with withRowSchema() before selecting or including
-                        fields. The immutable PostgreSQL reader exposes the
-                        actual decoded result schema: SQL null stays null, dates
-                        are Date objects at every depth, and decimal/bigint
-                        values are exact strings before JSON parsing.
+                        Every query exposes rowSchema automatically. Immutable
+                        PostgreSQL queries describe the actual decoded result
+                        schema: SQL null stays null, dates are Date objects at
+                        every depth, and decimal/bigint values are exact strings
+                        before JSON parsing.
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`const read = query(knex, TaskSchema).withRowSchema()
+                                __html: highlightTS(`const read = query(knex, TaskSchema)
     .select(t => ({ title: t.title, amount: t.amount }));
 const Source = read.rowSchema;
 const rows = await read.where(t => t.id, taskId);`)
@@ -404,11 +405,49 @@ const rows = await read.where(t => t.id, taskId);`)
                         Typed aliases, aggregates, named projections and nested
                         graphs retain their selected shape. Polymorphic readers
                         expose a union rowSchema and per-variant object schemas.
-                        Raw shapes are rejected; existing query behavior is
-                        unchanged.
+                        Raw shapes require an explicit Framework output schema.
+                        Retain every returned builder when configuring a query.
                     </p>
                     <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#projection-aware-reads">
-                        Read representation, pagination and migration details
+                        Read representation and pagination details
+                    </a>
+                </div>
+
+                <div className="card" id="read-predicates">
+                    <h2>Filtering and ordering schema-aware reads</h2>
+                    <p>
+                        Group AND/OR search predicates without changing the
+                        selected row schema. IN/EXISTS subqueries, null checks,
+                        and bound raw predicates and ordering remain explicit.
+                        Every outer operation returns an independent reader.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const base = query(knex, TaskSchema)
+    .select(t => ({ id: t.id, title: t.title }));
+const read = base.where(t => t.projectId, projectId)
+    .andWhere(group => group
+        .where(t => t.title, 'ilike', pattern)
+        .orWhereExists(labelMatches))
+    .orderByRaw('case when ?? = ? then 0 else 1 end', [
+        base.ref(t => t.id), priorityTaskId
+    ]);
+// read.rowSchema === base.rowSchema`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Group callbacks run synchronously once and expose only
+                        predicates. Subquery SQL and bindings are captured on
+                        attachment, with no database execution. Use ref() for
+                        quoted columns and generated aliases; keep values in
+                        bindings and raw SQL fragments application-authored. Raw
+                        apply() requires an explicit output schema. Return the
+                        configured group from every predicate callback.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#filtering-and-ordering-without-changing-the-result-schema">
+                        Multi-file examples and compatibility boundaries
                     </a>
                 </div>
 
@@ -534,7 +573,7 @@ const rows = await read.where(t => t.id, taskId);`)
                                         <strong>Escape hatch</strong>
                                     </td>
                                     <td>
-                                        <code>.apply(fn)</code>,{' '}
+                                        <code>.apply(fn, {'{ output }'})</code>,{' '}
                                         <code>.toQuery()</code>,{' '}
                                         <code>.toString()</code>
                                     </td>

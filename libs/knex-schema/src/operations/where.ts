@@ -1,7 +1,7 @@
 // @cleverbrush/knex-schema — WHERE / ORDER BY / GROUP BY / HAVING operations
 
 import type { Knex } from 'knex';
-import type { SchemaQueryBuilder } from '../SchemaQueryBuilder.js';
+import type { QuerySource } from '../QuerySource.js';
 import type { ColumnRef } from '../types.js';
 import {
     invalidateCache,
@@ -13,7 +13,7 @@ import {
 import { getState } from './state.js';
 
 export function whereImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     columnOrRaw: any,
     ...args: any[]
 ): any {
@@ -42,7 +42,7 @@ export function whereImpl(
 }
 
 export function andWhereImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     columnOrRaw: any,
     ...args: any[]
 ): any {
@@ -71,7 +71,7 @@ export function andWhereImpl(
 }
 
 export function orWhereImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     columnOrRaw: any,
     ...args: any[]
 ): any {
@@ -100,7 +100,7 @@ export function orWhereImpl(
 }
 
 export function whereNotImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     columnOrRaw: any,
     ...args: any[]
 ): any {
@@ -129,7 +129,7 @@ export function whereNotImpl(
 }
 
 export function whereInImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     values: readonly any[] | Knex.QueryBuilder
 ): any {
@@ -143,7 +143,7 @@ export function whereInImpl(
 }
 
 export function whereNotInImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     values: readonly any[] | Knex.QueryBuilder
 ): any {
@@ -157,7 +157,7 @@ export function whereNotInImpl(
 }
 
 export function orWhereInImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     values: readonly any[] | Knex.QueryBuilder
 ): any {
@@ -171,7 +171,7 @@ export function orWhereInImpl(
 }
 
 export function orWhereNotInImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     values: readonly any[] | Knex.QueryBuilder
 ): any {
@@ -185,7 +185,7 @@ export function orWhereNotInImpl(
 }
 
 export function whereNullImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>
 ): any {
     const state = getState(builder);
@@ -197,7 +197,7 @@ export function whereNullImpl(
 }
 
 export function whereNotNullImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>
 ): any {
     const state = getState(builder);
@@ -209,7 +209,7 @@ export function whereNotNullImpl(
 }
 
 export function orWhereNullImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>
 ): any {
     const state = getState(builder);
@@ -221,7 +221,7 @@ export function orWhereNullImpl(
 }
 
 export function orWhereNotNullImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>
 ): any {
     const state = getState(builder);
@@ -233,7 +233,7 @@ export function orWhereNotNullImpl(
 }
 
 export function whereBetweenImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     range: readonly [any, any]
 ): any {
@@ -247,7 +247,7 @@ export function whereBetweenImpl(
 }
 
 export function whereNotBetweenImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     range: readonly [any, any]
 ): any {
@@ -261,7 +261,7 @@ export function whereNotBetweenImpl(
 }
 
 export function whereLikeImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     value: string
 ): any {
@@ -275,7 +275,7 @@ export function whereLikeImpl(
 }
 
 export function whereILikeImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     value: string
 ): any {
@@ -289,7 +289,7 @@ export function whereILikeImpl(
 }
 
 export function whereRawImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     sql: string,
     ...bindings: any[]
 ): any {
@@ -300,7 +300,7 @@ export function whereRawImpl(
 }
 
 export function whereExistsImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     callback: Knex.QueryCallback | Knex.QueryBuilder
 ): any {
     const state = getState(builder);
@@ -310,7 +310,7 @@ export function whereExistsImpl(
 }
 
 export function whereNotExistsImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     callback: Knex.QueryCallback | Knex.QueryBuilder
 ): any {
     const state = getState(builder);
@@ -320,7 +320,7 @@ export function whereNotExistsImpl(
 }
 
 export function whereJsonPathImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any>,
     path: string,
     operator?: string,
@@ -356,7 +356,7 @@ export function whereJsonPathImpl(
 }
 
 export function orderByImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any> | Knex.Raw,
     direction?: 'asc' | 'desc'
 ): any {
@@ -368,7 +368,7 @@ export function orderByImpl(
 }
 
 export function orderByRawImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     sql: string,
     ...bindings: any[]
 ): any {
@@ -379,7 +379,7 @@ export function orderByRawImpl(
 }
 
 export function groupByImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     ...columns: (ColumnRef<any> | Knex.Raw)[]
 ): any {
     const state = getState(builder);
@@ -390,7 +390,7 @@ export function groupByImpl(
 }
 
 export function groupByRawImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     sql: string,
     ...bindings: any[]
 ): any {
@@ -401,7 +401,7 @@ export function groupByRawImpl(
 }
 
 export function havingImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     column: ColumnRef<any> | Knex.Raw,
     operator: string,
     value: any
@@ -414,7 +414,7 @@ export function havingImpl(
 }
 
 export function havingRawImpl(
-    builder: SchemaQueryBuilder<any, any>,
+    builder: QuerySource<any, any>,
     sql: string,
     ...bindings: any[]
 ): any {

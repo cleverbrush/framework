@@ -246,7 +246,7 @@ typed as synchronous that returns a promise/thenable throws when invoked.
 `configureSync()` API.
 
 Configure once and reuse the same source/target schema instances. Queries can
-provide their projection schema through `.withRowSchema().rowSchema`; see the
+provide their projection schema through `.rowSchema`; see the
 [projection-aware read guide](../knex-schema/README.md#projection-aware-reads), including separate
 definition/mapping/service files and explicit polymorphic dispatch. The mapper
 performs no database calls or application enrichment.

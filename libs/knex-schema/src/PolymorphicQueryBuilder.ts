@@ -10,18 +10,21 @@ import {
 import type { Knex } from 'knex';
 import { buildColumnMap, getPrimaryKeyColumns } from './columns.js';
 import type { SchemaProps } from './entity.js';
-import { COLUMN } from './expressions.js';
-import { getVariants } from './extension.js';
-import {
-    getEffectiveBaseQuery,
-    getSchemaQueryBuilderCtor
-} from './operations/helpers.js';
+import { type AliasedColumn, COLUMN } from './expressions.js';
+import { getTableName, getVariants } from './extension.js';
+import { OpaqueQuery, type QueryOutput } from './OpaqueQuery.js';
 import { privateColumn } from './operations/ordering.js';
 import type {
     EntityReadSchema,
     ReadRelations,
     ReadVariantMetadata
 } from './read-entity.js';
+import {
+    captureReadRaw,
+    type ReadPredicate,
+    type ReadPredicateContext,
+    ReadPredicates
+} from './read-predicates.js';
 import {
     type ObjectReadSchema,
     type ReadObject,
@@ -34,8 +37,12 @@ import {
     type ReadColumns,
     type ReadCorrelation,
     type ReadQueryShape,
-    SchemaReadQuery
-} from './SchemaReadQuery.js';
+    type Related,
+    type RelationField,
+    type SchemaAwareQuery,
+    SchemaQueryBuilder
+} from './SchemaQueryBuilder.js';
+import type { PaginationResult } from './types.js';
 
 type VariantMap<S> =
     ReadVariantMetadata<S> extends { variants: infer V } ? V : {};
@@ -109,7 +116,7 @@ type BranchQueries<
     S extends ReadObject,
     B extends Record<string, ReadObject>
 > = {
-    [K in keyof B & keyof VariantMap<S> & string]: SchemaReadQuery<
+    [K in keyof B & keyof VariantMap<S> & string]: SchemaQueryBuilder<
         BranchSource<S, K>,
         B[K],
         ReadRelations<S> & ReadRelations<VariantBody<S, K>>
@@ -118,35 +125,69 @@ type BranchQueries<
 type Selector<S extends ReadObject> = (
     columns: ReadColumns<S, keyof ReadRelations<S>>
 ) => { readonly [COLUMN]: { column: string } };
+let polymorphicAliasSequence = 0;
+type PolymorphicOrder =
+    | { key: string; direction: 'asc' | 'desc' }
+    | { raw: () => Knex.Raw };
 
 /**
  * Immutable polymorphic read graph. Branches are combined in one PostgreSQL statement;
  * rowSchema is a real discriminated union and variantRowSchemas supplies object schemas
  * for separately configured mappers. Framework does not choose application DTO mappings.
  */
-export class PolymorphicReadQuery<
+export class PolymorphicQueryBuilder<
     S extends ReadObject,
     B extends Record<string, ReadObject> = VariantReadSchemas<S>
-> {
+> extends ReadPredicates<ReadColumns<S, keyof ReadRelations<S>>> {
     /** @internal Nominal identity for typed child-query customizers. */
     declare readonly [READ_QUERY]: true;
     /** Runtime union matching decoded results, including selected variant bodies. */
     readonly rowSchema: PolymorphicRowSchema<B>;
     /** Stable object schemas keyed by discriminator, suitable for mapper.configure(). */
     readonly variantRowSchemas: Readonly<B>;
-    private branches: Record<string, SchemaReadQuery<any, any, any>>;
-    private fallback: SchemaReadQuery<any, any, any>;
-    private orders: Array<{ key: string; direction: 'asc' | 'desc' }> = [];
+    private branches: Record<
+        string,
+        SchemaQueryBuilder<any, any, any, boolean>
+    >;
+    private fallback: SchemaQueryBuilder<any, any, any, boolean>;
+    private orders: PolymorphicOrder[] = [];
     private rowLimit?: number;
     private rowOffset?: number;
     private includeUnknown = true;
+    private predicates: readonly ReadPredicate[] = [];
+    private defaults?: {
+        predicates: readonly ReadPredicate[];
+        orders: PolymorphicOrder[];
+        limit?: number;
+        offset?: number;
+    };
+    private skipDefaults = false;
+    private deleted: 'exclude' | 'include' | 'only' = 'exclude';
+    private readonly predicateAlias =
+        `__polymorphic_${polymorphicAliasSequence++}`;
+    private readonly columns: Record<string, AliasedColumn<any>>;
 
-    /** @internal Use withRowSchema() instead of constructing polymorphic readers. */
+    /** @internal Create through query() or an ORM DbSet. */
     constructor(
         private readonly knex: Knex,
         private readonly source: S,
         private readonly base: Knex.QueryBuilder
     ) {
+        super();
+        this.columns = Object.fromEntries(
+            Object.entries(source.introspect().properties).map(
+                ([key, schema]) => [
+                    key,
+                    {
+                        [COLUMN]: {
+                            alias: this.predicateAlias,
+                            column: key,
+                            schema
+                        }
+                    }
+                ]
+            )
+        );
         const config = getVariants(source);
         if (!config)
             throw new ReadSchemaError('No polymorphic variants are declared');
@@ -158,16 +199,27 @@ export class PolymorphicReadQuery<
             buildColumnMap(source).propToCol.get(config.discriminatorKey) ??
             config.discriminatorKey;
         // Invert only the discriminator guard, not caller/default-scope filters.
-        this.fallback = new SchemaReadQuery<any, any, any>(
+        this.fallback = new SchemaQueryBuilder<any, any, any, boolean>(
             knex,
             common,
             knex
                 .from(base.clone().as('__read_unknown'))
+                .select(
+                    Object.fromEntries(
+                        Object.keys(common.introspect().properties).map(key => [
+                            key,
+                            knex.ref(
+                                `__read_unknown.${buildColumnMap(source).propToCol.get(key) ?? key}`
+                            )
+                        ])
+                    )
+                )
                 .where(q =>
                     q
                         .whereNotIn(discriminator, Object.keys(config.variants))
                         .orWhereNull(discriminator)
-                )
+                ),
+            this.predicateAlias
         );
         const schemas = Object.fromEntries(
             Object.entries(this.branches).map(([key, q]) => [key, q.rowSchema])
@@ -176,11 +228,47 @@ export class PolymorphicReadQuery<
         this.rowSchema = this.unionSchema(
             schemas
         ) as unknown as PolymorphicRowSchema<B>;
+        const scope = source.introspect().extensions?.defaultScope;
+        if (typeof scope === 'function') {
+            const configured = scope(this.copy());
+            if (
+                !this.sameSource(configured) ||
+                configured.rowSchema !== this.rowSchema ||
+                configured.deleted !== this.deleted ||
+                configured.skipDefaults !== this.skipDefaults ||
+                configured.knex !== this.knex
+            ) {
+                if (configured instanceof Promise)
+                    void configured.catch(() => {});
+                throw new ReadSchemaError(
+                    'Scopes must synchronously return a shape-preserving query'
+                );
+            }
+            this.defaults = {
+                predicates: configured.predicates,
+                orders: configured.orders,
+                limit: configured.rowLimit,
+                offset: configured.rowOffset
+            };
+        }
     }
 
     private commonSource(): ReadObject {
         const info = this.source.introspect();
-        return (object(info.properties) as any)
+        const relationNames = new Set(
+            ((info.extensions?.relations ?? []) as { name: string }[]).map(
+                relation => relation.name
+            )
+        );
+        const properties = Object.fromEntries(
+            Object.entries(info.properties)
+                .filter(([key]) => !relationNames.has(key))
+                .map(([key, schema]) => [
+                    key,
+                    (schema as ReadSchema).withExtension('columnName', key)
+                ])
+        );
+        return (object(properties) as any)
             .withExtension('tableName', info.extensions?.tableName)
             .withExtension('relations', info.extensions?.relations ?? []);
     }
@@ -197,7 +285,10 @@ export class PolymorphicReadQuery<
         );
     }
 
-    private branch(key: string, body: boolean): SchemaReadQuery<any, any, any> {
+    private branch(
+        key: string,
+        body: boolean
+    ): SchemaQueryBuilder<any, any, any, boolean> {
         const config = getVariants(this.source)!;
         const variant = config.variants[key];
         const baseInfo = this.source.introspect();
@@ -237,10 +328,11 @@ export class PolymorphicReadQuery<
                 throw new ReadSchemaError(
                     'CTI read graphs require a single-column primary key'
                 );
-            const Constructor = getSchemaQueryBuilderCtor();
-            const bodyQuery = getEffectiveBaseQuery(
-                new Constructor(this.knex, variant.schema)
-            ).clone();
+            const bodyQuery = new SchemaQueryBuilder(
+                this.knex,
+                variant.schema,
+                this.knex(getTableName(variant.schema))
+            ).storageQuery();
             query.leftJoin(
                 bodyQuery.as(bodyAlias),
                 `${bodyAlias}.${variant.foreignKey}`,
@@ -310,10 +402,11 @@ export class PolymorphicReadQuery<
                 '__read_cti_present'
             );
         }
-        return new SchemaReadQuery<any, any, any>(
+        return new SchemaQueryBuilder<any, any, any, boolean>(
             this.knex,
             schema,
-            query.select(columns)
+            query.select(columns),
+            this.predicateAlias
         );
     }
 
@@ -327,7 +420,7 @@ export class PolymorphicReadQuery<
     /** @internal Check the identity of the original read source, retained by clones. */
     sameSource(other: unknown): boolean {
         return (
-            other instanceof PolymorphicReadQuery &&
+            other instanceof PolymorphicQueryBuilder &&
             this.base === other.base &&
             this.source === other.source
         );
@@ -343,35 +436,187 @@ export class PolymorphicReadQuery<
         });
     }
 
-    /** Add a comparison to every branch without changing its declared result schema. */
-    where(selector: Selector<S>, value: unknown): this;
-    /** Add an explicit supported comparison operator to every branch. */
-    where(selector: Selector<S>, operator: string, value: unknown): this;
-    /** Add a bound comparison; existing reader instances remain unchanged. */
-    where(selector: Selector<S>, ...args: unknown[]): this {
+    protected readPredicateContext(): ReadPredicateContext<
+        ReadColumns<S, keyof ReadRelations<S>>
+    > {
+        return {
+            knex: this.knex,
+            column: selector => {
+                const column =
+                    typeof selector === 'string'
+                        ? this.columns[selector]
+                        : selector(this.columns as any);
+                if (!column || !Object.values(this.columns).includes(column))
+                    throw new ReadSchemaError(
+                        'Column does not belong to this polymorphic query'
+                    );
+                return `${this.predicateAlias}.${column[COLUMN].column}`;
+            }
+        };
+    }
+    protected addReadPredicate(predicate: ReadPredicate): this {
         const copy = this.copy();
-        for (const [key, branch] of Object.entries(copy.branches))
-            copy.branches[key] = (branch.where as Function)(selector, ...args);
-        copy.fallback = (copy.fallback.where as Function)(selector, ...args);
+        copy.predicates = [...this.predicates, predicate];
         return copy;
     }
+    /** Remove the default scope while preserving explicit predicates. */
+    unscoped(): this {
+        const copy = this.copy();
+        copy.skipDefaults = true;
+        return copy;
+    }
+    /** Include soft-deleted entities in every branch. */
+    withDeleted(): this {
+        const copy = this.copy();
+        copy.deleted = 'include';
+        return copy;
+    }
+    /** Match only soft-deleted entities in every branch. */
+    onlyDeleted(): this {
+        const copy = this.copy();
+        copy.deleted = 'only';
+        return copy;
+    }
+    /** Apply a named immutable scope once. */
+    scoped(name: string): this {
+        const scope = (
+            this.source.introspect().extensions?.scopes as
+                | Record<string, Function>
+                | undefined
+        )?.[name];
+        if (!scope) throw new ReadSchemaError(`Unknown scope: ${name}`);
+        const configured = scope(this.copy());
+        if (
+            !this.sameSource(configured) ||
+            configured.rowSchema !== this.rowSchema ||
+            configured.deleted !== this.deleted ||
+            configured.skipDefaults !== this.skipDefaults ||
+            configured.knex !== this.knex
+        ) {
+            if (configured instanceof Promise) void configured.catch(() => {});
+            throw new ReadSchemaError(
+                'Scopes must synchronously return a shape-preserving query'
+            );
+        }
+        return configured;
+    }
+    /** True when all branches retain complete entity rows. */
+    get returnsEntityRows(): boolean {
+        return Object.values(this.branches).every(
+            branch => branch.returnsEntityRows
+        );
+    }
+    /** Customize a relation on one discriminator branch. */
+    includeVariant(
+        key: keyof B & keyof VariantMap<S> & string,
+        relation: string,
+        customize?: (query: SchemaQueryBuilder<any, any>) => ReadQueryShape
+    ): this {
+        return this.forVariant(key, query =>
+            query.include(() => relation as any, customize as any)
+        ) as unknown as this;
+    }
+    /** Load a common relation on every branch, configuring the child exactly once. */
+    include<
+        K extends keyof ReadRelations<S> & string,
+        Child extends ReadQueryShape = SchemaAwareQuery<
+            Related<ReadRelations<S>[K]>
+        >
+    >(
+        selector: K | ((relations: { [P in keyof ReadRelations<S>]: P }) => K),
+        customize?: (
+            query: SchemaAwareQuery<Related<ReadRelations<S>[K]>>
+        ) => Child
+    ): PolymorphicQueryBuilder<
+        S,
+        {
+            [P in keyof B]: ObjectSchemaBuilder<
+                SchemaProps<B[P]> &
+                    Record<
+                        K,
+                        RelationField<ReadRelations<S>[K], Child['rowSchema']>
+                    >
+            >;
+        }
+    > {
+        const relations = (this.source.introspect().extensions?.relations ??
+            []) as { name: string }[];
+        const name =
+            typeof selector === 'string'
+                ? selector
+                : selector(
+                      Object.fromEntries(
+                          relations.map(relation => [
+                              relation.name,
+                              relation.name
+                          ])
+                      ) as any
+                  );
+        if (!relations.some(relation => relation.name === name)) {
+            const variants = getVariants(this.source)!.variants;
+            const candidates = Object.entries(variants).filter(([, variant]) =>
+                variant.relations.some(relation => relation.name === name)
+            );
+            if (candidates.length > 1)
+                throw new ReadSchemaError(
+                    `Ambiguous relation: ${name}; use includeVariant`
+                );
+            if (candidates.length === 1)
+                return this.includeVariant(
+                    candidates[0][0] as any,
+                    name,
+                    customize as any
+                ) as any;
+            throw new ReadSchemaError(`Unknown relation: ${name}`);
+        }
+        const copy = this.copy();
+        const entries = Object.entries(copy.branches);
+        const [firstKey, first] = entries[0];
+        const prepared = first.include(name, customize as any);
+        copy.branches[firstKey] = prepared;
+        for (const [key, branch] of entries.slice(1))
+            copy.branches[key] = branch.includeFrom(name, prepared);
+        copy.fallback = copy.fallback.includeFrom(name, prepared);
+        copy.refresh();
+        return copy as any;
+    }
+    /** Filter one branch using schema property names; other variants remain unaffected. */
+    whereVariant(
+        key: keyof B & keyof VariantMap<S> & string,
+        selector: string | ((columns: any) => any),
+        operator: string,
+        value: unknown
+    ): this {
+        return this.forVariant(key, query =>
+            query.where(selector as any, operator, value)
+        ) as unknown as this;
+    }
     /** Order all variants together, not independently within each branch. */
-    orderBy(selector: Selector<S>, direction: 'asc' | 'desc' = 'asc'): this {
+    orderBy(
+        selector:
+            | Selector<S>
+            | (keyof ReadColumns<S, keyof ReadRelations<S>> & string),
+        direction: 'asc' | 'desc' = 'asc'
+    ): this {
         if (direction !== 'asc' && direction !== 'desc')
             throw new ReadSchemaError('Invalid ordering direction');
-        const properties = this.source.introspect().properties;
-        const key = selector(
-            Object.fromEntries(
-                Object.keys(properties).map(k => [
-                    k,
-                    { [COLUMN]: { column: k } }
-                ])
-            ) as any
-        )[COLUMN].column;
-        if (!Object.hasOwn(properties, key))
-            throw new ReadSchemaError('Unknown polymorphic ordering column');
+        const column =
+            typeof selector === 'string'
+                ? this.columns[selector]
+                : selector(this.columns as any);
+        if (!column || !Object.values(this.columns).includes(column as any))
+            throw new ReadSchemaError(
+                'Column does not belong to this polymorphic query'
+            );
+        const key = column[COLUMN].column;
         const copy = this.copy();
         copy.orders.push({ key, direction });
+        return copy;
+    }
+    /** Order the combined JSON-envelope SQL using trusted SQL and captured bindings. */
+    orderByRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): this {
+        const copy = this.copy();
+        copy.orders.push({ raw: captureReadRaw(this.knex, sql, bindings) });
         return copy;
     }
     /** Limit the combined result across all variants. */
@@ -385,7 +630,7 @@ export class PolymorphicReadQuery<
     /** Restrict returned discriminator branches and narrow both runtime and inferred schemas. */
     selectVariants<const K extends readonly (keyof B & string)[]>(
         keys: K
-    ): PolymorphicReadQuery<S, Pick<B, K[number]>> {
+    ): PolymorphicQueryBuilder<S, Pick<B, K[number]>> {
         if (
             !keys.length ||
             new Set(keys).size !== keys.length ||
@@ -421,14 +666,16 @@ export class PolymorphicReadQuery<
     >(
         key: K,
         configure: (query: BranchQueries<S, B>[K]) => Q
-    ): PolymorphicReadQuery<S, Omit<B, K> & Record<K, Q['rowSchema']>> {
+    ): PolymorphicQueryBuilder<S, Omit<B, K> & Record<K, Q['rowSchema']>> {
         const current = this.branches[key];
         if (!current) throw new ReadSchemaError(`Unknown variant: ${key}`);
         const configured = configure(current as any);
-        if (!current.sameSource(configured))
+        if (!current.sameSource(configured)) {
+            if (configured instanceof Promise) void configured.catch(() => {});
             throw new ReadSchemaError(
                 'Variant customizer must return its configured read query'
             );
+        }
         const discriminator = getVariants(this.source)!.discriminatorKey;
         if (
             configured.rowSchema
@@ -439,7 +686,7 @@ export class PolymorphicReadQuery<
                 'Variant projections must retain the original discriminator'
             );
         const copy = this.copy();
-        copy.branches[key] = configured as unknown as SchemaReadQuery<
+        copy.branches[key] = configured as unknown as SchemaQueryBuilder<
             any,
             any,
             any
@@ -450,36 +697,71 @@ export class PolymorphicReadQuery<
 
     /** @internal Compile one UNION ALL statement; JSON preserves distinct branch shapes. */
     compile(correlate?: ReadCorrelation): Knex.QueryBuilder {
+        const defaults = this.skipDefaults ? undefined : this.defaults;
         const reserved = Object.values(this.branches).flatMap(branch =>
             Object.keys(branch.rowSchema.introspect().properties)
         );
-        const order = this.orders.map(item => {
-            const hidden = privateColumn(reserved, 'read_order');
-            reserved.push(hidden);
-            return { ...item, hidden };
-        });
+        const order = [...(defaults?.orders ?? []), ...this.orders].map(
+            item => {
+                if ('raw' in item) return item;
+                const hidden = privateColumn(reserved, 'read_order');
+                reserved.push(hidden);
+                return { ...item, hidden };
+            }
+        );
         const queries = [
             ...Object.values(this.branches),
             ...(this.includeUnknown ? [this.fallback] : [])
-        ].map(branch =>
-            this.knex
+        ].map(original => {
+            let branch = original;
+            for (const predicates of [
+                defaults?.predicates ?? [],
+                this.predicates
+            ]) {
+                if (predicates.length)
+                    branch = branch.withPredicate(query => {
+                        query.where(nested => {
+                            for (const predicate of predicates)
+                                predicate(nested);
+                        });
+                    });
+            }
+            const softDelete = this.source.introspect().extensions
+                ?.softDelete as { column: string } | undefined;
+            if (softDelete && this.deleted !== 'include') {
+                const key =
+                    buildColumnMap(this.source).colToProp.get(
+                        softDelete.column
+                    ) ?? softDelete.column;
+                branch = branch.withPredicate(query => {
+                    query[
+                        this.deleted === 'only' ? 'whereNotNull' : 'whereNull'
+                    ](key);
+                });
+            }
+            return this.knex
                 .from(
                     branch
                         .compile((sql, alias, source) => {
                             correlate?.(sql, alias, source);
                             const columns = buildColumnMap(source).propToCol;
-                            for (const { key, hidden } of order)
+                            for (const item of order) {
+                                if ('raw' in item) continue;
+                                const { key, hidden } = item;
                                 sql.select({
                                     [hidden]: this.knex.raw(
                                         'cast(?? as text)',
                                         [`${alias}.${columns.get(key) ?? key}`]
                                     )
                                 });
+                            }
                         })
                         .as('__read_branch')
                 )
-                .select(this.knex.raw('to_jsonb(__read_branch) as __read_poly'))
-        );
+                .select(
+                    this.knex.raw('to_jsonb(__read_branch) as __read_poly')
+                );
+        });
         const query = this.knex
             .from(
                 this.knex
@@ -488,7 +770,12 @@ export class PolymorphicReadQuery<
                     .as('__read_variants')
             )
             .select('__read_poly');
-        for (const { key, direction, hidden } of order) {
+        for (const item of order) {
+            if ('raw' in item) {
+                query.orderByRaw(item.raw());
+                continue;
+            }
+            const { key, direction, hidden } = item;
             const info = this.source.introspect().properties[key].introspect();
             const type =
                 info.type === 'number'
@@ -509,8 +796,10 @@ export class PolymorphicReadQuery<
                 [hidden]
             );
         }
-        if (this.rowLimit !== undefined) query.limit(this.rowLimit);
-        if (this.rowOffset !== undefined) query.offset(this.rowOffset);
+        const limit = this.rowLimit ?? defaults?.limit;
+        const offset = this.rowOffset ?? defaults?.offset;
+        if (limit !== undefined) query.limit(limit);
+        if (offset !== undefined) query.offset(offset);
         return query;
     }
     /** @internal Decode using exactly the selected branch's schema and codecs. */
@@ -527,6 +816,90 @@ export class PolymorphicReadQuery<
     /** Render debugging SQL without performing any database calls. */
     toQuery(): string {
         return this.compile().toQuery();
+    }
+    /** Return a separately mutable Knex snapshot of the union statement. */
+    toKnexQuery(): Knex.QueryBuilder {
+        return this.compile();
+    }
+    /** Configure a captured union SELECT and declare its complete raw output shape. */
+    apply<O extends ReadObject>(
+        configure: (query: Knex.QueryBuilder) => Knex.QueryBuilder | undefined,
+        options: QueryOutput<O>
+    ): OpaqueQuery<O> {
+        const sql = this.compile();
+        const result = configure(sql);
+        if (result !== undefined && result !== sql) {
+            if (result instanceof Promise) void result.catch(() => {});
+            throw new ReadSchemaError(
+                'Raw configuration must synchronously configure the supplied Knex builder'
+            );
+        }
+        return OpaqueQuery.capture(this.knex, sql, options);
+    }
+    /** Select trusted SQL from the union envelope with an explicit output contract. */
+    selectRaw<O extends ReadObject>(
+        sql: string,
+        bindings: readonly Knex.RawBinding[],
+        options: QueryOutput<O>
+    ): OpaqueQuery<O> {
+        const captured = captureReadRaw(this.knex, sql, bindings);
+        return this.apply(
+            query => query.clearSelect().select(captured()),
+            options
+        );
+    }
+    /** Count matching rows across variants, excluding global pagination and ordering. */
+    async countValue(): Promise<number> {
+        const source = this.compile()
+            .clearOrder()
+            .clear('limit')
+            .clear('offset');
+        const row = await this.knex
+            .from(source.as('__variant_count'))
+            .count({ count: '*' })
+            .first();
+        const count = Number(row?.count ?? 0);
+        if (!Number.isSafeInteger(count))
+            throw new ReadSchemaError('Count exceeds the safe integer range');
+        return count;
+    }
+    /** Globally paginate the discriminated union, leaving the source and its metadata unchanged. */
+    async paginate({
+        page,
+        pageSize
+    }: {
+        page: number;
+        pageSize: number;
+    }): Promise<PaginationResult<InferType<PolymorphicRowSchema<B>>>> {
+        if (
+            !Number.isInteger(page) ||
+            page < 1 ||
+            !Number.isInteger(pageSize) ||
+            pageSize < 1
+        )
+            throw new ReadSchemaError(
+                'Page and pageSize must be positive integers'
+            );
+        const total = await this.countValue();
+        const data = await this.offset((page - 1) * pageSize)
+            .limit(pageSize)
+            .execute();
+        const totalPages = Math.ceil(total / pageSize);
+        return {
+            data,
+            total,
+            page,
+            pageSize,
+            totalPages,
+            hasNextPage: page < totalPages,
+            hasPreviousPage: page > 1
+        };
+    }
+    /** Read a property common to the selected variants; returned scalar values are detached. */
+    async pluck<K extends keyof InferType<PolymorphicRowSchema<B>>>(
+        key: K
+    ): Promise<InferType<PolymorphicRowSchema<B>>[K][]> {
+        return (await this.execute()).map(row => (row as any)[key]);
     }
     /** Execute and decode one statement containing every requested branch. */
     async execute(): Promise<InferType<PolymorphicRowSchema<B>>[]> {

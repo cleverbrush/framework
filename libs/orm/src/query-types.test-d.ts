@@ -35,6 +35,7 @@ test('include customizers know their relation schema', () => {
             owners.where(t => t.name, 'Alice');
             // @ts-expect-error field belongs to tasks, not users
             owners.where(t => t.ownerId, 1);
+            return owners.where(t => t.name, 'Alice');
         }
     );
 });
