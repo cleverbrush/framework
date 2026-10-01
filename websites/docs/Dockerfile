@@ -15,6 +15,9 @@ COPY libs/react-form/ libs/react-form/
 COPY libs/async/ libs/async/
 COPY libs/deep/ libs/deep/
 COPY libs/scheduler/ libs/scheduler/
+COPY libs/scheduler-postgres/ libs/scheduler-postgres/
+COPY libs/knex-schema/ libs/knex-schema/
+COPY libs/orm/ libs/orm/
 COPY libs/schema-json/ libs/schema-json/
 
 # Copy the shared package and the docs website

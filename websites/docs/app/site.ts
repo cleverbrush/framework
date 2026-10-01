@@ -109,7 +109,7 @@ export const DOCS_ROUTES: RouteMetadata[] = [
         path: '/scheduler',
         title: '@cleverbrush/scheduler',
         description:
-            'Job scheduling documentation for workers, event handling, schedule calculators, and custom persistence.'
+            'Typed durable jobs, PostgreSQL persistence, recurring triggers, worker leases, and replayable progress.'
     },
     {
         path: '/log',

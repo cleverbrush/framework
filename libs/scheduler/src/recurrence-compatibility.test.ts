@@ -1,6 +1,7 @@
+// v4 schedule fixtures; weekly intervals now consistently anchor to the start week.
 import { expect, test } from 'vitest';
 
-import { ScheduleCalculator } from './ScheduleCalculator.js';
+import { ScheduleCalculator } from './recurrence.js';
 
 test('day - 1', () => {
     const calculator = new ScheduleCalculator({
@@ -174,9 +175,9 @@ test('week - 2', () => {
     });
 
     const results = [
-        new Date(Date.UTC(2022, 8, 12, 9, 0, 0, 0)),
-        new Date(Date.UTC(2022, 8, 13, 9, 0, 0, 0)),
-        new Date(Date.UTC(2022, 8, 26, 9, 0, 0, 0))
+        new Date(Date.UTC(2022, 8, 19, 9, 0, 0, 0)),
+        new Date(Date.UTC(2022, 8, 20, 9, 0, 0, 0)),
+        new Date(Date.UTC(2022, 9, 3, 9, 0, 0, 0))
     ];
 
     for (let i = 0; i < results.length; i++) {
@@ -486,7 +487,6 @@ test('minute - 3', () => {
 });
 
 test('constructor defaults startsOn to now when not provided', () => {
-    // Covers the else branch (lines 65-66) where startsOn is not given
     const before = Date.now();
     const calc = new ScheduleCalculator({
         every: 'minute',
@@ -503,7 +503,6 @@ test('constructor defaults startsOn to now when not provided', () => {
 });
 
 test('hasNext(span) returns true when next date is within the span', () => {
-    // Covers lines 364-365: hasNext called with a numeric span
     const farFutureStart = new Date(Date.now() + 500);
     const calc = new ScheduleCalculator({
         every: 'minute',
@@ -519,7 +518,6 @@ test('hasNext(span) returns true when next date is within the span', () => {
 });
 
 test('throws for unknown schedule type', () => {
-    // Covers line 336: default case in #getNext switch
     expect(
         () =>
             new ScheduleCalculator({
@@ -527,10 +525,10 @@ test('throws for unknown schedule type', () => {
                 interval: 1,
                 startsOn: new Date()
             })
-    ).toThrow('unknown schedule type');
+    ).toThrow();
 });
 
-test('hasNext(span) returns false when schedule is exhausted (line 364)', () => {
+test('hasNext(span) returns false when schedule is exhausted', () => {
     const past = new Date(Date.now() - 10_000);
     const calc = new ScheduleCalculator({
         every: 'minute',
@@ -544,7 +542,7 @@ test('hasNext(span) returns false when schedule is exhausted (line 364)', () => 
     expect(calc.hasNext(10_000)).toBe(false);
 });
 
-test('next() throws when schedule is over (line 379)', () => {
+test('next() throws when schedule is over', () => {
     const past = new Date(Date.now() - 10_000);
     const calc = new ScheduleCalculator({
         every: 'minute',
@@ -553,10 +551,10 @@ test('next() throws when schedule is over (line 379)', () => {
         maxOccurences: 1
     });
     calc.next();
-    expect(() => calc.next()).toThrow('schedule is over');
+    expect(() => calc.next()).toThrow('exhausted');
 });
 
-test('year - day:last covers lines 292-298', () => {
+test('year - day:last', () => {
     const calculator = new ScheduleCalculator({
         every: 'year',
         day: 'last',

@@ -714,7 +714,7 @@ const result = ShapeSchema.validate({ type: 'circle', radius: 5 });
 
 ### Real-World Example: Job Scheduler
 
-The `@cleverbrush/scheduler` library uses this exact pattern to validate job schedules. The `every` field acts as the discriminator, and each variant adds its own set of allowed properties:
+An application's schedule-input form can use this pattern. The `every` field acts as the discriminator, and each variant adds its own set of allowed properties:
 
 ```typescript
 import { object, string, number, array, date, union, type InferType } from '@cleverbrush/schema';

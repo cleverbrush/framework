@@ -39,7 +39,8 @@ JSON Schema, API contracts, and Standard Schema integrations.
 | [`@cleverbrush/otel`](./libs/otel) | OpenTelemetry setup and instrumentation helpers for apps and clients. |
 | [`@cleverbrush/async`](./libs/async) | Async utilities including collector, debounce, throttle, and retry. |
 | [`@cleverbrush/deep`](./libs/deep) | Deep equality, deep extension, flattening, and object utilities. |
-| [`@cleverbrush/scheduler`](./libs/scheduler) | Cron-like job scheduler with schema-validated job configuration. |
+| [`@cleverbrush/scheduler`](./libs/scheduler) | Typed durable jobs, recurring triggers and ordered progress. |
+| [`@cleverbrush/scheduler-postgres`](./libs/scheduler-postgres) | PostgreSQL job persistence, transactional enqueue and fenced leases. |
 
 ## How The Pieces Fit
 

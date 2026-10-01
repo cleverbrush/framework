@@ -9,6 +9,7 @@
             "@cleverbrush/deep",
             "@cleverbrush/async",
             "@cleverbrush/scheduler",
+            "@cleverbrush/scheduler-postgres",
             "@cleverbrush/mapper",
             "@cleverbrush/knex-clickhouse",
             "@cleverbrush/react-form",

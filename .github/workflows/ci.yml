@@ -63,6 +63,7 @@ jobs:
           --health-retries 10
     env:
       QUERY_TEST_DATABASE_URL: postgres://framework_test:framework_test@127.0.0.1:5432/framework_queries
+      SCHEDULER_TEST_DATABASE_URL: postgres://framework_test:framework_test@127.0.0.1:5432/framework_queries
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -72,3 +73,6 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm run test:queries:integration
+      - run: npm run test:scheduler:integration
+      - run: node demos/durable-jobs/demo.ts
+      - run: node demos/durable-jobs/periodic.ts --fast
