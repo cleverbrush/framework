@@ -225,6 +225,12 @@ identities.
   occurrence in bounded batches (100 per schedule/pass).
 - Overlap skip consumes skipped occurrences; it does not defer them.
 
+Calendar calculations use built-in `Date` and `Intl.DateTimeFormat` APIs;
+no additional date-time package is required. IANA rules come from the Node.js
+runtime's ICU data. Keep runtime/tzdata versions aligned across dispatchers
+so they agree on time-zone rule updates. Calculations do not depend on the
+host process's `TZ` setting.
+
 `ScheduleCalculator` previews the same rules. Supply startsOn for reproducibility;
 `next()` returns `{ date, index }` with a one-based slot index (including skipped
 slots), and `hasNext()` checks exhaustion. Internal persisted cursors are zero-based.

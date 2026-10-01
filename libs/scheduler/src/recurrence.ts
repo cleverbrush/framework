@@ -1,4 +1,10 @@
-import { Temporal } from '@js-temporal/polyfill';
+import {
+    addDays,
+    addMonths,
+    calendarDate,
+    localDate,
+    resolveLocal
+} from './calendar.js';
 import type { StoredSchedule, TaskSchedule } from './contracts.js';
 import { normalizeSchedule } from './schedule-schemas.js';
 
@@ -21,14 +27,6 @@ export function storeSchedule(
     };
 }
 
-function resolve(local: Temporal.PlainDateTime, zone: string) {
-    const zoned = local.toZonedDateTime(zone, { disambiguation: 'earlier' });
-    return {
-        at: zoned.epochMilliseconds,
-        executable: zoned.toPlainDateTime().equals(local)
-    };
-}
-
 /** Calculate a slot without reference to the wall clock or successful run count. */
 export function occurrenceAt(
     rule: StoredSchedule,
@@ -45,84 +43,73 @@ export function occurrenceAt(
     try {
         if (rule.every === 'minute') {
             const at = rule.startsOn + index * interval * 60000;
-            if (!Number.isSafeInteger(at)) return undefined;
+            if (
+                !Number.isSafeInteger(at) ||
+                !Number.isFinite(new Date(at).getTime())
+            )
+                return undefined;
             value = { at, executable: true };
         } else {
             const zone = rule.timeZone ?? 'UTC';
-            const anchor = Temporal.Instant.fromEpochMilliseconds(
-                rule.startsOn
-            ).toZonedDateTimeISO(zone);
-            const time = Temporal.PlainTime.from({
-                hour: rule.hour ?? 9,
-                minute: rule.minute ?? 0
-            });
-            let local: Temporal.PlainDateTime;
+            const anchor = localDate(rule.startsOn, zone);
+            const hour = rule.hour ?? 9,
+                minute = rule.minute ?? 0;
+            const onDate = (day: number, month = anchor.getUTCMonth() + 1) =>
+                calendarDate(anchor.getUTCFullYear(), month, day, hour, minute);
+            let local: Date;
             if (rule.every === 'day') {
-                let first = anchor.toPlainDate().toPlainDateTime(time);
-                if (resolve(first, zone).at < rule.startsOn)
-                    first = first.add({ days: 1 });
-                local = first.add({ days: index * interval });
+                let first = onDate(anchor.getUTCDate());
+                if (resolveLocal(first, zone).at < rule.startsOn)
+                    first = addDays(first, 1);
+                local = addDays(first, index * interval);
             } else if (rule.every === 'week') {
-                const monday = anchor
-                    .toPlainDate()
-                    .subtract({ days: anchor.dayOfWeek - 1 });
-                const days = rule.dayOfWeek!;
+                const monday = addDays(
+                    onDate(anchor.getUTCDate()),
+                    1 - (anchor.getUTCDay() || 7)
+                );
+                const days = rule.dayOfWeek;
                 const initial = days.filter(
                     day =>
-                        resolve(
-                            monday.add({ days: day - 1 }).toPlainDateTime(time),
-                            zone
-                        ).at >= rule.startsOn
+                        resolveLocal(addDays(monday, day - 1), zone).at >=
+                        rule.startsOn
                 );
                 if (index < initial.length)
-                    local = monday
-                        .add({ days: initial[index] - 1 })
-                        .toPlainDateTime(time);
+                    local = addDays(monday, initial[index] - 1);
                 else {
                     const remaining = index - initial.length;
-                    local = monday
-                        .add({
-                            weeks:
-                                (Math.floor(remaining / days.length) + 1) *
-                                interval,
-                            days: days[remaining % days.length] - 1
-                        })
-                        .toPlainDateTime(time);
+                    local = addDays(
+                        monday,
+                        (Math.floor(remaining / days.length) + 1) *
+                            interval *
+                            7 +
+                            days[remaining % days.length] -
+                            1
+                    );
                 }
             } else {
-                let first = Temporal.PlainDate.from({
-                    year: anchor.year,
-                    month:
-                        rule.every === 'year'
-                            ? (rule.month ?? 1)
-                            : anchor.month,
-                    day: 1
-                });
-                const onDay = (date: Temporal.PlainDate) =>
-                    date
-                        .with({
-                            day:
-                                rule.day === 'last'
-                                    ? date.daysInMonth
-                                    : (rule.day ?? 1)
-                        })
-                        .toPlainDateTime(time);
-                if (resolve(onDay(first), zone).at < rule.startsOn)
-                    first = first.add(
-                        rule.every === 'year' ? { years: 1 } : { months: 1 }
-                    );
-                local = onDay(
-                    first.add(
-                        rule.every === 'year'
-                            ? { years: index * interval }
-                            : { months: index * interval }
-                    )
+                let first = onDate(
+                    1,
+                    rule.every === 'year'
+                        ? rule.month
+                        : anchor.getUTCMonth() + 1
                 );
+                const period = rule.every === 'year' ? 12 : 1;
+                const onDay = (date: Date) =>
+                    calendarDate(
+                        date.getUTCFullYear(),
+                        date.getUTCMonth() + (rule.day === 'last' ? 2 : 1),
+                        rule.day === 'last' ? 0 : rule.day,
+                        hour,
+                        minute
+                    );
+                if (resolveLocal(onDay(first), zone).at < rule.startsOn)
+                    first = addMonths(first, period);
+                local = onDay(addMonths(first, index * interval * period));
             }
-            value = resolve(local, zone);
+            value = resolveLocal(local, zone);
         }
     } catch (error) {
-        if (error instanceof RangeError) return undefined; // End of Temporal's supported calendar range.
+        if (error instanceof RangeError) return undefined; // End of JavaScript Date's supported calendar range.
         throw error;
     }
     if (rule.endsOn !== undefined && value.at > rule.endsOn) return undefined;

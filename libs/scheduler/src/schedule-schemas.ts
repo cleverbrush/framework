@@ -7,7 +7,7 @@ import {
     string,
     union
 } from '@cleverbrush/schema';
-import { Temporal } from '@js-temporal/polyfill';
+import { timeZoneFormatter } from './calendar.js';
 
 const count = () => number().isInteger().min(1).max(Number.MAX_SAFE_INTEGER);
 const scheduleDate = date()
@@ -29,10 +29,7 @@ export const ScheduleSchemaBase = object({
     timeZone: string()
         .addValidator(value => {
             try {
-                if (/^[+-]/.test(value)) throw new RangeError();
-                Temporal.Instant.fromEpochMilliseconds(0).toZonedDateTimeISO(
-                    value
-                );
+                timeZoneFormatter(value);
                 return { valid: true };
             } catch {
                 return {

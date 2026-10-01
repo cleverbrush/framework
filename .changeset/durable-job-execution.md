@@ -21,3 +21,8 @@ one-based calculator index and accept the deprecated maxOccurences spelling
 while rejecting ambiguous dual spelling. Name the explicit persistence option
 storageRepository. Derive PostgreSQL row and entity types from schema definitions
 without parallel hand-written row types.
+
+Use native Date/Intl calendar calculations without an additional date-time
+runtime dependency. Preserve DST-gap skipping and earlier-fold selection,
+including non-hour transitions and skipped calendar dates, independently of
+the host time zone. Bound minute schedules to the representable Date range.
