@@ -2,7 +2,7 @@ import { JobScheduler, InMemoryJobRepository } from '@cleverbrush/scheduler';
 import { Report } from './contracts.ts';
 import { handleReport } from './handler.ts';
 
-const jobs = new JobScheduler({ repository: new InMemoryJobRepository(), pollIntervalMs: 10 });
+const jobs = new JobScheduler({ storageRepository: new InMemoryJobRepository(), pollIntervalMs: 10 });
 const worker = jobs.createWorker({ jobs: [Report.handle(handleReport)], pollIntervalMs: 10 });
 const run = await jobs.enqueue(Report, { reportId: 'quarterly' });
 await worker.start();

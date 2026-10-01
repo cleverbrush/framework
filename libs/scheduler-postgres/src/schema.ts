@@ -1,48 +1,73 @@
-import type { Entity } from '@cleverbrush/orm';
 import {
     boolean,
     defineEntity,
+    type Entity,
     number,
     object,
     string
 } from '@cleverbrush/orm';
-import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
 
-type RowSchema<T> = ObjectSchemaBuilder<{
-    [K in keyof T & string]: SchemaBuilder<T[K]>;
-}>;
-type RunRow = {
-    id: string;
-    namespace: string;
-    name: string;
-    version: number;
-    status: string;
-    availableAt: number;
-    leaseExpiresAt: number | null;
-    expiresAt: number | null;
-    scheduleId: string | null;
-    dedupeKey: string | null;
-    record: string;
+const time = () => number().columnType('double precision');
+const runFields = {
+    id: string().primaryKey(),
+    namespace: string(),
+    name: string(),
+    version: number(),
+    status: string(),
+    availableAt: time(),
+    leaseExpiresAt: time().nullable().optional(),
+    expiresAt: time().nullable().optional(),
+    scheduleId: string().nullable().optional(),
+    dedupeKey: string().nullable().optional(),
+    record: string().columnType('text')
 };
-type ScheduleRow = {
-    namespace: string;
-    id: string;
-    active: boolean;
-    nextAt: number | null;
-    record: string;
+const scheduleFields = {
+    namespace: string(),
+    id: string(),
+    active: boolean(),
+    nextAt: time().nullable().optional(),
+    record: string().columnType('text')
 };
-type EventRow = { runId: string; sequence: number; record: string };
-type AttemptRow = { runId: string; attempt: number; record: string };
+const eventFields = {
+    runId: string(),
+    sequence: number(),
+    record: string().columnType('text')
+};
+const attemptFields = {
+    runId: string(),
+    attempt: number(),
+    record: string().columnType('text')
+};
+
+// Named field maps keep declaration emission portable without duplicating row types.
+const runs: ReturnType<typeof object<typeof runFields>> =
+    object(runFields).hasTableName('cb_jobs_runs');
+const schedules: ReturnType<typeof object<typeof scheduleFields>> = object(
+    scheduleFields
+)
+    .hasTableName('cb_jobs_schedules')
+    .hasPrimaryKey(['namespace', 'id']);
+const events: ReturnType<typeof object<typeof eventFields>> = object(
+    eventFields
+)
+    .hasTableName('cb_jobs_events')
+    .hasPrimaryKey(['runId', 'sequence']);
+const attempts: ReturnType<typeof object<typeof attemptFields>> = object(
+    attemptFields
+)
+    .hasTableName('cb_jobs_attempts')
+    .hasPrimaryKey(['runId', 'attempt']);
+
 type StorageSchemas = {
-    runs: RowSchema<RunRow>;
-    schedules: RowSchema<ScheduleRow>;
-    events: RowSchema<EventRow>;
-    attempts: RowSchema<AttemptRow>;
+    runs: typeof runs;
+    schedules: typeof schedules;
+    events: typeof events;
+    attempts: typeof attempts;
     entities: {
-        runs: Entity<RowSchema<RunRow>>;
-        schedules: Entity<RowSchema<ScheduleRow>>;
-        events: Entity<RowSchema<EventRow>>;
-        attempts: Entity<RowSchema<AttemptRow>>;
+        runs: Entity<typeof runs>;
+        schedules: Entity<typeof schedules>;
+        events: Entity<typeof events>;
+        attempts: Entity<typeof attempts>;
     };
 };
 
@@ -55,59 +80,19 @@ export function storageSchemas(
     const prefix = options.tablePrefix ?? 'cb_jobs';
     if (!/^[a-z][a-z0-9_]{0,39}$/.test(prefix))
         throw new TypeError('Invalid scheduler table prefix');
-    const time = () => number().columnType('double precision');
-    const runs = object({
-        id: string().primaryKey(),
-        namespace: string(),
-        name: string(),
-        version: number(),
-        status: string(),
-        availableAt: time(),
-        leaseExpiresAt: time().nullable().optional(),
-        expiresAt: time().nullable().optional(),
-        scheduleId: string().nullable().optional(),
-        dedupeKey: string().nullable().optional(),
-        record: string().columnType('text')
-    }).hasTableName(prefix + '_runs') as unknown as RowSchema<RunRow>;
-    const schedules = object({
-        namespace: string(),
-        id: string(),
-        active: boolean(),
-        nextAt: time().nullable().optional(),
-        record: string().columnType('text')
-    })
-        .hasTableName(prefix + '_schedules')
-        .hasPrimaryKey([
-            'namespace',
-            'id'
-        ]) as unknown as RowSchema<ScheduleRow>;
-    const events = object({
-        runId: string(),
-        sequence: number(),
-        record: string().columnType('text')
-    })
-        .hasTableName(prefix + '_events')
-        .hasPrimaryKey(['runId', 'sequence']) as unknown as RowSchema<EventRow>;
-    const attempts = object({
-        runId: string(),
-        attempt: number(),
-        record: string().columnType('text')
-    })
-        .hasTableName(prefix + '_attempts')
-        .hasPrimaryKey([
-            'runId',
-            'attempt'
-        ]) as unknown as RowSchema<AttemptRow>;
+    const tables = {
+        runs: runs.hasTableName(prefix + '_runs'),
+        schedules: schedules.hasTableName(prefix + '_schedules'),
+        events: events.hasTableName(prefix + '_events'),
+        attempts: attempts.hasTableName(prefix + '_attempts')
+    };
     return {
-        runs,
-        schedules,
-        events,
-        attempts,
+        ...tables,
         entities: {
-            runs: defineEntity(runs),
-            schedules: defineEntity(schedules),
-            events: defineEntity(events),
-            attempts: defineEntity(attempts)
+            runs: defineEntity(tables.runs),
+            schedules: defineEntity(tables.schedules),
+            events: defineEntity(tables.events),
+            attempts: defineEntity(tables.attempts)
         }
     };
 }

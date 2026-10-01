@@ -9,6 +9,17 @@ export { InMemoryJobRepository, InMemoryJobStorage } from './memory.js';
 export { ScheduleCalculator } from './recurrence.js';
 export type { JobSubmission, ScheduleSubmission } from './repository.js';
 export { JobRepository } from './repository.js';
+export {
+    type Schedule,
+    ScheduleDaySchema,
+    ScheduleMinuteSchema,
+    ScheduleMonthSchema,
+    ScheduleSchema,
+    ScheduleSchemaBase,
+    ScheduleWeekSchema,
+    ScheduleYearSchema,
+    Schemas
+} from './schedule-schemas.js';
 export type { JobSchedulerOptions } from './scheduler.js';
 export { JobScheduler } from './scheduler.js';
 export type * from './storage.js';

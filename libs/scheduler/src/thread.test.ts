@@ -25,7 +25,7 @@ describe('packaged worker threads', () => {
             timeoutMs: mode === 'hang' ? 200 : 5000
         });
         const repository = new InMemoryJobRepository();
-        const scheduler = new JobScheduler({ repository });
+        const scheduler = new JobScheduler({ storageRepository: repository });
         const run = await scheduler.enqueue(job, { id: 'one', mode });
         const worker = scheduler.createWorker({
             pollIntervalMs: 2,

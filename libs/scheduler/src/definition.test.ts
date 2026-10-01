@@ -40,7 +40,7 @@ describe('durable boundaries', () => {
     });
     it('validates schema before persistence and rejects invalid policies', async () => {
         const scheduler = new JobScheduler({
-            repository: new InMemoryJobRepository()
+            storageRepository: new InMemoryJobRepository()
         });
         await expect(
             scheduler.enqueue(testJob(), { id: 1 } as any)

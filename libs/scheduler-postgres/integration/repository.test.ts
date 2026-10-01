@@ -36,17 +36,81 @@ afterAll(async () => {
 const repository = new PostgresJobRepository(db, options);
 repositoryContract(async () => ({
     repository,
-    scheduler: new JobScheduler({ repository, namespace: randomUUID() }),
+    scheduler: new JobScheduler({
+        storageRepository: repository,
+        namespace: randomUUID()
+    }),
     advance: ms => new Promise(resolve => setTimeout(resolve, ms))
 }));
 
 describe('PostgreSQL durability', () => {
+    it('executes recurring runs and retains the cursor across scheduler/repository replacement', async () => {
+        const namespace = randomUUID();
+        const first = new JobScheduler({
+            storageRepository: repository,
+            namespace
+        });
+        const job = testJob();
+        const spec = {
+            schedule: {
+                every: 'minute' as const,
+                startsOn: new Date(Date.now() - 120000),
+                maxOccurences: 3
+            },
+            missed: 'replay' as const
+        };
+        await first.upsertSchedule('periodic', job, { id: 'periodic' }, spec);
+        const replacement = new JobScheduler({
+            storageRepository: new PostgresJobRepository(db, options),
+            namespace
+        });
+        const counts = await Promise.all([
+            first.dispatch(),
+            replacement.dispatch()
+        ]);
+        expect(counts.reduce((a, b) => a + b)).toBe(3);
+        const worker = replacement.createWorker({
+            pollIntervalMs: 2,
+            jobs: [
+                job.handle(async (input, context) => {
+                    await context.report({ percent: 100 });
+                    return { url: '/' + input.id };
+                })
+            ]
+        });
+        try {
+            await worker.start();
+            await expect
+                .poll(async () => (await replacement.health()).counts.succeeded)
+                .toBe(3);
+        } finally {
+            await worker.stop();
+        }
+        const same = await replacement.upsertSchedule(
+            'periodic',
+            job,
+            { id: 'periodic' },
+            {
+                ...spec,
+                schedule: {
+                    ...spec.schedule,
+                    maxOccurences: undefined,
+                    maxOccurrences: 3,
+                    interval: 1,
+                    skipFirst: 0,
+                    timeZone: 'UTC'
+                }
+            }
+        );
+        expect(same).toMatchObject({ revision: 1, cursor: 3, nextAt: null });
+        expect(await replacement.dispatch()).toBe(0);
+    });
     it('rolls back an enqueue with the enclosing business transaction', async () => {
         let id = '';
         await expect(
             db.transaction(async tx => {
                 const scheduler = new JobScheduler({
-                    repository: new PostgresJobRepository(tx, options)
+                    storageRepository: new PostgresJobRepository(tx, options)
                 });
                 id = (await scheduler.enqueue(testJob(), { id: 'rollback' }))
                     .id;
@@ -57,7 +121,7 @@ describe('PostgreSQL durability', () => {
     });
     it('skips a row held by another transaction instead of blocking claims', async () => {
         const scheduler = new JobScheduler({
-            repository,
+            storageRepository: repository,
             namespace: randomUUID()
         });
         const first = await scheduler.enqueue(testJob(), { id: 'one' });
@@ -80,7 +144,10 @@ describe('PostgreSQL durability', () => {
     });
     it('recovers after SIGKILL and preserves committed progress across processes', async () => {
         const namespace = randomUUID();
-        const scheduler = new JobScheduler({ repository, namespace });
+        const scheduler = new JobScheduler({
+            storageRepository: repository,
+            namespace
+        });
         const job = testJob({ retry: { maxAttempts: 2, initialDelayMs: 1 } });
         const run = await scheduler.enqueue(job, { id: 'restart' });
         const child = fork(

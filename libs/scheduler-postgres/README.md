@@ -35,7 +35,7 @@ const database = knex({
     pool: { min: 0, max: 10 }, acquireConnectionTimeout: 5000
 });
 const jobs = new JobScheduler({
-    repository: new PostgresJobRepository(database),
+    storageRepository: new PostgresJobRepository(database),
     namespace: 'reporting'
 });
 ```
@@ -51,7 +51,7 @@ connection acquisition and network timeouts for your deployment as well.
 await database.transaction(async transaction => {
     // Write application data using this same transaction.
     const producer = new JobScheduler({
-        repository: new PostgresJobRepository(transaction),
+        storageRepository: new PostgresJobRepository(transaction),
         namespace: 'reporting'
     });
     await producer.enqueue(Report, { reportId }, { idempotencyKey: reportId });

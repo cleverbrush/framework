@@ -1,6 +1,6 @@
 import { Temporal } from '@js-temporal/polyfill';
 import type { StoredSchedule, TaskSchedule } from './contracts.js';
-import { positive } from './definition.js';
+import { normalizeSchedule } from './schedule-schemas.js';
 
 /** One recurrence slot. A DST gap has an ordering instant but is not executable. */
 export type Occurrence = { index: number; at: number; executable: boolean };
@@ -10,68 +10,14 @@ export function storeSchedule(
     input: TaskSchedule,
     now: number
 ): StoredSchedule {
-    const every = input.every;
-    if (!['minute', 'day', 'week', 'month', 'year'].includes(every))
-        throw new TypeError('Invalid schedule frequency');
-    const interval = positive(input.interval ?? 1, 'schedule interval', 356);
-    const timeZone = input.timeZone ?? 'UTC';
-    if (/^[+-]/.test(timeZone))
-        throw new TypeError('Use a named IANA time zone');
-    Temporal.Instant.fromEpochMilliseconds(now).toZonedDateTimeISO(timeZone);
-    const startsOn = input.startsOn?.getTime() ?? now;
-    const endsOn = input.endsOn?.getTime();
-    if (
-        !Number.isFinite(startsOn) ||
-        (endsOn !== undefined &&
-            (!Number.isFinite(endsOn) || endsOn < startsOn))
-    )
+    const { startsOn, endsOn, ...schedule } = normalizeSchedule(input);
+    const start = startsOn?.getTime() ?? now;
+    if (!Number.isFinite(start) || (endsOn && endsOn.getTime() < start))
         throw new RangeError('Invalid schedule date range');
-    const hour = input.hour ?? 9,
-        minute = input.minute ?? 0;
-    if (
-        !Number.isInteger(hour) ||
-        hour < 0 ||
-        hour > 23 ||
-        !Number.isInteger(minute) ||
-        minute < 0 ||
-        minute > 59
-    )
-        throw new RangeError('Invalid local schedule time');
-    if (input.maxOccurrences !== undefined)
-        positive(input.maxOccurrences, 'maxOccurrences');
-    if (
-        input.skipFirst !== undefined &&
-        (!Number.isSafeInteger(input.skipFirst) || input.skipFirst < 0)
-    )
-        throw new RangeError('skipFirst');
-    const day = input.day ?? 1;
-    if (day !== 'last' && (!Number.isInteger(day) || day < 1 || day > 28))
-        throw new RangeError('day must be 1–28 or last');
-    const month = input.month ?? 1;
-    positive(month, 'month', 12);
-    const days = [...(input.dayOfWeek ?? [])].sort((a, b) => a - b);
-    if (
-        every === 'week' &&
-        (!days.length ||
-            new Set(days).size !== days.length ||
-            days.some(day => !Number.isInteger(day) || day < 1 || day > 7))
-    )
-        throw new RangeError('dayOfWeek must contain unique ISO weekdays');
     return {
-        every,
-        interval,
-        timeZone,
-        hour,
-        minute,
-        day,
-        month,
-        ...(every === 'week' ? { dayOfWeek: days } : {}),
-        startsOn,
-        ...(endsOn === undefined ? {} : { endsOn }),
-        ...(input.maxOccurrences === undefined
-            ? {}
-            : { maxOccurrences: input.maxOccurrences }),
-        ...(input.skipFirst === undefined ? {} : { skipFirst: input.skipFirst })
+        ...schedule,
+        startsOn: start,
+        ...(endsOn === undefined ? {} : { endsOn: endsOn.getTime() })
     };
 }
 
@@ -232,10 +178,7 @@ export class ScheduleCalculator {
     private cursor: number;
     private readonly rule: StoredSchedule;
     constructor(schedule: TaskSchedule) {
-        this.rule = storeSchedule(
-            schedule,
-            schedule.startsOn?.getTime() ?? Date.now()
-        );
+        this.rule = storeSchedule(schedule, Date.now());
         this.cursor = this.rule.skipFirst ?? 0;
     }
     /** Whether an occurrence remains, optionally within a look-ahead window. */
@@ -246,11 +189,11 @@ export class ScheduleCalculator {
             (withinMs === undefined || next.at <= Date.now() + withinMs)
         );
     }
-    /** Advance by a scheduled occurrence, never by a completed execution. */
+    /** Advance one occurrence; index is one-based and includes skipped calendar slots. */
     next(): { date: Date; index: number } {
         const next = nextOccurrence(this.rule, this.cursor);
         if (!next) throw new RangeError('Schedule exhausted');
         this.cursor = next.index + 1;
-        return { date: new Date(next.at), index: next.index };
+        return { date: new Date(next.at), index: next.index + 1 };
     }
 }

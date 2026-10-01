@@ -338,6 +338,16 @@ export class JobRepository {
     upsertSchedule(submission: ScheduleSubmission): Promise<ScheduleRecord> {
         return this.storage.atomic(async tx => {
             const now = await tx.now();
+            const existing = await tx.schedule(
+                submission.namespace,
+                submission.id
+            );
+            if (
+                existing &&
+                !existing.removed &&
+                existing.fingerprint === submission.fingerprint
+            )
+                return existing;
             const rule = storeSchedule(submission.schedule, now);
             const cursor = rule.skipFirst ?? 0;
             const proposed: ScheduleRecord = {

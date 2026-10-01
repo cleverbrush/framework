@@ -8,12 +8,14 @@ import type {
 } from './contracts.js';
 import { fingerprint, identity, parsePayload, positive } from './definition.js';
 import { isTerminal, type JobRepository } from './repository.js';
+import { normalizeSchedule } from './schedule-schemas.js';
 import { delay } from './wait.js';
 import { JobWorker, type JobWorkerOptions } from './worker.js';
 
 /** Producer and schedule-dispatcher options; no implicit in-memory persistence. */
 export type JobSchedulerOptions = {
-    repository: JobRepository;
+    /** Persistence boundary used by producers, dispatchers and workers. */
+    storageRepository: JobRepository;
     namespace?: string;
     pollIntervalMs?: number;
     onError?: (error: unknown) => void;
@@ -56,7 +58,7 @@ export class JobScheduler {
                       definition.version,
                       identity(options.idempotencyKey, 'idempotencyKey')
                   ]);
-        const run = await this.options.repository.enqueue({
+        const run = await this.options.storageRepository.enqueue({
             namespace: this.namespace,
             name: definition.name,
             version: definition.version,
@@ -100,7 +102,10 @@ export class JobScheduler {
         definition: D,
         id: string
     ): Promise<JobRun<InferType<D['output']>> | undefined> {
-        const run = await this.options.repository.get(this.namespace, id);
+        const run = await this.options.storageRepository.get(
+            this.namespace,
+            id
+        );
         return run ? this.snapshot(definition, run) : undefined;
     }
     /** Replay then follow committed events; disconnecting does not cancel the job. */
@@ -113,10 +118,13 @@ export class JobScheduler {
         if (!Number.isSafeInteger(cursor) || cursor < 0)
             throw new RangeError('Invalid event cursor');
         while (!options.signal?.aborted) {
-            const run = await this.options.repository.get(this.namespace, id);
+            const run = await this.options.storageRepository.get(
+                this.namespace,
+                id
+            );
             if (!run) return;
             this.snapshot(definition, run);
-            const events = await this.options.repository.events(
+            const events = await this.options.storageRepository.events(
                 this.namespace,
                 id,
                 cursor
@@ -141,11 +149,15 @@ export class JobScheduler {
     }
     /** Fence cancellation; application authorization must happen before calling. */
     cancel(id: string): Promise<boolean> {
-        return this.options.repository.cancel(this.namespace, id);
+        return this.options.storageRepository.cancel(this.namespace, id);
     }
     /** Create a separately startable worker sharing this namespace/repository. */
     createWorker(options: JobWorkerOptions): JobWorker {
-        return new JobWorker(this.options.repository, this.namespace, options);
+        return new JobWorker(
+            this.options.storageRepository,
+            this.namespace,
+            options
+        );
     }
     /** Upsert future recurrence; already accepted runs are never rewritten. */
     async upsertSchedule<D extends JobDefinition<any, any, any>>(
@@ -171,14 +183,15 @@ export class JobScheduler {
             !['allow', 'skip'].includes(overlap)
         )
             throw new TypeError('Invalid schedule policy');
-        return this.options.repository.upsertSchedule({
+        const schedule = normalizeSchedule(options.schedule);
+        return this.options.storageRepository.upsertSchedule({
             namespace: this.namespace,
             id,
             name: definition.name,
             version: definition.version,
             input: parsed,
             policy: structuredClone(definition.policy),
-            schedule: structuredClone(options.schedule),
+            schedule,
             missed,
             overlap,
             fingerprint: fingerprint([
@@ -187,9 +200,9 @@ export class JobScheduler {
                 parsed,
                 definition.policy,
                 {
-                    ...options.schedule,
-                    startsOn: options.schedule.startsOn?.getTime() ?? null,
-                    endsOn: options.schedule.endsOn?.getTime() ?? null
+                    ...schedule,
+                    startsOn: schedule.startsOn?.getTime() ?? null,
+                    endsOn: schedule.endsOn?.getTime() ?? null
                 },
                 missed,
                 overlap
@@ -198,7 +211,7 @@ export class JobScheduler {
     }
     /** Pause/resume future occurrences. Resume applies the configured missed policy. */
     pauseSchedule(id: string, paused = true) {
-        return this.options.repository.pauseSchedule(
+        return this.options.storageRepository.pauseSchedule(
             this.namespace,
             id,
             paused
@@ -206,19 +219,22 @@ export class JobScheduler {
     }
     /** Remove a recurring trigger, not its already accepted runs. */
     removeSchedule(id: string) {
-        return this.options.repository.removeSchedule(this.namespace, id);
+        return this.options.storageRepository.removeSchedule(
+            this.namespace,
+            id
+        );
     }
     /** Run one bounded dispatcher pass, useful for externally managed lifecycles. */
     dispatch(): Promise<number> {
-        return this.options.repository.dispatch(this.namespace);
+        return this.options.storageRepository.dispatch(this.namespace);
     }
     /** Inspect operational counts/queue age and queued definition versions. */
     health() {
-        return this.options.repository.health(this.namespace);
+        return this.options.storageRepository.health(this.namespace);
     }
     /** Explicit bounded terminal-data cleanup. Workers/dispatcher also run this periodically. */
     cleanup(limit = 100) {
-        return this.options.repository.cleanup(
+        return this.options.storageRepository.cleanup(
             this.namespace,
             positive(limit, 'cleanup limit', 10000)
         );

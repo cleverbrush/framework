@@ -94,7 +94,7 @@ describe('calendar recurrence', () => {
             skipFirst: 2,
             maxOccurrences: 3
         });
-        expect(calc.next().index).toBe(2);
+        expect(calc.next().index).toBe(3);
         expect(calc.hasNext()).toBe(false);
         expect(() => calc.next()).toThrow('exhausted');
         const rule = storeSchedule(

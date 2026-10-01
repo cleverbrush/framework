@@ -121,25 +121,16 @@ export type RunRecord = JobRun & {
     progressCount: number;
 };
 /** Calendar recurrence. DST gaps are skipped; repeated wall times execute once. */
-export type TaskSchedule = {
-    every: 'minute' | 'day' | 'week' | 'month' | 'year';
-    interval?: number;
-    timeZone?: string;
-    hour?: number;
-    minute?: number;
-    dayOfWeek?: number[];
-    day?: number | 'last';
-    month?: number;
-    startsOn?: Date;
-    endsOn?: Date;
-    maxOccurrences?: number;
-    skipFirst?: number;
-};
-/** Serializable recurrence anchored once at registration. */
-export type StoredSchedule = Omit<TaskSchedule, 'startsOn' | 'endsOn'> & {
-    startsOn: number;
-    endsOn?: number;
-};
+export type TaskSchedule = import('./schedule-schemas.js').Schedule;
+/** Serializable recurrence anchored once at registration, preserving each variant. */
+export type StoredSchedule = TaskSchedule extends infer S
+    ? S extends TaskSchedule
+        ? Omit<S, 'startsOn' | 'endsOn' | 'maxOccurences'> & {
+              startsOn: number;
+              endsOn?: number;
+          }
+        : never
+    : never;
 /** Recurring trigger, revision and persisted cursor. */
 export type ScheduleRecord = {
     namespace: string;

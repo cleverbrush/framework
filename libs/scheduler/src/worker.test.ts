@@ -17,7 +17,10 @@ function setup() {
     const repository = new InMemoryJobRepository();
     return {
         repository,
-        scheduler: new JobScheduler({ repository, pollIntervalMs: 2 })
+        scheduler: new JobScheduler({
+            storageRepository: repository,
+            pollIntervalMs: 2
+        })
     };
 }
 describe('function worker', () => {

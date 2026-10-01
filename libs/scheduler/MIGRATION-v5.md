@@ -7,19 +7,45 @@ Do not run v4 and v5 workers against the same work queue.
 
 | v4.x | v5 |
 | --- | --- |
-| Implicit in-memory JobScheduler persistence | Explicit repository option; PostgreSQL adapter for durability |
+| Implicit in-memory JobScheduler persistence | Explicit storageRepository option; PostgreSQL adapter for durability |
 | rootFolder and file-oriented task registration | Versioned defineJob contract + handle(fn) or thread(fileURL) |
 | IJobRepository task CRUD contract | JobRepository transition engine over transactional JobStorage |
 | Auto-execution around scheduler registration | Producer enqueue, dispatcher start and worker start are separate |
 | Process event listeners for progress | Durable events(definition, runId, { after, signal }) stream |
-| ScheduleCalculator(schedule, startDate) | ScheduleCalculator({ ...schedule, startsOn }) |
-| Date-only calculator result | next() returns { date, index } |
-| maxOccurences | maxOccurrences |
+| maxOccurences | maxOccurrences (deprecated spelling still accepted; do not supply both) |
 
 Definitions require input, progress and output schemas. A no-progress or no-output
 job can use null schemas and return null. Typed handlers can live in separate
 modules using JobHandler<typeof Definition>. Thread modules default-export a
 handler and must be built to executable ESM.
+
+## Schedule definitions are retained
+
+The minute/day/week/month/year objects, `Schedule` type and schedule members
+of `Schemas` remain supported. Schemas are now also direct exports, and
+`TaskSchedule` aliases the inferred `Schedule` union. Pass the schedule to
+`upsertSchedule(id, Definition, input, { schedule })`; do not restore
+`addJob`, `rootFolder` or the old file-based worker registration.
+
+```ts
+const schedule = {
+    every: 'week' as const, interval: 2, dayOfWeek: [1, 5],
+    hour: 9, startsOn: new Date('2026-10-01T00:00:00Z'),
+    maxOccurences: 10 // accepted for migration; prefer maxOccurrences
+};
+await jobs.upsertSchedule('weekly-report', Report, { reportId: 'weekly' }, {
+    schedule, missed: 'coalesce', overlap: 'skip'
+});
+// Register Report.handle(handleReport), start the worker and jobs.start().
+```
+
+`ScheduleCalculator(schedule)` still accepts one schedule and `next()` still
+returns `{ date, index }` with a one-based index. Dates may be validated from
+JSON strings through `ScheduleSchema.parse`. The deprecated `maxOccurences`
+alias normalizes to `maxOccurrences`; supplying both throws, even if equal.
+`interval` now defaults to 1 and `skipFirst` can be 0. Fractional calendar
+components, duplicate weekdays, irrelevant variant fields and invalid dates
+are rejected. Weekly, monthly and yearly identifying fields remain required.
 
 ## Retry and calendar semantics
 
@@ -28,7 +54,8 @@ Audit application-side idempotency before enabling them. The first attempt count
 toward the limit. Jobs rerun from the beginning, not from a progress checkpoint.
 
 All calendar calculations default to UTC. Set an IANA zone explicitly for local
-wall time. DST gaps are skipped and folds use the earlier instant only. Recurring
+wall time. DST gaps are skipped and folds use the earlier instant only. Weekly intervals are anchored consistently to the week containing startsOn,
+including when all selected weekdays in that first week have passed. Recurring
 triggers persist schedule-slot cursors; occurrence limits count slots, not
 successful executions. Missed triggers coalesce by default.
 

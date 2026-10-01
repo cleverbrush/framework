@@ -75,3 +75,4 @@ jobs:
       - run: npm run test:queries:integration
       - run: npm run test:scheduler:integration
       - run: node demos/durable-jobs/demo.ts
+      - run: node demos/durable-jobs/periodic.ts --fast

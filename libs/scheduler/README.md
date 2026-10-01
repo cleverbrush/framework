@@ -47,7 +47,7 @@ export const database = knex({
     acquireConnectionTimeout: 5000
 });
 export const jobs = new JobScheduler({
-    repository: new PostgresJobRepository(database),
+    storageRepository: new PostgresJobRepository(database),
     namespace: 'reports'
 });
 ```
@@ -150,6 +150,37 @@ calls need bounded connection/statement timeouts too. Workers are single-use.
 
 ## Recurring triggers
 
+Schedules are schema-driven discriminated objects. Import `Schedule` (also
+available as `TaskSchedule`) for the inferred type, or `ScheduleSchema` to
+validate configuration, including JSON date strings:
+
+```ts
+import {
+    ScheduleSchema, ScheduleCalculator, type Schedule
+} from '@cleverbrush/scheduler';
+
+const examples: Schedule[] = [
+    { every: 'minute', interval: 15 },
+    { every: 'day', hour: 18, minute: 30 },
+    { every: 'week', dayOfWeek: [1, 5], hour: 9 },
+    { every: 'month', day: 'last' },
+    { every: 'year', month: 2, day: 'last' }
+];
+const schedule = ScheduleSchema.parse({
+    every: 'week', dayOfWeek: [1, 5],
+    startsOn: '2026-10-01T00:00:00Z', maxOccurrences: 10
+});
+const preview = new ScheduleCalculator(schedule).next();
+// { date: Date, index: 1 } — public indexes are one-based.
+```
+
+`ScheduleMinuteSchema`, `ScheduleDaySchema`, `ScheduleWeekSchema`,
+`ScheduleMonthSchema`, `ScheduleYearSchema` and `ScheduleSchemaBase` are
+also direct exports and members of `Schemas`. Weekly schedules require
+`dayOfWeek`; monthly schedules require `day`; yearly schedules require
+`month` and `day`. Minute schedules reject local `hour`/`minute` fields.
+The same schemas validate registration and calculator inputs.
+
 ```ts
 await jobs.upsertSchedule('weekday-reports', Report, { reportId: 'daily' }, {
     schedule: {
@@ -159,15 +190,24 @@ await jobs.upsertSchedule('weekday-reports', Report, { reportId: 'daily' }, {
     missed: 'coalesce', // default; alternatives: 'skip', 'replay'
     overlap: 'allow'    // default; 'skip' includes queued and retry-wait runs
 });
-await jobs.start(); // dispatcher only; workers start separately
-await jobs.pauseSchedule('weekday-reports');
-await jobs.pauseSchedule('weekday-reports', false);
-await jobs.removeSchedule('weekday-reports');
+const worker = jobs.createWorker({ jobs: [Report.handle(handleReport)] });
+await worker.start(); // execute accepted runs
+await jobs.start();   // dispatch recurring occurrences
+
+// Keep the process alive until application shutdown, then:
+await jobs.stop();    // stop producing occurrences first
+await worker.stop({ drainTimeoutMs: 30000 });
+await database.destroy();
 ```
+
+See the [runnable periodic demo](../../demos/durable-jobs/README.md) for a bounded
+example. Use `pauseSchedule(id)`, `pauseSchedule(id, false)` and
+`removeSchedule(id)` to manage a trigger without cancelling accepted runs.
 
 The dispatcher atomically enqueues occurrences and advances a persisted cursor.
 Multiple dispatchers do not duplicate occurrences. Identical upserts retain
-cursor and revision; changes create a new revision for future dispatch, leaving
+cursor, original start anchor and revision. Defaults, date representations,
+weekday order and supported aliases are normalized before comparison; changes create a new revision for future dispatch, leaving
 accepted runs intact. Pause/remove also leave accepted runs intact. Removed
 triggers retain a small tombstone so recreating an ID cannot reuse old occurrence
 identities.
@@ -177,7 +217,7 @@ identities.
   Calendar time defaults to 09:00. ISO weekdays are 1 (Monday) through 7.
 - Nonexistent DST wall times are skipped. A repeated wall time executes only at
   its earlier instant.
-- Month/year days are 1–28 or `'last'`; months are 1–12; interval is 1–356.
+- Month/year days are 1–28 or `'last'`; months are 1–12; interval is 1–356 (default 1).
 - startsOn defaults to registration time. endsOn is inclusive. maxOccurrences
   and skipFirst count calendar slots, including skipped DST gaps, not successes.
 - Coalesce enqueues the latest overdue occurrence. Skip drops an accumulated
@@ -186,7 +226,8 @@ identities.
 - Overlap skip consumes skipped occurrences; it does not defer them.
 
 `ScheduleCalculator` previews the same rules. Supply startsOn for reproducibility;
-`next()` returns `{ date, index }`, and `hasNext()` checks exhaustion.
+`next()` returns `{ date, index }` with a one-based slot index (including skipped
+slots), and `hasNext()` checks exhaustion. Internal persisted cursors are zero-based.
 
 ## Limits and operations
 

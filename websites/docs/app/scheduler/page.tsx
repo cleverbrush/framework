@@ -37,7 +37,7 @@ const database = knex({
     acquireConnectionTimeout: 5000
 });
 const jobs = new JobScheduler({
-    repository: new PostgresJobRepository(database),
+    storageRepository: new PostgresJobRepository(database),
     namespace: 'reports'
 });
 const run = await jobs.enqueue(Report, { reportId: 'quarterly' }, {
@@ -55,6 +55,20 @@ await worker.stop();
 await jobs.stop();
 await database.destroy();`;
 
+const schedules = `import { ScheduleSchema, type Schedule } from '@cleverbrush/scheduler';
+
+const rules: Schedule[] = [
+    { every: 'minute', interval: 15 },
+    { every: 'day', hour: 18, minute: 30 },
+    { every: 'week', dayOfWeek: [1, 5], hour: 9 },
+    { every: 'month', day: 'last' },
+    { every: 'year', month: 2, day: 'last' }
+];
+const schedule = ScheduleSchema.parse({
+    every: 'week', dayOfWeek: [1, 5],
+    startsOn: '2026-10-01T00:00:00Z', maxOccurrences: 10
+});`;
+
 const recurring = `await jobs.upsertSchedule('weekday-reports', Report, { reportId: 'daily' }, {
     schedule: {
         every: 'week', dayOfWeek: [1, 2, 3, 4, 5],
@@ -63,10 +77,13 @@ const recurring = `await jobs.upsertSchedule('weekday-reports', Report, { report
     missed: 'coalesce', // or skip / replay
     overlap: 'allow'    // or skip
 });
-await jobs.start(); // starts dispatch, not workers
-await jobs.pauseSchedule('weekday-reports');
-await jobs.pauseSchedule('weekday-reports', false);
-await jobs.removeSchedule('weekday-reports');`;
+const worker = jobs.createWorker({ jobs: [Report.handle(handleReport)] });
+await worker.start(); // executes accepted runs
+await jobs.start();   // dispatches due occurrences
+// Keep running until application shutdown, then:
+await jobs.stop();
+await worker.stop({ drainTimeoutMs: 30000 });
+await database.destroy();`;
 
 export default function SchedulerPage() {
     return (
@@ -173,7 +190,23 @@ export default function SchedulerPage() {
                     </p>
                 </div>
                 <div className="card">
-                    <h2>Recurring triggers</h2>
+                    <h2>Schema-driven periodic schedules</h2>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(schedules)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Schedule is inferred from ScheduleSchema. All five
+                        variants have individual schemas, exported directly and
+                        through Schemas. Weekly schedules require weekdays;
+                        monthly schedules require a day; yearly schedules
+                        require both month and day. Minute schedules have no
+                        local hour or minute. JSON dates are parsed at
+                        validation boundaries.
+                    </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
@@ -183,18 +216,23 @@ export default function SchedulerPage() {
                     </pre>
                     <p>
                         Recurring occurrences are enqueued through the same
-                        worker engine. Identical registrations preserve cursors;
+                        worker engine. Equivalent defaults, dates and weekday
+                        order preserve cursors and the original start anchor;
                         updates affect future dispatch only. Pause/remove do not
-                        cancel accepted runs.
+                        cancel accepted runs. Use pauseSchedule(id),
+                        pauseSchedule(id, false) or removeSchedule(id) to manage
+                        triggers.
                     </p>
                     <p>
                         Minutes use elapsed time. Days, weeks, months and years
                         use UTC or explicit IANA calendar time. DST gaps are
                         skipped; repeated wall times use the earlier instant
-                        once. Monthly days are 1–28 or last. Missed occurrences
-                        coalesce by default; skip drops backlogs and replay
-                        enqueues bounded batches. Overlap skip includes queued
-                        and retry-wait work.
+                        once. Calendar time defaults to 09:00; interval defaults
+                        to 1. Monthly days are 1–28 or last. ScheduleCalculator
+                        previews these same rules with one-based slot indexes.
+                        Missed occurrences coalesce by default; skip drops
+                        backlogs and replay enqueues bounded batches. Overlap
+                        skip includes queued and retry-wait work.
                     </p>
                 </div>
                 <div className="card">
@@ -220,7 +258,7 @@ export default function SchedulerPage() {
                         </a>
                         {' · '}
                         <a href="https://github.com/cleverbrush/framework/tree/development/demos/durable-jobs">
-                            Runnable multi-file example
+                            Runnable immediate and periodic examples
                         </a>
                     </p>
                 </div>

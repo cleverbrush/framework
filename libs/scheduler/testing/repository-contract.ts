@@ -35,7 +35,10 @@ export function repositoryContract(create: () => Promise<Fixture>) {
             await expect(
                 scheduler.enqueue(job, { id: 'two' }, { idempotencyKey: 'one' })
             ).rejects.toThrow('different submission');
-            const other = new JobScheduler({ repository, namespace: 'other' });
+            const other = new JobScheduler({
+                storageRepository: repository,
+                namespace: 'other'
+            });
             expect(await other.getRun(job, runs[0].id)).toBeUndefined();
             expect(await other.cancel(runs[0].id)).toBe(false);
             expect(await repository.events('other', runs[0].id, 0)).toEqual([]);
@@ -253,6 +256,43 @@ export function repositoryContract(create: () => Promise<Fixture>) {
             expect(
                 await repository.events(scheduler.namespace, run.id, 0)
             ).toHaveLength(1);
+        });
+        it('preserves revisions for canonical defaults, weekday order and date input forms', async () => {
+            const { scheduler } = await create();
+            const register = (schedule: any) =>
+                scheduler.upsertSchedule(
+                    'equivalent',
+                    testJob(),
+                    { id: 'one' },
+                    { schedule }
+                );
+            const startsOn = new Date('2030-01-01T00:00:00Z');
+            const first = await register({
+                every: 'week',
+                dayOfWeek: [5, 1],
+                startsOn,
+                maxOccurences: 3
+            });
+            const second = await register({
+                every: 'week',
+                dayOfWeek: [1, 5],
+                startsOn: startsOn.toISOString(),
+                maxOccurrences: 3,
+                interval: 1,
+                timeZone: 'UTC',
+                hour: 9,
+                minute: 0,
+                skipFirst: 0
+            });
+            expect(second).toEqual(first);
+            const revised = await register({
+                every: 'week',
+                dayOfWeek: [1, 5],
+                startsOn,
+                maxOccurrences: 3,
+                hour: 10
+            });
+            expect(revised.revision).toBe(2);
         });
         it('dispatches each occurrence once, retains cursors and revisions', async () => {
             const { scheduler, repository } = await create();
