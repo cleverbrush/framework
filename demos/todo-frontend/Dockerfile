@@ -20,6 +20,7 @@ COPY libs/react-form/package.json ./libs/react-form/
 COPY libs/schema/package.json ./libs/schema/
 COPY libs/schema-json/package.json ./libs/schema-json/
 COPY libs/scheduler/package.json ./libs/scheduler/
+COPY libs/scheduler-postgres/package.json ./libs/scheduler-postgres/
 COPY libs/server/package.json ./libs/server/
 COPY libs/server-openapi/package.json ./libs/server-openapi/
 COPY libs/client/package.json ./libs/client/

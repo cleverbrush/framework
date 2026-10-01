@@ -5,7 +5,8 @@
         "email": "andrew_zol@cleverbrush.com"
     },
     "dependencies": {
-        "@cleverbrush/schema": "^4.4.3"
+        "@cleverbrush/schema": "^4.4.3",
+        "@js-temporal/polyfill": "0.5.1"
     },
     "devDependencies": {
         "@types/node": "^25.4.0"

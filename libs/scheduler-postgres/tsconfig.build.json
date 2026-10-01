@@ -5,13 +5,12 @@
         "declaration": true,
         "target": "ES2022",
         "module": "ES2022",
-        "esModuleInterop": true,
         "moduleResolution": "bundler",
-        "allowSyntheticDefaultImports": true,
-        "sourceMap": false,
-        "declarationMap": false,
+        "esModuleInterop": true,
+        "strict": true,
+        "skipLibCheck": true,
         "types": ["node"]
     },
     "include": ["src/**/*.ts"],
-    "exclude": ["src/**/*.test.ts", "src/**/*.test-d.ts"]
+    "exclude": ["src/**/*.test.ts"]
 }

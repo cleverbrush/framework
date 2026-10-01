@@ -58,7 +58,8 @@ scripts/       ← build/release helper scripts
 | `@cleverbrush/async` | Async utilities: Collector, debounce, throttle, retry |
 | `@cleverbrush/mapper` | Schema-driven object mapper |
 | `@cleverbrush/react-form` | React form library powered by schema PropertyDescriptors |
-| `@cleverbrush/scheduler` | Cron-like job scheduler with schema-validated config |
+| `@cleverbrush/scheduler` | Typed durable jobs, recurring triggers and progress |
+| `@cleverbrush/scheduler-postgres` | PostgreSQL job repository and explicit migrations |
 | `@cleverbrush/server` | Schema-first HTTP server: DI, auto-validation, RFC 9457 errors |
 | `@cleverbrush/server-openapi` | OpenAPI 3.x generation from server endpoints |
 | `@cleverbrush/client` | Type-safe HTTP client for `@cleverbrush/server` endpoints |
