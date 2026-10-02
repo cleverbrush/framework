@@ -308,3 +308,11 @@ export function omitGroups<T extends ApiContract, K extends keyof T>(
     }
     return Object.freeze(result);
 }
+
+export {
+    file,
+    type UploadConfiguration,
+    type UploadContract,
+    type UploadFiles,
+    type UploadSchema
+} from './upload.js';

@@ -76,6 +76,7 @@ export {
     string,
     union
 } from './extension.js';
+export { encodeJsonColumn, isJsonColumn } from './json-storage.js';
 // Mappers (from knex-eager)
 export { clearRow, MAPPERS, mapObject, mapValue } from './mappers.js';
 // Migration generation

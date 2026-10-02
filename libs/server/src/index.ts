@@ -123,4 +123,11 @@ export type {
     SubscriptionRegistration,
     UploadOptions
 } from './types.js';
+export {
+    file,
+    type UploadConfiguration,
+    type UploadContract,
+    type UploadFiles,
+    type UploadSchema
+} from './upload.js';
 export { defineWebhook, type WebhookDefinition } from './Webhook.js';

@@ -963,3 +963,47 @@ Optionally pass a `baseQuery` (e.g. a scoped `knex('users').where('deleted_at', 
 | Execution | `.execute()`, `.first()`, `await builder` (thenable) |
 | Debugging | `.toQuery()`, `.toString()` |
 | Escape hatch | `.apply(fn)` |
+
+
+## Lossless JSONB documents
+
+Use ordinary object schemas with `.jsonb()` for document columns. Enable
+`.acceptUnknownProps()` on each object that must preserve extension data.
+
+```ts
+import { array, number, object, string } from '@cleverbrush/knex-schema';
+
+const Document = object({
+    id: number().primaryKey(),
+    content: object({
+        title: string(),
+        tags: array(string()),
+        metadata: object({ revision: number().optional() }).acceptUnknownProps()
+    }).acceptUnknownProps().jsonb(),
+    settings: object({}).acceptUnknownProps().jsonb().nullable()
+}).hasTableName('documents');
+```
+
+Open objects preserve undeclared JSON keys through inserts, updates, returning
+results, reads, projections and mapping. This includes nested objects, arrays,
+scalars and nulls inside the document. Document column roots are objects.
+Declared properties retain their inferred types and existing read decoding rules;
+undeclared properties do not acquire an inferred type. Strict objects project
+only their declared properties, and relational projections remain unchanged.
+
+Optional or nullable document columns accept SQL NULL, exposed as JavaScript
+`null` on reads. Omitting an optional column follows existing SQL default/null
+rules. Required, non-nullable document columns reject null. DDL and generated
+migrations use the same nullability rules.
+
+Database validation rejects non-JSON extension values before persistence,
+including functions, cycles, non-finite numbers, undefined, accessors and
+non-JSON instances. Declared fields retain existing serialization, including
+schema-declared dates and omitted optional fields. Input preprocessors and
+defaults are not replayed during persistence or database reads.
+
+Object key ordering is not a storage guarantee; compare documents structurally.
+JSON numbers use JavaScript precision; use strings for exact decimals or large
+integers. JSONB storage behavior belongs to `knex-schema` and `orm`; normal
+object schemas describe API responses and JSON Schema without database-specific
+builders.

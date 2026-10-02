@@ -7,7 +7,7 @@ import type {
     AuthenticationConfig,
     EndpointMetadata,
     EndpointRegistration,
-    UploadOptions,
+    UploadConfiguration,
     WebhookDefinition
 } from '@cleverbrush/server';
 import { resolvePath } from './pathUtils.js';
@@ -162,24 +162,62 @@ function buildParameterObject(
 }
 
 function buildRequestBody(
-    bodySchema: SchemaBuilder<any, any, any, any, any>,
+    bodySchema: SchemaBuilder<any, any, any, any, any> | null,
     registry: SchemaRegistry,
     example?: unknown | null,
     examples?: Record<
         string,
         { summary?: string; description?: string; value: unknown }
     > | null,
-    fileUpload?: UploadOptions | null
+    fileUpload?: UploadConfiguration | null
 ): Record<string, unknown> {
-    const bodyInfo = bodySchema.introspect() as any;
+    const bodyInfo = (bodySchema?.introspect() as any) ?? {};
     const body: Record<string, unknown> = {
         required: bodyInfo.isRequired !== false
     };
 
     // When file uploads are enabled, emit multipart/form-data
     if (fileUpload) {
-        const jsonSchema = convertSchema(bodySchema, registry);
-        const mediaType: Record<string, unknown> = { schema: jsonSchema };
+        // Inline the outer text object so additionalProperties does not reject
+        // file fields; keep references for its nested property schemas.
+        const jsonSchema = convertSchema(bodySchema, node =>
+            node === bodySchema ? null : registry.getName(node)
+        );
+        const properties: Record<string, unknown> = {
+            ...((jsonSchema.properties as Record<string, unknown>) ?? {})
+        };
+        const required = [...((jsonSchema.required as string[]) ?? [])];
+        for (const [name, field] of Object.entries(
+            fileUpload.schema?.introspect().properties ?? {}
+        )) {
+            const info = (field as SchemaBuilder<any>).introspect() as any;
+            const binary = { type: 'string', format: 'binary' };
+            const property: Record<string, unknown> =
+                info.type === 'array'
+                    ? { type: 'array', items: binary }
+                    : binary;
+            if (info.description) property.description = info.description;
+            if (info.minLength !== undefined)
+                property.minItems = info.minLength;
+            if (info.maxLength !== undefined)
+                property.maxItems = info.maxLength;
+            properties[name] = property;
+            if (info.isRequired) required.push(name);
+        }
+        body.required = required.length > 0;
+        const mediaType: Record<string, unknown> = {
+            schema: {
+                ...jsonSchema,
+                type: 'object',
+                properties,
+                ...(required.length ? { required } : {}),
+                additionalProperties: fileUpload.schema
+                    ? bodyInfo.acceptUnknownProps === true
+                        ? { type: 'string' }
+                        : false
+                    : { type: 'string', format: 'binary' }
+            }
+        };
         body['content'] = {
             'multipart/form-data': mediaType
         };
@@ -529,7 +567,7 @@ function buildOperation(
     if (parameters.length > 0) operation['parameters'] = parameters;
 
     // Request body
-    if (meta.bodySchema) {
+    if (meta.bodySchema || meta.fileUpload) {
         operation['requestBody'] = buildRequestBody(
             meta.bodySchema,
             registry,

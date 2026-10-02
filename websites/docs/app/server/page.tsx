@@ -255,23 +255,25 @@ return ActionResult.status(202);`)
                     <h2>File Upload</h2>
                     <p>
                         Accept file uploads via <code>multipart/form-data</code>{' '}
-                        by chaining <code>.upload()</code> on an endpoint. File
-                        fields are received as <code>FilePart</code> objects on
-                        the handler context's <code>files</code> property;
+                        with <code>.upload(object(...))</code>. Declare single
+                        files with <code>file()</code> and repeated files with
+                        <code>array(file())</code>. The handler receives
+                        matching
+                        <code>FilePart</code> or <code>FilePart[]</code> fields;
                         non-file form fields are validated against the body
                         schema and available via <code>body</code>.
                     </p>
                     <pre>
                         <code
                             dangerouslySetInnerHTML={{
-                                __html: highlightTS(`import { endpoint, type FilePart } from '@cleverbrush/server';
+                                __html: highlightTS(`import { endpoint, file } from '@cleverbrush/server/contract';
 import { object, string } from '@cleverbrush/schema';
 
 const UserPrincipal = object({ sub: string(), role: string() });
 
 const UploadAvatar = endpoint
     .post('/api/avatar')
-    .upload({
+    .upload(object({ avatar: file() }), {
         maxFileSize: 2 * 1024 * 1024,
         allowedMimeTypes: ['image/*']
     })
@@ -279,7 +281,7 @@ const UploadAvatar = endpoint
     .authorize(UserPrincipal);
 
 server.handle(UploadAvatar, ({ body, files }) => {
-    const avatar: FilePart = files['avatar'];
+    const avatar = files.avatar;
     // avatar.filename, avatar.mimeType, avatar.buffer, avatar.size
     return ActionResult.created({ name: avatar.filename });
 });`)
@@ -338,6 +340,25 @@ server.handle(UploadAvatar, ({ body, files }) => {
                             </tbody>
                         </table>
                     </div>
+
+                    <p>
+                        Omit <code>.body()</code> for file-only requests. Typed
+                        uploads reject invalid fields before calling the
+                        handler. Limits return 413 Problem Details; truncated
+                        content is never delivered as a successful upload.
+                        Required arrays default to empty, so use{' '}
+                        <code>.minLength(1)</code> to require at least one file.
+                    </p>
+                    <p>
+                        The whole multipart body also respects the server's
+                        <code>maxBodySize</code> (5 MiB by default). Text fields
+                        default to 1 MiB each and 100 fields; names are limited
+                        to 100 UTF-8 bytes. Configure these with
+                        <code>maxFieldSize</code>, <code>maxFieldCount</code>,
+                        <code>maxFieldNameSize</code> and{' '}
+                        <code>maxPartCount</code>. Files are buffered in memory
+                        within these bounds.
+                    </p>
 
                     <h3>FilePart type</h3>
                     <pre>

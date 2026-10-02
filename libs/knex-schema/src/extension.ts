@@ -250,6 +250,13 @@ export const dbExtension = defineExtension({
         }
     },
     object: {
+        /** Override the SQL column name when this object is stored as JSON. */
+        hasColumnName(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string
+        ) {
+            return hasColumnName.call(this, name);
+        },
         /**
          * Set the SQL table name for this object schema.
          *

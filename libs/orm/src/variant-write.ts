@@ -7,6 +7,7 @@
 
 import {
     buildColumnMap,
+    encodeJsonColumn,
     getPrimaryKeyColumns,
     getVariants,
     object,
@@ -183,7 +184,10 @@ export async function insertVariant(
         const variantRow: Record<string, unknown> = { [fkCol]: pkValue };
         for (const [propKey, val] of Object.entries(variantPayload)) {
             const colName = varPropToCol.get(propKey) ?? propKey;
-            variantRow[colName] = val;
+            variantRow[colName] = encodeJsonColumn(
+                variantSchema.introspect().properties[propKey],
+                val
+            );
         }
         const discColInVariant = varPropToCol.get(discKey);
         if (discColInVariant) {
@@ -259,7 +263,11 @@ export async function updateVariant(
 
         const updateData: Record<string, unknown> = {};
         for (const [propKey, val] of Object.entries(set)) {
-            updateData[propToCol.get(propKey) ?? propKey] = val;
+            updateData[propToCol.get(propKey) ?? propKey] = encodeJsonColumn(
+                spec.schema.introspect().properties[propKey] ??
+                    schema.introspect().properties[propKey],
+                val
+            );
         }
 
         await db(baseTable)
@@ -279,7 +287,10 @@ export async function updateVariant(
     for (const [propKey, val] of Object.entries(set)) {
         // Don't allow updating the FK (it's the join column)
         if (propKey === fkCol) continue;
-        updateData[varPropToCol.get(propKey) ?? propKey] = val;
+        updateData[varPropToCol.get(propKey) ?? propKey] = encodeJsonColumn(
+            variantSchema.introspect().properties[propKey],
+            val
+        );
     }
 
     if (Object.keys(updateData).length === 0) return;

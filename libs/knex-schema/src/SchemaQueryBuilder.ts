@@ -86,7 +86,7 @@ export interface ReadQueryShape<R extends ReadSchema = ReadSchema> {
 let readAliasSequence = 0;
 /** A typed SQL column; selectors receive descriptions, not row values. */
 export interface ReadColumn<S extends ReadSchema, K extends string = string>
-    extends AliasedColumn<InferType<S>> {
+    extends AliasedColumn<InferType<S>, S> {
     /** @internal Decoding and projection metadata shared by the query compiler. */
     readonly [READ_COLUMN]: ReadNode;
     /** @internal Captured JSON path beneath a storage column. */

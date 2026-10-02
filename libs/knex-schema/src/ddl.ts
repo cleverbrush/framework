@@ -1,3 +1,4 @@
+import { isStorageNullable } from './json-storage.js';
 // @cleverbrush/knex-schema — DDL generation from schema introspection
 
 import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
@@ -199,11 +200,11 @@ export function generateCreateTable(
 
                     // Nullability
                     if (
-                        propIntrospected.isRequired &&
+                        !isStorageNullable(propIntrospected) &&
                         !ext.primaryKey?.autoIncrement
                     ) {
                         column = column.notNullable();
-                    } else if (!propIntrospected.isRequired) {
+                    } else if (isStorageNullable(propIntrospected)) {
                         column = column.nullable();
                     }
 
@@ -390,9 +391,12 @@ export function generateCreateTableSource(
         }
 
         // Nullability
-        if (propIntrospected.isRequired && !ext.primaryKey?.autoIncrement) {
+        if (
+            !isStorageNullable(propIntrospected) &&
+            !ext.primaryKey?.autoIncrement
+        ) {
             line += '.notNullable()';
-        } else if (!propIntrospected.isRequired) {
+        } else if (isStorageNullable(propIntrospected)) {
             line += '.nullable()';
         }
 

@@ -582,6 +582,23 @@ const read = base.where(t => t.projectId, projectId)
                         </table>
                     </div>
                 </div>
+                <div className="card">
+                    <h2>JSONB documents</h2>
+                    <p>
+                        Use <code>object({'{ ... }'}).jsonb()</code> for a
+                        document column. Add <code>.acceptUnknownProps()</code>{' '}
+                        on each object that must retain undeclared JSON fields.
+                        Reads, projections and write-returning results preserve
+                        those fields alongside typed, declared properties.
+                    </p>
+                    <p>
+                        Invalid JSON extension values are rejected before
+                        persistence. Tracked ORM document columns detect nested
+                        edits and compare documents structurally; object key
+                        order is not a storage guarantee. Optional and nullable
+                        object columns accept SQL null.
+                    </p>
+                </div>
             </div>
         </div>
     );

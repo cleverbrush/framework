@@ -415,3 +415,16 @@ precision policy, grouped aggregates, cursor restrictions, and examples.
   query builder
 - [`@cleverbrush/orm-cli`](../orm-cli) — migration CLI tool
 - [API reference](https://cleverbrush.github.io/framework/api-docs/latest)
+
+
+## JSON document columns
+
+Declare document columns with `object({...}).jsonb()` using the ORM schema
+factories. Add `.acceptUnknownProps()` to preserve undeclared JSON fields. See [JSONB document contracts](../knex-schema/README.md#lossless-jsonb-documents)
+for declarations, null behavior and permissive object schemas.
+
+Tracked JSON columns use independent document snapshots and structural comparison.
+Editing a nested object or array marks the column modified; replacing it with an
+equivalent document does not. `entry(entity).reset()` and `discardChanges()` restore
+independent copies, so subsequent edits cannot mutate the saved snapshot. JSON
+validation and encoding also apply to ORM saves and tracked updates.

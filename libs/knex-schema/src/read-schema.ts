@@ -14,6 +14,7 @@ import {
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { buildColumnMap } from './columns.js';
+import { assertJsonValue } from './json-validation.js';
 
 /** A schema builder accepted by the database-read schema compiler. */
 export type ReadSchema = SchemaBuilder<any, any, any, any, any>;
@@ -207,7 +208,14 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
                     ])
                 )
             );
-            convert = (value, path) => decodeObject(children, value, path);
+            if (info.acceptUnknownProps) schema = schema.acceptUnknownProps();
+            convert = (value, path) =>
+                decodeObject(
+                    children,
+                    value,
+                    path,
+                    info.acceptUnknownProps === true
+                );
             break;
         }
         case 'array': {
@@ -277,11 +285,28 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
 export function decodeObject(
     children: Record<string, ReadNode>,
     value: any,
-    path: string
+    path: string,
+    preserveUnknown = false
 ): Record<string, any> {
     if (!value || typeof value !== 'object' || Array.isArray(value))
         throw new ReadSchemaError(`${path}: expected a database object`);
     const result: Record<string, any> = {};
+    if (preserveUnknown) {
+        for (const [key, extra] of Object.entries(value)) {
+            if (Object.hasOwn(children, key)) continue;
+            try {
+                assertJsonValue(extra);
+            } catch (error) {
+                throw new ReadSchemaError(`${path}.${key}: ${String(error)}`);
+            }
+            Object.defineProperty(result, key, {
+                value: extra,
+                enumerable: true,
+                configurable: true,
+                writable: true
+            });
+        }
+    }
     for (const [key, child] of Object.entries(children)) {
         const decoded = child.decode(value[key], `${path}.${key}`);
         if (decoded !== undefined)

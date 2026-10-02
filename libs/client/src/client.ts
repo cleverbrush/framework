@@ -203,41 +203,49 @@ export function createClient<T extends ApiContract>(
 
         // -- Body --
         let body: string | FormData | undefined;
-        if (args?.body !== undefined && hasBody(method)) {
+        if (hasBody(method) && (meta.fileUpload || args?.body !== undefined)) {
             if (meta.fileUpload) {
                 // Build FormData for multipart uploads
                 const fd = new FormData();
                 if (
-                    args.body &&
+                    args?.body &&
                     typeof args.body === 'object' &&
                     !(args.body instanceof Blob)
                 ) {
                     for (const [key, val] of Object.entries(args.body)) {
-                        fd.append(key, String(val));
+                        if (val !== undefined) fd.append(key, String(val));
                     }
                 }
                 // Append file fields from args.files
-                if (args.files) {
+                if (args?.files) {
                     for (const [key, value] of Object.entries(
                         args.files as Record<string, FilePart | Blob>
                     )) {
-                        if (value instanceof Blob) {
-                            fd.append(key, value);
-                        } else {
-                            const fp = value as FilePart;
-                            fd.append(
-                                key,
-                                new Blob([fp.buffer], {
-                                    type: fp.mimeType
-                                }),
-                                fp.filename
-                            );
+                        for (const part of Array.isArray(value)
+                            ? value
+                            : [value]) {
+                            if (part === undefined) continue;
+                            if (part instanceof Blob) {
+                                fd.append(key, part);
+                            } else {
+                                const fp = part as FilePart;
+                                fd.append(
+                                    key,
+                                    new Blob([fp.buffer], {
+                                        type: fp.mimeType
+                                    }),
+                                    fp.filename
+                                );
+                            }
                         }
                     }
                 }
                 body = fd;
                 // Let the browser set Content-Type with boundary
-                delete reqHeaders['Content-Type'];
+                for (const name of Object.keys(reqHeaders)) {
+                    if (name.toLowerCase() === 'content-type')
+                        delete reqHeaders[name];
+                }
             } else {
                 reqHeaders['Content-Type'] = JSON_CONTENT_TYPE;
                 body = JSON.stringify(args.body);
