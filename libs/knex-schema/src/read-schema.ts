@@ -20,6 +20,8 @@ import { assertJsonValue } from './json-validation.js';
 export type ReadSchema = SchemaBuilder<any, any, any, any, any>;
 /** A table/object schema accepted by schema-aware read queries. */
 export type ReadObject = ObjectSchemaBuilder<any, any, any, any, any, any, any>;
+// `keyof` plus key filtering preserves source declarations through decoded
+// values and rowSchema; computed key unions discard navigation and hover docs.
 /** Reconstruct structural schema types without discarding nested property schemas. */
 export type SchemaForValue<T> = 0 extends 1 & T
     ? ReadSchema
@@ -42,9 +44,9 @@ export type SchemaForValue<T> = 0 extends 1 & T
         : NonNullable<T> extends object
           ? ObjectSchemaBuilder<
                 {
-                    [K in keyof NonNullable<T> & string]-?: SchemaForValue<
-                        NonNullable<T>[K]
-                    >;
+                    -readonly [K in keyof NonNullable<T> as K extends string
+                        ? K
+                        : never]-?: SchemaForValue<NonNullable<T>[K]>;
                 },
                 undefined extends T ? false : true,
                 null extends T ? true : false
@@ -81,9 +83,11 @@ export type ColumnReadSchema<S> = SchemaForValue<ReadValue<S>>;
 export type ObjectReadSchema<S, Relations extends PropertyKey = never> =
     S extends ObjectSchemaBuilder<infer P, any, any, any, any, any, any>
         ? ObjectSchemaBuilder<{
-              [K in Exclude<keyof P, Relations> & string]: ColumnReadSchema<
-                  P[K]
-              >;
+              -readonly [K in keyof P as K extends Relations
+                  ? never
+                  : K extends string
+                    ? K
+                    : never]-?: ColumnReadSchema<P[K]>;
           }>
         : never;
 

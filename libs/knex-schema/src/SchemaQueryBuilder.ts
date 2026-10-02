@@ -94,6 +94,9 @@ export interface ReadColumn<S extends ReadSchema, K extends string = string>
     /** Type-only property identity for column-list projections. */
     readonly __property?: K;
 }
+// Map directly over source properties and filter in `as` so TypeScript retains
+// their declarations/JSDoc. Mapping a computed key union loses those origins.
+// Explicit modifiers keep the existing required, mutable column slots.
 /** A JSON object column also exposes its known nested properties. */
 export type NestedReadColumn<S, Key extends string = string> = ReadColumn<
     ColumnReadSchema<S>,
@@ -101,9 +104,11 @@ export type NestedReadColumn<S, Key extends string = string> = ReadColumn<
 > &
     (S extends ReadObject
         ? {
-              [K in keyof SchemaProps<S> & string]: NestedReadColumn<
+              -readonly [K in keyof SchemaProps<S> as K extends string
+                  ? K
+                  : never]-?: NestedReadColumn<
                   SchemaProps<S>[K],
-                  `${Key}.${K}`
+                  `${Key}.${K & string}`
               >;
           }
         : {});
@@ -112,10 +117,11 @@ export type ReadColumns<
     S extends ReadObject,
     Relations extends PropertyKey = never
 > = {
-    [K in Exclude<keyof SchemaProps<S>, Relations> & string]: NestedReadColumn<
-        SchemaProps<S>[K],
-        K
-    >;
+    -readonly [K in keyof SchemaProps<S> as K extends Relations
+        ? never
+        : K extends string
+          ? K
+          : never]-?: NestedReadColumn<SchemaProps<S>[K], K & string>;
 };
 type SelectedValue<Columns, Selector> =
     | (Selector extends (...args: any[]) => AliasedColumn<infer Value>
@@ -127,13 +133,10 @@ type SelectedValue<Columns, Selector> =
             : never)
     | null;
 type Selection = Record<string, ReadColumn<any> | AggregateExpression<any>>;
+// Keep each side's property origins while retaining the right side's precedence.
 type MergeProps<A, B> = {
-    [K in keyof A | keyof B]: K extends keyof B
-        ? B[K]
-        : K extends keyof A
-          ? A[K]
-          : never;
-};
+    -readonly [K in keyof Required<A> as K extends keyof B ? never : K]: A[K];
+} & { -readonly [K in keyof Required<B>]: B[K] };
 type NamedProjections<S> = S extends { readonly [EXTRA_TYPE_BRAND]?: infer P }
     ? P
     : {};
@@ -145,7 +148,9 @@ type NamedKeys<
     : never;
 /** Structural schema inferred from a typed projection. */
 export type ReadProjection<S extends Selection> = ObjectSchemaBuilder<{
-    [K in keyof S & string]: S[K] extends ReadColumn<infer R>
+    -readonly [K in keyof S as K extends string
+        ? K
+        : never]-?: S[K] extends ReadColumn<infer R>
         ? R
         : S[K] extends AggregateExpression<infer T>
           ? SchemaForValue<T>
@@ -154,8 +159,14 @@ export type ReadProjection<S extends Selection> = ObjectSchemaBuilder<{
 type AddField<
     S extends ReadObject,
     K extends string,
-    F extends ReadSchema
-> = ObjectSchemaBuilder<Omit<SchemaProps<S>, K> & Record<K, F>>;
+    F extends ReadSchema,
+    Origin = SchemaProps<S>
+> = ObjectSchemaBuilder<
+    // Declared includes have an origin; ad-hoc join aliases may introduce a key.
+    Omit<SchemaProps<S>, K> & {
+        -readonly [P in keyof Pick<Origin, Extract<K, keyof Origin>>]-?: F;
+    } & Record<Exclude<K, keyof Origin>, F>
+>;
 /** @internal Foreign schema retained by a declared relation. */
 export type Related<R> = R extends RelationInfo<any, infer S> ? S : never;
 /** @internal Output cardinality and nullability of a loaded relation. */
@@ -376,7 +387,9 @@ export class SchemaQueryBuilder<
                 'Scopes must synchronously return the supplied query with filters, ordering or pagination only'
             );
         }
-        return result as this;
+        // The runtime checks above preserve this query's shape; instanceof
+        // alone cannot recover its schema and relation type parameters.
+        return result as unknown as this;
     }
 
     /** Apply a named, synchronous shape-preserving scope once to an independent query. */
@@ -956,7 +969,12 @@ export class SchemaQueryBuilder<
         customize?: (query: SchemaAwareQuery<Related<Relations[K]>>) => Child
     ): SchemaQueryBuilder<
         S,
-        AddField<Row, K, RelationField<Relations[K], Child['rowSchema']>>,
+        AddField<
+            Row,
+            K,
+            RelationField<Relations[K], Child['rowSchema']>,
+            Relations
+        >,
         Relations,
         false
     > {

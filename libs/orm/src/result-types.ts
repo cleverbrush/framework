@@ -69,7 +69,9 @@ export type ResolvedRel<R> =
  * @public
  */
 export type RelKeyTree<TEntity extends Entity<any, any, any>> = {
-    readonly [K in keyof EntityRelations<TEntity> & string]: K;
+    readonly [K in keyof EntityRelations<TEntity> as K extends string
+        ? K
+        : never]-?: K;
 };
 
 /** Schema of an entity's declared navigation property. */
@@ -87,7 +89,11 @@ export type WithIncluded<
     TEntity extends Entity<any, any, any>,
     TResult,
     K extends keyof EntityRelations<TEntity> & string
-> = TResult & { [P in K]: ResolvedRel<EntityRelations<TEntity>[P]> };
+> = TResult & {
+    -readonly [P in keyof Pick<EntityRelations<TEntity>, K>]-?: ResolvedRel<
+        EntityRelations<TEntity>[P]
+    >;
+};
 
 /**
  * Result type after `.includeVariant(variant, rel)` is applied — adds
@@ -106,12 +112,14 @@ export type WithVariantIncluded<
         ? Extract<U, Record<string, Variant>> extends never
             ? U
             : Extract<U, Record<string, Variant>> extends U
-              ? U & { [P in Rel]: ResolvedRel<EntityRelations<TEntity>[P]> }
+              ? WithIncluded<TEntity, U, Rel>
               :
                     | Exclude<U, Extract<U, Record<string, Variant>>>
-                    | (Extract<U, Record<string, Variant>> & {
-                          [P in Rel]: ResolvedRel<EntityRelations<TEntity>[P]>;
-                      })
+                    | WithIncluded<
+                          TEntity,
+                          Extract<U, Record<string, Variant>>,
+                          Rel
+                      >
         : U
     : never;
 

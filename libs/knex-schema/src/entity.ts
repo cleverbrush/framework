@@ -176,7 +176,16 @@ export type WithRelation<
     TReadVariants extends ReadVariants = {}
 > = Entity<
     TSchema,
-    TRels & Record<TKey, RelationInfo<TKind, TForeign>>,
+    // Derive metadata from schema properties so includes retain their origins.
+    TRels & {
+        -readonly [P in keyof Pick<
+            SchemaProps<TSchema>,
+            Extract<TKey, keyof SchemaProps<TSchema>>
+        >]-?: RelationInfo<TKind, TForeign>;
+    } & Record<
+            Exclude<TKey, keyof SchemaProps<TSchema>>,
+            RelationInfo<TKind, TForeign>
+        >,
     TVariantUnion,
     TReadVariants
 >;
@@ -377,11 +386,14 @@ export class Entity<
         opts?: { optional?: TOptional }
     ): Entity<
         TSchema,
-        TRels &
-            Record<
-                TKey,
-                RelationInfo<'belongsTo', TForeign> & { optional: TOptional }
-            >,
+        TRels & {
+            -readonly [P in keyof Pick<
+                SchemaProps<TSchema>,
+                TKey
+            >]-?: RelationInfo<'belongsTo', TForeign> & {
+                optional: TOptional;
+            };
+        },
         TVariantUnion,
         TReadVariants
     > {

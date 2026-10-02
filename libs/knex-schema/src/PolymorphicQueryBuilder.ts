@@ -69,7 +69,9 @@ type BranchProps<S extends ReadObject, K extends keyof VariantMap<S>> = Omit<
         keyof ReadRelations<VariantBody<S, K>> | VariantKey<S, K>
     >;
 type OrphanProps<P, V> = {
-    [K in keyof P & string]: V extends { allowOrphan: true }
+    -readonly [K in keyof P as K extends string ? K : never]-?: V extends {
+        allowOrphan: true;
+    }
         ? SchemaForValue<InferType<P[K]> | null>
         : P[K] extends ReadSchema
           ? P[K]
@@ -95,12 +97,21 @@ export type VariantReadSchema<
                 VariantKey<S, K> | Discriminator<S>
             >,
             VariantMap<S>[K]
-        > &
-        Record<Discriminator<S>, SchemaBuilder<K>>
+        > & {
+            -readonly [P in keyof Pick<
+                SchemaProps<S>,
+                Extract<Discriminator<S>, keyof SchemaProps<S>>
+            >]-?: SchemaBuilder<K>;
+        } & Record<
+            Exclude<Discriminator<S>, keyof SchemaProps<S>>,
+            SchemaBuilder<K>
+        >
 >;
 /** Per-variant schemas for explicit application-level discriminator dispatch. */
 export type VariantReadSchemas<S extends ReadObject> = {
-    [K in keyof VariantMap<S> & string]: VariantReadSchema<S, K>;
+    -readonly [K in keyof VariantMap<S> as K extends string
+        ? K
+        : never]-?: VariantReadSchema<S, K & string>;
 };
 /** The genuine union schema returned for polymorphic read rows. */
 export type PolymorphicRowSchema<B extends Record<string, ReadObject>> =
@@ -531,11 +542,15 @@ export class PolymorphicQueryBuilder<
         S,
         {
             [P in keyof B]: ObjectSchemaBuilder<
-                SchemaProps<B[P]> &
-                    Record<
-                        K,
-                        RelationField<ReadRelations<S>[K], Child['rowSchema']>
-                    >
+                SchemaProps<B[P]> & {
+                    -readonly [R in keyof Pick<
+                        ReadRelations<S>,
+                        K
+                    >]-?: RelationField<
+                        ReadRelations<S>[K],
+                        Child['rowSchema']
+                    >;
+                }
             >;
         }
     > {

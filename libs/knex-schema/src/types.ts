@@ -262,9 +262,10 @@ export type ValidatedSpec =
 export type InsertType<
     T extends ObjectSchemaBuilder<any, any, any, any, any, any, any>
 > = {
-    [K in Exclude<keyof SchemaProps<T>, keyof ReadRelations<T>>]?:
-        | InferType<SchemaProps<T>[K]>
-        | ReadValue<SchemaProps<T>[K]>;
+    // Retain the declared property for both payload access and contextual keys.
+    -readonly [K in keyof SchemaProps<T> as K extends keyof ReadRelations<T>
+        ? never
+        : K]?: InferType<SchemaProps<T>[K]> | ReadValue<SchemaProps<T>[K]>;
 };
 
 // ---------------------------------------------------------------------------

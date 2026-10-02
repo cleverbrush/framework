@@ -50,7 +50,11 @@ import {
 } from './variant-write.js';
 
 type EntityRowSchema<T> = ObjectSchemaBuilder<
-    { [K in keyof T & string]-?: SchemaForValue<T[K]> },
+    {
+        -readonly [K in keyof T as K extends string
+            ? K
+            : never]-?: SchemaForValue<T[K]>;
+    },
     true,
     false,
     T
@@ -176,7 +180,10 @@ export interface TableEntityQuery<
     ): EntityQuery<
         TEntity,
         TResult & {
-            [P in K]: EntityRelations<TEntity>[K] extends {
+            -readonly [P in keyof Pick<
+                EntityRelations<TEntity>,
+                K
+            >]-?: EntityRelations<TEntity>[K] extends {
                 kind: 'hasMany' | 'belongsToMany';
             }
                 ? InferType<Child['rowSchema']>[]

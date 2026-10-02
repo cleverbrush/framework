@@ -159,7 +159,8 @@ export function defineApi<T extends ApiContract>(contract: T): Readonly<T> {
  *   visible on the merged group.
  */
 export type MergedContracts<A extends ApiContract, B extends ApiContract> = {
-    readonly [K in keyof A | keyof B]: K extends keyof A
+    // Keep group origins instead of synthesizing keys from `keyof A | keyof B`.
+    readonly [K in keyof Required<A & B>]: K extends keyof A
         ? K extends keyof B
             ? A[K] & B[K]
             : A[K]

@@ -103,13 +103,17 @@ export type InferFromJsonSchema<S> = S extends { readonly const: infer V }
                               string)[];
                       }
                     ? {
-                          [K in keyof P & string as K extends R
-                              ? K
-                              : never]: InferFromJsonSchema<P[K]>;
+                          -readonly [K in keyof P as K extends string
+                              ? K extends R
+                                  ? K
+                                  : never
+                              : never]-?: InferFromJsonSchema<P[K]>;
                       } & {
-                          [K in keyof P & string as K extends R
-                              ? never
-                              : K]?: InferFromJsonSchema<P[K]>;
+                          -readonly [K in keyof P as K extends string
+                              ? K extends R
+                                  ? never
+                                  : K
+                              : never]?: InferFromJsonSchema<P[K]>;
                       }
                     : S extends {
                             readonly type: 'object';
