@@ -302,3 +302,13 @@ export function enumOf<const T extends string>(
         ...(args as [T, ...T[]])
     ) as unknown as ExtendedString<T>;
 }
+
+export {
+    assertJsonValue,
+    type JsonObject,
+    type JsonValue,
+    jsonExtensions,
+    jsonObject,
+    jsonValidator,
+    jsonValue
+} from './json.js';

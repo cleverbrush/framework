@@ -388,16 +388,16 @@ export async function upsertImpl(
 
     const qb = state
         .knex(state.tableName)
-        .insert(mapObjectToColumns(builder, data as Record<string, any>))
-        .onConflict(cols);
+        .insert(mapObjectToColumns(builder, data as Record<string, any>));
+    const conflict = qb.onConflict(cols);
 
     if (opts.updateColumns && opts.updateColumns.length > 0) {
         const updateCols = opts.updateColumns.map(
             c => resolveColumn(builder, c, 'upsert') as string
         );
-        (qb as any).merge(updateCols);
+        conflict.merge(updateCols);
     } else {
-        (qb as any).merge();
+        conflict.merge();
     }
 
     const [row] = await (qb as any).returning(

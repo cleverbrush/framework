@@ -23,6 +23,9 @@ function convertNodeInner(
     const ext: Record<string, unknown> = info.extensions ?? {};
     const readOnly: Out = info.isReadonly === true ? { readOnly: true } : {};
 
+    if (ext.jsonDocument === 'value') return { ...readOnly };
+    if (ext.jsonDocument === 'object')
+        return { ...readOnly, type: 'object', additionalProperties: true };
     switch (info.type) {
         case 'string': {
             if (info.equalsTo !== undefined)

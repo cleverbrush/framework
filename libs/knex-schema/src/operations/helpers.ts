@@ -1,3 +1,4 @@
+import { encodeJsonColumn } from '../json-storage.js';
 // @cleverbrush/knex-schema — Extracted helper functions from QuerySource
 
 import type { InferType } from '@cleverbrush/schema';
@@ -911,11 +912,12 @@ export function mapObjectToColumns(
     const state = getState(builder);
     const { propToCol } = buildColumnMap(state.localSchema);
     const result: Record<string, any> = {};
+    const properties = state.localSchema.introspect().properties;
 
     for (const [key, value] of Object.entries(obj)) {
         const colName = propToCol.get(key);
         if (colName) {
-            result[colName] = value;
+            result[colName] = encodeJsonColumn(properties[key], value);
         } else {
             result[key] = value;
         }

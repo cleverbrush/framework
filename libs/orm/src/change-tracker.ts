@@ -14,9 +14,11 @@
 
 import {
     buildColumnMap,
+    encodeJsonColumn,
     getPrimaryKeyColumns,
     getRowVersionColumn,
     getVariants,
+    isJsonColumn,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
 import type { Knex } from 'knex';
@@ -207,37 +209,107 @@ function extractPkValues(
     return pkInfo.propertyKeys.map(k => entity[k]);
 }
 
-/** Take a shallow snapshot of the entity's persisted (non-relation) columns. */
+// Document columns need independent snapshots; relational values keep their
+// existing identity semantics. Metadata stays outside the public snapshot.
+const documentKeys = new WeakMap<object, Set<string>>();
+
+function cloneDocument(value: any): any {
+    if (value === null || typeof value !== 'object') return value;
+    if (value instanceof Date) return new Date(value.getTime());
+    if (Array.isArray(value)) return value.map(cloneDocument);
+    const result = Object.create(Object.getPrototypeOf(value));
+    for (const key of Object.keys(value))
+        Object.defineProperty(result, key, {
+            value: cloneDocument(value[key]),
+            enumerable: true,
+            writable: true,
+            configurable: true
+        });
+    return result;
+}
+
+function documentsEqual(a: any, b: any): boolean {
+    if (Object.is(a, b)) return true;
+    if (!a || !b || typeof a !== 'object' || typeof b !== 'object')
+        return false;
+    if (a instanceof Date || b instanceof Date)
+        return (
+            a instanceof Date &&
+            b instanceof Date &&
+            a.getTime() === b.getTime()
+        );
+    if (Array.isArray(a) !== Array.isArray(b)) return false;
+    const prototype = Object.getPrototypeOf(b);
+    if (
+        !Array.isArray(b) &&
+        prototype !== Object.prototype &&
+        prototype !== null
+    )
+        return false;
+    const keys = Reflect.ownKeys(a);
+    if (keys.length !== Reflect.ownKeys(b).length) return false;
+    return keys.every(key => {
+        const descriptor = Object.getOwnPropertyDescriptor(b, key);
+        return (
+            descriptor &&
+            descriptor.enumerable ===
+                Object.getOwnPropertyDescriptor(a, key)!.enumerable &&
+            'value' in descriptor &&
+            documentsEqual(a[key], descriptor.value)
+        );
+    });
+}
+
+function sameColumn(
+    snapshot: Record<string, unknown>,
+    key: string,
+    current: unknown
+): boolean {
+    return documentKeys.get(snapshot)?.has(key)
+        ? documentsEqual(snapshot[key], current)
+        : Object.is(snapshot[key], current);
+}
+
+function restoreColumn(
+    snapshot: Record<string, unknown>,
+    key: string
+): unknown {
+    return documentKeys.get(snapshot)?.has(key)
+        ? cloneDocument(snapshot[key])
+        : snapshot[key];
+}
+
+/** Snapshot document contents independently, preserving other column semantics. */
 function snapshotEntity(entity: object, schema: any): Record<string, unknown> {
-    const introspected = (schema as any).introspect?.() as {
-        properties?: Record<string, unknown>;
-    };
-    const propKeys = new Set(Object.keys(introspected?.properties ?? {}));
+    const properties = { ...schema.introspect().properties };
     const variants = getVariants(schema);
     const variant =
         variants?.variants[(entity as any)[variants.discriminatorKey]];
     if (variant)
-        for (const key of Object.keys(variant.schema.introspect().properties))
-            propKeys.add(key);
+        Object.assign(properties, variant.schema.introspect().properties);
     const snap: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(entity as Record<string, unknown>)) {
-        if (propKeys.has(k)) snap[k] = v;
+    const documents = new Set<string>();
+    for (const [k, v] of Object.entries(entity)) {
+        if (!Object.hasOwn(properties, k)) continue;
+        if (isJsonColumn(properties[k])) {
+            // Validate before snapshotting, including invalid nested mutations.
+            encodeJsonColumn(properties[k], v);
+            documents.add(k);
+            snap[k] = cloneDocument(v);
+        } else snap[k] = v;
     }
+    documentKeys.set(snap, documents);
     return Object.freeze(snap);
 }
 
-/** Check if two values differ (shallow). */
 function isDirty(
     original: Record<string, unknown>,
     current: Record<string, unknown>
 ): boolean {
-    for (const key of Object.keys(original)) {
-        if (!Object.is(original[key], current[key])) return true;
-    }
-    // Check for new keys on current that weren't in original
-    for (const key of Object.keys(current)) {
+    for (const key of Object.keys(original))
+        if (!sameColumn(original, key, current[key])) return true;
+    for (const key of Object.keys(current))
         if (!(key in original) && current[key] !== undefined) return true;
-    }
     return false;
 }
 
@@ -438,8 +510,9 @@ export class ChangeTracker {
             isModified(field?: keyof T): boolean {
                 const current = entity as Record<string, unknown>;
                 if (field !== undefined) {
-                    return !Object.is(
-                        rawEntry.originalSnapshot[field as string],
+                    return !sameColumn(
+                        rawEntry.originalSnapshot,
+                        field as string,
                         current[field as string]
                     );
                 }
@@ -448,10 +521,8 @@ export class ChangeTracker {
             reset(): void {
                 // Restore current values from snapshot
                 const current = entity as Record<string, unknown>;
-                for (const [k, v] of Object.entries(
-                    rawEntry.originalSnapshot
-                )) {
-                    current[k] = v;
+                for (const k of Object.keys(rawEntry.originalSnapshot)) {
+                    current[k] = restoreColumn(rawEntry.originalSnapshot, k);
                 }
                 rawEntry.state = rawEntry.pkKey ? 'Unchanged' : 'Added';
             }
@@ -484,8 +555,8 @@ export class ChangeTracker {
             ) {
                 // Restore values from snapshot
                 const current = entry.entity as Record<string, unknown>;
-                for (const [k, v] of Object.entries(entry.originalSnapshot)) {
-                    current[k] = v;
+                for (const k of Object.keys(entry.originalSnapshot)) {
+                    current[k] = restoreColumn(entry.originalSnapshot, k);
                 }
                 entry.state = 'Unchanged';
             }
@@ -730,6 +801,10 @@ export class ChangeTracker {
                     : new Map<string, string>();
                 const variantData: Record<string, unknown> = {};
                 const put = (key: string, value: unknown) => {
+                    const property =
+                        config.schema.introspect().properties[key] ??
+                        variant?.schema.introspect().properties[key];
+                    value = encodeJsonColumn(property, value);
                     const variantColumn =
                         !propToCol.has(key) && variantColumns.get(key);
                     if (variantColumn && variant?.storage === 'cti') {
@@ -742,8 +817,9 @@ export class ChangeTracker {
                 for (const propKey of Object.keys(entry.originalSnapshot)) {
                     if (pkPropSet.has(propKey)) continue;
                     if (
-                        !Object.is(
-                            entry.originalSnapshot[propKey],
+                        !sameColumn(
+                            entry.originalSnapshot,
+                            propKey,
                             current[propKey]
                         )
                     ) {

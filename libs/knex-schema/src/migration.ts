@@ -1,3 +1,4 @@
+import { isStorageNullable } from './json-storage.js';
 // @cleverbrush/knex-schema — Schema diff & migration generation
 
 import type { ObjectSchemaBuilder, SchemaBuilder } from '@cleverbrush/schema';
@@ -157,6 +158,7 @@ function schemaTypeToDbType(
     ext: Record<string, any>
 ): string {
     if (ext.columnType) return ext.columnType;
+    if (ext.jsonDocument) return 'jsonb';
     if (ext.primaryKey?.autoIncrement) return 'integer';
     switch (introspected.type) {
         case 'string':
@@ -229,7 +231,7 @@ export function entitySchemaToTableState(
         columns[col] = {
             name: col,
             type: schemaTypeToDbType(propIntrospected, ext),
-            nullable: !propIntrospected.isRequired,
+            nullable: isStorageNullable(propIntrospected),
             defaultValue: ext.defaultTo ?? null,
             maxLength: ext.maxLength ?? propIntrospected.maxLength ?? null,
             numericPrecision: null
@@ -388,7 +390,7 @@ export function diffSchema(
             addColumns.push({
                 name: col,
                 type: schemaTypeToDbType(propIntrospected, ext),
-                nullable: !propIntrospected.isRequired,
+                nullable: isStorageNullable(propIntrospected),
                 defaultValue: ext.defaultTo,
                 references: ext.references,
                 onDelete: ext.onDelete,
@@ -398,7 +400,7 @@ export function diffSchema(
             // Column exists in both → check for alterations
             const changes: Record<string, { from: any; to: any }> = {};
 
-            const expectedNullable = !propIntrospected.isRequired;
+            const expectedNullable = isStorageNullable(propIntrospected);
             if (dbCol.nullable !== expectedNullable) {
                 changes.nullable = {
                     from: dbCol.nullable,

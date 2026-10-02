@@ -1,10 +1,13 @@
 import {
     type ArraySchemaBuilder,
     array,
+    assertJsonValue,
     boolean,
     date,
     type InferExtensionMetadata,
     type InferType,
+    jsonObject,
+    jsonValue,
     number,
     type ObjectSchemaBuilder,
     object,
@@ -75,7 +78,14 @@ export type ReadValue<S> =
     | (undefined extends InferType<S> ? null : never)
     | (null extends InferType<S> ? null : never);
 /** Structural schema for one decoded database column. */
-export type ColumnReadSchema<S> = SchemaForValue<ReadValue<S>>;
+export type ColumnReadSchema<S> =
+    InferExtensionMetadata<S> extends { jsonDocument: 'value' | 'object' }
+        ? SchemaBuilder<
+              ReadValue<S>,
+              true,
+              null extends ReadValue<S> ? true : false
+          >
+        : SchemaForValue<ReadValue<S>>;
 /** Derive a row's scalar properties, excluding explicitly declared navigation keys. */
 export type ObjectReadSchema<S, Relations extends PropertyKey = never> =
     S extends ObjectSchemaBuilder<infer P, any, any, any, any, any, any>
@@ -123,7 +133,13 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
             'Defaulted optional schemas have ambiguous read nullability; declare storage without input defaults'
         );
     const sqlType = info.extensions?.columnType as string | undefined;
-    if (sqlType && !allowedSql[info.type]?.test(sqlType))
+    const jsonKind = info.extensions?.jsonDocument;
+    if (
+        sqlType &&
+        !(jsonKind
+            ? /^jsonb?$/i.test(sqlType)
+            : allowedSql[info.type]?.test(sqlType))
+    )
         throw new ReadSchemaError(
             `Unsupported SQL type "${sqlType}" for ${info.type}`
         );
@@ -136,7 +152,11 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
         );
     let schema: any;
     let convert: (value: any, path: string) => any;
-    switch (info.type) {
+    switch (jsonKind ? 'jsonDocument' : info.type) {
+        case 'jsonDocument':
+            schema = jsonKind === 'object' ? jsonObject() : jsonValue();
+            convert = value => value;
+            break;
         case 'string':
             schema =
                 info.equalsTo === undefined ? string() : string(info.equalsTo);
@@ -207,7 +227,14 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
                     ])
                 )
             );
-            convert = (value, path) => decodeObject(children, value, path);
+            if (info.acceptUnknownProps) schema = schema.acceptUnknownProps();
+            convert = (value, path) =>
+                decodeObject(
+                    children,
+                    value,
+                    path,
+                    info.acceptUnknownProps === true
+                );
             break;
         }
         case 'array': {
@@ -277,11 +304,28 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
 export function decodeObject(
     children: Record<string, ReadNode>,
     value: any,
-    path: string
+    path: string,
+    preserveUnknown = false
 ): Record<string, any> {
     if (!value || typeof value !== 'object' || Array.isArray(value))
         throw new ReadSchemaError(`${path}: expected a database object`);
     const result: Record<string, any> = {};
+    if (preserveUnknown) {
+        for (const [key, extra] of Object.entries(value)) {
+            if (Object.hasOwn(children, key)) continue;
+            try {
+                assertJsonValue(extra);
+            } catch (error) {
+                throw new ReadSchemaError(`${path}.${key}: ${String(error)}`);
+            }
+            Object.defineProperty(result, key, {
+                value: extra,
+                enumerable: true,
+                configurable: true,
+                writable: true
+            });
+        }
+    }
     for (const [key, child] of Object.entries(children)) {
         const decoded = child.decode(value[key], `${path}.${key}`);
         if (decoded !== undefined)
