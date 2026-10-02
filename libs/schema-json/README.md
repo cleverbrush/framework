@@ -325,3 +325,9 @@ type B = JsonSchemaNodeToBuilder<typeof S>;
 | Dual IP format (`ip()` with both v4 + v6) | `format` is omitted in `toJsonSchema` output (no standard keyword covers both) |
 | JSDoc comments on properties | Not preserved in `toJsonSchema` output |
 | `nameResolver` + `$ref` / `$defs` round-trip | `nameResolver` emits `$ref` pointers based on external registry; `fromJsonSchema` does not resolve `$ref` references — they fall back to `any()` |
+
+
+`jsonValue()` emits an unrestricted JSON Schema (`{}`); `jsonObject()` emits
+`{ type: 'object', additionalProperties: true }`. JSON Schema already operates
+on JSON values, so JavaScript-only validation constraints do not need separate
+keywords. These document schemas can be nested in ordinary response objects.

@@ -963,3 +963,39 @@ Optionally pass a `baseQuery` (e.g. a scoped `knex('users').where('deleted_at', 
 | Execution | `.execute()`, `.first()`, `await builder` (thenable) |
 | Debugging | `.toQuery()`, `.toString()` |
 | Escape hatch | `.apply(fn)` |
+
+
+## Lossless JSONB documents
+
+```ts
+import { jsonObject, jsonValue, number, object, string } from '@cleverbrush/knex-schema';
+
+const Document = object({
+    id: number().primaryKey(),
+    content: jsonObject().jsonb(),
+    event: jsonValue().jsonb(),
+    settings: object({ theme: string() }).acceptUnknownProps().jsonb()
+}).hasTableName('documents');
+```
+
+JSON document schemas preserve every JSON key and nested value through inserts,
+updates, returning results, reads, projections and mapping. Their default storage
+type is JSONB; `.jsonb()` makes the storage choice explicit. JSON arrays and root
+scalars are bound as JSON text, rather than relying on driver parameter inference.
+DDL and generated migrations recognize these schemas.
+
+`jsonValue()` accepts JSON null and writes it as a JSON value. A nullable
+`jsonObject()` column uses SQL NULL for `null`; an omitted optional column follows
+the existing SQL-default/null rules. Reads expose either null representation as
+JavaScript `null`. No separate null sentinel is introduced.
+
+Objects with `.acceptUnknownProps()` retain undeclared JSON keys at each node
+where that option is enabled. Declared properties retain existing read decoding
+rules. Strict object schemas still project their declared properties only;
+relational projections do not gain undeclared columns. Use `jsonObject()` when
+arbitrary keys need the `JsonObject` index signature.
+
+Non-JSON values in explicit documents or undeclared extension properties fail
+validation before persistence. Object key ordering is not a storage guarantee;
+compare documents structurally. Numeric values use JavaScript finite numbers;
+use strings when exact decimal or large integer precision is required.

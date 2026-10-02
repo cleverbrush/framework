@@ -31,6 +31,34 @@ standard. Business messages and network exceptions are never guessed into fields
 See the [multi-file action/form example](../react-form/README.md#server-validation-issues)
 for serialization boundaries and the form issue lifecycle.
 
+## Typed file uploads
+
+An endpoint's upload schema determines its `files` argument. Single fields accept
+`File`, `Blob`, or `FilePart`; array fields accept arrays of those values.
+
+```ts
+import { createClient } from '@cleverbrush/client';
+import { defineApi, endpoint, file } from '@cleverbrush/server/contract';
+import { array, object } from '@cleverbrush/schema';
+
+const api = defineApi({ assets: {
+    upload: endpoint.post('/assets').upload(object({
+        images: array(file()).minLength(1),
+        cover: file().optional()
+    }))
+} });
+const client = createClient(api);
+await client.assets.upload({ files: {
+    images: [new File(['first'], 'first.txt'), new File(['second'], 'second.txt')]
+} });
+```
+
+File-only calls need no `body` argument. The client serializes arrays as repeated
+multipart fields in order, omits undefined optional fields, and lets `FormData`
+set the content-type boundary. Use `File` or `FilePart` to supply a filename;
+a plain `Blob` uses the platform's default filename. Text fields remain in the
+endpoint's separate `body` argument.
+
 ## Overview
 
 `@cleverbrush/client` provides a Proxy-based HTTP client that infers all endpoint types (params, body, query, headers, responses) from an API contract defined with `defineApi()` from `@cleverbrush/server/contract`. No code generation or manual type annotations are needed.

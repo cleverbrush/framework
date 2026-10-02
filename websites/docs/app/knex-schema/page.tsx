@@ -582,6 +582,25 @@ const read = base.where(t => t.projectId, projectId)
                         </table>
                     </div>
                 </div>
+                <div className="card">
+                    <h2>JSONB documents</h2>
+                    <p>
+                        Use <code>jsonObject().jsonb()</code> for an open JSON
+                        document or <code>jsonValue().jsonb()</code> for any
+                        JSON value. Reads, projections and write-returning
+                        results preserve all nested document keys. Objects with
+                        declared fields can opt in to extension-key preservation
+                        through
+                        <code>.acceptUnknownProps().jsonb()</code>.
+                    </p>
+                    <p>
+                        Invalid JSON values are rejected before persistence.
+                        Tracked ORM document columns detect nested edits and
+                        compare documents structurally; object key order is not
+                        a storage guarantee. Optional columns retain normal SQL
+                        null behavior.
+                    </p>
+                </div>
             </div>
         </div>
     );

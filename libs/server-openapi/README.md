@@ -486,3 +486,17 @@ with recursive uses referencing that component.
 ## License
 
 BSD-3-Clause — see [LICENSE](../../LICENSE).
+
+
+## Multipart upload contracts
+
+`.upload(object({ images: array(file()).minLength(1), cover: file().optional() }))`
+emits a multipart object with a binary `images` array and an optional binary
+`cover` property. Required fields and array bounds come from the same schema used
+by the server and typed client. File-only endpoints emit a request body even
+without `.body()`. When a text-body schema exists, its properties are combined
+with the file properties in the multipart schema.
+
+JSON document response schemas are supported: `jsonValue()` permits arbitrary
+JSON and `jsonObject()` emits an open object. Objects explicitly using
+`.acceptUnknownProps()` remain open in the generated schema.

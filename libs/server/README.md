@@ -467,34 +467,54 @@ validated against the endpoint body schema. Repeated fields become arrays:
 
 ## File Upload
 
-Accept file uploads via `multipart/form-data` by chaining `.upload()` on an endpoint:
+Declare uploaded fields with schema builders. Import contracts through the
+browser-safe entry point when sharing them with a client:
 
 ```ts
-import { endpoint } from '@cleverbrush/server';
-import { object, string } from '@cleverbrush/schema';
+import { endpoint, file } from '@cleverbrush/server/contract';
+import { array, object, string } from '@cleverbrush/schema';
 
-const UploadAvatar = endpoint
-    .post('/api/avatar')
-    .upload({ maxFileSize: 2 * 1024 * 1024, allowedMimeTypes: ['image/*'] })
-    .body(object({ description: string().optional() }))
-    .authorize(UserPrincipal);
-
-const handler: Handler<typeof UploadAvatar> = async ({ body, files }) => {
-    const avatar = files['avatar'];
-    // avatar: FilePart { filename, mimeType, buffer, size }
-    return ActionResult.created({ name: avatar.filename });
-};
+export const UploadAssets = endpoint.post('/api/assets')
+    .upload(object({
+        images: array(file()).minLength(1).maxLength(3),
+        cover: file().optional()
+    }), { allowedMimeTypes: ['image/*'] })
+    .body(object({ description: string().optional() }));
 ```
 
-The `files` object on the handler context contains one `FilePart` entry per uploaded file field. Non-file form fields are validated against the body schema and available via `body`.
+Handlers receive `files.images: FilePart[]` in request order and an optional
+`files.cover: FilePart`. Text fields are validated through `.body()`. Omit
+`.body()` for a file-only endpoint. Text and file field names must be distinct.
+A missing required array becomes `[]`; use `.minLength(1)` to require a file.
+Absent optional file fields are omitted.
+
+Typed upload endpoints reject malformed or invalid requests with `400` Problem
+Details before calling the handler. Resource limits return `413`, including
+oversized files, text fields, field names, request bodies and part counts.
+Truncated content is never passed to handlers. Files are buffered in memory
+within these limits; authorization runs before parsing. MIME allowlists compare
+the declared multipart MIME type; they do not inspect file contents.
+
+The options-only `.upload(options?)` overload accepts one `FilePart` per field.
+It reports MIME exclusions through `rejectedFiles` (including `fieldName`) and
+rejects duplicate file fields and limit violations.
 
 ### Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `maxFileSize` | `number` | 10 MB | Maximum file size per file in bytes |
-| `allowedMimeTypes` | `string[]` | all | MIME type allowlist (supports `image/*` glob) |
-| `maxFileCount` | `number` | 10 | Maximum number of files per request |
+| Option | Default | Meaning |
+| --- | --- | --- |
+| `maxFileSize` | 10 MiB | Bytes per file |
+| `maxFileCount` | 10 | Files per request, including rejected files |
+| `allowedMimeTypes` | All | Declared MIME types; supports patterns such as `image/*` |
+| `maxFieldSize` | 1 MiB | Bytes per text field |
+| `maxFieldCount` | 100 | Text fields per request |
+| `maxFieldNameSize` | 100 | UTF-8 bytes per field name |
+| `maxPartCount` | File-count limit + field-count limit | Total file and text parts |
+
+Limits must be positive safe integers. The server's `maxBodySize` (default 5 MiB)
+also limits the **entire multipart request**, including boundaries and headers.
+Configure it large enough for the permitted file collection. It applies even
+when the request has no `Content-Length`.
 
 ### FilePart type
 
