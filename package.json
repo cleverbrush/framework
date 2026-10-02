@@ -34,7 +34,8 @@
         "test:e2e": "npm run test -w @cleverbrush/demo-e2e",
         "test:e2e:api": "npm run test:api -w @cleverbrush/demo-e2e",
         "test:e2e:ui": "npm run test:ui -w @cleverbrush/demo-e2e",
-        "test:e2e:reset": "RESET=1 npm run test -w @cleverbrush/demo-e2e"
+        "test:e2e:reset": "RESET=1 npm run test -w @cleverbrush/demo-e2e",
+        "test:storage:integration": "node scripts/test-storage.mjs"
     },
     "workspaces": [
         "./libs/*",

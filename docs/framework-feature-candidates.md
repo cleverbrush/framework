@@ -1,6 +1,6 @@
 # Framework feature candidates
 
-Status: F01–F03 implemented on the feature branch for PR review; F04–F07 remain proposed.
+Status: F01–F03 merged; F04–F05 implemented on the storage feature branch for PR review; F06–F07 remain proposed.
 Assessment date: 2026-10-02.
 
 This is an unprioritized list of reusable Framework capabilities and correctness
@@ -163,6 +163,8 @@ application responsibilities.
 - Public URL construction handles object keys correctly and does not expose
   credentials or depend on temporary signed URLs.
 
+**Implementation:** Added the provider-neutral storage contract, portable errors, key and public URL helpers, and a shared adapter contract suite. See the [storage guide](../libs/storage/README.md).
+
 **Review notes:**
 
 ## F05 — S3-compatible storage adapter
@@ -193,6 +195,8 @@ features are separate future candidates.
   provider errors without leaking credentials.
 - Verify object contents with an independent checksum or byte comparison rather
   than assuming an ETag always represents a content checksum.
+
+**Implementation:** Added the configurable S3 adapter, bounded multipart transfers, cancellation and stream cleanup, Garage integration tests and a dedicated CI job. Hetzner configuration is documented; a live Hetzner account is not included in CI. See the [S3 guide](../libs/storage-s3/README.md).
 
 **Review notes:**
 

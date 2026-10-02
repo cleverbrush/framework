@@ -37,6 +37,7 @@ const NAV_ITEMS: NavItem[] = [
             { href: '/react-form', label: 'React Form' },
             { href: '/mapper', label: 'Mapper' },
             { href: '/scheduler', label: 'Scheduler' },
+            { href: '/storage', label: 'Storage' },
             { href: '/log', label: 'Log' },
             { href: '/otel', label: 'OpenTelemetry' }
         ]
