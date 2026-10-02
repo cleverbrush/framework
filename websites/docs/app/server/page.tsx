@@ -406,6 +406,68 @@ server.handle(GetUser, ({ params }) => {
                     </pre>
                 </div>
 
+                <div className="card" id="cors">
+                    <h2>CORS and preflight requests</h2>
+                    <p>
+                        Enable a server-wide policy with <code>useCors()</code>.
+                        CORS runs before routing and authentication,
+                        independently of ordinary middleware registration order.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`const server = createServer().useCors({
+    origin: ['https://app.example.com', 'http://localhost:5173'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    exposedHeaders: ['WWW-Authenticate', 'X-Request-Id'],
+    credentials: true,
+    maxAgeSeconds: 600
+});
+
+// Alternatively, check application-owned domain configuration at request time:
+server.useCors({
+    origin: async origin => tenantDomains.isAllowed(origin),
+    allowedHeaders: ['Content-Type', 'Authorization']
+});`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Origins are exact URL origins without a path or trailing
+                        slash. An explicit <code>origin: '*'</code> enables
+                        public access and cannot be combined with credentials.
+                        Predicates may be synchronous or asynchronous and run
+                        once per HTTP request carrying Origin; results are not
+                        cached by the server. Disallowed origins return 403
+                        before handlers run; predicate failures return a generic
+                        500. Requests without Origin continue through the normal
+                        pipeline.
+                    </p>
+                    <p>
+                        Accepted preflights return an empty 204 without
+                        authentication. Actual protected requests still require
+                        authentication. Optional <code>methods</code> restricts
+                        preflights to an allowlist of registered route methods.
+                        Allowed and exposed header lists default to empty,
+                        credentials to false, and preflight cache duration to
+                        zero. Header names are case-insensitive; method/header
+                        wildcards are not supported.
+                    </p>
+                    <p>
+                        Successful and error responses share the CORS policy,
+                        including cached, raw and streamed results. Existing
+                        Vary headers are preserved. CORS includes enabled health
+                        and batch routes; virtual batch subrequests retain their
+                        usual authentication. Ordinary OPTIONS requests retain
+                        normal routing. CORS short-circuits do not run ordinary
+                        middleware, and WebSocket upgrades are outside this
+                        policy.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/server/README.md#cors">
+                        CORS options, defaults and execution order
+                    </a>
+                </div>
+
                 {/* ── Middleware ───────────────────────────────────── */}
                 <div className="card">
                     <h2>Middleware</h2>

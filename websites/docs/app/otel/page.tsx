@@ -111,16 +111,21 @@ export const otel = setupOtel({
 import { createServer } from '@cleverbrush/server';
 
 const server = createServer()
-    .use(tracingMiddleware({ excludePaths: ['/health'] })) // first!
-    .use(corsMiddleware);`)
+    .useCors({
+        origin: 'https://app.example.com',
+        allowedHeaders: ['Content-Type', 'Authorization', 'traceparent', 'tracestate']
+    })
+    .use(tracingMiddleware({ excludePaths: ['/health'] }));`)
                         }}
                     />
                 </pre>
                 <p>
-                    A <code>SpanKind.SERVER</code> span is opened per request,
-                    named from the endpoint metadata (<code>operationId</code>{' '}
-                    or <code>METHOD route</code>), and tagged with HTTP
-                    semantic-convention attributes. Inbound W3C{' '}
+                    CORS runs before ordinary middleware; its preflight and
+                    rejection responses do not enter this tracing middleware. A{' '}
+                    <code>SpanKind.SERVER</code> span is opened for requests
+                    reaching the middleware, named from the endpoint metadata (
+                    <code>operationId</code> or <code>METHOD route</code>), and
+                    tagged with HTTP semantic-convention attributes. Inbound W3C{' '}
                     <code>traceparent</code> headers are extracted
                     automatically.
                 </p>

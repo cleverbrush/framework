@@ -22,6 +22,7 @@ export {
     formUrlEncodedContentTypeHandler,
     jsonContentTypeHandler
 } from './ContentNegotiator.js';
+export type { ServerCorsOptions } from './Cors.js';
 export {
     type ApiContract,
     type ApiGroup,

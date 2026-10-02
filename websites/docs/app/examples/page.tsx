@@ -272,7 +272,10 @@ const form = useSchemaForm(CreateTodoBodySchema);
                         <code
                             dangerouslySetInnerHTML={{
                                 __html: highlightTS(`const server = createServer()
-    .use(corsMiddleware)
+    .useCors({
+        origin: 'https://app.example.com',
+        allowedHeaders: ['Content-Type', 'Authorization']
+    })
     .services(svc => configureDI(svc, config))
     .useAuthentication({
         defaultScheme: 'jwt',
