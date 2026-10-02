@@ -53,13 +53,3 @@ export {
     tuple,
     union
 } from './extensions/index.js';
-
-export {
-    assertJsonValue,
-    type JsonObject,
-    type JsonValue,
-    jsonExtensions,
-    jsonObject,
-    jsonValidator,
-    jsonValue
-} from './extensions/json.js';

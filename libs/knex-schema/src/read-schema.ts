@@ -1,13 +1,10 @@
 import {
     type ArraySchemaBuilder,
     array,
-    assertJsonValue,
     boolean,
     date,
     type InferExtensionMetadata,
     type InferType,
-    jsonObject,
-    jsonValue,
     number,
     type ObjectSchemaBuilder,
     object,
@@ -17,6 +14,7 @@ import {
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { buildColumnMap } from './columns.js';
+import { assertJsonValue } from './json-validation.js';
 
 /** A schema builder accepted by the database-read schema compiler. */
 export type ReadSchema = SchemaBuilder<any, any, any, any, any>;
@@ -78,14 +76,7 @@ export type ReadValue<S> =
     | (undefined extends InferType<S> ? null : never)
     | (null extends InferType<S> ? null : never);
 /** Structural schema for one decoded database column. */
-export type ColumnReadSchema<S> =
-    InferExtensionMetadata<S> extends { jsonDocument: 'value' | 'object' }
-        ? SchemaBuilder<
-              ReadValue<S>,
-              true,
-              null extends ReadValue<S> ? true : false
-          >
-        : SchemaForValue<ReadValue<S>>;
+export type ColumnReadSchema<S> = SchemaForValue<ReadValue<S>>;
 /** Derive a row's scalar properties, excluding explicitly declared navigation keys. */
 export type ObjectReadSchema<S, Relations extends PropertyKey = never> =
     S extends ObjectSchemaBuilder<infer P, any, any, any, any, any, any>
@@ -133,13 +124,7 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
             'Defaulted optional schemas have ambiguous read nullability; declare storage without input defaults'
         );
     const sqlType = info.extensions?.columnType as string | undefined;
-    const jsonKind = info.extensions?.jsonDocument;
-    if (
-        sqlType &&
-        !(jsonKind
-            ? /^jsonb?$/i.test(sqlType)
-            : allowedSql[info.type]?.test(sqlType))
-    )
+    if (sqlType && !allowedSql[info.type]?.test(sqlType))
         throw new ReadSchemaError(
             `Unsupported SQL type "${sqlType}" for ${info.type}`
         );
@@ -152,11 +137,7 @@ export function compileReadSchema(source: ReadSchema, column = true): ReadNode {
         );
     let schema: any;
     let convert: (value: any, path: string) => any;
-    switch (jsonKind ? 'jsonDocument' : info.type) {
-        case 'jsonDocument':
-            schema = jsonKind === 'object' ? jsonObject() : jsonValue();
-            convert = value => value;
-            break;
+    switch (info.type) {
         case 'string':
             schema =
                 info.equalsTo === undefined ? string() : string(info.equalsTo);

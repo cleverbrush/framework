@@ -497,6 +497,5 @@ by the server and typed client. File-only endpoints emit a request body even
 without `.body()`. When a text-body schema exists, its properties are combined
 with the file properties in the multipart schema.
 
-JSON document response schemas are supported: `jsonValue()` permits arbitrary
-JSON and `jsonObject()` emits an open object. Objects explicitly using
-`.acceptUnknownProps()` remain open in the generated schema.
+Object response schemas explicitly using `.acceptUnknownProps()` remain open
+in the generated schema, including responses containing JSON document fields.

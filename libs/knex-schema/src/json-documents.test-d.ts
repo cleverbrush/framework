@@ -1,23 +1,32 @@
-import type { InferType, JsonObject, JsonValue } from '@cleverbrush/schema';
+import type { InferType } from '@cleverbrush/schema';
 import Knex from 'knex';
 import { expectTypeOf, it } from 'vitest';
-import { jsonObject, jsonValue, number, object, query } from './index.js';
+import { array, number, object, query, string } from './index.js';
 
-it('preserves JSON types through database factories and projections without recursive expansion', () => {
+it('preserves declared document types through database reads and projections', () => {
+    const content = object({
+        title: string(),
+        tags: array(string()),
+        metadata: object({ revision: number().optional() }).acceptUnknownProps()
+    })
+        .acceptUnknownProps()
+        .jsonb();
     const schema = object({
         id: number().primaryKey(),
-        document: jsonObject().jsonb(),
-        value: jsonValue().jsonb()
+        document: content,
+        optional: content.optional(),
+        nullable: content.nullable()
     }).hasTableName('documents');
+    type Content = InferType<typeof content>;
     const read = query(Knex({ client: 'pg' }), schema);
     type Row = InferType<typeof read.rowSchema>;
-    expectTypeOf<Row['document']>().toEqualTypeOf<JsonObject>();
-    expectTypeOf<Row['value']>().toEqualTypeOf<JsonValue>();
-    const projected = read.select(t => ({
-        payload: t.document,
-        scalar: t.value
-    }));
+    expectTypeOf<Row['document']>().toEqualTypeOf<Content>();
+    expectTypeOf<Row['optional']>().toEqualTypeOf<Content | null>();
+    expectTypeOf<Row['nullable']>().toEqualTypeOf<Content | null>();
+    const projected = read.select(t => ({ payload: t.document }));
     type Projected = InferType<typeof projected.rowSchema>;
-    expectTypeOf<Projected['payload']>().toEqualTypeOf<JsonObject>();
-    expectTypeOf<Projected['scalar']>().toEqualTypeOf<JsonValue>();
+    expectTypeOf<Projected['payload']>().toEqualTypeOf<Content>();
+    expectTypeOf<Row['document']['tags']>().toEqualTypeOf<string[]>();
+    // @ts-expect-error Undeclared fields are preserved, not inferred as any.
+    const _arbitrary: string = ({} as Row).document.extension;
 });

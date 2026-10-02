@@ -1957,30 +1957,3 @@ Confirmed integrations: **tRPC**, **TanStack Form**, **React Hook Form**, **T3 E
 ## License
 
 BSD-3-Clause
-
-
-## JSON documents
-
-`jsonValue()` validates a complete JSON value and infers `JsonValue`.
-`jsonObject()` restricts the root to an object and infers `JsonObject`, a string
-keyed map of JSON values. Both preserve all JSON keys and compose with normal
-`.optional()`, `.nullable()`, object and array schemas.
-
-```ts
-import { jsonObject, jsonValue, object, string } from '@cleverbrush/schema';
-
-const Document = object({ id: string(), content: jsonObject() });
-const EventData = jsonValue(); // objects, arrays, strings, finite numbers, booleans, null
-```
-
-Validation rejects functions, bigint, non-finite numbers, cycles, nested
-`undefined`, sparse arrays, accessors, hidden/symbol properties, and non-JSON
-object instances such as `Date`. It does not invoke getters or `toJSON` hooks.
-Shared object references are valid when they do not form a cycle.
-`assertJsonValue(value)` provides the same check as a TypeScript assertion.
-
-For known fields with open extension data, use the existing
-`object({ ... }).acceptUnknownProps()` contract. The ordinary object schema
-validates declared fields; JSONB storage additionally validates undeclared
-extension values as JSON. JSON metadata can be composed with other extensions
-through `jsonExtensions`.

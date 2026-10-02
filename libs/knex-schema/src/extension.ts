@@ -20,10 +20,6 @@ import {
     defineExtension,
     defineMetadataMethod,
     EXTRA_TYPE_BRAND,
-    type JsonObject,
-    type JsonValue,
-    jsonExtensions,
-    jsonValidator,
     METHOD_LITERAL_BRAND,
     NumberSchemaBuilder as NumberSchemaBuilderClass,
     numberExtensions,
@@ -254,6 +250,13 @@ export const dbExtension = defineExtension({
         }
     },
     object: {
+        /** Override the SQL column name when this object is stored as JSON. */
+        hasColumnName(
+            this: ObjectSchemaBuilder<any, any, any, any, any, any, any>,
+            name: string
+        ) {
+            return hasColumnName.call(this, name);
+        },
         /**
          * Set the SQL table name for this object schema.
          *
@@ -291,9 +294,6 @@ type FKAction = 'CASCADE' | 'SET NULL' | 'RESTRICT' | 'NO ACTION';
  * `.afterInsert()`, `.beforeUpdate()`, `.beforeDelete()`.
  */
 export const ddlExtension = defineExtension({
-    any: {
-        jsonb: defineMetadataMethod('columnType').value('jsonb')
-    },
     number: {
         /** Add a foreign key reference to another table.
          * @param table - The referenced table name.
@@ -1078,8 +1078,7 @@ const extended = withExtensions(
     numberExtensions,
     arrayExtensions,
     dbExtension,
-    ddlExtension,
-    jsonExtensions
+    ddlExtension
 );
 
 /**
@@ -1118,31 +1117,6 @@ export const func = extended.func;
  * Create an unconstrained schema with database extensions; prefer a specific schema when value typing matters.
  */
 export const any = extended.any;
-
-/** Create a strict JSON document schema with database column extensions. */
-export function jsonValue() {
-    return extended
-        .any()
-        .hasType<JsonValue>()
-        .nullable()
-        .jsonDocument('value')
-        .addValidator(jsonValidator);
-}
-/** Create an open JSON object schema with database column extensions. */
-export function jsonObject() {
-    return extended
-        .any()
-        .hasType<JsonObject>()
-        .jsonDocument('object')
-        .addValidator(value => {
-            if (!value || typeof value !== 'object' || Array.isArray(value))
-                return {
-                    valid: false,
-                    errors: [{ message: 'Expected a JSON object' }]
-                };
-            return jsonValidator(value);
-        });
-}
 
 // ---------------------------------------------------------------------------
 // Primary-key methods (declared & patched out-of-band)

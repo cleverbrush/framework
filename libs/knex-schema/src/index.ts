@@ -1,6 +1,5 @@
 // @cleverbrush/knex-schema — Type-safe schema-driven query builder for Knex
 
-export type { JsonObject, JsonValue } from '@cleverbrush/schema';
 export type { ReadAliasTables } from './AliasedQueryBuilder.js';
 export { AliasedQueryBuilder } from './AliasedQueryBuilder.js';
 export type {
@@ -69,8 +68,6 @@ export {
     getProjections,
     getTableName,
     getVariants,
-    jsonObject,
-    jsonValue,
     METHOD_LITERAL_BRAND,
     number,
     object,

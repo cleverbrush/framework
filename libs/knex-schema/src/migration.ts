@@ -158,7 +158,6 @@ function schemaTypeToDbType(
     ext: Record<string, any>
 ): string {
     if (ext.columnType) return ext.columnType;
-    if (ext.jsonDocument) return 'jsonb';
     if (ext.primaryKey?.autoIncrement) return 'integer';
     switch (introspected.type) {
         case 'string':

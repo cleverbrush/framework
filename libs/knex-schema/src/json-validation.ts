@@ -1,22 +1,8 @@
-import { defineExtension, withExtensions } from '../extension.js';
-import { defineMetadataMethod } from '../metadata-extension.js';
-
-/** A value representable as JSON without implicit conversion. */
-export type JsonValue =
-    | null
-    | boolean
-    | number
-    | string
-    | JsonValue[]
-    | JsonObject;
-/** An open JSON object, including nested extension properties. */
-export type JsonObject = { [key: string]: JsonValue };
-
 /**
  * Assert strict JSON without invoking getters or serialization hooks.
  * Shared references are allowed; cycles and lossy JavaScript values are not.
  */
-export function assertJsonValue(value: unknown): asserts value is JsonValue {
+export function assertJsonValue(value: unknown): void {
     const ancestors = new Set<object>();
     const pending: { value: unknown; path: string; leave?: boolean }[] = [
         { value, path: '$' }
@@ -75,60 +61,4 @@ export function assertJsonValue(value: unknown): asserts value is JsonValue {
             });
         }
     }
-}
-
-/** @internal Strict JSON validation shared by database-enabled factories. */
-export function jsonValidator(value: unknown) {
-    try {
-        assertJsonValue(value);
-        return { valid: true, errors: [] };
-    } catch (error) {
-        return {
-            valid: false,
-            errors: [
-                {
-                    message:
-                        error instanceof Error
-                            ? error.message
-                            : 'Invalid JSON value'
-                }
-            ]
-        };
-    }
-}
-
-/** JSON document metadata, composable with database or application extensions. */
-export const jsonExtensions = defineExtension({
-    any: {
-        jsonDocument: defineMetadataMethod('jsonDocument').argument<
-            'value' | 'object'
-        >()
-    }
-});
-const schemas = withExtensions(jsonExtensions);
-
-/** Strict JSON of any kind; null is itself a JSON value. */
-export function jsonValue() {
-    return schemas
-        .any()
-        .hasType<JsonValue>()
-        .nullable()
-        .jsonDocument('value')
-        .addValidator(jsonValidator);
-}
-
-/** Strict JSON whose root is an object; all JSON keys are preserved. */
-export function jsonObject() {
-    return schemas
-        .any()
-        .hasType<JsonObject>()
-        .jsonDocument('object')
-        .addValidator(value => {
-            if (!value || typeof value !== 'object' || Array.isArray(value))
-                return {
-                    valid: false,
-                    errors: [{ message: 'Expected a JSON object' }]
-                };
-            return jsonValidator(value);
-        });
 }

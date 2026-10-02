@@ -14,7 +14,7 @@ commitments, and proposed interfaces are not current supported APIs.
 | --- | --- | --- | --- |
 | F01 | Reliable multiple-file multipart uploads | `server` | |
 | F02 | Typed upload contracts, client support, and OpenAPI | `server`, `client`, `server-openapi` | |
-| F03 | Lossless JSONB document storage | `schema`, `knex-schema`, `orm` | |
+| F03 | Lossless JSONB document storage | `knex-schema`, `orm` | |
 | F04 | Provider-independent object storage | Proposed `storage` package | |
 | F05 | S3-compatible storage adapter | Proposed `storage-s3` package | |
 | F06 | CORS preflight support | `server` | |
@@ -106,16 +106,18 @@ objects from declared properties. A decoder probe using a stored document with
 declared property. Nested `any` schemas and record-based JSONB columns were also
 rejected. This probe exercised decoding, not a complete PostgreSQL round trip.
 
-**Proposed capability.** Add an explicit JSON-document storage mode with a typed
-JSON value/object schema. Preserve all JSON keys and nested values, including
-extension data, through reads and write-returning results. Reject non-JSON values
-rather than silently transforming them. Keep ordinary relational projections and
-strict object schemas unchanged; preservation must be an explicit contract.
+**Proposed capability.** Use native `object({...}).jsonb()` schemas for document
+columns. Add `.acceptUnknownProps()` at each object node whose undeclared JSON
+fields must survive reads and write-returning results. Document roots are objects;
+nested values can include arrays, scalars and nulls. Reject non-JSON extension
+values before persistence, while retaining declared-field serialization and
+strict object projection behavior.
 
-**Public API implications.** Provide reusable JSON value types/schema support and
-JSONB storage metadata understood by DDL, database read schemas, ORM operations,
-mapping, and JSON Schema/OpenAPI consumers. Project identifiers, ownership, and
-revision metadata can remain ordinary relational columns around the document.
+**Public API implications.** Reuse existing object schemas and database extensions.
+Keep JSON storage validation, serialization and decoding in `knex-schema` and ORM
+tracking in `orm`. Schema and JSON Schema packages remain database-agnostic.
+Declared fields retain normal type inference; unknown fields are preserved at
+runtime. Identifiers, ownership and revision metadata remain relational columns.
 
 **Acceptance criteria.**
 
@@ -127,8 +129,8 @@ revision metadata can remain ordinary relational columns around the document.
 - Equality is structural; JSON object key ordering is not a storage guarantee.
 - Existing relational projection and strict-schema behavior remains unchanged.
 
-**Implementation:** Added strict JSON value/object schemas, explicit open-object
-preservation, PostgreSQL round-trip coverage and document-aware ORM tracking.
+**Implementation:** Added native open-object preservation, database-local JSON
+validation, PostgreSQL round-trip coverage and document-aware ORM tracking.
 See the [JSONB guide](../libs/knex-schema/README.md#lossless-jsonb-documents).
 
 **Review notes:**

@@ -419,8 +419,8 @@ precision policy, grouped aggregates, cursor restrictions, and examples.
 
 ## JSON document columns
 
-The ORM re-exports `jsonValue()` and `jsonObject()` with `.jsonb()` storage
-extensions. See [JSONB document contracts](../knex-schema/README.md#lossless-jsonb-documents)
+Declare document columns with `object({...}).jsonb()` using the ORM schema
+factories. Add `.acceptUnknownProps()` to preserve undeclared JSON fields. See [JSONB document contracts](../knex-schema/README.md#lossless-jsonb-documents)
 for declarations, null behavior and permissive object schemas.
 
 Tracked JSON columns use independent document snapshots and structural comparison.

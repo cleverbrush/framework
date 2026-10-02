@@ -36,7 +36,6 @@ function resolveColumnType(
     if (ext.columnType) {
         return table.specificType(col, ext.columnType);
     }
-    if (ext.jsonDocument) return table.specificType(col, 'jsonb');
     switch (introspected.type) {
         case 'string': {
             const maxLen = ext.maxLength ?? introspected.maxLength ?? undefined;
@@ -500,7 +499,6 @@ function _colTypeCode(
 ): string {
     if (ext.columnType)
         return `table.specificType('${col}', '${ext.columnType}')`;
-    if (ext.jsonDocument) return `table.specificType('${col}', 'jsonb')`;
     switch (introspected.type) {
         case 'string': {
             const maxLen = ext.maxLength ?? introspected.maxLength ?? undefined;

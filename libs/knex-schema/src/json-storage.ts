@@ -1,24 +1,21 @@
-import { assertJsonValue, type SchemaBuilder } from '@cleverbrush/schema';
+import type { SchemaBuilder } from '@cleverbrush/schema';
+import { assertJsonValue } from './json-validation.js';
 
 type Schema = SchemaBuilder<any, any, any, any, any>;
 
-/** @internal Whether an explicit column stores a JSON document. */
+/** @internal Whether an explicit object column stores a JSON document. */
 export function isJsonColumn(schema: Schema | undefined): boolean {
     const info = schema?.introspect();
     return (
-        !!info &&
-        (typeof info.extensions?.jsonDocument === 'string' ||
-            /^jsonb?$/i.test(String(info.extensions?.columnType)))
+        info?.type === 'object' &&
+        /^jsonb?$/i.test(String(info.extensions?.columnType))
     );
 }
 
 function validateExtras(schema: Schema, value: unknown): void {
     if (value === null || value === undefined) return;
     const info = schema.introspect() as any;
-    if (info.extensions?.jsonDocument) {
-        assertJsonValue(value);
-        schema.parse(value);
-    } else if (
+    if (
         info.type === 'object' &&
         typeof value === 'object' &&
         !Array.isArray(value)
@@ -30,8 +27,11 @@ function validateExtras(schema: Schema, value: unknown): void {
                     ? info.properties[key]
                     : undefined;
             if (child) {
-                if ('value' in descriptor)
-                    validateExtras(child, descriptor.value);
+                if (!('value' in descriptor))
+                    throw new TypeError(
+                        'JSON properties must not be accessors'
+                    );
+                validateExtras(child, descriptor.value);
             } else if (info.acceptUnknownProps) {
                 if (
                     typeof key !== 'string' ||
@@ -54,8 +54,9 @@ function validateExtras(schema: Schema, value: unknown): void {
 }
 
 /**
- * @internal Validate document contracts and bind JSON text explicitly. PostgreSQL
- * otherwise treats JS arrays as SQL arrays and strings as already encoded JSON.
+ * @internal Validate object storage and extension data before binding JSON text.
+ * Declared fields retain their existing serialization, including dates. Input
+ * preprocessors and defaults are not replayed at the persistence boundary.
  */
 export function encodeJsonColumn(
     schema: Schema | undefined,
@@ -64,30 +65,30 @@ export function encodeJsonColumn(
     if (!schema || !isJsonColumn(schema)) return value;
     const info = schema.introspect();
     if (value === undefined && !info.isRequired) return undefined;
-    if (info.extensions?.jsonDocument) {
-        if (
-            value === null &&
-            info.isNullable &&
-            info.extensions.jsonDocument === 'object'
-        )
-            return null;
-        assertJsonValue(value);
-        schema.parse(value);
-    } else {
-        if (value === null || value === undefined) return value;
-        validateExtras(schema, value);
-    }
+    if (value === null && (info.isNullable || !info.isRequired)) return null;
+    if (
+        !value ||
+        typeof value !== 'object' ||
+        Array.isArray(value) ||
+        (Object.getPrototypeOf(value) !== Object.prototype &&
+            Object.getPrototypeOf(value) !== null)
+    )
+        throw new TypeError('Expected a JSON object document');
+    validateExtras(schema, value);
     return JSON.stringify(value);
 }
 
-/** @internal SQL nullability for JSON documents; JSON null is a value, not SQL NULL. */
+/** @internal Optional and nullable JSON object columns accept SQL NULL. */
 export function isStorageNullable(info: {
+    type: string;
     isRequired: boolean;
     isNullable: boolean;
     extensions?: Record<string, unknown>;
 }): boolean {
     return (
         !info.isRequired ||
-        (info.extensions?.jsonDocument === 'object' && info.isNullable)
+        (info.type === 'object' &&
+            /^jsonb?$/i.test(String(info.extensions?.columnType)) &&
+            info.isNullable)
     );
 }
