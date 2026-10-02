@@ -23,7 +23,7 @@ import {
 } from '@cleverbrush/knex-schema';
 import type { Knex } from 'knex';
 import { ConcurrencyError, InvariantViolationError } from './errors.js';
-import { insertVariant } from './variant-write.js';
+import { insertVariant, mutateVariant } from './variant-write.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -790,29 +790,86 @@ export class ChangeTracker {
                 const pkInfo = getPrimaryKeyColumns(config.schema);
                 const current = entry.entity as Record<string, unknown>;
 
+                if (entry.variantKey !== undefined) {
+                    const variants = getVariants(config.schema)!;
+                    const patch: Record<string, unknown> = {};
+                    for (const key of new Set([
+                        ...Object.keys(entry.originalSnapshot),
+                        ...Object.keys(current)
+                    ])) {
+                        if (
+                            pkInfo.propertyKeys.includes(key) ||
+                            key === variants.discriminatorKey
+                        )
+                            continue;
+                        if (
+                            !sameColumn(
+                                entry.originalSnapshot,
+                                key,
+                                current[key]
+                            )
+                        )
+                            patch[key] = current[key];
+                    }
+                    const managed: Record<string, unknown> = {};
+                    const rv = entry.rowVersion;
+                    if (rv?.strategy === 'increment') {
+                        const value =
+                            typeof rv.snapshotValue === 'string'
+                                ? (BigInt(rv.snapshotValue) + 1n).toString()
+                                : Number(rv.snapshotValue ?? 0) + 1;
+                        if (
+                            typeof value === 'number' &&
+                            !Number.isSafeInteger(value)
+                        )
+                            throw new Error(
+                                'Row-version increment exceeds the safe integer range; use a bigint storage column'
+                            );
+                        managed[rv.propertyKey] = value;
+                    } else if (rv?.strategy === 'timestamp')
+                        managed[rv.propertyKey] = new Date();
+                    let selected = (schemaQuery(trx, config.schema) as any)
+                        .selectVariants([entry.variantKey])
+                        .unscoped()
+                        .withDeleted()
+                        .where(
+                            pkInfo.propertyKeys[0],
+                            current[pkInfo.propertyKeys[0]]
+                        );
+                    if (rv)
+                        selected = selected.where(
+                            rv.propertyKey,
+                            rv.snapshotValue
+                        );
+                    const result = await mutateVariant(
+                        trx,
+                        config.schema,
+                        entry.variantKey,
+                        selected,
+                        'update',
+                        patch,
+                        managed
+                    );
+                    if (!result.count && rv)
+                        throw new ConcurrencyError(
+                            tableName,
+                            extractPkValues(config.schema, current),
+                            rv.snapshotValue
+                        );
+                    if (result.rows[0])
+                        committedValues.set(current, result.rows[0]);
+                    updated++;
+                    continue;
+                }
+
                 // Build the SET clause — only changed columns, excluding PK
                 const pkPropSet = new Set(pkInfo.propertyKeys);
                 const updateData: Record<string, unknown> = {};
-                const variant = getVariants(config.schema)?.variants[
-                    entry.variantKey ?? ''
-                ];
-                const variantColumns = variant
-                    ? buildColumnMap(variant.schema).propToCol
-                    : new Map<string, string>();
-                const variantData: Record<string, unknown> = {};
                 const put = (key: string, value: unknown) => {
-                    const property =
-                        config.schema.introspect().properties[key] ??
-                        variant?.schema.introspect().properties[key];
-                    value = encodeJsonColumn(property, value);
-                    const variantColumn =
-                        !propToCol.has(key) && variantColumns.get(key);
-                    if (variantColumn && variant?.storage === 'cti') {
-                        if (variantColumn !== variant.foreignKey)
-                            variantData[variantColumn] = value;
-                    } else
-                        updateData[variantColumn || propToCol.get(key) || key] =
-                            value;
+                    updateData[propToCol.get(key) ?? key] = encodeJsonColumn(
+                        config.schema.introspect().properties[key],
+                        value
+                    );
                 };
                 for (const propKey of Object.keys(entry.originalSnapshot)) {
                     if (pkPropSet.has(propKey)) continue;
@@ -866,11 +923,7 @@ export class ChangeTracker {
                     // 'manual': caller already set the new value in current
                 }
 
-                if (
-                    Object.keys(updateData).length === 0 &&
-                    Object.keys(variantData).length === 0
-                )
-                    continue;
+                if (Object.keys(updateData).length === 0) continue;
 
                 // Build WHERE clause with PK + optional rowVersion check
                 let qb = trx(tableName);
@@ -890,11 +943,7 @@ export class ChangeTracker {
                     qb = qb.andWhere(rvCol, rv.snapshotValue as any) as any;
                 }
 
-                const affected = Object.keys(updateData).length
-                    ? await qb.update(updateData)
-                    : (await qb.forUpdate().first())
-                      ? 1
-                      : 0;
+                const affected = await qb.update(updateData);
                 if (affected === 0 && entry.rowVersion) {
                     const tableName2 = config.schema.getExtension?.(
                         'tableName'
@@ -905,17 +954,6 @@ export class ChangeTracker {
                         entry.rowVersion.snapshotValue
                     );
                 }
-                if (
-                    affected &&
-                    variant?.storage === 'cti' &&
-                    Object.keys(variantData).length
-                )
-                    await trx(variant.tableName!)
-                        .where(
-                            variant.foreignKey!,
-                            current[pkInfo.propertyKeys[0]] as any
-                        )
-                        .update(variantData);
                 updated++;
             }
 
@@ -933,6 +971,37 @@ export class ChangeTracker {
                 const { propToCol } = buildColumnMap(config.schema);
                 const pkInfo = getPrimaryKeyColumns(config.schema);
                 const current = entry.entity as Record<string, unknown>;
+
+                if (entry.variantKey !== undefined) {
+                    let selected = (schemaQuery(trx, config.schema) as any)
+                        .selectVariants([entry.variantKey])
+                        .unscoped()
+                        .withDeleted()
+                        .where(
+                            pkInfo.propertyKeys[0],
+                            current[pkInfo.propertyKeys[0]]
+                        );
+                    if (entry.rowVersion)
+                        selected = selected.where(
+                            entry.rowVersion.propertyKey,
+                            entry.rowVersion.snapshotValue
+                        );
+                    const result = await mutateVariant(
+                        trx,
+                        config.schema,
+                        entry.variantKey,
+                        selected,
+                        'delete'
+                    );
+                    if (!result.count && entry.rowVersion)
+                        throw new ConcurrencyError(
+                            tableName,
+                            extractPkValues(config.schema, current),
+                            entry.rowVersion.snapshotValue
+                        );
+                    deleted++;
+                    continue;
+                }
 
                 let qb = trx(tableName);
                 for (let i = 0; i < pkInfo.propertyKeys.length; i++) {

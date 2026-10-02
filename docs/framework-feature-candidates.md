@@ -1,6 +1,6 @@
 # Framework feature candidates
 
-Status: F01–F05 merged; F06 implemented on the CORS feature branch for PR review; F07 remains proposed.
+Status: F01–F06 merged; F07 implemented on the polymorphic-write lifecycle branch for PR review.
 Assessment date: 2026-10-02.
 
 This is an unprioritized list of reusable Framework capabilities and correctness
@@ -242,7 +242,7 @@ documentation. See the [CORS guide](../libs/server/README.md#cors).
 
 **Priority:**
 
-**Existing support and gap.** Ordinary entities support soft deletion and lifecycle
+**Original assessment.** Ordinary entities support soft deletion and lifecycle
 hooks. Source review of [variant writes](../libs/orm/src/variant-write.ts) found
 direct Knex updates/deletes: variant deletion physically removes rows and these
 paths bypass the ordinary write pipeline. This finding needs PostgreSQL
@@ -267,6 +267,15 @@ this candidate is pending.
 - Hooks and timestamps follow the documented ordinary-entity contract.
 - Failures roll back base/variant writes together and respect query predicates.
 - Type tests describe the supported mutation surface accurately.
+
+**Implementation:** Variant and tracked polymorphic writes share an atomic
+lifecycle pipeline for STI and CTI, including hooks, timestamps, soft deletion,
+restoration and explicit permanent deletion. Base soft-delete metadata controls
+visibility; CTI child rows remain intact until permanent deletion. PostgreSQL
+regressions cover scopes, transaction/savepoint rollback, concurrency and exact
+keys. The deletion change ships in the coordinated v5 major release; see the
+[ORM lifecycle contract](../libs/orm/README.md#variant-deletion-and-lifecycle) and
+[v5 migration guide](../libs/knex-schema/MIGRATION-v5.md#7-review-polymorphic-mutation-lifecycle).
 
 **Review notes:**
 

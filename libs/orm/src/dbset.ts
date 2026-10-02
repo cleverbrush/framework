@@ -17,6 +17,7 @@ import type {
     PolymorphicQueryBuilder,
     PrimaryKeyValueOf,
     ReadQueryShape,
+    ReadVariantMetadata,
     SchemaAwareQuery,
     SchemaForValue,
     VariantReadSchemas
@@ -44,9 +45,8 @@ import type {
 } from './result-types.js';
 import { saveGraph } from './save-graph.js';
 import {
-    deleteVariant as _deleteVariant,
     insertVariant as _insertVariant,
-    updateVariant as _updateVariant
+    mutateVariant
 } from './variant-write.js';
 
 type EntityRowSchema<T> = ObjectSchemaBuilder<
@@ -120,10 +120,10 @@ export type EntityQuery<
     TResult,
     Writable extends boolean = true
 > =
-    SchemaAwareQuery<EntitySchema<TEntity>> extends PolymorphicQueryBuilder<
-        any,
-        any
-    >
+    ReadVariantMetadata<EntitySchema<TEntity>> extends {
+        discriminator: string;
+        variants: Record<string, unknown>;
+    }
         ? PolymorphicEntityQuery<TEntity>
         : TableEntityQuery<TEntity, TResult, Writable>;
 
@@ -338,7 +338,9 @@ export interface DbSetOperations<TEntity extends Entity<any, any, any>> {
      * // a.type === 'assigned' and a.assigneeId is available
      * ```
      */
-    ofVariant<K extends string>(variantKey: K): VariantDbSet<TEntity, K>;
+    ofVariant<
+        K extends keyof VariantReadSchemas<EntitySchema<TEntity>> & string
+    >(variantKey: K): VariantDbSet<TEntity, K>;
 }
 
 // ---------------------------------------------------------------------------
@@ -390,13 +392,19 @@ export interface VariantDbSet<
     ): Promise<VariantResult<TEntity, K>>;
 
     /**
-     * Update variant-specific columns for rows matched by the current
-     * WHERE clause. For CTI, only the variant table is updated.
+     * Update matching base and variant columns atomically, honoring hooks
+     * and configured timestamps.
      */
     update(patch: VariantUpdatePayload<TEntity, K>): Promise<void>;
 
-    /** Delete rows matched by the current WHERE clause (CTI: atomic). */
+    /** Delete matching entities, honoring base-schema soft deletion and hooks. */
     delete(): Promise<void>;
+
+    /** Permanently delete matching entities, including both CTI rows. */
+    hardDelete(): Promise<number>;
+
+    /** Restore matching soft-deleted entities; select them with onlyDeleted/withDeleted. */
+    restore(): Promise<VariantResult<TEntity, K>[]>;
 
     /** Return a new variant view bound to `trx`. */
     withTransaction(trx: Knex.Transaction): VariantDbSet<TEntity, K>;
@@ -444,7 +452,9 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                 if (
                     prop === 'update' ||
                     prop === 'delete' ||
-                    prop === 'insert'
+                    prop === 'insert' ||
+                    prop === 'restore' ||
+                    prop === 'hardDelete'
                 ) {
                     if (getVariants((entity as any).schema)) {
                         return () => {
@@ -817,6 +827,9 @@ function wrapVariantQuery<
                     return async (
                         payload: Record<string, unknown>
                     ): Promise<unknown> => {
+                        (
+                            sqb as unknown as PolymorphicQueryBuilder<any, any>
+                        ).mutationTargets(variantKey);
                         const maybeTrx = (
                             knexInst as unknown as { isTransaction?: boolean }
                         ).isTransaction
@@ -840,74 +853,34 @@ function wrapVariantQuery<
                     };
                 }
 
-                // --- Variant-aware update (collect PKs first, then UPDATE) ---
-                if (prop === 'update') {
-                    return async (
-                        set: Record<string, unknown>
-                    ): Promise<void> => {
-                        const pkInfo = getPrimaryKeyColumns(
-                            entity.schema as Parameters<
-                                typeof getPrimaryKeyColumns
-                            >[0]
-                        );
-                        const rows = (await (
-                            proxy as unknown as {
-                                execute: () => Promise<
-                                    Array<Record<string, unknown>>
-                                >;
-                            }
-                        ).execute()) as Array<Record<string, unknown>>;
-                        const pkProp = pkInfo.propertyKeys[0];
-                        const pkValues = rows
-                            .map(r => r[pkProp])
-                            .filter(v => v !== undefined);
-                        const maybeTrx = (
-                            knexInst as unknown as { isTransaction?: boolean }
-                        ).isTransaction
-                            ? (knexInst as unknown as Knex.Transaction)
-                            : undefined;
-                        await _updateVariant(
-                            knexInst,
-                            entity.schema,
+                if (prop === 'transacting' || prop === 'withTransaction') {
+                    return (trx: Knex.Transaction) =>
+                        wrapVariantQuery(
+                            sqb.transacting(trx),
+                            entity,
                             variantKey,
-                            set,
-                            pkValues,
-                            maybeTrx
+                            trx,
+                            onResults
                         );
-                    };
                 }
-
-                // --- Variant-aware delete (collect PKs first, then DELETE) ---
-                if (prop === 'delete') {
-                    return async (): Promise<void> => {
-                        const pkInfo = getPrimaryKeyColumns(
-                            entity.schema as Parameters<
-                                typeof getPrimaryKeyColumns
-                            >[0]
-                        );
-                        const rows = (await (
-                            proxy as unknown as {
-                                execute: () => Promise<
-                                    Array<Record<string, unknown>>
-                                >;
-                            }
-                        ).execute()) as Array<Record<string, unknown>>;
-                        const pkProp = pkInfo.propertyKeys[0];
-                        const pkValues = rows
-                            .map(r => r[pkProp])
-                            .filter(v => v !== undefined);
-                        const maybeTrx = (
-                            knexInst as unknown as { isTransaction?: boolean }
-                        ).isTransaction
-                            ? (knexInst as unknown as Knex.Transaction)
-                            : undefined;
-                        await _deleteVariant(
+                if (
+                    prop === 'update' ||
+                    prop === 'delete' ||
+                    prop === 'restore' ||
+                    prop === 'hardDelete'
+                ) {
+                    return async (patch: Record<string, unknown> = {}) => {
+                        const result = await mutateVariant(
                             knexInst,
                             entity.schema,
                             variantKey,
-                            pkValues,
-                            maybeTrx
+                            sqb as unknown as PolymorphicQueryBuilder<any, any>,
+                            prop,
+                            patch
                         );
+                        if (prop === 'hardDelete') return result.count;
+                        if (prop === 'restore')
+                            return onResults?.(result.rows) ?? result.rows;
                     };
                 }
 

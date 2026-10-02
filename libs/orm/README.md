@@ -320,18 +320,60 @@ await db.activities.ofVariant('assigned').where(t => t.id, 3).delete();
 | Method | Description |
 |--------|-------------|
 | `.insert(payload)` | Insert a new variant row; discriminator is set automatically |
-| `.update(patch)` | Update variant columns for rows matched by the current `WHERE` clause |
-| `.delete()` | Delete rows matched by the current `WHERE` clause (CTI: atomic) |
+| `.update(patch)` | Atomically update matching base and variant fields; returns `Promise<void>` |
+| `.delete()` | Delete matching entities, honoring base soft deletion; returns `Promise<void>` |
+| `.restore()` | Clear the base deletion marker and return restored variant rows |
+| `.hardDelete()` | Permanently delete matching entities and return their count |
 | `.find(pk)` | Find a single variant row by PK; `undefined` if not found |
 | `.findOrFail(pk)` | Like `.find`, but throws `EntityNotFoundError` |
 | `.findMany([pk…])` | Fetch multiple variant rows by PK in one query |
 | `.where(col, value)` | Adds a `WHERE` predicate (chainable; returns `VariantDbSet`) |
-| `.include(t => t.rel)` | Eager-loads a relation (chainable; returns `VariantDbSet`) |
-| `.withTransaction(trx)` | Returns a new `VariantDbSet` bound to an existing transaction |
+| `.include(t => t.rel)` | Eager-load a relation; the resulting query is read-only |
+| `.withTransaction(trx)` / `.transacting(trx)` | Bind an independent variant view to an existing transaction, preserving filters |
 
-Calling `.insert()` / `.update()` / `.delete()` directly on the polymorphic
-base `DbSet` (without `ofVariant`) throws a runtime error — use `ofVariant`
-for all writes on polymorphic entities.
+Polymorphic root queries are read-only. Use `ofVariant()` for explicit mutations;
+tracked polymorphic inserts, updates and removals use the same lifecycle pipeline
+when `saveChanges()` runs. Writes require a single-column base primary key and an
+unprojected variant view without loaded relations. Primary keys, discriminators
+and CTI join keys cannot be changed by an update, including from a hook.
+
+### Variant deletion and lifecycle
+
+The **base schema** controls entity soft deletion. With `.softDelete()`, `delete()`
+sets its deletion marker and keeps CTI child rows intact. Without that metadata,
+`delete()` removes the physical rows. `hardDelete()` always removes CTI children
+before their base rows. The child schema's own deletion marker is not changed by
+soft deletion or restoration of the entity.
+
+All mutations retain query predicates, default scopes, ordering/pagination, and
+deleted-row visibility. Select hidden rows explicitly when restoring or purging:
+
+```ts
+const assigned = db.activities.ofVariant('assigned');
+await assigned.onlyDeleted().where(t => t.id, activityId).restore();
+await assigned.withDeleted().where(t => t.id, activityId).hardDelete();
+```
+
+Base hooks run before variant hooks, in registration order, once per operation.
+`beforeInsert` and `beforeUpdate` receive the combined property-name payload before
+it is split into storage tables. `afterInsert` receives the complete decoded row.
+`beforeDelete` receives a transaction-bound read query restricted to the captured
+mutation targets, for both soft and permanent deletion. Query configuration is
+immutable; hooks cannot add delete predicates by changing that query. No hooks run
+when an update or delete matches no rows.
+
+Inserts set configured creation/update timestamps on both storage schemas; updates
+advance configured update timestamps, including the base timestamp for child-only
+changes. Soft deletion and restoration change only the base deletion marker:
+restoration runs no lifecycle hook and neither operation advances update timestamps,
+matching ordinary query writes. Restoring a schema without base soft deletion fails.
+
+Target selection and all storage writes execute in one transaction. Existing
+transactions use a savepoint, so catching a failed mutation cannot retain half a CTI
+write. Hooks run before commit: database changes roll back on failure, but external
+side effects performed by hooks cannot be rolled back. Tracked saves preserve
+optimistic row-version checks and apply returned values and new snapshots only
+after their save transaction succeeds.
 
 ---
 

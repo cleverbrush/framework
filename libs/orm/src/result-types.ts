@@ -8,6 +8,7 @@ import type {
     Entity,
     EntityRelations,
     EntitySchema,
+    PrimaryKeyOf,
     RelationInfo,
     SchemaAwareQuery
 } from '@cleverbrush/knex-schema';
@@ -167,7 +168,7 @@ export type VariantResult<
 > = ExtractBranch<EntityResultByVariant<TEntity>, K>;
 
 /**
- * Write payload for `DbSet.insertVariant(key, payload)`.
+ * Write payload for `DbSet.ofVariant(key).insert(payload)`.
  *
  * All columns from the matching variant branch are **optional** (so
  * auto-generated PKs and columns with DB defaults can be omitted), and the
@@ -176,7 +177,7 @@ export type VariantResult<
  * @example
  * ```ts
  * // Only valid fields for the 'assigned' variant; type-checked at compile time:
- * await db.activities.insertVariant('assigned', {
+ * await db.activities.ofVariant('assigned').insert({
  *     todoId: 42,
  *     userId: 7,
  *     assigneeId: 9,
@@ -203,17 +204,23 @@ export type VariantInsertPayload<
         : never;
 
 /**
- * Write payload for `EntityQuery.updateVariant(key, set)`.
+ * Write payload for `DbSet.ofVariant(key).update(patch)`.
  *
- * Same shape as {@link VariantInsertPayload} — partial of the variant
- * branch with the discriminator excluded.
+ * Partial variant branch with primary keys and the discriminator excluded.
+ * The CTI join key is already absent from the public variant row.
  *
  * @public
  */
 export type VariantUpdatePayload<
     TEntity extends Entity<any, any, any>,
     K extends string
-> = VariantInsertPayload<TEntity, K>;
+> = Omit<
+    VariantInsertPayload<TEntity, K>,
+    PrimaryKeyOf<EntitySchema<TEntity>> extends readonly (infer P extends
+        string)[]
+        ? P
+        : Extract<PrimaryKeyOf<EntitySchema<TEntity>>, string>
+>;
 
 /**
  * @internal Re-export ExtractBranch for use in DbSet/EntityQuery types.

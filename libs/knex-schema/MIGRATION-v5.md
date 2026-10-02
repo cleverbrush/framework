@@ -198,6 +198,25 @@ with typed child customizers. Use application mappers after decoding for DTO cha
 Child default scopes and soft deletion apply automatically; disable them explicitly
 on the child when that is the intended policy.
 
+## 7. Review polymorphic mutation lifecycle
+
+Variant writes and tracked polymorphic `saveChanges()` now honor lifecycle hooks,
+timestamps and base-schema soft deletion for STI and CTI. Previously, explicit
+variant updates/deletes and tracked mutations bypassed that pipeline; variant
+`delete()` physically removed rows even when soft deletion was configured.
+
+If physical removal is required, replace `.ofVariant(key).delete()` with
+`.ofVariant(key).hardDelete()`. Use `.withDeleted()` to include previously deleted
+rows. Restore with `.ofVariant(key).onlyDeleted().restore()`. CTI soft deletion
+retains the child row; the base deletion marker controls entity visibility.
+
+Variant updates now accept base and branch fields together, with correct column
+mapping. Remove primary-key, discriminator and CTI join-key changes from update
+payloads. Review hooks that may now execute: base hooks precede variant hooks,
+insert/update hooks receive the combined payload, and after-insert hooks receive
+the completed row. Do not assume hook side effects are undone on transaction rollback.
+See the [ORM lifecycle contract](../orm/README.md#variant-deletion-and-lifecycle).
+
 ## Upgrade checklist
 
 - Upgrade the fixed Framework package group together; remove `.withRowSchema()` calls.
@@ -205,6 +224,7 @@ on the child when that is the intended policy.
 - Replace raw base queries and shape-changing SQL with explicit output contracts.
 - Audit API DTOs for exact numbers, dates, SQL nulls and storage/input separation.
 - Migrate relation customizers and polymorphic branch projections.
+- Review polymorphic deletion intent and hooks; use `hardDelete()` for permanent removal.
 - Verify identity tracking, writes, transaction rollback and concurrency in the app.
 - Run TypeScript, unit and real PostgreSQL tests; test representative endpoint flows.
 
