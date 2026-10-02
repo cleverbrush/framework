@@ -76,3 +76,16 @@ jobs:
       - run: npm run test:scheduler:integration
       - run: node demos/durable-jobs/demo.ts
       - run: node demos/durable-jobs/periodic.ts --fast
+
+  storage-integration:
+    name: S3 Storage Integration (Garage)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:storage:integration

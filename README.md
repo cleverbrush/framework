@@ -41,6 +41,8 @@ JSON Schema, API contracts, and Standard Schema integrations.
 | [`@cleverbrush/deep`](./libs/deep) | Deep equality, deep extension, flattening, and object utilities. |
 | [`@cleverbrush/scheduler`](./libs/scheduler) | Typed durable jobs, recurring triggers and ordered progress. |
 | [`@cleverbrush/scheduler-postgres`](./libs/scheduler-postgres) | PostgreSQL job persistence, transactional enqueue and fenced leases. |
+| [`@cleverbrush/storage`](./libs/storage) | Provider-neutral object storage contracts and public URL mapping. |
+| [`@cleverbrush/storage-s3`](./libs/storage-s3) | Streaming S3-compatible storage for self-hosted and hosted providers. |
 
 ## How The Pieces Fit
 

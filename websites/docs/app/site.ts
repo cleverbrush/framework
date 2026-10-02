@@ -106,6 +106,12 @@ export const DOCS_ROUTES: RouteMetadata[] = [
             'Schema-driven object mapping with compile-time completeness and type-safe property selectors.'
     },
     {
+        path: '/storage',
+        title: 'Object Storage',
+        description:
+            'Provider-neutral object storage and an S3-compatible adapter for self-hosted services and hosted providers.'
+    },
+    {
         path: '/scheduler',
         title: '@cleverbrush/scheduler',
         description:

@@ -23,7 +23,9 @@
             "@cleverbrush/server",
             "@cleverbrush/server-openapi",
             "@cleverbrush/orm",
-            "@cleverbrush/orm-cli"
+            "@cleverbrush/orm-cli",
+            "@cleverbrush/storage",
+            "@cleverbrush/storage-s3"
         ]
     ],
     "linked": [],
