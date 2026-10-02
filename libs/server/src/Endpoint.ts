@@ -33,6 +33,13 @@ import type {
     RejectedFile,
     UploadOptions
 } from './types.js';
+import {
+    type UploadConfiguration,
+    type UploadContract,
+    type UploadFiles,
+    type UploadSchema,
+    validateUploadConfiguration
+} from './upload.js';
 
 // ---------------------------------------------------------------------------
 // Simplify — flattens intersection types for clean IDE tooltips
@@ -52,7 +59,7 @@ type ActionContextParts<
     TQuery,
     THeaders,
     TPrincipal,
-    TUpload extends boolean
+    TUpload extends UploadContract
 > = {
     context: RequestContext;
 } & (HasKeys<TParams> extends true ? { params: TParams } : {}) &
@@ -66,9 +73,11 @@ type ActionContextParts<
     (HasKeys<TQuery> extends true ? { query: TQuery } : {}) &
     (HasKeys<THeaders> extends true ? { headers: THeaders } : {}) &
     (TPrincipal extends undefined ? {} : { principal: TPrincipal }) &
-    (TUpload extends true
-        ? { files: Record<string, FilePart>; rejectedFiles?: RejectedFile[] }
-        : {});
+    (TUpload extends false
+        ? {}
+        : TUpload extends true
+          ? { files: Record<string, FilePart>; rejectedFiles?: RejectedFile[] }
+          : { files: UploadFiles<TUpload> });
 
 /**
  * The fully-typed argument object passed to endpoint handlers.
@@ -582,7 +591,7 @@ export interface EndpointMetadata {
      * The configuration controls max file size, allowed MIME types, etc.
      * @see `EndpointBuilder.upload()`
      */
-    readonly fileUpload: UploadOptions | null;
+    readonly fileUpload: UploadConfiguration | null;
     /**
      * Cache tags declared via `.clearsCacheTag()`, providing tag-based cache
      * key computation for the client middleware.
@@ -685,7 +694,7 @@ export class EndpointBuilder<
     TRoles extends string = string,
     TResponse = any,
     TResponses extends Record<number, any> = {},
-    TUpload extends boolean = false
+    TUpload extends UploadContract = false
 > {
     readonly #method: string;
     readonly #basePath: string;
@@ -749,7 +758,7 @@ export class EndpointBuilder<
     readonly #externalDocs: { url: string; description?: string } | null;
     readonly #links: Record<string, LinkDefinition> | null;
     readonly #callbacks: Record<string, CallbackDefinition> | null;
-    readonly #fileUpload: UploadOptions | null;
+    readonly #fileUpload: UploadConfiguration | null;
     readonly #cacheTags: readonly CacheTagDefinition[];
 
     constructor(
@@ -815,9 +824,10 @@ export class EndpointBuilder<
         externalDocs: { url: string; description?: string } | null = null,
         links: Record<string, LinkDefinition> | null = null,
         callbacks: Record<string, CallbackDefinition> | null = null,
-        fileUpload: UploadOptions | null = null,
+        fileUpload: UploadConfiguration | null = null,
         cacheTags: readonly CacheTagDefinition[] = []
     ) {
+        validateUploadConfiguration(fileUpload, bodySchema);
         this.#method = method;
         this.#basePath = basePath;
         this.#pathTemplate = pathTemplate;
@@ -1694,9 +1704,11 @@ export class EndpointBuilder<
      *
      * When set, the server parses the request body with a streaming multipart
      * parser instead of the default JSON deserializer. File fields are made
-     * available to the handler via `arg.files` (a `Record<string, FilePart>`),
-     * while non-file form fields are validated against the body schema and
-     * available via `arg.body`.
+     * available via `arg.files`. A schema of file() / array(file()) fields
+     * infers their names, cardinality and optionality. Without a schema,
+     * files remain a Record<string, FilePart>. Non-file fields use arg.body.
+     * File-only endpoints do not require a body schema. Typed uploads fail
+     * before the handler if their contract is invalid; limits produce 413.
      *
      * @param options - Upload configuration (max file size, allowed MIME types, etc.).
      *
@@ -1714,6 +1726,21 @@ export class EndpointBuilder<
      * };
      * ```
      */
+    upload<S extends UploadSchema>(
+        schema: S,
+        options?: UploadOptions
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        S
+    >;
     upload(
         options?: UploadOptions
     ): EndpointBuilder<
@@ -1727,7 +1754,29 @@ export class EndpointBuilder<
         TResponse,
         TResponses,
         true
+    >;
+    upload(
+        schemaOrOptions?: UploadSchema | UploadOptions,
+        options?: UploadOptions
+    ): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        any
     > {
+        const schema =
+            schemaOrOptions && 'introspect' in schemaOrOptions
+                ? schemaOrOptions
+                : undefined;
+        const config = schema
+            ? options
+            : (schemaOrOptions as UploadOptions | undefined);
         return new EndpointBuilder(
             this.#method,
             this.#basePath,
@@ -1753,9 +1802,13 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             {
-                maxFileSize: options?.maxFileSize ?? 10 * 1024 * 1024,
-                allowedMimeTypes: options?.allowedMimeTypes,
-                maxFileCount: options?.maxFileCount ?? 10
+                ...config,
+                allowedMimeTypes: config?.allowedMimeTypes
+                    ? [...config.allowedMimeTypes]
+                    : undefined,
+                maxFileSize: config?.maxFileSize ?? 10 * 1024 * 1024,
+                maxFileCount: config?.maxFileCount ?? 10,
+                schema
             },
             this.#cacheTags
         );

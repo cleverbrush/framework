@@ -140,6 +140,8 @@ export interface FilePart {
  * Describes a file that was rejected during multipart parsing.
  */
 export interface RejectedFile {
+    /** Multipart field name, when available. */
+    readonly fieldName?: string;
     /** Original filename as provided by the client. */
     readonly filename: string;
     /** MIME type of the file (e.g. `'application/xlsx'`). */
@@ -153,6 +155,14 @@ export interface RejectedFile {
  * `EndpointBuilder.upload()`.
  */
 export interface UploadOptions {
+    /** Maximum bytes per text field. Default: 1 MiB. */
+    maxFieldSize?: number;
+    /** Maximum text fields per request. Default: 100. */
+    maxFieldCount?: number;
+    /** Maximum UTF-8 bytes per field name. Default: 100. */
+    maxFieldNameSize?: number;
+    /** Maximum parts. Default: maxFileCount + maxFieldCount. */
+    maxPartCount?: number;
     /**
      * Maximum allowed file size per uploaded file in bytes.
      * @default 10_485_760 (10 MB)

@@ -12,7 +12,7 @@ import type {
     EndpointMetadata,
     EndpointRegistration
 } from '@cleverbrush/server';
-import { endpoint } from '@cleverbrush/server';
+import { endpoint, file } from '@cleverbrush/server';
 import { describe, expect, it } from 'vitest';
 import {
     generateOpenApiSpec,
@@ -1837,4 +1837,38 @@ describe('responsesSchemas', () => {
         expect(op.responses['201']).toBeDefined();
         expect(op.responses['200']).toBeUndefined();
     });
+});
+
+it('describes file-only and mixed upload contracts with binary arrays and required fields', () => {
+    const files = object({
+        images: array(file()).minLength(1).maxLength(3),
+        cover: file().optional()
+    });
+    for (const text of [
+        null,
+        object({ title: string() }).schemaName('UploadText')
+    ]) {
+        let ep = endpoint.post('/assets').upload(files);
+        if (text) ep = ep.body(text) as any;
+        const spec: any = generateOpenApiSpec(
+            makeOptions([{ endpoint: ep.introspect(), handler: () => {} }])
+        );
+        const request = spec.paths['/assets'].post.requestBody;
+        const schema = request.content['multipart/form-data'].schema;
+        expect(request.required).toBe(true);
+        expect(schema.properties.images).toEqual({
+            type: 'array',
+            items: { type: 'string', format: 'binary' },
+            minItems: 1,
+            maxItems: 3
+        });
+        expect(schema.properties.cover).toEqual({
+            type: 'string',
+            format: 'binary'
+        });
+        expect(schema.required).toEqual(
+            text ? ['title', 'images'] : ['images']
+        );
+        expect(schema.additionalProperties).toBe(false);
+    }
 });
