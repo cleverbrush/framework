@@ -79,6 +79,9 @@ function memoryStorage(): ObjectStorage {
         },
         async close() {
             closed = true;
+        },
+        [Symbol.asyncDispose]() {
+            return this.close();
         }
     };
 }

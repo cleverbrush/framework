@@ -11,6 +11,7 @@ import {
     S3Client,
     UploadPartCommand
 } from '@aws-sdk/client-s3';
+import type { ObjectStorage } from '@cleverbrush/storage';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { S3Storage, type S3StorageOptions } from './S3Storage.js';
 
@@ -111,7 +112,11 @@ describe('S3 storage', () => {
         await rejected;
         expect(input.destroyed).toBe(true);
     });
-    it('closes an unread download and releases the client exactly once', async () => {
+    it.each([
+        'normal exit',
+        'exception',
+        'explicit close'
+    ])('await using closes unread downloads exactly once on %s', async exit => {
         const source = new PassThrough();
         vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({
             Body: source,
@@ -119,11 +124,22 @@ describe('S3 storage', () => {
         } as never);
         const destroy = vi.spyOn(S3Client.prototype, 'destroy');
         const storage = create();
-        const read = await storage.get('unread');
-        await storage.close();
-        await storage.close();
+        const failure = new Error('scope failed');
+        let body: Readable | undefined;
+        const scoped = (async () => {
+            await using owned: ObjectStorage = storage;
+            body = (await owned.get('unread')).body;
+            if (exit === 'explicit close') await owned.close();
+            if (exit === 'exception') throw failure;
+        })();
+        if (exit === 'exception') await expect(scoped).rejects.toBe(failure);
+        else await scoped;
         expect(source.destroyed).toBe(true);
-        expect(read.body.destroyed).toBe(true);
+        expect(body?.destroyed).toBe(true);
+        await expect(storage.stat('after-disposal')).rejects.toMatchObject({
+            code: 'closed'
+        });
+        await storage.close();
         expect(destroy).toHaveBeenCalledTimes(1);
     });
     it('normalizes failed input streams and aborts their multipart state', async () => {
@@ -272,6 +288,69 @@ describe('S3 storage', () => {
         await rejected;
         expect(cleaned).toBe(true);
         expect(body.destroyed).toBe(true);
+    });
+    it('await using waits for multipart cleanup before leaving the scope', async () => {
+        let started!: () => void;
+        const ready = new Promise<void>(resolve => {
+            started = resolve;
+        });
+        let cleaning!: () => void;
+        const cleanupStarted = new Promise<void>(resolve => {
+            cleaning = resolve;
+        });
+        let finishCleanup!: () => void;
+        const cleanupFinished = new Promise<void>(resolve => {
+            finishCleanup = resolve;
+        });
+        vi.spyOn(S3Client.prototype, 'send').mockImplementation(
+            async (command: any, request: any) => {
+                if (command instanceof CreateMultipartUploadCommand)
+                    return { UploadId: 'upload' };
+                if (command instanceof UploadPartCommand) {
+                    started();
+                    await new Promise((_, reject) =>
+                        request.abortSignal.addEventListener(
+                            'abort',
+                            () => reject({ name: 'AbortError' }),
+                            { once: true }
+                        )
+                    );
+                }
+                if (command instanceof AbortMultipartUploadCommand) {
+                    expect(request.abortSignal.aborted).toBe(false);
+                    cleaning();
+                    await cleanupFinished;
+                }
+                return {};
+            }
+        );
+        const destroy = vi.spyOn(S3Client.prototype, 'destroy');
+        const storage = create();
+        const body = Readable.from([Buffer.alloc(6 * 1024 * 1024)]);
+        let rejected!: Promise<void>;
+        let exited = false;
+        const scoped = (async () => {
+            await using owned: ObjectStorage = storage;
+            rejected = expect(owned.put('key', body)).rejects.toMatchObject({
+                code: 'aborted'
+            });
+            await ready;
+        })().finally(() => {
+            exited = true;
+        });
+        try {
+            await cleanupStarted;
+            await new Promise<void>(resolve => setImmediate(resolve));
+            expect(exited).toBe(false);
+            expect(destroy).not.toHaveBeenCalled();
+        } finally {
+            finishCleanup();
+            await scoped;
+            await rejected;
+        }
+        expect(exited).toBe(true);
+        expect(body.destroyed).toBe(true);
+        expect(destroy).toHaveBeenCalledTimes(1);
     });
     it('cleans up a stalled input when closed and rejects subsequent operations', async () => {
         const storage = create();

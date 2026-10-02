@@ -10,7 +10,7 @@ lookup. The package is server-only and requires Node.js 20+.
 ```ts
 import { S3Storage } from '@cleverbrush/storage-s3';
 
-const storage = new S3Storage({
+await using storage = new S3Storage({
     endpoint: process.env.STORAGE_ENDPOINT!,
     region: process.env.STORAGE_REGION!,
     bucket: process.env.STORAGE_BUCKET!,
@@ -26,8 +26,13 @@ const storage = new S3Storage({
 await storage.put('images/logo.png', imageBytes, { contentType: 'image/png' });
 const url = storage.publicUrl('images/logo.png');
 // https://assets.example.com/assets/images/logo.png
-await storage.close();
+// Leaving this scope automatically awaits storage.close().
 ```
+
+`await using` closes owned storage on both normal scope exit and exceptions,
+waiting for active work and multipart cleanup. Keep application-wide instances
+alive until shutdown; handlers borrowing injected storage must not dispose them.
+Explicit `await storage.close()` is also supported and is idempotent.
 
 The public base URL is the public bucket/proxy root. The prefix is appended once,
 so do not include the same prefix in both settings. No public URL is inferred

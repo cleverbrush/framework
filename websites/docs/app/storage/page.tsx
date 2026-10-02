@@ -4,7 +4,7 @@ export const metadata = docsMetadata('/storage');
 
 const setup = `import { S3Storage } from '@cleverbrush/storage-s3';
 
-const storage = new S3Storage({
+await using storage = new S3Storage({
     endpoint: process.env.STORAGE_ENDPOINT!,
     region: process.env.STORAGE_REGION!,
     bucket: process.env.STORAGE_BUCKET!,
@@ -21,7 +21,7 @@ await storage.put('images/logo.png', imageBytes, {
     contentType: 'image/png'
 });
 const url = storage.publicUrl('images/logo.png');
-await storage.close();`;
+// Leaving this scope automatically awaits storage.close().`;
 
 export default function StoragePage() {
     return (
@@ -54,8 +54,13 @@ export default function StoragePage() {
                     Use put, get, stat, copy and delete with an AbortSignal.
                     Writes accept buffers or binary Node streams and use bounded
                     multipart uploads. Consume or destroy every returned read
-                    stream. Close adapters during application shutdown to cancel
-                    active work and release connections.
+                    stream. Use <code>await using</code> for storage owned by
+                    the current scope: normal exit and exceptions both await
+                    active work and multipart cleanup before releasing
+                    connections. Explicit <code>close()</code> is also supported
+                    and is idempotent. Keep application-wide instances alive
+                    until shutdown; handlers borrowing injected storage must not
+                    dispose them.
                 </p>
                 <p>
                     Metadata survives writes and copies. Errors have portable

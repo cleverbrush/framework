@@ -15,6 +15,7 @@ The core has no runtime dependencies. Use an adapter such as
 | `delete(key, { signal }?)` | Delete the current object; missing objects succeed. |
 | `publicUrl(key)` | Return a stable public URL, or `undefined` without a configured public base URL. |
 | `close()` | Abort active work, release resources and permanently close the instance. |
+| `[Symbol.asyncDispose]()` | Await `close()` automatically when an `await using` scope ends. |
 
 `StorageBody` accepts `Uint8Array` (including Buffer) or a binary Node `Readable`.
 `PutOptions` supports `size`, `contentType`, `cacheControl`, `contentDisposition`,
@@ -29,7 +30,13 @@ The adapter owns a supplied write stream for that operation, consuming it once
 and destroying it on failure or cancellation. A returned read stream belongs to
 the caller: consume it, pipe it with `pipeline`, or destroy it. A read's abort
 signal stays active until its body closes. Adapters must not buffer complete
-streamed objects. The S3 adapter also implements `Symbol.asyncDispose`.
+streamed objects.
+
+Every `ObjectStorage` implements `AsyncDisposable`. Use `await using` when your
+scope owns the instance; leaving that scope awaits `close()`, including when an
+exception is thrown. Cleanup is asynchronous so active operations and multipart
+cleanup finish before resources are released. Explicit `close()` remains
+available and is safe to call more than once.
 
 `StorageError.code` is one of `not_found`, `access_denied`, `aborted`,
 `invalid_argument`, `unavailable`, `closed` or `provider_error`. Errors omit raw
@@ -65,6 +72,8 @@ export const AssetStorageToken = any().hasType<ObjectStorage>();
 ```
 
 Register multiple tokens/instances when assets use different providers or buckets.
-Close owned adapters during application shutdown, after stopping incoming work.
+Keep application-wide adapters alive until application shutdown, then close them
+after stopping incoming work. Handlers borrowing injected storage must not dispose
+it. Use `await using` only in the scope that owns the adapter's lifetime.
 The reusable contract suite under `testing/` is a repository test utility and is
 not included in the published package.

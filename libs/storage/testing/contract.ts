@@ -22,6 +22,16 @@ export function storageContract(create: () => ObjectStorage) {
                 await storage.close();
             }
         });
+        it('closes automatically at scope exit and remains safe to close again', async () => {
+            {
+                await using owned = storage;
+                expect(owned).toBe(storage);
+            }
+            await expect(storage.stat('after-disposal')).rejects.toMatchObject({
+                code: 'closed'
+            });
+            await storage.close();
+        });
         it('round trips bytes and headers without treating ETags as checksums', async () => {
             const name = key('folder/雪 #?%2F.bin');
             const bytes = Buffer.from([0, 1, 255, 42]);

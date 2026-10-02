@@ -43,8 +43,9 @@ export interface StorageReadResult extends ObjectMetadata {
  * Server-side, provider-neutral object storage. Keys are relative logical names;
  * provider prefixes never appear in results. Operations on one key replace its
  * current value; they do not provide database transactions or version history.
+ * Owners can use `await using` to close the instance when leaving its scope.
  */
-export interface ObjectStorage {
+export interface ObjectStorage extends AsyncDisposable {
     put(
         key: string,
         body: StorageBody,
@@ -67,6 +68,8 @@ export interface ObjectStorage {
     delete(key: string, options?: StorageOptions): Promise<void>;
     /** Stable URL only when a public base URL was explicitly configured. */
     publicUrl(key: string): string | undefined;
-    /** Cancel active work, release resources and permanently close this instance. */
+    /** Cancel active work, await cleanup and permanently close this instance. Idempotent. */
     close(): Promise<void>;
+    /** Delegate to close(), awaiting the same cleanup on scope exit. */
+    [Symbol.asyncDispose](): Promise<void>;
 }

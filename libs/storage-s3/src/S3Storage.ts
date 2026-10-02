@@ -63,7 +63,7 @@ type Operation = {
 };
 
 /** S3 protocol adapter for custom endpoints, with bounded uploads and owned streams. */
-export class S3Storage implements ObjectStorage, AsyncDisposable {
+export class S3Storage implements ObjectStorage {
     readonly #client: S3Client;
     readonly #options: S3StorageOptions;
     readonly #active = new Set<Operation>();
