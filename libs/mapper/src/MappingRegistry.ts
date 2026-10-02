@@ -164,7 +164,10 @@ type TargetPropertyTree<
     TSchema extends ObjectSchemaBuilder<any, any, any, any, any, any, any>,
     TAllowedKeys extends string
 > = {
-    [K in SchemaKeys<TSchema> & TAllowedKeys]: TargetPropertyKey<K> &
+    // Filter source properties without detaching the target key's declaration.
+    -readonly [K in keyof ExtractSchemaProperties<TSchema> as K extends TAllowedKeys
+        ? K
+        : never]-?: TargetPropertyKey<K & string> &
         PropertyDescriptor<TSchema, ExtractSchemaProperties<TSchema>[K], any>;
 };
 

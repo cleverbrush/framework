@@ -44,13 +44,10 @@ type AnySubscription = SubscriptionBuilder<
     any
 >;
 type Definition = AnyEndpoint | AnySubscription;
+// Preserve service declarations through defaults/overrides, with B winning.
 type Merge<A, B> = {
-    [K in keyof A | keyof B]: K extends keyof B
-        ? B[K]
-        : K extends keyof A
-          ? A[K]
-          : never;
-};
+    -readonly [K in keyof Required<A> as K extends keyof B ? never : K]: A[K];
+} & { -readonly [K in keyof Required<B>]: B[K] };
 
 /** Server-only enrichment shared by every operation in a scope. */
 export interface ImplementationDefaults {
@@ -339,8 +336,9 @@ export class ImplementationScope<
 }
 
 type ContractOf<M> = M extends ImplementationModule<infer C> ? C : never;
+// Map over the combined object so groups keep their original declarations.
 type MergeContracts<A extends ApiContract, B extends ApiContract> = {
-    [G in keyof A | keyof B]: G extends keyof A
+    -readonly [G in keyof Required<A & B>]: G extends keyof A
         ? G extends keyof B
             ? A[G] & B[G]
             : A[G]
