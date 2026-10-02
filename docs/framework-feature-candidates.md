@@ -1,6 +1,6 @@
 # Framework feature candidates
 
-Status: F01–F03 merged; F04–F05 implemented on the storage feature branch for PR review; F06–F07 remain proposed.
+Status: F01–F05 merged; F06 implemented on the CORS feature branch for PR review; F07 remains proposed.
 Assessment date: 2026-10-02.
 
 This is an unprioritized list of reusable Framework capabilities and correctness
@@ -204,7 +204,7 @@ features are separate future candidates.
 
 **Priority:**
 
-**Existing support and gap.** Applications can set response headers in middleware,
+**Original assessment.** Applications can set response headers in middleware,
 but [route matching](../libs/server/src/Server.ts) occurs first. An HTTP probe sent
 an OPTIONS preflight to a POST route and received `405`; ordinary middleware never
 ran. Application middleware alone therefore cannot handle that preflight.
@@ -215,9 +215,11 @@ for the actual request. Apply appropriate CORS headers to successful and error
 responses. Support configured origins, methods, allowed/exposed headers, and
 credential behavior.
 
-**Public API implications.** Add server configuration or a first-class CORS helper
-with documented execution order. Avoid silently changing the execution order of
-existing ordinary middleware.
+**Public API.** `ServerBuilder.useCors(options)` and the exported
+`ServerCorsOptions` provide a server-wide policy with static origins or synchronous/
+asynchronous origin predicates, preflight methods and headers, exposed headers,
+credentials and browser preflight cache duration. Ordinary middleware order is
+unchanged.
 
 **Acceptance criteria.**
 
@@ -227,6 +229,12 @@ existing ordinary middleware.
   CORS behavior.
 - Actual protected requests still require authentication.
 - Same-origin applications without CORS configuration remain unaffected.
+
+**Implementation:** Added the CORS stage before routing and authentication,
+route-aware preflight responses, rejection of disallowed origins before handlers,
+and consistent headers on success/error responses and cache/idempotency replays.
+Includes real HTTP and type tests, built-in health/batch route support, and updated
+documentation. See the [CORS guide](../libs/server/README.md#cors).
 
 **Review notes:**
 

@@ -25,6 +25,7 @@ fields; the framework never derives a field name from an exception's message.
 - **Action results** — `ActionResult.ok()`, `.created()`, `.noContent()`, `.redirect()`, `.file()`, `.stream()`, `.raw()`, `.status()` — no manual `res.write()` / `res.end()` unless you explicitly opt in.
 - **Content negotiation** — pluggable `ContentTypeHandler` registry; JSON and `application/x-www-form-urlencoded` registered by default; honours the `Accept` request header.
 - **Middleware pipeline** — `server.use(middleware)` for global middleware; per-endpoint middleware via `handle(ep, handler, { middlewares })`.
+- **Opt-in CORS** — `server.useCors()` handles route-aware preflights before authentication, with explicit origins or asynchronous origin predicates.
 - **DI integration** — `endpoint.inject({ db: IDbContext })` resolves services per-request from a `@cleverbrush/di` container.
 - **Authentication & authorization** — `server.useAuthentication()` / `server.useAuthorization()` wired to `@cleverbrush/auth` schemes and policies.
 - **RFC 9457 Problem Details** — validation errors and `HttpError` subclasses are serialized as `application/problem+json`.
@@ -36,6 +37,87 @@ fields; the framework never derives a field name from an exception's message.
 - **Contract composition** — `mergeContracts`, `pickGroups`, and `omitGroups` enable audience-scoped bundles: ship only the endpoints each consumer needs.
 - **Modular implementations** — `implement(api)` derives server-configured scopes, keeps separate handler files strongly typed, and checks full contract coverage at final registration.
 - **Typed error policies** — `errorMap()` and `withErrors()` translate known handler exceptions without repeated catch blocks or widening endpoint responses.
+
+## CORS
+
+Enable CORS with an explicit server-wide policy:
+
+```ts
+import { createServer } from '@cleverbrush/server';
+
+const server = createServer().useCors({
+    origin: ['https://app.example.com', 'http://localhost:5173'],
+    methods: ['GET', 'POST', 'PATCH', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key'],
+    exposedHeaders: ['WWW-Authenticate', 'X-Request-Id'],
+    credentials: true,
+    maxAgeSeconds: 600
+});
+```
+
+`ServerCorsOptions` is exported from `@cleverbrush/server`. The policy is
+validated and copied before listening. Origins are exact serialized URL origins
+(scheme, host and optional port, without a path or trailing slash). The special
+origin string `null` can be included explicitly for opaque browser origins.
+
+| Option | Behavior / default |
+| --- | --- |
+| `origin` | Required: an exact origin, readonly origin list, `'*'`, or `(origin: string) => boolean \| Promise<boolean>`. Empty lists deny all origins. |
+| `methods` | Optional preflight allowlist, intersected with the registered routes. By default, any method registered for the requested URL may be preflighted. |
+| `allowedHeaders` | Explicit preflight request-header names; case-insensitive, default `[]`. Include `Authorization` or custom auth headers when needed. |
+| `exposedHeaders` | Additional response-header names browsers may read; default `[]`. |
+| `credentials` | Default `false`. With `true`, an exact accepted origin is returned. `origin: '*'` with credentials is rejected at startup. |
+| `maxAgeSeconds` | Non-negative integer browser preflight cache duration, default `0`. |
+
+Method and header lists use explicit names; wildcard entries are not supported.
+`origin: '*'` explicitly permits all valid origins, including opaque `null`
+origins, without credential support. CORS is disabled until `useCors` is called.
+
+For domains determined at request time, use a predicate backed by application
+configuration or a domain registry:
+
+```ts
+server.useCors({
+    origin: async origin => tenantDomains.isAllowed(origin),
+    allowedHeaders: ['Content-Type', 'Authorization']
+});
+```
+
+The predicate is awaited once per physical HTTP request carrying a valid `Origin`,
+including preflights; it is not called for requests without `Origin`. Results are
+not cached by the server. Browser preflight caching follows `maxAgeSeconds`.
+Returning `false` rejects the request with `403` before authentication or handlers.
+Throwing or rejecting returns a generic `500` without exposing the callback error.
+Calling `useCors` again replaces the policy for subsequently started servers.
+
+### Execution order and responses
+
+CORS runs before routing, body parsing, DI scopes and ordinary middleware,
+regardless of where `useCors` appears in the builder chain. An `OPTIONS` request
+with both `Origin` and `Access-Control-Request-Method` is a preflight. Accepted
+preflights return an empty `204` without running authentication or handlers.
+Only registered HTTP routes and enabled health/batch endpoints are eligible.
+Malformed preflights return `400`, unknown routes `404`, unsupported route methods
+`405`, and policy denials `403`. Denied preflights have no CORS permission headers.
+Ordinary `OPTIONS` requests still use registered handlers and normal routing.
+
+Actual requests from accepted origins follow the existing middleware and
+authentication pipeline. CORS headers accompany successful and error responses,
+including authentication challenges, validation failures and routing errors.
+Disallowed or malformed origins receive `403` before handlers run. Requests
+without `Origin` retain normal processing and receive no CORS permission headers.
+Authentication remains responsible for resource access; the method/header lists
+govern browser preflight permission, not ordinary HTTP routing.
+
+When enabled, the CORS stage owns its six standard response headers and finalizes
+them as headers are sent, including raw/streamed responses and cache/idempotency
+replays. Configure CORS through this API rather than writing competing CORS headers
+in middleware. Existing `Vary` values are preserved and merged with `Origin`, plus
+the requested method/header fields on preflights. Cached CORS permissions are not
+reused for another origin. Virtual batch subrequests retain their usual auth
+pipeline; CORS applies to the outer HTTP request. WebSocket upgrades are outside
+this policy. Ordinary middleware, including middleware-based tracing, does not run
+for CORS short-circuits.
 
 ## Large APIs and shared error handling
 

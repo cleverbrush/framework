@@ -17,6 +17,7 @@ import { ServiceCollection, type ServiceProvider } from '@cleverbrush/di';
 import { type WebSocket, WebSocketServer } from 'ws';
 import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
+import { CorsPolicy, type ServerCorsOptions } from './Cors.js';
 import type { EndpointBuilder, Handler, HandlerMapping } from './Endpoint.js';
 import { HttpError } from './HttpError.js';
 import { MiddlewarePipeline } from './MiddlewarePipeline.js';
@@ -120,6 +121,7 @@ export class ServerBuilder {
     #authzConfig: AuthorizationConfig | null = null;
     #healthcheck = false;
     #batchConfig: ServerBatchingOptions | null = null;
+    #corsOptions?: ServerCorsOptions;
 
     constructor(options: ServerOptions = {}) {
         this.#options = options;
@@ -136,11 +138,26 @@ export class ServerBuilder {
     }
 
     /**
-     * Add a global middleware that runs for every request.
-     * Middleware is executed in the order it is added.
+     * Add middleware to the matched-request pipeline after authentication.
+     * Middleware is executed in the order it is added. CORS short-circuits
+     * and unmatched routes do not enter this pipeline.
      */
     use(middleware: Middleware): this {
         this.#globalMiddlewares.push(middleware);
+        return this;
+    }
+
+    /**
+     * Enable server-wide CORS before routing and authentication.
+     * Accepted preflights return 204 without running ordinary middleware.
+     * Requests with disallowed origins return 403 before handlers run.
+     * Configuration is validated and copied when the server starts listening.
+     */
+    useCors(options: ServerCorsOptions): this {
+        if (options === undefined) {
+            throw new TypeError('CORS requires an explicit origin policy');
+        }
+        this.#corsOptions = options;
         return this;
     }
 
@@ -155,8 +172,8 @@ export class ServerBuilder {
 
     /**
      * Enable authentication with one or more schemes.
-     * Registers a global middleware that authenticates every request and
-     * sets `ctx.principal`.
+     * Registers middleware that authenticates protected requests and sets
+     * `ctx.principal`. CORS preflights are handled before this middleware.
      */
     useAuthentication(config: AuthenticationConfig): this {
         this.#authConfig = config;
@@ -362,7 +379,8 @@ export class ServerBuilder {
             this.#healthcheck,
             this.#subscriptionRegistrations.length > 0,
             this.#batchConfig,
-            this.#options.maxBodySize
+            this.#options.maxBodySize,
+            this.#corsOptions
         );
 
         const listenPort = port ?? this.#options.port ?? 3000;
@@ -390,6 +408,7 @@ export class Server {
     readonly #hasSubscriptions: boolean;
     readonly #batchConfig: ServerBatchingOptions | null;
     readonly #maxBodySize: number;
+    readonly #cors?: CorsPolicy;
     #httpServer: http.Server | https.Server | null = null;
     #wss: WebSocketServer | null = null;
     readonly #activeConnections: Set<WebSocket> = new Set();
@@ -402,7 +421,8 @@ export class Server {
         healthcheck = false,
         hasSubscriptions = false,
         batchConfig: ServerBatchingOptions | null = null,
-        maxBodySize: number = DEFAULT_MAX_BODY_SIZE
+        maxBodySize: number = DEFAULT_MAX_BODY_SIZE,
+        corsOptions?: ServerCorsOptions
     ) {
         this.#router = router;
         this.#serviceProvider = serviceProvider;
@@ -412,6 +432,8 @@ export class Server {
         this.#hasSubscriptions = hasSubscriptions;
         this.#batchConfig = batchConfig;
         this.#maxBodySize = maxBodySize;
+        this.#cors =
+            corsOptions === undefined ? undefined : new CorsPolicy(corsOptions);
     }
 
     /**
@@ -526,8 +548,17 @@ export class Server {
 
     async #handleRequest(
         req: http.IncomingMessage,
-        res: http.ServerResponse
+        res: http.ServerResponse,
+        physicalRequest = true
     ): Promise<void> {
+        if (
+            physicalRequest &&
+            this.#cors &&
+            (await this.#cors.handle(req, res, (method, path) =>
+                this.#matchCorsRoute(method, path)
+            ))
+        )
+            return;
         const scope = this.#serviceProvider.createScope();
 
         try {
@@ -810,6 +841,37 @@ export class Server {
     }
 
     // -----------------------------------------------------------------------
+    // CORS target lookup includes built-in routes without changing normal routing.
+    // -----------------------------------------------------------------------
+
+    #matchCorsRoute(
+        method: string,
+        path: string
+    ): {
+        status: 200 | 400 | 404 | 405;
+        allowedMethods?: string[];
+    } {
+        const builtins: string[] = [];
+        if (this.#healthcheck && path === '/health') builtins.push('GET');
+        if (
+            this.#batchConfig &&
+            path === (this.#batchConfig.path ?? '/__batch')
+        ) {
+            builtins.push('POST');
+        }
+        if (builtins.includes(method)) return { status: 200 };
+        const result = this.#router.match(method, path);
+        if (result.badRequest) return { status: 400 };
+        if (result.match) return { status: 200 };
+        const allowedMethods = [
+            ...new Set([...builtins, ...(result.allowedMethods ?? [])])
+        ];
+        return allowedMethods.length
+            ? { status: 405, allowedMethods }
+            : { status: 404 };
+    }
+
+    // -----------------------------------------------------------------------
     // Batch request handler
     // -----------------------------------------------------------------------
 
@@ -877,7 +939,8 @@ export class Server {
 
             await this.#handleRequest(
                 virtualReq as unknown as http.IncomingMessage,
-                virtualRes as unknown as http.ServerResponse
+                virtualRes as unknown as http.ServerResponse,
+                false
             );
 
             return virtualRes.toResult();
