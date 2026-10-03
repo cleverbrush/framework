@@ -118,8 +118,8 @@ type TakeExceptIndex<
  * Which means that you are not limited to primitive types and
  * can construct complex types as well, e.g. object | array.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link union | union()} function instead.
  *
  * @example

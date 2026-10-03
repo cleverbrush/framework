@@ -767,8 +767,8 @@ type ResolvedSchemaType<
  * Base class for all schema builders. Provides basic functionality for schema building.
  *
  * **Note:** this class is not intended to be used directly, use one of the subclasses instead.
- * @typeparam TResult Type of the object that will be returned by `validate()` method.
- * @typeparam TRequired If `true`, object will be required. If `false`, object will be optional.
+ * @typeParam TResult Type of the object that will be returned by `validate()` method.
+ * @typeParam TRequired If `true`, object will be required. If `false`, object will be optional.
  */
 export abstract class SchemaBuilder<
     TResult = any,

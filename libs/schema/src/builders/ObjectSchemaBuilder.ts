@@ -279,8 +279,8 @@ export type ObjectSchemaValidationResult<
  * Which means that you can define nested objects and arrays of
  * any complexity.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link object | object()} function instead.
  *
  * @example

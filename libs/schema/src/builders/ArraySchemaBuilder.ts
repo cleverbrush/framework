@@ -86,8 +86,8 @@ type ArraySchemaBuilderCreateProps<
  * Also you can limit the length of the array by using `minLength`
  * and `maxLength` methods.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link array | array()} function instead.
  * @see {@link array}
  */
@@ -387,7 +387,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * Performs synchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validate}
+     * {@inheritDoc SchemaBuilder.validate}
      */
     public validate(
         object: TResult,
@@ -400,7 +400,7 @@ export class ArraySchemaBuilder<
     }
 
     /**
-     * Performs asynchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validateAsync}
+     * {@inheritDoc SchemaBuilder.validateAsync}
      */
     public async validateAsync(
         object: TResult,

@@ -30,6 +30,10 @@
     ],
     "out": "websites/docs/public/api-docs/latest",
     "name": "Libraries",
+    "highlightLanguages": [
+        "bash", "console", "css", "html", "javascript", "json", "jsonc",
+        "json5", "yaml", "tsx", "typescript", "sql"
+    ],
     "excludePrivate": true,
     "exclude": ["**/node_modules/**", "websites/**", "demos/**"],
     "navigationLinks": {

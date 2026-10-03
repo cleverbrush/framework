@@ -21,8 +21,8 @@ type InferParameters<TParams extends SchemaBuilder<any, any, any, any, any>[]> =
  * It can be required or optional, and may carry typed parameter and return-type
  * schemas so that the inferred TypeScript function signature is fully typed.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link func | func()} function instead.
  *
  * @example Basic validation

@@ -38,33 +38,37 @@ const parseFromEpochPreprocessor = (value: any) => {
  * It can be restricted to be: equal to a certain value, in future, in past, in a certain range.
  * Supports parsing from JSON string and UNIX epoch (using preprocessors).
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link date | date()} function instead.
  *
- * @example ```ts
- * const date = new Date(2020, 0, 2);
+ * @example
+ * ```ts
+ * const value = new Date(2020, 0, 2);
  * const schema = date().min(new Date(2020, 0, 1));
- * const result = schema.validate(date);
+ * const result = schema.validate(value);
  * // result.valid === true
- * // result.object === date
+ * // result.object === value
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = date();
  * const result = schema.validate('2020-01-01');
  * // result.valid === false
  * // result.errors[0].message === 'is expected to be a date'
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = date().parseFromJson();
  * const result = schema.validate('2020-01-01T00:00:00.000Z');
  * // result.valid === true
  * // result.object is equal to corresponding Date object
  * ```
  *
- * @example ```ts
+ * @example
+ * ```ts
  * const schema = date().parseFromEpoch();
  * const result = schema.validate(1577836800000);
  * // result.valid === true
@@ -896,7 +900,8 @@ export class DateSchemaBuilder<
      * For more specific parsing, see {@link acceptJsonString} and
      * {@link acceptEpoch}.
      *
-     * @example ```ts
+     * @example
+     * ```ts
      * const schema = date().coerce();
      * const result = schema.validate('2024-01-15');
      * // result.valid === true

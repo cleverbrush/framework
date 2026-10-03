@@ -95,8 +95,8 @@ type TupleSchemaBuilderCreateProps<
  * Use it when you need to validate function arguments, CSV rows, coordinate
  * pairs, structured event payloads, or any other fixed-structure array.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link tuple | tuple()} function instead.
  *
  * @example
@@ -399,7 +399,7 @@ export class TupleSchemaBuilder<
     }
 
     /**
-     * Performs synchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validate}
+     * {@inheritDoc SchemaBuilder.validate}
      */
     public validate(
         object: TResult,
@@ -412,7 +412,7 @@ export class TupleSchemaBuilder<
     }
 
     /**
-     * Performs asynchronous validation of the schema over `object`. {@inheritDoc SchemaBuilder.validateAsync}
+     * {@inheritDoc SchemaBuilder.validateAsync}
      */
     public async validateAsync(
         object: TResult,

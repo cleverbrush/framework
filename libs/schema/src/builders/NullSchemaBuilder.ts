@@ -21,8 +21,8 @@ type NullSchemaBuilderCreateProps<R extends boolean = true> = Partial<
  * in a typed schema, for example in discriminated-union branches or when
  * modelling a JSON payload that may carry a JSON `null` value.
  *
- * **NOTE** this class is exported only to give opportunity to extend it
- * by inheriting. It is not recommended to create an instance of this class
+ * **NOTE** this class is exported for type annotations and advanced use.
+ * Customize via extensions rather than subclassing. Avoid instantiating it
  * directly. Use {@link nul | nul()} function instead.
  *
  * @example
@@ -161,7 +161,6 @@ export class NullSchemaBuilder<
 
     /**
      * Performs synchronous validation of the schema over `object`.
-     * @param context Optional `ValidationContext` settings.
      */
     protected _validate(
         object: null,
@@ -172,7 +171,6 @@ export class NullSchemaBuilder<
 
     /**
      * Performs async validation of the schema over `object`.
-     * @param context Optional `ValidationContext` settings.
      */
     protected async _validateAsync(
         object: null,
