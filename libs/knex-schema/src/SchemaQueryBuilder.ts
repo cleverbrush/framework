@@ -13,6 +13,17 @@ import {
     getPrimaryKeyColumns,
     resolvePropertyKey
 } from './columns.js';
+import {
+    assertParametersBound,
+    COMPILE_PARAMETERS,
+    COMPILED_READER,
+    type CompiledReader,
+    copyParameterOrder,
+    finishParameterizedQuery,
+    readerParameters,
+    shareParameterCompilation,
+    unwrapParameterizedQuery
+} from './compiled-query.js';
 import type { RelationInfo, SchemaProps } from './entity.js';
 import {
     type AggregateExpression,
@@ -36,11 +47,22 @@ import type { ScopesOf } from './operations/helpers.js';
 import { getQuerySourceCtor } from './operations/helpers.js';
 import { getState } from './operations/state.js';
 import { PolymorphicQueryBuilder } from './PolymorphicQueryBuilder.js';
+import type {
+    AttachParameters,
+    CheckParameterState,
+    ParameterReader,
+    ParameterState,
+    ParametersOf,
+    QueryView,
+    WithoutParameters
+} from './parameter-types.js';
 import { QuerySource } from './QuerySource.js';
 import type { ReadRelations, ReadVariantMetadata } from './read-entity.js';
 import {
+    bindReadPredicate,
     captureReadRaw,
     captureValue,
+    predicateParameters,
     type ReadPredicate,
     type ReadPredicateContext,
     type ReadPredicateSelector,
@@ -204,6 +226,26 @@ export type ReadCorrelation = (
     source: ReadObject
 ) => void;
 
+/** @internal Fluent return constructor, also specialized by ORM readers. */
+export interface TableParameterReader<
+    S extends ReadObject,
+    Row extends ReadObject,
+    Relations extends Record<string, RelationInfo>,
+    Writable extends boolean
+> extends ParameterReader {
+    readonly result: QueryView<
+        SchemaQueryBuilder<
+            S,
+            Row,
+            Relations,
+            Writable,
+            this['parameters'] extends ParameterState
+                ? this['parameters']
+                : never
+        >
+    >;
+}
+
 /**
  * Immutable table query whose row schema follows its decoded selection and relations.
  * Configuration returns independent lazy builders; metadata access never executes SQL.
@@ -213,8 +255,13 @@ export class SchemaQueryBuilder<
     S extends ReadObject,
     Row extends ReadObject = ObjectReadSchema<S, keyof ReadRelations<S>>,
     Relations extends Record<string, RelationInfo> = ReadRelations<S>,
-    Writable extends boolean = true
-> extends ReadPredicates<ReadColumns<S, keyof Relations>> {
+    Writable extends boolean = true,
+    P extends ParameterState = []
+> extends ReadPredicates<
+    ReadColumns<S, keyof Relations>,
+    P,
+    TableParameterReader<S, Row, Relations, Writable>
+> {
     /** @internal Nominal identity for typed child-query customizers. */
     declare readonly [READ_QUERY]: true;
     private declare readonly writable: Writable;
@@ -226,6 +273,8 @@ export class SchemaQueryBuilder<
     private grouped = false;
     private distinctRows = false;
     private defaults?: Knex.QueryBuilder;
+    private predicates: readonly ReadPredicate[] = [];
+    private defaultPredicates: readonly ReadPredicate[] = [];
     private skipDefaults = false;
     private deleted: 'exclude' | 'include' | 'only' = 'exclude';
     private readonly columns: Record<string, ReadColumn<any>>;
@@ -269,10 +318,10 @@ export class SchemaQueryBuilder<
         if (typeof defaultScope === 'function') {
             const scope = this.copy();
             scope.base = knex.queryBuilder();
-            this.defaults = this.checkScope(
-                scope,
-                defaultScope(scope)
-            ).base.clone();
+            const configured = this.checkScope(scope, defaultScope(scope));
+            assertParametersBound(configured);
+            this.defaults = configured.base.clone();
+            this.defaultPredicates = configured.predicates;
         }
     }
 
@@ -323,11 +372,13 @@ export class SchemaQueryBuilder<
             fields: { ...this.fields },
             loaded: [...this.loaded]
         });
+        copyParameterOrder(this, copy);
         return copy;
     }
 
     /** @internal Prevent customizers from substituting an unrelated query source. */
     sameSource(other: unknown): boolean {
+        other = unwrapParameterizedQuery(other);
         return (
             other instanceof SchemaQueryBuilder &&
             this.columns === other.columns
@@ -371,6 +422,7 @@ export class SchemaQueryBuilder<
     }
 
     private checkScope(input: this, result: unknown): this {
+        result = unwrapParameterizedQuery(result);
         if (
             !(result instanceof SchemaQueryBuilder) ||
             !input.sameSource(result) ||
@@ -389,11 +441,19 @@ export class SchemaQueryBuilder<
         }
         // The runtime checks above preserve this query's shape; instanceof
         // alone cannot recover its schema and relation type parameters.
+        if (
+            readerParameters(result).some(
+                use => !readerParameters(input).includes(use)
+            )
+        )
+            throw new ReadSchemaError(
+                'Schema scopes cannot introduce query parameters'
+            );
         return result as unknown as this;
     }
 
     /** Apply a named, synchronous shape-preserving scope once to an independent query. */
-    scoped(name: ScopesOf<S>): this {
+    scoped(name: ScopesOf<S>): QueryView<this> {
         const scope = (
             this.source.introspect().extensions?.scopes as
                 | Record<string, Function>
@@ -401,28 +461,30 @@ export class SchemaQueryBuilder<
         )?.[name];
         if (!scope) throw new ReadSchemaError(`Unknown scope: ${name}`);
         const copy = this.copy();
-        return this.checkScope(copy, scope(copy));
+        return finishParameterizedQuery(
+            this.checkScope(copy, scope(copy))
+        ) as any;
     }
 
     /** Exclude only the default scope; keep explicitly configured predicates. */
-    unscoped(): this {
+    unscoped(): QueryView<this> {
         const copy = this.copy();
         copy.skipDefaults = true;
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /** Include soft-deleted rows without changing the source query. */
-    withDeleted(): this {
+    withDeleted(): QueryView<this> {
         const copy = this.copy();
         copy.deleted = 'include';
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /** Match only soft-deleted rows. */
-    onlyDeleted(): this {
+    onlyDeleted(): QueryView<this> {
         const copy = this.copy();
         copy.deleted = 'only';
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /** True only when rows retain their complete entity shape. */
@@ -432,6 +494,7 @@ export class SchemaQueryBuilder<
 
     /** @internal Reject writes through projections or loaded relations. */
     assertWritable(): void {
+        assertParametersBound(this);
         if (!this.returnsEntityRows || this.loaded.length)
             throw new ReadSchemaError(
                 'Writes require an unprojected table query without relations or aggregation'
@@ -439,7 +502,8 @@ export class SchemaQueryBuilder<
     }
 
     /** @internal Build an independent statement containing defaults and explicit filters. */
-    private filtered(): Knex.QueryBuilder {
+    private filtered(mode?: typeof COMPILE_PARAMETERS): Knex.QueryBuilder {
+        assertParametersBound(this, mode);
         const query = this.base.clone();
         const explicitWhere = (query as any)._statements.filter(
             (statement: any) => statement.grouping === 'where'
@@ -462,14 +526,20 @@ export class SchemaQueryBuilder<
                 ...defaults._single,
                 ...(query as any)._single
             };
-            if (where.length)
+            if (where.length || this.defaultPredicates.length)
                 query.where(nested => {
                     (nested as any)._statements = [...where];
+                    for (const predicate of this.defaultPredicates)
+                        predicate(nested);
                 });
         }
         if (explicitWhere.length)
             query.where(nested => {
                 (nested as any)._statements = [...explicitWhere];
+            });
+        if (this.predicates.length)
+            query.where(nested => {
+                for (const predicate of this.predicates) predicate(nested);
             });
         const softDelete = this.source.introspect().extensions?.softDelete as
             | { column: string }
@@ -645,28 +715,34 @@ export class SchemaQueryBuilder<
             | K
             | ((columns: ReadColumns<S, keyof Relations>) => ReadColumn<any, K>)
         >
-    ): SchemaQueryBuilder<
-        S,
-        ObjectSchemaBuilder<Pick<SchemaProps<ObjectReadSchema<S>>, K>>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ObjectSchemaBuilder<Pick<SchemaProps<ObjectReadSchema<S>>, K>>,
+            Relations,
+            false,
+            P
+        >
     >;
     /** Select named output fields and aggregates, replacing the previous scalar projection. */
-    select<P extends Selection>(
-        selector: (columns: ReadColumns<S, keyof Relations>) => P
-    ): SchemaQueryBuilder<
-        S,
-        ObjectSchemaBuilder<
-            MergeProps<
-                SchemaProps<ReadProjection<P>>,
-                Pick<
-                    SchemaProps<Row>,
-                    Extract<keyof SchemaProps<Row>, keyof Relations>
+    select<Selected extends Selection>(
+        selector: (columns: ReadColumns<S, keyof Relations>) => Selected
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ObjectSchemaBuilder<
+                MergeProps<
+                    SchemaProps<ReadProjection<Selected>>,
+                    Pick<
+                        SchemaProps<Row>,
+                        Extract<keyof SchemaProps<Row>, keyof Relations>
+                    >
                 >
-            >
-        >,
-        Relations,
-        false
+            >,
+            Relations,
+            false,
+            P
+        >
     >;
     select(...selectors: any[]): any {
         const selections = selectors.map(selector =>
@@ -713,17 +789,20 @@ export class SchemaQueryBuilder<
         for (const relation of copy.loaded)
             copy.fields[relation.name] = this.fields[relation.name];
         Object.assign(copy, { rowSchema: copy.schema() });
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /** Select a typed COUNT result on a new query. */
     count(
         column?: ReadPredicateSelector<ReadColumns<S, keyof Relations>>
-    ): SchemaQueryBuilder<
-        S,
-        ReadProjection<{ count: AggregateExpression<number> }>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ReadProjection<{ count: AggregateExpression<number> }>,
+            Relations,
+            false,
+            P
+        >
     > {
         return this.select(() => ({
             count: createAggregate<number>(
@@ -735,11 +814,14 @@ export class SchemaQueryBuilder<
     /** Select a typed COUNTDISTINCT result on a new query. */
     countDistinct(
         column: ReadPredicateSelector<ReadColumns<S, keyof Relations>>
-    ): SchemaQueryBuilder<
-        S,
-        ReadProjection<{ countDistinct: AggregateExpression<number> }>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ReadProjection<{ countDistinct: AggregateExpression<number> }>,
+            Relations,
+            false,
+            P
+        >
     > {
         return this.select(() => ({
             countDistinct: createAggregate<number>(
@@ -751,11 +833,14 @@ export class SchemaQueryBuilder<
     /** Select a typed SUM result on a new query. */
     sum(
         column: ReadPredicateSelector<ReadColumns<S, keyof Relations>>
-    ): SchemaQueryBuilder<
-        S,
-        ReadProjection<{ sum: AggregateExpression<string | null> }>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ReadProjection<{ sum: AggregateExpression<string | null> }>,
+            Relations,
+            false,
+            P
+        >
     > {
         return this.select(() => ({
             sum: createAggregate<string | null>(
@@ -767,11 +852,14 @@ export class SchemaQueryBuilder<
     /** Select a typed AVG result on a new query. */
     avg(
         column: ReadPredicateSelector<ReadColumns<S, keyof Relations>>
-    ): SchemaQueryBuilder<
-        S,
-        ReadProjection<{ avg: AggregateExpression<string | null> }>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ReadProjection<{ avg: AggregateExpression<string | null> }>,
+            Relations,
+            false,
+            P
+        >
     > {
         return this.select(() => ({
             avg: createAggregate<string | null>(
@@ -783,15 +871,18 @@ export class SchemaQueryBuilder<
     /** Select a typed MIN result on a new query. */
     min<C extends ReadPredicateSelector<ReadColumns<S, keyof Relations>>>(
         column: C
-    ): SchemaQueryBuilder<
-        S,
-        ReadProjection<{
-            min: AggregateExpression<
-                SelectedValue<ReadColumns<S, keyof Relations>, C>
-            >;
-        }>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ReadProjection<{
+                min: AggregateExpression<
+                    SelectedValue<ReadColumns<S, keyof Relations>, C>
+                >;
+            }>,
+            Relations,
+            false,
+            P
+        >
     > {
         return this.select(() => ({
             min: createAggregate<
@@ -802,15 +893,18 @@ export class SchemaQueryBuilder<
     /** Select a typed MAX result on a new query. */
     max<C extends ReadPredicateSelector<ReadColumns<S, keyof Relations>>>(
         column: C
-    ): SchemaQueryBuilder<
-        S,
-        ReadProjection<{
-            max: AggregateExpression<
-                SelectedValue<ReadColumns<S, keyof Relations>, C>
-            >;
-        }>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ReadProjection<{
+                max: AggregateExpression<
+                    SelectedValue<ReadColumns<S, keyof Relations>, C>
+                >;
+            }>,
+            Relations,
+            false,
+            P
+        >
     > {
         return this.select(() => ({
             max: createAggregate<
@@ -820,40 +914,47 @@ export class SchemaQueryBuilder<
     }
 
     /** Keep only distinct selected rows, preserving the row schema. */
-    distinct(): SchemaQueryBuilder<S, Row, Relations, false>;
+    distinct(): QueryView<SchemaQueryBuilder<S, Row, Relations, false, P>>;
     /** Select a property subset and eliminate duplicate rows on that immutable projection. */
     distinct<K extends keyof ReadColumns<S, keyof Relations> & string>(
         ...columns: Array<
             | K
             | ((columns: ReadColumns<S, keyof Relations>) => ReadColumn<any, K>)
         >
-    ): SchemaQueryBuilder<
-        S,
-        ObjectSchemaBuilder<Pick<SchemaProps<ObjectReadSchema<S>>, K>>,
-        Relations,
-        false
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ObjectSchemaBuilder<Pick<SchemaProps<ObjectReadSchema<S>>, K>>,
+            Relations,
+            false,
+            P
+        >
     >;
     distinct(...columns: any[]): any {
-        const copy = columns.length ? this.select(...columns) : this.copy();
+        const copy = (
+            columns.length
+                ? unwrapParameterizedQuery(this.select(...columns))
+                : this.copy()
+        ) as this;
         copy.distinctRows = true;
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Filter grouped results using trusted SQL and captured bindings. */
     havingRaw(
         sql: string,
         bindings: readonly Knex.RawBinding[] = []
-    ): SchemaQueryBuilder<S, Row, Relations, false> {
+    ): QueryView<SchemaQueryBuilder<S, Row, Relations, false, P>> {
         const copy = this.copy();
         copy.base.havingRaw(captureReadRaw(this.knex, sql, bindings)());
         copy.grouped = true;
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Filter groups by a mapped column comparison. */
-    having(
+    having<V>(
         column: ReadPredicateSelector<ReadColumns<S, keyof Relations>>,
         operator: string,
-        value: unknown
-    ): SchemaQueryBuilder<S, Row, Relations, false> {
+        value: V & WithoutParameters<NoInfer<V>>
+    ): QueryView<SchemaQueryBuilder<S, Row, Relations, false, P>> {
         const copy = this.copy();
         copy.base.having(
             this.name(this.column(column)),
@@ -861,36 +962,42 @@ export class SchemaQueryBuilder<
             captureValue(this.knex, value)()
         );
         copy.grouped = true;
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Group using trusted SQL without changing the explicit projection. */
-    groupByRaw(
+    groupByRaw<const A extends readonly Knex.RawBinding[]>(
         sql: string,
-        bindings: readonly Knex.RawBinding[] = []
-    ): SchemaQueryBuilder<S, Row, Relations, false> {
+        bindings: A & WithoutParameters<NoInfer<A>> = [] as any
+    ): QueryView<SchemaQueryBuilder<S, Row, Relations, false, P>> {
         const copy = this.copy();
         copy.base.groupByRaw(captureReadRaw(this.knex, sql, bindings)());
         copy.grouped = true;
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /** Apply a named schema projection with the same exact row-schema guarantees. */
     projected<K extends keyof NamedProjections<S> & string>(
         name: K
-    ): SchemaQueryBuilder<
-        S,
-        ObjectSchemaBuilder<
-            Pick<
-                SchemaProps<ObjectReadSchema<S>>,
-                Extract<NamedKeys<S, K>, keyof SchemaProps<ObjectReadSchema<S>>>
-            > &
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            ObjectSchemaBuilder<
                 Pick<
-                    SchemaProps<Row>,
-                    Extract<keyof SchemaProps<Row>, keyof Relations>
-                >
-        >,
-        Relations,
-        false
+                    SchemaProps<ObjectReadSchema<S>>,
+                    Extract<
+                        NamedKeys<S, K>,
+                        keyof SchemaProps<ObjectReadSchema<S>>
+                    >
+                > &
+                    Pick<
+                        SchemaProps<Row>,
+                        Extract<keyof SchemaProps<Row>, keyof Relations>
+                    >
+            >,
+            Relations,
+            false,
+            P
+        >
     > {
         const definition = getProjections(this.source)[name];
         if (!definition)
@@ -905,19 +1012,29 @@ export class SchemaQueryBuilder<
     protected readPredicateContext(): ReadPredicateContext<
         ReadColumns<S, keyof Relations>
     > {
+        const resolve = (
+            selector: ReadPredicateSelector<ReadColumns<S, keyof Relations>>
+        ) => {
+            const column = this.column(selector);
+            return {
+                column: this.name(column),
+                schema: column[READ_COLUMN].schema
+            };
+        };
         return {
             knex: this.knex,
-            column: selector => this.name(this.column(selector))
+            column: selector => resolve(selector).column,
+            resolve
         };
     }
     protected addReadPredicate(predicate: ReadPredicate): this {
         const copy = this.copy();
-        predicate(copy.base);
-        return copy;
+        copy.predicates = [...this.predicates, predicate];
+        return finishParameterizedQuery(copy);
     }
     /** @internal Apply an already captured Framework predicate to an independent query. */
-    withPredicate(predicate: ReadPredicate): this {
-        return this.addReadPredicate(predicate);
+    withPredicate(predicate: ReadPredicate): QueryView<this> {
+        return this.addReadPredicate(predicate) as any;
     }
     /** @internal Native storage columns for composing CTI table sources. */
     storageQuery(): Knex.QueryBuilder {
@@ -927,42 +1044,45 @@ export class SchemaQueryBuilder<
     orderBy(
         column: ReadPredicateSelector<ReadColumns<S, keyof Relations>>,
         direction: 'asc' | 'desc' = 'asc'
-    ): this {
+    ): QueryView<this> {
         const copy = this.copy();
         copy.base.orderBy(this.name(this.column(column)), direction);
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Append trusted raw ordering with captured positional bindings; ref() supplies quoted columns. */
-    orderByRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): this {
+    orderByRaw<const A extends readonly Knex.RawBinding[]>(
+        sql: string,
+        bindings: A & WithoutParameters<NoInfer<A>> = [] as any
+    ): QueryView<this> {
         const captured = captureReadRaw(this.knex, sql, bindings);
         const copy = this.copy();
         copy.base.orderByRaw(captured());
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Group rows before typed aggregate projection. */
     groupBy(
         ...columns: ReadPredicateSelector<ReadColumns<S, keyof Relations>>[]
-    ): SchemaQueryBuilder<S, Row, Relations, false> {
+    ): QueryView<SchemaQueryBuilder<S, Row, Relations, false, P>> {
         const copy = this.copy();
         copy.base.groupBy(columns.map(c => this.name(this.column(c))));
         copy.grouped = true;
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Limit parent rows; relation limits apply independently within each parent. */
-    limit(count: number): this {
+    limit(count: number): QueryView<this> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Limit must be a non-negative integer');
         const copy = this.copy();
         copy.base.limit(count);
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Skip parent rows; use a deterministic order for pagination. */
-    offset(count: number): this {
+    offset(count: number): QueryView<this> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Offset must be a non-negative integer');
         const copy = this.copy();
         copy.base.offset(count);
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /**
@@ -974,17 +1094,29 @@ export class SchemaQueryBuilder<
         Child extends ReadQueryShape = SchemaAwareQuery<Related<Relations[K]>>
     >(
         selector: K | ((relations: { [P in keyof Relations]: P }) => K),
-        customize?: (query: SchemaAwareQuery<Related<Relations[K]>>) => Child
-    ): SchemaQueryBuilder<
-        S,
-        AddField<
-            Row,
-            K,
-            RelationField<Relations[K], Child['rowSchema']>,
-            Relations
-        >,
-        Relations,
-        false
+        customize?: (
+            query: SchemaAwareQuery<Related<Relations[K]>>
+        ) => Child &
+            CheckParameterState<
+                AttachParameters<
+                    P,
+                    ParametersOf<NoInfer<Child>>,
+                    `relation:${K}`
+                >
+            >
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            AddField<
+                Row,
+                K,
+                RelationField<Relations[K], Child['rowSchema']>,
+                Relations
+            >,
+            Relations,
+            false,
+            AttachParameters<P, ParametersOf<Child>, `relation:${K}`>
+        >
     > {
         if (Object.values(this.fields).some(f => f.aggregate) || this.grouped)
             throw new ReadSchemaError(
@@ -1033,7 +1165,7 @@ export class SchemaQueryBuilder<
                     'Relation customizer must return its configured read query'
                 );
             }
-            child = customized as any;
+            child = unwrapParameterizedQuery(customized) as any;
         }
         return child;
     }
@@ -1090,18 +1222,18 @@ export class SchemaQueryBuilder<
             }
         };
         Object.assign(copy, { rowSchema: copy.schema() });
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /** @internal Reuse a captured child query across polymorphic parent branches. */
     includeFrom(
         name: string,
         prepared: SchemaQueryBuilder<any, any, any, boolean>
-    ): this {
+    ): QueryView<this> {
         const loaded = prepared.loaded.find(relation => relation.name === name);
         if (!loaded)
             throw new ReadSchemaError(`Unknown prepared relation: ${name}`);
-        return this.load(loaded.relation, loaded.query, loaded.required);
+        return this.load(loaded.relation, loaded.query, loaded.required) as any;
     }
 
     /** Join one typed nested object with explicit property keys, including nullable joins. */
@@ -1112,18 +1244,30 @@ export class SchemaQueryBuilder<
         Child extends ReadQueryShape = SchemaAwareQuery<F>
     >(
         spec: Omit<JoinOneSpec<S, F, K, Required>, 'foreignQuery' | 'mappers'>,
-        customize?: (query: SchemaAwareQuery<F>) => Child
-    ): SchemaQueryBuilder<
-        S,
-        AddField<
-            Row,
-            K,
-            Required extends true
-                ? Child['rowSchema']
-                : SchemaForValue<InferType<Child['rowSchema']> | null>
-        >,
-        Relations & Record<K, RelationInfo<'hasOne', F>>,
-        false
+        customize?: (
+            query: SchemaAwareQuery<F>
+        ) => Child &
+            CheckParameterState<
+                AttachParameters<
+                    P,
+                    ParametersOf<NoInfer<Child>>,
+                    `relation:${K}`
+                >
+            >
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            AddField<
+                Row,
+                K,
+                Required extends true
+                    ? Child['rowSchema']
+                    : SchemaForValue<InferType<Child['rowSchema']> | null>
+            >,
+            Relations & Record<K, RelationInfo<'hasOne', F>>,
+            false,
+            AttachParameters<P, ParametersOf<Child>, `relation:${K}`>
+        >
     > {
         if ('foreignQuery' in spec || 'mappers' in spec)
             throw new ReadSchemaError(
@@ -1160,12 +1304,24 @@ export class SchemaQueryBuilder<
             JoinManySpec<S, F, K>,
             'orderBy' | 'foreignQuery' | 'mappers'
         >,
-        customize?: (query: SchemaAwareQuery<F>) => Child
-    ): SchemaQueryBuilder<
-        S,
-        AddField<Row, K, ArraySchemaBuilder<Child['rowSchema']>>,
-        Relations & Record<K, RelationInfo<'hasMany', F>>,
-        false
+        customize?: (
+            query: SchemaAwareQuery<F>
+        ) => Child &
+            CheckParameterState<
+                AttachParameters<
+                    P,
+                    ParametersOf<NoInfer<Child>>,
+                    `relation:${K}`
+                >
+            >
+    ): QueryView<
+        SchemaQueryBuilder<
+            S,
+            AddField<Row, K, ArraySchemaBuilder<Child['rowSchema']>>,
+            Relations & Record<K, RelationInfo<'hasMany', F>>,
+            false,
+            AttachParameters<P, ParametersOf<Child>, `relation:${K}`>
+        >
     > {
         if ('foreignQuery' in spec || 'mappers' in spec || 'orderBy' in spec)
             throw new ReadSchemaError(
@@ -1215,8 +1371,11 @@ export class SchemaQueryBuilder<
     }
 
     /** @internal Compile a bound SQL statement; callers never receive the mutable builder. */
-    compile(correlate?: ReadCorrelation): Knex.QueryBuilder {
-        const query = this.filtered().clearSelect();
+    compile(
+        correlate?: ReadCorrelation,
+        mode?: typeof COMPILE_PARAMETERS
+    ): Knex.QueryBuilder {
+        const query = this.filtered(mode).clearSelect();
         correlate?.(query, this.alias, this.source);
         const expressions: Record<string, Knex.Raw> = Object.create(null);
         for (const [key, field] of Object.entries(this.fields)) {
@@ -1286,7 +1445,7 @@ export class SchemaQueryBuilder<
                         `${childTable}.${resolveKey(childSource, foreignKey)}`,
                         this.knex.ref(`${parentTable}.${parentPk[0]}`)
                     );
-            });
+            }, mode);
             const many =
                 relation.type === 'hasMany' ||
                 relation.type === 'belongsToMany';
@@ -1490,7 +1649,9 @@ export class SchemaQueryBuilder<
     }
     /** Execute a limited copy, returning undefined when no row matches. */
     async first(): Promise<InferType<Row> | undefined> {
-        return (await this.limit(1).execute())[0];
+        return (
+            await (unwrapParameterizedQuery(this.limit(1)) as this).execute()
+        )[0];
     }
     /** Awaiting executes the query; repeated awaits deliberately execute again. */
     // biome-ignore lint/suspicious/noThenProperty: query readers intentionally support await
@@ -1501,15 +1662,51 @@ export class SchemaQueryBuilder<
         return this.execute().then(resolve, reject);
     }
     /** Bind an independent query graph to a caller-owned transaction. */
-    transacting(trx: Knex.Transaction): this {
+    transacting(trx: Knex.Transaction): QueryView<this> {
         const copy = this.copy();
         copy.base.transacting(trx);
         Object.assign(copy, { knex: trx });
         copy.loaded = this.loaded.map(r => ({
             ...r,
-            query: r.query.transacting(trx)
+            query: unwrapParameterizedQuery(r.query.transacting(trx)) as any
         }));
-        return copy;
+        shareParameterCompilation(this, copy);
+        return finishParameterizedQuery(copy) as any;
+    }
+
+    /** @internal Compiled SELECT protocol; never replays consumer callbacks. */
+    [COMPILED_READER](): CompiledReader {
+        const nodes = Object.fromEntries(
+            Object.entries(this.fields).map(([key, field]) => [key, field.node])
+        );
+        const checkOrphan =
+            this.source.introspect().extensions?.readOrphanColumn;
+        return {
+            knex: this.knex,
+            uses: [
+                ...predicateParameters(this.predicates),
+                ...this.loaded.flatMap(r => readerParameters(r.query))
+            ],
+            compile: () => this.compile(undefined, COMPILE_PARAMETERS),
+            decode: row => {
+                if (checkOrphan && (row as any).__read_cti_present == null)
+                    throw new ReadSchemaError('row: missing CTI variant body');
+                return decodeObject(nodes, row, 'row');
+            },
+            bind: values => {
+                const copy = this.copy();
+                copy.predicates = this.predicates.map(predicate =>
+                    bindReadPredicate(predicate, values)
+                );
+                copy.loaded = this.loaded.map(relation => ({
+                    ...relation,
+                    query: relation.query[COMPILED_READER]().bind(
+                        values
+                    ) as AnyReadQuery
+                }));
+                return finishParameterizedQuery(copy);
+            }
+        };
     }
     /**
      * Read a lossless composite cursor page using native SQL ordering. Cursor sort
@@ -1635,9 +1832,11 @@ export class SchemaQueryBuilder<
             throw new ReadSchemaError(
                 'Pagination count exceeds the safe integer range'
             );
-        const data = await this.offset((page - 1) * pageSize)
-            .limit(pageSize)
-            .execute();
+        const data = await (
+            unwrapParameterizedQuery(
+                this.offset((page - 1) * pageSize).limit(pageSize)
+            ) as this
+        ).execute();
         const totalPages = Math.ceil(total / pageSize);
         return {
             data,

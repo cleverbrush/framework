@@ -1,5 +1,5 @@
 // Checked JavaScript consumers must retain the same declaration origins as TS.
-import { query } from '@cleverbrush/knex-schema';
+import { parameter, query } from '@cleverbrush/knex-schema';
 import { mapper } from '@cleverbrush/mapper';
 import { useSchemaForm } from '@cleverbrush/react-form';
 import Knex from 'knex';
@@ -32,3 +32,14 @@ const form = useSchemaForm(Plain);
 form.useField(t => t./*form-field*/ name);
 form.useField(t => t.tags[0]./*form-array*/ label);
 db.users.include(t => t./*orm-include*/ department);
+
+const findByName = read.where(t => t./*where*/ firstName, parameter('name'));
+findByName.where(group =>
+    group.where(t => t./*where*/ firstName, parameter('name'))
+);
+(await findByName('John'))[0]./*read-row*/ firstName;
+const findEntity = db.users.where(
+    t => t./*orm-where*/ firstName,
+    parameter('name')
+);
+(await findEntity('John'))[0]./*orm-row*/ firstName;

@@ -160,6 +160,11 @@ export class AliasedQuerySource<TTables, TResult = never> {
         return { knex: this.knex, sql: this.sql.clone(), columns: this.tree() };
     }
 
+    /** @internal Connection access without cloning the query planner. */
+    readConnection(): Knex {
+        return this.knex;
+    }
+
     /**
      * Create a read-only query for one aliased schema.
      * Prefer query(knex, alias(schema, name)) so the table-context type is inferred.

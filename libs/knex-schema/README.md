@@ -202,6 +202,124 @@ Available WHERE methods: `where`, `andWhere`, `orWhere`, `whereNot`, `whereIn`, 
 
 ---
 
+## Parameterized compiled queries
+
+Use `parameter('name')` in a typed predicate to make a query callable. Call it
+with values to execute a SELECT, use `.query(...)` to get an independent bound
+reader, or `.toSQL(...)` to inspect SQL and bindings without execution.
+
+```ts
+import { number, object, parameter, query, string } from '@cleverbrush/knex-schema';
+
+const User = object({
+    id: number().primaryKey(),
+    firstName: string().hasColumnName('first_name'),
+    lastName: string().hasColumnName('last_name'),
+    age: number()
+}).hasTableName('users');
+
+// One numeric argument, inferred from User.id.
+const findUser = query(knex, User).where(t => t.id, parameter('id'));
+const first = await findUser(10);
+const second = await findUser(20);
+
+// Two arguments in first-appearance order: string, number.
+const findUsers = query(knex, User)
+    .where(t => t.firstName, parameter('firstName'))
+    .where(t => t.age, '>=', parameter('minimumAge'));
+const users = await findUsers('John', 18);
+
+// Three arguments; constants do not add arguments.
+const inAgeRange = query(knex, User)
+    .where(t => t.id, '>', 0)
+    .where(t => t.firstName, parameter('name'))
+    .whereBetween(t => t.age, [parameter('minimum'), parameter('maximum')]);
+const matches = await inAgeRange('Jane', 18, 65);
+
+// Repeated names share one argument, including inside groups.
+const byName = query(knex, User).where(p => p
+    .where(t => t.firstName, parameter('name'))
+    .orWhere(t => t.lastName, parameter('name')));
+const names = await byName('John');
+
+// Fixed membership tuples retain a fixed SQL shape.
+const byIds = query(knex, User)
+    .whereIn(t => t.id, [parameter('first'), parameter('second')]);
+const pair = await byIds(10, 20);
+```
+
+The first direct call or `.toSQL(...)` compiles the SQL and caches its binding
+slots and result decoder. Later calls reuse them without rebuilding the query
+or rerunning selectors, groups, relation customizers, or variant customizers.
+Every invocation executes against the database; results are not cached. Each
+call receives independent bindings, including copies of dates and JSON values.
+
+```ts
+const { sql, bindings } = findUsers.toSQL('John', 18); // warm without executing
+const bound = findUsers.query('John', 18);            // bind without executing
+const oldest = await bound.orderBy(t => t.age, 'desc').limit(10).execute();
+const debugSql = bound.toQuery();
+
+const firstTen = findUsers.limit(10).select(t => ({ id: t.id }));
+const ids = await firstTen('John', 18); // { id: number }[]; independent SQL cache
+
+await knex.transaction(async trx => {
+    const rows = await findUsers.transacting(trx)('John', 18);
+});
+```
+
+`.query(...)` retains ordinary composition, terminals, and permitted writes;
+this optional path uses normal query-building machinery. It never changes the
+template or another bound reader. Transaction derivatives from the same Knex
+client share compiled SQL and use the caller's transaction without committing
+or rolling it back. A different client configuration gets an independent plan.
+
+Parameters also work with flat alias joins, relation includes, and STI/CTI
+variants. A child's distinct parameter names enter the parent's argument list
+when that child is configured. Repeated names across the graph share an argument.
+Removing a variant removes arguments used only by that variant; surviving names
+keep their order.
+
+```ts
+const findProjects = query(knex, ProjectEntity.schema)
+    .include(t => t.tasks, tasks => tasks
+        .where(t => t.title, parameter('title')))
+    .where(t => t.id, parameter('projectId'));
+const projects = await findProjects('Review', 10);
+
+const findAssets = query(knex, AssetEntity.schema)
+    .forVariant('photo', photos => photos
+        .where(t => t.width, '>=', parameter('minimumWidth')))
+    .where(t => t.id, '>=', parameter('minimumId'));
+const assets = await findAssets(640, 1);
+```
+
+Names must be non-empty string literals. Missing/extra arguments, incorrect
+value types, and incompatible reuse of one name are type errors. JavaScript
+callers also receive runtime arity and storage-type checks before execution.
+Types follow stored values: exact decimal/bigint fields take strings, timestamps
+take valid `Date` objects, and optional/nullable columns allow `null`, never
+`undefined`. Input defaults and preprocessors are not replayed.
+
+Nullable predicates preserve ordinary Knex semantics: shorthand
+`where(t => t.age, parameter('age'))` with `null` matches SQL null, while an
+explicit operator such as `where(t => t.age, '=', parameter('age'))` keeps that
+operator's SQL null semantics. A single compiled statement handles both null
+and non-null arguments.
+
+This API supports PostgreSQL SELECTs with fixed SQL shapes. Placeholders belong
+in schema-backed scalar comparisons, `whereNot`, LIKE helpers on string fields,
+ranges, or fixed membership tuples. Use `.whereIn(column, [parameter('id'), ...])`
+for membership; a parameter cannot stand for a variable-length list. Placeholders
+are not supported in raw SQL/bindings, object-form filters, JSON-path comparisons,
+schema scopes, pagination controls, operators, identifiers, or mutations.
+
+An unbound template is callable, not thenable: `await template` does not execute.
+Parameterless terminals, writes and SQL escape hatches are unavailable until
+values are bound. SQL inspection uses `?` value placeholders and separate
+bindings; normal execution uses the PostgreSQL driver's bindings. This caches
+application-side SQL compilation, not named server-side prepared statements.
+
 ## Ordering, Pagination, Grouping
 
 ```typescript

@@ -247,6 +247,32 @@ for scoped search, subquery snapshots, pagination, and raw-SQL boundaries.
 
 ---
 
+## Parameterized compiled reads
+
+`parameter` is re-exported by `@cleverbrush/orm`. Adding a named placeholder to
+a DbSet query creates a callable SELECT with schema-inferred positional arguments:
+
+```ts
+import { parameter } from '@cleverbrush/orm';
+
+const findUsers = db.users
+    .where(t => t.name, parameter('name'))
+    .where(t => t.id, '>=', parameter('minimumId'));
+const users = await findUsers('John', 10);
+const sql = findUsers.toSQL('Jane', 20); // inspect without execution
+const one = await findUsers.query('John', 10).find(10);
+```
+
+SQL compiles once on the first direct call or SQL inspection. Complete entity
+rows participate in the context's identity map exactly as ordinary reads do;
+projections remain detached. Bound readers retain ORM lookup helpers and
+permitted mutation methods. Unbound templates cannot execute parameterless
+terminals or writes. `ofVariant(...)` views support the same callable behavior.
+
+See [parameterized compiled queries](../knex-schema/README.md#parameterized-compiled-queries)
+for argument ordering, null semantics, relation/variant parameters, transactions,
+and the supported PostgreSQL SELECT shapes.
+
 ## Polymorphic entities (STI / CTI)
 
 ### Single-Table Inheritance (STI)

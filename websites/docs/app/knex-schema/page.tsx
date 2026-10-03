@@ -413,6 +413,49 @@ const rows = await read.where(t => t.id, taskId);`)
                     </a>
                 </div>
 
+                <div className="card" id="compiled-queries">
+                    <h2>Parameterized compiled queries</h2>
+                    <p>
+                        Add a named parameter to make a PostgreSQL SELECT
+                        callable. Argument types come from the selected schema
+                        properties, in the order their names first appear.
+                        Repeated names share one argument.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`import { parameter, query } from '@cleverbrush/knex-schema';
+
+const findUser = query(knex, UserSchema)
+    .where(t => t.id, parameter('id'));
+const users = await findUser(10);
+
+const search = query(knex, UserSchema)
+    .where(t => t.firstName, parameter('name'))
+    .where(t => t.age, '>=', parameter('minimumAge'));
+await search('John', 18);
+await search('Jane', 30);
+
+const sql = search.toSQL('John', 18); // inspect without executing
+const bound = search.query('John', 18);
+await bound.orderBy(t => t.age).limit(10);`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        The first call or SQL inspection caches SQL, binding
+                        slots and decoding. Later calls bind fresh values and
+                        execute again. Bound readers compose independently;
+                        template derivatives own their compiled statements.
+                        Relations, aliases, variants and caller-owned
+                        transactions are supported.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#parameterized-compiled-queries">
+                        Examples, null semantics and supported parameter
+                        positions
+                    </a>
+                </div>
+
                 <div className="card" id="read-predicates">
                     <h2>Filtering and ordering schema-aware reads</h2>
                     <p>

@@ -540,6 +540,21 @@ npx cb-orm db push`
                 <div className="card">
                     <h2>Reliable query composition</h2>
                     <p>
+                        Named parameters make DbSet reads callable: use{' '}
+                        <code>
+                            db.users.where(t =&gt; t.id, parameter('id'))
+                        </code>
+                        , then call the result with an ID. SQL compiles once;
+                        complete rows retain identity tracking and projections
+                        stay detached. Use <code>.query(...args)</code> for a
+                        bound ORM reader or <code>.toSQL(...args)</code> to
+                        inspect SQL. See{' '}
+                        <a href="/knex-schema#compiled-queries">
+                            compiled query examples
+                        </a>
+                        .
+                    </p>
+                    <p>
                         Eager loading retains parent ordering and page size.
                         Relation customization callbacks infer the foreign
                         schema. Scalar aggregate helpers accept optional output

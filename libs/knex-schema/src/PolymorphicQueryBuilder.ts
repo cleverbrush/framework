@@ -9,23 +9,53 @@ import {
 } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { buildColumnMap, getPrimaryKeyColumns } from './columns.js';
+import {
+    assertParametersBound,
+    COMPILE_PARAMETERS,
+    COMPILED_READER,
+    type CompiledReader,
+    copyParameterOrder,
+    finishParameterizedQuery,
+    readerParameters,
+    shareParameterCompilation,
+    unwrapParameterizedQuery
+} from './compiled-query.js';
 import type { SchemaProps } from './entity.js';
 import { type AliasedColumn, COLUMN } from './expressions.js';
 import { getTableName, getVariants } from './extension.js';
 import { OpaqueQuery, type QueryOutput } from './OpaqueQuery.js';
 import { privateColumn } from './operations/ordering.js';
 import type {
+    AttachParameters,
+    CheckParameterState,
+    CheckParameterValue,
+    MergeParameters,
+    ParameterReader,
+    ParameterState,
+    ParametersOf,
+    QueryView,
+    ScopedParameters,
+    SelectParameterVariants,
+    ValueParameters,
+    WithoutParameters
+} from './parameter-types.js';
+import type {
     EntityReadSchema,
     ReadRelations,
     ReadVariantMetadata
 } from './read-entity.js';
 import {
+    bindReadPredicate,
     captureReadRaw,
+    type PredicateValue,
+    predicateParameters,
     type ReadPredicate,
     type ReadPredicateContext,
+    type ReadPredicateSelector,
     ReadPredicates
 } from './read-predicates.js';
 import {
+    compileReadSchema,
     type ObjectReadSchema,
     type ReadObject,
     type ReadSchema,
@@ -123,14 +153,27 @@ type BranchSource<
     ObjectSchemaBuilder<BranchProps<S, K>>,
     ReadRelations<S> & ReadRelations<VariantBody<S, K>>
 >;
+type VariantRelationQuery<
+    S extends ReadObject,
+    K extends keyof VariantMap<S> & string,
+    R extends string
+> = R extends keyof ReadRelations<BranchSource<S, K>>
+    ? SchemaAwareQuery<Related<ReadRelations<BranchSource<S, K>>[R]>>
+    : SchemaQueryBuilder<any, any>;
+
 type BranchQueries<
     S extends ReadObject,
-    B extends Record<string, ReadObject>
+    B extends Record<string, ReadObject>,
+    P extends ParameterState = []
 > = {
-    [K in keyof B & keyof VariantMap<S> & string]: SchemaQueryBuilder<
-        BranchSource<S, K>,
-        B[K],
-        ReadRelations<S> & ReadRelations<VariantBody<S, K>>
+    [K in keyof B & keyof VariantMap<S> & string]: QueryView<
+        SchemaQueryBuilder<
+            BranchSource<S, K>,
+            B[K],
+            ReadRelations<S> & ReadRelations<VariantBody<S, K>>,
+            true,
+            ScopedParameters<P, `variant:${K}`>
+        >
     >;
 };
 type Selector<S extends ReadObject> = (
@@ -148,8 +191,13 @@ type PolymorphicOrder =
  */
 export class PolymorphicQueryBuilder<
     S extends ReadObject,
-    B extends Record<string, ReadObject> = VariantReadSchemas<S>
-> extends ReadPredicates<ReadColumns<S, keyof ReadRelations<S>>> {
+    B extends Record<string, ReadObject> = VariantReadSchemas<S>,
+    P extends ParameterState = []
+> extends ReadPredicates<
+    ReadColumns<S, keyof ReadRelations<S>>,
+    P,
+    PolymorphicParameterReader<S, B>
+> {
     /** @internal Nominal identity for typed child-query customizers. */
     declare readonly [READ_QUERY]: true;
     /** Runtime union matching decoded results, including selected variant bodies. */
@@ -158,9 +206,9 @@ export class PolymorphicQueryBuilder<
     readonly variantRowSchemas: Readonly<B>;
     private branches: Record<
         string,
-        SchemaQueryBuilder<any, any, any, boolean>
+        SchemaQueryBuilder<any, any, any, any, any>
     >;
-    private fallback: SchemaQueryBuilder<any, any, any, boolean>;
+    private fallback: SchemaQueryBuilder<any, any, any, any, any>;
     private orders: PolymorphicOrder[] = [];
     private rowLimit?: number;
     private rowOffset?: number;
@@ -220,7 +268,7 @@ export class PolymorphicQueryBuilder<
             buildColumnMap(source).propToCol.get(config.discriminatorKey) ??
             config.discriminatorKey;
         // Invert only the discriminator guard, not caller/default-scope filters.
-        this.fallback = new SchemaQueryBuilder<any, any, any, boolean>(
+        this.fallback = new SchemaQueryBuilder<any, any, any, any, any>(
             knex,
             common,
             knex
@@ -252,7 +300,7 @@ export class PolymorphicQueryBuilder<
         ) as unknown as PolymorphicRowSchema<B>;
         const scope = source.introspect().extensions?.defaultScope;
         if (typeof scope === 'function') {
-            const configured = scope(this.copy());
+            const configured = unwrapParameterizedQuery(scope(this.copy()));
             if (
                 !this.sameSource(configured) ||
                 configured.rowSchema !== this.rowSchema ||
@@ -272,6 +320,7 @@ export class PolymorphicQueryBuilder<
                 limit: configured.rowLimit,
                 offset: configured.rowOffset
             };
+            assertParametersBound(configured);
         }
     }
 
@@ -323,7 +372,7 @@ export class PolymorphicQueryBuilder<
     private branch(
         key: string,
         body: boolean
-    ): SchemaQueryBuilder<any, any, any, boolean> {
+    ): SchemaQueryBuilder<any, any, any, any, any> {
         const config = getVariants(this.source)!;
         const variant = config.variants[key];
         const baseInfo = this.source.introspect();
@@ -439,7 +488,7 @@ export class PolymorphicQueryBuilder<
                 '__read_cti_present'
             );
         }
-        return new SchemaQueryBuilder<any, any, any, boolean>(
+        return new SchemaQueryBuilder<any, any, any, any, any>(
             this.knex,
             schema,
             query.select(columns),
@@ -448,14 +497,21 @@ export class PolymorphicQueryBuilder<
     }
 
     private copy(): this {
-        return Object.assign(Object.create(Object.getPrototypeOf(this)), this, {
-            branches: { ...this.branches },
-            orders: [...this.orders]
-        });
+        const copy = Object.assign(
+            Object.create(Object.getPrototypeOf(this)),
+            this,
+            {
+                branches: { ...this.branches },
+                orders: [...this.orders]
+            }
+        );
+        copyParameterOrder(this, copy);
+        return copy;
     }
 
     /** @internal Check the identity of the original read source, retained by clones. */
     sameSource(other: unknown): boolean {
+        other = unwrapParameterizedQuery(other);
         return (
             other instanceof PolymorphicQueryBuilder &&
             this.base === other.base &&
@@ -476,53 +532,60 @@ export class PolymorphicQueryBuilder<
     protected readPredicateContext(): ReadPredicateContext<
         ReadColumns<S, keyof ReadRelations<S>>
     > {
+        const resolve: ReadPredicateContext<
+            ReadColumns<S, keyof ReadRelations<S>>
+        >['resolve'] = selector => {
+            const column =
+                typeof selector === 'string'
+                    ? this.columns[selector]
+                    : selector(this.columns as any);
+            if (!column || !Object.values(this.columns).includes(column))
+                throw new ReadSchemaError(
+                    'Column does not belong to this polymorphic query'
+                );
+            return {
+                column: `${this.predicateAlias}.${column[COLUMN].column}`,
+                schema: compileReadSchema(column[COLUMN].schema).schema
+            };
+        };
         return {
             knex: this.knex,
-            column: selector => {
-                const column =
-                    typeof selector === 'string'
-                        ? this.columns[selector]
-                        : selector(this.columns as any);
-                if (!column || !Object.values(this.columns).includes(column))
-                    throw new ReadSchemaError(
-                        'Column does not belong to this polymorphic query'
-                    );
-                return `${this.predicateAlias}.${column[COLUMN].column}`;
-            }
+            resolve,
+            column: selector => resolve(selector).column
         };
     }
     protected addReadPredicate(predicate: ReadPredicate): this {
         const copy = this.copy();
         copy.predicates = [...this.predicates, predicate];
-        return copy;
+        return finishParameterizedQuery(copy);
     }
     /** Remove the default scope while preserving explicit predicates. */
-    unscoped(): this {
+    unscoped(): QueryView<this> {
         const copy = this.copy();
         copy.skipDefaults = true;
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Include soft-deleted entities in every branch. */
-    withDeleted(): this {
+    withDeleted(): QueryView<this> {
         const copy = this.copy();
         copy.deleted = 'include';
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Match only soft-deleted entities in every branch. */
-    onlyDeleted(): this {
+    onlyDeleted(): QueryView<this> {
         const copy = this.copy();
         copy.deleted = 'only';
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Apply a named immutable scope once. */
-    scoped(name: string): this {
+    scoped(name: string): QueryView<this> {
         const scope = (
             this.source.introspect().extensions?.scopes as
                 | Record<string, Function>
                 | undefined
         )?.[name];
         if (!scope) throw new ReadSchemaError(`Unknown scope: ${name}`);
-        const configured = scope(this.copy());
+        const configured = unwrapParameterizedQuery(scope(this.copy()));
         if (
             !this.sameSource(configured) ||
             configured.rowSchema !== this.rowSchema ||
@@ -535,7 +598,15 @@ export class PolymorphicQueryBuilder<
                 'Scopes must synchronously return a shape-preserving query'
             );
         }
-        return configured;
+        if (
+            readerParameters(configured).some(
+                use => !readerParameters(this).includes(use)
+            )
+        )
+            throw new ReadSchemaError(
+                'Schema scopes cannot introduce query parameters'
+            );
+        return finishParameterizedQuery(configured) as any;
     }
     /** True when all branches retain complete entity rows. */
     get returnsEntityRows(): boolean {
@@ -544,14 +615,54 @@ export class PolymorphicQueryBuilder<
         );
     }
     /** Customize a relation on one discriminator branch. */
-    includeVariant(
-        key: keyof B & keyof VariantMap<S> & string,
-        relation: string,
-        customize?: (query: SchemaQueryBuilder<any, any>) => ReadQueryShape
-    ): this {
-        return this.forVariant(key, query =>
-            query.include(() => relation as any, customize as any)
-        ) as unknown as this;
+    includeVariant<
+        K extends keyof B & keyof VariantMap<S> & string,
+        R extends string,
+        Child extends ReadQueryShape = VariantRelationQuery<S, K, R>
+    >(
+        key: K,
+        relation: R,
+        customize?: (
+            query: VariantRelationQuery<S, K, R>
+        ) => Child &
+            CheckParameterState<
+                MergeParameters<P, ParametersOf<NoInfer<Child>>>
+            >
+    ): QueryView<
+        PolymorphicQueryBuilder<
+            S,
+            R extends keyof ReadRelations<BranchSource<S, K>>
+                ? Omit<B, K> &
+                      Record<
+                          K,
+                          ObjectSchemaBuilder<
+                              SchemaProps<B[K]> & {
+                                  -readonly [F in keyof Pick<
+                                      ReadRelations<BranchSource<S, K>>,
+                                      R
+                                  >]-?: RelationField<
+                                      ReadRelations<BranchSource<S, K>>[F],
+                                      Child['rowSchema']
+                                  >;
+                              }
+                          >
+                      >
+                : B,
+            AttachParameters<
+                P,
+                MergeParameters<
+                    ScopedParameters<P, `variant:${K}`>,
+                    ParametersOf<Child>
+                >,
+                `variant:${K}`
+            >
+        >
+    > {
+        return this.forVariant(
+            key,
+            query =>
+                query.include(() => relation as any, customize as any) as any
+        ) as any;
     }
     /** Load a common relation on every branch, configuring the child exactly once. */
     include<
@@ -563,22 +674,32 @@ export class PolymorphicQueryBuilder<
         selector: K | ((relations: { [P in keyof ReadRelations<S>]: P }) => K),
         customize?: (
             query: SchemaAwareQuery<Related<ReadRelations<S>[K]>>
-        ) => Child
-    ): PolymorphicQueryBuilder<
-        S,
-        {
-            [P in keyof B]: ObjectSchemaBuilder<
-                SchemaProps<B[P]> & {
-                    -readonly [R in keyof Pick<
-                        ReadRelations<S>,
-                        K
-                    >]-?: RelationField<
-                        ReadRelations<S>[K],
-                        Child['rowSchema']
-                    >;
-                }
-            >;
-        }
+        ) => Child &
+            CheckParameterState<
+                AttachParameters<
+                    P,
+                    ParametersOf<NoInfer<Child>>,
+                    `relation:${K}`
+                >
+            >
+    ): QueryView<
+        PolymorphicQueryBuilder<
+            S,
+            {
+                [P in keyof B]: ObjectSchemaBuilder<
+                    SchemaProps<B[P]> & {
+                        -readonly [R in keyof Pick<
+                            ReadRelations<S>,
+                            K
+                        >]-?: RelationField<
+                            ReadRelations<S>[K],
+                            Child['rowSchema']
+                        >;
+                    }
+                >;
+            },
+            AttachParameters<P, ParametersOf<Child>, `relation:${K}`>
+        >
     > {
         const relations = (this.source.introspect().extensions?.relations ??
             []) as { name: string }[];
@@ -613,24 +734,53 @@ export class PolymorphicQueryBuilder<
         const copy = this.copy();
         const entries = Object.entries(copy.branches);
         const [firstKey, first] = entries[0];
-        const prepared = first.include(name, customize as any);
+        const prepared = unwrapParameterizedQuery(
+            first.include(name, customize as any)
+        );
         copy.branches[firstKey] = prepared;
         for (const [key, branch] of entries.slice(1))
-            copy.branches[key] = branch.includeFrom(name, prepared);
-        copy.fallback = copy.fallback.includeFrom(name, prepared);
+            copy.branches[key] = unwrapParameterizedQuery(
+                branch.includeFrom(name, prepared)
+            );
+        copy.fallback = unwrapParameterizedQuery(
+            copy.fallback.includeFrom(name, prepared)
+        );
         copy.refresh();
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Filter one branch using schema property names; other variants remain unaffected. */
-    whereVariant(
-        key: keyof B & keyof VariantMap<S> & string,
-        selector: string | ((columns: any) => any),
+    whereVariant<
+        K extends keyof B & keyof VariantMap<S> & string,
+        Sel extends ReadPredicateSelector<ReadColumns<BranchSource<S, K>>>,
+        const A
+    >(
+        key: K,
+        selector: Sel,
         operator: string,
-        value: unknown
-    ): this {
+        value: A &
+            CheckParameterValue<
+                P,
+                NoInfer<A>,
+                PredicateValue<ReadColumns<BranchSource<S, K>>, Sel>
+            >
+    ): QueryView<
+        PolymorphicQueryBuilder<
+            S,
+            B,
+            AttachParameters<
+                P,
+                ValueParameters<
+                    ScopedParameters<P, `variant:${K}`>,
+                    A,
+                    PredicateValue<ReadColumns<BranchSource<S, K>>, Sel>
+                >,
+                `variant:${K}`
+            >
+        >
+    > {
         return this.forVariant(key, query =>
-            query.where(selector as any, operator, value)
-        ) as unknown as this;
+            (query as any).where(selector, operator, value)
+        ) as any;
     }
     /** Order all variants together, not independently within each branch. */
     orderBy(
@@ -638,7 +788,7 @@ export class PolymorphicQueryBuilder<
             | Selector<S>
             | (keyof ReadColumns<S, keyof ReadRelations<S>> & string),
         direction: 'asc' | 'desc' = 'asc'
-    ): this {
+    ): QueryView<this> {
         if (direction !== 'asc' && direction !== 'desc')
             throw new ReadSchemaError('Invalid ordering direction');
         const column =
@@ -652,26 +802,35 @@ export class PolymorphicQueryBuilder<
         const key = column[COLUMN].column;
         const copy = this.copy();
         copy.orders.push({ key, direction });
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Order the combined JSON-envelope SQL using trusted SQL and captured bindings. */
-    orderByRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): this {
+    orderByRaw<const A extends readonly Knex.RawBinding[]>(
+        sql: string,
+        bindings: A & WithoutParameters<NoInfer<A>> = [] as any
+    ): QueryView<this> {
         const copy = this.copy();
         copy.orders.push({ raw: captureReadRaw(this.knex, sql, bindings) });
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Limit the combined result across all variants. */
-    limit(count: number): this {
+    limit(count: number): QueryView<this> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Limit must be a non-negative integer');
         const copy = this.copy();
         copy.rowLimit = count;
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Restrict returned discriminator branches and narrow both runtime and inferred schemas. */
     selectVariants<const K extends readonly (keyof B & string)[]>(
         keys: K
-    ): PolymorphicQueryBuilder<S, Pick<B, K[number]>> {
+    ): QueryView<
+        PolymorphicQueryBuilder<
+            S,
+            Pick<B, K[number]>,
+            SelectParameterVariants<P, K[number]>
+        >
+    > {
         if (
             !keys.length ||
             new Set(keys).size !== keys.length ||
@@ -686,15 +845,15 @@ export class PolymorphicQueryBuilder<
         );
         copy.includeUnknown = false;
         copy.refresh();
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
     /** Skip rows of the combined result, using a stable explicit ordering. */
-    offset(count: number): this {
+    offset(count: number): QueryView<this> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Offset must be a non-negative integer');
         const copy = this.copy();
         copy.rowOffset = count;
-        return copy;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /**
@@ -706,11 +865,24 @@ export class PolymorphicQueryBuilder<
         Q extends ReadQueryShape<ReadObject>
     >(
         key: K,
-        configure: (query: BranchQueries<S, B>[K]) => Q
-    ): PolymorphicQueryBuilder<S, Omit<B, K> & Record<K, Q['rowSchema']>> {
+        configure: (
+            query: BranchQueries<S, B, P>[K]
+        ) => Q &
+            CheckParameterState<
+                AttachParameters<P, ParametersOf<NoInfer<Q>>, `variant:${K}`>
+            >
+    ): QueryView<
+        PolymorphicQueryBuilder<
+            S,
+            Omit<B, K> & Record<K, Q['rowSchema']>,
+            AttachParameters<P, ParametersOf<Q>, `variant:${K}`>
+        >
+    > {
         const current = this.branches[key];
         if (!current) throw new ReadSchemaError(`Unknown variant: ${key}`);
-        const configured = configure(current as any);
+        const configured = unwrapParameterizedQuery(
+            configure(finishParameterizedQuery(current) as any)
+        );
         if (!current.sameSource(configured)) {
             if (configured instanceof Promise) void configured.catch(() => {});
             throw new ReadSchemaError(
@@ -733,17 +905,22 @@ export class PolymorphicQueryBuilder<
             any
         >;
         copy.refresh();
-        return copy as any;
+        return finishParameterizedQuery(copy) as any;
     }
 
     /** @internal Compile one UNION ALL statement; JSON preserves distinct branch shapes. */
-    compile(correlate?: ReadCorrelation): Knex.QueryBuilder {
-        return this.compileRows(correlate);
+    compile(
+        correlate?: ReadCorrelation,
+        mode?: typeof COMPILE_PARAMETERS
+    ): Knex.QueryBuilder {
+        assertParametersBound(this, mode);
+        return this.compileRows(correlate, undefined, mode);
     }
 
     private compileRows(
         correlate?: ReadCorrelation,
-        targetKey?: string
+        targetKey?: string,
+        mode?: typeof COMPILE_PARAMETERS
     ): Knex.QueryBuilder {
         const defaults = this.skipDefaults ? undefined : this.defaults;
         const reserved = Object.values(this.branches).flatMap(branch =>
@@ -767,21 +944,27 @@ export class PolymorphicQueryBuilder<
                 this.predicates
             ]) {
                 if (predicates.length)
-                    branch = branch.withPredicate(query => {
-                        query.where(nested => {
-                            for (const predicate of predicates)
-                                predicate(nested);
-                        });
-                    });
+                    branch = unwrapParameterizedQuery(
+                        branch.withPredicate(query => {
+                            query.where(nested => {
+                                for (const predicate of predicates)
+                                    predicate(nested);
+                            });
+                        })
+                    );
             }
             const softDelete = this.source.introspect().extensions
                 ?.softDelete as { column: string } | undefined;
             if (softDelete && this.deleted !== 'include') {
-                branch = branch.withPredicate(query => {
-                    query[
-                        this.deleted === 'only' ? 'whereNotNull' : 'whereNull'
-                    ](this.deletionColumn);
-                });
+                branch = unwrapParameterizedQuery(
+                    branch.withPredicate(query => {
+                        query[
+                            this.deleted === 'only'
+                                ? 'whereNotNull'
+                                : 'whereNull'
+                        ](this.deletionColumn);
+                    })
+                );
             }
             let nativeKey: Knex.Raw | undefined;
             const orderColumns: Record<string, Knex.Raw> = {};
@@ -798,7 +981,7 @@ export class PolymorphicQueryBuilder<
                     ]);
                 }
                 if (Object.keys(orderColumns).length) sql.select(orderColumns);
-            });
+            }, mode);
             if (targetKey) {
                 return compiled
                     .clearSelect()
@@ -854,6 +1037,7 @@ export class PolymorphicQueryBuilder<
     }
     /** @internal Capture native primary keys for a single writable ORM variant. */
     mutationTargets(variantKey: string): Knex.QueryBuilder {
+        assertParametersBound(this);
         const keys = Object.keys(this.branches);
         if (keys.length !== 1 || keys[0] !== variantKey || this.includeUnknown)
             throw new ReadSchemaError(
@@ -947,9 +1131,11 @@ export class PolymorphicQueryBuilder<
                 'Page and pageSize must be positive integers'
             );
         const total = await this.countValue();
-        const data = await this.offset((page - 1) * pageSize)
-            .limit(pageSize)
-            .execute();
+        const data = await (
+            unwrapParameterizedQuery(
+                this.offset((page - 1) * pageSize).limit(pageSize)
+            ) as this
+        ).execute();
         const totalPages = Math.ceil(total / pageSize);
         return {
             data,
@@ -973,7 +1159,9 @@ export class PolymorphicQueryBuilder<
     }
     /** Return the first globally ordered row, or undefined. */
     async first(): Promise<InferType<PolymorphicRowSchema<B>> | undefined> {
-        return (await this.limit(1).execute())[0];
+        return (
+            await (unwrapParameterizedQuery(this.limit(1)) as this).execute()
+        )[0];
     }
     /** Awaiting deliberately executes the query each time. */
     // biome-ignore lint/suspicious/noThenProperty: query readers intentionally support await
@@ -988,16 +1176,80 @@ export class PolymorphicQueryBuilder<
         return this.execute().then(resolve, reject);
     }
     /** Bind independent branch queries to a caller-owned transaction. */
-    transacting(trx: Knex.Transaction): this {
+    transacting(trx: Knex.Transaction): QueryView<this> {
         const copy = this.copy();
         Object.assign(copy, { knex: trx });
         copy.branches = Object.fromEntries(
             Object.entries(this.branches).map(([key, q]) => [
                 key,
-                q.transacting(trx)
+                unwrapParameterizedQuery(q.transacting(trx))
             ])
         );
-        copy.fallback = this.fallback.transacting(trx);
-        return copy;
+        copy.fallback = unwrapParameterizedQuery(
+            this.fallback.transacting(trx)
+        );
+        shareParameterCompilation(this, copy);
+        return finishParameterizedQuery(copy) as any;
     }
+
+    /** @internal Shared parameter plan across union branches and included relations. */
+    [COMPILED_READER](): CompiledReader {
+        const branches = new Map(
+            Object.entries(this.branches).map(([key, branch]) => [
+                key,
+                branch[COMPILED_READER]()
+            ])
+        );
+        const discriminator = getVariants(this.source)!.discriminatorKey;
+        return {
+            knex: this.knex,
+            uses: [
+                ...predicateParameters(this.predicates),
+                ...[...branches.values()].flatMap(branch => branch.uses),
+                ...(this.includeUnknown ? readerParameters(this.fallback) : [])
+            ],
+            compile: () => this.compile(undefined, COMPILE_PARAMETERS),
+            decode: row => {
+                const value = (row as any).__read_poly;
+                const branch = branches.get(value?.[discriminator]);
+                if (!branch)
+                    throw new ReadSchemaError(
+                        'row: unknown polymorphic discriminator'
+                    );
+                return branch.decode(value);
+            },
+            bind: values => {
+                const copy = this.copy();
+                copy.predicates = this.predicates.map(predicate =>
+                    bindReadPredicate(predicate, values)
+                );
+                copy.branches = Object.fromEntries(
+                    Object.entries(this.branches).map(([key, branch]) => [
+                        key,
+                        branch[COMPILED_READER]().bind(values)
+                    ])
+                ) as typeof this.branches;
+                copy.fallback = this.fallback[COMPILED_READER]().bind(
+                    values
+                ) as typeof this.fallback;
+                return finishParameterizedQuery(copy);
+            }
+        };
+    }
+}
+
+/** @internal Fluent return constructor for polymorphic SELECTs. */
+export interface PolymorphicParameterReader<
+    S extends ReadObject,
+    B extends Record<string, ReadObject>
+> extends ParameterReader {
+    readonly result: QueryView<
+        PolymorphicQueryBuilder<
+            S,
+            B,
+            this['parameters'] extends ParameterState
+                ? this['parameters']
+                : never
+        >
+    >;
 }
