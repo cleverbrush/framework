@@ -172,6 +172,7 @@ export class PolymorphicQueryBuilder<
         limit?: number;
         offset?: number;
     };
+    private readonly deletionColumn: string;
     private skipDefaults = false;
     private deleted: 'exclude' | 'include' | 'only' = 'exclude';
     private readonly predicateAlias =
@@ -202,6 +203,15 @@ export class PolymorphicQueryBuilder<
         const config = getVariants(source);
         if (!config)
             throw new ReadSchemaError('No polymorphic variants are declared');
+        this.deletionColumn = privateColumn(
+            [
+                ...Object.keys(source.introspect().properties),
+                ...Object.values(config.variants).flatMap(v =>
+                    Object.keys(v.schema.introspect().properties)
+                )
+            ],
+            'read_deleted'
+        );
         this.branches = Object.create(null);
         for (const key of Object.keys(config.variants))
             this.branches[key] = this.branch(key, true);
@@ -215,16 +225,17 @@ export class PolymorphicQueryBuilder<
             common,
             knex
                 .from(base.clone().as('__read_unknown'))
-                .select(
-                    Object.fromEntries(
+                .select({
+                    ...Object.fromEntries(
                         Object.keys(common.introspect().properties).map(key => [
                             key,
                             knex.ref(
                                 `__read_unknown.${buildColumnMap(source).propToCol.get(key) ?? key}`
                             )
                         ])
-                    )
-                )
+                    ),
+                    ...this.deletionSelection('__read_unknown')
+                })
                 .where(q =>
                     q
                         .whereNotIn(discriminator, Object.keys(config.variants))
@@ -262,6 +273,19 @@ export class PolymorphicQueryBuilder<
                 offset: configured.rowOffset
             };
         }
+    }
+
+    private deletionSelection(alias: string): Record<string, Knex.Raw> {
+        const softDelete = this.source.introspect().extensions?.softDelete as
+            | { column: string }
+            | undefined;
+        return softDelete
+            ? {
+                  [this.deletionColumn]: this.knex.raw('??', [
+                      `${alias}.${softDelete.column}`
+                  ])
+              }
+            : {};
     }
 
     private commonSource(): ReadObject {
@@ -350,7 +374,9 @@ export class PolymorphicQueryBuilder<
                 `${baseAlias}.${basePk[0]}`
             );
         }
-        const columns: Record<string, Knex.Raw> = Object.create(null);
+        const columns: Record<string, Knex.Raw> = {
+            ...this.deletionSelection(baseAlias)
+        };
         const properties: Record<string, ReadSchema> = Object.create(null);
         for (const [name, schema] of Object.entries(baseProperties)) {
             if (excluded.has(name)) continue;
@@ -712,6 +738,13 @@ export class PolymorphicQueryBuilder<
 
     /** @internal Compile one UNION ALL statement; JSON preserves distinct branch shapes. */
     compile(correlate?: ReadCorrelation): Knex.QueryBuilder {
+        return this.compileRows(correlate);
+    }
+
+    private compileRows(
+        correlate?: ReadCorrelation,
+        targetKey?: string
+    ): Knex.QueryBuilder {
         const defaults = this.skipDefaults ? undefined : this.defaults;
         const reserved = Object.values(this.branches).flatMap(branch =>
             Object.keys(branch.rowSchema.introspect().properties)
@@ -744,35 +777,35 @@ export class PolymorphicQueryBuilder<
             const softDelete = this.source.introspect().extensions
                 ?.softDelete as { column: string } | undefined;
             if (softDelete && this.deleted !== 'include') {
-                const key =
-                    buildColumnMap(this.source).colToProp.get(
-                        softDelete.column
-                    ) ?? softDelete.column;
                 branch = branch.withPredicate(query => {
                     query[
                         this.deleted === 'only' ? 'whereNotNull' : 'whereNull'
-                    ](key);
+                    ](this.deletionColumn);
                 });
             }
+            let nativeKey: Knex.Raw | undefined;
+            const orderColumns: Record<string, Knex.Raw> = {};
+            const compiled = branch.compile((sql, alias, source) => {
+                correlate?.(sql, alias, source);
+                if (targetKey)
+                    nativeKey = this.knex.raw('??', [`${alias}.${targetKey}`]);
+                const columns = buildColumnMap(source).propToCol;
+                for (const item of order) {
+                    if ('raw' in item) continue;
+                    const { key, hidden } = item;
+                    orderColumns[hidden] = this.knex.raw('cast(?? as text)', [
+                        `${alias}.${columns.get(key) ?? key}`
+                    ]);
+                }
+                if (Object.keys(orderColumns).length) sql.select(orderColumns);
+            });
+            if (targetKey) {
+                return compiled
+                    .clearSelect()
+                    .select({ __write_pk: nativeKey!, ...orderColumns });
+            }
             return this.knex
-                .from(
-                    branch
-                        .compile((sql, alias, source) => {
-                            correlate?.(sql, alias, source);
-                            const columns = buildColumnMap(source).propToCol;
-                            for (const item of order) {
-                                if ('raw' in item) continue;
-                                const { key, hidden } = item;
-                                sql.select({
-                                    [hidden]: this.knex.raw(
-                                        'cast(?? as text)',
-                                        [`${alias}.${columns.get(key) ?? key}`]
-                                    )
-                                });
-                            }
-                        })
-                        .as('__read_branch')
-                )
+                .from(compiled.as('__read_branch'))
                 .select(
                     this.knex.raw('to_jsonb(__read_branch) as __read_poly')
                 );
@@ -784,7 +817,7 @@ export class PolymorphicQueryBuilder<
                     .unionAll(queries, true)
                     .as('__read_variants')
             )
-            .select('__read_poly');
+            .select(targetKey ? '__write_pk' : '__read_poly');
         for (const item of order) {
             if ('raw' in item) {
                 query.orderByRaw(item.raw());
@@ -807,7 +840,9 @@ export class PolymorphicQueryBuilder<
                     'Polymorphic ordering requires a scalar column'
                 );
             query.orderByRaw(
-                `cast(__read_poly ->> ? as ${type}) ${direction}`,
+                targetKey
+                    ? `cast(?? as ${type}) ${direction}`
+                    : `cast(__read_poly ->> ? as ${type}) ${direction}`,
                 [hidden]
             );
         }
@@ -817,6 +852,22 @@ export class PolymorphicQueryBuilder<
         if (offset !== undefined) query.offset(offset);
         return query;
     }
+    /** @internal Capture native primary keys for a single writable ORM variant. */
+    mutationTargets(variantKey: string): Knex.QueryBuilder {
+        const keys = Object.keys(this.branches);
+        if (keys.length !== 1 || keys[0] !== variantKey || this.includeUnknown)
+            throw new ReadSchemaError(
+                'Variant writes require exactly their original variant'
+            );
+        this.branches[variantKey].assertWritable();
+        const pk = getPrimaryKeyColumns(this.source);
+        if (pk.propertyKeys.length !== 1)
+            throw new ReadSchemaError(
+                'Variant writes require a single-column primary key'
+            );
+        return this.compileRows(undefined, pk.propertyKeys[0]);
+    }
+
     /** @internal Decode using exactly the selected branch's schema and codecs. */
     decode(row: any, path = 'row'): InferType<PolymorphicRowSchema<B>> {
         const value = row.__read_poly;

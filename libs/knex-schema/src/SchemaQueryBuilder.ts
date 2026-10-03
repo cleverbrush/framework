@@ -430,6 +430,14 @@ export class SchemaQueryBuilder<
         return !this.selected && !this.grouped && !this.distinctRows;
     }
 
+    /** @internal Reject writes through projections or loaded relations. */
+    assertWritable(): void {
+        if (!this.returnsEntityRows || this.loaded.length)
+            throw new ReadSchemaError(
+                'Writes require an unprojected table query without relations or aggregation'
+            );
+    }
+
     /** @internal Build an independent statement containing defaults and explicit filters. */
     private filtered(): Knex.QueryBuilder {
         const query = this.base.clone();
@@ -1341,10 +1349,7 @@ export class SchemaQueryBuilder<
     }
 
     private writer(filtered = true): QuerySource<S, InferType<Row>> {
-        if (!this.returnsEntityRows || this.loaded.length)
-            throw new ReadSchemaError(
-                'Writes require an unprojected table query without relations or aggregation'
-            );
+        this.assertWritable();
         let base = this.knex(getTableName(this.source));
         if (filtered) {
             const keys = getPrimaryKeyColumns(this.source).columnNames;

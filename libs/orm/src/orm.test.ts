@@ -974,6 +974,8 @@ describe('VariantDbSet.update', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
+        (mock.knex.client as any).transacting = true;
+        stubTransaction();
     });
     afterEach(async () => {
         await mock.knex.destroy();
@@ -986,19 +988,10 @@ describe('VariantDbSet.update', () => {
     }
 
     it('STI: emits an UPDATE on the base table filtered by discriminator', async () => {
-        // First query: execute() to collect PKs → returns matching rows.
-        mock.responses.push([
-            {
-                __read_poly: {
-                    id: 3,
-                    type: 'assigned',
-                    todoId: 10,
-                    userId: 1,
-                    assigneeId: 4
-                }
-            }
-        ]);
-        // Second query: the UPDATE itself.
+        // Lock matching base keys, then recheck the captured predicates.
+        mock.responses.push([{ id: 3 }]);
+        mock.responses.push([{ id: 3 }]);
+        // Execute the UPDATE after target selection.
         mock.responses.push([]);
 
         const db = createDb(mock.knex, { activities: ActivityEntitySTI });
@@ -1015,17 +1008,10 @@ describe('VariantDbSet.update', () => {
 
     it('CTI: emits an UPDATE on the variant table', async () => {
         stubTransaction();
-        // execute() returns matched base-table rows.
-        mock.responses.push([
-            {
-                __read_poly: {
-                    id: 5,
-                    type: 'assigned',
-                    todoId: 1,
-                    assigneeId: 4
-                }
-            }
-        ]);
+        // Lock base and child rows, then confirm matching base keys.
+        mock.responses.push([{ id: 5 }]);
+        mock.responses.push([]);
+        mock.responses.push([{ id: 5 }]);
         // UPDATE on the variant table.
         mock.responses.push([]);
 
@@ -1064,6 +1050,8 @@ describe('VariantDbSet.delete', () => {
     let mock: MockKnex;
     beforeEach(() => {
         mock = makeMockKnex();
+        (mock.knex.client as any).transacting = true;
+        stubTransaction();
     });
     afterEach(async () => {
         await mock.knex.destroy();
@@ -1077,18 +1065,9 @@ describe('VariantDbSet.delete', () => {
 
     it('STI: emits a DELETE on the base table with discriminator filter', async () => {
         stubTransaction();
-        // execute() to collect PKs.
-        mock.responses.push([
-            {
-                __read_poly: {
-                    id: 2,
-                    type: 'commented',
-                    todoId: 1,
-                    userId: 7,
-                    body: 'hi'
-                }
-            }
-        ]);
+        // Lock and confirm matching base keys.
+        mock.responses.push([{ id: 2 }]);
+        mock.responses.push([{ id: 2 }]);
         // The DELETE.
         mock.responses.push([]);
 
@@ -1105,17 +1084,10 @@ describe('VariantDbSet.delete', () => {
 
     it('CTI: deletes variant row first then base row', async () => {
         stubTransaction();
-        // execute() → matched base rows.
-        mock.responses.push([
-            {
-                __read_poly: {
-                    id: 7,
-                    type: 'assigned',
-                    todoId: 3,
-                    assigneeId: 4
-                }
-            }
-        ]);
+        // Lock base and child rows, then confirm matching base keys.
+        mock.responses.push([{ id: 7 }]);
+        mock.responses.push([]);
+        mock.responses.push([{ id: 7 }]);
         // DELETE from variant table.
         mock.responses.push([]);
         // DELETE from base table.
