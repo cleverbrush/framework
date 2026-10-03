@@ -1,7 +1,29 @@
 import type { Knex } from 'knex';
 import type { AliasedColumn } from './expressions.js';
 import { ALLOWED_OPS } from './operations/helpers.js';
-import { ReadSchemaError } from './read-schema.js';
+import {
+    assertNoParameters,
+    copyBinding,
+    isParameter,
+    type ParameterUse,
+    type ParameterValues,
+    parameterBinding
+} from './parameter.js';
+import {
+    type CheckParameterState,
+    type CheckParameterValue,
+    type CheckScalarParameter,
+    type MergeParameters,
+    PARAMETER_READER,
+    PARAMETER_STATE,
+    type ParameterReader,
+    type ParameterState,
+    type ParametersOf,
+    type Reparameterize,
+    type ValueParameters,
+    type WithoutParameters
+} from './parameter-types.js';
+import { type ReadSchema, ReadSchemaError } from './read-schema.js';
 
 const finishGroup = Symbol('finishReadPredicateGroup');
 
@@ -9,44 +31,60 @@ const finishGroup = Symbol('finishReadPredicateGroup');
 export type ReadPredicateSelector<C> =
     | ((columns: C) => AliasedColumn<any>)
     | (keyof C & string);
+/** @internal Infer the storage representation from the selected column. */
+export type PredicateValue<C, S> = S extends (
+    columns: C
+) => AliasedColumn<infer V>
+    ? V
+    : S extends keyof C
+      ? C[S] extends AliasedColumn<infer V>
+          ? V
+          : never
+      : never;
 
-/** A synchronous, parenthesized predicate group. The callback cannot shape or execute a query. */
-export type ReadPredicateGroup<C> = (
+/** A synchronous, parenthesized predicate group; configuration never executes SQL. */
+export type ReadPredicateGroup<C, G = ReadPredicateBuilder<C, any>> = (
     predicates: ReadPredicateBuilder<C>
-) => ReadPredicateBuilder<C>;
-
-/** A bound value list or a caller-built SELECT subquery; captured without executing it. */
+) => G;
+/** A bound value list or a caller-built SELECT subquery, captured without execution. */
 export type ReadMembership = readonly unknown[] | Knex.QueryBuilder;
 
-/** @internal Predicate application contains only library-owned, already captured operations. */
-export type ReadPredicate = (query: Knex.QueryBuilder) => void;
+/** @internal Captured library operation; user callbacks are never replayed. */
+export interface ReadPredicate {
+    (query: Knex.QueryBuilder, values?: ParameterValues): void;
+    readonly parameters?: readonly ParameterUse[];
+}
 
-/** @internal Resolve references without exposing the parent's mutable SQL builder. */
+/** @internal Resolve SQL and storage metadata together, invoking selectors once. */
 export interface ReadPredicateContext<C> {
     knex: Knex;
     column: (selector: ReadPredicateSelector<C>) => string | Knex.Raw;
+    resolve: (selector: ReadPredicateSelector<C>) => {
+        column: string | Knex.Raw;
+        schema: ReadSchema;
+    };
 }
 
-/** @internal Snapshot common mutable binding values independently of query builders. */
-function copyValue(value: any): any {
-    if (value instanceof Date) return new Date(value.getTime());
-    if (Buffer.isBuffer(value)) return Buffer.from(value);
-    if (Array.isArray(value)) return value.map(copyValue);
-    if (value && typeof value === 'object') {
-        const prototype = Object.getPrototypeOf(value);
-        if (prototype === Object.prototype || prototype === null) {
-            return Object.fromEntries(
-                Object.entries(value).map(([key, item]) => [
-                    key,
-                    copyValue(item)
-                ])
-            );
-        }
-    }
-    return value;
+/** @internal */
+export function predicateParameters(
+    predicates: readonly ReadPredicate[]
+): ParameterUse[] {
+    return predicates.flatMap(predicate => predicate.parameters ?? []);
+}
+/** @internal Materialize captured operations, not user configuration callbacks. */
+export function bindReadPredicate(
+    predicate: ReadPredicate,
+    values: ParameterValues
+): ReadPredicate {
+    return query => predicate(query, values);
+}
+function capturedPredicate(
+    predicate: ReadPredicate,
+    parameters: readonly ParameterUse[]
+): ReadPredicate {
+    return Object.assign(predicate, { parameters });
 }
 
-/** @internal Compiled SQL is recreated per use, so externally owned builders are never retained. */
 function captureSql(
     knex: Knex,
     source: Knex.Raw | Knex.QueryBuilder
@@ -56,20 +94,20 @@ function captureSql(
         throw new ReadSchemaError(
             'Read predicates require a single SQL expression'
         );
+    assertNoParameters(compiled.bindings);
     const sql = compiled.sql;
-    const bindings = compiled.bindings?.map(copyValue) ?? [];
-    return () => knex.raw(sql, bindings.map(copyValue));
+    const bindings = compiled.bindings?.map(copyBinding) ?? [];
+    return () => knex.raw(sql, bindings.map(copyBinding));
 }
-
-/** @internal Capture trusted SQL and positional bindings now, including refs and nested raw expressions. */
+/** @internal Capture trusted SQL and bindings, including nested raw expressions. */
 export function captureReadRaw(
     knex: Knex,
     sql: string,
     bindings: readonly Knex.RawBinding[] = []
 ): () => Knex.Raw {
+    assertNoParameters(bindings);
     return captureSql(knex, knex.raw(sql, [...bindings]));
 }
-
 function captureSubquery(knex: Knex, query: Knex.QueryBuilder): () => Knex.Raw {
     if (
         !query ||
@@ -83,171 +121,201 @@ function captureSubquery(knex: Knex, query: Knex.QueryBuilder): () => Knex.Raw {
         !['select', 'first'].includes(compiled.method)
     )
         throw new ReadSchemaError('Read predicates require a SELECT subquery');
-    // Rewrap the compiled statement, not the original builder or its callbacks.
+    assertNoParameters(compiled.bindings);
     return captureSql(
         knex,
         knex.raw(compiled.sql, [...(compiled.bindings ?? [])])
     );
 }
-
-/** @internal Capture mutable bindings without retaining caller-owned values. */
+/** @internal Snapshot concrete bindings; placeholders require a typed predicate. */
 export function captureValue(knex: Knex, value: any): () => any {
-    if (value && typeof value.toSQL === 'function') {
+    assertNoParameters(value);
+    if (value && typeof value.toSQL === 'function')
         return typeof value.clone === 'function'
             ? captureSubquery(knex, value)
             : captureSql(knex, value);
-    }
     if (typeof value === 'function')
         throw new ReadSchemaError('Predicate values cannot be callbacks');
-    const captured = copyValue(value);
-    return () => copyValue(captured);
+    const captured = copyBinding(value);
+    return () => copyBinding(captured);
+}
+function typedValue(knex: Knex, value: unknown, schema: ReadSchema) {
+    return isParameter(value)
+        ? {
+              parameters: [{ name: value.name, schema }],
+              get: (values?: ParameterValues) =>
+                  parameterBinding(
+                      value,
+                      values,
+                      ['object', 'array'].includes(schema.introspect().type)
+                          ? 'json'
+                          : 'value'
+                  )
+          }
+        : { parameters: [] as ParameterUse[], get: captureValue(knex, value) };
 }
 
-/**
- * Shared shape-preserving predicate methods for immutable readers and scoped groups.
- * @internal Consumers obtain these methods through query factories, not inheritance.
- */
-export abstract class ReadPredicates<C> {
-    protected abstract readPredicateContext(): ReadPredicateContext<C>;
-    protected abstract addReadPredicate(predicate: ReadPredicate): this;
+/** @internal Higher-kinded predicate group return type; groups are never executable. */
+export interface GroupParameterReader<C> extends ParameterReader {
+    readonly result: ReadPredicateBuilder<
+        C,
+        this['parameters'] extends ParameterState ? this['parameters'] : never
+    >;
+}
 
-    /**
-     * Quote a schema-backed column for raw bindings or correlated subqueries.
-     * The reference uses this reader's actual SQL alias and never executes SQL.
-     * @example read.whereRaw('lower(??) = ?', [read.ref(t => t.name), 'alice'])
-     */
+/** Shared immutable predicates for schema readers and grouped conditions. */
+export abstract class ReadPredicates<
+    C,
+    P extends ParameterState = [],
+    Self extends ParameterReader = GroupParameterReader<C>
+> {
+    /** @internal Type-only ordered argument contract. */
+    declare readonly [PARAMETER_STATE]: P;
+    /** @internal Type-only fluent return constructor. */
+    declare readonly [PARAMETER_READER]: Self;
+    protected abstract readPredicateContext(): ReadPredicateContext<C>;
+    protected abstract addReadPredicate(predicate: ReadPredicate): any;
+
+    /** Quote a mapped column for trusted raw SQL or correlated subqueries. */
     ref(selector: ReadPredicateSelector<C>): Knex.Ref<string, {}> | Knex.Raw {
         const { knex, column } = this.readPredicateContext();
         const resolved = column(selector);
         return typeof resolved === 'string' ? knex.ref(resolved) : resolved;
     }
 
-    /** Add a parenthesized AND group using a synchronous predicate-only callback. */
-    where(group: ReadPredicateGroup<C>): this;
-    /** Match a record of property names and bound equality values. */
-    where(values: Partial<Record<keyof C, unknown>>): this;
-    /** Add a bound equality comparison. Null uses SQL IS NULL. */
-    where(column: ReadPredicateSelector<C>, value: unknown): this;
+    /** Add a synchronous group, retaining the group's inferred named parameters. */
+    where<G extends ReadPredicateBuilder<C, any>>(
+        group: ReadPredicateGroup<
+            C,
+            G &
+                CheckParameterState<
+                    MergeParameters<P, ParametersOf<NoInfer<G>>>
+                >
+        >
+    ): Reparameterize<Self, MergeParameters<P, ParametersOf<G>>>;
+    /** Match a record of concrete equality values. Use selectors for parameters. */
+    where<const V extends Partial<Record<keyof C, unknown>>>(
+        values: V & WithoutParameters<NoInfer<V>>
+    ): Reparameterize<Self, P>;
+    /** Match a column and infer a named parameter's storage type. */
+    where<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
+        value: A & CheckScalarParameter<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>>;
     /** Add a bound comparison using a supported SQL operator. */
-    where(
-        column: ReadPredicateSelector<C>,
+    where<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
         operator: string,
-        value: unknown
-    ): this;
-    where(
-        first:
-            | ReadPredicateSelector<C>
-            | ReadPredicateGroup<C>
-            | Partial<Record<keyof C, unknown>>,
-        ...args: [] | [unknown] | [string, unknown]
-    ): this {
+        value: A & CheckScalarParameter<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>>;
+    where(first: any, ...args: any[]): any {
         if (typeof first === 'object' && first !== null && !args.length) {
+            assertNoParameters(first);
             return Object.entries(first).reduce(
-                (query, [key, value]) =>
-                    query.where(key as keyof C & string, value),
+                (q: any, [key, value]) => q.where(key, value),
                 this
             );
         }
-        return this.comparison(
-            'and',
-            first as ReadPredicateSelector<C> | ReadPredicateGroup<C>,
-            args
-        );
+        return this.comparison('and', first, args);
     }
-
-    /** Explicit AND spelling of where(), including nested groups. */
-    andWhere(group: ReadPredicateGroup<C>): this;
-    /** Match all property/value pairs with AND semantics. */
-    andWhere(values: Partial<Record<keyof C, unknown>>): this;
-    /** Add a bound AND equality comparison. */
-    andWhere(column: ReadPredicateSelector<C>, value: unknown): this;
-    /** Add a bound AND comparison. */
-    andWhere(
-        column: ReadPredicateSelector<C>,
+    /** Explicit AND spelling of where(), including groups and typed parameters. */
+    andWhere<G extends ReadPredicateBuilder<C, any>>(
+        group: ReadPredicateGroup<
+            C,
+            G &
+                CheckParameterState<
+                    MergeParameters<P, ParametersOf<NoInfer<G>>>
+                >
+        >
+    ): Reparameterize<Self, MergeParameters<P, ParametersOf<G>>>;
+    andWhere<const V extends Partial<Record<keyof C, unknown>>>(
+        values: V & WithoutParameters<NoInfer<V>>
+    ): Reparameterize<Self, P>;
+    andWhere<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
+        value: A & CheckScalarParameter<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>>;
+    andWhere<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
         operator: string,
-        value: unknown
-    ): this;
-    andWhere(
-        first:
-            | ReadPredicateSelector<C>
-            | ReadPredicateGroup<C>
-            | Partial<Record<keyof C, unknown>>,
-        ...args: [] | [unknown] | [string, unknown]
-    ): this {
+        value: A & CheckScalarParameter<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>>;
+    andWhere(first: any, ...args: any[]): any {
         if (typeof first === 'object' && first !== null && !args.length)
             return this.where(first);
-        return this.comparison(
-            'and',
-            first as ReadPredicateSelector<C> | ReadPredicateGroup<C>,
-            args
-        );
+        return this.comparison('and', first, args);
     }
-
-    /** Add a parenthesized OR group. Use an enclosing AND group beside authorization filters. */
-    orWhere(group: ReadPredicateGroup<C>): this;
-    /** Match a parenthesized AND record as one alternative to the preceding predicates. */
-    orWhere(values: Partial<Record<keyof C, unknown>>): this;
-    /** Add a bound OR equality comparison. */
-    orWhere(column: ReadPredicateSelector<C>, value: unknown): this;
-    /** Add a bound OR comparison. */
-    orWhere(
-        column: ReadPredicateSelector<C>,
+    /** Add an OR comparison or parenthesized group. */
+    orWhere<G extends ReadPredicateBuilder<C, any>>(
+        group: ReadPredicateGroup<
+            C,
+            G &
+                CheckParameterState<
+                    MergeParameters<P, ParametersOf<NoInfer<G>>>
+                >
+        >
+    ): Reparameterize<Self, MergeParameters<P, ParametersOf<G>>>;
+    orWhere<const V extends Partial<Record<keyof C, unknown>>>(
+        values: V & WithoutParameters<NoInfer<V>>
+    ): Reparameterize<Self, P>;
+    orWhere<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
+        value: A & CheckScalarParameter<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>>;
+    orWhere<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
         operator: string,
-        value: unknown
-    ): this;
-    orWhere(
-        first:
-            | ReadPredicateSelector<C>
-            | ReadPredicateGroup<C>
-            | Partial<Record<keyof C, unknown>>,
-        ...args: [] | [unknown] | [string, unknown]
-    ): this {
-        if (typeof first === 'object' && first !== null && !args.length)
-            return this.orWhere(group => group.where(first));
-        return this.comparison(
-            'or',
-            first as ReadPredicateSelector<C> | ReadPredicateGroup<C>,
-            args
-        );
+        value: A & CheckScalarParameter<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>>;
+    orWhere(first: any, ...args: any[]): any {
+        if (typeof first === 'object' && first !== null && !args.length) {
+            assertNoParameters(first);
+            return this.comparison(
+                'or',
+                (group: ReadPredicateBuilder<C>) => group.where(first),
+                []
+            );
+        }
+        return this.comparison('or', first, args);
     }
 
     private comparison(
-        boolean: 'and' | 'or',
-        first: ReadPredicateSelector<C> | ReadPredicateGroup<C>,
-        args: [] | [unknown] | [string, unknown]
-    ): this {
+        boolean: 'and' | 'or' | 'not',
+        selector: any,
+        args: any[]
+    ): any {
         const context = this.readPredicateContext();
-        const method = boolean === 'and' ? 'where' : 'orWhere';
+        const method =
+            boolean === 'or'
+                ? 'orWhere'
+                : boolean === 'not'
+                  ? 'whereNot'
+                  : 'where';
         if (!args.length) {
             const group = new ReadPredicateBuilder(context);
-            let operations: readonly ReadPredicate[];
-            {
-                const result: unknown = (first as ReadPredicateGroup<C>)(group);
-                if (
-                    result &&
-                    typeof (result as PromiseLike<unknown>).then === 'function'
-                ) {
-                    // Consume native async rejection without assimilating foreign
-                    // thenables (a Knex query's then() would execute SQL).
-                    if (result instanceof Promise) void result.catch(() => {});
-                    throw new ReadSchemaError(
-                        'Read predicate groups must be synchronous'
-                    );
-                }
-                if (
-                    !(result instanceof ReadPredicateBuilder) ||
-                    !result.sameSource(group)
-                )
-                    throw new ReadSchemaError(
-                        'Predicate callbacks must return a builder from the supplied group'
-                    );
-                operations = result[finishGroup]();
+            const result = selector(group);
+            if (result && typeof result.then === 'function') {
+                if (result instanceof Promise) void result.catch(() => {});
+                throw new ReadSchemaError(
+                    'Read predicate groups must be synchronous'
+                );
             }
-            return this.addReadPredicate(query => {
-                query[method](nested => {
-                    for (const operation of operations) operation(nested);
-                });
-            });
+            if (
+                !(result instanceof ReadPredicateBuilder) ||
+                !result.sameSource(group)
+            )
+                throw new ReadSchemaError(
+                    'Predicate callbacks must return a builder from the supplied group'
+                );
+            const operations = result[finishGroup]();
+            return this.addReadPredicate(
+                capturedPredicate((query, values) => {
+                    query[method](nested => {
+                        for (const operation of operations)
+                            operation(nested, values);
+                    });
+                }, predicateParameters(operations))
+            );
         }
         const operator = args.length === 1 ? '=' : args[0];
         if (
@@ -257,40 +325,72 @@ export abstract class ReadPredicates<C> {
             throw new ReadSchemaError(
                 `Unsupported comparison operator: ${operator}`
             );
-        const column = context.column(first as ReadPredicateSelector<C>);
-        const value = captureValue(
-            context.knex,
-            args.length === 1 ? args[0] : args[1]
+        const { column, schema } = context.resolve(selector);
+        const input = args.length === 1 ? args[0] : args[1];
+        if (isParameter(input)) {
+            if (
+                ['in', 'not in', 'is', 'is not'].includes(
+                    operator.toLowerCase()
+                )
+            )
+                throw new ReadSchemaError(
+                    'Use a typed scalar comparison or fixed whereIn tuple for parameters'
+                );
+            if (
+                operator.toLowerCase().includes('like') &&
+                schema.introspect().type !== 'string'
+            )
+                throw new ReadSchemaError(
+                    'LIKE parameters require a string column'
+                );
+        }
+        const value = typedValue(context.knex, input, schema);
+        return this.addReadPredicate(
+            capturedPredicate((query, values) => {
+                if (
+                    isParameter(input) &&
+                    schema.introspect().isNullable &&
+                    args.length === 1
+                ) {
+                    // Knex rewrites shorthand where(column, null) to IS NULL.
+                    // Explicit operators retain SQL's three-valued null semantics.
+                    const expression = context.knex.raw(
+                        'case when ? then ?? is null else ?? = ? end',
+                        [
+                            parameterBinding(input, values, 'isNull'),
+                            column,
+                            column,
+                            value.get(values)
+                        ]
+                    );
+                    query[method](expression);
+                } else if (args.length === 1)
+                    query[method](column as any, value.get(values));
+                else query[method](column as any, operator, value.get(values));
+            }, value.parameters)
         );
-        return this.addReadPredicate(query => {
-            if (args.length === 1) query[method](column as any, value());
-            else query[method](column as any, operator, value());
-        });
     }
 
     private nullPredicate(
         column: ReadPredicateSelector<C>,
         method: 'whereNull' | 'whereNotNull' | 'orWhereNull' | 'orWhereNotNull'
-    ): this {
+    ): any {
         const name = this.readPredicateContext().column(column);
         return this.addReadPredicate(query => {
             query[method](name as any);
         });
     }
-    /** Match SQL null without changing the row schema. */
-    whereNull(column: ReadPredicateSelector<C>): this {
+    /** Match SQL null without changing the declared result type. */
+    whereNull(column: ReadPredicateSelector<C>): Reparameterize<Self, P> {
         return this.nullPredicate(column, 'whereNull');
     }
-    /** Exclude SQL null without narrowing the declared row schema. */
-    whereNotNull(column: ReadPredicateSelector<C>): this {
+    whereNotNull(column: ReadPredicateSelector<C>): Reparameterize<Self, P> {
         return this.nullPredicate(column, 'whereNotNull');
     }
-    /** Add an OR SQL-null condition. */
-    orWhereNull(column: ReadPredicateSelector<C>): this {
+    orWhereNull(column: ReadPredicateSelector<C>): Reparameterize<Self, P> {
         return this.nullPredicate(column, 'orWhereNull');
     }
-    /** Add an OR SQL-not-null condition. */
-    orWhereNotNull(column: ReadPredicateSelector<C>): this {
+    orWhereNotNull(column: ReadPredicateSelector<C>): Reparameterize<Self, P> {
         return this.nullPredicate(column, 'orWhereNotNull');
     }
 
@@ -298,44 +398,72 @@ export abstract class ReadPredicates<C> {
         column: ReadPredicateSelector<C>,
         values: ReadMembership,
         method: 'whereIn' | 'whereNotIn' | 'orWhereIn' | 'orWhereNotIn'
-    ): this {
+    ): any {
         const context = this.readPredicateContext();
-        const name = context.column(column);
+        const resolved = context.resolve(column);
         const captured = Array.isArray(values)
-            ? values.map(value => captureValue(context.knex, value))
+            ? values.map(value =>
+                  typedValue(context.knex, value, resolved.schema)
+              )
             : captureSubquery(context.knex, values as Knex.QueryBuilder);
-        return this.addReadPredicate(query => {
-            if (typeof captured === 'function') {
-                const rawMethod = method.startsWith('or')
-                    ? 'orWhereRaw'
-                    : 'whereRaw';
-                const operator = method.includes('Not') ? 'not in' : 'in';
-                query[rawMethod](`?? ${operator} (?)`, [name, captured()]);
-            } else {
-                query[method](
-                    name as any,
-                    captured.map(value => value())
-                );
-            }
-        });
+        return this.addReadPredicate(
+            capturedPredicate(
+                (query, parameters) => {
+                    if (typeof captured === 'function') {
+                        const rawMethod = method.startsWith('or')
+                            ? 'orWhereRaw'
+                            : 'whereRaw';
+                        const operator = method.includes('Not')
+                            ? 'not in'
+                            : 'in';
+                        query[rawMethod](`?? ${operator} (?)`, [
+                            resolved.column,
+                            captured()
+                        ]);
+                    } else
+                        query[method](
+                            resolved.column as any,
+                            captured.map(value => value.get(parameters))
+                        );
+                },
+                typeof captured === 'function'
+                    ? []
+                    : captured.flatMap(value => value.parameters)
+            )
+        );
     }
-    /** Match captured values or a SELECT subquery. An empty list matches no rows. */
-    whereIn(column: ReadPredicateSelector<C>, values: ReadMembership): this {
+    /** Match a fixed value tuple or captured SELECT subquery. */
+    whereIn<S extends ReadPredicateSelector<C>, const A extends ReadMembership>(
+        column: S,
+        values: A & CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
         return this.membership(column, values, 'whereIn');
     }
-    /** Exclude captured values or a SELECT subquery. SQL NOT IN null semantics apply. */
-    whereNotIn(column: ReadPredicateSelector<C>, values: ReadMembership): this {
+    whereNotIn<
+        S extends ReadPredicateSelector<C>,
+        const A extends ReadMembership
+    >(
+        column: S,
+        values: A & CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
         return this.membership(column, values, 'whereNotIn');
     }
-    /** Add an OR membership condition. */
-    orWhereIn(column: ReadPredicateSelector<C>, values: ReadMembership): this {
+    orWhereIn<
+        S extends ReadPredicateSelector<C>,
+        const A extends ReadMembership
+    >(
+        column: S,
+        values: A & CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
         return this.membership(column, values, 'orWhereIn');
     }
-    /** Add an OR negative membership condition. */
-    orWhereNotIn(
-        column: ReadPredicateSelector<C>,
-        values: ReadMembership
-    ): this {
+    orWhereNotIn<
+        S extends ReadPredicateSelector<C>,
+        const A extends ReadMembership
+    >(
+        column: S,
+        values: A & CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
         return this.membership(column, values, 'orWhereNotIn');
     }
 
@@ -346,7 +474,7 @@ export abstract class ReadPredicates<C> {
             | 'whereNotExists'
             | 'orWhereExists'
             | 'orWhereNotExists'
-    ): this {
+    ): any {
         const captured = captureSubquery(
             this.readPredicateContext().knex,
             subquery
@@ -359,25 +487,26 @@ export abstract class ReadPredicates<C> {
             query[rawMethod](`${operator} (?)`, [captured()]);
         });
     }
-    /** Require a row in a captured SELECT subquery; use ref() to correlate it. */
-    whereExists(subquery: Knex.QueryBuilder): this {
-        return this.exists(subquery, 'whereExists');
+    whereExists(query: Knex.QueryBuilder): Reparameterize<Self, P> {
+        return this.exists(query, 'whereExists');
     }
-    /** Require no rows in a captured SELECT subquery. */
-    whereNotExists(subquery: Knex.QueryBuilder): this {
-        return this.exists(subquery, 'whereNotExists');
+    whereNotExists(query: Knex.QueryBuilder): Reparameterize<Self, P> {
+        return this.exists(query, 'whereNotExists');
     }
-    /** Add an OR EXISTS predicate. */
-    orWhereExists(subquery: Knex.QueryBuilder): this {
-        return this.exists(subquery, 'orWhereExists');
+    orWhereExists(query: Knex.QueryBuilder): Reparameterize<Self, P> {
+        return this.exists(query, 'orWhereExists');
     }
-    /** Add an OR NOT EXISTS predicate. */
-    orWhereNotExists(subquery: Knex.QueryBuilder): this {
-        return this.exists(subquery, 'orWhereNotExists');
+    orWhereNotExists(query: Knex.QueryBuilder): Reparameterize<Self, P> {
+        return this.exists(query, 'orWhereNotExists');
     }
 
-    /** Trusted SQL predicate with positional value (?) and identifier (??) bindings; not a SQL sandbox. */
-    whereRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): this {
+    /** Trusted SQL with concrete bindings; use a typed predicate for placeholders. */
+    whereRaw<const A extends readonly Knex.RawBinding[]>(
+        sql: string,
+        bindings: A & WithoutParameters<NoInfer<A>>
+    ): Reparameterize<Self, P>;
+    whereRaw(sql: string): Reparameterize<Self, P>;
+    whereRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): any {
         const captured = captureReadRaw(
             this.readPredicateContext().knex,
             sql,
@@ -387,8 +516,12 @@ export abstract class ReadPredicates<C> {
             query.whereRaw(captured());
         });
     }
-    /** Add an OR trusted SQL predicate with captured positional bindings. */
-    orWhereRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): this {
+    orWhereRaw<const A extends readonly Knex.RawBinding[]>(
+        sql: string,
+        bindings: A & WithoutParameters<NoInfer<A>>
+    ): Reparameterize<Self, P>;
+    orWhereRaw(sql: string): Reparameterize<Self, P>;
+    orWhereRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): any {
         const captured = captureReadRaw(
             this.readPredicateContext().knex,
             sql,
@@ -398,64 +531,92 @@ export abstract class ReadPredicates<C> {
             query.orWhereRaw(captured());
         });
     }
-
-    /** Negated bound equality (null uses SQL IS NOT NULL). */
-    whereNot(column: ReadPredicateSelector<C>, value: unknown): this {
-        const context = this.readPredicateContext();
-        const name = context.column(column);
-        const captured = captureValue(context.knex, value);
-        return this.addReadPredicate(query => {
-            query.whereNot(name as any, captured());
-        });
+    /** Negate equality while preserving ordinary SQL null semantics. */
+    whereNot<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
+        value: A & CheckScalarParameter<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
+        return this.comparison('not', column, [value]);
     }
-    /** Match an inclusive range of captured values. */
-    whereBetween(
-        column: ReadPredicateSelector<C>,
-        range: readonly [unknown, unknown]
-    ): this {
+    whereBetween<
+        S extends ReadPredicateSelector<C>,
+        const A extends readonly [unknown, unknown]
+    >(
+        column: S,
+        range: A & CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
         return this.range(column, range, false);
     }
-    /** Exclude an inclusive range of captured values. */
-    whereNotBetween(
-        column: ReadPredicateSelector<C>,
-        range: readonly [unknown, unknown]
-    ): this {
+    whereNotBetween<
+        S extends ReadPredicateSelector<C>,
+        const A extends readonly [unknown, unknown]
+    >(
+        column: S,
+        range: A & CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
         return this.range(column, range, true);
     }
     private range(
         column: ReadPredicateSelector<C>,
         range: readonly [unknown, unknown],
         not: boolean
-    ): this {
+    ): any {
         const context = this.readPredicateContext();
-        const name = context.column(column);
-        const values = range.map(value => captureValue(context.knex, value));
-        return this.addReadPredicate(query => {
-            query[not ? 'whereNotBetween' : 'whereBetween'](name as any, [
-                values[0](),
-                values[1]()
-            ]);
-        });
+        const resolved = context.resolve(column);
+        const values = range.map(value =>
+            typedValue(context.knex, value, resolved.schema)
+        );
+        return this.addReadPredicate(
+            capturedPredicate(
+                (query, parameters) => {
+                    query[not ? 'whereNotBetween' : 'whereBetween'](
+                        resolved.column as any,
+                        [values[0].get(parameters), values[1].get(parameters)]
+                    );
+                },
+                values.flatMap(value => value.parameters)
+            )
+        );
     }
-    /** Match a SQL LIKE pattern. Wildcards retain their SQL meaning. */
-    whereLike(column: ReadPredicateSelector<C>, value: string): this {
-        return this.where(column, 'like', value);
+    whereLike<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
+        value: A &
+            (A extends import('./parameter.js').QueryParameter
+                ? CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+                : string)
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
+        return this.comparison('and', column, ['like', value]);
     }
-    /** Match a case-insensitive PostgreSQL pattern. */
-    whereILike(column: ReadPredicateSelector<C>, value: string): this {
-        return this.where(column, 'ilike', value);
+    whereILike<S extends ReadPredicateSelector<C>, const A>(
+        column: S,
+        value: A &
+            (A extends import('./parameter.js').QueryParameter
+                ? CheckParameterValue<P, NoInfer<A>, PredicateValue<C, S>>
+                : string)
+    ): Reparameterize<Self, ValueParameters<P, A, PredicateValue<C, S>>> {
+        return this.comparison('and', column, ['ilike', value]);
     }
-    /** Compare a JSON path while preserving the declared output schema. */
+    /** JSON-path strings do not provide a schema-derived parameter type. */
+    whereJsonPath<A>(
+        column: ReadPredicateSelector<C>,
+        path: string,
+        operator?: string,
+        value?: A & WithoutParameters<NoInfer<A>>
+    ): Reparameterize<Self, P>;
     whereJsonPath(
         column: ReadPredicateSelector<C>,
         path: string,
         operator = '=',
         value?: unknown
-    ): this {
+    ): any {
+        assertNoParameters(value);
         const context = this.readPredicateContext();
         const name = context.column(column);
-        const client = context.knex.client.config.client;
-        if (!['pg', 'postgres', 'postgresql'].includes(client))
+        if (
+            !['pg', 'postgres', 'postgresql'].includes(
+                context.knex.client.config.client as string
+            )
+        )
             throw new ReadSchemaError(
                 'whereJsonPath() is only supported on PostgreSQL'
             );
@@ -477,16 +638,14 @@ export abstract class ReadPredicates<C> {
     }
 }
 
-/**
- * Predicate-only builder supplied to grouped where/andWhere/orWhere callbacks.
- * Group methods return independent builders; attachment snapshots the returned group.
- * No select, join, order, raw-query escape hatch, then, or execution method exists.
- * Retaining this builder and mutating it after the callback throws.
- */
-export class ReadPredicateBuilder<C> extends ReadPredicates<C> {
+/** Predicate-only immutable builder; no execution, projection or ordering methods. */
+export class ReadPredicateBuilder<
+    C,
+    P extends ParameterState = []
+> extends ReadPredicates<C, P, GroupParameterReader<C>> {
     #context: ReadPredicateContext<C>;
-    #operations: ReadPredicate[] = [];
-    /** @internal Created only for grouped predicates. */
+    #operations: readonly ReadPredicate[] = [];
+    /** @internal Created by a reader to capture a synchronous predicate group. */
     constructor(context: ReadPredicateContext<C>) {
         super();
         this.#context = context;
@@ -494,17 +653,24 @@ export class ReadPredicateBuilder<C> extends ReadPredicates<C> {
     protected readPredicateContext(): ReadPredicateContext<C> {
         return this.#context;
     }
-    protected addReadPredicate(predicate: ReadPredicate): this {
+    protected addReadPredicate(predicate: ReadPredicate): any {
         const copy = new ReadPredicateBuilder(this.#context);
         copy.#operations = [...this.#operations, predicate];
-        return copy as this;
+        return copy;
     }
-    /** @internal Verify that a returned builder belongs to the supplied group. */
-    sameSource(other: ReadPredicateBuilder<C>): boolean {
+    /** @internal Reject builders belonging to another predicate group. */
+    sameSource(other: ReadPredicateBuilder<C, any>): boolean {
         return this.#context === other.#context;
     }
-    /** @internal Snapshot the immutable predicate list. */
+    /** @internal Snapshot the configured group without executing its callbacks again. */
     [finishGroup](): readonly ReadPredicate[] {
         return [...this.#operations];
     }
 }
+
+/** @internal ORM readers specialize the same predicate signatures with their own return type. */
+export type ReadPredicateMethods<
+    C,
+    P extends ParameterState,
+    Self extends ParameterReader
+> = Pick<ReadPredicates<C, P, Self>, keyof ReadPredicates<C, P, Self>>;

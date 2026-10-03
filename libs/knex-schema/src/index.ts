@@ -23,6 +23,12 @@ export {
     resolveColumnRef,
     resolvePropertyKey
 } from './columns.js';
+/** @internal Shared query/ORM composition contract. */
+export {
+    assertParametersBound,
+    COMPILED_READER,
+    isParameterizedQuery
+} from './compiled-query.js';
 // DDL generation
 export {
     generateCreatePolymorphicTables,
@@ -101,6 +107,21 @@ export type {
     VariantReadSchemas
 } from './PolymorphicQueryBuilder.js';
 export { PolymorphicQueryBuilder } from './PolymorphicQueryBuilder.js';
+export { parameter, type QueryParameter } from './parameter.js';
+export type {
+    AttachParameters,
+    BoundQuerySql,
+    CheckParameterState,
+    MergeParameters,
+    ParameterizedQuery,
+    ParameterReader,
+    ParameterState,
+    ParametersOf,
+    QueryArguments,
+    QueryView
+} from './parameter-types.js';
+/** @internal Shared query/ORM fluent typing. */
+export { PARAMETER_READER, PARAMETER_STATE } from './parameter-types.js';
 export type { BoundQuery } from './query.js';
 // Main entry point
 export { createQuery, query } from './query.js';
@@ -120,6 +141,7 @@ export type {
     ReadMembership,
     ReadPredicateBuilder,
     ReadPredicateGroup,
+    ReadPredicateMethods,
     ReadPredicateSelector
 } from './read-predicates.js';
 export type {

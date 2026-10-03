@@ -2,7 +2,7 @@
  * Assert strict JSON without invoking getters or serialization hooks.
  * Shared references are allowed; cycles and lossy JavaScript values are not.
  */
-export function assertJsonValue(value: unknown): void {
+export function assertJsonValue(value: unknown, allowDates = false): void {
     const ancestors = new Set<object>();
     const pending: { value: unknown; path: string; leave?: boolean }[] = [
         { value, path: '$' }
@@ -10,6 +10,12 @@ export function assertJsonValue(value: unknown): void {
     while (pending.length) {
         const item = pending.pop()!;
         const current = item.value;
+        if (
+            allowDates &&
+            current instanceof Date &&
+            Number.isFinite(current.getTime())
+        )
+            continue;
         if (item.leave) {
             ancestors.delete(current as object);
             continue;

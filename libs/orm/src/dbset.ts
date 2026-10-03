@@ -23,8 +23,20 @@ import type {
     VariantReadSchemas
 } from '@cleverbrush/knex-schema';
 import {
+    type AttachParameters,
+    assertParametersBound,
+    type CheckParameterState,
+    COMPILED_READER,
     getPrimaryKeyColumns,
     getVariants,
+    isParameterizedQuery,
+    type MergeParameters,
+    type ParameterReader,
+    type ParameterState,
+    type ParametersOf,
+    type QueryView,
+    type ReadColumns,
+    type ReadPredicateMethods,
     type SchemaQueryBuilder,
     query as schemaQuery
 } from '@cleverbrush/knex-schema';
@@ -86,6 +98,24 @@ type EntityWrites<
         : never;
 };
 
+type EntityFluentMethod =
+    | 'orderBy'
+    | 'orderByRaw'
+    | 'limit'
+    | 'offset'
+    | 'transacting'
+    | 'withDeleted'
+    | 'onlyDeleted'
+    | 'unscoped'
+    | 'scoped';
+type EntityFluent<Q, R> = {
+    [K in Extract<keyof Q, EntityFluentMethod>]: Q[K] extends (
+        ...args: infer A
+    ) => unknown
+        ? (...args: A) => QueryView<R>
+        : never;
+};
+
 // These methods return scalars or detached read plans, not tracked entity rows.
 const untrackedResultMethods = new Set<PropertyKey>([
     'apply',
@@ -118,18 +148,38 @@ const untrackedResultMethods = new Set<PropertyKey>([
 export type EntityQuery<
     TEntity extends Entity<any, any, any>,
     TResult,
-    Writable extends boolean = true
+    Writable extends boolean = true,
+    P extends ParameterState = []
 > =
     ReadVariantMetadata<EntitySchema<TEntity>> extends {
         discriminator: string;
         variants: Record<string, unknown>;
     }
-        ? PolymorphicEntityQuery<TEntity>
-        : TableEntityQuery<TEntity, TResult, Writable>;
+        ? PolymorphicEntityQuery<TEntity, P>
+        : TableEntityQuery<TEntity, TResult, Writable, P>;
 
 /** A tracked-capable polymorphic read; projections use forVariant(). */
-export interface PolymorphicEntityQuery<TEntity extends Entity<any, any, any>>
-    extends PolymorphicQueryBuilder<EntitySchema<TEntity>>,
+export interface PolymorphicEntityQuery<
+    TEntity extends Entity<any, any, any>,
+    P extends ParameterState = []
+> extends Omit<
+            PolymorphicQueryBuilder<
+                EntitySchema<TEntity>,
+                VariantReadSchemas<EntitySchema<TEntity>>,
+                P
+            >,
+            | keyof ReadPredicateMethods<any, any, ParameterReader>
+            | EntityFluentMethod
+        >,
+        ReadPredicateMethods<
+            ReadColumns<EntitySchema<TEntity>, keyof EntityRelations<TEntity>>,
+            P,
+            PolymorphicEntityParameterReader<TEntity>
+        >,
+        EntityFluent<
+            PolymorphicQueryBuilder<EntitySchema<TEntity>>,
+            PolymorphicEntityQuery<TEntity, P>
+        >,
         Pick<
             TableEntityQuery<TEntity, EntityResult<TEntity>>,
             'find' | 'findOrFail' | 'findMany'
@@ -139,17 +189,32 @@ export interface PolymorphicEntityQuery<TEntity extends Entity<any, any, any>>
 export interface TableEntityQuery<
     TEntity extends Entity<any, any, any>,
     TResult,
-    Writable extends boolean = true
+    Writable extends boolean = true,
+    P extends ParameterState = []
 > extends Omit<
             SchemaQueryBuilder<
                 EntitySchema<TEntity>,
                 EntityRowSchema<TResult>,
                 EntityRelations<TEntity>,
-                Writable
+                Writable,
+                P
             >,
-            'include' | 'includeVariant' | WriteMethod
+            | 'include'
+            | 'includeVariant'
+            | WriteMethod
+            | keyof ReadPredicateMethods<any, any, ParameterReader>
+            | EntityFluentMethod
         >,
-        EntityWrites<TEntity, TResult, Writable> {
+        EntityFluent<
+            SchemaQueryBuilder<EntitySchema<TEntity>>,
+            TableEntityQuery<TEntity, TResult, Writable, P>
+        >,
+        EntityWrites<TEntity, TResult, Writable>,
+        ReadPredicateMethods<
+            ReadColumns<EntitySchema<TEntity>, keyof EntityRelations<TEntity>>,
+            P,
+            EntityParameterReader<TEntity, TResult, Writable>
+        > {
     /** Configure a discriminator branch with the canonical strongly typed query API. */
     forVariant: SchemaAwareQuery<EntitySchema<TEntity>> extends {
         forVariant: infer F;
@@ -176,20 +241,26 @@ export interface TableEntityQuery<
         sel: (t: RelKeyTree<TEntity>) => K,
         customize?: (
             query: SchemaAwareQuery<RelatedSchema<TEntity, K>>
-        ) => Child
-    ): EntityQuery<
-        TEntity,
-        TResult & {
-            -readonly [P in keyof Pick<
-                EntityRelations<TEntity>,
-                K
-            >]-?: EntityRelations<TEntity>[K] extends {
-                kind: 'hasMany' | 'belongsToMany';
-            }
-                ? InferType<Child['rowSchema']>[]
-                : InferType<Child['rowSchema']> | null;
-        },
-        false
+        ) => Child &
+            CheckParameterState<
+                MergeParameters<P, ParametersOf<NoInfer<Child>>>
+            >
+    ): QueryView<
+        EntityQuery<
+            TEntity,
+            TResult & {
+                -readonly [P in keyof Pick<
+                    EntityRelations<TEntity>,
+                    K
+                >]-?: EntityRelations<TEntity>[K] extends {
+                    kind: 'hasMany' | 'belongsToMany';
+                }
+                    ? InferType<Child['rowSchema']>[]
+                    : InferType<Child['rowSchema']> | null;
+            },
+            false,
+            AttachParameters<P, ParametersOf<Child>, `relation:${K}`>
+        >
     >;
 
     /**
@@ -253,6 +324,36 @@ export interface TableEntityQuery<
     findMany(
         pks: ReadonlyArray<PrimaryKeyValueOf<EntitySchema<TEntity>>>
     ): Promise<TResult[]>;
+}
+
+/** @internal Typed ORM fluent return constructors. */
+interface EntityParameterReader<
+    TEntity extends Entity<any, any, any>,
+    TResult,
+    Writable extends boolean
+> extends ParameterReader {
+    readonly result: QueryView<
+        TableEntityQuery<
+            TEntity,
+            TResult,
+            Writable,
+            this['parameters'] extends ParameterState
+                ? this['parameters']
+                : never
+        >
+    >;
+}
+interface PolymorphicEntityParameterReader<
+    TEntity extends Entity<any, any, any>
+> extends ParameterReader {
+    readonly result: QueryView<
+        PolymorphicEntityQuery<
+            TEntity,
+            this['parameters'] extends ParameterState
+                ? this['parameters']
+                : never
+        >
+    >;
 }
 
 // ---------------------------------------------------------------------------
@@ -359,14 +460,29 @@ export interface DbSetOperations<TEntity extends Entity<any, any, any>> {
  */
 export interface VariantDbSet<
     TEntity extends Entity<any, any, any>,
-    K extends string
-> extends PolymorphicQueryBuilder<
-        EntitySchema<TEntity>,
-        Pick<
-            VariantReadSchemas<EntitySchema<TEntity>>,
-            Extract<K, keyof VariantReadSchemas<EntitySchema<TEntity>>>
-        >
-    > {
+    K extends string,
+    P extends ParameterState = []
+> extends Omit<
+            PolymorphicQueryBuilder<
+                EntitySchema<TEntity>,
+                Pick<
+                    VariantReadSchemas<EntitySchema<TEntity>>,
+                    Extract<K, keyof VariantReadSchemas<EntitySchema<TEntity>>>
+                >,
+                P
+            >,
+            | keyof ReadPredicateMethods<any, any, ParameterReader>
+            | EntityFluentMethod
+        >,
+        ReadPredicateMethods<
+            ReadColumns<EntitySchema<TEntity>, keyof EntityRelations<TEntity>>,
+            P,
+            VariantParameterReader<TEntity, K>
+        >,
+        EntityFluent<
+            PolymorphicQueryBuilder<EntitySchema<TEntity>>,
+            VariantDbSet<TEntity, K, P>
+        > {
     /** Look up a single row by PK, typed to this variant. */
     find(
         pk: PrimaryKeyValueOf<EntitySchema<TEntity>>
@@ -407,7 +523,24 @@ export interface VariantDbSet<
     restore(): Promise<VariantResult<TEntity, K>[]>;
 
     /** Return a new variant view bound to `trx`. */
-    withTransaction(trx: Knex.Transaction): VariantDbSet<TEntity, K>;
+    withTransaction(
+        trx: Knex.Transaction
+    ): QueryView<VariantDbSet<TEntity, K, P>>;
+}
+
+interface VariantParameterReader<
+    TEntity extends Entity<any, any, any>,
+    K extends string
+> extends ParameterReader {
+    readonly result: QueryView<
+        VariantDbSet<
+            TEntity,
+            K,
+            this['parameters'] extends ParameterState
+                ? this['parameters']
+                : never
+        >
+    >;
 }
 
 // ---------------------------------------------------------------------------
@@ -430,9 +563,32 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
     const proxy: EntityQuery<TEntity, TResult> = new Proxy(
         sqb as unknown as object,
         {
+            apply(target, _this, args) {
+                return Reflect.apply(target as Function, undefined, args).then(
+                    (rows: unknown[]) =>
+                        onResults && sqb.returnsEntityRows
+                            ? (onResults(rows) ?? rows)
+                            : rows
+                );
+            },
             get(target, prop, receiver) {
                 if (prop === '_sqb') return sqb;
                 if (prop === '_entity') return entity;
+                if (
+                    isParameterizedQuery(sqb) &&
+                    [
+                        'find',
+                        'findOrFail',
+                        'findMany',
+                        'insert',
+                        'update',
+                        'delete',
+                        'restore',
+                        'hardDelete'
+                    ].includes(String(prop))
+                ) {
+                    return () => assertParametersBound(sqb);
+                }
 
                 if (
                     prop === 'find' ||
@@ -485,7 +641,7 @@ function wrapQuery<TEntity extends Entity<any, any, any>, TResult>(
                     if (result === sqb) return proxy;
                     if (
                         result &&
-                        typeof result.execute === 'function' &&
+                        typeof result[COMPILED_READER] === 'function' &&
                         typeof result.sameSource === 'function' &&
                         sqb.sameSource(result)
                     )
@@ -801,9 +957,32 @@ function wrapVariantQuery<
     const proxy: VariantDbSet<TEntity, K> = new Proxy(
         sqb as unknown as object,
         {
+            apply(target, _this, args) {
+                return Reflect.apply(target as Function, undefined, args).then(
+                    (rows: unknown[]) =>
+                        onResults && sqb.returnsEntityRows
+                            ? (onResults(rows) ?? rows)
+                            : rows
+                );
+            },
             get(target, prop, receiver) {
                 if (prop === '_sqb') return sqb;
                 if (prop === '_entity') return entity;
+                if (
+                    isParameterizedQuery(sqb) &&
+                    [
+                        'find',
+                        'findOrFail',
+                        'findMany',
+                        'insert',
+                        'update',
+                        'delete',
+                        'restore',
+                        'hardDelete'
+                    ].includes(String(prop))
+                ) {
+                    return () => assertParametersBound(sqb);
+                }
 
                 // --- find* delegated to the shared helper ---
                 if (
@@ -903,7 +1082,7 @@ function wrapVariantQuery<
                     if (result === sqb) return proxy;
                     if (
                         result &&
-                        typeof result.execute === 'function' &&
+                        typeof result[COMPILED_READER] === 'function' &&
                         typeof result.sameSource === 'function' &&
                         sqb.sameSource(result)
                     )
