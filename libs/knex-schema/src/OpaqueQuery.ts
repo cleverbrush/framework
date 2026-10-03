@@ -2,6 +2,7 @@ import type { InferType } from '@cleverbrush/schema';
 import type { Knex } from 'knex';
 import { captureReadRaw } from './read-predicates.js';
 import { type ReadObject, ReadSchemaError } from './read-schema.js';
+import { actualConnection } from './sql-description.js';
 
 /** Explicit output contract required when Framework cannot infer the SQL row shape. */
 export interface QueryOutput<S extends ReadObject> {
@@ -38,6 +39,7 @@ export class OpaqueQuery<S extends ReadObject> {
         sql: Knex.QueryBuilder,
         options: QueryOutput<S>
     ): OpaqueQuery<S> {
+        knex = actualConnection(knex);
         const compiled = sql.toSQL();
         if (Array.isArray(compiled) || compiled.method !== 'select')
             throw new ReadSchemaError(

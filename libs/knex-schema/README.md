@@ -202,6 +202,102 @@ Available WHERE methods: `where`, `andWhere`, `orWhere`, `whereNot`, `whereIn`, 
 
 ---
 
+## Connection-independent query definitions
+
+Define reads once at module scope with `query(Schema)`, then supply an injected
+Knex connection or caller-owned transaction when using them. Definitions are
+immutable and **not thenable**: constructing them, accessing `rowSchema`, or
+awaiting the definition itself never runs a query. No Knex client is created
+behind the scenes.
+
+```ts
+// data/user-queries.ts
+import { parameter, query } from '@cleverbrush/knex-schema';
+import { UserSchema } from './user-schema.js';
+
+export const findUser = query(UserSchema)
+    .where(user => user.id, parameter('id'));
+
+export const userNames = query(UserSchema)
+    .select(user => ({ id: user.id, name: user.name }))
+    .orderBy(user => user.name);
+
+export const userNameRow = userNames.rowSchema; // available without Knex
+```
+
+```ts
+// api/handlers/get-user.ts
+import type { Knex } from 'knex';
+import { findUser, userNames } from '../../data/user-queries.js';
+
+// The controller's dependency-injection layer supplies knex.
+export async function getUser(knex: Knex, id: number) {
+    return findUser.query(knex, id).first(); // inferred row | undefined
+}
+
+export async function listUserNames(knex: Knex) {
+    return userNames(knex); // inferred { id: number; name: string }[]
+}
+
+export async function renameUser(knex: Knex, id: number, name: string) {
+    return knex.transaction(async trx => {
+        await findUser.query(trx, id).update({ name });
+        return findUser(trx, id); // SELECT on the same transaction
+    });
+}
+```
+
+The connection is always the first argument; parameter values follow in
+first-appearance order. Parameterless definitions still require a connection:
+`userNames(knex)`, `userNames.query(knex)`, and `userNames.toSQL(knex)`.
+`findUser.toSQL(knex, id)` returns SQL with placeholders and independent bindings,
+without executing it. Direct compiled execution currently requires PostgreSQL.
+
+Framework HTTP handlers can stay in separate files with the same contract-bound
+types. Here `GetUserEndpoint` declares the `id` parameter and injects a Knex token
+under `knex`:
+
+```ts
+// api/handlers/get-user.ts
+import { NotFoundError, type Handler } from '@cleverbrush/server';
+import type { GetUserEndpoint } from '../endpoints.js';
+import { findUser } from '../../data/user-queries.js';
+
+export const getUserHandler: Handler<typeof GetUserEndpoint> = async (
+    { params },
+    { knex }
+) => {
+    const user = await findUser.query(knex, params.id).first();
+    if (!user) throw new NotFoundError('User not found');
+    return user;
+};
+```
+
+Definitions support table and named projections, typed aggregates, predicate
+groups, scopes, alias joins, relation includes, and STI/CTI variants. Their types
+retain positional parameter inference and projection/variant row schemas.
+Selectors, scopes and customizers run during definition, **not** when binding
+or executing. Captured dates, arrays and JSON values are snapshotted.
+
+Each immutable definition lazily caches its compiled SELECT separately for each
+actual Knex instance, using weak references. Different instances never share a
+plan, even when their connection settings match: identifier formatting and
+other client configuration may differ. Directly supplied transactions have
+their own cache entries. Explicit `.transacting(trx)` derivatives of a bound
+parameterized reader retain the existing safe compilation-sharing behavior.
+Each invocation has fresh bindings and executes against the database; this is
+not a result cache. The caller owns connection disposal and transaction lifetime.
+
+`.query(knex, ...values)` creates an independent ordinary reader for additional
+filters, `first()`, pagination, native SQL composition, or allowed writes. Writes
+still require an unprojected, writable table shape. Bind before using `ref()`,
+native Knex subqueries/raw objects, `apply()`, or raw projections. String raw
+predicates/orderings with concrete, captured bindings remain available during
+definition; they cannot introduce parameter placeholders.
+
+`query(knex, Schema)`, `createQuery(knex)`, and ORM DbSet APIs remain supported.
+Use them when a connection is already available while configuring the query.
+
 ## Parameterized compiled queries
 
 Use `parameter('name')` in a typed predicate to make a query callable. Call it
@@ -1061,10 +1157,13 @@ See [Composable read queries](#composable-read-queries) for typed flat joins wit
 ordering, and multi-column cursor pagination. These APIs preserve existing calls
 and include runtime, type, and PostgreSQL integration coverage.
 
-### `query(knex, schema, baseQuery?)`
+### `query(schema)` / `query(knex, schema)`
 
-Creates a `SchemaQueryBuilder`. `schema` must have `.hasTableName()` set.
-Optionally pass a `baseQuery` (e.g. a scoped `knex('users').where('deleted_at', null)`) as the starting point.
+`query(schema)` creates a connection-independent callable definition;
+`query(knex, schema)` creates an ordinary connection-bound reader. Both infer
+table, alias, or polymorphic query types. Table schemas need `.hasTableName()`.
+Raw source arguments are not supported; bind first and use
+`apply(configure, { output })` when changing the SQL output shape.
 
 ### `SchemaQueryBuilder<TLocalSchema, TResult>`
 

@@ -249,6 +249,28 @@ for scoped search, subquery snapshots, pagination, and raw-SQL boundaries.
 
 ## Parameterized compiled reads
 
+For module-level reads that receive an injected connection only at execution,
+`query` and `parameter` are also re-exported from this package:
+
+```ts
+// data/user-queries.ts
+import { parameter, query } from '@cleverbrush/orm';
+import { UserSchema } from './user-schema.js';
+
+export const findUser = query(UserSchema)
+    .where(user => user.id, parameter('id'));
+
+// api/handlers/get-user.ts — db is the injected DbContext
+const user = await findUser.query(db.knex, userId).first();
+const rows = await findUser(db.knex, userId);
+```
+
+These connection-independent reads return detached schema-backed rows, not
+entities registered in a DbContext's identity map. Use DbSet queries below when
+tracking, `find()` helpers or context-managed changes are required. See the
+[multi-file query-definition example](../knex-schema/README.md#connection-independent-query-definitions)
+for transactions, connection-specific SQL caching and binding before writes.
+
 `parameter` is re-exported by `@cleverbrush/orm`. Adding a named placeholder to
 a DbSet query creates a callable SELECT with schema-inferred positional arguments:
 

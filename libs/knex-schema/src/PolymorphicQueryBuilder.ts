@@ -72,6 +72,12 @@ import {
     type SchemaAwareQuery,
     SchemaQueryBuilder
 } from './SchemaQueryBuilder.js';
+import {
+    bindDescriptionConnection,
+    bindSql,
+    nativeSql,
+    transactionConnection
+} from './sql-description.js';
 import type { PaginationResult } from './types.js';
 
 type VariantMap<S> =
@@ -156,15 +162,17 @@ type BranchSource<
 type VariantRelationQuery<
     S extends ReadObject,
     K extends keyof VariantMap<S> & string,
-    R extends string
+    R extends string,
+    Connected extends boolean = true
 > = R extends keyof ReadRelations<BranchSource<S, K>>
-    ? SchemaAwareQuery<Related<ReadRelations<BranchSource<S, K>>[R]>>
+    ? SchemaAwareQuery<Related<ReadRelations<BranchSource<S, K>>[R]>, Connected>
     : SchemaQueryBuilder<any, any>;
 
 type BranchQueries<
     S extends ReadObject,
     B extends Record<string, ReadObject>,
-    P extends ParameterState = []
+    P extends ParameterState = [],
+    Connected extends boolean = true
 > = {
     [K in keyof B & keyof VariantMap<S> & string]: QueryView<
         SchemaQueryBuilder<
@@ -172,8 +180,10 @@ type BranchQueries<
             B[K],
             ReadRelations<S> & ReadRelations<VariantBody<S, K>>,
             true,
-            ScopedParameters<P, `variant:${K}`>
-        >
+            ScopedParameters<P, `variant:${K}`>,
+            Connected
+        >,
+        Connected
     >;
 };
 type Selector<S extends ReadObject> = (
@@ -192,11 +202,12 @@ type PolymorphicOrder =
 export class PolymorphicQueryBuilder<
     S extends ReadObject,
     B extends Record<string, ReadObject> = VariantReadSchemas<S>,
-    P extends ParameterState = []
+    P extends ParameterState = [],
+    Connected extends boolean = true
 > extends ReadPredicates<
     ReadColumns<S, keyof ReadRelations<S>>,
     P,
-    PolymorphicParameterReader<S, B>
+    PolymorphicParameterReader<S, B, Connected>
 > {
     /** @internal Nominal identity for typed child-query customizers. */
     declare readonly [READ_QUERY]: true;
@@ -206,9 +217,9 @@ export class PolymorphicQueryBuilder<
     readonly variantRowSchemas: Readonly<B>;
     private branches: Record<
         string,
-        SchemaQueryBuilder<any, any, any, any, any>
+        SchemaQueryBuilder<any, any, any, any, any, Connected>
     >;
-    private fallback: SchemaQueryBuilder<any, any, any, any, any>;
+    private fallback: SchemaQueryBuilder<any, any, any, any, any, Connected>;
     private orders: PolymorphicOrder[] = [];
     private rowLimit?: number;
     private rowOffset?: number;
@@ -268,7 +279,14 @@ export class PolymorphicQueryBuilder<
             buildColumnMap(source).propToCol.get(config.discriminatorKey) ??
             config.discriminatorKey;
         // Invert only the discriminator guard, not caller/default-scope filters.
-        this.fallback = new SchemaQueryBuilder<any, any, any, any, any>(
+        this.fallback = new SchemaQueryBuilder<
+            any,
+            any,
+            any,
+            any,
+            any,
+            Connected
+        >(
             knex,
             common,
             knex
@@ -372,7 +390,7 @@ export class PolymorphicQueryBuilder<
     private branch(
         key: string,
         body: boolean
-    ): SchemaQueryBuilder<any, any, any, any, any> {
+    ): SchemaQueryBuilder<any, any, any, any, any, Connected> {
         const config = getVariants(this.source)!;
         const variant = config.variants[key];
         const baseInfo = this.source.introspect();
@@ -488,7 +506,7 @@ export class PolymorphicQueryBuilder<
                 '__read_cti_present'
             );
         }
-        return new SchemaQueryBuilder<any, any, any, any, any>(
+        return new SchemaQueryBuilder<any, any, any, any, any, Connected>(
             this.knex,
             schema,
             query.select(columns),
@@ -560,25 +578,25 @@ export class PolymorphicQueryBuilder<
         return finishParameterizedQuery(copy);
     }
     /** Remove the default scope while preserving explicit predicates. */
-    unscoped(): QueryView<this> {
+    unscoped(): QueryView<this, Connected> {
         const copy = this.copy();
         copy.skipDefaults = true;
         return finishParameterizedQuery(copy) as any;
     }
     /** Include soft-deleted entities in every branch. */
-    withDeleted(): QueryView<this> {
+    withDeleted(): QueryView<this, Connected> {
         const copy = this.copy();
         copy.deleted = 'include';
         return finishParameterizedQuery(copy) as any;
     }
     /** Match only soft-deleted entities in every branch. */
-    onlyDeleted(): QueryView<this> {
+    onlyDeleted(): QueryView<this, Connected> {
         const copy = this.copy();
         copy.deleted = 'only';
         return finishParameterizedQuery(copy) as any;
     }
     /** Apply a named immutable scope once. */
-    scoped(name: string): QueryView<this> {
+    scoped(name: string): QueryView<this, Connected> {
         const scope = (
             this.source.introspect().extensions?.scopes as
                 | Record<string, Function>
@@ -618,12 +636,12 @@ export class PolymorphicQueryBuilder<
     includeVariant<
         K extends keyof B & keyof VariantMap<S> & string,
         R extends string,
-        Child extends ReadQueryShape = VariantRelationQuery<S, K, R>
+        Child extends ReadQueryShape = VariantRelationQuery<S, K, R, Connected>
     >(
         key: K,
         relation: R,
         customize?: (
-            query: VariantRelationQuery<S, K, R>
+            query: VariantRelationQuery<S, K, R, Connected>
         ) => Child &
             CheckParameterState<
                 MergeParameters<P, ParametersOf<NoInfer<Child>>>
@@ -655,8 +673,10 @@ export class PolymorphicQueryBuilder<
                     ParametersOf<Child>
                 >,
                 `variant:${K}`
-            >
-        >
+            >,
+            Connected
+        >,
+        Connected
     > {
         return this.forVariant(
             key,
@@ -668,12 +688,13 @@ export class PolymorphicQueryBuilder<
     include<
         K extends keyof ReadRelations<S> & string,
         Child extends ReadQueryShape = SchemaAwareQuery<
-            Related<ReadRelations<S>[K]>
+            Related<ReadRelations<S>[K]>,
+            Connected
         >
     >(
         selector: K | ((relations: { [P in keyof ReadRelations<S>]: P }) => K),
         customize?: (
-            query: SchemaAwareQuery<Related<ReadRelations<S>[K]>>
+            query: SchemaAwareQuery<Related<ReadRelations<S>[K]>, Connected>
         ) => Child &
             CheckParameterState<
                 AttachParameters<
@@ -698,8 +719,10 @@ export class PolymorphicQueryBuilder<
                     }
                 >;
             },
-            AttachParameters<P, ParametersOf<Child>, `relation:${K}`>
-        >
+            AttachParameters<P, ParametersOf<Child>, `relation:${K}`>,
+            Connected
+        >,
+        Connected
     > {
         const relations = (this.source.introspect().extensions?.relations ??
             []) as { name: string }[];
@@ -775,8 +798,10 @@ export class PolymorphicQueryBuilder<
                     PredicateValue<ReadColumns<BranchSource<S, K>>, Sel>
                 >,
                 `variant:${K}`
-            >
-        >
+            >,
+            Connected
+        >,
+        Connected
     > {
         return this.forVariant(key, query =>
             (query as any).where(selector, operator, value)
@@ -788,7 +813,7 @@ export class PolymorphicQueryBuilder<
             | Selector<S>
             | (keyof ReadColumns<S, keyof ReadRelations<S>> & string),
         direction: 'asc' | 'desc' = 'asc'
-    ): QueryView<this> {
+    ): QueryView<this, Connected> {
         if (direction !== 'asc' && direction !== 'desc')
             throw new ReadSchemaError('Invalid ordering direction');
         const column =
@@ -808,13 +833,13 @@ export class PolymorphicQueryBuilder<
     orderByRaw<const A extends readonly Knex.RawBinding[]>(
         sql: string,
         bindings: A & WithoutParameters<NoInfer<A>> = [] as any
-    ): QueryView<this> {
+    ): QueryView<this, Connected> {
         const copy = this.copy();
         copy.orders.push({ raw: captureReadRaw(this.knex, sql, bindings) });
         return finishParameterizedQuery(copy) as any;
     }
     /** Limit the combined result across all variants. */
-    limit(count: number): QueryView<this> {
+    limit(count: number): QueryView<this, Connected> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Limit must be a non-negative integer');
         const copy = this.copy();
@@ -828,8 +853,10 @@ export class PolymorphicQueryBuilder<
         PolymorphicQueryBuilder<
             S,
             Pick<B, K[number]>,
-            SelectParameterVariants<P, K[number]>
-        >
+            SelectParameterVariants<P, K[number]>,
+            Connected
+        >,
+        Connected
     > {
         if (
             !keys.length ||
@@ -848,7 +875,7 @@ export class PolymorphicQueryBuilder<
         return finishParameterizedQuery(copy) as any;
     }
     /** Skip rows of the combined result, using a stable explicit ordering. */
-    offset(count: number): QueryView<this> {
+    offset(count: number): QueryView<this, Connected> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Offset must be a non-negative integer');
         const copy = this.copy();
@@ -866,7 +893,7 @@ export class PolymorphicQueryBuilder<
     >(
         key: K,
         configure: (
-            query: BranchQueries<S, B, P>[K]
+            query: BranchQueries<S, B, P, Connected>[K]
         ) => Q &
             CheckParameterState<
                 AttachParameters<P, ParametersOf<NoInfer<Q>>, `variant:${K}`>
@@ -875,8 +902,10 @@ export class PolymorphicQueryBuilder<
         PolymorphicQueryBuilder<
             S,
             Omit<B, K> & Record<K, Q['rowSchema']>,
-            AttachParameters<P, ParametersOf<Q>, `variant:${K}`>
-        >
+            AttachParameters<P, ParametersOf<Q>, `variant:${K}`>,
+            Connected
+        >,
+        Connected
     > {
         const current = this.branches[key];
         if (!current) throw new ReadSchemaError(`Unknown variant: ${key}`);
@@ -902,7 +931,10 @@ export class PolymorphicQueryBuilder<
         copy.branches[key] = configured as unknown as SchemaQueryBuilder<
             any,
             any,
-            any
+            any,
+            any,
+            any,
+            Connected
         >;
         copy.refresh();
         return finishParameterizedQuery(copy) as any;
@@ -1069,14 +1101,14 @@ export class PolymorphicQueryBuilder<
     }
     /** Return a separately mutable Knex snapshot of the union statement. */
     toKnexQuery(): Knex.QueryBuilder {
-        return this.compile();
+        return nativeSql(this.compile());
     }
     /** Configure a captured union SELECT and declare its complete raw output shape. */
     apply<O extends ReadObject>(
         configure: (query: Knex.QueryBuilder) => Knex.QueryBuilder | undefined,
         options: QueryOutput<O>
     ): OpaqueQuery<O> {
-        const sql = this.compile();
+        const sql = this.toKnexQuery();
         const result = configure(sql);
         if (result !== undefined && result !== sql) {
             if (result instanceof Promise) void result.catch(() => {});
@@ -1176,9 +1208,9 @@ export class PolymorphicQueryBuilder<
         return this.execute().then(resolve, reject);
     }
     /** Bind independent branch queries to a caller-owned transaction. */
-    transacting(trx: Knex.Transaction): QueryView<this> {
+    transacting(trx: Knex.Transaction): QueryView<this, Connected> {
         const copy = this.copy();
-        Object.assign(copy, { knex: trx });
+        Object.assign(copy, { knex: transactionConnection(this.knex, trx) });
         copy.branches = Object.fromEntries(
             Object.entries(this.branches).map(([key, q]) => [
                 key,
@@ -1208,6 +1240,24 @@ export class PolymorphicQueryBuilder<
                 ...[...branches.values()].flatMap(branch => branch.uses),
                 ...(this.includeUnknown ? readerParameters(this.fallback) : [])
             ],
+            connect: knex => {
+                const copy = this.copy();
+                const bound = bindDescriptionConnection(knex);
+                Object.assign(copy, {
+                    knex: bound,
+                    base: bindSql(this.base, bound)
+                });
+                copy.branches = Object.fromEntries(
+                    Object.entries(this.branches).map(([key, branch]) => [
+                        key,
+                        branch[COMPILED_READER]().connect!(knex)
+                    ])
+                ) as typeof this.branches;
+                copy.fallback = this.fallback[COMPILED_READER]().connect!(
+                    knex
+                ) as typeof this.fallback;
+                return copy;
+            },
             compile: () => this.compile(undefined, COMPILE_PARAMETERS),
             decode: row => {
                 const value = (row as any).__read_poly;
@@ -1241,7 +1291,8 @@ export class PolymorphicQueryBuilder<
 /** @internal Fluent return constructor for polymorphic SELECTs. */
 export interface PolymorphicParameterReader<
     S extends ReadObject,
-    B extends Record<string, ReadObject>
+    B extends Record<string, ReadObject>,
+    Connected extends boolean = true
 > extends ParameterReader {
     readonly result: QueryView<
         PolymorphicQueryBuilder<
@@ -1249,7 +1300,17 @@ export interface PolymorphicParameterReader<
             B,
             this['parameters'] extends ParameterState
                 ? this['parameters']
-                : never
-        >
+                : never,
+            Connected extends true
+                ? true
+                : this['connection'] extends boolean
+                  ? this['connection']
+                  : false
+        >,
+        Connected extends true
+            ? true
+            : this['connection'] extends boolean
+              ? this['connection']
+              : false
     >;
 }

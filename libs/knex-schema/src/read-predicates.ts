@@ -24,6 +24,10 @@ import {
     type WithoutParameters
 } from './parameter-types.js';
 import { type ReadSchema, ReadSchemaError } from './read-schema.js';
+import {
+    assertPortableBindings,
+    isConnectionDescription
+} from './sql-description.js';
 
 const finishGroup = Symbol('finishReadPredicateGroup');
 
@@ -106,9 +110,15 @@ export function captureReadRaw(
     bindings: readonly Knex.RawBinding[] = []
 ): () => Knex.Raw {
     assertNoParameters(bindings);
+    if (isConnectionDescription(knex)) {
+        assertPortableBindings(bindings);
+        const captured = bindings.map(copyBinding);
+        return () => knex.raw(sql, captured.map(copyBinding));
+    }
     return captureSql(knex, knex.raw(sql, [...bindings]));
 }
 function captureSubquery(knex: Knex, query: Knex.QueryBuilder): () => Knex.Raw {
+    if (isConnectionDescription(knex)) assertPortableBindings(query);
     if (
         !query ||
         typeof query.toSQL !== 'function' ||
@@ -130,6 +140,7 @@ function captureSubquery(knex: Knex, query: Knex.QueryBuilder): () => Knex.Raw {
 /** @internal Snapshot concrete bindings; placeholders require a typed predicate. */
 export function captureValue(knex: Knex, value: any): () => any {
     assertNoParameters(value);
+    if (isConnectionDescription(knex)) assertPortableBindings(value);
     if (value && typeof value.toSQL === 'function')
         return typeof value.clone === 'function'
             ? captureSubquery(knex, value)
@@ -179,6 +190,8 @@ export abstract class ReadPredicates<
     /** Quote a mapped column for trusted raw SQL or correlated subqueries. */
     ref(selector: ReadPredicateSelector<C>): Knex.Ref<string, {}> | Knex.Raw {
         const { knex, column } = this.readPredicateContext();
+        if (isConnectionDescription(knex))
+            throw new ReadSchemaError('Bind a connection before calling ref()');
         const resolved = column(selector);
         return typeof resolved === 'string' ? knex.ref(resolved) : resolved;
     }
@@ -613,6 +626,7 @@ export abstract class ReadPredicates<
         const context = this.readPredicateContext();
         const name = context.column(column);
         if (
+            !isConnectionDescription(context.knex) &&
             !['pg', 'postgres', 'postgresql'].includes(
                 context.knex.client.config.client as string
             )
@@ -620,21 +634,33 @@ export abstract class ReadPredicates<
             throw new ReadSchemaError(
                 'whereJsonPath() is only supported on PostgreSQL'
             );
-        if (operator === '@?' || operator === '@@')
-            return this.whereRaw(`?? ${operator === '@?' ? '@\\?' : '@@'} ?`, [
-                name,
-                path
-            ]);
-        if (!ALLOWED_OPS.has(operator.toLowerCase()))
+        const predicateOperator = operator === '@?' || operator === '@@';
+        if (!predicateOperator && !ALLOWED_OPS.has(operator.toLowerCase()))
             throw new ReadSchemaError('Unsupported JSON comparison operator');
-        return this.whereRaw(
-            `jsonb_path_query_first(??, ?) ${operator} ?::jsonb`,
-            [
-                name,
-                path.startsWith('$') ? path : `$.${path}`,
-                JSON.stringify(value)
-            ]
+        const captured = captureReadRaw(
+            context.knex,
+            predicateOperator
+                ? `?? ${operator === '@?' ? '@\\?' : '@@'} ?`
+                : `jsonb_path_query_first(??, ?) ${operator} ?::jsonb`,
+            predicateOperator
+                ? [name, path]
+                : [
+                      name,
+                      path.startsWith('$') ? path : `$.${path}`,
+                      JSON.stringify(value)
+                  ]
         );
+        return this.addReadPredicate(query => {
+            if (
+                !['pg', 'postgres', 'postgresql'].includes(
+                    query.client.config.client as string
+                )
+            )
+                throw new ReadSchemaError(
+                    'whereJsonPath() is only supported on PostgreSQL'
+                );
+            query.whereRaw(captured());
+        });
     }
 }
 

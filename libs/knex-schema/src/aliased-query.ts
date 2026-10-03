@@ -13,6 +13,11 @@ import {
 import { getTableName } from './extension.js';
 import { ALLOWED_OPS } from './operations/helpers.js';
 import { SchemaQueryBuilder } from './SchemaQueryBuilder.js';
+import {
+    bindDescriptionConnection,
+    bindSql,
+    transactionConnection
+} from './sql-description.js';
 import { isSqlIdentifier } from './sql-identifiers.js';
 
 type TableSchema = ObjectSchemaBuilder<any, any, any, any, any, any, any>;
@@ -163,6 +168,14 @@ export class AliasedQuerySource<TTables, TResult = never> {
     /** @internal Connection access without cloning the query planner. */
     readConnection(): Knex {
         return this.knex;
+    }
+
+    /** @internal Materialize a captured plan without rerunning selectors or scopes. */
+    bindConnection(knex: Knex): AliasedQuerySource<TTables, TResult> {
+        const copy = this.cloneReadSource();
+        copy.knex = bindDescriptionConnection(knex);
+        copy.sql = bindSql(this.sql, copy.knex);
+        return copy;
     }
 
     /**
@@ -371,8 +384,11 @@ export class AliasedQuerySource<TTables, TResult = never> {
     /**
      * Append raw ordering with Knex bindings; the caller owns aliases and SQL syntax.
      */
-    orderByRaw(sql: string, bindings: readonly Knex.RawBinding[] = []): this {
-        this.sql.orderByRaw(sql, bindings);
+    orderByRaw(
+        sql: string | Knex.Raw,
+        bindings: readonly Knex.RawBinding[] = []
+    ): this {
+        this.sql.orderByRaw(sql as string, bindings);
         return this;
     }
 
@@ -466,8 +482,10 @@ export class AliasedQuerySource<TTables, TResult = never> {
      */
     transacting(trx: Knex.Transaction): AliasedQuerySource<TTables, TResult> {
         const copy = this.cloneReadSource();
-        Object.assign(copy, { knex: trx });
+        const connection = transactionConnection(this.knex, trx);
+        Object.assign(copy, { knex: connection });
         copy.sql = this.sql.clone().transacting(trx);
+        if (connection !== trx) copy.sql = bindSql(copy.sql, connection);
         copy.tables = new Map(this.tables);
         copy.selected = this.selected;
         copy.decoders = { ...this.decoders };
