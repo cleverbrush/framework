@@ -63,17 +63,18 @@ describe('native calendar and time zones', () => {
             executable
         );
     });
-    it.each([
-        0, 1, 22, 99, -1
-    ])('preserves ISO year %s, including eras', year => {
-        const wall = calendarDate(year, 1, 1, 0, 0, 0, 123);
-        expect(wall.getUTCFullYear()).toBe(year);
-        expect(localDate(wall.getTime(), 'Etc/UTC')).toEqual(wall);
-        expect(resolveLocal(wall, 'Etc/UTC')).toEqual({
-            at: wall.getTime(),
-            executable: true
-        });
-    });
+    it.each([0, 1, 22, 99, -1])(
+        'preserves ISO year %s, including eras',
+        year => {
+            const wall = calendarDate(year, 1, 1, 0, 0, 0, 123);
+            expect(wall.getUTCFullYear()).toBe(year);
+            expect(localDate(wall.getTime(), 'Etc/UTC')).toEqual(wall);
+            expect(resolveLocal(wall, 'Etc/UTC')).toEqual({
+                at: wall.getTime(),
+                executable: true
+            });
+        }
+    );
     it('uses calendar arithmetic without changing the input date', () => {
         const leap = calendarDate(2028, 2, 28, 9);
         expect(addDays(leap, 1).toISOString()).toBe('2028-02-29T09:00:00.000Z');

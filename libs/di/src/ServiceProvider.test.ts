@@ -21,6 +21,51 @@ const ILogger = object({
 // ---------------------------------------------------------------------------
 
 describe('ServiceProvider', () => {
+    test.each([false, true])(
+        'optional factory resolution preserves errors and cycles (scoped=%s)',
+        scoped => {
+            const services = new ServiceCollection();
+            services.addTransient(
+                IConfig,
+                provider => provider.getOptional(ILogger) as any
+            );
+            services.addTransient(
+                ILogger,
+                provider => provider.getOptional(IConfig) as any
+            );
+            const root = services.buildServiceProvider();
+            const scope = root.createScope();
+            const provider = scoped ? scope.serviceProvider : root;
+            expect(() => provider.get(IConfig)).toThrow(/circular/i);
+            scope.dispose();
+        }
+    );
+
+    test('does not disguise a registered optional factory failure as an absent service', () => {
+        const services = new ServiceCollection();
+        services.addTransient(ILogger, () => {
+            throw new Error('factory failed');
+        });
+        services.addTransient(
+            IConfig,
+            provider => provider.getOptional(ILogger) as any
+        );
+        expect(() => services.buildServiceProvider().get(IConfig)).toThrow(
+            'factory failed'
+        );
+    });
+
+    test('enforces root scope validation within factories', () => {
+        const services = new ServiceCollection();
+        services.addScoped(IConfig, () => ({ port: 1, host: 'localhost' }));
+        services.addSingleton(
+            ILogger,
+            provider => provider.get(IConfig) as any
+        );
+        expect(() => services.buildServiceProvider().get(ILogger)).toThrow(
+            /scop/i
+        );
+    });
     // ── Singleton ────────────────────────────────────
 
     test('singleton returns the same instance across calls', () => {
@@ -294,7 +339,7 @@ describe('ServiceProvider', () => {
 
     // ── Singleton factory resolves scoped service (lines 283-298) ────────
 
-    test('singleton factory can resolve scoped service via proxy', () => {
+    test('factory can resolve a scoped dependency inside an explicit scope', () => {
         const IScoped = object({ value: string() });
         const ISingleton = object({ length: number() });
 
@@ -305,7 +350,7 @@ describe('ServiceProvider', () => {
         }));
 
         const provider = services.buildServiceProvider();
-        const result = provider.get(ISingleton);
+        const result = provider.createScope().serviceProvider.get(ISingleton);
         expect(result.length).toBe(5);
     });
 
@@ -328,7 +373,7 @@ describe('ServiceProvider', () => {
         }));
 
         const p = services.buildServiceProvider();
-        const result = p.get(IOuter);
+        const result = p.createScope().serviceProvider.get(IOuter);
         expect(result.result).toBe(1);
     });
 
@@ -345,7 +390,7 @@ describe('ServiceProvider', () => {
         }));
 
         const provider = services.buildServiceProvider();
-        const result = provider.get(ISingleton);
+        const result = provider.createScope().serviceProvider.get(ISingleton);
         expect(result.found).toBe('42');
     });
 

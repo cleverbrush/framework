@@ -67,30 +67,29 @@ describe('calendar recurrence', () => {
         expect(calc.next().date.getTime()).toBe(8640000000000000);
         expect(calc.hasNext()).toBe(false);
     });
-    it.each([
-        'UTC',
-        'America/Los_Angeles',
-        'Asia/Tokyo'
-    ])('is independent of the host TZ=%s', tz => {
-        const moduleUrl = new URL('../dist/index.js', import.meta.url).href;
-        const program = `import { ScheduleCalculator } from ${JSON.stringify(moduleUrl)};
+    it.each(['UTC', 'America/Los_Angeles', 'Asia/Tokyo'])(
+        'is independent of the host TZ=%s',
+        tz => {
+            const moduleUrl = new URL('../dist/index.js', import.meta.url).href;
+            const program = `import { ScheduleCalculator } from ${JSON.stringify(moduleUrl)};
             const calc = new ScheduleCalculator({ every: 'day', hour: 9,
                 timeZone: 'Europe/Berlin', startsOn: new Date('2026-03-28T00:00:00Z') });
             process.stdout.write(JSON.stringify([calc.next().date, calc.next().date]));`;
-        const result = execFileSync(
-            process.execPath,
-            ['--input-type=module', '--eval', program],
-            {
-                env: { ...process.env, TZ: tz },
-                encoding: 'utf8',
-                timeout: 5000
-            }
-        );
-        expect(JSON.parse(result)).toEqual([
-            '2026-03-28T08:00:00.000Z',
-            '2026-03-29T07:00:00.000Z'
-        ]);
-    });
+            const result = execFileSync(
+                process.execPath,
+                ['--input-type=module', '--eval', program],
+                {
+                    env: { ...process.env, TZ: tz },
+                    encoding: 'utf8',
+                    timeout: 5000
+                }
+            );
+            expect(JSON.parse(result)).toEqual([
+                '2026-03-28T08:00:00.000Z',
+                '2026-03-29T07:00:00.000Z'
+            ]);
+        }
+    );
     it('skips DST gaps and selects the earlier repeated wall time once', () => {
         expect(
             dates(

@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-81.6%25-green)
+<!-- coverage-badge-end -->
 
 A schema-first HTTP server framework for Node.js. Combines [`@cleverbrush/schema`](../schema) for request validation, [`@cleverbrush/di`](../di) for dependency injection, and [`@cleverbrush/auth`](../auth) for authentication — all wired together through a fluent builder API.
 
@@ -910,6 +913,34 @@ apps/
   admin-panel/         // imports fullApi    — full set of endpoints
   backend/             // imports fullApi    — handles all routes
 ```
+
+## Response replay and caching
+
+`idempotency({ scope })` coalesces concurrent mutations and replays their completed
+responses within one middleware instance. Install it after authentication and
+authorization. Derive `scope(ctx)` from verified identity/tenant context; returning
+`undefined` bypasses replay. A constant scope is appropriate only for intentionally
+public operations. Keys also include method and full URL. Reusing a key asserts
+identical input; request bodies are not fingerprinted.
+
+Defaults: `ttl: 86400000`, `maxEntries: 1000`, `maxResponseBytes: 65536`.
+Capacity exhaustion returns 503 before execution. Oversized or incomplete responses
+reserve the key; retries return 409 so the caller can verify the outcome. This is
+process-local replay, not durable exactly-once execution: crashes, expiry or thrown
+handler errors can permit a later execution. Use database deduplication for durable
+business guarantees.
+
+`cacheResponse()` retains at most 1000 keys and 65,536-byte complete response bodies
+by default (`maxEntries`, `maxResponseBytes`); oldest keys are evicted at capacity.
+It bypasses `Set-Cookie` and `Cache-Control: private`/`no-store` responses.
+`defaultTtl` and `ttlByTag` are finite, non-negative milliseconds; retention uses
+the longest TTL among an endpoint's tags (all zero disables retention).
+Tags must distinguish endpoint shapes, verified identities,
+tenants and all representation inputs. Both middleware capture `write()`/`end()`
+chunks and restore response hooks on failure.
+
+See [security guidance](../../SECURITY.md) and the
+[v4.x-to-v5 migration guide](../../docs/MIGRATION-v5.md).
 
 ## License
 

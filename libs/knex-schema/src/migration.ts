@@ -827,7 +827,7 @@ export async function applyDiff(
  * - Orders tables topologically by FK dependencies so parent tables are
  *   created before child tables in `up` (and dropped after in `down`).
  *
- * @param entities - The entities from your {@link EntityMap}.
+ * @param entities - The entities from your `EntityMap`.
  * @param prevSnapshot - The last committed {@link SchemaSnapshot} (empty on first run).
  * @returns `{ up, down, full, isEmpty, nextSnapshot }` where `nextSnapshot`
  *   should be written to disk after the migration file is created.

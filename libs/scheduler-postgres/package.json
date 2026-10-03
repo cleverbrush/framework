@@ -1,5 +1,8 @@
 {
     "name": "@cleverbrush/scheduler-postgres",
+    "engines": {
+        "node": ">=24"
+    },
     "version": "4.4.3",
     "description": "Transactional PostgreSQL repository for the Cleverbrush durable scheduler",
     "type": "module",

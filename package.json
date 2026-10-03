@@ -1,9 +1,12 @@
 {
     "name": "cleverbrush-framework",
-    "private": "true",
+    "engines": {
+        "node": ">=24"
+    },
+    "private": true,
     "version": "4.2.0",
-    "description": "Cleverbrush Framework - a set of libraries used by Cleverbrush, a web-based publishing application",
-    "packageManager": "npm@24.13.0",
+    "description": "Schema-first TypeScript libraries for application development",
+    "packageManager": "npm@11.12.1",
     "scripts": {
         "build": "turbo run build --filter=!website-schema --filter=!website-docs",
         "build:all": "npm run lint:fix && npm run build && node scripts/update-bundle-badge.js && node scripts/measure-bundle-sizes.js && npm run test && npm run docs && npm run test:coverage && npm run bench:json",
@@ -26,7 +29,9 @@
         "test": "vitest --run --typecheck",
         "test:queries:integration": "vitest run --config vitest.queries.config.mts",
         "test:scheduler:integration": "vitest run --config vitest.scheduler.config.mts",
-        "test:coverage": "vitest --run --coverage && node scripts/update-coverage-badges.js",
+        "test:coverage": "vitest --run --coverage && node scripts/check-coverage.mjs",
+        "coverage:badges": "node scripts/update-coverage-badges.js",
+        "test:packages": "node scripts/test-packages.mjs",
         "bench": "vitest bench --run",
         "bench:json": "BENCH_JSON=bench-results.json vitest bench --run --project benchmarks && node scripts/relativize-bench-paths.js bench-results.json",
         "dev:demo": "./scripts/dev-demo.sh",
@@ -46,20 +51,21 @@
     ],
     "keywords": [],
     "author": "Andrew Zolotukhin <andrew_zol@cleverbrush.com>",
-    "license": "BSD 3-Clause",
+    "license": "BSD-3-Clause",
     "type": "module",
     "devDependencies": {
         "@playwright/mcp": "^0.0.70",
         "@biomejs/biome": "^2.4.9",
-        "@changesets/cli": "^2.30.0",
+        "@changesets/cli": "^3.0.3",
         "@testing-library/react": "^16.3.2",
-        "@vitest/coverage-v8": "^4.1.2",
+        "@vitest/coverage-v8": "^4.1.11",
         "concurrently": "^9.1.0",
+        "esbuild": "^0.28.2",
         "jsdom": "^29.0.1",
         "tsup": "^8.5.1",
-        "turbo": "^2.8.21",
+        "turbo": "^2.9.14",
         "typedoc": "^0.28.18",
         "typescript": "^6.0.2",
-        "vitest": "^4.1.2"
+        "vitest": "^4.1.11"
     }
 }

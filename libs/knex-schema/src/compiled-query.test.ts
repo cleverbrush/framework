@@ -200,50 +200,50 @@ describe('compiled parameterized SELECTs', () => {
         expect(image.toSQL(3).bindings).toContain(3);
     });
 
-    it.each([
-        false,
-        true
-    ])('executes and caches concurrent calls (inspect first: %s)', async inspectFirst => {
-        const db = Knex({ client: 'pg' });
-        vi.spyOn(db.client, 'acquireConnection').mockResolvedValue({});
-        const release = vi
-            .spyOn(db.client, 'releaseConnection')
-            .mockResolvedValue(undefined);
-        const event = vi.fn();
-        db.on('query', event);
-        vi.spyOn(db.client, '_query').mockImplementation(
-            async (_connection: unknown, statement: any) => {
-                statement.response = {
-                    command: 'SELECT',
-                    rows: [
-                        {
-                            id: statement.bindings[0],
-                            birthday: '2026-01-01T00:00:00Z'
-                        }
-                    ]
-                };
-                return statement;
-            }
-        );
-        const read = query(db, User)
-            .where(t => t.id, parameter('id'))
-            .select(t => ({ id: t.id, birthday: t.birthday }));
-        const compiler = vi.spyOn(db.client, 'queryCompiler');
-        if (inspectFirst) read.toSQL(1);
-        const [a, b] = await Promise.all([read(1), read(2)]);
-        expect(a).toEqual([
-            { id: 1, birthday: new Date('2026-01-01T00:00:00Z') }
-        ]);
-        expect(b[0].id).toBe(2);
-        const compiled = compiler.mock.calls.length;
-        expect(compiled).toBeGreaterThan(0);
-        await read(3);
-        expect(compiler).toHaveBeenCalledTimes(compiled);
-        expect(event).toHaveBeenCalledTimes(3);
-        expect(release).toHaveBeenCalledTimes(3);
-        expect(event.mock.calls[0][0].sql).toContain('$1');
-        await db.destroy();
-    });
+    it.each([false, true])(
+        'executes and caches concurrent calls (inspect first: %s)',
+        async inspectFirst => {
+            const db = Knex({ client: 'pg' });
+            vi.spyOn(db.client, 'acquireConnection').mockResolvedValue({});
+            const release = vi
+                .spyOn(db.client, 'releaseConnection')
+                .mockResolvedValue(undefined);
+            const event = vi.fn();
+            db.on('query', event);
+            vi.spyOn(db.client, '_query').mockImplementation(
+                async (_connection: unknown, statement: any) => {
+                    statement.response = {
+                        command: 'SELECT',
+                        rows: [
+                            {
+                                id: statement.bindings[0],
+                                birthday: '2026-01-01T00:00:00Z'
+                            }
+                        ]
+                    };
+                    return statement;
+                }
+            );
+            const read = query(db, User)
+                .where(t => t.id, parameter('id'))
+                .select(t => ({ id: t.id, birthday: t.birthday }));
+            const compiler = vi.spyOn(db.client, 'queryCompiler');
+            if (inspectFirst) read.toSQL(1);
+            const [a, b] = await Promise.all([read(1), read(2)]);
+            expect(a).toEqual([
+                { id: 1, birthday: new Date('2026-01-01T00:00:00Z') }
+            ]);
+            expect(b[0].id).toBe(2);
+            const compiled = compiler.mock.calls.length;
+            expect(compiled).toBeGreaterThan(0);
+            await read(3);
+            expect(compiler).toHaveBeenCalledTimes(compiled);
+            expect(event).toHaveBeenCalledTimes(3);
+            expect(release).toHaveBeenCalledTimes(3);
+            expect(event.mock.calls[0][0].sql).toContain('$1');
+            await db.destroy();
+        }
+    );
 
     it('blocks unbound escape hatches and unsupported placeholder positions', async () => {
         const read = query(knex, User).where(t => t.id, parameter('id'));

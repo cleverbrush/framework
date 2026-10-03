@@ -3,6 +3,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
     test: {
+        // Compiler-consumer tests allocate several GB; bound parallel workers.
+        maxWorkers: 4,
         // Use simple glob pattern for auto-discovery
         projects: ['libs/*'],
         benchmark: {
@@ -14,11 +16,12 @@ export default defineConfig({
             'libs/**/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'
         ],
         coverage: {
-            // Updated for v3: Define include patterns first
-            include: ['libs/**/src/**/*.{js,mjs,cjs,ts,mts,cts}'],
+            include: ['libs/**/src/**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
             exclude: [
                 '**/node_modules/**',
                 '**/dist/**',
+                '**/*.d.ts',
+                '**/*.test-d.ts',
                 '**/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
                 'libs/**/src/index.ts',
                 'libs/**/src/types.ts',

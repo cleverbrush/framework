@@ -195,7 +195,7 @@ export class ServerBuilder {
      * Enable the `GET /health` endpoint that returns `{ ok: true }` (200).
      * Useful for load balancer and container readiness probes.
      *
-     * The path is available as {@link HEALTHCHECK_PATH}.
+     * The path is available as `HEALTHCHECK_PATH`.
      */
     withHealthcheck(): this {
         this.#healthcheck = true;

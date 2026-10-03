@@ -33,6 +33,26 @@ export default { knex, entities, migrations };
 `;
 
 describe('loadConfig', () => {
+    it.each(['', '   '])(
+        'rejects an empty migrations directory %j',
+        async directory => {
+            dir = mkdtempSync(path.join(os.tmpdir(), 'cfg-'));
+            const file = writeConfig(
+                'bad.mjs',
+                `export default { knex: { schema: {} }, entities: {}, migrations: { directory: ${JSON.stringify(directory)} } };`
+            );
+            await expect(loadConfig(file)).rejects.toThrow(/non-empty/);
+        }
+    );
+
+    it('rejects arrays as the entity registry', async () => {
+        dir = mkdtempSync(path.join(os.tmpdir(), 'cfg-'));
+        const file = writeConfig(
+            'bad.mjs',
+            'export default { knex: { schema: {} }, entities: [], migrations: { directory: "./m" } };'
+        );
+        await expect(loadConfig(file)).rejects.toThrow(/entities/);
+    });
     it('throws when explicit configPath does not exist', async () => {
         dir = mkdtempSync(path.join(os.tmpdir(), 'cfg-'));
         await expect(loadConfig(path.join(dir, 'missing.ts'))).rejects.toThrow(

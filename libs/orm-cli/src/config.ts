@@ -66,12 +66,20 @@ function assertConfig(config: unknown): asserts config is OrmCliConfig {
     if (!c.knex || typeof (c.knex as any).schema !== 'object') {
         throw new Error('config.knex must be a Knex instance.');
     }
-    if (!c.entities || typeof c.entities !== 'object') {
+    if (
+        !c.entities ||
+        typeof c.entities !== 'object' ||
+        Array.isArray(c.entities)
+    ) {
         throw new Error(
             'config.entities must be an object mapping names to Entity instances.'
         );
     }
-    if (!c.migrations || typeof (c.migrations as any).directory !== 'string') {
+    if (
+        !c.migrations ||
+        typeof (c.migrations as any).directory !== 'string' ||
+        !(c.migrations as any).directory.trim()
+    ) {
         throw new Error(
             'config.migrations.directory must be a non-empty string path.'
         );

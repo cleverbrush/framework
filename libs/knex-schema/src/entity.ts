@@ -215,10 +215,10 @@ export class Entity<
     readonly schema: EntityReadSchema<TSchema, TRels, TReadVariants>;
 
     /** @internal Phantom slot to retain `TRels` in inferred types. */
-    private declare readonly __relations__: TRels;
+    declare private readonly __relations__: TRels;
 
     /** @internal Phantom slot to retain `TVariantUnion` in inferred types. */
-    private declare readonly __variantUnion__: TVariantUnion;
+    declare private readonly __variantUnion__: TVariantUnion;
 
     /**
      * Wrap a schema as an entity definition with typed relation metadata.

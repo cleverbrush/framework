@@ -69,21 +69,19 @@ describe('errorMap and withErrors', () => {
         });
     });
 
-    it.each([
-        new Error('Database password'),
-        'non-error',
-        undefined,
-        null
-    ])('rethrows unmatched values without changing identity: %s', async error => {
-        const wrapped = withErrors(
-            ep,
-            errorMap().on(Missing, () => ActionResult.noContent()),
-            () => {
-                throw error;
-            }
-        );
-        await expect(wrapped({} as never)).rejects.toBe(error);
-    });
+    it.each([new Error('Database password'), 'non-error', undefined, null])(
+        'rethrows unmatched values without changing identity: %s',
+        async error => {
+            const wrapped = withErrors(
+                ep,
+                errorMap().on(Missing, () => ActionResult.noContent()),
+                () => {
+                    throw error;
+                }
+            );
+            await expect(wrapped({} as never)).rejects.toBe(error);
+        }
+    );
 
     it('does not feed translator failures back into the policy', async () => {
         const failure = new SpecialMissing('translator failed');

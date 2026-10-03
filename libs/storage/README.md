@@ -1,6 +1,9 @@
 # @cleverbrush/storage
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-100%25-brightgreen)
+<!-- coverage-badge-end -->
 
-Provider-neutral object storage contracts and key/URL helpers for Node.js 20+.
+Provider-neutral object storage contracts and key/URL helpers for Node.js 24+.
 The core has no runtime dependencies. Use an adapter such as
 [`@cleverbrush/storage-s3`](../storage-s3) for self-hosted or hosted S3 services.
 

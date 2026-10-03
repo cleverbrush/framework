@@ -11,14 +11,14 @@
         "typecheck": "tsc --noEmit"
     },
     "dependencies": {
-        "@cleverbrush/mapper": "file:../../libs/mapper",
-        "@cleverbrush/schema": "file:../../libs/schema",
-        "@cleverbrush/website-shared": "file:../shared",
+        "@cleverbrush/mapper": "*",
+        "@cleverbrush/schema": "*",
+        "@cleverbrush/website-shared": "*",
         "@monaco-editor/react": "^4.7.0",
         "@t3-oss/env-core": "^0.13.11",
         "@t3-oss/env-nextjs": "^0.13.11",
         "@tanstack/react-form": "^1.28.6",
-        "next": "^16.2.1",
+        "next": "^16.3.6",
         "performative-ui": "^0.3.0",
         "react": "^19.2.4",
         "react-dom": "^19.2.4"

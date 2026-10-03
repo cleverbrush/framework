@@ -187,22 +187,25 @@ it.each([
         { maxFieldNameSize: 5 }
     ],
     ['text encoded as file name', [['images', 'not a file']], 400, {}]
-] as const)('rejects %s without running the handler', async (_name, entries, status, limits) => {
-    const { base, handler } = await setup(limits);
-    const response = await fetch(`${base}/files`, {
-        method: 'POST',
-        body: form(entries as any)
-    });
-    expect(response.status).toBe(status);
-    expect(response.headers.get('content-type')).toContain(
-        'application/problem+json'
-    );
-    expect(await response.json()).toMatchObject({
-        status,
-        errors: expect.any(Array)
-    });
-    expect(handler).not.toHaveBeenCalled();
-});
+] as const)(
+    'rejects %s without running the handler',
+    async (_name, entries, status, limits) => {
+        const { base, handler } = await setup(limits);
+        const response = await fetch(`${base}/files`, {
+            method: 'POST',
+            body: form(entries as any)
+        });
+        expect(response.status).toBe(status);
+        expect(response.headers.get('content-type')).toContain(
+            'application/problem+json'
+        );
+        expect(await response.json()).toMatchObject({
+            status,
+            errors: expect.any(Array)
+        });
+        expect(handler).not.toHaveBeenCalled();
+    }
+);
 
 it('allows exact file, field and count limits without truncation', async () => {
     const { base } = await setup({

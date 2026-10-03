@@ -213,8 +213,7 @@ export class JobRepository {
             const run = await tx.run(namespace, id, true);
             const now = await tx.now();
             if (
-                !run ||
-                run.status !== 'running' ||
+                run?.status !== 'running' ||
                 run.leaseToken !== token ||
                 run.leaseExpiresAt! <= now
             )

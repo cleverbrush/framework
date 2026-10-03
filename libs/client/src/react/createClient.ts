@@ -30,7 +30,7 @@ import type { UnifiedClient } from './types.js';
  * Creates a unified typed client from an API contract.
  *
  * Each endpoint on the returned object is **callable** (direct HTTP fetch,
- * identical to `@cleverbrush/web`'s `createClient`) and also exposes
+ * identical to `@cleverbrush/client`'s `createClient`) and also exposes
  * TanStack Query hooks as properties:
  *
  * - **Call directly**: `await client.todos.list()` — returns a Promise
@@ -49,7 +49,7 @@ import type { UnifiedClient } from './types.js';
  * automatically invalidate TanStack Query entries for the affected group.
  *
  * @param contract - An API contract created with `defineApi()`.
- * @param options - Client options passed to `@cleverbrush/web`'s `createClient()`.
+ * @param options - Client options passed to `@cleverbrush/client`'s `createClient()`.
  * @returns A fully typed unified client proxy.
  *
  * @example
@@ -131,7 +131,7 @@ export function createClient<T extends ApiContract>(
         return unified;
     }
 
-    // Two-level proxy mirroring @cleverbrush/web's client.ts pattern
+    // Two-level proxy mirroring @cleverbrush/client's client.ts pattern
     return new Proxy(Object.create(null) as UnifiedClient<T>, {
         get(_target, groupName: PropertyKey) {
             if (typeof groupName !== 'string') return undefined;

@@ -112,36 +112,36 @@ describe('S3 storage', () => {
         await rejected;
         expect(input.destroyed).toBe(true);
     });
-    it.each([
-        'normal exit',
-        'exception',
-        'explicit close'
-    ])('await using closes unread downloads exactly once on %s', async exit => {
-        const source = new PassThrough();
-        vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({
-            Body: source,
-            ContentLength: 20
-        } as never);
-        const destroy = vi.spyOn(S3Client.prototype, 'destroy');
-        const storage = create();
-        const failure = new Error('scope failed');
-        let body: Readable | undefined;
-        const scoped = (async () => {
-            await using owned: ObjectStorage = storage;
-            body = (await owned.get('unread')).body;
-            if (exit === 'explicit close') await owned.close();
-            if (exit === 'exception') throw failure;
-        })();
-        if (exit === 'exception') await expect(scoped).rejects.toBe(failure);
-        else await scoped;
-        expect(source.destroyed).toBe(true);
-        expect(body?.destroyed).toBe(true);
-        await expect(storage.stat('after-disposal')).rejects.toMatchObject({
-            code: 'closed'
-        });
-        await storage.close();
-        expect(destroy).toHaveBeenCalledTimes(1);
-    });
+    it.each(['normal exit', 'exception', 'explicit close'])(
+        'await using closes unread downloads exactly once on %s',
+        async exit => {
+            const source = new PassThrough();
+            vi.spyOn(S3Client.prototype, 'send').mockResolvedValue({
+                Body: source,
+                ContentLength: 20
+            } as never);
+            const destroy = vi.spyOn(S3Client.prototype, 'destroy');
+            const storage = create();
+            const failure = new Error('scope failed');
+            let body: Readable | undefined;
+            const scoped = (async () => {
+                await using owned: ObjectStorage = storage;
+                body = (await owned.get('unread')).body;
+                if (exit === 'explicit close') await owned.close();
+                if (exit === 'exception') throw failure;
+            })();
+            if (exit === 'exception')
+                await expect(scoped).rejects.toBe(failure);
+            else await scoped;
+            expect(source.destroyed).toBe(true);
+            expect(body?.destroyed).toBe(true);
+            await expect(storage.stat('after-disposal')).rejects.toMatchObject({
+                code: 'closed'
+            });
+            await storage.close();
+            expect(destroy).toHaveBeenCalledTimes(1);
+        }
+    );
     it('normalizes failed input streams and aborts their multipart state', async () => {
         const source = new PassThrough();
         const send = vi

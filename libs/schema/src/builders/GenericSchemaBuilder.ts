@@ -149,7 +149,7 @@ export class GenericSchemaBuilder<
      * ```
      */
     // Set to the actual function in the constructor; declared here for TypeScript.
-    public declare readonly apply: TFn;
+    declare public readonly apply: TFn;
 
     /**
      * @hidden

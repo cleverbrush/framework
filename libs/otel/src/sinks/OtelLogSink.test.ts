@@ -16,7 +16,7 @@ import { otelLogSink } from './OtelLogSink.js';
 
 const logExporter = new InMemoryLogRecordExporter();
 const loggerProvider = new LoggerProvider({
-    processors: [new SimpleLogRecordProcessor(logExporter)]
+    processors: [new SimpleLogRecordProcessor({ exporter: logExporter })]
 });
 
 const spanExporter = new InMemorySpanExporter();

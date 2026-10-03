@@ -26,7 +26,7 @@ const requireFromHere = createRequire(import.meta.url);
  * npm install @opentelemetry/instrumentation-http @opentelemetry/instrumentation-undici
  * ```
  *
- * @returns an array of instrumentation instances ready to pass to {@link import('./setupOtel.js').setupOtel}
+ * @returns an array of instrumentation instances ready to pass to `setupOtel`
  *
  * @example
  * ```ts

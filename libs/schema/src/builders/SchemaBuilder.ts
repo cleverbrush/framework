@@ -63,7 +63,7 @@ export type InferType<T> = T extends {
  *
  * When returned from an object-level validator (via {@link SchemaBuilder.addValidator | addValidator}),
  * the optional `property` selector can route the error to a specific property
- * so that {@link ObjectSchemaValidationResult.getErrorsFor | getErrorsFor()} reports it
+ * so that `ObjectSchemaValidationResult.getErrorsFor()` reports it
  * on that property rather than only on the root object.
  *
  * ```ts

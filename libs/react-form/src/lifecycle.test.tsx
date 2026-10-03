@@ -234,45 +234,44 @@ describe('synchronized mounted fields', () => {
 });
 
 describe('validation generations', () => {
-    test.each([
-        'reset',
-        'setValue',
-        'onChange'
-    ] as const)('ignores old async results after %s', async action => {
-        vi.useFakeTimers();
-        const pending = deferred<{
-            valid: boolean;
-            errors: { message: string }[];
-        }>();
-        const asyncSchema = object({
-            name: string().addValidator(() => pending.promise)
-        });
-        const { result } = renderHook(() => {
-            const form = useSchemaForm(asyncSchema, {
-                validationDebounceMs: 100
+    test.each(['reset', 'setValue', 'onChange'] as const)(
+        'ignores old async results after %s',
+        async action => {
+            vi.useFakeTimers();
+            const pending = deferred<{
+                valid: boolean;
+                errors: { message: string }[];
+            }>();
+            const asyncSchema = object({
+                name: string().addValidator(() => pending.promise)
             });
-            return { form, field: form.useField(t => t.name) };
-        });
-        act(() => result.current.form.reset({ name: 'old' }));
-        let validation!: ReturnType<typeof result.current.form.validate>;
-        act(() => {
-            validation = result.current.form.validate();
-        });
-        act(() => {
-            if (action === 'onChange') result.current.field.onChange('new');
-            else result.current.form[action]({ name: 'new' });
-        });
-        await act(async () => {
-            pending.resolve({
-                valid: false,
-                errors: [{ message: 'obsolete' }]
+            const { result } = renderHook(() => {
+                const form = useSchemaForm(asyncSchema, {
+                    validationDebounceMs: 100
+                });
+                return { form, field: form.useField(t => t.name) };
             });
-            await validation;
-        });
-        expect(result.current.field.value).toBe('new');
-        expect(result.current.field.error).toBeUndefined();
-        expect(result.current.field.validating).toBe(false);
-    });
+            act(() => result.current.form.reset({ name: 'old' }));
+            let validation!: ReturnType<typeof result.current.form.validate>;
+            act(() => {
+                validation = result.current.form.validate();
+            });
+            act(() => {
+                if (action === 'onChange') result.current.field.onChange('new');
+                else result.current.form[action]({ name: 'new' });
+            });
+            await act(async () => {
+                pending.resolve({
+                    valid: false,
+                    errors: [{ message: 'obsolete' }]
+                });
+                await validation;
+            });
+            expect(result.current.field.value).toBe('new');
+            expect(result.current.field.error).toBeUndefined();
+            expect(result.current.field.validating).toBe(false);
+        }
+    );
     test('reset and unmount cancel scheduled validation', async () => {
         vi.useFakeTimers();
         const validator = vi.fn(() => ({ valid: true }));
@@ -393,30 +392,30 @@ describe('submission lifecycle', () => {
         });
         expect(result.current.submitting).toBe(false);
     });
-    test.each([
-        'reset',
-        'unmount'
-    ] as const)('ignores obsolete success after %s', async action => {
-        const { result, unmount } = ready();
-        const pending = deferred<void>();
-        const success = vi.fn();
-        let submitted!: Promise<void>;
-        await act(async () => {
-            submitted = result.current.handleSubmit(() => pending.promise, {
-                onSuccess: success
-            })();
-        });
-        if (action === 'reset')
-            act(() => result.current.reset({ name: 'New' }));
-        else unmount();
-        await act(async () => {
-            pending.resolve();
-            await submitted;
-        });
-        expect(success).not.toHaveBeenCalled();
-        if (action === 'reset')
-            expect(result.current.getValue()).toEqual({ name: 'New' });
-    });
+    test.each(['reset', 'unmount'] as const)(
+        'ignores obsolete success after %s',
+        async action => {
+            const { result, unmount } = ready();
+            const pending = deferred<void>();
+            const success = vi.fn();
+            let submitted!: Promise<void>;
+            await act(async () => {
+                submitted = result.current.handleSubmit(() => pending.promise, {
+                    onSuccess: success
+                })();
+            });
+            if (action === 'reset')
+                act(() => result.current.reset({ name: 'New' }));
+            else unmount();
+            await act(async () => {
+                pending.resolve();
+                await submitted;
+            });
+            expect(success).not.toHaveBeenCalled();
+            if (action === 'reset')
+                expect(result.current.getValue()).toEqual({ name: 'New' });
+        }
+    );
     test('does not dispatch values changed during asynchronous validation', async () => {
         const pending = deferred<{ valid: true }>();
         const guarded = object({

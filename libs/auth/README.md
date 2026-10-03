@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-92.5%25-brightgreen)
+<!-- coverage-badge-end -->
 
 Transport-agnostic authentication and authorization for TypeScript. Ships with JWT and cookie schemes, a fluent policy builder, and a typed `Principal` value object. Designed for [`@cleverbrush/server`](../server) but usable in any Node.js context.
 
@@ -58,7 +61,11 @@ if (result.succeeded) {
 import { jwtScheme, signJwt } from '@cleverbrush/auth';
 
 // Sign a token (for testing or token issuance)
-const token = signJwt({ sub: 'user-1', role: 'admin' }, 'my-secret');
+const token = signJwt({
+    sub: 'user-1', role: 'admin',
+    iss: 'https://my-app.com', aud: 'my-api',
+    exp: Math.floor(Date.now() / 1000) + 3600
+}, 'my-secret');
 
 // Verify and authenticate
 const scheme = jwtScheme({
@@ -73,6 +80,16 @@ const scheme = jwtScheme({
 ```
 
 Supported algorithms: `HS256`, `HS384`, `HS512`, `RS256`, `RS384`, `RS512`.
+
+Configure a single key family per scheme: HMAC secrets and RSA keys must never
+share an algorithm allowlist. RSA requires an RSA PEM key; HMAC rejects empty
+secrets and PEM key material. Use a cryptographically random secret from secure
+configuration, not the illustrative value above. Unsupported critical JOSE
+extensions, malformed claim types and tokens at their expiration instant are
+rejected. Clock tolerance must be finite and non-negative.
+
+See [security guidance](../../SECURITY.md) and the
+[v4.x-to-v5 migration guide](../../docs/MIGRATION-v5.md).
 
 ## Cookie Authentication
 

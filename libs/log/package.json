@@ -16,7 +16,7 @@
         "clef",
         "cleverbrush"
     ],
-    "license": "BSD 3-Clause",
+    "license": "BSD-3-Clause",
     "main": "./dist/index.js",
     "exports": {
         ".": {
@@ -30,6 +30,9 @@
     },
     "sideEffects": false,
     "name": "@cleverbrush/log",
+    "engines": {
+        "node": ">=24"
+    },
     "readme": "https://github.com/cleverbrush/framework/tree/master/libs/log#readme",
     "repository": {
         "type": "git",
@@ -61,6 +64,9 @@
         }
     },
     "devDependencies": {
+        "@cleverbrush/di": "*",
+        "@cleverbrush/server": "*",
+        "@cleverbrush/knex-clickhouse": "*",
         "@types/node": "^25.4.0"
     },
     "type": "module",

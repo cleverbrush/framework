@@ -125,7 +125,7 @@ async function wrapAndRunBeforeError(
  * @example
  * ```ts
  * import { api } from 'todo-shared';
- * import { createClient } from '@cleverbrush/web';
+ * import { createClient } from '@cleverbrush/client';
  *
  * const client = createClient(api, {
  *     baseUrl: 'https://api.example.com',

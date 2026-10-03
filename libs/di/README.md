@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/cleverbrush/framework/actions/workflows/ci.yml/badge.svg)](https://github.com/cleverbrush/framework/actions/workflows/ci.yml)
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](../../LICENSE)
+<!-- coverage-badge-start -->
+![Unit coverage](https://img.shields.io/badge/unit_coverage-94.7%25-brightgreen)
+<!-- coverage-badge-end -->
 
 A .NET-style dependency injection container for TypeScript. Uses [`@cleverbrush/schema`](../schema) instances as service keys for fully-typed, zero-generic registration and resolution. Supports three service lifetimes, schema-driven function injection, and automatic disposal of scoped services.
 
@@ -132,9 +135,13 @@ const provider = services.buildServiceProvider();
 // Throws if not registered
 const config = provider.get(IConfig);
 
-// Returns undefined if not registered (no throw)
+// Returns undefined only if not registered
 const mailer = provider.getOptional(IMailer);
 ```
+
+Registered factories still propagate errors, circular dependencies and scope
+violations through `getOptional()`. Root factories respect `validateScopes`;
+resolve scoped dependencies through an explicitly created scope.
 
 ## Scopes
 

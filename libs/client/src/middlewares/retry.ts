@@ -1,5 +1,5 @@
 /**
- * Retry middleware for the `@cleverbrush/web` client.
+ * Retry middleware for the `@cleverbrush/client` client.
  *
  * Automatically retries failed requests based on HTTP status codes and
  * methods.  Supports exponential backoff, jitter, and `Retry-After`
@@ -7,8 +7,8 @@
  *
  * @example
  * ```ts
- * import { createClient } from '@cleverbrush/web';
- * import { retry } from '@cleverbrush/web/retry';
+ * import { createClient } from '@cleverbrush/client';
+ * import { retry } from '@cleverbrush/client/retry';
  *
  * const client = createClient(api, {
  *     middlewares: [retry({ limit: 3, jitter: true })],
@@ -134,7 +134,7 @@ function applyJitter(
 // ---------------------------------------------------------------------------
 
 /**
- * Creates a retry middleware for the `@cleverbrush/web` client.
+ * Creates a retry middleware for the `@cleverbrush/client` client.
  *
  * @param options - Retry configuration.
  * @returns A {@link Middleware} that wraps fetch calls with retry logic.

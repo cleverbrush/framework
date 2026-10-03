@@ -3,7 +3,7 @@
  *
  * Uses `@cleverbrush/schema` instances as service keys for type-safe
  * registration and resolution. Supports singleton, scoped, and transient
- * lifetimes, function injection via {@link FunctionSchemaBuilder}, and
+ * lifetimes, function injection via `FunctionSchemaBuilder`, and
  * automatic disposal of scoped services.
  *
  * @example Quick start

@@ -12,7 +12,11 @@ permissions:
   contents: read
 
 jobs:
+  validate:
+    uses: ./.github/workflows/ci.yml
+
   publish-beta:
+    needs: validate
     name: Publish Beta to npm
     runs-on: ubuntu-latest
 

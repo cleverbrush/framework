@@ -2185,7 +2185,7 @@ export class EndpointBuilder<
      * Declare a cache group for this endpoint.
      *
      * Use on GET / query endpoints to group responses into a named cache.
-     * The client-side {@code cacheTags} middleware caches responses keyed
+     * The client-side `cacheTags` middleware caches responses keyed
      * by this tag and flushes matching entries when a mutation calls
      * {@link clearsCacheTag}.
      *
@@ -2251,7 +2251,7 @@ export class EndpointBuilder<
      * Declare which cache groups are cleared when this mutation succeeds.
      *
      * Use on POST / PUT / PATCH / DELETE endpoints. When the mutation
-     * completes, the {@code cacheTags} client middleware invalidates all
+     * completes, the `cacheTags` client middleware invalidates all
      * cache entries matching the declared tag names (prefix match).
      *
      * @overload Simple tag (clears all entries prefixed with the name).

@@ -312,7 +312,7 @@ export class SchemaQueryBuilder<
 > {
     /** @internal Nominal identity for typed child-query customizers. */
     declare readonly [READ_QUERY]: true;
-    private declare readonly writable: Writable;
+    declare private readonly writable: Writable;
     private readonly alias = `__schema_read_${readAliasSequence++}`;
     private fields: Record<string, ReadField>;
     private loaded: Loaded[] = [];

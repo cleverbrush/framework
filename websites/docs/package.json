@@ -8,8 +8,8 @@
         "start": "next start"
     },
     "dependencies": {
-        "@cleverbrush/website-shared": "file:../shared",
-        "next": "^16.2.1",
+        "@cleverbrush/website-shared": "*",
+        "next": "^16.3.6",
         "performative-ui": "^0.3.0",
         "react": "^19.1.0",
         "react-dom": "^19.1.0"

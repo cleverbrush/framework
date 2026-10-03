@@ -4,7 +4,7 @@
 [![License: BSD-3-Clause](https://img.shields.io/badge/license-BSD--3--Clause-blue.svg)](./LICENSE)
 [![Standard Schema v1](https://img.shields.io/badge/Standard%20Schema-v1-blue)](https://standardschema.dev/)
 <!-- coverage-badge-start -->
-![Coverage](https://img.shields.io/badge/coverage-86.6%25-green)
+![Unit coverage](https://img.shields.io/badge/unit_coverage-82.2%25-green)
 <!-- coverage-badge-end -->
 
 Cleverbrush is a schema-first TypeScript framework monorepo. It provides the
@@ -48,10 +48,10 @@ JSON Schema, API contracts, and Standard Schema integrations.
 
 ```ts
 import { object, string, number, type InferType } from '@cleverbrush/schema';
-import { endpoint } from '@cleverbrush/server/contract';
+import { endpoint, route } from '@cleverbrush/server/contract';
 
 const UserSchema = object({
-    id: number().int().min(1),
+    id: number().isInteger().min(1),
     email: string().email(),
     displayName: string().minLength(2)
 });
@@ -59,8 +59,7 @@ const UserSchema = object({
 type User = InferType<typeof UserSchema>;
 
 const GetUserEndpoint = endpoint
-    .get('/api/users/:id')
-    .params(object({ id: number().int().min(1) }))
+    .get('/api/users', route({ id: number().coerce().isInteger().min(1) })`/${p => p.id}`)
     .responses({ 200: UserSchema });
 ```
 
@@ -90,7 +89,7 @@ ES modules.
 
 ## Development
 
-Use Node.js 20 or newer. Node.js 22 is recommended.
+Use Node.js 24 or newer and npm 11. Install the Node version in `.nvmrc`.
 
 ```bash
 npm ci
@@ -119,6 +118,9 @@ This starts the todo backend, frontend, and local database stack used by the
 demo workflow.
 
 ## Documentation
+
+- [Migrating from v4.x to v5](./docs/MIGRATION-v5.md)
+- [Security guidance](./SECURITY.md)
 
 - Framework docs: https://docs.cleverbrush.com
 - Schema docs and playground: https://schema.cleverbrush.com

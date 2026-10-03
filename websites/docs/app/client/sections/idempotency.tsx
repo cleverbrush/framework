@@ -41,7 +41,10 @@ await client.todos.create({ body: { title: 'Buy milk' } });
                 <p>
                     The server-side <code>idempotency()</code> middleware reads
                     the header, stores the response, and replays it for
-                    duplicate keys.
+                    duplicate keys within an explicit scope, method and URL.
+                    Install it after authentication and authorization.
+                    Concurrent duplicates share one execution; this
+                    process-local store is not durable exactly-once execution.
                 </p>
                 <pre>
                     <code
@@ -49,7 +52,8 @@ await client.todos.create({ body: { title: 'Buy milk' } });
                             __html: highlightTS(`import { idempotency } from '@cleverbrush/server';
 
 server.handle(CreateTodo, createHandler, {
-    middlewares: [idempotency({ ttl: 86_400_000 })],
+    // Public example. For protected operations, use verified user/tenant scope.
+    middlewares: [idempotency({ scope: () => 'public-todos', ttl: 86_400_000 })],
 });
 `)
                         }}
@@ -145,6 +149,37 @@ server.handle(CreateTodo, createHandler, {
                             </tr>
                         </thead>
                         <tbody>
+                            <tr>
+                                <td>
+                                    <code>scope</code>
+                                </td>
+                                <td>
+                                    <code>(ctx) =&gt; string | undefined</code>
+                                </td>
+                                <td>Required; undefined skips replay</td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <code>maxEntries</code>
+                                </td>
+                                <td>
+                                    <code>number</code>
+                                </td>
+                                <td>
+                                    <code>1000</code> (pending and completed)
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <code>maxResponseBytes</code>
+                                </td>
+                                <td>
+                                    <code>number</code>
+                                </td>
+                                <td>
+                                    <code>65536</code> bytes
+                                </td>
+                            </tr>
                             <tr>
                                 <td>
                                     <code>ttl</code>

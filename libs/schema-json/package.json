@@ -15,7 +15,7 @@
         "validation",
         "cleverbrush"
     ],
-    "license": "BSD 3-Clause",
+    "license": "BSD-3-Clause",
     "main": "./dist/index.js",
     "exports": {
         ".": {
@@ -25,6 +25,12 @@
     },
     "sideEffects": false,
     "name": "@cleverbrush/schema-json",
+    "engines": {
+        "node": ">=24"
+    },
+    "devDependencies": {
+        "@cleverbrush/schema": "*"
+    },
     "peerDependencies": {
         "@cleverbrush/schema": "^4.0.0",
         "@standard-schema/spec": "^1.1.0"
