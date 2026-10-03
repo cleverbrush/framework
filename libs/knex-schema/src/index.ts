@@ -118,6 +118,7 @@ export type {
     ParameterState,
     ParametersOf,
     QueryArguments,
+    QueryDefinition,
     QueryView
 } from './parameter-types.js';
 /** @internal Shared query/ORM fluent typing. */

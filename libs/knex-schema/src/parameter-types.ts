@@ -1,4 +1,5 @@
 import type { InferType } from '@cleverbrush/schema';
+import type { Knex } from 'knex';
 import type { QueryParameter } from './parameter.js';
 
 /** @internal Query argument state; origins allow branch removal without stale arguments. */
@@ -21,6 +22,7 @@ export type UnderlyingQuery<Q> = Q extends { readonly [QUERY_SOURCE]: infer S }
 /** @internal */
 export interface ParameterReader {
     readonly parameters: unknown;
+    readonly connection: unknown;
     readonly result: unknown;
 }
 
@@ -266,6 +268,39 @@ type UnboundTerminal =
     | 'onConflict'
     | 'save';
 
+type ConnectionTerminal =
+    | UnboundTerminal
+    | 'ref'
+    | 'transacting'
+    | 'whereExists'
+    | 'whereNotExists'
+    | 'orWhereExists'
+    | 'orWhereNotExists';
+
+/** A reusable, non-thenable SELECT definition, independent of any Knex client. */
+export type QueryDefinition<
+    Q,
+    P extends ParameterState = ParametersOf<Q>
+> = Omit<Q, ConnectionTerminal | 'query'> & {
+    readonly [QUERY_SOURCE]: Q;
+    /** Execute using the caller-owned connection or transaction and positional values. */
+    (
+        knex: Knex,
+        ...args: QueryArguments<P>
+    ): Promise<Q extends { rowSchema: infer S } ? InferType<S>[] : never>;
+    /** Bind a fresh ordinary reader for composition, pagination or supported writes. */
+    query(
+        knex: Knex,
+        ...args: QueryArguments<P>
+    ): Q extends {
+        readonly [PARAMETER_READER]: infer F extends ParameterReader;
+    }
+        ? (F & { readonly parameters: []; readonly connection: true })['result']
+        : never;
+    /** Inspect SQL; compilation is cached per immutable definition and Knex instance. */
+    toSQL(knex: Knex, ...args: QueryArguments<P>): BoundQuerySql;
+};
+
 /** SQL with positional value placeholders and independently snapshotted bindings. */
 export interface BoundQuerySql {
     readonly sql: string;
@@ -292,7 +327,11 @@ export type ParameterizedQuery<Q, P extends ParameterState> = Omit<
 };
 
 /** @internal Ordinary readers keep their existing API until a parameter is added. */
-export type QueryView<Q> =
-    ParametersOf<Q> extends readonly []
-        ? Q
-        : ParameterizedQuery<Q, ParametersOf<Q>>;
+export type QueryView<Q, Connected extends boolean = true> = [
+    Connected,
+    ParametersOf<Q>
+] extends [true, readonly []]
+    ? Q
+    : Connected extends false
+      ? QueryDefinition<Q>
+      : ParameterizedQuery<Q, ParametersOf<Q>>;

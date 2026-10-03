@@ -413,6 +413,59 @@ const rows = await read.where(t => t.id, taskId);`)
                     </a>
                 </div>
 
+                <div className="card" id="query-definitions">
+                    <h2>Define now, supply the connection at execution</h2>
+                    <p>
+                        Keep reusable queries in their own modules. Their row
+                        schemas and argument types are available without Knex;
+                        handlers supply an injected connection or transaction.
+                    </p>
+                    <pre>
+                        <code
+                            dangerouslySetInnerHTML={{
+                                __html: highlightTS(`// data/user-queries.ts
+import { parameter, query } from '@cleverbrush/knex-schema';
+import { UserSchema } from './user-schema.js';
+
+export const findUser = query(UserSchema)
+    .where(user => user.id, parameter('id'));
+export const names = query(UserSchema).select('id', 'name');
+
+// api/handlers/get-user.ts
+import type { Knex } from 'knex';
+import { findUser } from '../../data/user-queries.js';
+
+export async function getUser(knex: Knex, id: number) {
+    return findUser.query(knex, id).first();
+}
+
+// Direct SELECT or SQL inspection:
+await findUser(knex, 10);
+await names(knex); // parameterless definition
+findUser.toSQL(knex, 10);`)
+                            }}
+                        />
+                    </pre>
+                    <p>
+                        Definitions are immutable and non-thenable. Selectors,
+                        scopes and relation/variant customizers run once during
+                        configuration. Compiled PostgreSQL SELECTs are cached
+                        per definition and actual Knex instance, never across
+                        unrelated clients; each call executes with fresh
+                        bindings.
+                    </p>
+                    <p>
+                        Bind with <code>.query(knex, ...values)</code> before
+                        pagination, native SQL escape hatches or supported
+                        writes. The caller owns transaction lifetime. Existing
+                        connection-first queries and ORM DbSets remain
+                        supported.
+                    </p>
+                    <a href="https://github.com/cleverbrush/framework/blob/development/libs/knex-schema/README.md#connection-independent-query-definitions">
+                        Multi-file examples, transactions and cache boundaries
+                    </a>
+                </div>
+
                 <div className="card" id="compiled-queries">
                     <h2>Parameterized compiled queries</h2>
                     <p>

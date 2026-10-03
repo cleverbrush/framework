@@ -6,16 +6,32 @@ import {
     isTableAlias,
     type TableAlias
 } from './aliased-query.js';
+import { finishParameterizedQuery } from './compiled-query.js';
 import { getTableName } from './extension.js';
+import type { QueryView } from './parameter-types.js';
 import { QuerySource } from './QuerySource.js';
 import type { ReadObject } from './read-schema.js';
 import {
     createReadQuery,
     type SchemaAwareQuery
 } from './SchemaQueryBuilder.js';
+import { describeConnection } from './sql-description.js';
 
 // Register the private SQL/write planner before creating relation queries.
 void QuerySource;
+
+/** Define a reusable aliased SELECT. Supply Knex at invocation or query(knex, ...args). */
+export function query<S extends ReadObject, N extends string>(
+    schema: TableAlias<S, N>
+): QueryView<AliasedQueryBuilder<AliasTables<S, N>, never, [], false>, false>;
+/**
+ * Define an immutable, non-thenable query without creating a Knex client.
+ * Selectors and scopes run once during construction. Supply a connection or
+ * transaction when calling the definition, query(knex, ...args) or toSQL(knex, ...args).
+ */
+export function query<S extends ReadObject>(
+    schema: S
+): SchemaAwareQuery<S, false>;
 
 /** Create an immutable, lazy query with an automatically inferred row schema. */
 export function query<S extends ReadObject, N extends string>(
@@ -27,18 +43,29 @@ export function query<S extends ReadObject>(
     knex: Knex,
     schema: S
 ): SchemaAwareQuery<S>;
-export function query<S extends ReadObject, N extends string>(
-    knex: Knex,
-    schema: S | TableAlias<S, N>,
+export function query(
+    connectionOrSchema: Knex | ReadObject | TableAlias<any, any>,
+    suppliedSchema?: ReadObject | TableAlias<any, any>,
     ...unsupported: unknown[]
-): SchemaAwareQuery<S> | AliasedQueryBuilder<AliasTables<S, N>> {
+): any {
     if (unsupported.length)
         throw new TypeError(
             'Raw query sources are not supported; use apply(..., { output })'
         );
+    const knex =
+        suppliedSchema === undefined
+            ? describeConnection()
+            : (connectionOrSchema as Knex);
+    const schema = (suppliedSchema ?? connectionOrSchema) as
+        | ReadObject
+        | TableAlias<any, any>;
     if (isTableAlias(schema))
-        return new AliasedQueryBuilder(new AliasedQuerySource(knex, schema));
-    return createReadQuery(knex, schema, knex(getTableName(schema)));
+        return finishParameterizedQuery(
+            new AliasedQueryBuilder(new AliasedQuerySource(knex, schema))
+        );
+    return finishParameterizedQuery(
+        createReadQuery(knex, schema, knex(getTableName(schema)))
+    );
 }
 
 /** Connection-bound query factory. Query configuration is lazy and immutable. */

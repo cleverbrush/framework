@@ -8,9 +8,13 @@ import type {
     Entity,
     EntityRelations,
     EntitySchema,
+    ObjectReadSchema,
+    PolymorphicRowSchema,
     PrimaryKeyOf,
+    ReadRelations,
+    ReadVariantMetadata,
     RelationInfo,
-    SchemaAwareQuery
+    VariantReadSchemas
 } from '@cleverbrush/knex-schema';
 import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
 
@@ -31,7 +35,17 @@ import type { InferType, ObjectSchemaBuilder } from '@cleverbrush/schema';
  * @public
  */
 export type EntityResult<TEntity extends Entity<any, any, any>> = InferType<
-    SchemaAwareQuery<EntitySchema<TEntity>>['rowSchema']
+    // Derive metadata directly, without recursively instantiating a query's
+    // complete fluent API while constructing a generic DbContext.
+    ReadVariantMetadata<EntitySchema<TEntity>> extends {
+        discriminator: string;
+        variants: Record<string, unknown>;
+    }
+        ? PolymorphicRowSchema<VariantReadSchemas<EntitySchema<TEntity>>>
+        : ObjectReadSchema<
+              EntitySchema<TEntity>,
+              keyof ReadRelations<EntitySchema<TEntity>>
+          >
 >;
 
 /**

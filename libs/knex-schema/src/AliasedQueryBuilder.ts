@@ -47,6 +47,7 @@ import {
     type SchemaForValue
 } from './read-schema.js';
 import type { ReadColumn, ReadProjection } from './SchemaQueryBuilder.js';
+import { nativeSql } from './sql-description.js';
 
 /** Schema-backed aliases whose exact numeric and outer-join values match decoded rows. */
 export type ReadAliasTables<T> = {
@@ -65,8 +66,13 @@ type Selector<T> = (tables: ReadAliasTables<T>) => AliasedColumn<any>;
 export class AliasedQueryBuilder<
     T,
     Row extends ReadObject = never,
-    P extends ParameterState = []
-> extends ReadPredicates<ReadAliasTables<T>, P, AliasParameterReader<T, Row>> {
+    P extends ParameterState = [],
+    Connected extends boolean = true
+> extends ReadPredicates<
+    ReadAliasTables<T>,
+    P,
+    AliasParameterReader<T, Row, Connected>
+> {
     private fields?: Record<string, ReadField>;
     private schema?: Row;
     private predicates: readonly ReadPredicate[] = [];
@@ -98,7 +104,10 @@ export class AliasedQueryBuilder<
     join<S extends ReadObject, N extends string>(
         table: N extends keyof T ? never : TableAlias<S, N>,
         on: (tables: ReadAliasTables<T & AliasTables<S, N>>) => JoinPredicate
-    ): QueryView<AliasedQueryBuilder<T & AliasTables<S, N>, Row, P>> {
+    ): QueryView<
+        AliasedQueryBuilder<T & AliasTables<S, N>, Row, P, Connected>,
+        Connected
+    > {
         const copy = this.copy();
         copy.planner = copy.planner.join(table, on as any) as any;
         return finishParameterizedQuery(copy) as any;
@@ -109,7 +118,10 @@ export class AliasedQueryBuilder<
         on: (
             tables: ReadAliasTables<T & AliasTables<S, N, true>>
         ) => JoinPredicate
-    ): QueryView<AliasedQueryBuilder<T & AliasTables<S, N, true>, Row, P>> {
+    ): QueryView<
+        AliasedQueryBuilder<T & AliasTables<S, N, true>, Row, P, Connected>,
+        Connected
+    > {
         const copy = this.copy();
         copy.planner = copy.planner.leftJoin(table, on as any) as any;
         return finishParameterizedQuery(copy) as any;
@@ -117,7 +129,10 @@ export class AliasedQueryBuilder<
     /** Select exact columns and aggregates; opaque raw expressions are deliberately unsupported. */
     select<Selected extends Selection>(
         select: (tables: ReadAliasTables<T>) => Selected
-    ): QueryView<AliasedQueryBuilder<T, ReadProjection<Selected>, P>> {
+    ): QueryView<
+        AliasedQueryBuilder<T, ReadProjection<Selected>, P, Connected>,
+        Connected
+    > {
         const { knex, columns } = this.planner.readContext();
         const entries = Object.values(
             columns as Record<string, Record<string, AliasedColumn<any>>>
@@ -181,7 +196,7 @@ export class AliasedQueryBuilder<
     orderBy(
         column: Selector<T>,
         direction: 'asc' | 'desc' = 'asc'
-    ): QueryView<this> {
+    ): QueryView<this, Connected> {
         const copy = this.copy();
         copy.planner.orderBy(column as any, direction);
         return finishParameterizedQuery(copy) as any;
@@ -190,15 +205,15 @@ export class AliasedQueryBuilder<
     orderByRaw<const A extends readonly Knex.RawBinding[]>(
         sql: string,
         bindings: A & WithoutParameters<NoInfer<A>> = [] as any
-    ): QueryView<this> {
+    ): QueryView<this, Connected> {
         const { knex } = this.planner.readContext();
-        const captured = captureReadRaw(knex, sql, bindings)().toSQL();
+        const captured = captureReadRaw(knex, sql, bindings)();
         const copy = this.copy();
-        copy.planner.orderByRaw(captured.sql, captured.bindings);
+        copy.planner.orderByRaw(captured);
         return finishParameterizedQuery(copy) as any;
     }
     /** Group native columns for an aggregate projection. */
-    groupBy(...columns: Selector<T>[]): QueryView<this> {
+    groupBy(...columns: Selector<T>[]): QueryView<this, Connected> {
         const copy = this.copy();
         copy.planner.groupBy(...(columns as any));
         return finishParameterizedQuery(copy) as any;
@@ -210,7 +225,7 @@ export class AliasedQueryBuilder<
         ) => AggregateExpression<any> | AliasedColumn<any>,
         operator: string,
         right: V & WithoutParameters<NoInfer<V>>
-    ): QueryView<this> {
+    ): QueryView<this, Connected> {
         const copy = this.copy();
         copy.planner.having(
             value as any,
@@ -220,7 +235,7 @@ export class AliasedQueryBuilder<
         return finishParameterizedQuery(copy) as any;
     }
     /** Limit the flat row count, including repeated parents produced by joins. */
-    limit(count: number): QueryView<this> {
+    limit(count: number): QueryView<this, Connected> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Limit must be a non-negative integer');
         const copy = this.copy();
@@ -228,7 +243,7 @@ export class AliasedQueryBuilder<
         return finishParameterizedQuery(copy) as any;
     }
     /** Offset flat rows using caller-supplied deterministic ordering. */
-    offset(count: number): QueryView<this> {
+    offset(count: number): QueryView<this, Connected> {
         if (!Number.isInteger(count) || count < 0)
             throw new ReadSchemaError('Offset must be a non-negative integer');
         const copy = this.copy();
@@ -236,7 +251,7 @@ export class AliasedQueryBuilder<
         return finishParameterizedQuery(copy) as any;
     }
     /** Use a caller-owned transaction without mutating the original read query. */
-    transacting(trx: Knex.Transaction): QueryView<this> {
+    transacting(trx: Knex.Transaction): QueryView<this, Connected> {
         const copy = this.copy();
         copy.planner = copy.planner.transacting(trx);
         shareParameterCompilation(this, copy);
@@ -265,7 +280,7 @@ export class AliasedQueryBuilder<
     }
     /** Return an independent mutable Knex snapshot. */
     toKnexQuery(): Knex.QueryBuilder {
-        return this.compile();
+        return nativeSql(this.compile());
     }
     /** Configure raw SQL once and declare its complete output contract. */
     apply<O extends ReadObject>(
@@ -274,9 +289,10 @@ export class AliasedQueryBuilder<
     ): OpaqueQuery<O> {
         assertParametersBound(this);
         const { knex, sql: source } = this.planner.readContext();
-        const sql = this.fields ? this.compile() : source;
+        const planned = this.fields ? this.compile() : source;
         if (!this.fields)
-            for (const predicate of this.predicates) predicate(sql);
+            for (const predicate of this.predicates) predicate(planned);
+        const sql = nativeSql(planned);
         const result = configure(sql);
         if (result !== undefined && result !== sql) {
             if (result instanceof Promise) void result.catch(() => {});
@@ -321,6 +337,11 @@ export class AliasedQueryBuilder<
         );
         return {
             knex: this.planner.readConnection(),
+            connect: knex => {
+                const copy = this.copy();
+                copy.planner = this.planner.bindConnection(knex);
+                return copy;
+            },
             uses: predicateParameters(this.predicates),
             compile: () => this.compile(COMPILE_PARAMETERS),
             decode: row => decodeObject(nodes, row, 'row'),
@@ -350,15 +371,28 @@ export class AliasedQueryBuilder<
 }
 
 /** @internal Fluent return constructor for aliased SELECTs. */
-export interface AliasParameterReader<T, Row extends ReadObject>
-    extends ParameterReader {
+export interface AliasParameterReader<
+    T,
+    Row extends ReadObject,
+    Connected extends boolean = true
+> extends ParameterReader {
     readonly result: QueryView<
         AliasedQueryBuilder<
             T,
             Row,
             this['parameters'] extends ParameterState
                 ? this['parameters']
-                : never
-        >
+                : never,
+            Connected extends true
+                ? true
+                : this['connection'] extends boolean
+                  ? this['connection']
+                  : false
+        >,
+        Connected extends true
+            ? true
+            : this['connection'] extends boolean
+              ? this['connection']
+              : false
     >;
 }

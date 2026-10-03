@@ -540,6 +540,19 @@ npx cb-orm db push`
                 <div className="card">
                     <h2>Reliable query composition</h2>
                     <p>
+                        For module-level queries, import <code>query</code> and{' '}
+                        <code>parameter</code> from{' '}
+                        <code>@cleverbrush/orm</code>, define{' '}
+                        <code>query(UserSchema)</code>, and supply{' '}
+                        <code>db.knex</code> when calling it. These reads are
+                        detached; use DbSets when identity tracking and ORM
+                        lookup helpers are needed. See{' '}
+                        <a href="/knex-schema#query-definitions">
+                            connection-independent query definitions
+                        </a>
+                        .
+                    </p>
+                    <p>
                         Named parameters make DbSet reads callable: use{' '}
                         <code>
                             db.users.where(t =&gt; t.id, parameter('id'))

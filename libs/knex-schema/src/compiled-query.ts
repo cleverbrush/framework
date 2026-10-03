@@ -10,6 +10,10 @@ import {
 } from './parameter.js';
 import type { BoundQuerySql, UnderlyingQuery } from './parameter-types.js';
 import { ReadSchemaError } from './read-schema.js';
+import {
+    actualConnection,
+    isConnectionDescription
+} from './sql-description.js';
 
 /** @internal Internal compilation is the only path allowed to emit placeholder slots. */
 export const COMPILE_PARAMETERS = Symbol('compile-query-parameters');
@@ -23,6 +27,7 @@ export interface CompiledReader {
     compile(): Knex.QueryBuilder;
     decode(row: unknown): unknown;
     bind(values: ParameterValues): unknown;
+    connect?(knex: Knex): unknown;
 }
 
 type Reader = { [COMPILED_READER](): CompiledReader };
@@ -38,6 +43,31 @@ const facades = new WeakMap<object, object>();
 const orders = new WeakMap<object, readonly string[]>();
 const caches = new WeakMap<object, Cache>();
 const runtimes = new WeakMap<object, CompiledReader>();
+const boundReaders = new WeakMap<object, WeakMap<Knex, Reader>>();
+
+function withConnection(reader: Reader, knex: Knex): Reader {
+    if (
+        typeof knex !== 'function' ||
+        isConnectionDescription(knex) ||
+        !knex.client
+    )
+        throw new ReadSchemaError(
+            'Supply a Knex connection or transaction as the first argument'
+        );
+    const connection = actualConnection(knex);
+    let bindings = boundReaders.get(reader);
+    if (!bindings) {
+        bindings = new WeakMap();
+        boundReaders.set(reader, bindings);
+    }
+    let bound = bindings.get(connection);
+    if (!bound) {
+        bound = runtimeFor(reader).connect!(connection) as Reader;
+        copyParameterOrder(reader, bound);
+        bindings.set(connection, bound);
+    }
+    return bound;
+}
 
 function runtimeFor(reader: Reader): CompiledReader {
     let runtime = runtimes.get(reader);
@@ -252,13 +282,19 @@ const blocked = new Set<PropertyKey>([
 export function finishParameterizedQuery<T>(value: T): T {
     const reader = unwrapParameterizedQuery(value) as T & Reader;
     if (!reader || typeof reader[COMPILED_READER] !== 'function') return value;
-    const uses = reader[COMPILED_READER]().uses;
+    const runtime = reader[COMPILED_READER]();
+    const uses = runtime.uses;
+    const needsConnection = isConnectionDescription(runtime.knex);
     validateParameterUses(uses);
     names(reader, uses);
-    if (!uses.length) return reader;
+    if (!uses.length && !needsConnection) return reader;
     const previous = facades.get(reader);
     if (previous) return previous as T;
-    const callable = (...args: unknown[]) => execute(reader, args);
+    const resolve = (args: unknown[]): [Reader, unknown[]] =>
+        needsConnection
+            ? [withConnection(reader, args[0] as Knex), args.slice(1)]
+            : [reader, args];
+    const callable = (...args: unknown[]) => execute(...resolve(args));
     // Keep source checks and instanceof working; actual class methods are bound
     // to the captured reader, never to the function object.
     Object.setPrototypeOf(callable, Object.getPrototypeOf(reader));
@@ -266,14 +302,29 @@ export function finishParameterizedQuery<T>(value: T): T {
         get(_target, prop) {
             if (prop === 'then') return undefined;
             if (prop === 'query')
-                return (...args: unknown[]) =>
-                    reader[COMPILED_READER]().bind(valuesFor(reader, args));
+                return (...args: unknown[]) => {
+                    const [bound, values] = resolve(args);
+                    return bound[COMPILED_READER]().bind(
+                        valuesFor(bound, values)
+                    );
+                };
             if (prop === 'toSQL')
-                return (...args: unknown[]) => inspect(reader, args);
-            if (blocked.has(prop))
+                return (...args: unknown[]) => inspect(...resolve(args));
+            if (
+                blocked.has(prop) ||
+                (needsConnection &&
+                    [
+                        'ref',
+                        'transacting',
+                        'whereExists',
+                        'whereNotExists',
+                        'orWhereExists',
+                        'orWhereNotExists'
+                    ].includes(String(prop)))
+            )
                 return () => {
                     throw new ReadSchemaError(
-                        `Bind query parameters before calling ${String(prop)}()`
+                        `Bind query ${needsConnection ? 'connection and parameters' : 'parameters'} before calling ${String(prop)}()`
                     );
                 };
             const member = Reflect.get(reader, prop, reader);
