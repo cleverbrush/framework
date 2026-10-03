@@ -24,6 +24,10 @@ npm run build
 npm run test
 ```
 
+The root build also refreshes workspace CLI links. On a fresh checkout npm cannot
+link `cb-orm` until its generated `dist/bin.js` exists; the postbuild step makes
+demo migration commands work without a second dependency installation.
+
 ## Release verification
 
 In addition to lint, build and unit/type tests, CI runs:

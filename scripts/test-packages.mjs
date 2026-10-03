@@ -16,6 +16,7 @@ const directory = mkdtempSync(join(tmpdir(), 'framework-packages-'));
 const dependencies = {};
 const peers = {};
 const specifiers = [];
+const binaries = [];
 const execute = (command, args, cwd = directory) =>
     execFileSync(command, args, {
         cwd,
@@ -53,6 +54,11 @@ try {
         const files = new Set(packed.files.map(file => file.path));
         if (!files.has('LICENSE'))
             throw new Error(`${pkg.name}: missing packaged license`);
+        for (const bin of Object.values(pkg.bin ?? {})) {
+            if (!files.has(bin.replace(/^\.\//, '')))
+                throw new Error(`${pkg.name}: missing executable ${bin}`);
+            binaries.push(join(directory, 'node_modules', pkg.name, bin));
+        }
         if (
             [...files].some(file =>
                 /(?:\.test(?:-d)?\.[cm]?tsx?$|\.env$)/.test(file)
@@ -99,6 +105,7 @@ try {
     // Generate a disposable consumer lockfile, then install reproducibly.
     execute('npm', ['update', '--package-lock-only', '--ignore-scripts']);
     execute('npm', ['ci', '--ignore-scripts']);
+    for (const bin of binaries) execute(process.execPath, [bin, '--help']);
     execute(process.execPath, [
         '--input-type=module',
         '-e',
