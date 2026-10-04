@@ -130,6 +130,8 @@ export function getPerCallOptions<T>(
  * Used by `throttlingCache` for cache-invalidation callbacks.
  */
 export interface EndpointMeta {
+    /** Contract declares server-side mutation replay. */
+    idempotent?: boolean;
     /** Contract group name, e.g. `"todos"`. */
     group: string;
     /** Endpoint name within the group, e.g. `"update"`. */
@@ -184,4 +186,14 @@ export interface EndpointMeta {
     }>;
     /** Request headers from the call, e.g. `{ 'x-request-id': 'abc' }`. */
     headers: Readonly<Record<string, string>>;
+}
+
+/** @internal Only contract-declared, keyed mutations are automatically retryable. */
+export function isIdempotentRequest(init: RequestInit): boolean {
+    const meta = (init as RequestInit & { __endpointMeta?: EndpointMeta })
+        .__endpointMeta;
+    return (
+        meta?.idempotent === true &&
+        !!new Headers(init.headers).get('x-idempotency-key')
+    );
 }

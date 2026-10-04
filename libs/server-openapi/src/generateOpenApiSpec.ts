@@ -380,6 +380,27 @@ function buildResponses(
         }
     }
 
+    if (meta.idempotent) {
+        for (const [status, description] of [
+            [400, 'Invalid idempotency key'],
+            [
+                409,
+                'Previous response cannot be replayed; verify the operation outcome'
+            ],
+            [503, 'Idempotency capacity reached']
+        ] as const) {
+            const response = (result[status] ?? { description }) as Record<
+                string,
+                any
+            >;
+            response.content = {
+                ...response.content,
+                'application/problem+json': { schema: PROBLEM_DETAILS_SCHEMA }
+            };
+            result[status] = response;
+        }
+    }
+
     // Multiple content types — augment each response's content map with extra
     // MIME types from .produces(). producesFile already handled above (binary wins).
     if (meta.produces && !meta.producesFile) {
@@ -564,6 +585,24 @@ function buildOperation(
         }
     }
 
+    if (
+        meta.idempotent &&
+        !parameters.some(
+            parameter =>
+                parameter.in === 'header' &&
+                String(parameter.name).toLowerCase() === 'x-idempotency-key'
+        )
+    ) {
+        parameters.push(
+            buildParameterObject(
+                'X-Idempotency-Key',
+                'header',
+                { type: 'string', minLength: 1, maxLength: 256 },
+                false,
+                'Reuse for retries of the same mutation. Replay is bounded and process-local.'
+            )
+        );
+    }
     if (parameters.length > 0) operation['parameters'] = parameters;
 
     // Request body

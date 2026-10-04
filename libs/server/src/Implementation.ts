@@ -4,14 +4,13 @@ import {
     type EndpointBuilder,
     type Handler,
     type HandlerMapping,
-    mapHandlers,
-    type ResponsesOf
+    mapHandlers
 } from './Endpoint.js';
-import {
-    type ErrorMap,
-    type ErrorResponsesOf,
-    withErrors
-} from './ErrorMap.js';
+import type {
+    EndpointOptions,
+    RuntimeEndpointOptions
+} from './EndpointOptions.js';
+import { type ErrorMap, withErrors } from './ErrorMap.js';
 import {
     isSubscriptionBuilder,
     type SubscriptionBuilder,
@@ -151,15 +150,7 @@ type ConfiguredGroup<G extends ApiGroup, O> = {
 export type ImplementationHandlerEntry<E> = E extends AnySubscription
     ? SubscriptionHandlerEntry<E> & { errors?: never }
     : E extends AnyEndpoint
-      ?
-            | Handler<E>
-            | {
-                  handler: Handler<E>;
-                  middlewares?: Middleware[];
-                  errors?: keyof ResponsesOf<E> extends never
-                      ? never
-                      : ErrorMap<ErrorResponsesOf<E>>;
-              }
+      ? Handler<E> | ({ handler: Handler<E> } & EndpointOptions<E>)
       : never;
 
 /** Complete, endpoint-specific handler bindings for one configured scope. */
@@ -175,7 +166,7 @@ type ExactOperations<O, G> = O extends { readonly operations: infer Ops }
     ? { readonly operations: ExactKeys<Ops, G> }
     : unknown;
 
-type Entry = {
+type Entry = RuntimeEndpointOptions & {
     readonly group: string;
     readonly name: string;
     readonly source: Definition;
@@ -185,11 +176,11 @@ type Entry = {
 };
 type RuntimeBinding =
     | Entry['handler']
-    | {
+    | (RuntimeEndpointOptions & {
           handler: Entry['handler'];
           middlewares?: Middleware[];
           errors?: ErrorMap<any, any>;
-      };
+      });
 
 const moduleContract: unique symbol = Symbol('implementationContract');
 const moduleEntries: unique symbol = Symbol('implementationEntries');
@@ -325,6 +316,16 @@ export class ImplementationScope<
                 handler: errors
                     ? withErrors(endpoint as AnyEndpoint, errors, handler)
                     : handler,
+                handlerErrorsMapped: !!errors,
+                errors,
+                prepare:
+                    typeof binding === 'function'
+                        ? undefined
+                        : binding?.prepare,
+                idempotency:
+                    typeof binding === 'function'
+                        ? undefined
+                        : binding?.idempotency,
                 middlewares:
                     typeof binding === 'function'
                         ? undefined
@@ -519,6 +520,10 @@ export class ApiImplementation<
             endpoints[entry.group][entry.name] = entry.endpoint;
             handlers[entry.group][entry.name] = {
                 handler: entry.handler,
+                handlerErrorsMapped: entry.handlerErrorsMapped,
+                prepare: entry.prepare,
+                idempotency: entry.idempotency,
+                errors: entry.errors,
                 middlewares: entry.middlewares
                     ? [...entry.middlewares]
                     : undefined

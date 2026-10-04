@@ -243,6 +243,27 @@ const client = createClient(api, {
 
 ## Resilience Middlewares
 
+### Contract-declared mutation retries
+
+For endpoints declared with `.idempotent()`, the typed client generates one
+`X-Idempotency-Key` per call before middleware execution. `retry()` recognizes
+the contract and reuses the key/body for every HTTP attempt; other POSTs retain
+their existing retry policy. Ordinary endpoint calls require no extra options:
+
+```ts
+await client.items.create({ body: item });
+```
+
+Explicit middleware or per-call `retry.methods` takes precedence, and
+`retry: { limit: 0 }` disables automatic retries. `batching()` sends these calls
+directly so their individual timeout signals still reach the transport.
+Each new client invocation gets a fresh key, even when its input is identical.
+This does not track form submissions or user-initiated retries across calls.
+
+The server requires an authorization scope and replays responses within a
+bounded, process-local store. This does not provide durable exactly-once
+execution across replicas or restarts.
+
 ### Retry — `@cleverbrush/client/retry`
 
 ```ts

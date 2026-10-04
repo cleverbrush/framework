@@ -1,4 +1,5 @@
 import type { EndpointMetadata } from './Endpoint.js';
+import type { RuntimeEndpointOptions } from './EndpointOptions.js';
 import type { RequestContext } from './RequestContext.js';
 import type { SubscriptionMetadata } from './Subscription.js';
 
@@ -10,7 +11,7 @@ import type { SubscriptionMetadata } from './Subscription.js';
  * A registered endpoint pairing its metadata (method, path, schemas) with
  * the handler function and any per-endpoint middleware.
  */
-export interface EndpointRegistration {
+export interface EndpointRegistration extends RuntimeEndpointOptions {
     readonly endpoint: EndpointMetadata;
     readonly handler: (...args: any[]) => any;
     readonly middlewares?: readonly Middleware[];

@@ -1,4 +1,5 @@
 // biome-ignore-all lint/suspicious/useAdjacentOverloadSignatures: each method in ScopedEndpointFactoryMethods and EndpointFactory has a single signature; they are separate methods, not overloads
+
 import type {
     InferType,
     ObjectSchemaBuilder,
@@ -20,6 +21,10 @@ import type {
 } from './ActionResult.js';
 import type { CacheTagDefinition } from './CacheTag.js';
 import { createCacheTagTree, serializeTag } from './CacheTag.js';
+import type {
+    EndpointOptions,
+    RuntimeEndpointOptions
+} from './EndpointOptions.js';
 import type { RequestContext } from './RequestContext.js';
 import {
     createSubscription,
@@ -270,7 +275,7 @@ type AnySubscriptionBuilder = SubscriptionBuilder<
  */
 export type HandlerEntry<E> =
     | Handler<E>
-    | { handler: Handler<E>; middlewares?: Middleware[] };
+    | ({ handler: Handler<E> } & EndpointOptions<E>);
 
 /**
  * A compile-time complete mapping from an endpoint group structure to
@@ -304,6 +309,10 @@ export interface HandlerMapping {
         endpoint: AnyEndpoint;
         handler: (...args: any[]) => any;
         middlewares?: Middleware[];
+        handlerErrorsMapped?: boolean;
+        prepare?: RuntimeEndpointOptions['prepare'];
+        idempotency?: RuntimeEndpointOptions['idempotency'];
+        errors?: RuntimeEndpointOptions['errors'];
     }>;
     /** @internal */
     readonly _subscriptions: ReadonlyArray<{
@@ -372,7 +381,19 @@ export function mapHandlers<
                 entries.push({
                     endpoint: ep as AnyEndpoint,
                     handler,
-                    middlewares
+                    middlewares,
+                    handlerErrorsMapped:
+                        typeof entry === 'function'
+                            ? false
+                            : entry.handlerErrorsMapped,
+                    prepare:
+                        typeof entry === 'function' ? undefined : entry.prepare,
+                    idempotency:
+                        typeof entry === 'function'
+                            ? undefined
+                            : entry.idempotency,
+                    errors:
+                        typeof entry === 'function' ? undefined : entry.errors
                 });
             }
         }
@@ -597,6 +618,8 @@ export interface EndpointMetadata {
      * key computation for the client middleware.
      */
     readonly cacheTags: readonly CacheTagDefinition[];
+    /** Opt-in to bounded mutation response replay. */
+    readonly idempotent?: boolean;
 }
 
 /**
@@ -760,6 +783,7 @@ export class EndpointBuilder<
     readonly #callbacks: Record<string, CallbackDefinition> | null;
     readonly #fileUpload: UploadConfiguration | null;
     readonly #cacheTags: readonly CacheTagDefinition[];
+    readonly #idempotent: boolean;
 
     constructor(
         method: string,
@@ -825,7 +849,8 @@ export class EndpointBuilder<
         links: Record<string, LinkDefinition> | null = null,
         callbacks: Record<string, CallbackDefinition> | null = null,
         fileUpload: UploadConfiguration | null = null,
-        cacheTags: readonly CacheTagDefinition[] = []
+        cacheTags: readonly CacheTagDefinition[] = [],
+        idempotent = false
     ) {
         validateUploadConfiguration(fileUpload, bodySchema);
         this.#method = method;
@@ -853,6 +878,60 @@ export class EndpointBuilder<
         this.#callbacks = callbacks;
         this.#fileUpload = fileUpload;
         this.#cacheTags = cacheTags;
+        this.#idempotent = idempotent;
+    }
+
+    /**
+     * Enable optional X-Idempotency-Key replay for this mutation. The server
+     * registration must provide an explicit authorization scope. Retention is
+     * process-local; reusing a key asserts that the input is unchanged.
+     */
+    idempotent(): EndpointBuilder<
+        TParams,
+        TBody,
+        TQuery,
+        THeaders,
+        TServices,
+        TPrincipal,
+        TRoles,
+        TResponse,
+        TResponses,
+        TUpload
+    > {
+        if (
+            !['POST', 'PUT', 'PATCH', 'DELETE'].includes(
+                this.#method.toUpperCase()
+            )
+        )
+            throw new TypeError('Idempotency requires a mutation endpoint');
+        return new EndpointBuilder(
+            this.#method,
+            this.#basePath,
+            this.#pathTemplate,
+            this.#bodySchema,
+            this.#querySchema,
+            this.#headerSchema,
+            this.#serviceSchemas,
+            this.#authRoles,
+            this.#summary,
+            this.#description,
+            this.#tags,
+            this.#operationId,
+            this.#deprecated,
+            this.#responseSchema,
+            this.#responsesSchemas,
+            this.#example,
+            this.#examples,
+            this.#producesFile,
+            this.#produces,
+            this.#responseHeaderSchema,
+            this.#externalDocs,
+            this.#links,
+            this.#callbacks,
+            this.#fileUpload,
+            this.#cacheTags,
+            true
+        );
     }
 
     /** Define the request body schema. Validation failures return 422 Problem Details. */
@@ -895,7 +974,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -941,7 +1021,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -987,7 +1068,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1033,7 +1115,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1130,7 +1213,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1178,7 +1262,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1249,7 +1334,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1319,7 +1405,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1363,7 +1450,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1407,7 +1495,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1451,7 +1540,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1495,7 +1585,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1537,7 +1628,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1588,7 +1680,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1642,7 +1735,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1695,7 +1789,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1810,7 +1905,8 @@ export class EndpointBuilder<
                 maxFileCount: config?.maxFileCount ?? 10,
                 schema
             },
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1867,7 +1963,8 @@ export class EndpointBuilder<
             links: this.#links,
             callbacks: this.#callbacks,
             fileUpload: this.#fileUpload,
-            cacheTags: this.#cacheTags
+            cacheTags: this.#cacheTags,
+            idempotent: this.#idempotent
         };
     }
 
@@ -1934,7 +2031,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -1997,7 +2095,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -2049,7 +2148,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -2112,7 +2212,8 @@ export class EndpointBuilder<
             defs as Record<string, LinkDefinition>,
             this.#callbacks,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -2177,7 +2278,8 @@ export class EndpointBuilder<
             this.#links,
             defs as Record<string, CallbackDefinition>,
             this.#fileUpload,
-            this.#cacheTags
+            this.#cacheTags,
+            this.#idempotent
         );
     }
 
@@ -2336,7 +2438,8 @@ export class EndpointBuilder<
                 this.#links,
                 this.#callbacks,
                 this.#fileUpload,
-                [...this.#cacheTags, { name, properties: {} }]
+                [...this.#cacheTags, { name, properties: {} }],
+                this.#idempotent
             );
         }
 
@@ -2385,7 +2488,8 @@ export class EndpointBuilder<
             this.#links,
             this.#callbacks,
             this.#fileUpload,
-            [...this.#cacheTags, definition]
+            [...this.#cacheTags, definition],
+            this.#idempotent
         );
     }
 }

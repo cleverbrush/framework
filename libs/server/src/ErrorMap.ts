@@ -150,12 +150,7 @@ export function withErrors<
         : ErrorMap<ErrorResponsesOf<NoInfer<E>>>,
     handler: Handler<NoInfer<E>>
 ): Handler<E> {
-    const responses = endpoint.introspect().responsesSchemas;
-    if (!responses || Object.keys(responses).length === 0) {
-        throw new TypeError(
-            'Error policies require explicit endpoint responses'
-        );
-    }
+    validateErrorMap(endpoint);
     return (async (...args: unknown[]) => {
         try {
             return await (handler as (...args: unknown[]) => unknown)(...args);
@@ -163,4 +158,16 @@ export function withErrors<
             return policy.translate(error);
         }
     }) as Handler<E>;
+}
+
+/** @internal Shared registration validation. */
+export function validateErrorMap(endpoint: {
+    introspect(): { responsesSchemas: unknown };
+}): void {
+    const responses = endpoint.introspect().responsesSchemas;
+    if (!responses || Object.keys(responses).length === 0) {
+        throw new TypeError(
+            'Error policies require explicit endpoint responses'
+        );
+    }
 }
