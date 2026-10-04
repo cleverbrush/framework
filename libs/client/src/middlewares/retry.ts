@@ -20,7 +20,7 @@
 
 import { ApiError } from '../errors.js';
 import type { Middleware } from '../middleware.js';
-import { getPerCallOptions } from '../middleware.js';
+import { getPerCallOptions, isIdempotentRequest } from '../middleware.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -182,7 +182,11 @@ export function retry(options: RetryOptions = {}): Middleware {
         const method = (init.method ?? 'GET').toUpperCase();
 
         // Non-retryable methods go straight through.
-        if (!methodSet.has(method)) {
+        const allowed = perCall?.methods
+            ? perCall.methods.some(value => value.toUpperCase() === method)
+            : methodSet.has(method) ||
+              (options.methods === undefined && isIdempotentRequest(init));
+        if (!allowed) {
             return next(url, init);
         }
 

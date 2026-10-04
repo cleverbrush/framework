@@ -198,6 +198,8 @@ export type EndpointResponse<E> =
  * override middleware defaults for a single request.
  */
 export interface PerCallOverrides {
+    /** Reuse a logical mutation attempt on an idempotent endpoint. */
+    idempotencyKey?: string;
     /**
      * Override retry middleware options for this call only.
      * Pass `{ limit: 0 }` to disable retries entirely.

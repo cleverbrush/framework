@@ -5,7 +5,7 @@ export default function IdempotencySection() {
     return (
         <>
             <div className="section-header">
-                <h1>Idempotency Middleware</h1>
+                <h1>Idempotent Operations</h1>
                 <p className="subtitle">
                     Deduplicate replays of mutating requests via idempotency
                     keys
@@ -13,23 +13,22 @@ export default function IdempotencySection() {
             </div>
 
             <div className="card">
-                <h2>Basic Usage</h2>
+                <h2>Contract-declared retries</h2>
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { idempotency } from '@cleverbrush/client/idempotency';
+                            __html: highlightTS(`// Shared contract: opt in once.
+const CreateTodo = endpoint.post('/todos').idempotent().body(CreateTodoSchema);
 
 const client = createClient(api, {
-    middlewares: [
-        idempotency(),           // adds X-Idempotency-Key to mutations
-        retry({ limit: 3 }),     // preserves the key across retries
-    ],
+    middlewares: [retry({ limit: 3 }), timeout({ timeout: 10_000 })]
 });
 
-// First call — key is generated
+// Framework generates a key and retains it across HTTP retries.
 await client.todos.create({ body: { title: 'Buy milk' } });
 
-// Retry — same key, server returns stored response
+// To retry an existing user attempt, supply its saved key.
+await client.todos.create({ body: savedBody, idempotencyKey: savedKey });
 `)
                         }}
                     />
@@ -39,22 +38,24 @@ await client.todos.create({ body: { title: 'Buy milk' } });
             <div className="card">
                 <h2>Server Integration</h2>
                 <p>
-                    The server-side <code>idempotency()</code> middleware reads
-                    the header, stores the response, and replays it for
-                    duplicate keys within an explicit scope, method and URL.
-                    Install it after authentication and authorization.
-                    Concurrent duplicates share one execution; this
-                    process-local store is not durable exactly-once execution.
+                    Endpoint preparation runs after authentication and
+                    validation, before every replay. It receives typed request
+                    data and injected services. Scope resolution uses the
+                    prepared request. Concurrent duplicates share one execution
+                    within a bounded, process-local store.
                 </p>
                 <pre>
                     <code
                         dangerouslySetInnerHTML={{
-                            __html: highlightTS(`import { idempotency } from '@cleverbrush/server';
-
-server.handle(CreateTodo, createHandler, {
-    // Public example. For protected operations, use verified user/tenant scope.
-    middlewares: [idempotency({ scope: () => 'public-todos', ttl: 86_400_000 })],
+                            __html: highlightTS(`server.handle(CreateTodo.authorize(UserPrincipal).inject({ db: DbToken }), createHandler, {
+    prepare: authorizeAndResolveWorkspace,
+    idempotency: {
+        scope: ({ principal, body }) => [principal.userId, body.workspaceId]
+    },
+    errors: todoErrors
 });
+
+// The same options work in implement(api).group(...).withHandlers(...).
 `)
                         }}
                     />
@@ -62,7 +63,26 @@ server.handle(CreateTodo, createHandler, {
             </div>
 
             <div className="card">
-                <h2>How It Works</h2>
+                <h2>User save attempts</h2>
+                <p>
+                    Use <code>createIdempotentOperation</code> from
+                    <code>@cleverbrush/client/idempotency</code> to retain a
+                    payload snapshot and key after an uncertain failure. Its
+                    <code>prepare</code> callback computes defaults once per
+                    changed input, and <code>execute</code> sends the request.
+                    Success clears the attempt; <code>reset(draftId)</code>
+                    cancels its local state. Independent drafts use separate
+                    IDs.
+                </p>
+                <p>
+                    The matching <code>useIdempotentOperation</code> hook lives
+                    in <code>@cleverbrush/client/idempotency/react</code> and
+                    requires no form or query library. FormData actions can use
+                    <code>withIdempotencyKey</code> and
+                    <code>readIdempotencyKey</code> to pass metadata separately
+                    from their domain payload.
+                </p>
+                <h2>How replay works</h2>
                 <ul>
                     <li>
                         <strong>On mutation:</strong> Client auto-generates a
@@ -82,7 +102,7 @@ server.handle(CreateTodo, createHandler, {
             </div>
 
             <div className="card">
-                <h2>Options (Client)</h2>
+                <h2>Low-level middleware options (Client)</h2>
                 <div className="table-wrap">
                     <table className="api-table">
                         <caption className="visually-hidden">

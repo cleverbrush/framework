@@ -29,7 +29,11 @@
  * @module
  */
 
-import type { FetchLike, Middleware } from '../middleware.js';
+import {
+    type FetchLike,
+    isIdempotentRequest,
+    type Middleware
+} from '../middleware.js';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -293,7 +297,7 @@ export function batching(options: BatchingOptions = {}): Middleware {
         }
 
         // Honour the user-provided skip predicate.
-        if (skip?.(url, init)) {
+        if (isIdempotentRequest(init) || skip?.(url, init)) {
             return next(url, init);
         }
 

@@ -51,6 +51,11 @@ export {
     type ResponsesOf,
     type ScopedEndpointFactory
 } from './Endpoint.js';
+export type {
+    EndpointIdempotencyLimits,
+    EndpointOptions,
+    IdempotencyScope
+} from './EndpointOptions.js';
 export {
     ErrorMap,
     type ErrorResponse,

@@ -916,6 +916,51 @@ apps/
 
 ## Response replay and caching
 
+Declare mutation replay in the shared contract with `.idempotent()`. Bind an
+explicit scope on the server; registration fails at startup when it is missing.
+The optional `prepare` callback receives validated request data and injected
+services and returns the request passed to scope resolution and the handler.
+Use it to authorize resource access and resolve request defaults before replay.
+
+```ts
+const createItem = endpoint.post('/items')
+    .idempotent()
+    .body(CreateItemSchema)
+    .authorize(UserPrincipal)
+    .inject({ db: DbToken })
+    .responses({ 201: ItemSchema, 403: MessageSchema });
+
+server.handle(createItem, createItemHandler, {
+    prepare: async (request, { db }) => {
+        const workspace = await requireWorkspaceAccess(db, request.principal,
+            request.body.workspaceId);
+        return { ...request, body: { ...request.body, workspaceId: workspace.id } };
+    },
+    idempotency: {
+        scope: ({ principal, body }) => [principal.userId, body.workspaceId]
+    },
+    errors: itemErrors
+});
+```
+
+The same options work in `mapHandlers` and `implement(api).group(...).withHandlers`.
+Authentication, validation, preparation and scope resolution run before each
+replay, including batch subrequests. Preparation/scope exceptions use the bound
+error policy without reserving a key. Handler exceptions translated by that
+policy become replayable responses. Validation, DI and serialization errors
+retain their normal Framework handling; standalone `withErrors` still wraps
+only its handler.
+
+`X-Idempotency-Key` is optional, case-insensitive, and must contain 1–256
+characters when present. It is transport metadata, so no `.headers()` schema is
+needed. OpenAPI includes this header and the 400/409/503 Problem Details responses.
+When enabling cross-origin browser access, explicitly include this header in
+your CORS `allowedHeaders`. Each server endpoint retains its own bounded store
+with the defaults below; `idempotency` options can override its limits.
+
+### Low-level replay and caching
+
+
 `idempotency({ scope })` coalesces concurrent mutations and replays their completed
 responses within one middleware instance. Install it after authentication and
 authorization. Derive `scope(ctx)` from verified identity/tenant context; returning

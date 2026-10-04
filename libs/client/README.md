@@ -243,6 +243,55 @@ const client = createClient(api, {
 
 ## Resilience Middlewares
 
+### Contract-declared mutation retries
+
+For endpoints declared with `.idempotent()`, the typed client generates one
+`X-Idempotency-Key` per call before middleware execution. `retry()` recognizes
+the contract and reuses the key/body for every HTTP attempt; other POSTs retain
+their existing retry policy. Supply `idempotencyKey` to resume a user attempt.
+Explicit middleware or per-call `retry.methods` takes precedence, and `retry: { limit: 0 }`
+disables automatic retries. `batching()` sends these calls directly so their
+individual timeout signals still reach the transport.
+
+```ts
+await client.items.create({ body: item, idempotencyKey: savedAttemptKey });
+```
+
+### User save attempts — `@cleverbrush/client/idempotency`
+
+`createIdempotentOperation` retains the request snapshot and key after rejected
+calls or explicit unsuccessful results. `prepare` runs only for changed input,
+so generated defaults stay fixed on retry. Inputs support JSON values and Dates;
+object key order does not matter. Concurrent calls with the same operation ID
+join the pending call. Acknowledged success starts a fresh intentional operation.
+
+```ts
+const save = createIdempotentOperation({
+    prepare: (input: NewItem) => ({ ...input, createdAt: new Date() }),
+    execute: ({ value, idempotencyKey }) =>
+        client.items.create({ body: value, idempotencyKey })
+});
+await save.run(input, draftId);
+// After an uncertain failure, this reuses the same request and key:
+await save.run(input, draftId);
+```
+
+Use `isSuccess: result => result.ok` for actions returning failure values.
+`reset(draftId)` forgets a cancelled draft; `clear()` ends the owning session.
+Keep identity/tenant selection in the input or prepared snapshot, and use a new
+operation instance for a different authenticated session. Pending requests are
+not cancelled by reset; their completion cannot erase a replacement attempt.
+
+`useIdempotentOperation` from `@cleverbrush/client/idempotency/react` provides the
+same API with component-owned lifetime and current callbacks. It requires React
+but does not import TanStack Query or a form library. For FormData actions,
+`withIdempotencyKey(formData, key)` and `readIdempotencyKey(formData)` carry the
+optional `idempotencyKey` metadata field across the action boundary. Keep it
+separate from the application body when calling the HTTP client.
+
+Attempt state is in memory. Server replay is also bounded and process-local;
+this does not provide durable exactly-once execution across replicas/restarts.
+
 ### Retry — `@cleverbrush/client/retry`
 
 ```ts

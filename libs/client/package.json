@@ -27,7 +27,7 @@
             "optional": true
         }
     },
-    "description": "Typed HTTP client with optional TanStack Query hooks — generated from @cleverbrush/server API contracts, zero codegen, full type safety",
+    "description": "Typed HTTP client with optional TanStack Query hooks \u2014 generated from @cleverbrush/server API contracts, zero codegen, full type safety",
     "files": [
         "dist"
     ],
@@ -86,6 +86,10 @@
         "./react": {
             "types": "./dist/react.d.ts",
             "import": "./dist/react.js"
+        },
+        "./idempotency/react": {
+            "types": "./dist/idempotencyReact.d.ts",
+            "import": "./dist/idempotencyReact.js"
         }
     },
     "sideEffects": false,

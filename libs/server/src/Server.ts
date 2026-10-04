@@ -19,8 +19,11 @@ import { ActionResult, JsonResult } from './ActionResult.js';
 import { ContentNegotiator } from './ContentNegotiator.js';
 import { CorsPolicy, type ServerCorsOptions } from './Cors.js';
 import type { EndpointBuilder, Handler, HandlerMapping } from './Endpoint.js';
+import type { EndpointOptions } from './EndpointOptions.js';
+import { validateErrorMap } from './ErrorMap.js';
 import { HttpError } from './HttpError.js';
 import { MiddlewarePipeline } from './MiddlewarePipeline.js';
+import { idempotency } from './middlewares/Idempotency.js';
 import { parseMultipart } from './multipart.js';
 import { needsBody, resolveArgs } from './ParameterResolver.js';
 import {
@@ -237,15 +240,14 @@ export class ServerBuilder {
      */
     handle<
         E extends EndpointBuilder<any, any, any, any, any, any, any, any, any>
-    >(
-        endpointDef: E,
-        handler: Handler<E>,
-        options?: { middlewares?: Middleware[] }
-    ): this {
+    >(endpointDef: E, handler: Handler<E>, options?: EndpointOptions<E>): this {
         this.#registrations.push({
             endpoint: endpointDef.introspect(),
             handler,
-            middlewares: options?.middlewares
+            middlewares: options?.middlewares,
+            prepare: options?.prepare,
+            idempotency: options?.idempotency,
+            errors: options?.errors
         });
         return this;
     }
@@ -262,7 +264,11 @@ export class ServerBuilder {
             this.#registrations.push({
                 endpoint: entry.endpoint.introspect(),
                 handler: entry.handler,
-                middlewares: entry.middlewares
+                middlewares: entry.middlewares,
+                handlerErrorsMapped: entry.handlerErrorsMapped,
+                prepare: entry.prepare,
+                idempotency: entry.idempotency,
+                errors: entry.errors
             });
         }
         for (const entry of mapping._subscriptions) {
@@ -331,6 +337,23 @@ export class ServerBuilder {
         const router = new Router();
 
         for (const reg of this.#registrations) {
+            if (
+                reg.endpoint.idempotent &&
+                typeof reg.idempotency?.scope !== 'function'
+            )
+                throw new TypeError(
+                    'Idempotent endpoints require an explicit scope policy'
+                );
+            if (reg.idempotency && !reg.endpoint.idempotent)
+                throw new TypeError(
+                    'An idempotency policy requires an idempotent contract'
+                );
+            if (reg.errors)
+                validateErrorMap({ introspect: () => reg.endpoint });
+            if (reg.idempotency) {
+                // Validate limits before opening the listening socket.
+                idempotency({ ...reg.idempotency, scope: () => undefined });
+            }
             router.addRoute(reg);
         }
         for (const reg of this.#subscriptionRegistrations) {
@@ -401,6 +424,8 @@ const MAX_WS_QUEUE_SIZE = 1024;
 
 export class Server {
     readonly #router: Router;
+    readonly #replay = new Map<EndpointRegistration, Middleware>();
+    readonly #replayScopes = new WeakMap<RequestContext, string>();
     readonly #serviceProvider: ServiceProvider;
     readonly #contentNegotiator: ContentNegotiator;
     readonly #globalMiddlewares: Middleware[];
@@ -804,15 +829,79 @@ export class Server {
                     }
                 }
 
-                // Call handler
-                let result = registration.handler(...resolveResult.args);
-                if (result instanceof Promise) {
-                    result = await result;
+                const args = resolveResult.args;
+                const send = async (result: unknown) => {
+                    if (ctx.responded) return;
+                    await this.#sendResult(req, res, result);
+                    ctx.responded = true;
+                };
+                const translate = async (error: unknown) => {
+                    if (!registration.errors) throw error;
+                    return registration.errors.translate(error);
+                };
+                // Framework transport validation precedes application callbacks.
+                const key = ctx.headers['x-idempotency-key'];
+                if (
+                    meta.idempotent &&
+                    key !== undefined &&
+                    (key.length === 0 || key.length > 256)
+                )
+                    throw new HttpError(
+                        400,
+                        'Idempotency key must contain 1 to 256 characters'
+                    );
+                try {
+                    if (registration.prepare)
+                        args[0] = await registration.prepare(...args);
+                    if (registration.idempotency && key !== undefined) {
+                        const scope = await registration.idempotency.scope(
+                            ...args
+                        );
+                        if (
+                            typeof scope !== 'string' &&
+                            !(
+                                Array.isArray(scope) &&
+                                scope.length > 0 &&
+                                scope.every(
+                                    part =>
+                                        typeof part === 'string' ||
+                                        (typeof part === 'number' &&
+                                            Number.isFinite(part))
+                                )
+                            )
+                        )
+                            throw new TypeError(
+                                'Idempotency scope must be a string or identity components'
+                            );
+                        this.#replayScopes.set(ctx, JSON.stringify(scope));
+                    }
+                } catch (error) {
+                    await send(await translate(error));
+                    return;
                 }
-
-                if (ctx.responded) return;
-                await this.#sendResult(req, res, result);
-                ctx.responded = true;
+                const execute = async () => {
+                    let result: unknown;
+                    try {
+                        result = await registration.handler(...args);
+                    } catch (error) {
+                        if (registration.handlerErrorsMapped) throw error;
+                        result = await translate(error);
+                    }
+                    await send(result);
+                };
+                if (registration.idempotency) {
+                    let replay = this.#replay.get(registration);
+                    if (!replay) {
+                        replay = idempotency({
+                            ...registration.idempotency,
+                            scope: request => this.#replayScopes.get(request)
+                        });
+                        this.#replay.set(registration, replay);
+                    }
+                    await replay(ctx, execute);
+                } else {
+                    await execute();
+                }
             });
         } catch (err) {
             if (res.headersSent) return;
@@ -927,7 +1016,10 @@ export class Server {
             const virtualReq = new VirtualIncomingMessage({
                 method: (item.method ?? 'GET').toUpperCase(),
                 url: item.url,
-                headers: item.headers ?? {},
+                headers: {
+                    host: req.headers.host ?? 'localhost',
+                    ...item.headers
+                },
                 body: item.body
             });
             virtualReq.__cleverbrushBatchSubrequest = {
